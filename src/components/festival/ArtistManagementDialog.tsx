@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -600,62 +601,3 @@ export const ArtistManagementDialog = ({
 
               <div>
                 <Label htmlFor="infra_analog">Analog Lines</Label>
-                <Input
-                  id="infra_analog"
-                  type="number"
-                  min="0"
-                  value={formData.infra_analog}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      infra_analog: parseInt(e.target.value) || 0,
-                    })
-                  }
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="other_infrastructure">Other Infrastructure</Label>
-              <Input
-                id="other_infrastructure"
-                value={formData.other_infrastructure}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    other_infrastructure: e.target.value,
-                  })
-                }
-              />
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <textarea
-              id="notes"
-              className="w-full min-h-[100px] px-3 py-2 border rounded-md"
-              value={formData.notes}
-              onChange={(e) =>
-                setFormData({ ...formData, notes: e.target.value })
-              }
-            />
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Saving..." : "Save"}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-};
