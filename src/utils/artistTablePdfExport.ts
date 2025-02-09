@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -78,7 +77,6 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
     const scheduleRows: ScheduleRow[] = [];
     
     data.artists.forEach(artist => {
-      // Add soundcheck row if it exists (comes first chronologically)
       if (artist.soundcheck) {
         scheduleRows.push({
           name: artist.name,
@@ -88,7 +86,6 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
         });
       }
       
-      // Add show row
       scheduleRows.push({
         name: artist.name,
         stage: artist.stage,
@@ -100,21 +97,19 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
       });
     });
 
-    // Sort all rows chronologically by start time
     scheduleRows.sort((a, b) => {
       const timeA = new Date(`2000/01/01 ${a.time.start}`).getTime();
       const timeB = new Date(`2000/01/01 ${b.time.start}`).getTime();
       return timeA - timeB;
     });
 
-    // Prepare table data
     const tableBody = scheduleRows.map(row => {
       if (row.isSoundcheck) {
         return [
           `${row.name} (Soundcheck)`,
           `Stage ${row.stage}`,
           `${row.time.start}-${row.time.end}`,
-          '', '', '', '', '', ''  // Empty cells for other columns
+          '', '', '', '', '', ''
         ];
       }
       
@@ -135,7 +130,6 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
       ];
     });
 
-    // Generate table
     autoTable(doc, {
       startY: 25,
       head: [['Artist', 'Stage', 'Time', 'Consoles', 'Tech', 'RF/IEM', 'Monitors', 'Extras', 'Notes']],
@@ -148,8 +142,8 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
         lineWidth: 0.1,
       },
       headStyles: {
-        fillColor: [125/255, 1/255, 1/255],  // Corporate red normalized to 0-1 range
-        textColor: [1, 1, 1],  // White
+        fillColor: [125, 1, 1],  // Fixed: Using RGB values directly for corporate red
+        textColor: [255, 255, 255],  // Fixed: Using RGB values directly for white
         fontSize: 8,
         fontStyle: 'bold',
         halign: 'left',
@@ -167,16 +161,14 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
         8: { cellWidth: 'auto' },
       },
       didParseCell: function(data) {
-        if (data.row.index === -1) return; // Skip header row
+        if (data.row.index === -1) return;
         const rowData = scheduleRows[data.row.index];
         if (rowData.isSoundcheck) {
-          // Convert #FEF7CD to RGB values and normalize to 0-1 range
           data.cell.styles.fillColor = [0xFE/255, 0xF7/255, 0xCD/255];  // Light yellow
         }
       }
     });
 
-    // Add logo and generation info at the bottom
     const logo = new Image();
     logo.crossOrigin = 'anonymous';
     logo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
@@ -207,4 +199,3 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
     };
   });
 };
-
