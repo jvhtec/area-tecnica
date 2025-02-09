@@ -6,7 +6,12 @@ export const useTourDates = () => {
   ]);
 
   const handleAddDate = () => {
-    setDates([...dates, { date: "", location: "" }]);
+    const newDates = [...dates, { date: "", location: "" }];
+    newDates.sort((a, b) => {
+      if (!a.date || !b.date) return 0;
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
+    setDates(newDates);
   };
 
   const handleRemoveDate = (index: number) => {
@@ -23,6 +28,12 @@ export const useTourDates = () => {
   ) => {
     const newDates = [...dates];
     newDates[index] = { ...newDates[index], [field]: value };
+    if (field === "date") {
+      newDates.sort((a, b) => {
+        if (!a.date || !b.date) return 0;
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
+      });
+    }
     setDates(newDates);
   };
 
