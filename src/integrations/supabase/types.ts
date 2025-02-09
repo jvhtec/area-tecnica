@@ -352,21 +352,21 @@ export type Database = {
       }
       equipment: {
         Row: {
-          category: string | null
+          category: Database["public"]["Enums"]["equipment_category"]
           created_at: string | null
           id: string
           name: string
           updated_at: string | null
         }
         Insert: {
-          category?: string | null
+          category?: Database["public"]["Enums"]["equipment_category"]
           created_at?: string | null
           id?: string
           name: string
           updated_at?: string | null
         }
         Update: {
-          category?: string | null
+          category?: Database["public"]["Enums"]["equipment_category"]
           created_at?: string | null
           id?: string
           name?: string
@@ -2070,6 +2070,7 @@ export type Database = {
         | "production"
         | "administrative"
       direct_message_status: "unread" | "read"
+      equipment_category: "convencional" | "robotica" | "fx" | "rigging"
       job_date_type: "travel" | "setup" | "show" | "off" | "rehearsal"
       job_status: "pending" | "in_progress" | "completed" | "cancelled"
       job_type: "single" | "tour" | "festival" | "dryhire" | "tourdate"
