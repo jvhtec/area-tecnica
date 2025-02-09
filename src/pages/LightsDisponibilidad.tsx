@@ -1,4 +1,3 @@
-
 import { DisponibilidadCalendar } from '@/components/disponibilidad/DisponibilidadCalendar';
 import { Button } from '@/components/ui/button';
 import { Box, Settings } from 'lucide-react';
@@ -9,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useSessionManager } from '@/hooks/useSessionManager';
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 export default function LightsDisponibilidad() {
   const [selectedDate, setSelectedDate] = useState<Date>();
