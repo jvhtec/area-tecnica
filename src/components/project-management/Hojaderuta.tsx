@@ -1,4 +1,3 @@
-<lov-code>
 import React, { useState, useEffect } from "react";
 import {
   Card,
@@ -97,7 +96,7 @@ const HojaDeRutaGenerator = () => {
       loadingDetails: "",
       unloadingDetails: "",
     },
-    staff: [{ name: "", surname1: "", surname2: "", position: "" }],
+    staff: [{ name: "", surname1: "", surname2: string; position: "" }],
     schedule: "",
     powerRequirements: "",
     auxiliaryNeeds: "",
@@ -861,4 +860,4 @@ const HojaDeRutaGenerator = () => {
           event_name: eventData.eventName,
           event_dates: eventData.eventDates,
           venue_name: eventData.venue.name,
-          venue_address: eventData.venue
+          venue_address: eventData.venue.address
