@@ -500,7 +500,7 @@ const HojaDeRutaGenerator = () => {
         return 20;
       }
       return currentY;
-    };
+    }
 
     // Agregar fondo de cabecera en la primera página
     doc.setFillColor(125, 1, 1);
