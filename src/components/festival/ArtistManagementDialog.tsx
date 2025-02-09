@@ -71,6 +71,8 @@ export const ArtistManagementDialog = ({
         show_end: formData.show_end || null,
         soundcheck_start: formData.soundcheck_start || null,
         soundcheck_end: formData.soundcheck_end || null,
+        // Handle stage field - convert empty string to null
+        stage: formData.stage.trim() || null,
       };
 
       const { error } = artist?.id
