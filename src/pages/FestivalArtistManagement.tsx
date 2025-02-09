@@ -237,4 +237,14 @@ const FestivalArtistManagement = () => {
       </Card>
 
       <ArtistManagementDialog
-        
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        selectedArtist={selectedArtist}
+        jobId={jobId}
+        date={selectedDate}
+      />
+    </div>
+  );
+};
+
+export default FestivalArtistManagement;
