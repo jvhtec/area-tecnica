@@ -42,23 +42,23 @@ function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEqui
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit Equipment</DialogTitle>
+          <DialogTitle>{equipment ? 'Editar Equipo' : 'Nuevo Equipo'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Equipment Name</Label>
+            <Label htmlFor="name">Nombre del Equipo</Label>
             <Input
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Enter equipment name"
+              placeholder="Ingrese nombre del equipo"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="category">Category</Label>
+            <Label htmlFor="category">Categoría</Label>
             <Select value={category} onValueChange={(value) => setCategory(value as EquipmentCategory)}>
               <SelectTrigger>
-                <SelectValue placeholder="Select category" />
+                <SelectValue placeholder="Seleccione categoría" />
               </SelectTrigger>
               <SelectContent>
                 {EQUIPMENT_CATEGORIES.map((cat) => (
@@ -70,7 +70,7 @@ function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEqui
             </Select>
           </div>
           <DialogFooter>
-            <Button type="submit">Save Changes</Button>
+            <Button type="submit">Guardar</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -123,8 +123,8 @@ export function EquipmentCreationManager() {
       setEquipmentName('');
       setCategory('convencional');
       toast({
-        title: "Success",
-        description: "Equipment created successfully"
+        title: "Éxito",
+        description: "Equipo creado correctamente"
       });
     },
     onError: (error) => {
@@ -153,15 +153,15 @@ export function EquipmentCreationManager() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
       toast({
-        title: "Success",
-        description: "Equipment updated successfully"
+        title: "Éxito",
+        description: "Equipo actualizado correctamente"
       });
     },
     onError: (error) => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to update equipment"
+        description: "Error al actualizar el equipo"
       });
     }
   });
@@ -178,15 +178,15 @@ export function EquipmentCreationManager() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
       toast({
-        title: "Success",
-        description: "Equipment deleted successfully"
+        title: "Éxito",
+        description: "Equipo eliminado correctamente"
       });
     },
     onError: (error) => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to delete equipment"
+        description: "Error al eliminar el equipo"
       });
     }
   });
@@ -195,20 +195,20 @@ export function EquipmentCreationManager() {
     <div className="space-y-6">
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="equipmentName">Equipment Name</Label>
+          <Label htmlFor="equipmentName">Nombre del Equipo</Label>
           <Input
             id="equipmentName"
             value={equipmentName}
             onChange={(e) => setEquipmentName(e.target.value)}
-            placeholder="Enter equipment name"
+            placeholder="Ingrese nombre del equipo"
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="category">Category</Label>
+          <Label htmlFor="category">Categoría</Label>
           <Select value={category} onValueChange={(value) => setCategory(value as EquipmentCategory)}>
             <SelectTrigger>
-              <SelectValue placeholder="Select category" />
+              <SelectValue placeholder="Seleccione categoría" />
             </SelectTrigger>
             <SelectContent>
               {EQUIPMENT_CATEGORIES.map((cat) => (
@@ -226,12 +226,12 @@ export function EquipmentCreationManager() {
           className="w-full"
         >
           <Plus className="mr-2 h-4 w-4" />
-          Add Equipment
+          Añadir Equipo
         </Button>
       </div>
 
       <div className="space-y-4">
-        <h3 className="font-medium">Equipment List</h3>
+        <h3 className="font-medium">Lista de Equipos</h3>
         <ScrollArea className="h-[300px] rounded-md border p-4">
           <div className="space-y-4">
             {equipmentList?.map((item) => (
@@ -275,14 +275,14 @@ export function EquipmentCreationManager() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the equipment
-              and remove it from your inventory.
+              Esta acción no se puede deshacer. Esto eliminará permanentemente el equipo
+              y lo quitará de tu inventario.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (equipmentToDelete) {
@@ -291,7 +291,7 @@ export function EquipmentCreationManager() {
                 }
               }}
             >
-              Delete
+              Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -299,3 +299,4 @@ export function EquipmentCreationManager() {
     </div>
   );
 }
+
