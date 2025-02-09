@@ -27,6 +27,7 @@ import Logistics from '@/pages/Logistics';
 import FestivalManagement from '@/pages/FestivalManagement';
 import FestivalArtistManagement from '@/pages/FestivalArtistManagement';
 import LightsDisponibilidad from '@/pages/LightsDisponibilidad';
+import { EquipmentManagement } from '@/pages/EquipmentManagement';
 
 function App() {
   return (
@@ -45,6 +46,7 @@ function App() {
               <Route path="settings" element={<Settings />} />
               <Route path="project-management" element={<ProjectManagement />} />
               <Route path="technician" element={<TechnicianDashboard />} />
+              <Route path="equipment-management" element={<EquipmentManagement />} />
               
               {/* Tools Routes */}
               <Route path="pesos-tool" element={<PesosTool />} />
