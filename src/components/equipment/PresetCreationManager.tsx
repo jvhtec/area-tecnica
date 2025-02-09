@@ -10,12 +10,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Equipment, Preset, PresetItem, PresetWithItems } from '@/types/equipment';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Minus, Save, Trash2, X } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface PresetCreationManagerProps {
   onClose?: () => void;
+  selectedDate?: Date;
 }
 
-export function PresetCreationManager({ onClose }: PresetCreationManagerProps) {
+export function PresetCreationManager({ onClose, selectedDate }: PresetCreationManagerProps) {
   const { session } = useSessionManager();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -135,6 +137,39 @@ export function PresetCreationManager({ onClose }: PresetCreationManagerProps) {
     }
   });
 
+  const assignPresetMutation = useMutation({
+    mutationFn: async (presetId: string) => {
+      if (!session?.user?.id || !selectedDate) throw new Error('Missing required data');
+
+      const { error } = await supabase
+        .from('day_preset_assignments')
+        .upsert({
+          date: format(selectedDate, 'yyyy-MM-dd'),
+          preset_id: presetId,
+          user_id: session.user.id
+        }, {
+          onConflict: 'date,user_id'
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['preset-assignments'] });
+      toast({
+        title: "Success",
+        description: "Preset assigned to date successfully"
+      });
+      if (onClose) onClose();
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to assign preset to date"
+      });
+    }
+  });
+
   const handleQuantityChange = (equipmentId: string, change: number) => {
     setSelectedEquipment(prev => {
       const current = prev[equipmentId] || 0;
@@ -221,13 +256,24 @@ export function PresetCreationManager({ onClose }: PresetCreationManagerProps) {
             <CardHeader className="py-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">{preset.name}</CardTitle>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => deletePresetMutation.mutate(preset.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex gap-2">
+                  {selectedDate && (
+                    <Button
+                      variant="outline"
+                      onClick={() => assignPresetMutation.mutate(preset.id)}
+                      disabled={assignPresetMutation.isPending}
+                    >
+                      Assign to {format(selectedDate, 'PP')}
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => deletePresetMutation.mutate(preset.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
