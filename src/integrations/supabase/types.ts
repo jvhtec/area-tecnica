@@ -442,9 +442,13 @@ export type Database = {
           iem_quantity: number | null
           infra_analog: number | null
           infra_cat6: boolean | null
+          infra_cat6_quantity: number | null
           infra_coax: boolean | null
+          infra_coax_quantity: number | null
           infra_hma: boolean | null
+          infra_hma_quantity: number | null
           infra_opticalcon_duo: boolean | null
+          infra_opticalcon_duo_quantity: number | null
           job_id: string | null
           mic_pack: string | null
           mon_console: string | null
@@ -486,9 +490,13 @@ export type Database = {
           iem_quantity?: number | null
           infra_analog?: number | null
           infra_cat6?: boolean | null
+          infra_cat6_quantity?: number | null
           infra_coax?: boolean | null
+          infra_coax_quantity?: number | null
           infra_hma?: boolean | null
+          infra_hma_quantity?: number | null
           infra_opticalcon_duo?: boolean | null
+          infra_opticalcon_duo_quantity?: number | null
           job_id?: string | null
           mic_pack?: string | null
           mon_console?: string | null
@@ -530,9 +538,13 @@ export type Database = {
           iem_quantity?: number | null
           infra_analog?: number | null
           infra_cat6?: boolean | null
+          infra_cat6_quantity?: number | null
           infra_coax?: boolean | null
+          infra_coax_quantity?: number | null
           infra_hma?: boolean | null
+          infra_hma_quantity?: number | null
           infra_opticalcon_duo?: boolean | null
+          infra_opticalcon_duo_quantity?: number | null
           job_id?: string | null
           mic_pack?: string | null
           mon_console?: string | null

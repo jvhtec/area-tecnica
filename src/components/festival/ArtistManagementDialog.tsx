@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -72,10 +71,14 @@ export const ArtistManagementDialog = ({
     extras_djbooth: artist?.extras_djbooth || false,
     extras_wired: artist?.extras_wired || "",
     infra_cat6: artist?.infra_cat6 || false,
+    infra_cat6_quantity: artist?.infra_cat6_quantity || 0,
     infra_hma: artist?.infra_hma || false,
+    infra_hma_quantity: artist?.infra_hma_quantity || 0,
     infra_coax: artist?.infra_coax || false,
+    infra_coax_quantity: artist?.infra_coax_quantity || 0,
     infra_analog: artist?.infra_analog || 0,
     infra_opticalcon_duo: artist?.infra_opticalcon_duo || false,
+    infra_opticalcon_duo_quantity: artist?.infra_opticalcon_duo_quantity || 0,
     other_infrastructure: artist?.other_infrastructure || "",
     notes: artist?.notes || "",
   });
@@ -473,42 +476,128 @@ export const ArtistManagementDialog = ({
           <div className="border rounded-lg p-4 space-y-4">
             <h3 className="text-lg font-medium">Infrastructure</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={formData.infra_cat6}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, infra_cat6: checked })
-                  }
-                />
-                <Label>CAT6</Label>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={formData.infra_cat6}
+                      onCheckedChange={(checked) =>
+                        setFormData({
+                          ...formData,
+                          infra_cat6: checked,
+                          infra_cat6_quantity: checked ? 1 : 0
+                        })
+                      }
+                    />
+                    <Label>CAT6</Label>
+                  </div>
+                  {formData.infra_cat6 && (
+                    <Input
+                      type="number"
+                      min="1"
+                      className="w-24"
+                      value={formData.infra_cat6_quantity}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          infra_cat6_quantity: parseInt(e.target.value) || 0
+                        })
+                      }
+                    />
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={formData.infra_hma}
+                      onCheckedChange={(checked) =>
+                        setFormData({
+                          ...formData,
+                          infra_hma: checked,
+                          infra_hma_quantity: checked ? 1 : 0
+                        })
+                      }
+                    />
+                    <Label>HMA</Label>
+                  </div>
+                  {formData.infra_hma && (
+                    <Input
+                      type="number"
+                      min="1"
+                      className="w-24"
+                      value={formData.infra_hma_quantity}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          infra_hma_quantity: parseInt(e.target.value) || 0
+                        })
+                      }
+                    />
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={formData.infra_coax}
+                      onCheckedChange={(checked) =>
+                        setFormData({
+                          ...formData,
+                          infra_coax: checked,
+                          infra_coax_quantity: checked ? 1 : 0
+                        })
+                      }
+                    />
+                    <Label>Coax</Label>
+                  </div>
+                  {formData.infra_coax && (
+                    <Input
+                      type="number"
+                      min="1"
+                      className="w-24"
+                      value={formData.infra_coax_quantity}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          infra_coax_quantity: parseInt(e.target.value) || 0
+                        })
+                      }
+                    />
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={formData.infra_opticalcon_duo}
+                      onCheckedChange={(checked) =>
+                        setFormData({
+                          ...formData,
+                          infra_opticalcon_duo: checked,
+                          infra_opticalcon_duo_quantity: checked ? 1 : 0
+                        })
+                      }
+                    />
+                    <Label>OpticalCon Duo</Label>
+                  </div>
+                  {formData.infra_opticalcon_duo && (
+                    <Input
+                      type="number"
+                      min="1"
+                      className="w-24"
+                      value={formData.infra_opticalcon_duo_quantity}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          infra_opticalcon_duo_quantity: parseInt(e.target.value) || 0
+                        })
+                      }
+                    />
+                  )}
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={formData.infra_hma}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, infra_hma: checked })
-                  }
-                />
-                <Label>HMA</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={formData.infra_coax}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, infra_coax: checked })
-                  }
-                />
-                <Label>Coax</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={formData.infra_opticalcon_duo}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, infra_opticalcon_duo: checked })
-                  }
-                />
-                <Label>OpticalCon Duo</Label>
-              </div>
+
               <div>
                 <Label htmlFor="infra_analog">Analog Lines</Label>
                 <Input
