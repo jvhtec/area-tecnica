@@ -671,7 +671,7 @@ const HojaDeRutaGenerator = () => {
 
       // Dado que the URLs you provided are already substituted and uploaded into the public folder,
       // we assume that the pickup_address value exactly matches the key for the image URL.
-      // For example, if the pickup address is "Nave Sector-Pro. C\Puerto Rico 6, 28971 - Griñon 1",
+      // For example, if the pickup address is "Nave Sector-Pro. C\\Puerto Rico 6, 28971 - Griñon 1",
       // then the image URL should be something like "/IMG_7834.jpeg". Adjust these keys as needed.
       const transportationMapPlaceholders: { [key: string]: string } = {
         "Nave Sector-Pro. C\\Puerto Rico 6, 28971 - Griñon 1": "/lovable-uploads/IMG_7834.jpeg",
