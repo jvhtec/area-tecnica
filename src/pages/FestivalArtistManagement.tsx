@@ -239,9 +239,9 @@ const FestivalArtistManagement = () => {
       <ArtistManagementDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
-        selectedArtist={selectedArtist}
+        artist={selectedArtist}
         jobId={jobId}
-        date={selectedDate}
+        selectedDate={selectedDate}
       />
     </div>
   );
