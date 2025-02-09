@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -5,9 +6,10 @@ import { Department } from "@/types/department";
 import { JobAssignments } from "./JobAssignments";
 import { Button } from "../ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
+import { Loader2 } from "lucide-react";
 
 interface JobAssignmentDialogProps {
   open: boolean;
@@ -16,10 +18,25 @@ interface JobAssignmentDialogProps {
   department: Department;
 }
 
+interface Technician {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: string;
+  department: Department;
+}
+
 export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: JobAssignmentDialogProps) => {
   const [selectedTechnician, setSelectedTechnician] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<string>("");
   const queryClient = useQueryClient();
+
+  // Reset selections when department changes
+  useEffect(() => {
+    setSelectedTechnician("");
+    setSelectedRole("");
+  }, [department]);
 
   // Set up tab visibility tracking to refresh data when tab becomes visible
   useTabVisibility(['technicians']);
@@ -30,8 +47,9 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
       console.log("Fetching technicians for department:", department);
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, first_name, last_name, email")
-        .eq("department", department);
+        .select("id, first_name, last_name, email, role, department")
+        .eq("department", department)
+        .eq("role", "technician");
 
       if (error) {
         console.error("Error fetching technicians:", error);
@@ -39,7 +57,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
       }
 
       console.log("Fetched technicians:", data);
-      return data;
+      return data as Technician[];
     },
     staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
     refetchOnMount: true,
@@ -57,6 +75,25 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
     onOpenChange(isOpen);
   };
 
+  // Validate assignment before submitting
+  const validateAssignment = (techId: string, role: string, techs: Technician[]) => {
+    const technician = techs.find(t => t.id === techId);
+    if (!technician) {
+      throw new Error("Selected technician not found");
+    }
+
+    if (technician.department !== department) {
+      throw new Error(`Technician must belong to the ${department} department`);
+    }
+
+    const validRoles = getRoleOptions(department);
+    if (!validRoles.includes(role)) {
+      throw new Error(`Invalid role selected for ${department} department`);
+    }
+
+    return true;
+  };
+
   const handleAssign = async () => {
     if (!selectedTechnician || !selectedRole) {
       toast.error("Please select both a technician and a role");
@@ -66,6 +103,24 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
     try {
       console.log("Assigning technician:", selectedTechnician, "with role:", selectedRole);
       
+      // Validate assignment
+      if (!technicians) {
+        throw new Error("Technician data not available");
+      }
+      
+      validateAssignment(selectedTechnician, selectedRole, technicians);
+
+      // Check for existing assignment with same role
+      const { data: existingAssignments } = await supabase
+        .from("job_assignments")
+        .select("*")
+        .eq("job_id", jobId)
+        .eq(`${department}_role`, selectedRole);
+
+      if (existingAssignments?.length) {
+        throw new Error(`A technician is already assigned as ${selectedRole}`);
+      }
+
       const roleField = `${department}_role` as const;
       const { error } = await supabase
         .from("job_assignments")
@@ -90,7 +145,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
       
     } catch (error: any) {
       console.error("Failed to assign technician:", error);
-      toast.error("Failed to assign technician: " + error.message);
+      toast.error(error.message || "Failed to assign technician");
     }
   };
 
@@ -111,31 +166,37 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
     <Dialog open={open} onOpenChange={handleDialogChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Assign Technician</DialogTitle>
+          <DialogTitle>Assign {department.charAt(0).toUpperCase() + department.slice(1)} Technician</DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4 mt-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Technician</label>
-            <Select value={selectedTechnician} onValueChange={setSelectedTechnician}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select technician" />
-              </SelectTrigger>
-              <SelectContent>
-                {technicians?.map((tech) => (
-                  <SelectItem key={tech.id} value={tech.id}>
-                    {tech.first_name} {tech.last_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {isLoadingTechnicians ? (
+              <div className="flex items-center justify-center p-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+            ) : (
+              <Select value={selectedTechnician} onValueChange={setSelectedTechnician}>
+                <SelectTrigger>
+                  <SelectValue placeholder={`Select ${department} technician`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {technicians?.map((tech) => (
+                    <SelectItem key={tech.id} value={tech.id}>
+                      {tech.first_name} {tech.last_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium">Role</label>
             <Select value={selectedRole} onValueChange={setSelectedRole}>
               <SelectTrigger>
-                <SelectValue placeholder="Select role" />
+                <SelectValue placeholder={`Select ${department} role`} />
               </SelectTrigger>
               <SelectContent>
                 {getRoleOptions(department).map((role) => (
@@ -153,7 +214,10 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
             <Button variant="outline" onClick={() => handleDialogChange(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAssign}>
+            <Button 
+              onClick={handleAssign}
+              disabled={isLoadingTechnicians || !selectedTechnician || !selectedRole}
+            >
               Assign
             </Button>
           </div>
@@ -162,3 +226,4 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
     </Dialog>
   );
 };
+
