@@ -30,6 +30,28 @@ export interface ArtistTablePdfData {
   }[];
 }
 
+interface ScheduleRow {
+  name: string;
+  stage: number;
+  time: { start: string; end: string };
+  isSoundcheck: boolean;
+  technical?: {
+    fohTech: boolean;
+    monTech: boolean;
+    fohConsole: { model: string; providedBy: string };
+    monConsole: { model: string; providedBy: string };
+    wireless: { hh: number; bp: number; providedBy: string };
+    iem: { quantity: number; providedBy: string };
+    monitors: { enabled: boolean; quantity: number };
+  };
+  extras?: {
+    sideFill: boolean;
+    drumFill: boolean;
+    djBooth: boolean;
+  };
+  notes?: string;
+}
+
 export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> => {
   return new Promise((resolve) => {
     // Create PDF in landscape
@@ -52,22 +74,66 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
       doc.text(format(new Date(data.date), 'dd/MM/yyyy'), pageWidth / 2, 18, { align: 'center' });
     }
 
+    // Process artists into schedule rows with soundchecks
+    const scheduleRows: ScheduleRow[] = [];
+    
+    data.artists.forEach(artist => {
+      // Add soundcheck row if it exists (comes first chronologically)
+      if (artist.soundcheck) {
+        scheduleRows.push({
+          name: artist.name,
+          stage: artist.stage,
+          time: artist.soundcheck,
+          isSoundcheck: true
+        });
+      }
+      
+      // Add show row
+      scheduleRows.push({
+        name: artist.name,
+        stage: artist.stage,
+        time: artist.showTime,
+        isSoundcheck: false,
+        technical: artist.technical,
+        extras: artist.extras,
+        notes: artist.notes
+      });
+    });
+
+    // Sort all rows chronologically by start time
+    scheduleRows.sort((a, b) => {
+      const timeA = new Date(`2000/01/01 ${a.time.start}`).getTime();
+      const timeB = new Date(`2000/01/01 ${b.time.start}`).getTime();
+      return timeA - timeB;
+    });
+
     // Prepare table data
-    const tableBody = data.artists.map(artist => [
-      artist.name,
-      `Stage ${artist.stage}`,
-      `${artist.showTime.start}-${artist.showTime.end}${artist.soundcheck ? `\nSC: ${artist.soundcheck.start}-${artist.soundcheck.end}` : ''}`,
-      `FOH: ${artist.technical.fohConsole.model} (${artist.technical.fohConsole.providedBy})\nMON: ${artist.technical.monConsole.model} (${artist.technical.monConsole.providedBy})`,
-      `FOH Tech: ${artist.technical.fohTech ? '✓' : '-'}\nMON Tech: ${artist.technical.monTech ? '✓' : '-'}`,
-      `HH: ${artist.technical.wireless.hh} (${artist.technical.wireless.providedBy})\nBP: ${artist.technical.wireless.bp}\nIEM: ${artist.technical.iem.quantity} (${artist.technical.iem.providedBy})`,
-      artist.technical.monitors.enabled ? `Monitors: ${artist.technical.monitors.quantity}` : '-',
-      [
-        artist.extras.sideFill ? 'SF' : '',
-        artist.extras.drumFill ? 'DF' : '',
-        artist.extras.djBooth ? 'DJ' : ''
-      ].filter(Boolean).join(', ') || '-',
-      artist.notes || '-'
-    ]);
+    const tableBody = scheduleRows.map(row => {
+      if (row.isSoundcheck) {
+        return [
+          `${row.name} (Soundcheck)`,
+          `Stage ${row.stage}`,
+          `${row.time.start}-${row.time.end}`,
+          '', '', '', '', '', ''  // Empty cells for other columns
+        ];
+      }
+      
+      return [
+        row.name,
+        `Stage ${row.stage}`,
+        `${row.time.start}-${row.time.end}`,
+        `FOH: ${row.technical!.fohConsole.model} (${row.technical!.fohConsole.providedBy})\nMON: ${row.technical!.monConsole.model} (${row.technical!.monConsole.providedBy})`,
+        `FOH Tech: ${row.technical!.fohTech ? '✓' : '-'}\nMON Tech: ${row.technical!.monTech ? '✓' : '-'}`,
+        `HH: ${row.technical!.wireless.hh} (${row.technical!.wireless.providedBy})\nBP: ${row.technical!.wireless.bp}\nIEM: ${row.technical!.iem.quantity} (${row.technical!.iem.providedBy})`,
+        row.technical!.monitors.enabled ? `Monitors: ${row.technical!.monitors.quantity}` : '-',
+        [
+          row.extras!.sideFill ? 'SF' : '',
+          row.extras!.drumFill ? 'DF' : '',
+          row.extras!.djBooth ? 'DJ' : ''
+        ].filter(Boolean).join(', ') || '-',
+        row.notes || '-'
+      ];
+    });
 
     // Generate table
     autoTable(doc, {
@@ -97,6 +163,13 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
         7: { cellWidth: 20 },
         8: { cellWidth: 'auto' },
       },
+      didParseCell: function(data) {
+        if (data.row.index === -1) return; // Skip header row
+        const rowData = scheduleRows[data.row.index];
+        if (rowData.isSoundcheck) {
+          data.cell.styles.fillColor = [254, 247, 205]; // #FEF7CD for soundcheck rows
+        }
+      }
     });
 
     // Add logo and generation info at the bottom
