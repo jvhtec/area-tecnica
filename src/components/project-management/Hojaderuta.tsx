@@ -96,7 +96,7 @@ const HojaDeRutaGenerator = () => {
       loadingDetails: "",
       unloadingDetails: "",
     },
-    staff: [{ name: "", surname1: "", surname2: string; position: "" }],
+    staff: [{ name: "", surname1: "", surname2: "", position: "" }],
     schedule: "",
     powerRequirements: "",
     auxiliaryNeeds: "",
@@ -861,3 +861,5 @@ const HojaDeRutaGenerator = () => {
           event_dates: eventData.eventDates,
           venue_name: eventData.venue.name,
           venue_address: eventData.venue.address
+
+</edits_to_apply>
