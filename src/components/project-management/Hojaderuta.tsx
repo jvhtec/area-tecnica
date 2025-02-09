@@ -1,3 +1,4 @@
+<lov-code>
 import React, { useState, useEffect } from "react";
 import {
   Card,
@@ -854,12 +855,10 @@ const HojaDeRutaGenerator = () => {
     try {
       // First, upsert the main hoja_de_ruta record
       const { data: hojaData, error: hojaError } = await supabase
-        .from('hoja_de_ruta')
+        .from("hoja_de_ruta")
         .upsert({
           job_id: selectedJobId,
           event_name: eventData.eventName,
           event_dates: eventData.eventDates,
           venue_name: eventData.venue.name,
-          venue_address: eventData.venue.address
-
-</edits_to_apply>
+          venue_address: eventData.venue
