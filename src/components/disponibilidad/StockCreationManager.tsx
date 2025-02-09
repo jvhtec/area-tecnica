@@ -9,6 +9,7 @@ import { Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { EquipmentCreationManager } from '@/components/equipment/EquipmentCreationManager';
 
 interface StockManagerProps {
   stock: StockEntry[];
@@ -28,7 +29,7 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
   const { toast } = useToast();
 
   // Fetch equipment list with proper typing
-  const { data: equipmentList = [] } = useQuery<Equipment[]>({
+  const { data: equipmentList = [], refetch: refetchEquipment } = useQuery<Equipment[]>({
     queryKey: ['equipment'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -109,43 +110,58 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
 
   const handleSave = () => {
     onStockUpdate(localStock);
+    toast({
+      title: "Éxito",
+      description: "Stock actualizado correctamente"
+    });
+  };
+
+  const handleEquipmentChange = () => {
+    refetchEquipment();
   };
 
   return (
-    <div className="space-y-4">
-      <Button 
-        onClick={handleSave} 
-        className="w-full mb-4"
-      >
-        Guardar Inventario
-      </Button>
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">Gestionar Equipamiento</h2>
+        <EquipmentCreationManager onEquipmentChange={handleEquipmentChange} />
+      </div>
 
-      <ScrollArea className="h-[600px] pr-4">
-        <div className="space-y-8">
-          {Object.entries(groupedEquipment).map(([category, items]) => (
-            <div key={category} className="space-y-4">
-              <h3 className="text-lg font-semibold capitalize">{category}</h3>
-              <div className="space-y-4">
-                {items.map(equipment => (
-                  <div key={equipment.id} className="flex items-center space-x-4">
-                    <div className="flex-1">
-                      <Label>{equipment.name}</Label>
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">Gestionar Stock</h2>
+        <Button 
+          onClick={handleSave} 
+          className="w-full mb-4"
+        >
+          Guardar Inventario
+        </Button>
+
+        <ScrollArea className="h-[600px] pr-4">
+          <div className="space-y-8">
+            {Object.entries(groupedEquipment).map(([category, items]) => (
+              <div key={category} className="space-y-4">
+                <h3 className="text-lg font-semibold capitalize">{category}</h3>
+                <div className="space-y-4">
+                  {items.map(equipment => (
+                    <div key={equipment.id} className="flex items-center space-x-4">
+                      <div className="flex-1">
+                        <Label>{equipment.name}</Label>
+                      </div>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={equipment.quantity}
+                        onChange={(e) => handleQuantityChange(equipment.id, parseInt(e.target.value) || 0)}
+                        className="w-24"
+                      />
                     </div>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={equipment.quantity}
-                      onChange={(e) => handleQuantityChange(equipment.id, parseInt(e.target.value) || 0)}
-                      className="w-24"
-                    />
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </ScrollArea>
+            ))}
+          </div>
+        </ScrollArea>
+      </div>
     </div>
   );
 };
-

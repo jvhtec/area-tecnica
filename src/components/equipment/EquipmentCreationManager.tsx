@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Equipment } from '@/types/equipment';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Save, Trash2, Pencil } from 'lucide-react';
+import { Plus, Trash2, Pencil } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -22,6 +22,10 @@ interface EditEquipmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (equipment: Partial<Equipment>) => void;
+}
+
+interface EquipmentCreationManagerProps {
+  onEquipmentChange?: () => void;
 }
 
 function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEquipmentDialogProps) {
@@ -78,7 +82,7 @@ function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEqui
   );
 }
 
-export function EquipmentCreationManager() {
+export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreationManagerProps) {
   const { session } = useSessionManager();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -126,6 +130,7 @@ export function EquipmentCreationManager() {
         title: "Éxito",
         description: "Equipo creado correctamente"
       });
+      onEquipmentChange?.();
     },
     onError: (error) => {
       toast({
@@ -156,6 +161,7 @@ export function EquipmentCreationManager() {
         title: "Éxito",
         description: "Equipo actualizado correctamente"
       });
+      onEquipmentChange?.();
     },
     onError: (error) => {
       toast({
@@ -181,6 +187,7 @@ export function EquipmentCreationManager() {
         title: "Éxito",
         description: "Equipo eliminado correctamente"
       });
+      onEquipmentChange?.();
     },
     onError: (error) => {
       toast({
@@ -299,4 +306,3 @@ export function EquipmentCreationManager() {
     </div>
   );
 }
-
