@@ -88,7 +88,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
 
       const assignments = [];
       
-      // Fetch assignments for each day individually to avoid single() issues
+      // Fetch all assignments for each day
       for (const date of weekDates) {
         const { data, error } = await supabase
           .from('day_preset_assignments')
@@ -104,15 +104,15 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
           `)
           .eq('user_id', session.user.id)
           .eq('date', format(date, 'yyyy-MM-dd'))
-          .maybeSingle(); // Use maybeSingle instead of single
+          .order('order', { ascending: true });
 
         if (error) {
-          console.error('Error fetching assignment for date:', date, error);
+          console.error('Error fetching assignments for date:', date, error);
           continue;
         }
 
         if (data) {
-          assignments.push(data);
+          assignments.push(...data);
         }
       }
 
@@ -121,17 +121,20 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     enabled: !!session?.user?.id
   });
 
-  // Calculate used quantities for each equipment per day
+  // Calculate total used quantities for each equipment per day
   const getUsedQuantity = (equipmentId: string, date: Date) => {
-    const assignment = weekAssignments?.find(a => 
-      a?.date === format(date, 'yyyy-MM-dd') &&
-      a?.preset?.items?.some(item => item.equipment_id === equipmentId)
-    );
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const dayAssignments = weekAssignments?.filter(a => a.date === dateStr);
+    
+    if (!dayAssignments?.length) return 0;
 
-    if (!assignment) return 0;
-
-    const item = assignment.preset.items.find(item => item.equipment_id === equipmentId);
-    return item?.quantity || 0;
+    // Sum up quantities from all presets assigned to this date
+    return dayAssignments.reduce((total, assignment) => {
+      const item = assignment.preset.items.find(item => 
+        item.equipment_id === equipmentId
+      );
+      return total + (item?.quantity || 0);
+    }, 0);
   };
 
   const handlePreviousWeek = () => {
