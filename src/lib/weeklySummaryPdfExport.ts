@@ -72,7 +72,7 @@ export const exportWeeklySummaryPDF = async (
           return {
             content: `${usage.used} ${remainingText}`,
             styles: {
-              textColor: [255, 255, 255],
+              textColor: [255, 255, 255] as [number, number, number],
               fontStyle: usage.remaining < 0 ? 'bold' : 'normal' as 'bold' | 'normal'
             }
           };
@@ -80,7 +80,7 @@ export const exportWeeklySummaryPDF = async (
         {
           content: row.available.toString(),
           styles: {
-            textColor: row.available < 0 ? [255, 0, 0] : [0, 0, 0],
+            textColor: row.available < 0 ? [255, 0, 0] as [number, number, number] : [0, 0, 0] as [number, number, number],
             fontStyle: row.available < 0 ? 'bold' : 'normal' as 'bold' | 'normal'
           }
         }
@@ -95,16 +95,16 @@ export const exportWeeklySummaryPDF = async (
         styles: {
           fontSize: 10,
           cellPadding: 5,
-          lineColor: [220, 220, 230],
+          lineColor: [220, 220, 230] as [number, number, number],
           lineWidth: 0.1,
         },
         headStyles: {
-          fillColor: [125, 1, 1],
-          textColor: [255, 255, 255],
+          fillColor: [125, 1, 1] as [number, number, number],
+          textColor: [255, 255, 255] as [number, number, number],
           fontStyle: 'bold' as 'bold',
         },
-        bodyStyles: { textColor: [51, 51, 51] },
-        alternateRowStyles: { fillColor: [250, 250, 255] },
+        bodyStyles: { textColor: [51, 51, 51] as [number, number, number] },
+        alternateRowStyles: { fillColor: [250, 250, 255] as [number, number, number] },
       });
 
       // Add logo and page numbers
