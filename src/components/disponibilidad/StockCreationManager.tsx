@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { StockEntry } from '@/types/equipment';
+import { StockEntry, Equipment } from '@/types/equipment';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -27,8 +27,8 @@ type GroupedEquipment = {
 export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps) => {
   const { toast } = useToast();
 
-  // Fetch equipment list
-  const { data: equipmentList = [] } = useQuery({
+  // Fetch equipment list with proper typing
+  const { data: equipmentList = [] } = useQuery<Equipment[]>({
     queryKey: ['equipment'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -148,3 +148,4 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
     </div>
   );
 };
+
