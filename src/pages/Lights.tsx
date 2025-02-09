@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
@@ -10,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
-import { Scale, Zap } from "lucide-react";
+import { Scale, Zap, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
@@ -142,6 +143,14 @@ const Lights = () => {
       </div>
 
       <div className="flex gap-4 justify-end mt-4">
+        <Button 
+          variant="outline" 
+          onClick={() => navigate('/lights-disponibilidad')}
+          className="flex items-center gap-2"
+        >
+          <Calendar className="h-4 w-4" />
+          Disponibilidad
+        </Button>
         <Button 
           variant="outline" 
           onClick={() => navigate('/lights-pesos-tool')}

@@ -2,17 +2,21 @@
 import { useState } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Card } from '@/components/ui/card';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { useSessionManager } from '@/hooks/useSessionManager';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import type { AvailabilitySchedule } from '@/types/availability';
 import { format } from 'date-fns';
 
-export function DisponibilidadCalendar() {
+interface DisponibilidadCalendarProps {
+  selectedDate?: Date;
+  onDateSelect?: (date: Date | undefined) => void;
+}
+
+export function DisponibilidadCalendar({ selectedDate, onDateSelect }: DisponibilidadCalendarProps) {
   const { session, userDepartment } = useSessionManager();
   const { toast } = useToast();
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
   const { data: availabilityData, isLoading } = useQuery({
     queryKey: ['availability', session?.user?.id, userDepartment],
@@ -74,7 +78,7 @@ export function DisponibilidadCalendar() {
       <Calendar
         mode="single"
         selected={selectedDate}
-        onSelect={setSelectedDate}
+        onSelect={onDateSelect}
         className="rounded-md border"
         modifiers={modifiers}
         modifiersStyles={modifiersStyles}
