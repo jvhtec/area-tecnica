@@ -32,7 +32,7 @@ import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
 import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
 import { ArtistManagementDialog } from "../festival/ArtistManagementDialog";
-import { EditJobDialog } from "@/components/EditJobDialog";
+import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 
 export interface JobDocument {
   id: string;
