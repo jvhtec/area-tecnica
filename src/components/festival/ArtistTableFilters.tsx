@@ -40,7 +40,7 @@ export const ArtistTableFilters = ({
               <SelectValue placeholder="All Stages" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Stages</SelectItem>
+              <SelectItem value="all">All Stages</SelectItem>
               <SelectItem value="1">Stage 1</SelectItem>
               <SelectItem value="2">Stage 2</SelectItem>
               <SelectItem value="3">Stage 3</SelectItem>
@@ -55,7 +55,7 @@ export const ArtistTableFilters = ({
               <SelectValue placeholder="All Equipment" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Equipment</SelectItem>
+              <SelectItem value="all">All Equipment</SelectItem>
               <SelectItem value="wireless">Wireless</SelectItem>
               <SelectItem value="iem">IEM</SelectItem>
               <SelectItem value="monitors">Monitors</SelectItem>
@@ -66,3 +66,4 @@ export const ArtistTableFilters = ({
     </div>
   );
 };
+
