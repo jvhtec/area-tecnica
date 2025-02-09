@@ -29,13 +29,7 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
     queryFn: async () => {
       const { data, error } = await supabase
         .from('presets')
-        .select(`
-          *,
-          items:preset_items(
-            *,
-            equipment(*)
-          )
-        `)
+        .select('*')
         .eq('user_id', session?.user?.id);
       
       if (error) throw error;
@@ -44,29 +38,20 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
     enabled: !!session?.user?.id
   });
 
-  // Fetch current preset assignment
-  const { data: currentAssignment } = useQuery({
-    queryKey: ['preset-assignment', session?.user?.id, selectedDate],
+  // Fetch current preset assignments
+  const { data: currentAssignments } = useQuery({
+    queryKey: ['preset-assignments', session?.user?.id, selectedDate],
     queryFn: async () => {
-      if (!isValidDate) return null;
+      if (!isValidDate) return [];
 
       const { data, error } = await supabase
         .from('day_preset_assignments')
-        .select(`
-          *,
-          preset:presets (
-            *,
-            items:preset_items (
-              *,
-              equipment:equipment (*)
-            )
-          )
-        `)
+        .select('*, preset:presets(name)')
         .eq('user_id', session?.user?.id)
         .eq('date', format(selectedDate, 'yyyy-MM-dd'))
-        .maybeSingle();
+        .order('order', { ascending: true });
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error) throw error;
       return data;
     },
     enabled: !!session?.user?.id && isValidDate
@@ -77,21 +62,23 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
       if (!session?.user?.id) throw new Error('Must be logged in');
       if (!isValidDate) throw new Error('Invalid date selected');
 
+      // Get the next order number
+      const maxOrder = currentAssignments?.reduce((max, assignment) => 
+        Math.max(max, assignment.order || 0), -1) || -1;
+
       const { error } = await supabase
         .from('day_preset_assignments')
-        .upsert({
+        .insert({
           date: format(selectedDate, 'yyyy-MM-dd'),
           preset_id: presetId,
-          user_id: session.user.id
-        }, {
-          onConflict: 'date,user_id'
+          user_id: session.user.id,
+          order: maxOrder + 1
         });
 
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['preset-assignments'] });
-      queryClient.invalidateQueries({ queryKey: ['preset-assignment'] });
       toast({
         title: "Success",
         description: "Preset assigned successfully"
@@ -108,21 +95,19 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
   });
 
   const removeAssignmentMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (assignmentId: string) => {
       if (!session?.user?.id) throw new Error('Must be logged in');
       if (!isValidDate) throw new Error('Invalid date selected');
 
       const { error } = await supabase
         .from('day_preset_assignments')
         .delete()
-        .eq('user_id', session.user.id)
-        .eq('date', format(selectedDate, 'yyyy-MM-dd'));
+        .eq('id', assignmentId);
 
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['preset-assignments'] });
-      queryClient.invalidateQueries({ queryKey: ['preset-assignment'] });
       toast({
         title: "Success",
         description: "Preset assignment removed"
@@ -159,25 +144,27 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
             </p>
           </div>
 
-          {currentAssignment && (
+          {currentAssignments && currentAssignments.length > 0 && (
             <Card className="p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{currentAssignment.preset.name}</p>
-                  <p className="text-sm text-muted-foreground">Current Assignment</p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeAssignmentMutation.mutate()}
-                  disabled={removeAssignmentMutation.isPending}
-                >
-                  {removeAssignmentMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                </Button>
+              <div className="space-y-2">
+                <p className="font-medium">Current Assignments</p>
+                {currentAssignments.map((assignment) => (
+                  <div key={assignment.id} className="flex items-center justify-between">
+                    <span>{assignment.preset.name}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeAssignmentMutation.mutate(assignment.id)}
+                      disabled={removeAssignmentMutation.isPending}
+                    >
+                      {removeAssignmentMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                ))}
               </div>
             </Card>
           )}
@@ -189,10 +176,7 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
                 variant="outline"
                 className="w-full justify-start"
                 onClick={() => assignPresetMutation.mutate(preset.id)}
-                disabled={
-                  assignPresetMutation.isPending ||
-                  currentAssignment?.preset_id === preset.id
-                }
+                disabled={assignPresetMutation.isPending}
               >
                 {assignPresetMutation.isPending &&
                 assignPresetMutation.variables === preset.id ? (

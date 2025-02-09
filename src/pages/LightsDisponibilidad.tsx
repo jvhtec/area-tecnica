@@ -20,9 +20,9 @@ export default function LightsDisponibilidad() {
   const { session } = useSessionManager();
   const { toast } = useToast();
 
-  // Fetch preset for selected date
-  const { data: assignedPreset } = useQuery({
-    queryKey: ['preset-assignment', session?.user?.id, selectedDate],
+  // Fetch presets for selected date
+  const { data: assignedPresets } = useQuery({
+    queryKey: ['preset-assignments', session?.user?.id, selectedDate],
     queryFn: async () => {
       if (!session?.user?.id || !selectedDate) return null;
       
@@ -31,22 +31,18 @@ export default function LightsDisponibilidad() {
         .select(`
           *,
           preset:presets (
-            *,
-            items:preset_items (
-              *,
-              equipment:equipment (*)
-            )
+            name
           )
         `)
         .eq('user_id', session.user.id)
         .eq('date', format(selectedDate, 'yyyy-MM-dd'))
-        .maybeSingle();
+        .order('order', { ascending: true });
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Could not load preset assignment"
+          description: "Could not load preset assignments"
         });
         throw error;
       }
@@ -91,20 +87,16 @@ export default function LightsDisponibilidad() {
               <h2 className="text-lg font-semibold mb-4">
                 {format(selectedDate, 'PPP')}
               </h2>
-              {assignedPreset ? (
+              {assignedPresets && assignedPresets.length > 0 ? (
                 <div className="space-y-4">
-                  <h3 className="font-medium">{assignedPreset.preset.name}</h3>
-                  <div className="space-y-2">
-                    {assignedPreset.preset.items.map((item) => (
-                      <div key={item.id} className="flex justify-between text-sm">
-                        <span>{item.equipment.name}</span>
-                        <span>x{item.quantity}</span>
-                      </div>
-                    ))}
-                  </div>
+                  {assignedPresets.map((assignment) => (
+                    <div key={assignment.id}>
+                      <h3 className="font-medium">{assignment.preset.name}</h3>
+                    </div>
+                  ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground">No preset assigned for this date</p>
+                <p className="text-muted-foreground">No presets assigned for this date</p>
               )}
             </div>
           )}

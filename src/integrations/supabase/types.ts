@@ -278,6 +278,7 @@ export type Database = {
           created_at: string | null
           date: string
           id: string
+          order: number | null
           preset_id: string
           updated_at: string | null
           user_id: string
@@ -286,6 +287,7 @@ export type Database = {
           created_at?: string | null
           date: string
           id?: string
+          order?: number | null
           preset_id: string
           updated_at?: string | null
           user_id: string
@@ -294,6 +296,7 @@ export type Database = {
           created_at?: string | null
           date?: string
           id?: string
+          order?: number | null
           preset_id?: string
           updated_at?: string | null
           user_id?: string
