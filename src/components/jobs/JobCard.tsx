@@ -21,7 +21,7 @@ export const JobCard = ({ job, onEditClick, onDeleteClick, onJobClick, userRole,
 
   const handleFestivalManage = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigate(`/festival-management/${job.id}/artists`);
+    navigate(`/festival-management/${job.id}`);
   };
 
   return (
@@ -46,7 +46,7 @@ export const JobCard = ({ job, onEditClick, onDeleteClick, onJobClick, userRole,
                 variant="outline" 
                 onClick={handleFestivalManage}
               >
-                Manage Artists
+                Manage Festival
               </Button>
             )}
             <Button 
