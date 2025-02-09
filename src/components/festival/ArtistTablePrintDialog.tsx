@@ -50,12 +50,12 @@ export const ArtistTablePrintDialog = ({
           </div>
           <div className="space-y-2">
             <Label>Filter by Stage</Label>
-            <Select onValueChange={onStageChange}>
+            <Select onValueChange={onStageChange} defaultValue="all">
               <SelectTrigger>
                 <SelectValue placeholder="All stages" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All stages</SelectItem>
+                <SelectItem value="all">All stages</SelectItem>
                 {Array.from({ length: 5 }, (_, i) => i + 1).map((stage) => (
                   <SelectItem key={stage} value={stage.toString()}>
                     Stage {stage}
