@@ -73,7 +73,7 @@ export const exportWeeklySummaryPDF = async (
             content: `${usage.used} ${remainingText}`,
             styles: {
               textColor: [255, 255, 255],
-              fontStyle: 'normal',
+              fontStyle: usage.remaining < 0 ? 'bold' : 'normal' as 'bold' | 'normal'
             }
           };
         }),
@@ -81,7 +81,7 @@ export const exportWeeklySummaryPDF = async (
           content: row.available.toString(),
           styles: {
             textColor: row.available < 0 ? [255, 0, 0] : [0, 0, 0],
-            fontStyle: row.available < 0 ? 'bold' : 'normal'
+            fontStyle: row.available < 0 ? 'bold' : 'normal' as 'bold' | 'normal'
           }
         }
       ]);
@@ -101,7 +101,7 @@ export const exportWeeklySummaryPDF = async (
         headStyles: {
           fillColor: [125, 1, 1],
           textColor: [255, 255, 255],
-          fontStyle: 'bold',
+          fontStyle: 'bold' as 'bold',
         },
         bodyStyles: { textColor: [51, 51, 51] },
         alternateRowStyles: { fillColor: [250, 250, 255] },
@@ -152,3 +152,4 @@ export const exportWeeklySummaryPDF = async (
     }
   });
 };
+
