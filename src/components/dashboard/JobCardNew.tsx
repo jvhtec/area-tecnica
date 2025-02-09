@@ -33,6 +33,7 @@ import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
 import { ArtistManagementDialog } from "../festival/ArtistManagementDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
+import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 
 export interface JobDocument {
   id: string;
@@ -558,6 +559,7 @@ export function JobCardNew({
   const [lightsTaskDialogOpen, setLightsTaskDialogOpen] = useState(false);
   const [videoTaskDialogOpen, setVideoTaskDialogOpen] = useState(false);
   const [editJobDialogOpen, setEditJobDialogOpen] = useState(false);
+  const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
 
   const getDateTypeIcon = (jobId: string, date: Date, dateTypes: Record<string, any>) => {
     const key = `${jobId}-${format(date, "yyyy-MM-dd")}`;
@@ -1074,6 +1076,20 @@ export function JobCardNew({
                   Manage Artists
                 </Button>
               )}
+              {job.job_type !== "dryhire" && isProjectManagementPage && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setAssignmentDialogOpen(true);
+                  }}
+                  className="hover:bg-accent/50"
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  Assign
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -1300,6 +1316,14 @@ export function JobCardNew({
           open={editJobDialogOpen}
           onOpenChange={setEditJobDialogOpen}
           job={job}
+        />
+      )}
+      {assignmentDialogOpen && job.job_type !== "dryhire" && (
+        <JobAssignmentDialog
+          open={assignmentDialogOpen}
+          onOpenChange={setAssignmentDialogOpen}
+          jobId={job.id}
+          department={department as Department}
         />
       )}
     </div>
