@@ -75,13 +75,31 @@ interface EventData {
   auxiliaryNeeds: string;
 }
 
+interface ImageUploadSectionProps {
+  type: 'venue';
+  label: string;
+  images: {
+    venue: File[];
+  };
+  imagePreviews: {
+    venue: string[];
+  };
+  setImages: React.Dispatch<React.SetStateAction<{
+    venue: File[];
+  }>>;
+  setImagePreviews: React.Dispatch<React.SetStateAction<{
+    venue: string[];
+  }>>;
+}
+
 const ImageUploadSection = ({ 
   type, 
-  label 
-}: { 
-  type: keyof typeof images, 
-  label: string 
-}) => {
+  label,
+  images,
+  imagePreviews,
+  setImages,
+  setImagePreviews
+}: ImageUploadSectionProps) => {
   const handleImageUpload = (files: FileList | null) => {
     if (!files) return;
     const fileArray = Array.from(files);
@@ -976,7 +994,14 @@ const HojaDeRutaGenerator = () => {
   return (
     <div>
       <div className="space-y-4">
-        <ImageUploadSection type="venue" label="Imagen del Lugar" />
+        <ImageUploadSection 
+          type="venue" 
+          label="Imagen del Lugar"
+          images={images}
+          imagePreviews={imagePreviews}
+          setImages={setImages}
+          setImagePreviews={setImagePreviews}
+        />
         <div className="space-y-4">
           <Label>Nombre del Evento</Label>
           <Input
