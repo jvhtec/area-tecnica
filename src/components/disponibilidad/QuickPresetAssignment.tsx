@@ -7,7 +7,7 @@ import { useSessionManager } from "@/hooks/useSessionManager";
 import { supabase } from "@/lib/supabase";
 import { PresetWithItems } from "@/types/equipment";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { Calendar, Loader2, Trash2 } from "lucide-react";
 
 interface QuickPresetAssignmentProps {
@@ -19,6 +19,9 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
   const { session } = useSessionManager();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Validate selectedDate
+  const isValidDate = selectedDate && isValid(selectedDate);
 
   // Fetch user's presets
   const { data: presets } = useQuery({
@@ -45,6 +48,8 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
   const { data: currentAssignment } = useQuery({
     queryKey: ['preset-assignment', session?.user?.id, selectedDate],
     queryFn: async () => {
+      if (!isValidDate) return null;
+
       const { data, error } = await supabase
         .from('day_preset_assignments')
         .select(`
@@ -64,12 +69,13 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
       if (error && error.code !== 'PGRST116') throw error;
       return data;
     },
-    enabled: !!session?.user?.id && !!selectedDate
+    enabled: !!session?.user?.id && isValidDate
   });
 
   const assignPresetMutation = useMutation({
     mutationFn: async (presetId: string) => {
       if (!session?.user?.id) throw new Error('Must be logged in');
+      if (!isValidDate) throw new Error('Invalid date selected');
 
       const { error } = await supabase
         .from('day_preset_assignments')
@@ -104,6 +110,7 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
   const removeAssignmentMutation = useMutation({
     mutationFn: async () => {
       if (!session?.user?.id) throw new Error('Must be logged in');
+      if (!isValidDate) throw new Error('Invalid date selected');
 
       const { error } = await supabase
         .from('day_preset_assignments')
@@ -130,6 +137,10 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
       });
     }
   });
+
+  if (!isValidDate) {
+    return null;
+  }
 
   return (
     <Popover>
