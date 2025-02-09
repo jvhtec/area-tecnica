@@ -36,19 +36,34 @@ export function EquipmentManagement() {
     mutationFn: async (updatedStock: StockEntry[]) => {
       if (!session?.user?.id) throw new Error('No user session');
 
-      const { error } = await supabase
-        .from('stock_entries')
-        .upsert(
-          updatedStock.map(entry => ({
-            ...entry,
-            user_id: session.user.id
-          })),
-          {
-            onConflict: 'user_id,equipment_id'
-          }
+      // Process each stock entry individually
+      for (const entry of updatedStock) {
+        const existingEntry = stockEntries.find(
+          s => s.equipment_id === entry.equipment_id
         );
 
-      if (error) throw error;
+        if (existingEntry) {
+          // Update existing entry
+          const { error: updateError } = await supabase
+            .from('stock_entries')
+            .update({ base_quantity: entry.base_quantity })
+            .eq('id', existingEntry.id)
+            .eq('user_id', session.user.id);
+
+          if (updateError) throw updateError;
+        } else {
+          // Insert new entry
+          const { error: insertError } = await supabase
+            .from('stock_entries')
+            .insert({
+              equipment_id: entry.equipment_id,
+              base_quantity: entry.base_quantity,
+              user_id: session.user.id
+            });
+
+          if (insertError) throw insertError;
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock-entries'] });
