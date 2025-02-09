@@ -1,3 +1,4 @@
+<lov-code>
 import React, { useState, useEffect } from "react";
 import {
   Card,
@@ -852,6 +853,7 @@ const HojaDeRutaGenerator = () => {
     }
 
     try {
+      // First, upsert the main hoja_de_ruta record
       const { data: hojaData, error: hojaError } = await supabase
         .from("hoja_de_ruta")
         .upsert({
@@ -859,6 +861,4 @@ const HojaDeRutaGenerator = () => {
           event_name: eventData.eventName,
           event_dates: eventData.eventDates,
           venue_name: eventData.venue.name,
-          venue_address: eventData.venue.address,
-          contacts: eventData.contacts,
-          logistics: event
+          venue_address: eventData.venue
