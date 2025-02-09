@@ -1,8 +1,10 @@
+
 import { Music, CalendarDays } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Job } from "@/types/job";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
 
 interface JobCardProps {
   job: Job;
@@ -15,6 +17,13 @@ interface JobCardProps {
 }
 
 export const JobCard = ({ job, onEditClick, onDeleteClick, onJobClick, userRole, department, selectedDate }: JobCardProps) => {
+  const navigate = useNavigate();
+
+  const handleFestivalManage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/festival-management/${job.id}/artists`);
+  };
+
   return (
     <Card 
       className={cn(
@@ -32,10 +41,30 @@ export const JobCard = ({ job, onEditClick, onDeleteClick, onJobClick, userRole,
             )}
           </CardTitle>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={(e) => { e.stopPropagation(); onEditClick(job); }}>
+            {job.job_type === 'festival' && (
+              <Button 
+                variant="outline" 
+                onClick={handleFestivalManage}
+              >
+                Manage Artists
+              </Button>
+            )}
+            <Button 
+              variant="outline" 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                onEditClick(job); 
+              }}
+            >
               Edit
             </Button>
-            <Button variant="destructive" onClick={(e) => { e.stopPropagation(); onDeleteClick(job.id); }}>
+            <Button 
+              variant="destructive" 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                onDeleteClick(job.id); 
+              }}
+            >
               Delete
             </Button>
           </div>
