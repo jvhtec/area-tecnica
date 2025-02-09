@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 
@@ -45,49 +45,83 @@ export const ArtistManagementDialog = ({
 }: ArtistManagementDialogProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  
   const [formData, setFormData] = useState({
-    name: artist?.name || "",
-    stage: artist?.stage || "",
-    show_start: artist?.show_start || "",
-    show_end: artist?.show_end || "",
-    soundcheck: artist?.soundcheck || false,
-    soundcheck_start: artist?.soundcheck_start || "",
-    soundcheck_end: artist?.soundcheck_end || "",
-    foh_console: artist?.foh_console || "",
-    mon_console: artist?.mon_console || "",
-    wireless_model: artist?.wireless_model || "",
-    wireless_quantity_hh: artist?.wireless_quantity_hh || 0,
-    wireless_quantity_bp: artist?.wireless_quantity_bp || 0,
-    wireless_band: artist?.wireless_band || "",
-    iem_model: artist?.iem_model || "",
-    iem_quantity: artist?.iem_quantity || 0,
-    iem_band: artist?.iem_band || "",
-    monitors_enabled: artist?.monitors_enabled || false,
-    monitors_quantity: artist?.monitors_quantity || 0,
-    extras_sf: artist?.extras_sf || false,
-    extras_df: artist?.extras_df || false,
-    extras_djbooth: artist?.extras_djbooth || false,
-    extras_wired: artist?.extras_wired || "",
-    infra_cat6: artist?.infra_cat6 || false,
-    infra_cat6_quantity: artist?.infra_cat6_quantity || 0,
-    infra_hma: artist?.infra_hma || false,
-    infra_hma_quantity: artist?.infra_hma_quantity || 0,
-    infra_coax: artist?.infra_coax || false,
-    infra_coax_quantity: artist?.infra_coax_quantity || 0,
-    infra_analog: artist?.infra_analog || 0,
-    infra_opticalcon_duo: artist?.infra_opticalcon_duo || false,
-    infra_opticalcon_duo_quantity: artist?.infra_opticalcon_duo_quantity || 0,
-    other_infrastructure: artist?.other_infrastructure || "",
-    notes: artist?.notes || "",
-    date: artist?.date || selectedDate || "",
+    name: "",
+    stage: "",
+    show_start: "",
+    show_end: "",
+    soundcheck: false,
+    soundcheck_start: "",
+    soundcheck_end: "",
+    foh_console: "",
+    mon_console: "",
+    wireless_model: "",
+    wireless_quantity_hh: 0,
+    wireless_quantity_bp: 0,
+    wireless_band: "",
+    iem_model: "",
+    iem_quantity: 0,
+    iem_band: "",
+    monitors_enabled: false,
+    monitors_quantity: 0,
+    extras_sf: false,
+    extras_df: false,
+    extras_djbooth: false,
+    extras_wired: "",
+    infra_cat6: false,
+    infra_cat6_quantity: 0,
+    infra_hma: false,
+    infra_hma_quantity: 0,
+    infra_coax: false,
+    infra_coax_quantity: 0,
+    infra_analog: 0,
+    infra_opticalcon_duo: false,
+    infra_opticalcon_duo_quantity: 0,
+    other_infrastructure: "",
+    notes: "",
+    date: selectedDate || "",
   });
+
+  useEffect(() => {
+    if (artist) {
+      setFormData({
+        ...artist,
+        date: artist.date || selectedDate || "",
+      });
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        date: selectedDate || "",
+      }));
+    }
+  }, [artist, selectedDate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!jobId || !formData.date) {
+    
+    if (!jobId) {
       toast({
         title: "Error",
-        description: "Missing required fields",
+        description: "Job ID is missing",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.date) {
+      toast({
+        title: "Error",
+        description: "Performance date is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Artist name is required",
         variant: "destructive",
       });
       return;
@@ -95,7 +129,7 @@ export const ArtistManagementDialog = ({
 
     setIsLoading(true);
     try {
-      console.log("Submitting artist data:", formData);
+      console.log("Submitting artist data:", { ...formData, job_id: jobId });
       const data = {
         ...formData,
         job_id: jobId,
