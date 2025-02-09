@@ -183,6 +183,52 @@ export const ArtistManagementDialog = ({
                   />
                 </div>
               </div>
+              
+              {/* Soundcheck Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="soundcheck">Soundcheck</Label>
+                  <Switch
+                    id="soundcheck"
+                    checked={formData.soundcheck}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, soundcheck: checked })
+                    }
+                  />
+                </div>
+                {formData.soundcheck && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="soundcheck_start">Soundcheck Start</Label>
+                      <Input
+                        id="soundcheck_start"
+                        type="time"
+                        value={formData.soundcheck_start}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            soundcheck_start: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="soundcheck_end">Soundcheck End</Label>
+                      <Input
+                        id="soundcheck_end"
+                        type="time"
+                        value={formData.soundcheck_end}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            soundcheck_end: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Technical Setup */}
