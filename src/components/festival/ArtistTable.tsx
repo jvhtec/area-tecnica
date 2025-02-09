@@ -1,13 +1,15 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Edit2, Loader2, Mic, Headphones, FileText, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Edit2, Loader2, Mic, Headphones, FileText, Trash2, ChevronDown, ChevronUp, Printer } from "lucide-react";
 import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ArtistFileDialog } from "./ArtistFileDialog";
 import { cn } from "@/lib/utils";
+import { exportToPDF } from "@/utils/pdfExport";
+import { useToast } from "@/hooks/use-toast";
 
 interface ArtistTableProps {
   artists: any[];
@@ -33,6 +35,7 @@ export const ArtistTable = ({
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
   const [fileDialogOpen, setFileDialogOpen] = useState(false);
   const [selectedArtistForFiles, setSelectedArtistForFiles] = useState<string>("");
+  const { toast } = useToast();
 
   const toggleRowExpansion = (artistId: string) => {
     setExpandedRows(prev => 
@@ -53,6 +56,103 @@ export const ArtistTable = ({
     }
     setDeleteDialogOpen(false);
     setSelectedArtist(null);
+  };
+
+  const handlePrintArtist = async (artist: any) => {
+    try {
+      const tables = [{
+        name: `${artist.name} - Technical Requirements`,
+        rows: [
+          { quantity: '1', componentName: 'FOH Console', weight: artist.foh_console, totalWeight: null },
+          { quantity: '1', componentName: 'MON Console', weight: artist.mon_console, totalWeight: null },
+          { quantity: artist.wireless_quantity_hh.toString(), componentName: 'Handheld Wireless', weight: artist.wireless_model, totalWeight: null },
+          { quantity: artist.wireless_quantity_bp.toString(), componentName: 'Bodypack Wireless', weight: artist.wireless_model, totalWeight: null },
+          { quantity: artist.iem_quantity.toString(), componentName: 'IEM Systems', weight: artist.iem_model, totalWeight: null },
+          { quantity: artist.monitors_quantity?.toString() || '0', componentName: 'Monitors', weight: '', totalWeight: null },
+        ].filter(row => parseInt(row.quantity) > 0),
+        toolType: 'technical'
+      }, {
+        name: 'Infrastructure Requirements',
+        rows: [
+          { quantity: artist.infra_cat6_quantity?.toString() || '0', componentName: 'CAT6 Lines', weight: '', totalWeight: null },
+          { quantity: artist.infra_hma_quantity?.toString() || '0', componentName: 'HMA Lines', weight: '', totalWeight: null },
+          { quantity: artist.infra_coax_quantity?.toString() || '0', componentName: 'Coax Lines', weight: '', totalWeight: null },
+          { quantity: artist.infra_opticalcon_duo_quantity?.toString() || '0', componentName: 'OpticalCon Duo', weight: '', totalWeight: null },
+          { quantity: artist.infra_analog?.toString() || '0', componentName: 'Analog Lines', weight: '', totalWeight: null },
+        ].filter(row => parseInt(row.quantity) > 0),
+        toolType: 'infrastructure'
+      }];
+
+      const extraRequirements = [];
+      if (artist.extras_sf) extraRequirements.push('Side Fill');
+      if (artist.extras_df) extraRequirements.push('Drum Fill');
+      if (artist.extras_djbooth) extraRequirements.push('DJ Booth');
+      if (artist.extras_wired) extraRequirements.push(`Additional Wired: ${artist.extras_wired}`);
+
+      if (extraRequirements.length > 0) {
+        tables.push({
+          name: 'Extra Requirements',
+          rows: extraRequirements.map(req => ({
+            quantity: '1',
+            componentName: req,
+            weight: '',
+            totalWeight: null
+          })),
+          toolType: 'extras'
+        });
+      }
+
+      // Format show times
+      const showTimes = artist.show_start ? `${format(new Date(`2000-01-01T${artist.show_start}`), 'HH:mm')} - ${format(new Date(`2000-01-01T${artist.show_end}`), 'HH:mm')}` : 'Not set';
+      const soundcheckTimes = artist.soundcheck && artist.soundcheck_start ? 
+        `${format(new Date(`2000-01-01T${artist.soundcheck_start}`), 'HH:mm')} - ${format(new Date(`2000-01-01T${artist.soundcheck_end}`), 'HH:mm')}` : 
+        'Not scheduled';
+
+      const blob = await exportToPDF(
+        artist.name,
+        tables,
+        'technical',
+        `Stage ${artist.stage}`,
+        artist.date,
+        undefined,
+        undefined,
+        undefined,
+        {
+          showTimes,
+          soundcheckTimes,
+          notes: artist.notes || '',
+          additionalInfo: {
+            fohProvider: artist.foh_console_provided_by,
+            monProvider: artist.mon_console_provided_by,
+            wirelessProvider: artist.wireless_provided_by,
+            iemProvider: artist.iem_provided_by,
+            infrastructureProvider: artist.infrastructure_provided_by
+          }
+        }
+      );
+
+      // Create a download link and trigger it
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${artist.name}_technical_requirements.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Success",
+        description: "PDF generated successfully",
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "Error",
+        description: "Could not generate PDF",
+        variant: "destructive",
+      });
+    }
   };
 
   const filteredArtists = artists.filter(artist => {
@@ -205,6 +305,13 @@ export const ArtistTable = ({
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handlePrintArtist(artist)}
+                    >
+                      <Printer className="h-4 w-4" />
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -283,3 +390,4 @@ export const ArtistTable = ({
     </>
   );
 };
+
