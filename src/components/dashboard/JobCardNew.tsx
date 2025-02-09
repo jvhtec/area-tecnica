@@ -1,4 +1,3 @@
-<lov-code>
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -767,4 +766,4 @@ export function JobCardNew({
       return;
     }
 
-    if (!window.confirm("Are you sure you want to
+    if (!window.confirm("Are you sure you want to delete this job
