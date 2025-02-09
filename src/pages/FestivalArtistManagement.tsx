@@ -42,7 +42,9 @@ const FestivalArtistManagement = () => {
         if (isValid(startDate) && isValid(endDate)) {
           const dates = eachDayOfInterval({ start: startDate, end: endDate });
           setJobDates(dates);
-          setSelectedDate(format(dates[0], 'yyyy-MM-dd'));
+          // Set the first date as selected date
+          const formattedDate = format(dates[0], 'yyyy-MM-dd');
+          setSelectedDate(formattedDate);
         }
       }
     };
@@ -54,7 +56,7 @@ const FestivalArtistManagement = () => {
   useEffect(() => {
     const fetchArtists = async () => {
       try {
-        if (!selectedDate) return;
+        if (!jobId || !selectedDate) return;
         
         console.log("Fetching artists for job:", jobId, "and date:", selectedDate);
         const { data, error } = await supabase
@@ -79,9 +81,8 @@ const FestivalArtistManagement = () => {
       }
     };
 
-    if (jobId && selectedDate) {
-      fetchArtists();
-    }
+    setIsLoading(true);
+    fetchArtists();
   }, [jobId, selectedDate]);
 
   const handleAddArtist = () => {
