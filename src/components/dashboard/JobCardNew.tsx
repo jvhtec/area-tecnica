@@ -32,6 +32,7 @@ import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
 import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
 import { ArtistManagementDialog } from "../festival/ArtistManagementDialog";
+import { EditJobDialog } from "@/components/EditJobDialog";
 
 export interface JobDocument {
   id: string;
@@ -556,6 +557,7 @@ export function JobCardNew({
   const [soundTaskDialogOpen, setSoundTaskDialogOpen] = useState(false);
   const [lightsTaskDialogOpen, setLightsTaskDialogOpen] = useState(false);
   const [videoTaskDialogOpen, setVideoTaskDialogOpen] = useState(false);
+  const [editJobDialogOpen, setEditJobDialogOpen] = useState(false);
 
   const getDateTypeIcon = (jobId: string, date: Date, dateTypes: Record<string, any>) => {
     const key = `${jobId}-${format(date, "yyyy-MM-dd")}`;
@@ -1003,11 +1005,25 @@ export function JobCardNew({
     }
   };
 
-  const handleJobClick = () => {
-    if (job.job_type === "dryhire") {
-      return;
+  const handleJobCardClick = () => {
+    if (isProjectManagementPage) {
+      if (department === "sound") {
+        setSoundTaskDialogOpen(true);
+      } else if (department === "lights") {
+        setLightsTaskDialogOpen(true);
+      } else if (department === "video") {
+        setVideoTaskDialogOpen(true);
+      }
+    } else {
+      if (userRole !== "logistics") {
+        onJobClick(job.id);
+      }
     }
-    onJobClick(job.id);
+  };
+
+  const handleEditButtonClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditJobDialogOpen(true);
   };
 
   return (
@@ -1016,25 +1032,7 @@ export function JobCardNew({
         className={cn(
           "mb-4 hover:shadow-md transition-all duration-200 cursor-pointer border-l-4 overflow-hidden"
         )}
-        onClick={() => {
-          if (isProjectManagementPage) {
-            if (department === "sound") {
-              setSoundTaskDialogOpen(true);
-            } else if (department === "lights") {
-              setLightsTaskDialogOpen(true);
-            } else if (department === "video") {
-              setVideoTaskDialogOpen(true);
-            } else {
-              if (userRole !== "logistics") {
-                onJobClick(job.id);
-              }
-            }
-          } else {
-            if (userRole !== "logistics") {
-              onJobClick(job.id);
-            }
-          }
-        }}
+        onClick={handleJobCardClick}
         style={{
           borderLeftColor: appliedBorderColor,
           backgroundColor: appliedBgColor
@@ -1090,8 +1088,8 @@ export function JobCardNew({
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={handleEditClick}
-                    title="Edit job details, dates, and location"
+                    onClick={handleEditButtonClick}
+                    title="Edit job details"
                     className="hover:bg-accent/50"
                   >
                     <Edit className="h-4 w-4" />
@@ -1295,6 +1293,13 @@ export function JobCardNew({
           jobId={job.id}
           start_time={job.start_time}
           end_time={job.end_time}
+        />
+      )}
+      {editJobDialogOpen && (
+        <EditJobDialog
+          open={editJobDialogOpen}
+          onOpenChange={setEditJobDialogOpen}
+          job={job}
         />
       )}
     </div>
