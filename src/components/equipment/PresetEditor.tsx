@@ -53,11 +53,14 @@ export const PresetEditor = ({ preset, onSave, onCancel }: PresetEditorProps) =>
   const handleSave = () => {
     if (!name.trim()) return;
 
+    const now = new Date().toISOString();
     const items = Object.entries(quantities)
       .filter(([_, quantity]) => quantity > 0)
       .map(([equipment_id, quantity]) => ({
         equipment_id,
-        quantity
+        quantity,
+        created_at: now,
+        updated_at: now
       }));
 
     onSave({ name }, items);
