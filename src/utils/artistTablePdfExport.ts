@@ -148,8 +148,8 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
         lineWidth: 0.1,
       },
       headStyles: {
-        fillColor: [125, 1, 1],
-        textColor: [255, 255, 255],
+        fillColor: [125/255, 1/255, 1/255],  // Corporate red normalized to 0-1 range
+        textColor: [1, 1, 1],  // White in normalized RGB
         fontSize: 8,
         fontStyle: 'bold',
         halign: 'left',
@@ -170,7 +170,7 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
         if (data.row.index === -1) return; // Skip header row
         const rowData = scheduleRows[data.row.index];
         if (rowData.isSoundcheck) {
-          data.cell.styles.fillColor = [254, 247, 205]; // #FEF7CD for soundcheck rows
+          data.cell.styles.fillColor = [254/255, 247/255, 205/255]; // Normalized yellow for soundcheck rows
         }
       }
     });
