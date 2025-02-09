@@ -1,3 +1,4 @@
+
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -27,7 +28,6 @@ import FestivalManagement from '@/pages/FestivalManagement';
 import FestivalArtistManagement from '@/pages/FestivalArtistManagement';
 import LightsDisponibilidad from '@/pages/LightsDisponibilidad';
 import { EquipmentManagement } from '@/pages/EquipmentManagement';
-import { PresetManagementPage } from '@/pages/PresetManagementPage';
 
 function App() {
   return (
@@ -47,7 +47,6 @@ function App() {
               <Route path="project-management" element={<ProjectManagement />} />
               <Route path="technician" element={<TechnicianDashboard />} />
               <Route path="equipment-management" element={<EquipmentManagement />} />
-              <Route path="equipment-management/presets" element={<PresetManagementPage />} />
               
               {/* Tools Routes */}
               <Route path="pesos-tool" element={<PesosTool />} />
@@ -76,3 +75,4 @@ function App() {
 }
 
 export default App;
+
