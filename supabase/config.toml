@@ -1,0 +1,8 @@
+project_id = "syldobdcdsgfgjtbuwxm"
+
+[api]
+enabled = true
+
+[functions]
+[functions.get-secret]
+verify_jwt = false
