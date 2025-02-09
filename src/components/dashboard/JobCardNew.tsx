@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Department } from "@/types/department";
 import createFolderIcon from "@/assets/icons/icon.png";
+import { useNavigate } from "react-router-dom";
 
 // UI Components & Icons
 import { Card } from "@/components/ui/card";
@@ -31,7 +32,6 @@ import {
 import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
 import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
-import { ArtistManagementDialog } from "../festival/ArtistManagementDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 
@@ -543,6 +543,7 @@ export function JobCardNew({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { theme } = useTheme();
+  const navigate = useNavigate();
   const isDark = theme === "dark";
 
   const borderColor = job.color ? job.color : "#7E69AB";
@@ -553,7 +554,6 @@ export function JobCardNew({
   const [collapsed, setCollapsed] = useState(true);
   const [assignments, setAssignments] = useState(job.job_assignments || []);
   const [documents, setDocuments] = useState<JobDocument[]>(job.job_documents || []);
-  const [artistManagementOpen, setArtistManagementOpen] = useState(false);
   const [dateTypes, setDateTypes] = useState<Record<string, any>>({});
   const [soundTaskDialogOpen, setSoundTaskDialogOpen] = useState(false);
   const [lightsTaskDialogOpen, setLightsTaskDialogOpen] = useState(false);
@@ -1028,6 +1028,11 @@ export function JobCardNew({
     setEditJobDialogOpen(true);
   };
 
+  const handleFestivalArtistsClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/festival-management/${job.id}/artists`);
+  };
+
   return (
     <div className="p-4 bg-gray-50 dark:bg-gray-900">
       <Card
@@ -1067,10 +1072,7 @@ export function JobCardNew({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setArtistManagementOpen(true);
-                  }}
+                  onClick={handleFestivalArtistsClick}
                   className="hover:bg-accent/50"
                 >
                   Manage Artists
@@ -1300,15 +1302,6 @@ export function JobCardNew({
           open={videoTaskDialogOpen}
           onOpenChange={setVideoTaskDialogOpen}
           jobId={job.id}
-        />
-      )}
-      {artistManagementOpen && (
-        <ArtistManagementDialog
-          open={artistManagementOpen}
-          onOpenChange={setArtistManagementOpen}
-          jobId={job.id}
-          start_time={job.start_time}
-          end_time={job.end_time}
         />
       )}
       {editJobDialogOpen && (
