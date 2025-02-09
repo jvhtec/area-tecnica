@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { StockEntry } from '@/types/equipment';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -6,13 +5,16 @@ import { supabase } from '@/lib/supabase';
 import { useSessionManager } from '@/hooks/useSessionManager';
 import { useToast } from '@/hooks/use-toast';
 import { StockCreationManager } from '@/components/disponibilidad/StockCreationManager';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
 export function EquipmentManagement() {
   const { session, userRole } = useSessionManager();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Fetch current user's stock
   const { data: stockEntries = [], error: stockError } = useQuery({
@@ -86,9 +88,20 @@ export function EquipmentManagement() {
     updateStockMutation.mutate(updatedStock);
   };
 
-  if (stockError) {
-    return (
-      <div className="container mx-auto py-6">
+  return (
+    <div className="container mx-auto py-6">
+      <div className="flex items-center gap-4 mb-6">
+        <Button 
+          variant="ghost" 
+          size="icon"
+          onClick={() => navigate(-1)}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <h1 className="text-2xl font-bold">Gestionar Inventario</h1>
+      </div>
+
+      {stockError ? (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
@@ -96,17 +109,12 @@ export function EquipmentManagement() {
             Error al cargar el inventario. Por favor, inténtelo de nuevo más tarde.
           </AlertDescription>
         </Alert>
-      </div>
-    );
-  }
-
-  return (
-    <div className="container mx-auto py-6">
-      <h1 className="text-2xl font-bold mb-6">Gestionar Inventario</h1>
-      <StockCreationManager 
-        stock={stockEntries}
-        onStockUpdate={handleStockUpdate}
-      />
+      ) : (
+        <StockCreationManager 
+          stock={stockEntries}
+          onStockUpdate={handleStockUpdate}
+        />
+      )}
     </div>
   );
 }
