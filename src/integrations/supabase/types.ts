@@ -435,10 +435,14 @@ export type Database = {
           extras_sf: boolean | null
           extras_wired: string | null
           foh_console: string | null
+          foh_console_provided_by:
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           foh_tech: boolean | null
           id: string
           iem_band: string | null
           iem_model: string | null
+          iem_provided_by: Database["public"]["Enums"]["provider_type"] | null
           iem_quantity: number | null
           infra_analog: number | null
           infra_cat6: boolean | null
@@ -449,9 +453,15 @@ export type Database = {
           infra_hma_quantity: number | null
           infra_opticalcon_duo: boolean | null
           infra_opticalcon_duo_quantity: number | null
+          infrastructure_provided_by:
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           job_id: string | null
           mic_pack: string | null
           mon_console: string | null
+          mon_console_provided_by:
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           mon_tech: boolean | null
           monitors_enabled: boolean | null
           monitors_quantity: number | null
@@ -470,6 +480,9 @@ export type Database = {
           updated_at: string | null
           wireless_band: string | null
           wireless_model: string | null
+          wireless_provided_by:
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           wireless_quantity: number | null
           wireless_quantity_bp: number | null
           wireless_quantity_hh: number | null
@@ -483,10 +496,14 @@ export type Database = {
           extras_sf?: boolean | null
           extras_wired?: string | null
           foh_console?: string | null
+          foh_console_provided_by?:
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           foh_tech?: boolean | null
           id?: string
           iem_band?: string | null
           iem_model?: string | null
+          iem_provided_by?: Database["public"]["Enums"]["provider_type"] | null
           iem_quantity?: number | null
           infra_analog?: number | null
           infra_cat6?: boolean | null
@@ -497,9 +514,15 @@ export type Database = {
           infra_hma_quantity?: number | null
           infra_opticalcon_duo?: boolean | null
           infra_opticalcon_duo_quantity?: number | null
+          infrastructure_provided_by?:
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           job_id?: string | null
           mic_pack?: string | null
           mon_console?: string | null
+          mon_console_provided_by?:
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           mon_tech?: boolean | null
           monitors_enabled?: boolean | null
           monitors_quantity?: number | null
@@ -518,6 +541,9 @@ export type Database = {
           updated_at?: string | null
           wireless_band?: string | null
           wireless_model?: string | null
+          wireless_provided_by?:
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           wireless_quantity?: number | null
           wireless_quantity_bp?: number | null
           wireless_quantity_hh?: number | null
@@ -531,10 +557,14 @@ export type Database = {
           extras_sf?: boolean | null
           extras_wired?: string | null
           foh_console?: string | null
+          foh_console_provided_by?:
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           foh_tech?: boolean | null
           id?: string
           iem_band?: string | null
           iem_model?: string | null
+          iem_provided_by?: Database["public"]["Enums"]["provider_type"] | null
           iem_quantity?: number | null
           infra_analog?: number | null
           infra_cat6?: boolean | null
@@ -545,9 +575,15 @@ export type Database = {
           infra_hma_quantity?: number | null
           infra_opticalcon_duo?: boolean | null
           infra_opticalcon_duo_quantity?: number | null
+          infrastructure_provided_by?:
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           job_id?: string | null
           mic_pack?: string | null
           mon_console?: string | null
+          mon_console_provided_by?:
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           mon_tech?: boolean | null
           monitors_enabled?: boolean | null
           monitors_quantity?: number | null
@@ -566,6 +602,9 @@ export type Database = {
           updated_at?: string | null
           wireless_band?: string | null
           wireless_model?: string | null
+          wireless_provided_by?:
+            | Database["public"]["Enums"]["provider_type"]
+            | null
           wireless_quantity?: number | null
           wireless_quantity_bp?: number | null
           wireless_quantity_hh?: number | null
@@ -2110,6 +2149,7 @@ export type Database = {
         | "administrative"
         | "production"
       project_status: "pending" | "in_progress" | "completed" | "cancelled"
+      provider_type: "festival" | "band"
       room_type: "single" | "double"
       task_status: "not_started" | "in_progress" | "completed"
       transport_type: "trailer" | "9m" | "8m" | "6m" | "4m" | "furgoneta" | "rv"

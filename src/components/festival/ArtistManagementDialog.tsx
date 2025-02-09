@@ -1,9 +1,11 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
@@ -55,12 +57,18 @@ export const ArtistManagementDialog = ({
     soundcheck_start: "",
     soundcheck_end: "",
     foh_console: "",
+    foh_console_provided_by: "festival",
+    foh_tech: false,
     mon_console: "",
+    mon_console_provided_by: "festival",
+    mon_tech: false,
     wireless_model: "",
+    wireless_provided_by: "festival",
     wireless_quantity_hh: 0,
     wireless_quantity_bp: 0,
     wireless_band: "",
     iem_model: "",
+    iem_provided_by: "festival",
     iem_quantity: 0,
     iem_band: "",
     monitors_enabled: false,
@@ -78,6 +86,7 @@ export const ArtistManagementDialog = ({
     infra_analog: 0,
     infra_opticalcon_duo: false,
     infra_opticalcon_duo_quantity: 0,
+    infrastructure_provided_by: "festival",
     other_infrastructure: "",
     notes: "",
     date: selectedDate || "",
@@ -129,7 +138,6 @@ export const ArtistManagementDialog = ({
 
     setIsLoading(true);
     try {
-      console.log("Submitting artist data:", { ...formData, job_id: jobId });
       const data = {
         ...formData,
         job_id: jobId,
@@ -166,6 +174,26 @@ export const ArtistManagementDialog = ({
     }
   };
 
+  const ProviderRadioGroup = ({ value, onChange, label }: { value: string, onChange: (value: string) => void, label: string }) => (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <RadioGroup
+        value={value}
+        onValueChange={onChange}
+        className="flex space-x-4"
+      >
+        <div className="flex items-center space-x-2">
+          <RadioGroupItem value="festival" id={`${label}-festival`} />
+          <Label htmlFor={`${label}-festival`}>Festival</Label>
+        </div>
+        <div className="flex items-center space-x-2">
+          <RadioGroupItem value="band" id={`${label}-band`} />
+          <Label htmlFor={`${label}-band`}>Band</Label>
+        </div>
+      </RadioGroup>
+    </div>
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -184,6 +212,19 @@ export const ArtistManagementDialog = ({
                   value={formData.name}
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="stage">Stage Number</Label>
+                <Input
+                  id="stage"
+                  type="number"
+                  min="1"
+                  value={formData.stage}
+                  onChange={(e) =>
+                    setFormData({ ...formData, stage: e.target.value })
                   }
                   required
                 />
@@ -271,7 +312,30 @@ export const ArtistManagementDialog = ({
             </div>
 
             <div className="space-y-4">
-              <div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="foh_tech">FOH Tech</Label>
+                  <Switch
+                    id="foh_tech"
+                    checked={formData.foh_tech}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, foh_tech: checked })
+                    }
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="mon_tech">Monitor Tech</Label>
+                  <Switch
+                    id="mon_tech"
+                    checked={formData.mon_tech}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, mon_tech: checked })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="foh_console">FOH Console</Label>
                 <Select
                   value={formData.foh_console}
@@ -290,8 +354,14 @@ export const ArtistManagementDialog = ({
                     ))}
                   </SelectContent>
                 </Select>
+                <ProviderRadioGroup
+                  value={formData.foh_console_provided_by}
+                  onChange={(value) => setFormData({ ...formData, foh_console_provided_by: value })}
+                  label="FOH Console Provided By"
+                />
               </div>
-              <div>
+
+              <div className="space-y-2">
                 <Label htmlFor="mon_console">Monitor Console</Label>
                 <Select
                   value={formData.mon_console}
@@ -310,6 +380,11 @@ export const ArtistManagementDialog = ({
                     ))}
                   </SelectContent>
                 </Select>
+                <ProviderRadioGroup
+                  value={formData.mon_console_provided_by}
+                  onChange={(value) => setFormData({ ...formData, mon_console_provided_by: value })}
+                  label="Monitor Console Provided By"
+                />
               </div>
             </div>
           </div>
@@ -337,6 +412,11 @@ export const ArtistManagementDialog = ({
                       ))}
                     </SelectContent>
                   </Select>
+                  <ProviderRadioGroup
+                    value={formData.wireless_provided_by}
+                    onChange={(value) => setFormData({ ...formData, wireless_provided_by: value })}
+                    label="Wireless System Provided By"
+                  />
                 </div>
                 <div>
                   <Label htmlFor="wireless_quantity_hh">Handheld Quantity</Label>
@@ -399,6 +479,11 @@ export const ArtistManagementDialog = ({
                       ))}
                     </SelectContent>
                   </Select>
+                  <ProviderRadioGroup
+                    value={formData.iem_provided_by}
+                    onChange={(value) => setFormData({ ...formData, iem_provided_by: value })}
+                    label="IEM System Provided By"
+                  />
                 </div>
                 <div>
                   <Label htmlFor="iem_quantity">IEM Quantity</Label>
@@ -505,7 +590,14 @@ export const ArtistManagementDialog = ({
           </div>
 
           <div className="border rounded-lg p-4 space-y-4">
-            <h3 className="text-lg font-medium">Infrastructure</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium">Infrastructure</h3>
+              <ProviderRadioGroup
+                value={formData.infrastructure_provided_by}
+                onChange={(value) => setFormData({ ...formData, infrastructure_provided_by: value })}
+                label="Infrastructure Provided By"
+              />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -689,3 +781,4 @@ export const ArtistManagementDialog = ({
     </Dialog>
   );
 };
+
