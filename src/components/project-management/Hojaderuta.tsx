@@ -1,4 +1,3 @@
-<lov-code>
 import React, { useState, useEffect } from "react";
 import {
   Card,
@@ -34,7 +33,7 @@ import { supabase } from "@/lib/supabase";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-// Extensión de jsPDF para usar autoTable
+// Extending jsPDF for autoTable
 interface AutoTableJsPDF extends jsPDF {
   lastAutoTable?: {
     finalY: number;
@@ -107,16 +106,19 @@ const HojaDeRutaGenerator = () => {
   const [images, setImages] = useState({
     venue: [] as File[],
   });
+
   const [imagePreviews, setImagePreviews] = useState({
     venue: [] as string[],
   });
+  
   const [venueMap, setVenueMap] = useState<File | null>(null);
   const [venueMapPreview, setVenueMapPreview] = useState<string | null>(null);
-
   const [powerRequirements, setPowerRequirements] = useState<string>("");
+  
   const [travelArrangements, setTravelArrangements] = useState<TravelArrangement[]>([
     { transportation_type: "van" },
   ]);
+  
   const [roomAssignments, setRoomAssignments] = useState<RoomAssignment[]>([
     { room_type: "single" },
   ]);
