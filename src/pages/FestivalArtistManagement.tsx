@@ -1,9 +1,8 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowLeft } from "lucide-react";
+import { Plus, ArrowLeft, Printer } from "lucide-react";
 import { ArtistTable } from "@/components/festival/ArtistTable";
 import { ArtistManagementDialog } from "@/components/festival/ArtistManagementDialog";
 import { ArtistTableFilters } from "@/components/festival/ArtistTableFilters";
@@ -11,6 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { format, eachDayOfInterval, isValid } from "date-fns";
+import { ArtistTablePrintDialog } from "@/components/festival/ArtistTablePrintDialog";
+import { exportArtistTablePDF } from "@/utils/artistTablePdfExport";
 
 const FestivalArtistManagement = () => {
   const { jobId } = useParams();
@@ -26,6 +27,10 @@ const FestivalArtistManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [stageFilter, setStageFilter] = useState("");
   const [equipmentFilter, setEquipmentFilter] = useState("");
+  const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [printDate, setPrintDate] = useState("");
+  const [printStage, setPrintStage] = useState("");
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -157,6 +162,94 @@ const FestivalArtistManagement = () => {
     return format(date, 'EEE, MMM d');
   };
 
+  const handlePrintTable = async () => {
+    if (!jobId) return;
+    
+    setIsPrinting(true);
+    try {
+      const filteredArtists = artists.filter(artist => {
+        const matchesStage = !printStage || artist.stage?.toString() === printStage;
+        const matchesDate = artist.date === printDate;
+        return matchesStage && matchesDate;
+      });
+
+      const data = {
+        jobTitle: jobTitle,
+        date: printDate,
+        stage: printStage,
+        artists: filteredArtists.map(artist => ({
+          name: artist.name,
+          stage: artist.stage,
+          showTime: {
+            start: artist.show_start,
+            end: artist.show_end
+          },
+          soundcheck: artist.soundcheck ? {
+            start: artist.soundcheck_start,
+            end: artist.soundcheck_end
+          } : undefined,
+          technical: {
+            fohTech: artist.foh_tech,
+            monTech: artist.mon_tech,
+            fohConsole: {
+              model: artist.foh_console,
+              providedBy: artist.foh_console_provided_by
+            },
+            monConsole: {
+              model: artist.mon_console,
+              providedBy: artist.mon_console_provided_by
+            },
+            wireless: {
+              hh: artist.wireless_quantity_hh,
+              bp: artist.wireless_quantity_bp,
+              providedBy: artist.wireless_provided_by
+            },
+            iem: {
+              quantity: artist.iem_quantity,
+              providedBy: artist.iem_provided_by
+            },
+            monitors: {
+              enabled: artist.monitors_enabled,
+              quantity: artist.monitors_quantity
+            }
+          },
+          extras: {
+            sideFill: artist.extras_sf,
+            drumFill: artist.extras_df,
+            djBooth: artist.extras_djbooth
+          },
+          notes: artist.notes
+        }))
+      };
+
+      const blob = await exportArtistTablePDF(data);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `artist_schedule_${format(new Date(printDate), 'yyyy-MM-dd')}${printStage ? `_stage${printStage}` : ''}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Success",
+        description: "PDF generated successfully",
+      });
+      setIsPrintDialogOpen(false);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "Error",
+        description: "Could not generate PDF",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  // Update the return statement to include the new button and dialog
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="mb-6">
@@ -174,10 +267,19 @@ const FestivalArtistManagement = () => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Festival Artists</CardTitle>
-          <Button onClick={handleAddArtist}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Artist
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => {
+              setPrintDate(selectedDate);
+              setIsPrintDialogOpen(true);
+            }}>
+              <Printer className="h-4 w-4 mr-2" />
+              Print Schedule
+            </Button>
+            <Button onClick={handleAddArtist}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Artist
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <ArtistTableFilters
@@ -242,6 +344,17 @@ const FestivalArtistManagement = () => {
         artist={selectedArtist}
         jobId={jobId}
         selectedDate={selectedDate}
+      />
+
+      <ArtistTablePrintDialog
+        open={isPrintDialogOpen}
+        onOpenChange={setIsPrintDialogOpen}
+        jobDates={jobDates}
+        selectedDate={printDate}
+        onDateChange={setPrintDate}
+        onStageChange={setPrintStage}
+        onPrint={handlePrintTable}
+        isLoading={isPrinting}
       />
     </div>
   );
