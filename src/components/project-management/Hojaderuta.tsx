@@ -1,4 +1,5 @@
 
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -1244,3 +1245,4 @@ const HojaDeRutaGenerator = () => {
 };
 
 export default HojaDeRutaGenerator;
+
