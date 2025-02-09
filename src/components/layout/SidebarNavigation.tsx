@@ -9,8 +9,7 @@ import {
   Settings,
   Briefcase,
   UserCircle,
-  Truck,
-  Package
+  Truck
 } from "lucide-react";
 
 interface SidebarNavigationProps {
@@ -77,18 +76,6 @@ export const SidebarNavigation = ({ userRole }: SidebarNavigationProps) => {
               >
                 <Truck className="h-4 w-4" />
                 <span>Logistics</span>
-              </Button>
-            </Link>
-
-            <Link to="/equipment-management">
-              <Button
-                variant="ghost"
-                className={`w-full justify-start gap-2 ${
-                  location.pathname === "/equipment-management" ? "bg-accent" : ""
-                }`}
-              >
-                <Package className="h-4 w-4" />
-                <span>Equipment Management</span>
               </Button>
             </Link>
           </>
