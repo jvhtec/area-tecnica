@@ -37,27 +37,22 @@ export const ArtistManagementDialog = ({
     soundcheck_end: artist?.soundcheck_end || "",
     foh_console: artist?.foh_console || "",
     mon_console: artist?.mon_console || "",
-    // RF and Wireless fields
     wireless_model: artist?.wireless_model || "",
     wireless_quantity: artist?.wireless_quantity || 0,
     wireless_band: artist?.wireless_band || "",
     iem_model: artist?.iem_model || "",
     iem_quantity: artist?.iem_quantity || 0,
     iem_band: artist?.iem_band || "",
-    // Monitor setup
     monitors_enabled: artist?.monitors_enabled || false,
     monitors_quantity: artist?.monitors_quantity || 0,
-    // Extra requirements
     extras_sf: artist?.extras_sf || false,
     extras_df: artist?.extras_df || false,
     extras_djbooth: artist?.extras_djbooth || false,
     extras_wired: artist?.extras_wired || "",
-    // Infrastructure
     infra_cat6: artist?.infra_cat6 || false,
     infra_hma: artist?.infra_hma || false,
     infra_coax: artist?.infra_coax || false,
     infra_analog: artist?.infra_analog || 0,
-    // Notes
     notes: artist?.notes || "",
   });
 
@@ -71,6 +66,11 @@ export const ArtistManagementDialog = ({
       const data = {
         ...formData,
         job_id: jobId,
+        // Handle time fields - convert empty strings to null
+        show_start: formData.show_start || null,
+        show_end: formData.show_end || null,
+        soundcheck_start: formData.soundcheck_start || null,
+        soundcheck_end: formData.soundcheck_end || null,
       };
 
       const { error } = artist?.id
