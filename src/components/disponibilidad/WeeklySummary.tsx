@@ -1,7 +1,6 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, ChevronsUpDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsUpDown, Download } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -12,6 +11,7 @@ import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { exportWeeklySummaryPDF } from '@/lib/weeklySummaryPdfExport';
 
 interface WeeklySummaryProps {
   selectedDate: Date;
@@ -41,13 +41,11 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     localStorage.setItem('weeklySummaryOpen', JSON.stringify(isOpen));
   }, [isOpen]);
 
-  // Get dates for the current week
   const weekDates = eachDayOfInterval({
     start: currentWeekStart,
     end: endOfWeek(currentWeekStart)
   });
 
-  // Fetch equipment list and stock
   const { data: stockWithEquipment } = useQuery({
     queryKey: ['equipment-with-stock', session?.user?.id],
     queryFn: async () => {
@@ -66,7 +64,6 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
 
       if (!equipment) return [];
 
-      // Create a map of equipment quantities
       const stockMap = (stockEntries || []).reduce((acc, entry) => {
         acc[entry.equipment_id] = entry.base_quantity;
         return acc;
@@ -80,7 +77,6 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     enabled: !!session?.user?.id
   });
 
-  // Fetch preset assignments for the week
   const { data: weekAssignments } = useQuery({
     queryKey: ['week-preset-assignments', session?.user?.id, currentWeekStart],
     queryFn: async () => {
@@ -88,7 +84,6 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
 
       const assignments = [];
       
-      // Fetch all assignments for each day
       for (const date of weekDates) {
         const { data, error } = await supabase
           .from('day_preset_assignments')
@@ -121,14 +116,12 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     enabled: !!session?.user?.id
   });
 
-  // Calculate total used quantities for each equipment per day
   const getUsedQuantity = (equipmentId: string, date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const dayAssignments = weekAssignments?.filter(a => a.date === dateStr);
     
     if (!dayAssignments?.length) return 0;
 
-    // Sum up quantities from all presets assigned to this date
     return dayAssignments.reduce((total, assignment) => {
       const item = assignment.preset.items.find(item => 
         item.equipment_id === equipmentId
@@ -168,6 +161,57 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     selectedCategories.includes(item.category as EquipmentCategory)
   );
 
+  const handleExportPDF = async () => {
+    if (!filteredEquipment) return;
+
+    try {
+      const pdfRows = filteredEquipment.map(item => {
+        const dailyUsage = weekDates.map(date => {
+          const used = getUsedQuantity(item.id, date);
+          const remaining = item.stock - used;
+          return {
+            used,
+            remaining,
+            date
+          };
+        });
+
+        const maxUsedInWeek = Math.max(...dailyUsage.map(d => d.used));
+        const available = item.stock - maxUsedInWeek;
+
+        return {
+          name: item.name,
+          category: item.category,
+          stock: item.stock,
+          dailyUsage,
+          available
+        };
+      });
+
+      const blob = await exportWeeklySummaryPDF(currentWeekStart, pdfRows, selectedCategories);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `resumen-semanal-${format(currentWeekStart, 'yyyy-MM-dd')}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "PDF Exportado",
+        description: "El resumen semanal se ha exportado correctamente",
+      });
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo exportar el PDF",
+      });
+    }
+  };
+
   return (
     <Collapsible
       open={isOpen}
@@ -198,6 +242,14 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
           </span>
           <Button variant="outline" size="sm" onClick={handleNextWeek}>
             <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleExportPDF}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Exportar PDF
           </Button>
           <CollapsibleTrigger asChild>
             <Button variant="ghost" size="sm">
@@ -273,4 +325,3 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     </Collapsible>
   );
 }
-
