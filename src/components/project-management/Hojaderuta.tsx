@@ -103,16 +103,13 @@ const HojaDeRutaGenerator = () => {
     auxiliaryNeeds: "",
   });
 
-  // ---------------------------
-  // ESTADOS DE IMÁGENES Y ARCHIVOS
-  // ---------------------------
+  // States for images and files
   const [images, setImages] = useState({
     venue: [] as File[],
   });
   const [imagePreviews, setImagePreviews] = useState({
     venue: [] as string[],
   });
-  // Estado para el mapa de ubicación del lugar (archivo único)
   const [venueMap, setVenueMap] = useState<File | null>(null);
   const [venueMapPreview, setVenueMapPreview] = useState<string | null>(null);
 
@@ -124,9 +121,7 @@ const HojaDeRutaGenerator = () => {
     { room_type: "single" },
   ]);
 
-  // ---------------------------
-  // UTILIDAD: cargar imagen desde URL como DataURL
-  // ---------------------------
+  // Utility function to load image from URL as DataURL
   const loadImageAsDataURL = async (url: string): Promise<string | null> => {
     try {
       const response = await fetch(url);
@@ -138,14 +133,12 @@ const HojaDeRutaGenerator = () => {
         reader.readAsDataURL(blob);
       });
     } catch (error) {
-      console.error("Error al cargar la imagen", error);
+      console.error("Error loading image:", error);
       return null;
     }
   };
 
-  // ---------------------------
-  // FUNCIONES DE CONSULTA
-  // ---------------------------
+  // Query functions
   const fetchPowerRequirements = async (jobId: string) => {
     try {
       const { data: requirements, error } = await supabase
@@ -156,13 +149,12 @@ const HojaDeRutaGenerator = () => {
       if (error) throw error;
 
       if (requirements && requirements.length > 0) {
-        // Formatear los requisitos eléctricos en texto legible
         const formattedRequirements = requirements
           .map((req: any) => {
             return `${req.department.toUpperCase()} - ${req.table_name}:\n` +
-              `Potencia Total: ${req.total_watts}W\n` +
-              `Corriente por Fase: ${req.current_per_phase}A\n` +
-              `PDU Recomendado: ${req.pdu_type}\n`;
+              `Total Power: ${req.total_watts}W\n` +
+              `Current per Phase: ${req.current_per_phase}A\n` +
+              `PDU Type: ${req.pdu_type}\n`;
           })
           .join("\n");
         setPowerRequirements(formattedRequirements);
@@ -172,10 +164,10 @@ const HojaDeRutaGenerator = () => {
         }));
       }
     } catch (error: any) {
-      console.error("Error al obtener los requisitos eléctricos:", error);
+      console.error("Error fetching power requirements:", error);
       toast({
         title: "Error",
-        description: "No se pudieron obtener los requisitos eléctricos",
+        description: "Could not fetch power requirements",
         variant: "destructive",
       });
     }
@@ -207,7 +199,7 @@ const HojaDeRutaGenerator = () => {
             assignment.sound_role ||
             assignment.lights_role ||
             assignment.video_role ||
-            "Técnico",
+            "Technician",
         }));
 
         setEventData((prev) => ({
@@ -216,10 +208,10 @@ const HojaDeRutaGenerator = () => {
         }));
       }
     } catch (error) {
-      console.error("Error al obtener el personal:", error);
+      console.error("Error fetching staff:", error);
       toast({
         title: "Error",
-        description: "No se pudo obtener el personal asignado",
+        description: "Could not fetch assigned staff",
         variant: "destructive",
       });
     }
@@ -229,8 +221,7 @@ const HojaDeRutaGenerator = () => {
     if (selectedJobId && jobs) {
       const selectedJob = jobs.find((job: any) => job.id === selectedJobId);
       if (selectedJob) {
-        console.log("Trabajo seleccionado:", selectedJob);
-        // Formatear fechas
+        console.log("Selected job:", selectedJob);
         const formattedDates = `${format(
           new Date(selectedJob.start_time),
           "dd/MM/yyyy HH:mm"
@@ -246,16 +237,14 @@ const HojaDeRutaGenerator = () => {
         fetchAssignedStaff(selectedJob.id);
 
         toast({
-          title: "Trabajo Seleccionado",
-          description: "El formulario se ha actualizado con los detalles del trabajo",
+          title: "Job Selected",
+          description: "Form has been updated with job details",
         });
       }
     }
   }, [selectedJobId, jobs]);
 
-  // ---------------------------
-  // MANEJADORES DE IMÁGENES
-  // ---------------------------
+  // Image handlers
   const handleImageUpload = (
     type: keyof typeof images,
     files: FileList | null
@@ -282,7 +271,6 @@ const HojaDeRutaGenerator = () => {
     setImagePreviews({ ...imagePreviews, [type]: newPreviews });
   };
 
-  // Manejador para subir el mapa de ubicación del lugar
   const handleVenueMapUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -292,9 +280,7 @@ const HojaDeRutaGenerator = () => {
     }
   };
 
-  // ---------------------------
-  // MANEJADORES DE CONTACTOS Y PERSONAL
-  // ---------------------------
+  // Contact and staff handlers
   const handleContactChange = (index: number, field: string, value: string) => {
     const newContacts = [...eventData.contacts];
     newContacts[index] = { ...newContacts[index], [field]: value };
@@ -324,9 +310,7 @@ const HojaDeRutaGenerator = () => {
     });
   };
 
-  // ---------------------------
-  // MANEJADORES DE ARREGLOS DE VIAJE Y ASIGNACIONES DE HABITACIONES
-  // ---------------------------
+  // Travel arrangements and room assignments handlers
   const addTravelArrangement = () => {
     setTravelArrangements([...travelArrangements, { transportation_type: "van" }]);
   };
@@ -367,13 +351,12 @@ const HojaDeRutaGenerator = () => {
     setRoomAssignments(newAssignments);
   };
 
-  // ---------------------------
-  // COMPONENTE DE SUBIDA DE IMÁGENES
-  // ---------------------------
+  // Image upload section component
   interface ImageUploadSectionProps {
     type: keyof typeof images;
     label: string;
   }
+
   const ImageUploadSection = ({ type, label }: ImageUploadSectionProps) => {
     return (
       <div className="space-y-4">
@@ -391,7 +374,7 @@ const HojaDeRutaGenerator = () => {
               <div key={index} className="relative group">
                 <img
                   src={preview}
-                  alt={`${type} vista previa ${index + 1}`}
+                  alt={`${type} preview ${index + 1}`}
                   className="w-full h-32 object-cover rounded-lg"
                 />
                 <button
@@ -408,18 +391,15 @@ const HojaDeRutaGenerator = () => {
     );
   };
 
-  // ---------------------------
-  // SUBIDA DEL PDF A SUPABASE
-  // ---------------------------
+  // PDF upload to Supabase
   const uploadPdfToJob = async (
     jobId: string,
     pdfBlob: Blob,
     fileName: string
   ) => {
     try {
-      console.log("Iniciando subida del PDF:", fileName);
+      console.log("Starting PDF upload:", fileName);
 
-      // Sanitizar el nombre del archivo
       const sanitizedFileName = fileName
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
@@ -427,9 +407,8 @@ const HojaDeRutaGenerator = () => {
         .replace(/\s+/g, "_");
 
       const filePath = `${crypto.randomUUID()}-${sanitizedFileName}`;
-      console.log("Subiendo con la ruta sanitizada:", filePath);
+      console.log("Uploading with sanitized path:", filePath);
 
-      // Subir a Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("job_documents")
         .upload(filePath, pdfBlob, {
@@ -438,13 +417,12 @@ const HojaDeRutaGenerator = () => {
         });
 
       if (uploadError) {
-        console.error("Error en la subida:", uploadError);
+        console.error("Upload error:", uploadError);
         throw uploadError;
       }
 
-      console.log("Archivo subido con éxito:", uploadData);
+      console.log("File uploaded successfully:", uploadData);
 
-      // Crear un registro en la base de datos
       const { error: dbError } = await supabase.from("job_documents").insert({
         job_id: jobId,
         file_name: fileName,
@@ -454,46 +432,43 @@ const HojaDeRutaGenerator = () => {
       });
 
       if (dbError) {
-        console.error("Error en la base de datos:", dbError);
+        console.error("Database error:", dbError);
         throw dbError;
       }
 
       toast({
-        title: "Éxito",
-        description: "La Hoja de Ruta ha sido generada y subida",
+        title: "Success",
+        description: "Route Sheet has been generated and uploaded",
       });
     } catch (error: any) {
-      console.error("Fallo en la subida:", error);
+      console.error("Upload failed:", error);
       toast({
-        title: "Fallo en la subida",
+        title: "Upload failed",
         description: error.message,
         variant: "destructive",
       });
     }
   };
 
-  // ---------------------------
-  // GENERAR DOCUMENTO PDF (Todo en español)
-  // ---------------------------
+  // Generate PDF document
   const generateDocument = async () => {
     if (!selectedJobId) {
       toast({
         title: "Error",
-        description: "Por favor, seleccione un trabajo antes de generar el documento.",
+        description: "Please select a job before generating the document.",
         variant: "destructive",
       });
       return;
     }
 
     const selectedJob = jobs?.find((job: any) => job.id === selectedJobId);
-    const jobTitle = selectedJob?.title || "Trabajo_Sin_Nombre";
+    const jobTitle = selectedJob?.title || "Untitled_Job";
 
     const doc = new jsPDF() as AutoTableJsPDF;
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
-    const bottomMargin = 60; // Reservar 60 puntos en la parte inferior para el logo
+    const bottomMargin = 60;
 
-    // Función auxiliar para agregar una página si la posición actual excede el área segura
     const checkPageBreak = (currentY: number): number => {
       if (currentY > pageHeight - bottomMargin) {
         doc.addPage();
@@ -502,39 +477,41 @@ const HojaDeRutaGenerator = () => {
       return currentY;
     }
 
-    // Agregar fondo de cabecera en la primera página
+    // Add header background
     doc.setFillColor(125, 1, 1);
     doc.rect(0, 0, pageWidth, 40, "F");
 
-    // Título y nombre del evento (centrado, texto blanco)
+    // Title and event name
     doc.setFontSize(24);
     doc.setTextColor(255, 255, 255);
-    doc.text("Hoja de Ruta", pageWidth / 2, 20, { align: "center" });
+    doc.text("Route Sheet", pageWidth / 2, 20, { align: "center" });
     doc.setFontSize(16);
     doc.text(eventData.eventName, pageWidth / 2, 30, { align: "center" });
 
+    // Rest of content
     let yPosition = 50;
     doc.setFontSize(12);
     doc.setTextColor(51, 51, 51);
 
-    // Fechas del evento
+    // Event dates
     yPosition = checkPageBreak(yPosition);
-    doc.text(`Fechas: ${eventData.eventDates}`, 20, yPosition);
+    doc.text(`Dates: ${eventData.eventDates}`, 20, yPosition);
     yPosition += 15;
 
-    // Sección de Información del Lugar
+    // Venue information
     yPosition = checkPageBreak(yPosition);
     doc.setFontSize(14);
     doc.setTextColor(125, 1, 1);
-    doc.text("Información del Lugar", 20, yPosition);
+    doc.text("Venue Information", 20, yPosition);
     yPosition += 10;
     doc.setFontSize(10);
     doc.setTextColor(51, 51, 51);
-    doc.text(`Nombre: ${eventData.venue.name}`, 30, yPosition);
+    doc.text(`Name: ${eventData.venue.name}`, 30, yPosition);
     yPosition += 7;
-    doc.text(`Dirección: ${eventData.venue.address}`, 30, yPosition);
+    doc.text(`Address: ${eventData.venue.address}`, 30, yPosition);
     yPosition += 15;
-    // Insertar el mapa de ubicación del lugar, si está disponible
+
+    // Add venue map if available
     if (venueMapPreview) {
       try {
         const mapWidth = 100;
@@ -542,11 +519,11 @@ const HojaDeRutaGenerator = () => {
         doc.addImage(venueMapPreview, "JPEG", 30, yPosition, mapWidth, mapHeight);
         yPosition += mapHeight + 10;
       } catch (error) {
-        console.error("Error al agregar el mapa del lugar al PDF:", error);
+        console.error("Error adding venue map to PDF:", error);
       }
     }
 
-    // Sección de Contactos
+    // Section de Contactos
     if (
       eventData.contacts.some(
         (contact) => contact.name || contact.role || contact.phone
@@ -861,4 +838,41 @@ const HojaDeRutaGenerator = () => {
           event_name: eventData.eventName,
           event_dates: eventData.eventDates,
           venue_name: eventData.venue.name,
-          venue_address: eventData.venue
+          venue_address: eventData.venue.address,
+          logistics_transport: eventData.logistics.transport,
+          logistics_loading_details: eventData.logistics.loadingDetails,
+          logistics_unloading_details: eventData.logistics.unloadingDetails,
+          schedule: eventData.schedule,
+          power_requirements: eventData.powerRequirements,
+          auxiliary_needs: eventData.auxiliaryNeeds,
+        }, { onConflict: 'job_id' });
+
+      if (hojaError) {
+        console.error("Error al guardar la hoja de ruta:", hojaError);
+        throw hojaError;
+      }
+
+      // Next, handle contacts
+      await Promise.all(
+        eventData.contacts.map(async (contact, index) => {
+          const { data: contactData, error: contactError } = await supabase
+            .from("contacts")
+            .upsert({
+              hoja_de_ruta_job_id: selectedJobId,
+              contact_index: index,
+              name: contact.name,
+              role: contact.role,
+              phone: contact.phone,
+            }, { onConflict: ['hoja_de_ruta_job_id', 'contact_index'] });
+
+          if (contactError) {
+            console.error(`Error al guardar el contacto ${index}:`, contactError);
+            throw contactError;
+          }
+        })
+      );
+
+      // Then, handle staff
+      await Promise.all(
+        eventData.staff.map(async (staffMember, index) => {
+          const { data: staffData, error:
