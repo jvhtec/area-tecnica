@@ -39,9 +39,9 @@ export default function LightsDisponibilidad() {
         `)
         .eq('user_id', session.user.id)
         .eq('date', format(selectedDate, 'yyyy-MM-dd'))
-        .single();
+        .maybeSingle(); // Changed from single() to maybeSingle()
 
-      if (error && error.code !== 'PGRST116') { // Not found error code
+      if (error && error.code !== 'PGRST116') { // Still check for other errors
         toast({
           variant: "destructive",
           title: "Error",

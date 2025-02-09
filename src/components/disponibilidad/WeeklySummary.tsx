@@ -86,32 +86,37 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     queryFn: async () => {
       if (!session?.user?.id) return [];
 
-      const { data, error } = await supabase
-        .from('day_preset_assignments')
-        .select(`
-          *,
-          preset:presets (
+      const assignments = [];
+      
+      // Fetch assignments for each day individually to avoid single() issues
+      for (const date of weekDates) {
+        const { data, error } = await supabase
+          .from('day_preset_assignments')
+          .select(`
             *,
-            items:preset_items (
+            preset:presets (
               *,
-              equipment:equipment (*)
+              items:preset_items (
+                *,
+                equipment:equipment (*)
+              )
             )
-          )
-        `)
-        .eq('user_id', session.user.id)
-        .gte('date', format(currentWeekStart, 'yyyy-MM-dd'))
-        .lte('date', format(endOfWeek(currentWeekStart), 'yyyy-MM-dd'));
+          `)
+          .eq('user_id', session.user.id)
+          .eq('date', format(date, 'yyyy-MM-dd'))
+          .maybeSingle(); // Use maybeSingle instead of single
 
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Could not load preset assignments"
-        });
-        throw error;
+        if (error) {
+          console.error('Error fetching assignment for date:', date, error);
+          continue;
+        }
+
+        if (data) {
+          assignments.push(data);
+        }
       }
 
-      return data;
+      return assignments;
     },
     enabled: !!session?.user?.id
   });
@@ -119,8 +124,8 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
   // Calculate used quantities for each equipment per day
   const getUsedQuantity = (equipmentId: string, date: Date) => {
     const assignment = weekAssignments?.find(a => 
-      a.date === format(date, 'yyyy-MM-dd') &&
-      a.preset?.items.some(item => item.equipment_id === equipmentId)
+      a?.date === format(date, 'yyyy-MM-dd') &&
+      a?.preset?.items?.some(item => item.equipment_id === equipmentId)
     );
 
     if (!assignment) return 0;
