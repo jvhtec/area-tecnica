@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -121,6 +120,15 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
     }
   };
 
+  const getSortedTourDates = (tourId: string) => {
+    const tour = tours.find((t: any) => t.id === tourId);
+    if (!tour?.tour_dates) return [];
+    
+    return [...tour.tour_dates].sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -154,7 +162,7 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
           open={isDatesDialogOpen}
           onOpenChange={setIsDatesDialogOpen}
           tourId={selectedTourId}
-          tourDates={tours.find((t: any) => t.id === selectedTourId)?.tour_dates || []}
+          tourDates={getSortedTourDates(selectedTourId)}
         />
       )}
 
