@@ -75,6 +75,32 @@ interface EventData {
   auxiliaryNeeds: string;
 }
 
+const ImageUploadSection = ({ type, label }: { type: keyof typeof images; label: string }) => {
+  return (
+    <div className="space-y-4">
+      <Label>{label}</Label>
+      <div className="grid grid-cols-2 gap-4">
+        <Input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={(e) => handleImageUpload(type, e.target.files)}
+        />
+        <div className="flex flex-wrap gap-2">
+          {imagePreviews[type]?.map((preview, index) => (
+            <img
+              key={index}
+              src={preview}
+              alt={`Preview ${index + 1}`}
+              className="w-24 h-24 object-cover rounded"
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const HojaDeRutaGenerator = () => {
   const { toast } = useToast();
   const { data: jobs, isLoading: isLoadingJobs } = useJobSelection();
@@ -120,6 +146,168 @@ const HojaDeRutaGenerator = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  const handleVenueMapUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setVenueMap(file);
+      const preview = URL.createObjectURL(file);
+      setVenueMapPreview(preview);
+    }
+  };
+
+  const handleContactChange = (
+    index: number,
+    field: keyof EventData["contacts"][0],
+    value: string
+  ) => {
+    const newContacts = [...eventData.contacts];
+    newContacts[index] = { ...newContacts[index], [field]: value };
+    setEventData({ ...eventData, contacts: newContacts });
+  };
+
+  const addContact = () => {
+    setEventData({
+      ...eventData,
+      contacts: [...eventData.contacts, { name: "", role: "", phone: "" }],
+    });
+  };
+
+  const handleStaffChange = (
+    index: number,
+    field: keyof EventData["staff"][0],
+    value: string
+  ) => {
+    const newStaff = [...eventData.staff];
+    newStaff[index] = { ...newStaff[index], [field]: value };
+    setEventData({ ...eventData, staff: newStaff });
+  };
+
+  const addStaffMember = () => {
+    setEventData({
+      ...eventData,
+      staff: [...eventData.staff, { name: "", surname1: "", surname2: "", position: "" }],
+    });
+  };
+
+  const removeTravelArrangement = (index: number) => {
+    setTravelArrangements(travelArrangements.filter((_, i) => i !== index));
+  };
+
+  const updateTravelArrangement = (
+    index: number,
+    field: keyof TravelArrangement,
+    value: string
+  ) => {
+    const newArrangements = [...travelArrangements];
+    newArrangements[index] = {
+      ...newArrangements[index],
+      [field]: value,
+    } as TravelArrangement;
+    setTravelArrangements(newArrangements);
+  };
+
+  const addTravelArrangement = () => {
+    setTravelArrangements([...travelArrangements, { transportation_type: "van" }]);
+  };
+
+  const removeRoomAssignment = (index: number) => {
+    setRoomAssignments(roomAssignments.filter((_, i) => i !== index));
+  };
+
+  const updateRoomAssignment = (
+    index: number,
+    field: keyof RoomAssignment,
+    value: string
+  ) => {
+    const newAssignments = [...roomAssignments];
+    newAssignments[index] = {
+      ...newAssignments[index],
+      [field]: value as any,
+    };
+    setRoomAssignments(newAssignments);
+  };
+
+  const addRoomAssignment = () => {
+    setRoomAssignments([...roomAssignments, { room_type: "single" }]);
+  };
+
+  const handleImageUpload = async (
+    type: keyof typeof images,
+    files: FileList | null
+  ) => {
+    if (!files) return;
+    const fileArray = Array.from(files);
+    setImages({ ...images, [type]: [...(images[type] || []), ...fileArray] });
+
+    const previews = fileArray.map((file) => URL.createObjectURL(file));
+    setImagePreviews((prev) => ({
+      ...prev,
+      [type]: [...(prev[type] || []), ...previews],
+    }));
+  };
+
+  const generateDocument = async () => {
+    try {
+      const doc = new jsPDF() as AutoTableJsPDF;
+      
+      // Title
+      doc.setFontSize(20);
+      doc.text("Hoja de Ruta", 14, 20);
+
+      // Event Details
+      doc.setFontSize(12);
+      doc.text(`Evento: ${eventData.eventName}`, 14, 30);
+      doc.text(`Fechas: ${eventData.eventDates}`, 14, 40);
+
+      // Venue Information
+      doc.text("Lugar", 14, 50);
+      doc.setFontSize(10);
+      doc.text(`Nombre: ${eventData.venue.name}`, 14, 60);
+      doc.text(`Dirección: ${eventData.venue.address}`, 14, 70);
+
+      // Contacts Table
+      doc.setFontSize(12);
+      doc.text("Contactos", 14, 90);
+      autoTable(doc, {
+        startY: 95,
+        head: [["Nombre", "Rol", "Teléfono"]],
+        body: eventData.contacts.map(contact => [
+          contact.name,
+          contact.role,
+          contact.phone
+        ]),
+      });
+
+      // Staff Table
+      doc.text("Personal", 14, (doc.lastAutoTable?.finalY || 0) + 20);
+      autoTable(doc, {
+        startY: (doc.lastAutoTable?.finalY || 0) + 25,
+        head: [["Nombre", "Primer Apellido", "Segundo Apellido", "Puesto"]],
+        body: eventData.staff.map(member => [
+          member.name,
+          member.surname1,
+          member.surname2,
+          member.position
+        ]),
+      });
+
+      // Schedule
+      doc.text("Programa", 14, (doc.lastAutoTable?.finalY || 0) + 20);
+      doc.setFontSize(10);
+      doc.text(eventData.schedule, 14, (doc.lastAutoTable?.finalY || 0) + 30);
+
+      // Save the PDF
+      doc.save(`hoja_de_ruta_${eventData.eventName.replace(/\s+/g, '_')}.pdf`);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({
+        title: "Error",
+        description: "Error al generar el PDF",
+        variant: "destructive",
+      });
+    }
+  };
 
   const saveHojaDeRuta = async () => {
     if (!selectedJobId) {
@@ -428,21 +616,6 @@ const HojaDeRutaGenerator = () => {
       loadHojaDeRuta(selectedJobId);
     }
   }, [selectedJobId]);
-
-  const handleImageUpload = async (
-    type: keyof typeof images,
-    files: FileList | null
-  ) => {
-    if (!files) return;
-    const fileArray = Array.from(files);
-    setImages({ ...images, [type]: [...(images[type] || []), ...fileArray] });
-
-    const previews = fileArray.map((file) => URL.createObjectURL(file));
-    setImagePreviews((prev) => ({
-      ...prev,
-      [type]: [...(prev[type] || []), ...previews],
-    }));
-  };
 
   return (
     <Card className="w-full max-w-3xl mx-auto">
