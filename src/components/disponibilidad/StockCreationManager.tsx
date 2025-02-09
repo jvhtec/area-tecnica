@@ -64,7 +64,18 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
     },
     onSuccess: (newEquipment) => {
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
-      setLocalStock(prev => [...prev, { equipment_id: newEquipment.id, base_quantity: 0 }]);
+      
+      // Create a complete new stock entry
+      const newStockEntry: StockEntry = {
+        equipment_id: newEquipment.id,
+        base_quantity: 0,
+        id: crypto.randomUUID(), // Generate a temporary ID
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        user_id: '' // This will be set when saving to the database
+      };
+      
+      setLocalStock(prev => [...prev, newStockEntry]);
       setNewItemName('');
       setNewItemCategory('');
       toast({
