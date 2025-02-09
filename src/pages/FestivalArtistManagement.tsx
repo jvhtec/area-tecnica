@@ -52,43 +52,69 @@ const FestivalArtistManagement = () => {
     fetchJobDetails();
   }, [jobId]);
 
-  // Fetch artists for this job and date
+  // Subscribe to real-time updates
   useEffect(() => {
-    const fetchArtists = async () => {
-      try {
-        if (!jobId || !selectedDate) {
-          setIsLoading(false);
-          return;
+    if (!jobId || !selectedDate) return;
+
+    const channel = supabase
+      .channel('festival-artists-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'festival_artists',
+          filter: `job_id=eq.${jobId}`
+        },
+        () => {
+          // Refetch artists when changes occur
+          fetchArtists();
         }
-        
-        console.log("Fetching artists for job:", jobId, "and date:", selectedDate);
-        const { data, error } = await supabase
-          .from("festival_artists")
-          .select("*")
-          .eq("job_id", jobId)
-          .eq("date", selectedDate)
-          .order("show_start", { ascending: true });
+      )
+      .subscribe();
 
-        if (error) throw error;
-        console.log("Fetched artists:", data);
-        setArtists(data || []);
-      } catch (error: any) {
-        console.error("Error fetching artists:", error);
-        toast({
-          title: "Error",
-          description: "Could not load artists",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
+    return () => {
+      supabase.removeChannel(channel);
     };
+  }, [jobId, selectedDate]);
 
+  // Fetch artists for this job and date
+  const fetchArtists = async () => {
+    try {
+      if (!jobId || !selectedDate) {
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log("Fetching artists for job:", jobId, "and date:", selectedDate);
+      const { data, error } = await supabase
+        .from("festival_artists")
+        .select("*")
+        .eq("job_id", jobId)
+        .eq("date", selectedDate)
+        .order("show_start", { ascending: true });
+
+      if (error) throw error;
+      console.log("Fetched artists:", data);
+      setArtists(data || []);
+    } catch (error: any) {
+      console.error("Error fetching artists:", error);
+      toast({
+        title: "Error",
+        description: "Could not load artists",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     if (selectedDate) {
       setIsLoading(true);
       fetchArtists();
     }
-  }, [jobId, selectedDate, toast]);
+  }, [jobId, selectedDate]);
 
   const handleAddArtist = () => {
     setSelectedArtist(null);
