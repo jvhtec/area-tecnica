@@ -5,16 +5,19 @@ import { useSessionManager } from '@/hooks/useSessionManager';
 import { supabase } from '@/lib/supabase';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Equipment, StockEntry } from '@/types/equipment';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Save } from 'lucide-react';
+import { Plus, Save } from 'lucide-react';
 
 export function StockManagement() {
   const { session } = useSessionManager();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemCategory, setNewItemCategory] = useState('');
 
   // Fetch equipment list and stock entries
   const { data: equipmentWithStock } = useQuery({
@@ -48,9 +51,49 @@ export function StockManagement() {
     enabled: !!session?.user?.id
   });
 
+  const createEquipmentMutation = useMutation({
+    mutationFn: async () => {
+      if (!session?.user?.id) throw new Error('Debe iniciar sesión');
+      if (!newItemName.trim()) throw new Error('El nombre del equipo es requerido');
+
+      const { data: existingEquipment, error: checkError } = await supabase
+        .from('equipment')
+        .select('id')
+        .eq('name', newItemName)
+        .single();
+
+      if (existingEquipment) throw new Error('Ya existe un equipo con este nombre');
+
+      const { error } = await supabase
+        .from('equipment')
+        .insert({
+          name: newItemName,
+          category: newItemCategory.trim() || null
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['equipment-with-stock'] });
+      setNewItemName('');
+      setNewItemCategory('');
+      toast({
+        title: "Éxito",
+        description: "Equipo creado correctamente"
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message
+      });
+    }
+  });
+
   const updateStockMutation = useMutation({
     mutationFn: async () => {
-      if (!session?.user?.id) throw new Error('Must be logged in');
+      if (!session?.user?.id) throw new Error('Debe iniciar sesión');
 
       const entries = Object.entries(quantities).map(([equipmentId, quantity]) => ({
         user_id: session.user.id,
@@ -72,8 +115,8 @@ export function StockManagement() {
       queryClient.invalidateQueries({ queryKey: ['equipment-with-stock'] });
       setQuantities({});
       toast({
-        title: "Success",
-        description: "Stock quantities updated successfully"
+        title: "Éxito",
+        description: "Cantidades actualizadas correctamente"
       });
     },
     onError: (error) => {
@@ -99,6 +142,36 @@ export function StockManagement() {
 
   return (
     <div className="space-y-6">
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium">Añadir Nuevo Equipo</h3>
+        <div className="space-y-2">
+          <div>
+            <Label>Nombre</Label>
+            <Input
+              value={newItemName}
+              onChange={(e) => setNewItemName(e.target.value)}
+              placeholder="Ingrese nombre del equipo"
+            />
+          </div>
+          <div>
+            <Label>Categoría (opcional)</Label>
+            <Input
+              value={newItemCategory}
+              onChange={(e) => setNewItemCategory(e.target.value)}
+              placeholder="Ingrese categoría"
+            />
+          </div>
+          <Button 
+            onClick={() => createEquipmentMutation.mutate()}
+            disabled={createEquipmentMutation.isPending || !newItemName.trim()}
+            className="w-full"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Añadir Equipo
+          </Button>
+        </div>
+      </div>
+
       <ScrollArea className="h-[400px] rounded-md border p-4">
         <div className="space-y-4">
           {equipmentWithStock?.map((item) => {
@@ -134,7 +207,7 @@ export function StockManagement() {
         className="w-full"
       >
         <Save className="mr-2 h-4 w-4" />
-        Save Stock Quantities
+        Guardar Cantidades
       </Button>
     </div>
   );
