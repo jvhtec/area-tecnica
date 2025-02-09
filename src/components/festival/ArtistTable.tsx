@@ -8,7 +8,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ArtistFileDialog } from "./ArtistFileDialog";
 import { cn } from "@/lib/utils";
-import { exportToPDF } from "@/utils/pdfExport";
+import { ArtistPdfData, exportArtistPDF } from "@/utils/artistPdfExport";
 import { useToast } from "@/hooks/use-toast";
 
 interface ArtistTableProps {

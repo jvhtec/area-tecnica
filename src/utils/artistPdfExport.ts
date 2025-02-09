@@ -2,7 +2,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-interface ArtistTechnicalInfo {
+export interface ArtistTechnicalInfo {
   fohTech: boolean;
   monTech: boolean;
   fohConsole: { model: string; providedBy: string };
@@ -26,7 +26,7 @@ interface ArtistTechnicalInfo {
   };
 }
 
-interface ArtistInfrastructure {
+export interface ArtistInfrastructure {
   providedBy: string;
   cat6: { enabled: boolean; quantity: number };
   hma: { enabled: boolean; quantity: number };
@@ -36,7 +36,7 @@ interface ArtistInfrastructure {
   other: string;
 }
 
-interface ArtistPdfData {
+export interface ArtistPdfData {
   name: string;
   stage: number;
   date: string;
@@ -145,7 +145,7 @@ export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
       ['Handheld', data.technical.wireless.handhelds, data.technical.wireless.model, data.technical.wireless.band, data.technical.wireless.providedBy],
       ['Bodypack', data.technical.wireless.bodypacks, data.technical.wireless.model, data.technical.wireless.band, data.technical.wireless.providedBy],
       ['IEM', data.technical.iem.quantity, data.technical.iem.model, data.technical.iem.band, data.technical.iem.providedBy]
-    ].filter(row => row[1] > 0);
+    ].filter(row => Number(row[1]) > 0);
 
     if (wirelessRows.length > 0) {
       autoTable(doc, {
