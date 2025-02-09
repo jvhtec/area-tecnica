@@ -56,7 +56,10 @@ const FestivalArtistManagement = () => {
   useEffect(() => {
     const fetchArtists = async () => {
       try {
-        if (!jobId || !selectedDate) return;
+        if (!jobId || !selectedDate) {
+          setIsLoading(false);
+          return;
+        }
         
         console.log("Fetching artists for job:", jobId, "and date:", selectedDate);
         const { data, error } = await supabase
@@ -81,9 +84,11 @@ const FestivalArtistManagement = () => {
       }
     };
 
-    setIsLoading(true);
-    fetchArtists();
-  }, [jobId, selectedDate]);
+    if (selectedDate) {
+      setIsLoading(true);
+      fetchArtists();
+    }
+  }, [jobId, selectedDate, toast]);
 
   const handleAddArtist = () => {
     setSelectedArtist(null);
