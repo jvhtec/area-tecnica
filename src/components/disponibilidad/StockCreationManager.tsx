@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { StockEntry } from '@/types/equipment';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,7 +16,6 @@ interface StockManagerProps {
 }
 
 export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps) => {
-  const [localStock, setLocalStock] = useState<StockEntry[]>(stock);
   const [newItemName, setNewItemName] = useState('');
   const [newItemCategory, setNewItemCategory] = useState('');
   const { toast } = useToast();
@@ -35,6 +34,28 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
       return data;
     }
   });
+
+  // Initialize localStock with entries for all equipment
+  const [localStock, setLocalStock] = useState<StockEntry[]>([]);
+
+  // Update localStock when equipment list or stock changes
+  useEffect(() => {
+    const updatedStock = equipmentList.map(equipment => {
+      const existingEntry = stock.find(s => s.equipment_id === equipment.id);
+      if (existingEntry) {
+        return existingEntry;
+      }
+      return {
+        equipment_id: equipment.id,
+        base_quantity: 0,
+        id: crypto.randomUUID(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        user_id: '' // This will be set when saving to the database
+      };
+    });
+    setLocalStock(updatedStock);
+  }, [equipmentList, stock]);
 
   const createEquipmentMutation = useMutation({
     mutationFn: async () => {
@@ -65,14 +86,14 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
     onSuccess: (newEquipment) => {
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
       
-      // Create a complete new stock entry
+      // Create a new stock entry with quantity 0
       const newStockEntry: StockEntry = {
         equipment_id: newEquipment.id,
         base_quantity: 0,
-        id: crypto.randomUUID(), // Generate a temporary ID
+        id: crypto.randomUUID(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        user_id: '' // This will be set when saving to the database
+        user_id: ''
       };
       
       setLocalStock(prev => [...prev, newStockEntry]);
@@ -93,13 +114,30 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
   });
 
   const handleQuantityChange = (equipmentId: string, quantity: number) => {
-    setLocalStock(prev =>
-      prev.map(item =>
-        item.equipment_id === equipmentId
-          ? { ...item, base_quantity: quantity }
-          : item
-      )
-    );
+    setLocalStock(prev => {
+      const updatedStock = [...prev];
+      const existingIndex = updatedStock.findIndex(item => item.equipment_id === equipmentId);
+      
+      if (existingIndex >= 0) {
+        // Update existing entry
+        updatedStock[existingIndex] = {
+          ...updatedStock[existingIndex],
+          base_quantity: quantity
+        };
+      } else {
+        // Create new entry
+        updatedStock.push({
+          equipment_id: equipmentId,
+          base_quantity: quantity,
+          id: crypto.randomUUID(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          user_id: ''
+        });
+      }
+      
+      return updatedStock;
+    });
   };
 
   const handleAddNewItem = () => {
@@ -152,23 +190,26 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
 
       <ScrollArea className="h-[400px] pr-4">
         <div className="space-y-4">
-          {equipmentList.map(equipment => (
-            <div key={equipment.id} className="flex items-center space-x-4">
-              <div className="flex-1">
-                <Label>{equipment.name}</Label>
-                {equipment.category && (
-                  <p className="text-sm text-gray-500">{equipment.category}</p>
-                )}
+          {equipmentList.map(equipment => {
+            const stockEntry = localStock.find(s => s.equipment_id === equipment.id);
+            return (
+              <div key={equipment.id} className="flex items-center space-x-4">
+                <div className="flex-1">
+                  <Label>{equipment.name}</Label>
+                  {equipment.category && (
+                    <p className="text-sm text-gray-500">{equipment.category}</p>
+                  )}
+                </div>
+                <Input
+                  type="number"
+                  min="0"
+                  value={stockEntry?.base_quantity || 0}
+                  onChange={(e) => handleQuantityChange(equipment.id, parseInt(e.target.value) || 0)}
+                  className="w-24"
+                />
               </div>
-              <Input
-                type="number"
-                min="0"
-                value={localStock.find(s => s.equipment_id === equipment.id)?.base_quantity || 0}
-                onChange={(e) => handleQuantityChange(equipment.id, parseInt(e.target.value) || 0)}
-                className="w-24"
-              />
-            </div>
-          ))}
+            );
+          })}
         </div>
       </ScrollArea>
     </div>
