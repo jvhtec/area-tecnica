@@ -61,11 +61,11 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
     const createdDate = format(new Date(), 'dd/MM/yyyy');
 
     // Header
-    doc.setFillColor(125, 1, 1);
+    doc.setFillColor(125, 1, 1);  // Corporate red
     doc.rect(0, 0, pageWidth, 20, 'F');
 
     doc.setFontSize(14);
-    doc.setTextColor(255, 255, 255);
+    doc.setTextColor(255, 255, 255);  // White
     doc.text(`${data.jobTitle} - Artist Schedule`, pageWidth / 2, 12, { align: 'center' });
     
     if (data.stage) {
@@ -149,7 +149,7 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
       },
       headStyles: {
         fillColor: [125/255, 1/255, 1/255],  // Corporate red normalized to 0-1 range
-        textColor: [1, 1, 1],  // White in normalized RGB
+        textColor: [1, 1, 1],  // White
         fontSize: 8,
         fontStyle: 'bold',
         halign: 'left',
@@ -170,7 +170,8 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
         if (data.row.index === -1) return; // Skip header row
         const rowData = scheduleRows[data.row.index];
         if (rowData.isSoundcheck) {
-          data.cell.styles.fillColor = [254/255, 247/255, 205/255]; // Normalized yellow for soundcheck rows
+          // Convert #FEF7CD to RGB values and normalize to 0-1 range
+          data.cell.styles.fillColor = [0xFE/255, 0xF7/255, 0xCD/255];  // Light yellow
         }
       }
     });
