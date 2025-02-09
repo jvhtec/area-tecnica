@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import {
   Card,
@@ -426,14 +427,6 @@ const HojaDeRutaGenerator = () => {
     setRoomAssignments(newAssignments);
   };
 
-  const handleStateChange = () => {
-    setHasChanges(true);
-  };
-
-  useEffect(() => {
-    handleStateChange();
-  }, [eventData, travelArrangements, roomAssignments]);
-
   const generateDocument = async () => {
     if (!selectedJobId) {
       toast({
@@ -820,75 +813,3 @@ const HojaDeRutaGenerator = () => {
 
       toast({
         title: "Éxito",
-        description: "La Hoja de Ruta ha sido generada y subida",
-      });
-    } catch (error: any) {
-      console.error("Fallo en la subida:", error);
-      toast({
-        title: "Fallo en la subida",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const loadHojaDeRuta = async (jobId: string) => {
-    try {
-      console.log("Loading Hoja de Ruta for job:", jobId);
-      const { data: mainData, error } = await supabase
-        .from("hoja_de_ruta")
-        .select("*")
-        .eq("job_id", jobId)
-        .maybeSingle();
-
-      if (error) {
-        console.error("Error fetching Hoja de Ruta:", error);
-        throw error;
-      }
-
-      if (mainData) {
-        // Update eventData with the loaded data
-        setEventData((prev) => ({
-          ...prev,
-          eventName: mainData.event_name || prev.eventName,
-          eventDates: mainData.event_dates || prev.eventDates,
-          venue: {
-            name: mainData.venue_name || "",
-            address: mainData.venue_address || "",
-          },
-          schedule: mainData.schedule || "",
-          powerRequirements: mainData.power_requirements || "",
-          auxiliaryNeeds: mainData.auxiliary_needs || "",
-        }));
-
-        // Load contacts
-        const { data: contactsData, error: contactsError } = await supabase
-          .from("hoja_de_ruta_contacts")
-          .select("*")
-          .eq("hoja_de_ruta_id", mainData.id);
-
-        if (contactsError) throw contactsError;
-        if (contactsData) {
-          setEventData((prev) => ({
-            ...prev,
-            contacts: contactsData.map((contact) => ({
-              name: contact.name,
-              role: contact.role || "",
-              phone: contact.phone || "",
-            })),
-          }));
-        }
-
-        // Load logistics
-        const { data: logisticsData, error: logisticsError } = await supabase
-          .from("hoja_de_ruta_logistics")
-          .select("*")
-          .eq("hoja_de_ruta_id", mainData.id)
-          .maybeSingle();
-
-        if (logisticsError) throw logisticsError;
-        if (logisticsData) {
-          setEventData((prev) => ({
-            ...prev,
-            logistics: {
-              transport: logisticsData
