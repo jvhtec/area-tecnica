@@ -68,12 +68,13 @@ export const exportWeeklySummaryPDF = async (
         row.stock.toString(),
         ...row.dailyUsage.map(usage => {
           if (usage.used === 0) return '-';
-          const remainingText = usage.remaining >= 0 ? `(+${usage.remaining})` : `(${usage.remaining})`;
           return {
-            content: `${usage.used} ${remainingText}`,
+            content: `${usage.used} ${usage.remaining >= 0 ? `(+${usage.remaining})` : `(${usage.remaining})`}`,
             styles: {
+              fillColor: [51, 51, 51] as [number, number, number],
               textColor: [255, 255, 255] as [number, number, number],
-              fontStyle: usage.remaining < 0 ? 'bold' : 'normal' as 'bold' | 'normal'
+              fontStyle: usage.remaining < 0 ? 'bold' : 'normal' as 'bold' | 'normal',
+              halign: 'center' as 'center'
             }
           };
         }),
@@ -97,14 +98,20 @@ export const exportWeeklySummaryPDF = async (
           cellPadding: 5,
           lineColor: [220, 220, 230] as [number, number, number],
           lineWidth: 0.1,
+          halign: 'left' as 'left'
         },
         headStyles: {
           fillColor: [125, 1, 1] as [number, number, number],
           textColor: [255, 255, 255] as [number, number, number],
           fontStyle: 'bold' as 'bold',
+          halign: 'center' as 'center'
         },
-        bodyStyles: { textColor: [51, 51, 51] as [number, number, number] },
-        alternateRowStyles: { fillColor: [250, 250, 255] as [number, number, number] },
+        bodyStyles: { 
+          textColor: [51, 51, 51] as [number, number, number],
+        },
+        alternateRowStyles: { 
+          fillColor: [250, 250, 255] as [number, number, number] 
+        },
       });
 
       // Add logo and page numbers
@@ -152,4 +159,3 @@ export const exportWeeklySummaryPDF = async (
     }
   });
 };
-
