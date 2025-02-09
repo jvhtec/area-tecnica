@@ -4,9 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Box, Settings } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { PresetManagementDialog } from '@/components/equipment/PresetManagementDialog';
 
 export default function LightsDisponibilidad() {
   const [selectedDate, setSelectedDate] = useState<Date>();
+  const [showPresetDialog, setShowPresetDialog] = useState(false);
   const navigate = useNavigate();
 
   return (
@@ -23,7 +25,7 @@ export default function LightsDisponibilidad() {
           </Button>
           <Button 
             variant="outline"
-            onClick={() => navigate('/equipment-management/presets')}
+            onClick={() => setShowPresetDialog(true)}
           >
             <Settings className="mr-2 h-4 w-4" />
             Gestionar Presets
@@ -33,6 +35,10 @@ export default function LightsDisponibilidad() {
       <div className="space-y-6">
         <DisponibilidadCalendar onDateSelect={setSelectedDate} selectedDate={selectedDate} />
       </div>
+      <PresetManagementDialog 
+        open={showPresetDialog} 
+        onOpenChange={setShowPresetDialog}
+      />
     </div>
   );
 }

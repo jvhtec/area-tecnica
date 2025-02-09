@@ -1,4 +1,3 @@
-
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -10,9 +9,13 @@ import { Label } from '@/components/ui/label';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Equipment, Preset, PresetItem, PresetWithItems } from '@/types/equipment';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Minus, Save, Trash2 } from 'lucide-react';
+import { Plus, Minus, Save, Trash2, X } from 'lucide-react';
 
-export function PresetCreationManager() {
+interface PresetCreationManagerProps {
+  onClose?: () => void;
+}
+
+export function PresetCreationManager({ onClose }: PresetCreationManagerProps) {
   const { session } = useSessionManager();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -146,6 +149,10 @@ export function PresetCreationManager() {
     });
   };
 
+  const handleSave = () => {
+    createPresetMutation.mutate();
+  };
+
   return (
     <div className="space-y-6">
       <div className="space-y-4">
@@ -187,14 +194,24 @@ export function PresetCreationManager() {
           </div>
         </ScrollArea>
 
-        <Button 
-          onClick={() => createPresetMutation.mutate()}
-          disabled={createPresetMutation.isPending || !presetName.trim() || Object.keys(selectedEquipment).length === 0}
-          className="w-full"
-        >
-          <Save className="mr-2 h-4 w-4" />
-          Save Preset
-        </Button>
+        <div className="flex justify-end gap-2">
+          {onClose && (
+            <Button 
+              variant="outline" 
+              onClick={onClose}
+            >
+              <X className="mr-2 h-4 w-4" />
+              Cancel
+            </Button>
+          )}
+          <Button 
+            onClick={handleSave} 
+            disabled={createPresetMutation.isPending || !presetName.trim() || Object.keys(selectedEquipment).length === 0}
+          >
+            <Save className="mr-2 h-4 w-4" />
+            Save Preset
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-4">
