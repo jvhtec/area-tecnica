@@ -17,19 +17,18 @@ interface ExportTable {
   dualMotors?: boolean;
   totalWatts?: number;
   currentPerPhase?: number;
-  toolType?: 'pesos' | 'consumos';
+  toolType?: 'pesos' | 'consumos' | 'technical' | 'infrastructure' | 'extras';
   pduType?: string;
   customPduType?: string;
   includesHoist?: boolean;
 }
 
-export interface SummaryRow {
+interface SummaryRow {
   clusterName: string;
   riggingPoints: string;
   clusterWeight: number;
 }
 
-// Add new interface for artist-specific information
 interface ArtistPdfInfo {
   showTimes: string;
   soundcheckTimes: string;
@@ -47,7 +46,7 @@ interface ArtistPdfInfo {
  * Function signature:
  * 1. projectName
  * 2. tables
- * 3. type ('weight' | 'power')
+ * 3. type ('weight' | 'power' | 'technical')
  * 4. jobName
  * 5. jobDate (the date of the job – can be a Date or a parsable value)
  * 6. summaryRows (optional) – used for "pesos" reports; if not provided, summary rows are generated automatically
@@ -127,6 +126,7 @@ export const exportToPDF = (
           'Handheld Wireless': artistInfo.additionalInfo.wirelessProvider,
           'Bodypack Wireless': artistInfo.additionalInfo.wirelessProvider,
           'IEM Systems': artistInfo.additionalInfo.iemProvider,
+          'Monitors': artistInfo.additionalInfo.infrastructureProvider,
         };
 
         const tableRows = table.rows.map(row => [

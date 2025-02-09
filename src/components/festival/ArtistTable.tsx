@@ -60,7 +60,7 @@ export const ArtistTable = ({
 
   const handlePrintArtist = async (artist: any) => {
     try {
-      const tables = [{
+      const tables: ExportTable[] = [{
         name: `${artist.name} - Technical Requirements`,
         rows: [
           { quantity: '1', componentName: 'FOH Console', weight: artist.foh_console, totalWeight: null },
