@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -17,7 +18,7 @@ interface ExportTable {
   dualMotors?: boolean;
   totalWatts?: number;
   currentPerPhase?: number;
-  toolType?: 'pesos' | 'consumos' | 'technical' | 'infrastructure' | 'extras';
+  toolType?: 'pesos' | 'consumos';
   pduType?: string;
   customPduType?: string;
   includesHoist?: boolean;
@@ -29,24 +30,11 @@ interface SummaryRow {
   clusterWeight: number;
 }
 
-interface ArtistPdfInfo {
-  showTimes: string;
-  soundcheckTimes: string;
-  notes: string;
-  additionalInfo: {
-    fohProvider: string;
-    monProvider: string;
-    wirelessProvider: string;
-    iemProvider: string;
-    infrastructureProvider: string;
-  };
-}
-
 /**
  * Function signature:
  * 1. projectName
  * 2. tables
- * 3. type ('weight' | 'power' | 'technical')
+ * 3. type ('weight' | 'power')
  * 4. jobName
  * 5. jobDate (the date of the job – can be a Date or a parsable value)
  * 6. summaryRows (optional) – used for "pesos" reports; if not provided, summary rows are generated automatically
@@ -56,13 +44,12 @@ interface ArtistPdfInfo {
 export const exportToPDF = (
   projectName: string,
   tables: ExportTable[],
-  type: 'weight' | 'power' | 'technical',
+  type: 'weight' | 'power',
   jobName: string,
   jobDate: string,
   summaryRows?: SummaryRow[],
   powerSummary?: { totalSystemWatts: number; totalSystemAmps: number },
-  safetyMargin?: number,
-  artistInfo?: ArtistPdfInfo
+  safetyMargin?: number
 ): Promise<Blob> => {
   return new Promise((resolve) => {
     const doc = new jsPDF();
@@ -81,9 +68,7 @@ export const exportToPDF = (
     doc.setTextColor(255, 255, 255);
     let title = type === 'weight'
       ? "Informe de Distribución de Peso"
-      : type === 'power'
-      ? "Informe de Distribución de Potencia"
-      : "Technical Requirements";
+      : "Informe de Distribución de Potencia";
     doc.text(title, pageWidth / 2, 20, { align: 'center' });
 
     doc.setFontSize(16);
@@ -92,20 +77,6 @@ export const exportToPDF = (
     doc.text(`Fecha del Trabajo: ${jobDateStr}`, pageWidth / 2, 38, { align: 'center' });
 
     let yPosition = 70;
-
-    // Add artist-specific information if provided
-    if (artistInfo) {
-      doc.setFontSize(14);
-      doc.setTextColor(0, 0, 0);
-      doc.text("Schedule Information", 14, yPosition);
-      yPosition += 10;
-
-      doc.setFontSize(12);
-      doc.text(`Show Time: ${artistInfo.showTimes}`, 14, yPosition);
-      yPosition += 8;
-      doc.text(`Soundcheck: ${artistInfo.soundcheckTimes}`, 14, yPosition);
-      yPosition += 15;
-    }
 
     // === MAIN TABLES SECTION ===
     tables.forEach((table, index) => {
@@ -118,71 +89,32 @@ export const exportToPDF = (
       doc.text(table.name, 14, yPosition);
       yPosition += 10;
 
-      // For technical requirements, add provider information
-      if (table.toolType === 'technical' && artistInfo?.additionalInfo) {
-        const providers = {
-          'FOH Console': artistInfo.additionalInfo.fohProvider,
-          'MON Console': artistInfo.additionalInfo.monProvider,
-          'Handheld Wireless': artistInfo.additionalInfo.wirelessProvider,
-          'Bodypack Wireless': artistInfo.additionalInfo.wirelessProvider,
-          'IEM Systems': artistInfo.additionalInfo.iemProvider,
-          'Monitors': artistInfo.additionalInfo.infrastructureProvider,
-        };
+      const tableRows = table.rows.map(row => [
+        row.quantity,
+        row.componentName,
+        row.weight || '',
+        row.watts || ''
+      ]);
 
-        const tableRows = table.rows.map(row => [
-          row.quantity,
-          row.componentName,
-          row.weight || '',
-          providers[row.componentName as keyof typeof providers] === 'festival' ? 'Festival' : 'Band'
-        ]);
-
-        autoTable(doc, {
-          head: [['Quantity', 'Component', 'Model/Type', 'Provided By']],
-          body: tableRows,
-          startY: yPosition,
-          theme: 'grid',
-          styles: {
-            fontSize: 10,
-            cellPadding: 5,
-            lineColor: [220, 220, 230],
-            lineWidth: 0.1,
-          },
-          headStyles: {
-            fillColor: [125, 1, 1],
-            textColor: [255, 255, 255],
-            fontStyle: 'bold',
-          },
-          bodyStyles: { textColor: [51, 51, 51] },
-          alternateRowStyles: { fillColor: [250, 250, 255] },
-        });
-      } else {
-        const tableRows = table.rows.map(row => [
-          row.quantity,
-          row.componentName,
-          row.weight || '',
-          ''
-        ]);
-
-        autoTable(doc, {
-          head: [['Quantity', 'Component', 'Details', '']],
-          body: tableRows,
-          startY: yPosition,
-          theme: 'grid',
-          styles: {
-            fontSize: 10,
-            cellPadding: 5,
-            lineColor: [220, 220, 230],
-            lineWidth: 0.1,
-          },
-          headStyles: {
-            fillColor: [125, 1, 1],
-            textColor: [255, 255, 255],
-            fontStyle: 'bold',
-          },
-          bodyStyles: { textColor: [51, 51, 51] },
-          alternateRowStyles: { fillColor: [250, 250, 255] },
-        });
-      }
+      autoTable(doc, {
+        head: [['Quantity', 'Component', type === 'weight' ? 'Weight' : 'Watts', '']],
+        body: tableRows,
+        startY: yPosition,
+        theme: 'grid',
+        styles: {
+          fontSize: 10,
+          cellPadding: 5,
+          lineColor: [220, 220, 230],
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [125, 1, 1],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+        },
+        bodyStyles: { textColor: [51, 51, 51] },
+        alternateRowStyles: { fillColor: [250, 250, 255] },
+      });
 
       yPosition = (doc as any).lastAutoTable.finalY + 10;
 
@@ -191,25 +123,6 @@ export const exportToPDF = (
         yPosition = 20;
       }
     });
-
-    // Add notes section if present
-    if (artistInfo?.notes) {
-      if (yPosition > pageHeight - 80) {
-        doc.addPage();
-        yPosition = 20;
-      }
-
-      doc.setFontSize(14);
-      doc.setTextColor(125, 1, 1);
-      doc.text("Notes", 14, yPosition);
-      yPosition += 10;
-
-      doc.setFontSize(12);
-      doc.setTextColor(51, 51, 51);
-      const splitNotes = doc.splitTextToSize(artistInfo.notes, pageWidth - 28);
-      doc.text(splitNotes, 14, yPosition);
-      yPosition += splitNotes.length * 7 + 10;
-    }
 
     // === LOGO & CREATED DATE SECTION ===
     const logo = new Image();
@@ -249,3 +162,4 @@ export const exportToPDF = (
     };
   });
 };
+

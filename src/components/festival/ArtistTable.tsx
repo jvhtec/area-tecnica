@@ -60,76 +60,80 @@ export const ArtistTable = ({
 
   const handlePrintArtist = async (artist: any) => {
     try {
-      const tables: ExportTable[] = [{
-        name: `${artist.name} - Technical Requirements`,
-        rows: [
-          { quantity: '1', componentName: 'FOH Console', weight: artist.foh_console, totalWeight: null },
-          { quantity: '1', componentName: 'MON Console', weight: artist.mon_console, totalWeight: null },
-          { quantity: artist.wireless_quantity_hh.toString(), componentName: 'Handheld Wireless', weight: artist.wireless_model, totalWeight: null },
-          { quantity: artist.wireless_quantity_bp.toString(), componentName: 'Bodypack Wireless', weight: artist.wireless_model, totalWeight: null },
-          { quantity: artist.iem_quantity.toString(), componentName: 'IEM Systems', weight: artist.iem_model, totalWeight: null },
-          { quantity: artist.monitors_quantity?.toString() || '0', componentName: 'Monitors', weight: '', totalWeight: null },
-        ].filter(row => parseInt(row.quantity) > 0),
-        toolType: 'technical'
-      }, {
-        name: 'Infrastructure Requirements',
-        rows: [
-          { quantity: artist.infra_cat6_quantity?.toString() || '0', componentName: 'CAT6 Lines', weight: '', totalWeight: null },
-          { quantity: artist.infra_hma_quantity?.toString() || '0', componentName: 'HMA Lines', weight: '', totalWeight: null },
-          { quantity: artist.infra_coax_quantity?.toString() || '0', componentName: 'Coax Lines', weight: '', totalWeight: null },
-          { quantity: artist.infra_opticalcon_duo_quantity?.toString() || '0', componentName: 'OpticalCon Duo', weight: '', totalWeight: null },
-          { quantity: artist.infra_analog?.toString() || '0', componentName: 'Analog Lines', weight: '', totalWeight: null },
-        ].filter(row => parseInt(row.quantity) > 0),
-        toolType: 'infrastructure'
-      }];
-
-      const extraRequirements = [];
-      if (artist.extras_sf) extraRequirements.push('Side Fill');
-      if (artist.extras_df) extraRequirements.push('Drum Fill');
-      if (artist.extras_djbooth) extraRequirements.push('DJ Booth');
-      if (artist.extras_wired) extraRequirements.push(`Additional Wired: ${artist.extras_wired}`);
-
-      if (extraRequirements.length > 0) {
-        tables.push({
-          name: 'Extra Requirements',
-          rows: extraRequirements.map(req => ({
-            quantity: '1',
-            componentName: req,
-            weight: '',
-            totalWeight: null
-          })),
-          toolType: 'extras'
-        });
-      }
-
-      // Format show times
-      const showTimes = artist.show_start ? `${format(new Date(`2000-01-01T${artist.show_start}`), 'HH:mm')} - ${format(new Date(`2000-01-01T${artist.show_end}`), 'HH:mm')}` : 'Not set';
-      const soundcheckTimes = artist.soundcheck && artist.soundcheck_start ? 
-        `${format(new Date(`2000-01-01T${artist.soundcheck_start}`), 'HH:mm')} - ${format(new Date(`2000-01-01T${artist.soundcheck_end}`), 'HH:mm')}` : 
-        'Not scheduled';
-
-      const blob = await exportToPDF(
-        artist.name,
-        tables,
-        'technical',
-        `Stage ${artist.stage}`,
-        artist.date,
-        undefined,
-        undefined,
-        undefined,
-        {
-          showTimes,
-          soundcheckTimes,
-          notes: artist.notes || '',
-          additionalInfo: {
-            fohProvider: artist.foh_console_provided_by,
-            monProvider: artist.mon_console_provided_by,
-            wirelessProvider: artist.wireless_provided_by,
-            iemProvider: artist.iem_provided_by,
-            infrastructureProvider: artist.infrastructure_provided_by
+      const artistData: ArtistPdfData = {
+        name: artist.name,
+        stage: artist.stage,
+        date: artist.date,
+        schedule: {
+          show: {
+            start: artist.show_start,
+            end: artist.show_end
+          },
+          soundcheck: artist.soundcheck ? {
+            start: artist.soundcheck_start,
+            end: artist.soundcheck_end
+          } : undefined
+        },
+        technical: {
+          fohTech: artist.foh_tech,
+          monTech: artist.mon_tech,
+          fohConsole: {
+            model: artist.foh_console,
+            providedBy: artist.foh_console_provided_by
+          },
+          monConsole: {
+            model: artist.mon_console,
+            providedBy: artist.mon_console_provided_by
+          },
+          wireless: {
+            model: artist.wireless_model,
+            providedBy: artist.wireless_provided_by,
+            handhelds: artist.wireless_quantity_hh,
+            bodypacks: artist.wireless_quantity_bp,
+            band: artist.wireless_band
+          },
+          iem: {
+            model: artist.iem_model,
+            providedBy: artist.iem_provided_by,
+            quantity: artist.iem_quantity,
+            band: artist.iem_band
+          },
+          monitors: {
+            enabled: artist.monitors_enabled,
+            quantity: artist.monitors_quantity || 0
           }
-        }
-      );
+        },
+        infrastructure: {
+          providedBy: artist.infrastructure_provided_by,
+          cat6: {
+            enabled: artist.infra_cat6,
+            quantity: artist.infra_cat6_quantity || 0
+          },
+          hma: {
+            enabled: artist.infra_hma,
+            quantity: artist.infra_hma_quantity || 0
+          },
+          coax: {
+            enabled: artist.infra_coax,
+            quantity: artist.infra_coax_quantity || 0
+          },
+          opticalconDuo: {
+            enabled: artist.infra_opticalcon_duo,
+            quantity: artist.infra_opticalcon_duo_quantity || 0
+          },
+          analog: artist.infra_analog || 0,
+          other: artist.other_infrastructure || ''
+        },
+        extras: {
+          sideFill: artist.extras_sf,
+          drumFill: artist.extras_df,
+          djBooth: artist.extras_djbooth,
+          wired: artist.extras_wired || ''
+        },
+        notes: artist.notes
+      };
+
+      const blob = await exportArtistPDF(artistData);
 
       // Create a download link and trigger it
       const url = URL.createObjectURL(blob);
