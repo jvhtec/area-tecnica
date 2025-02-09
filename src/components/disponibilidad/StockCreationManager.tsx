@@ -1,157 +1,128 @@
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { useSessionManager } from '@/hooks/useSessionManager';
-import { supabase } from '@/lib/supabase';
-import type { AvailabilityStatus } from '@/types/availability';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { addDays, format, isSameDay, isWeekend } from 'date-fns';
 import { useState } from 'react';
-import { Calendar } from '@/components/ui/calendar';
+import { StockEntry, Equipment } from '../types';
+import { equipmentList } from '../data/equipmentList';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Button } from './ui/button';
+import { ScrollArea } from './ui/scroll-area';
+import { Plus } from 'lucide-react';
+import { useToast } from './ui/use-toast';
 
-export function StockCreationManager() {
-  const { session, userDepartment } = useSessionManager();
+interface StockManagerProps {
+  stock: StockEntry[];
+  onStockUpdate: (stock: StockEntry[]) => void;
+}
+
+export const StockManager = ({ stock, onStockUpdate }: StockManagerProps) => {
+  const [localStock, setLocalStock] = useState<StockEntry[]>(stock);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemCategory, setNewItemCategory] = useState('');
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [dateRange, setDateRange] = useState<{
-    from: Date | undefined;
-    to: Date | undefined;
-  }>({
-    from: undefined,
-    to: undefined
-  });
-  const [pattern, setPattern] = useState<'daily' | 'weekdays' | 'weekends'>('daily');
 
-  const createBatchAvailabilityMutation = useMutation({
-    mutationFn: async ({ status }: { status: AvailabilityStatus }) => {
-      if (!session?.user?.id || !userDepartment || !dateRange.from || !dateRange.to) {
-        throw new Error('Missing required data');
-      }
+  const handleQuantityChange = (equipmentId: string, quantity: number) => {
+    setLocalStock(prev =>
+      prev.map(item =>
+        item.equipmentId === equipmentId
+          ? { ...item, baseQuantity: quantity }
+          : item
+      )
+    );
+  };
 
-      const dates: Date[] = [];
-      let currentDate = dateRange.from;
-
-      while (!isSameDay(currentDate, dateRange.to)) {
-        if (
-          pattern === 'daily' ||
-          (pattern === 'weekdays' && !isWeekend(currentDate)) ||
-          (pattern === 'weekends' && isWeekend(currentDate))
-        ) {
-          dates.push(currentDate);
-        }
-        currentDate = addDays(currentDate, 1);
-      }
-      // Include the end date if it matches the pattern
-      if (
-        pattern === 'daily' ||
-        (pattern === 'weekdays' && !isWeekend(dateRange.to)) ||
-        (pattern === 'weekends' && isWeekend(dateRange.to))
-      ) {
-        dates.push(dateRange.to);
-      }
-
-      const { error } = await supabase
-        .from('availability_schedules')
-        .upsert(
-          dates.map(date => ({
-            user_id: session.user.id,
-            department: userDepartment,
-            date: format(date, 'yyyy-MM-dd'),
-            status
-          })),
-          { onConflict: 'user_id,department,date' }
-        );
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['availability', session?.user?.id, userDepartment]
-      });
+  const handleAddNewItem = () => {
+    if (!newItemName.trim()) {
       toast({
-        title: "Success",
-        description: "Batch availability created successfully"
-      });
-    },
-    onError: (error) => {
-      toast({
-        variant: "destructive",
         title: "Error",
-        description: "Failed to create batch availability"
+        description: "El nombre del equipo es requerido",
+        variant: "destructive"
       });
-      console.error('Error creating batch availability:', error);
+      return;
     }
-  });
+
+    const newId = newItemName.toLowerCase().replace(/\s+/g, '-');
+    
+    if (equipmentList.some(e => e.id === newId)) {
+      toast({
+        title: "Error",
+        description: "Ya existe un elemento con este nombre",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newEquipment: Equipment = {
+      id: newId,
+      name: newItemName,
+      category: newItemCategory || undefined
+    };
+
+    equipmentList.push(newEquipment);
+    setLocalStock(prev => [...prev, { equipmentId: newId, baseQuantity: 0 }]);
+    setNewItemName('');
+    setNewItemCategory('');
+
+    toast({
+      title: "Éxito",
+      description: `Nuevo equipo añadido: ${newItemName}`,
+    });
+  };
+
+  const handleSave = () => {
+    onStockUpdate(localStock);
+  };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Batch Creation</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <Calendar
-          mode="range"
-          selected={dateRange}
-          onSelect={(range) => {
-            if (range) {
-              setDateRange({
-                from: range.from || undefined,
-                to: range.to || range.from || undefined
-              });
-            } else {
-              setDateRange({ from: undefined, to: undefined });
-            }
-          }}
-          className="rounded-md border"
-          numberOfMonths={2}
-        />
-        
-        <div className="flex gap-2">
-          <Button
-            variant={pattern === 'daily' ? 'default' : 'outline'}
-            onClick={() => setPattern('daily')}
-          >
-            Daily
-          </Button>
-          <Button
-            variant={pattern === 'weekdays' ? 'default' : 'outline'}
-            onClick={() => setPattern('weekdays')}
-          >
-            Weekdays
-          </Button>
-          <Button
-            variant={pattern === 'weekends' ? 'default' : 'outline'}
-            onClick={() => setPattern('weekends')}
-          >
-            Weekends
+    <div className="space-y-4">
+      <Button onClick={handleSave} className="w-full mb-4">Guardar Inventario</Button>
+      
+      <div className="space-y-4 mb-6">
+        <h3 className="text-lg font-medium">Añadir Nuevo Equipo</h3>
+        <div className="space-y-2">
+          <div>
+            <Label>Nombre</Label>
+            <Input
+              value={newItemName}
+              onChange={(e) => setNewItemName(e.target.value)}
+              placeholder="Ingrese nombre del equipo"
+            />
+          </div>
+          <div>
+            <Label>Categoría (opcional)</Label>
+            <Input
+              value={newItemCategory}
+              onChange={(e) => setNewItemCategory(e.target.value)}
+              placeholder="Ingrese categoría"
+            />
+          </div>
+          <Button onClick={handleAddNewItem} className="w-full flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Añadir Equipo
           </Button>
         </div>
+      </div>
 
-        <div className="flex gap-2">
-          <Button
-            className="bg-green-500 hover:bg-green-600"
-            onClick={() => createBatchAvailabilityMutation.mutate({ status: 'available' })}
-            disabled={!dateRange.from || !dateRange.to}
-          >
-            Set Available
-          </Button>
-          <Button
-            className="bg-yellow-500 hover:bg-yellow-600"
-            onClick={() => createBatchAvailabilityMutation.mutate({ status: 'tentative' })}
-            disabled={!dateRange.from || !dateRange.to}
-          >
-            Set Tentative
-          </Button>
-          <Button
-            className="bg-red-500 hover:bg-red-600"
-            onClick={() => createBatchAvailabilityMutation.mutate({ status: 'unavailable' })}
-            disabled={!dateRange.from || !dateRange.to}
-          >
-            Set Unavailable
-          </Button>
+      <ScrollArea className="h-[400px] pr-4">
+        <div className="space-y-4">
+          {equipmentList.map(equipment => (
+            <div key={equipment.id} className="flex items-center space-x-4">
+              <div className="flex-1">
+                <Label>{equipment.name}</Label>
+                {equipment.category && (
+                  <p className="text-sm text-gray-500">{equipment.category}</p>
+                )}
+              </div>
+              <Input
+                type="number"
+                min="0"
+                value={localStock.find(s => s.equipmentId === equipment.id)?.baseQuantity || 0}
+                onChange={(e) => handleQuantityChange(equipment.id, parseInt(e.target.value) || 0)}
+                className="w-24"
+              />
+            </div>
+          ))}
         </div>
-      </CardContent>
-    </Card>
+      </ScrollArea>
+    </div>
   );
-}
+};
