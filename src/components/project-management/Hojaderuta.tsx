@@ -1,3 +1,4 @@
+<lov-code>
 import React, { useState, useEffect } from "react";
 import {
   Card,
@@ -39,6 +40,14 @@ interface AutoTableJsPDF extends jsPDF {
   };
 }
 
+interface ImageUploads {
+  venue: File[];
+}
+
+interface ImagePreviews {
+  venue: string[];
+}
+
 interface TravelArrangement {
   transportation_type: "van" | "sleeper_bus" | "train" | "plane" | "RV";
   pickup_address?: string;
@@ -75,7 +84,9 @@ interface EventData {
   auxiliaryNeeds: string;
 }
 
-const ImageUploadSection = ({ type, label }: { type: keyof typeof images; label: string }) => {
+const ImageUploadSection = ({ type, label }: { type: keyof ImageUploads; label: string }) => {
+  const { images, imagePreviews, handleImageUpload } = useImageUploads();
+  
   return (
     <div className="space-y-4">
       <Label>{label}</Label>
@@ -101,12 +112,39 @@ const ImageUploadSection = ({ type, label }: { type: keyof typeof images; label:
   );
 };
 
+const useImageUploads = () => {
+  const [images, setImages] = useState<ImageUploads>({
+    venue: [],
+  });
+  const [imagePreviews, setImagePreviews] = useState<ImagePreviews>({
+    venue: [],
+  });
+
+  const handleImageUpload = async (
+    type: keyof ImageUploads,
+    files: FileList | null
+  ) => {
+    if (!files) return;
+    const fileArray = Array.from(files);
+    setImages({ ...images, [type]: [...(images[type] || []), ...fileArray] });
+
+    const previews = fileArray.map((file) => URL.createObjectURL(file));
+    setImagePreviews((prev) => ({
+      ...prev,
+      [type]: [...(prev[type] || []), ...previews],
+    }));
+  };
+
+  return { images, imagePreviews, handleImageUpload };
+};
+
 const HojaDeRutaGenerator = () => {
   const { toast } = useToast();
   const { data: jobs, isLoading: isLoadingJobs } = useJobSelection();
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState("");
   const [selectedJobId, setSelectedJobId] = useState<string>("");
+  const { images, imagePreviews, handleImageUpload } = useImageUploads();
 
   const [eventData, setEventData] = useState<EventData>({
     eventName: "",
@@ -127,12 +165,6 @@ const HojaDeRutaGenerator = () => {
     auxiliaryNeeds: "",
   });
 
-  const [images, setImages] = useState({
-    venue: [] as File[],
-  });
-  const [imagePreviews, setImagePreviews] = useState({
-    venue: [] as string[],
-  });
   const [venueMap, setVenueMap] = useState<File | null>(null);
   const [venueMapPreview, setVenueMapPreview] = useState<string | null>(null);
 
@@ -230,21 +262,6 @@ const HojaDeRutaGenerator = () => {
 
   const addRoomAssignment = () => {
     setRoomAssignments([...roomAssignments, { room_type: "single" }]);
-  };
-
-  const handleImageUpload = async (
-    type: keyof typeof images,
-    files: FileList | null
-  ) => {
-    if (!files) return;
-    const fileArray = Array.from(files);
-    setImages({ ...images, [type]: [...(images[type] || []), ...fileArray] });
-
-    const previews = fileArray.map((file) => URL.createObjectURL(file));
-    setImagePreviews((prev) => ({
-      ...prev,
-      [type]: [...(prev[type] || []), ...previews],
-    }));
   };
 
   const generateDocument = async () => {
@@ -963,192 +980,4 @@ const HojaDeRutaGenerator = () => {
                     </div>
                   </div>
                 ))}
-                <Button onClick={addTravelArrangement} variant="outline">
-                  Agregar Arreglo de Viaje
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="w-full">
-                Editar Asignaciones de Habitaciones
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-3xl">
-              <DialogHeader>
-                <DialogTitle>Asignaciones de Habitaciones</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                {roomAssignments.map((assignment, index) => (
-                  <div key={index} className="space-y-4 p-4 border rounded-lg">
-                    <div className="flex justify-between items-center">
-                      <h4 className="text-sm font-medium">
-                        Asignación de Habitación {index + 1}
-                      </h4>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeRoomAssignment(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    <Select
-                      value={assignment.room_type}
-                      onValueChange={(value) =>
-                        updateRoomAssignment(
-                          index,
-                          "room_type",
-                          value as "single" | "double"
-                        )
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione el tipo de habitación" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="single">Individual</SelectItem>
-                        <SelectItem value="double">Doble</SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    <div>
-                      <Label>Número de Habitación</Label>
-                      <Input
-                        value={assignment.room_number || ""}
-                        onChange={(e) =>
-                          updateRoomAssignment(index, "room_number", e.target.value)
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Personal Asignado 1</Label>
-                      <Select
-                        value={assignment.staff_member1_id || "unassigned"}
-                        onValueChange={(value) =>
-                          updateRoomAssignment(
-                            index,
-                            "staff_member1_id",
-                            value !== "unassigned" ? value : ""
-                          )
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione un miembro" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="unassigned">Sin asignar</SelectItem>
-                          {eventData.staff.map((member) => (
-                            <SelectItem key={member.name} value={member.name}>
-                              {`${member.name} ${member.surname1 || ""}`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {assignment.room_type === "double" && (
-                      <div>
-                        <Label>Personal Asignado 2</Label>
-                        <Select
-                          value={assignment.staff_member2_id || "unassigned"}
-                          onValueChange={(value) =>
-                            updateRoomAssignment(
-                              index,
-                              "staff_member2_id",
-                              value !== "unassigned" ? value : ""
-                            )
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccione un miembro" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="unassigned">Sin asignar</SelectItem>
-                            {eventData.staff.map((member) => (
-                              <SelectItem key={member.name} value={member.name}>
-                                {`${member.name} ${member.surname1 || ""}`}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                <Button onClick={addRoomAssignment} variant="outline">
-                  Agregar Asignación de Habitación
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          <div>
-            <Label htmlFor="schedule">Programa</Label>
-            <Textarea
-              id="schedule"
-              value={eventData.schedule}
-              onChange={(e) =>
-                setEventData({ ...eventData, schedule: e.target.value })
-              }
-              className="min-h-[200px]"
-              placeholder="Load in: 08:00&#10;Soundcheck: 14:00&#10;Doors: 19:00&#10;Show: 20:00..."
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="powerRequirements">Requisitos Eléctricos</Label>
-            <Textarea
-              id="powerRequirements"
-              value={eventData.powerRequirements}
-              onChange={(e) =>
-                setEventData({
-                  ...eventData,
-                  powerRequirements: e.target.value,
-                })
-              }
-              className="min-h-[150px]"
-              placeholder="Los requisitos eléctricos se completarán automáticamente cuando estén disponibles..."
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="auxiliaryNeeds">Necesidades Auxiliares</Label>
-            <Textarea
-              id="auxiliaryNeeds"
-              value={eventData.auxiliaryNeeds}
-              onChange={(e) =>
-                setEventData({ ...eventData, auxiliaryNeeds: e.target.value })
-              }
-              className="min-h-[150px]"
-              placeholder="Requerimientos del equipo de carga, necesidades de equipamiento..."
-            />
-          </div>
-
-          <div className="flex gap-4">
-            <Button 
-              onClick={generateDocument} 
-              className="flex-1"
-              disabled={isLoading || isSaving}
-            >
-              Generar PDF
-            </Button>
-            <Button 
-              onClick={saveHojaDeRuta} 
-              className="flex-1"
-              disabled={isLoading || isSaving}
-            >
-              Guardar Datos
-            </Button>
-          </div>
-        </CardContent>
-      </ScrollArea>
-    </Card>
-  );
-};
-
-export default HojaDeRutaGenerator;
+                <Button onClick={addTravelArrangement
