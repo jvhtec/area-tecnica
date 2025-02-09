@@ -11,6 +11,7 @@ import { useSessionManager } from '@/hooks/useSessionManager';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { WeeklySummary } from '@/components/disponibilidad/WeeklySummary';
+import { QuickPresetAssignment } from '@/components/disponibilidad/QuickPresetAssignment';
 
 export default function LightsDisponibilidad() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -39,9 +40,9 @@ export default function LightsDisponibilidad() {
         `)
         .eq('user_id', session.user.id)
         .eq('date', format(selectedDate, 'yyyy-MM-dd'))
-        .maybeSingle(); // Changed from single() to maybeSingle()
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') { // Still check for other errors
+      if (error && error.code !== 'PGRST116') {
         toast({
           variant: "destructive",
           title: "Error",
@@ -80,6 +81,9 @@ export default function LightsDisponibilidad() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">
           <DisponibilidadCalendar onDateSelect={setSelectedDate} selectedDate={selectedDate} />
+          <div className="flex justify-end">
+            <QuickPresetAssignment selectedDate={selectedDate} />
+          </div>
         </div>
         <div className="space-y-4">
           {selectedDate && (
