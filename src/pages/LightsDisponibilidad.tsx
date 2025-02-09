@@ -1,3 +1,4 @@
+
 import { DisponibilidadCalendar } from '@/components/disponibilidad/DisponibilidadCalendar';
 import { Button } from '@/components/ui/button';
 import { Box, Settings } from 'lucide-react';
@@ -9,9 +10,10 @@ import { supabase } from '@/lib/supabase';
 import { useSessionManager } from '@/hooks/useSessionManager';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { WeeklySummary } from '@/components/disponibilidad/WeeklySummary';
 
 export default function LightsDisponibilidad() {
-  const [selectedDate, setSelectedDate] = useState<Date>();
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPresetDialog, setShowPresetDialog] = useState(false);
   const navigate = useNavigate();
   const { session } = useSessionManager();
@@ -54,8 +56,8 @@ export default function LightsDisponibilidad() {
   });
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="container mx-auto py-6 space-y-6">
+      <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Presets de Equipamiento</h1>
         <div className="flex gap-2">
           <Button 
@@ -74,6 +76,7 @@ export default function LightsDisponibilidad() {
           </Button>
         </div>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">
           <DisponibilidadCalendar onDateSelect={setSelectedDate} selectedDate={selectedDate} />
@@ -103,6 +106,12 @@ export default function LightsDisponibilidad() {
           )}
         </div>
       </div>
+
+      <WeeklySummary 
+        selectedDate={selectedDate} 
+        onDateChange={setSelectedDate} 
+      />
+
       <PresetManagementDialog 
         open={showPresetDialog} 
         onOpenChange={setShowPresetDialog}
