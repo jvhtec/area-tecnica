@@ -444,6 +444,7 @@ export type Database = {
           infra_cat6: boolean | null
           infra_coax: boolean | null
           infra_hma: boolean | null
+          infra_opticalcon_duo: boolean | null
           job_id: string | null
           mic_pack: string | null
           mon_console: string | null
@@ -452,6 +453,7 @@ export type Database = {
           monitors_quantity: number | null
           name: string
           notes: string | null
+          other_infrastructure: string | null
           rf_festival_mics: number | null
           rf_festival_url: string | null
           rf_festival_wireless: number | null
@@ -460,11 +462,13 @@ export type Database = {
           soundcheck: boolean | null
           soundcheck_end: string | null
           soundcheck_start: string | null
-          stage: string | null
+          stage: number | null
           updated_at: string | null
           wireless_band: string | null
           wireless_model: string | null
           wireless_quantity: number | null
+          wireless_quantity_bp: number | null
+          wireless_quantity_hh: number | null
         }
         Insert: {
           created_at?: string | null
@@ -484,6 +488,7 @@ export type Database = {
           infra_cat6?: boolean | null
           infra_coax?: boolean | null
           infra_hma?: boolean | null
+          infra_opticalcon_duo?: boolean | null
           job_id?: string | null
           mic_pack?: string | null
           mon_console?: string | null
@@ -492,6 +497,7 @@ export type Database = {
           monitors_quantity?: number | null
           name: string
           notes?: string | null
+          other_infrastructure?: string | null
           rf_festival_mics?: number | null
           rf_festival_url?: string | null
           rf_festival_wireless?: number | null
@@ -500,11 +506,13 @@ export type Database = {
           soundcheck?: boolean | null
           soundcheck_end?: string | null
           soundcheck_start?: string | null
-          stage?: string | null
+          stage?: number | null
           updated_at?: string | null
           wireless_band?: string | null
           wireless_model?: string | null
           wireless_quantity?: number | null
+          wireless_quantity_bp?: number | null
+          wireless_quantity_hh?: number | null
         }
         Update: {
           created_at?: string | null
@@ -524,6 +532,7 @@ export type Database = {
           infra_cat6?: boolean | null
           infra_coax?: boolean | null
           infra_hma?: boolean | null
+          infra_opticalcon_duo?: boolean | null
           job_id?: string | null
           mic_pack?: string | null
           mon_console?: string | null
@@ -532,6 +541,7 @@ export type Database = {
           monitors_quantity?: number | null
           name?: string
           notes?: string | null
+          other_infrastructure?: string | null
           rf_festival_mics?: number | null
           rf_festival_url?: string | null
           rf_festival_wireless?: number | null
@@ -540,11 +550,13 @@ export type Database = {
           soundcheck?: boolean | null
           soundcheck_end?: string | null
           soundcheck_start?: string | null
-          stage?: string | null
+          stage?: number | null
           updated_at?: string | null
           wireless_band?: string | null
           wireless_model?: string | null
           wireless_quantity?: number | null
+          wireless_quantity_bp?: number | null
+          wireless_quantity_hh?: number | null
         }
         Relationships: [
           {

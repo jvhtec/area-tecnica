@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
@@ -16,6 +17,26 @@ interface ArtistManagementDialogProps {
   start_time?: string;
   end_time?: string;
 }
+
+const consoleOptions = [
+  'Yamaha CL5', 'Yamaha PMx', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
+  'DiGiCo SD10', 'DiGiCo SD11', 'DiGiCo SD12', 'DiGiCo SD5Q', 'DiGiCo SD7Q',
+  'DiGiCo Q225', 'DiGiCo Q326', 'DiGiCo Q338', 'DiGiCo Q852', 'Avid S6L',
+  'A&H C1500', 'A&H C2500', 'A&H S3000', 'A&H S5000', 'A&H S7000',
+  'Waves LV1 (homemade)', 'Waves LV1 Classic', 'SSL', 'Other'
+];
+
+const wirelessOptions = [
+  'Shure AD Series', 'Shure AXT Series', 'Shure UR Series', 'Shure ULX Series',
+  'Shure QLX Series', 'Sennheiser 2000 Series', 'Sennheiser EW500 Series',
+  'Sennheiser EW300 Series', 'Sennheiser EW100 Series', 'Other'
+];
+
+const iemOptions = [
+  'Shure Digital PSM Series', 'Shure PSM1000 Series', 'Shure PSM900 Series',
+  'Shure PSM300 Series', 'Sennheiser 2000 series', 'Sennheiser 300 G4 Series',
+  'Sennheiser 300 G3 Series', 'Wysicom MTK', 'Other'
+];
 
 export const ArtistManagementDialog = ({
   open,
@@ -38,7 +59,8 @@ export const ArtistManagementDialog = ({
     foh_console: artist?.foh_console || "",
     mon_console: artist?.mon_console || "",
     wireless_model: artist?.wireless_model || "",
-    wireless_quantity: artist?.wireless_quantity || 0,
+    wireless_quantity_hh: artist?.wireless_quantity_hh || 0,
+    wireless_quantity_bp: artist?.wireless_quantity_bp || 0,
     wireless_band: artist?.wireless_band || "",
     iem_model: artist?.iem_model || "",
     iem_quantity: artist?.iem_quantity || 0,
@@ -53,6 +75,8 @@ export const ArtistManagementDialog = ({
     infra_hma: artist?.infra_hma || false,
     infra_coax: artist?.infra_coax || false,
     infra_analog: artist?.infra_analog || 0,
+    infra_opticalcon_duo: artist?.infra_opticalcon_duo || false,
+    other_infrastructure: artist?.other_infrastructure || "",
     notes: artist?.notes || "",
   });
 
@@ -66,13 +90,11 @@ export const ArtistManagementDialog = ({
       const data = {
         ...formData,
         job_id: jobId,
-        // Handle time fields - convert empty strings to null
+        stage: formData.stage ? parseInt(formData.stage) : null,
         show_start: formData.show_start || null,
         show_end: formData.show_end || null,
         soundcheck_start: formData.soundcheck_start || null,
         soundcheck_end: formData.soundcheck_end || null,
-        // Handle stage field - convert empty string to null
-        stage: formData.stage.trim() || null,
       };
 
       const { error } = artist?.id
@@ -125,9 +147,12 @@ export const ArtistManagementDialog = ({
                 />
               </div>
               <div>
-                <Label htmlFor="stage">Stage</Label>
+                <Label htmlFor="stage">Stage Number (1-4)</Label>
                 <Input
                   id="stage"
+                  type="number"
+                  min="1"
+                  max="4"
                   value={formData.stage}
                   onChange={(e) =>
                     setFormData({ ...formData, stage: e.target.value })
@@ -164,23 +189,43 @@ export const ArtistManagementDialog = ({
             <div className="space-y-4">
               <div>
                 <Label htmlFor="foh_console">FOH Console</Label>
-                <Input
-                  id="foh_console"
+                <Select
                   value={formData.foh_console}
-                  onChange={(e) =>
-                    setFormData({ ...formData, foh_console: e.target.value })
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, foh_console: value })
                   }
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select FOH console" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {consoleOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="mon_console">Monitor Console</Label>
-                <Input
-                  id="mon_console"
+                <Select
                   value={formData.mon_console}
-                  onChange={(e) =>
-                    setFormData({ ...formData, mon_console: e.target.value })
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, mon_console: value })
                   }
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select monitor console" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {consoleOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
@@ -192,24 +237,50 @@ export const ArtistManagementDialog = ({
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="wireless_model">Wireless Microphone Model</Label>
-                  <Input
-                    id="wireless_model"
+                  <Select
                     value={formData.wireless_model}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, wireless_model: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select wireless model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {wirelessOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="wireless_quantity_hh">Handheld Quantity</Label>
+                  <Input
+                    id="wireless_quantity_hh"
+                    type="number"
+                    min="0"
+                    value={formData.wireless_quantity_hh}
                     onChange={(e) =>
-                      setFormData({ ...formData, wireless_model: e.target.value })
+                      setFormData({
+                        ...formData,
+                        wireless_quantity_hh: parseInt(e.target.value) || 0,
+                      })
                     }
                   />
                 </div>
                 <div>
-                  <Label htmlFor="wireless_quantity">Quantity</Label>
+                  <Label htmlFor="wireless_quantity_bp">Bodypack Quantity</Label>
                   <Input
-                    id="wireless_quantity"
+                    id="wireless_quantity_bp"
                     type="number"
-                    value={formData.wireless_quantity}
+                    min="0"
+                    value={formData.wireless_quantity_bp}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        wireless_quantity: parseInt(e.target.value) || 0,
+                        wireless_quantity_bp: parseInt(e.target.value) || 0,
                       })
                     }
                   />
@@ -228,19 +299,30 @@ export const ArtistManagementDialog = ({
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="iem_model">IEM Model</Label>
-                  <Input
-                    id="iem_model"
+                  <Select
                     value={formData.iem_model}
-                    onChange={(e) =>
-                      setFormData({ ...formData, iem_model: e.target.value })
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, iem_model: value })
                     }
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select IEM model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {iemOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="iem_quantity">IEM Quantity</Label>
                   <Input
                     id="iem_quantity"
                     type="number"
+                    min="0"
                     value={formData.iem_quantity}
                     onChange={(e) =>
                       setFormData({
@@ -284,6 +366,7 @@ export const ArtistManagementDialog = ({
                 <Input
                   id="monitors_quantity"
                   type="number"
+                  min="0"
                   value={formData.monitors_quantity}
                   onChange={(e) =>
                     setFormData({
@@ -371,11 +454,21 @@ export const ArtistManagementDialog = ({
                 />
                 <Label>Coax</Label>
               </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  checked={formData.infra_opticalcon_duo}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, infra_opticalcon_duo: checked })
+                  }
+                />
+                <Label>OpticalCon Duo</Label>
+              </div>
               <div>
                 <Label htmlFor="infra_analog">Analog Lines</Label>
                 <Input
                   id="infra_analog"
                   type="number"
+                  min="0"
                   value={formData.infra_analog}
                   onChange={(e) =>
                     setFormData({
@@ -385,6 +478,19 @@ export const ArtistManagementDialog = ({
                   }
                 />
               </div>
+            </div>
+            <div>
+              <Label htmlFor="other_infrastructure">Other Infrastructure</Label>
+              <Input
+                id="other_infrastructure"
+                value={formData.other_infrastructure}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    other_infrastructure: e.target.value,
+                  })
+                }
+              />
             </div>
           </div>
 
