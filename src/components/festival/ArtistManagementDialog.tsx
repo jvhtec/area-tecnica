@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -14,8 +13,7 @@ interface ArtistManagementDialogProps {
   onOpenChange: (open: boolean) => void;
   artist?: any;
   jobId?: string;
-  start_time?: string;
-  end_time?: string;
+  selectedDate?: string;
 }
 
 const consoleOptions = [
@@ -43,8 +41,7 @@ export const ArtistManagementDialog = ({
   onOpenChange,
   artist,
   jobId,
-  start_time,
-  end_time
+  selectedDate
 }: ArtistManagementDialogProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -82,6 +79,7 @@ export const ArtistManagementDialog = ({
     infra_opticalcon_duo_quantity: artist?.infra_opticalcon_duo_quantity || 0,
     other_infrastructure: artist?.other_infrastructure || "",
     notes: artist?.notes || "",
+    date: artist?.date || selectedDate || "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -137,7 +135,6 @@ export const ArtistManagementDialog = ({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Basic Information */}
             <div className="space-y-4">
               <div>
                 <Label htmlFor="name">Artist Name</Label>
@@ -188,7 +185,6 @@ export const ArtistManagementDialog = ({
                 </div>
               </div>
               
-              {/* Soundcheck Section */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="soundcheck">Soundcheck</Label>
@@ -235,7 +231,6 @@ export const ArtistManagementDialog = ({
               </div>
             </div>
 
-            {/* Technical Setup */}
             <div className="space-y-4">
               <div>
                 <Label htmlFor="foh_console">FOH Console</Label>
@@ -280,7 +275,6 @@ export const ArtistManagementDialog = ({
             </div>
           </div>
 
-          {/* RF and Wireless Section */}
           <div className="border rounded-lg p-4 space-y-4">
             <h3 className="text-lg font-medium">RF & Wireless Setup</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -396,7 +390,6 @@ export const ArtistManagementDialog = ({
             </div>
           </div>
 
-          {/* Monitor Setup */}
           <div className="border rounded-lg p-4 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-medium">Monitor Setup</h3>
@@ -429,7 +422,6 @@ export const ArtistManagementDialog = ({
             )}
           </div>
 
-          {/* Extra Requirements */}
           <div className="border rounded-lg p-4 space-y-4">
             <h3 className="text-lg font-medium">Extra Requirements</h3>
             <div className="grid grid-cols-2 gap-4">
@@ -473,7 +465,6 @@ export const ArtistManagementDialog = ({
             </div>
           </div>
 
-          {/* Infrastructure */}
           <div className="border rounded-lg p-4 space-y-4">
             <h3 className="text-lg font-medium">Infrastructure</h3>
             <div className="grid grid-cols-2 gap-4">
@@ -630,7 +621,6 @@ export const ArtistManagementDialog = ({
             </div>
           </div>
 
-          {/* Notes */}
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
             <textarea

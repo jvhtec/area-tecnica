@@ -8,6 +8,8 @@ import { ArtistTable } from "@/components/festival/ArtistTable";
 import { ArtistManagementDialog } from "@/components/festival/ArtistManagementDialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { format, eachDayOfInterval, isValid } from "date-fns";
 
 const FestivalArtistManagement = () => {
   const { jobId } = useParams();
@@ -18,13 +20,15 @@ const FestivalArtistManagement = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
   const [jobTitle, setJobTitle] = useState("");
+  const [jobDates, setJobDates] = useState<Date[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string>("");
 
   useEffect(() => {
     const fetchJobDetails = async () => {
       if (!jobId) return;
       const { data, error } = await supabase
         .from("jobs")
-        .select("title")
+        .select("title, start_time, end_time")
         .eq("id", jobId)
         .single();
 
@@ -32,21 +36,32 @@ const FestivalArtistManagement = () => {
         console.error("Error fetching job details:", error);
       } else {
         setJobTitle(data.title);
+        const startDate = new Date(data.start_time);
+        const endDate = new Date(data.end_time);
+        
+        if (isValid(startDate) && isValid(endDate)) {
+          const dates = eachDayOfInterval({ start: startDate, end: endDate });
+          setJobDates(dates);
+          setSelectedDate(format(dates[0], 'yyyy-MM-dd'));
+        }
       }
     };
 
     fetchJobDetails();
   }, [jobId]);
 
-  // Fetch artists for this job
+  // Fetch artists for this job and date
   useEffect(() => {
     const fetchArtists = async () => {
       try {
-        console.log("Fetching artists for job:", jobId);
+        if (!selectedDate) return;
+        
+        console.log("Fetching artists for job:", jobId, "and date:", selectedDate);
         const { data, error } = await supabase
           .from("festival_artists")
           .select("*")
           .eq("job_id", jobId)
+          .eq("date", selectedDate)
           .order("show_start", { ascending: true });
 
         if (error) throw error;
@@ -64,10 +79,10 @@ const FestivalArtistManagement = () => {
       }
     };
 
-    if (jobId) {
+    if (jobId && selectedDate) {
       fetchArtists();
     }
-  }, [jobId]);
+  }, [jobId, selectedDate]);
 
   const handleAddArtist = () => {
     setSelectedArtist(null);
@@ -77,6 +92,10 @@ const FestivalArtistManagement = () => {
   const handleEditArtist = (artist: any) => {
     setSelectedArtist(artist);
     setIsDialogOpen(true);
+  };
+
+  const formatTabDate = (date: Date) => {
+    return format(date, 'EEE, MMM d');
   };
 
   return (
@@ -102,11 +121,42 @@ const FestivalArtistManagement = () => {
           </Button>
         </CardHeader>
         <CardContent>
-          <ArtistTable
-            artists={artists}
-            isLoading={isLoading}
-            onEditArtist={handleEditArtist}
-          />
+          {jobDates.length > 0 ? (
+            <Tabs
+              value={selectedDate}
+              onValueChange={setSelectedDate}
+              className="w-full"
+            >
+              <TabsList className="mb-4">
+                {jobDates.map((date) => (
+                  <TabsTrigger
+                    key={format(date, 'yyyy-MM-dd')}
+                    value={format(date, 'yyyy-MM-dd')}
+                  >
+                    {formatTabDate(date)}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              {jobDates.map((date) => (
+                <TabsContent
+                  key={format(date, 'yyyy-MM-dd')}
+                  value={format(date, 'yyyy-MM-dd')}
+                >
+                  <ArtistTable
+                    artists={artists}
+                    isLoading={isLoading}
+                    onEditArtist={handleEditArtist}
+                  />
+                </TabsContent>
+              ))}
+            </Tabs>
+          ) : (
+            <ArtistTable
+              artists={artists}
+              isLoading={isLoading}
+              onEditArtist={handleEditArtist}
+            />
+          )}
         </CardContent>
       </Card>
 
@@ -115,6 +165,7 @@ const FestivalArtistManagement = () => {
         onOpenChange={setIsDialogOpen}
         artist={selectedArtist}
         jobId={jobId}
+        selectedDate={selectedDate}
       />
     </div>
   );
