@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, ArrowLeft } from "lucide-react";
 import { ArtistTable } from "@/components/festival/ArtistTable";
 import { ArtistManagementDialog } from "@/components/festival/ArtistManagementDialog";
+import { ArtistTableFilters } from "@/components/festival/ArtistTableFilters";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -22,6 +23,9 @@ const FestivalArtistManagement = () => {
   const [jobTitle, setJobTitle] = useState("");
   const [jobDates, setJobDates] = useState<Date[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [stageFilter, setStageFilter] = useState("");
+  const [equipmentFilter, setEquipmentFilter] = useState("");
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -126,6 +130,29 @@ const FestivalArtistManagement = () => {
     setIsDialogOpen(true);
   };
 
+  const handleDeleteArtist = async (artist: any) => {
+    try {
+      const { error } = await supabase
+        .from("festival_artists")
+        .delete()
+        .eq("id", artist.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Artist deleted successfully",
+      });
+    } catch (error: any) {
+      console.error("Error deleting artist:", error);
+      toast({
+        title: "Error",
+        description: "Could not delete artist",
+        variant: "destructive",
+      });
+    }
+  };
+
   const formatTabDate = (date: Date) => {
     return format(date, 'EEE, MMM d');
   };
@@ -153,6 +180,15 @@ const FestivalArtistManagement = () => {
           </Button>
         </CardHeader>
         <CardContent>
+          <ArtistTableFilters
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            stageFilter={stageFilter}
+            onStageFilterChange={setStageFilter}
+            equipmentFilter={equipmentFilter}
+            onEquipmentFilterChange={setEquipmentFilter}
+          />
+          
           {jobDates.length > 0 ? (
             <Tabs
               value={selectedDate}
@@ -178,6 +214,10 @@ const FestivalArtistManagement = () => {
                     artists={artists}
                     isLoading={isLoading}
                     onEditArtist={handleEditArtist}
+                    onDeleteArtist={handleDeleteArtist}
+                    searchTerm={searchTerm}
+                    stageFilter={stageFilter}
+                    equipmentFilter={equipmentFilter}
                   />
                 </TabsContent>
               ))}
@@ -187,20 +227,14 @@ const FestivalArtistManagement = () => {
               artists={artists}
               isLoading={isLoading}
               onEditArtist={handleEditArtist}
+              onDeleteArtist={handleDeleteArtist}
+              searchTerm={searchTerm}
+              stageFilter={stageFilter}
+              equipmentFilter={equipmentFilter}
             />
           )}
         </CardContent>
       </Card>
 
       <ArtistManagementDialog
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        artist={selectedArtist}
-        jobId={jobId}
-        selectedDate={selectedDate}
-      />
-    </div>
-  );
-};
-
-export default FestivalArtistManagement;
+        
