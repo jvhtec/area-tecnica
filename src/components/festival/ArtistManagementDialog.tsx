@@ -84,7 +84,14 @@ export const ArtistManagementDialog = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!jobId) return;
+    if (!jobId || !formData.date) {
+      toast({
+        title: "Error",
+        description: "Missing required fields",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -148,16 +155,14 @@ export const ArtistManagementDialog = ({
                 />
               </div>
               <div>
-                <Label htmlFor="stage">Stage Number (1-4)</Label>
+                <Label htmlFor="date">Performance Date</Label>
                 <Input
-                  id="stage"
-                  type="number"
-                  min="1"
-                  max="4"
-                  value={formData.stage}
-                  onChange={(e) =>
-                    setFormData({ ...formData, stage: e.target.value })
-                  }
+                  id="date"
+                  type="date"
+                  value={formData.date}
+                  readOnly
+                  className="bg-gray-100"
+                  required
                 />
               </div>
               <div className="grid grid-cols-2 gap-2">
