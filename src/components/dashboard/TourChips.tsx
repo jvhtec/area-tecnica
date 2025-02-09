@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { TourCard } from "../tours/TourCard";
 import CreateTourDialog from "../tours/CreateTourDialog";
 import { useToast } from "@/hooks/use-toast";
 import { exportTourPDF } from "@/lib/tourPdfExport";
+import { format } from "date-fns";
 
 interface TourChipsProps {
   onTourClick: (tourId: string) => void;
@@ -70,13 +72,16 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
         return;
       }
 
-      const rows = tour.tour_dates.map((td: any) => ({
-        date: new Date(td.date).toLocaleDateString(),
-        location: td.location?.name || "TBD",
-      }));
+      // Sort tour dates chronologically before mapping
+      const rows = [...tour.tour_dates]
+        .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .map((td: any) => ({
+          date: format(new Date(td.date), 'dd/MM/yyyy'),
+          location: td.location?.name || "TBD",
+        }));
 
-      const start = tour.start_date ? new Date(tour.start_date).toLocaleDateString() : "TBD";
-      const end = tour.end_date ? new Date(tour.end_date).toLocaleDateString() : "TBD";
+      const start = tour.start_date ? format(new Date(tour.start_date), 'dd/MM/yyyy') : "TBD";
+      const end = tour.end_date ? format(new Date(tour.end_date), 'dd/MM/yyyy') : "TBD";
       const dateSpan = `${start} - ${end}`;
 
       console.log("Generating PDF with:", {
@@ -94,7 +99,6 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
       console.log("PDF generated successfully, creating download URL");
       const url = URL.createObjectURL(pdfBlob);
       
-      // Create a temporary link and trigger download
       const link = document.createElement('a');
       link.href = url;
       link.download = `${tour.name} - Schedule.pdf`;
