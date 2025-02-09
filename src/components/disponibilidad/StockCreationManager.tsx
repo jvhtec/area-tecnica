@@ -92,8 +92,17 @@ export function StockCreationManager() {
       <CardContent className="space-y-4">
         <Calendar
           mode="range"
-          selected={{ from: dateRange.from, to: dateRange.to }}
-          onSelect={(range) => setDateRange(range || { from: undefined, to: undefined })}
+          selected={dateRange}
+          onSelect={(range) => {
+            if (range) {
+              setDateRange({
+                from: range.from || undefined,
+                to: range.to || range.from || undefined
+              });
+            } else {
+              setDateRange({ from: undefined, to: undefined });
+            }
+          }}
           className="rounded-md border"
           numberOfMonths={2}
         />
