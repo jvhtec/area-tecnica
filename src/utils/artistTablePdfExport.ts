@@ -151,9 +151,12 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
         fillColor: [125, 1, 1],
         textColor: [255, 255, 255],
         fontSize: 8,
+        fontStyle: 'bold',
+        halign: 'left',
+        cellPadding: 4
       },
       columnStyles: {
-        0: { cellWidth: 30 },
+        0: { cellWidth: 35 },
         1: { cellWidth: 15 },
         2: { cellWidth: 25 },
         3: { cellWidth: 40 },
@@ -203,3 +206,4 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
     };
   });
 };
+
