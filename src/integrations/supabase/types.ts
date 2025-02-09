@@ -51,6 +51,193 @@ export type Database = {
           },
         ]
       }
+      availability_conflicts: {
+        Row: {
+          conflict_date: string
+          created_at: string | null
+          department: string
+          id: string
+          job_id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          conflict_date: string
+          created_at?: string | null
+          department: string
+          id?: string
+          job_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          conflict_date?: string
+          created_at?: string | null
+          department?: string
+          id?: string
+          job_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "availability_conflicts_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "availability_conflicts_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "availability_conflicts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      availability_exceptions: {
+        Row: {
+          created_at: string | null
+          department: string
+          end_date: string
+          id: string
+          reason: string | null
+          start_date: string
+          status: Database["public"]["Enums"]["availability_status"]
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          department: string
+          end_date: string
+          id?: string
+          reason?: string | null
+          start_date: string
+          status?: Database["public"]["Enums"]["availability_status"]
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          department?: string
+          end_date?: string
+          id?: string
+          reason?: string | null
+          start_date?: string
+          status?: Database["public"]["Enums"]["availability_status"]
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "availability_exceptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      availability_preferences: {
+        Row: {
+          created_at: string | null
+          day_of_week: number
+          department: string
+          id: string
+          notes: string | null
+          status: Database["public"]["Enums"]["availability_status"]
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          day_of_week: number
+          department: string
+          id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["availability_status"]
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          day_of_week?: number
+          department?: string
+          id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["availability_status"]
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "availability_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      availability_schedules: {
+        Row: {
+          created_at: string | null
+          date: string
+          department: string
+          id: string
+          notes: string | null
+          status: Database["public"]["Enums"]["availability_status"]
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          department: string
+          id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["availability_status"]
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          department?: string
+          id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["availability_status"]
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "availability_schedules_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       direct_messages: {
         Row: {
           content: string
@@ -1679,6 +1866,7 @@ export type Database = {
     }
     Enums: {
       assignment_status: "invited" | "confirmed" | "declined"
+      availability_status: "available" | "unavailable" | "tentative"
       department:
         | "sound"
         | "lights"

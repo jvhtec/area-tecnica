@@ -1,3 +1,4 @@
+
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -25,6 +26,7 @@ import LaborPOForm from '@/pages/LaborPOForm';
 import Logistics from '@/pages/Logistics';
 import FestivalManagement from '@/pages/FestivalManagement';
 import FestivalArtistManagement from '@/pages/FestivalArtistManagement';
+import LightsDisponibilidad from '@/pages/LightsDisponibilidad';
 
 function App() {
   return (
@@ -54,6 +56,9 @@ function App() {
               <Route path="excel-tool" element={<ExcelTool />} />
               <Route path="hoja-de-ruta" element={<HojaDeRuta />} />
               <Route path="labor-po-form" element={<LaborPOForm />} />
+              
+              {/* Disponibilidad Routes */}
+              <Route path="lights-disponibilidad" element={<LightsDisponibilidad />} />
               
               {/* Festival Management Routes */}
               <Route path="festival-management/:jobId" element={<FestivalManagement />} />
