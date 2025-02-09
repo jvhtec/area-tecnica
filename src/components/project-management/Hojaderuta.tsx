@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import {
   Card,
@@ -765,6 +764,84 @@ const HojaDeRutaGenerator = () => {
       link.click();
       URL.revokeObjectURL(url);
     };
+
+    toast({
+      title: "Éxito",
+      description: "La Hoja de Ruta ha sido generada y subida",
+    });
+  };
+
+  const loadHojaDeRuta = async (jobId: string) => {
+    try {
+      console.log("Loading Hoja de Ruta for job:", jobId);
+      const { data: mainData, error } = await supabase
+        .from("hoja_de_ruta")
+        .select("*")
+        .eq("job_id", jobId)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error fetching Hoja de Ruta:", error);
+        throw error;
+      }
+
+      if (mainData) {
+        setEventData((prev) => ({
+          ...prev,
+          eventName: mainData.event_name || prev.eventName,
+          eventDates: mainData.event_dates || prev.eventDates,
+          venue: {
+            name: mainData.venue_name || "",
+            address: mainData.venue_address || "",
+          },
+          schedule: mainData.schedule || "",
+          powerRequirements: mainData.power_requirements || "",
+          auxiliaryNeeds: mainData.auxiliary_needs || "",
+        }));
+
+        const { data: contactsData, error: contactsError } = await supabase
+          .from("hoja_de_ruta_contacts")
+          .select("*")
+          .eq("hoja_de_ruta_id", mainData.id);
+
+        if (contactsError) throw contactsError;
+        if (contactsData) {
+          setEventData((prev) => ({
+            ...prev,
+            contacts: contactsData.map((contact) => ({
+              name: contact.name,
+              role: contact.role || "",
+              phone: contact.phone || "",
+            })),
+          }));
+        }
+
+        const { data: logisticsData, error: logisticsError } = await supabase
+          .from("hoja_de_ruta_logistics")
+          .select("*")
+          .eq("hoja_de_ruta_id", mainData.id)
+          .maybeSingle();
+
+        if (logisticsError) throw logisticsError;
+        if (logisticsData) {
+          setEventData((prev) => ({
+            ...prev,
+            logistics: {
+              transport: logisticsData.transport || "",
+              loadingDetails: logisticsData.loading_details || "",
+              unloadingDetails: logisticsData.unloading_details || "",
+            },
+          }));
+        }
+      }
+    } catch (error: any) {
+      console.error("Error loading Hoja de Ruta:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo cargar la Hoja de Ruta",
+        variant: "destructive",
+      });
+    }
   };
 
   const uploadPdfToJob = async (
@@ -813,3 +890,356 @@ const HojaDeRutaGenerator = () => {
 
       toast({
         title: "Éxito",
+        description: "La Hoja de Ruta ha sido generada y subida",
+      });
+    } catch (error: any) {
+      console.error("Error al subir el PDF:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo subir la Hoja de Ruta",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Generar Hoja de Ruta</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="space-y-4">
+              <Label>Trabajo</Label>
+              <Select
+                value={selectedJobId}
+                onValueChange={(value) => setSelectedJobId(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccione un trabajo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobs?.map((job: any) => (
+                    <SelectItem key={job.id} value={job.id}>
+                      {job.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-4">
+              <Label>Imagenes del Lugar</Label>
+              <ImageUploadSection
+                type="venue"
+                label="Imagenes del Lugar"
+                images={images}
+                imagePreviews={imagePreviews}
+                setImages={setImages}
+                setImagePreviews={setImagePreviews}
+              />
+            </div>
+            <div className="space-y-4">
+              <Label>Mapa del Lugar</Label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleVenueMapUpload}
+              />
+              {venueMapPreview && (
+                <img
+                  src={venueMapPreview}
+                  alt="Mapa del Lugar"
+                  className="w-full h-32 object-cover rounded-md"
+                />
+              )}
+            </div>
+            <div className="space-y-4">
+              <Label>Contactos</Label>
+              <div className="space-y-4">
+                {eventData.contacts.map((contact, index) => (
+                  <div key={index} className="space-y-2">
+                    <Label>Nombre</Label>
+                    <Input
+                      value={contact.name}
+                      onChange={(e) =>
+                        handleContactChange(index, "name", e.target.value)
+                      }
+                    />
+                    <Label>Rol</Label>
+                    <Input
+                      value={contact.role}
+                      onChange={(e) =>
+                        handleContactChange(index, "role", e.target.value)
+                      }
+                    />
+                    <Label>Teléfono</Label>
+                    <Input
+                      value={contact.phone}
+                      onChange={(e) =>
+                        handleContactChange(index, "phone", e.target.value)
+                      }
+                    />
+                  </div>
+                ))}
+                <Button onClick={addContact}>Añadir Contacto</Button>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <Label>Logística</Label>
+              <div className="space-y-4">
+                <Label>Transporte</Label>
+                <Input
+                  value={eventData.logistics.transport}
+                  onChange={(e) =>
+                    setEventData({
+                      ...eventData,
+                      logistics: {
+                        ...eventData.logistics,
+                        transport: e.target.value,
+                      },
+                    })
+                  }
+                />
+                <Label>Detalles de Carga</Label>
+                <Input
+                  value={eventData.logistics.loadingDetails}
+                  onChange={(e) =>
+                    setEventData({
+                      ...eventData,
+                      logistics: {
+                        ...eventData.logistics,
+                        loadingDetails: e.target.value,
+                      },
+                    })
+                  }
+                />
+                <Label>Detalles de Descarga</Label>
+                <Input
+                  value={eventData.logistics.unloadingDetails}
+                  onChange={(e) =>
+                    setEventData({
+                      ...eventData,
+                      logistics: {
+                        ...eventData.logistics,
+                        unloadingDetails: e.target.value,
+                      },
+                    })
+                  }
+                />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <Label>Lista de Personal</Label>
+              <div className="space-y-4">
+                {eventData.staff.map((person, index) => (
+                  <div key={index} className="space-y-2">
+                    <Label>Nombre</Label>
+                    <Input
+                      value={person.name}
+                      onChange={(e) =>
+                        handleStaffChange(index, "name", e.target.value)
+                      }
+                    />
+                    <Label>Primer Apellido</Label>
+                    <Input
+                      value={person.surname1}
+                      onChange={(e) =>
+                        handleStaffChange(index, "surname1", e.target.value)
+                      }
+                    />
+                    <Label>Segundo Apellido</Label>
+                    <Input
+                      value={person.surname2}
+                      onChange={(e) =>
+                        handleStaffChange(index, "surname2", e.target.value)
+                      }
+                    />
+                    <Label>Puesto</Label>
+                    <Input
+                      value={person.position}
+                      onChange={(e) =>
+                        handleStaffChange(index, "position", e.target.value)
+                      }
+                    />
+                  </div>
+                ))}
+                <Button onClick={addStaffMember}>Añadir Personal</Button>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <Label>Arreglos de Viaje</Label>
+              <div className="space-y-4">
+                {travelArrangements.map((arr, index) => (
+                  <div key={index} className="space-y-2">
+                    <Label>Transporte</Label>
+                    <Select
+                      value={arr.transportation_type}
+                      onValueChange={(value) =>
+                        updateTravelArrangement(index, "transportation_type", value)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione un transporte" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="van">Van</SelectItem>
+                        <SelectItem value="sleeper_bus">Sleeper Bus</SelectItem>
+                        <SelectItem value="train">Train</SelectItem>
+                        <SelectItem value="plane">Plane</SelectItem>
+                        <SelectItem value="RV">RV</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Label>Recogida</Label>
+                    <Input
+                      value={`${arr.pickup_address || ""} ${arr.pickup_time || ""}`.trim()}
+                      onChange={(e) =>
+                        updateTravelArrangement(index, "pickup_address", e.target.value)
+                      }
+                    />
+                    <Label>Salida</Label>
+                    <Input
+                      value={arr.departure_time || ""}
+                      onChange={(e) =>
+                        updateTravelArrangement(index, "departure_time", e.target.value)
+                      }
+                    />
+                    <Label>Llegada</Label>
+                    <Input
+                      value={arr.arrival_time || ""}
+                      onChange={(e) =>
+                        updateTravelArrangement(index, "arrival_time", e.target.value)
+                      }
+                    />
+                    <Label>Vuelo/Tren #</Label>
+                    <Input
+                      value={arr.flight_train_number || ""}
+                      onChange={(e) =>
+                        updateTravelArrangement(index, "flight_train_number", e.target.value)
+                      }
+                    />
+                    <Label>Notas</Label>
+                    <Input
+                      value={arr.notes || ""}
+                      onChange={(e) =>
+                        updateTravelArrangement(index, "notes", e.target.value)
+                      }
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeTravelArrangement(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button onClick={addTravelArrangement}>Añadir Arreglo de Viaje</Button>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <Label>Asignaciones de Habitaciones</Label>
+              <div className="space-y-4">
+                {roomAssignments.map((room, index) => (
+                  <div key={index} className="space-y-2">
+                    <Label>Tipo de Habitación</Label>
+                    <Select
+                      value={room.room_type}
+                      onValueChange={(value) =>
+                        updateRoomAssignment(index, "room_type", value)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione un tipo de habitación" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="single">Single</SelectItem>
+                        <SelectItem value="double">Double</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Label>Número</Label>
+                    <Input
+                      value={room.room_number || ""}
+                      onChange={(e) =>
+                        updateRoomAssignment(index, "room_number", e.target.value)
+                      }
+                    />
+                    <Label>Personal 1</Label>
+                    <Input
+                      value={room.staff_member1_id || ""}
+                      onChange={(e) =>
+                        updateRoomAssignment(index, "staff_member1_id", e.target.value)
+                      }
+                    />
+                    <Label>Personal 2</Label>
+                    <Input
+                      value={room.room_type === "double" ? room.staff_member2_id || "" : ""}
+                      onChange={(e) =>
+                        updateRoomAssignment(index, "staff_member2_id", e.target.value)
+                      }
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeRoomAssignment(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button onClick={addRoomAssignment}>Añadir Asignación de Habitación</Button>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <Label>Programa</Label>
+              <Textarea
+                value={eventData.schedule}
+                onChange={(e) =>
+                  setEventData({
+                    ...eventData,
+                    schedule: e.target.value,
+                  })
+                }
+              />
+            </div>
+            <div className="space-y-4">
+              <Label>Requisitos Eléctricos</Label>
+              <Textarea
+                value={eventData.powerRequirements}
+                onChange={(e) =>
+                  setEventData({
+                    ...eventData,
+                    powerRequirements: e.target.value,
+                  })
+                }
+              />
+            </div>
+            <div className="space-y-4">
+              <Label>Necesidades Auxiliares</Label>
+              <Textarea
+                value={eventData.auxiliaryNeeds}
+                onChange={(e) =>
+                  setEventData({
+                    ...eventData,
+                    auxiliaryNeeds: e.target.value,
+                  })
+                }
+              />
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter>
+          <Button
+            onClick={generateDocument}
+            disabled={!selectedJobId || isSaving}
+            className="w-full"
+          >
+            Generar Hoja de Ruta
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
+  );
+};
+
+export default HojaDeRutaGenerator;
