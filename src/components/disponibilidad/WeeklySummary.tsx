@@ -237,12 +237,23 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
                       <TableCell>{item.stock}</TableCell>
                       {weekDates.map((date) => {
                         const used = getUsedQuantity(item.id, date);
+                        const remaining = item.stock - used;
+                        const remainingText = remaining >= 0 ? `(+${remaining})` : `(${remaining})`;
+                        const remainingClass = remaining >= 0 ? 'text-green-500' : 'text-red-500';
+
                         return (
                           <TableCell 
                             key={date.toISOString()} 
-                            className={`text-center ${used > item.stock ? 'text-red-500 font-bold' : ''}`}
+                            className="text-center"
                           >
-                            {used || '-'}
+                            {used > 0 ? (
+                              <span className="flex justify-center items-center gap-1">
+                                <span className="text-white">{used}</span>
+                                <span className={remainingClass}>{remainingText}</span>
+                              </span>
+                            ) : (
+                              '-'
+                            )}
                           </TableCell>
                         );
                       })}
@@ -262,3 +273,4 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     </Collapsible>
   );
 }
+
