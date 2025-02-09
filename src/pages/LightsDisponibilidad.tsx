@@ -23,7 +23,7 @@ export default function LightsDisponibilidad() {
           </Button>
           <Button 
             variant="outline"
-            onClick={() => navigate('/equipment-management')}
+            onClick={() => navigate('/equipment-management/presets')}
           >
             <Settings className="mr-2 h-4 w-4" />
             Gestionar Presets
