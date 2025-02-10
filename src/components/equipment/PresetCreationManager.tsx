@@ -1,3 +1,4 @@
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -11,11 +12,25 @@ import type { Equipment, Preset, PresetItem, PresetWithItems } from '@/types/equ
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Minus, Save, Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface PresetCreationManagerProps {
   onClose?: () => void;
   selectedDate?: Date;
 }
+
+const EQUIPMENT_CATEGORIES = ['convencional', 'robotica', 'fx', 'rigging', 'controles', 'cuadros', 'led', 'strobo'] as const;
+
+const categoryLabels: Record<string, string> = {
+  convencional: 'Convencional',
+  robotica: 'Robótica',
+  fx: 'FX',
+  rigging: 'Rigging',
+  controles: 'Controles',
+  cuadros: 'Cuadros',
+  led: 'LED',
+  strobo: 'Strobo'
+};
 
 export function PresetCreationManager({ onClose, selectedDate }: PresetCreationManagerProps) {
   const { session } = useSessionManager();
@@ -205,31 +220,45 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
         </div>
 
         <ScrollArea className="h-[300px] border rounded-md p-4">
-          <div className="space-y-4">
-            {equipment?.map((item) => (
-              <div key={item.id} className="flex items-center justify-between">
-                <span>{item.name}</span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleQuantityChange(item.id, -1)}
-                    disabled={!selectedEquipment[item.id]}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <span className="w-8 text-center">{selectedEquipment[item.id] || 0}</span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleQuantityChange(item.id, 1)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+          <Tabs defaultValue="convencional" className="w-full">
+            <TabsList className="w-full flex flex-wrap">
+              {EQUIPMENT_CATEGORIES.map(category => (
+                <TabsTrigger key={category} value={category} className="flex-grow">
+                  {categoryLabels[category]}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            
+            {EQUIPMENT_CATEGORIES.map(category => (
+              <TabsContent key={category} value={category} className="space-y-4">
+                {equipment
+                  ?.filter(item => item.category === category)
+                  .map((item) => (
+                    <div key={item.id} className="flex items-center justify-between">
+                      <span>{item.name}</span>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleQuantityChange(item.id, -1)}
+                          disabled={!selectedEquipment[item.id]}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <span className="w-8 text-center">{selectedEquipment[item.id] || 0}</span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleQuantityChange(item.id, 1)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+              </TabsContent>
             ))}
-          </div>
+          </Tabs>
         </ScrollArea>
 
         <div className="flex justify-end gap-2">
@@ -283,7 +312,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
               <div className="space-y-2">
                 {preset.items?.map((item) => (
                   <div key={item.id} className="flex justify-between text-sm">
-                    <span>{item.equipment.name}</span>
+                    <span>{item.equipment?.name}</span>
                     <span>x{item.quantity}</span>
                   </div>
                 ))}
