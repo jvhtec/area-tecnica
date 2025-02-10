@@ -42,6 +42,7 @@ serve(async (req) => {
       throw new Error('Mistral API key not found');
     }
 
+    console.log('Calling Mistral API...');
     const mistralResponse = await fetch('https://api.mistral.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -53,7 +54,9 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are an expert at analyzing technical documents. Analyze the following document and extract all microphones and stands mentioned with their quantities. Format your response in JSON with this structure:
+            content: `You are an expert at analyzing technical documents and extracting equipment information. 
+            I will provide you with a base64 encoded PDF. Focus on identifying any microphones and stands mentioned, 
+            including their quantities. Format your response in valid JSON with this structure:
             {
               "microphones": [{"model": "string", "quantity": number}],
               "stands": [{"type": "string", "quantity": number}]
@@ -61,25 +64,28 @@ serve(async (req) => {
           },
           {
             role: 'user',
-            content: `Here is the content of the technical document in base64: ${base64Content}`
+            content: `I have a technical document in base64 format. Please analyze it and extract any mentions of microphones and stands with their quantities. Here's the base64 content: ${base64Content}`
           }
         ],
         temperature: 0.2,
+        max_tokens: 4000
       })
     });
 
     if (!mistralResponse.ok) {
       const errorData = await mistralResponse.text();
-      console.error('Mistral API error:', errorData);
-      throw new Error(`Mistral API error: ${mistralResponse.statusText}`);
+      console.error('Mistral API error response:', errorData);
+      throw new Error(`Mistral API error: ${mistralResponse.statusText}\nDetails: ${errorData}`);
     }
 
     const mistralData = await mistralResponse.json();
-    console.log('Mistral analysis completed');
+    console.log('Mistral API response received');
 
     // Parse Mistral's response
     try {
       const analysisText = mistralData.choices[0].message.content;
+      console.log('Raw analysis text:', analysisText);
+      
       const analysis = JSON.parse(analysisText);
 
       // Validate the structure
