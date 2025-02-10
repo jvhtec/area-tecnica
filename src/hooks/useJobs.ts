@@ -1,11 +1,7 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { useTimezone } from "@/contexts/TimezoneContext";
 
 export const useJobs = () => {
-  const { convertToLocal } = useTimezone();
-
   return useQuery({
     queryKey: ["jobs"],
     queryFn: async () => {
@@ -40,19 +36,12 @@ export const useJobs = () => {
             throw error;
           }
 
-          // Convert UTC dates to local timezone
-          const localJobs = jobs?.map(job => ({
-            ...job,
-            start_time: convertToLocal(job.start_time),
-            end_time: convertToLocal(job.end_time)
-          }));
-
-          console.log("Jobs fetched successfully:", localJobs);
-          return localJobs;
+          console.log("Jobs fetched successfully:", jobs);
+          return jobs;
         } catch (error) {
           if (retries > 0) {
             console.log(`Retrying... ${retries} attempts remaining`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
             return fetchWithRetry(retries - 1);
           }
           throw error;
@@ -62,8 +51,8 @@ export const useJobs = () => {
       return fetchWithRetry();
     },
     retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    staleTime: 1000 * 60 * 5,
-    refetchInterval: 1000 * 60 * 5,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+    staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
+    refetchInterval: 1000 * 60 * 5, // Refetch every 5 minutes
   });
 };

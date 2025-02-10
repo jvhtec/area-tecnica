@@ -1,9 +1,7 @@
-
 import { Label } from "@/components/ui/label";
 import { SimplifiedTourDateInput } from "./SimplifiedTourDateInput";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import { useTimezone } from "@/contexts/TimezoneContext";
 
 interface TourDateFormProps {
   dates: { date: string; location: string }[];
@@ -20,8 +18,6 @@ export const TourDateForm = ({
   onRemoveDate,
   locations,
 }: TourDateFormProps) => {
-  const { formatDate } = useTimezone();
-
   return (
     <div className="space-y-2">
       <Label>Tour Dates</Label>

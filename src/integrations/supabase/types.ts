@@ -205,7 +205,6 @@ export type Database = {
           id: string
           notes: string | null
           status: Database["public"]["Enums"]["availability_status"]
-          timezone: string | null
           updated_at: string | null
           user_id: string
         }
@@ -216,7 +215,6 @@ export type Database = {
           id?: string
           notes?: string | null
           status?: Database["public"]["Enums"]["availability_status"]
-          timezone?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -227,7 +225,6 @@ export type Database = {
           id?: string
           notes?: string | null
           status?: Database["public"]["Enums"]["availability_status"]
-          timezone?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -480,7 +477,6 @@ export type Database = {
           soundcheck_end: string | null
           soundcheck_start: string | null
           stage: number | null
-          timezone: string | null
           updated_at: string | null
           wireless_band: string | null
           wireless_model: string | null
@@ -542,7 +538,6 @@ export type Database = {
           soundcheck_end?: string | null
           soundcheck_start?: string | null
           stage?: number | null
-          timezone?: string | null
           updated_at?: string | null
           wireless_band?: string | null
           wireless_model?: string | null
@@ -604,7 +599,6 @@ export type Database = {
           soundcheck_end?: string | null
           soundcheck_start?: string | null
           stage?: number | null
-          timezone?: string | null
           updated_at?: string | null
           wireless_band?: string | null
           wireless_model?: string | null
@@ -1231,7 +1225,6 @@ export type Database = {
           location_id: string | null
           start_time: string
           status: Database["public"]["Enums"]["job_status"] | null
-          timezone: string | null
           title: string
           tour_date_id: string | null
           tour_id: string | null
@@ -1248,7 +1241,6 @@ export type Database = {
           location_id?: string | null
           start_time: string
           status?: Database["public"]["Enums"]["job_status"] | null
-          timezone?: string | null
           title: string
           tour_date_id?: string | null
           tour_id?: string | null
@@ -1265,7 +1257,6 @@ export type Database = {
           location_id?: string | null
           start_time?: string
           status?: Database["public"]["Enums"]["job_status"] | null
-          timezone?: string | null
           title?: string
           tour_date_id?: string | null
           tour_id?: string | null
@@ -1437,7 +1428,6 @@ export type Database = {
           license_plate: string | null
           loading_bay: string | null
           notes: string | null
-          timezone: string | null
           title: string | null
           transport_type: Database["public"]["Enums"]["transport_type"]
           updated_at: string | null
@@ -1452,7 +1442,6 @@ export type Database = {
           license_plate?: string | null
           loading_bay?: string | null
           notes?: string | null
-          timezone?: string | null
           title?: string | null
           transport_type: Database["public"]["Enums"]["transport_type"]
           updated_at?: string | null
@@ -1467,7 +1456,6 @@ export type Database = {
           license_plate?: string | null
           loading_bay?: string | null
           notes?: string | null
-          timezone?: string | null
           title?: string | null
           transport_type?: Database["public"]["Enums"]["transport_type"]
           updated_at?: string | null
@@ -1679,7 +1667,6 @@ export type Database = {
           role: Database["public"]["Enums"]["user_role"]
           selected_job_types: string[] | null
           time_span: string | null
-          timezone: string | null
           tours_expanded: boolean | null
         }
         Insert: {
@@ -1697,7 +1684,6 @@ export type Database = {
           role?: Database["public"]["Enums"]["user_role"]
           selected_job_types?: string[] | null
           time_span?: string | null
-          timezone?: string | null
           tours_expanded?: boolean | null
         }
         Update: {
@@ -1715,7 +1701,6 @@ export type Database = {
           role?: Database["public"]["Enums"]["user_role"]
           selected_job_types?: string[] | null
           time_span?: string | null
-          timezone?: string | null
           tours_expanded?: boolean | null
         }
         Relationships: []
@@ -2146,13 +2131,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      convert_to_timezone: {
-        Args: {
-          timestamp_val: string
-          target_timezone?: string
-        }
-        Returns: string
-      }
       create_default_logistics_events_for_job: {
         Args: {
           job_id: string

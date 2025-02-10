@@ -1,7 +1,5 @@
-
 import { Card, CardContent } from "@/components/ui/card";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
-import { useTimezone } from "@/contexts/TimezoneContext";
 
 interface VideoCalendarProps {
   date: Date | undefined;
@@ -10,18 +8,12 @@ interface VideoCalendarProps {
 }
 
 export const VideoCalendar = ({ date, onSelect, jobs = [] }: VideoCalendarProps) => {
-  const { convertToLocal } = useTimezone();
-  
-  const handleDateSelect = (newDate: Date | undefined) => {
-    onSelect(newDate ? convertToLocal(newDate) : undefined);
-  };
-
   return (
     <Card className="h-full flex flex-col">
       <CardContent className="flex-grow p-2">
         <CalendarSection 
           date={date} 
-          onDateSelect={handleDateSelect}
+          onDateSelect={onSelect}
           jobs={jobs}
           department="video"
         />
