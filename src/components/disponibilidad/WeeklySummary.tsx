@@ -12,6 +12,7 @@ import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { exportWeeklySummaryPDF } from '@/lib/weeklySummaryPdfExport';
+import { ReloadButton } from '@/components/ui/reload-button';
 
 interface WeeklySummaryProps {
   selectedDate: Date;
@@ -48,7 +49,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     end: endOfWeek(currentWeekStart)
   });
 
-  const { data: stockWithEquipment } = useQuery({
+  const { data: stockWithEquipment, refetch: refetchStock } = useQuery({
     queryKey: ['equipment-with-stock', session?.user?.id],
     queryFn: async () => {
       if (!session?.user?.id) return [];
@@ -79,7 +80,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     enabled: !!session?.user?.id
   });
 
-  const { data: weekAssignments } = useQuery({
+  const { data: weekAssignments, refetch: refetchAssignments } = useQuery({
     queryKey: ['week-preset-assignments', session?.user?.id, currentWeekStart],
     queryFn: async () => {
       if (!session?.user?.id) return [];
@@ -117,6 +118,13 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     },
     enabled: !!session?.user?.id
   });
+
+  const handleReload = async () => {
+    await Promise.all([
+      refetchStock(),
+      refetchAssignments()
+    ]);
+  };
 
   const getUsedQuantity = (equipmentId: string, date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -247,6 +255,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
           <Button variant="outline" size="sm" onClick={handleNextWeek}>
             <ChevronRight className="h-4 w-4" />
           </Button>
+          <ReloadButton onReload={handleReload} />
           <Button 
             variant="outline" 
             size="sm"
