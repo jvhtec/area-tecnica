@@ -1023,7 +1023,7 @@ const HojaDeRutaGenerator = () => {
                 Editar Lista de Personal
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-3xl">
+             <DialogContent className="max-w-3xl h-[80vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Lista de Personal</DialogTitle>
               </DialogHeader>
