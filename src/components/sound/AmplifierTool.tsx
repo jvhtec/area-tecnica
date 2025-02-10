@@ -34,7 +34,7 @@ const sectionSpeakers = {
   mains: ['K1', 'K2', 'K3', 'KARA II', 'TFS900H', 'TFS600A', 'TFS550H'],
   outs: ['K1', 'K2', 'K3', 'KARA II', 'TFS900H', 'TFS600A', 'TFS550H'],
   subs: ['KS28', 'SB28', 'K1-SB', 'KS21', 'TFS900B', 'TFS550L'],
-  fronts: ['KARA II', 'KIVA', 'TFS550H'],
+  fronts: ['KARA II', 'KIVA'],
   delays: ['K1', 'K2', 'K3', 'KARA II', 'TFS900H', 'TFS600A', 'TFS550H'],
   other: ['KIVA', 'X15', '115HiQ']
 };
@@ -232,16 +232,22 @@ export const AmplifierTool = () => {
 
     const actualQuantity = mirrored ? quantity * 2 : quantity;
     const actualMaxLinked = Math.min(maxLinked || config.maxLink, config.maxLink);
+    
     const groups = Math.ceil(actualQuantity / actualMaxLinked);
-    const speakersPerGroup = Math.min(actualQuantity, actualMaxLinked);
-    const ampsPerGroup = Math.ceil(speakersPerGroup / config.maxPerAmp);
+    const speakersPerGroup = Math.min(actualMaxLinked, actualQuantity);
+    const channelsPerGroup = speakersPerGroup * config.channelsRequired;
+    const ampsPerGroup = Math.ceil(channelsPerGroup / 4);
     const totalAmps = groups * ampsPerGroup;
 
     const mirrorText = mirrored ? ` × 2 (mirrored clusters)` : '';
     const ampType = isTFSpeaker(speakerName) ? 'PLM20000D' : 'LA12X';
+    const channelsText = config.channelsRequired === 1 
+      ? '1 channel' 
+      : `${config.channelsRequired} channels`;
+
     return {
       amps: totalAmps,
-      details: `${quantity} ${speakerName} speakers${mirrorText} requiring ${totalAmps} ${ampType} amplifier${totalAmps !== 1 ? 's' : ''}`
+      details: `${quantity} ${speakerName} speakers${mirrorText} (${channelsText} each) requiring ${totalAmps} ${ampType} amplifier${totalAmps !== 1 ? 's' : ''}`
     };
   };
 
