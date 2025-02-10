@@ -28,17 +28,44 @@ serve(async (req) => {
     const pdfContent = await response.arrayBuffer();
     console.log('PDF content retrieved, size:', pdfContent.byteLength);
 
-    // Convert ArrayBuffer to Base64
-    const base64Content = btoa(String.fromCharCode(...new Uint8Array(pdfContent)));
+    // If PDF is too large, return an error
+    const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+    if (pdfContent.byteLength > MAX_SIZE) {
+      return new Response(
+        JSON.stringify({
+          error: 'PDF file too large',
+          details: 'PDF must be less than 10MB'
+        }),
+        { 
+          status: 400,
+          headers: { 
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
+
+    // Convert ArrayBuffer to Base64 in chunks to avoid stack overflow
+    const chunk_size = 1024 * 1024; // 1MB chunks
+    const chunks = [];
+    const uint8Array = new Uint8Array(pdfContent);
+    
+    for (let i = 0; i < uint8Array.length; i += chunk_size) {
+      const chunk = uint8Array.slice(i, i + chunk_size);
+      chunks.push(String.fromCharCode(...chunk));
+    }
+    
+    const base64Content = btoa(chunks.join(''));
     console.log('PDF content converted to base64');
 
     const hf = new HfInference(Deno.env.get('HUGGING_FACE_API_KEY'));
 
-    // First, find where the equipment list is located
+    // First, find where the equipment list is located with a very specific prompt
     const locationAnalysis = await hf.documentQuestionAnswering({
       model: 'impira/layoutlm-document-qa',
       inputs: {
-        question: "On which pages are equipment lists, technical riders, or input lists located? Just respond with page numbers.",
+        question: "On which pages are technical equipment lists or input lists located? Just respond with page numbers, nothing else.",
         image: base64Content
       }
     });
@@ -49,7 +76,7 @@ serve(async (req) => {
     const micAnalysis = await hf.documentQuestionAnswering({
       model: 'impira/layoutlm-document-qa',
       inputs: {
-        question: "Extract only microphone models and their quantities. Format should be like '2x SM58' or '3 Beta58'. Ignore any other equipment.",
+        question: "List only microphone models and their quantities. Format: '2x SM58' or '3 Beta58'. Ignore any other equipment.",
         image: base64Content
       }
     });
@@ -60,7 +87,7 @@ serve(async (req) => {
     const standAnalysis = await hf.documentQuestionAnswering({
       model: 'impira/layoutlm-document-qa',
       inputs: {
-        question: "Extract only microphone stand types and quantities. Format should be like '4x Tall Boom Stand' or '2 Short Stand'. Ignore any other equipment.",
+        question: "List only microphone stand types and quantities. Format: '4x Tall Boom Stand' or '2 Short Stand'. Ignore other items.",
         image: base64Content
       }
     });
@@ -69,7 +96,6 @@ serve(async (req) => {
 
     // Improved parsing for microphone results
     const micResults = (micAnalysis.answer || '').split(/[,\n;]/).map(item => {
-      // Support multiple formats: "2x SM58", "3 Beta58", "SM58 (4)", etc.
       const patterns = [
         /(\d+)\s*x?\s*([\w\s-]+)/i,  // "2x SM58" or "3 Beta58"
         /([\w\s-]+)\s*\((\d+)\)/i,   // "SM58 (4)"
@@ -125,7 +151,7 @@ serve(async (req) => {
       JSON.stringify(results),
       { 
         headers: { 
-          ...corsHeaders, 
+          ...corsHeaders,
           'Content-Type': 'application/json' 
         } 
       }
@@ -141,7 +167,7 @@ serve(async (req) => {
       { 
         status: 500,
         headers: { 
-          ...corsHeaders, 
+          ...corsHeaders,
           'Content-Type': 'application/json' 
         } 
       }
