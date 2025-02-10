@@ -12,26 +12,31 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { generateAmplifierPdf } from "@/utils/amplifierCalculationPdf";
 
 const soundComponentDatabase = [
-  { id: 1, name: ' K1 ', weight: 106 },
-  { id: 2, name: ' K2 ', weight: 56 },
-  { id: 3, name: ' K3 ', weight: 43 },
-  { id: 4, name: ' KARA II ', weight: 25 },
-  { id: 5, name: ' KIVA ', weight: 14 },
-  { id: 6, name: ' KS28 ', weight: 79 },
-  { id: 7, name: ' K1-SB ', weight: 83 }
+  { id: 1, name: ' K1 ' },
+  { id: 2, name: ' K2 ' },
+  { id: 3, name: ' K3 ' },
+  { id: 4, name: ' KARA II ' },
+  { id: 5, name: ' KIVA ' },
+  { id: 6, name: ' KS28 ' },
+  { id: 7, name: ' SB28 ' },
+  { id: 8, name: ' K1-SB '},
+  { id: 9, name: ' KS21 ' },
+  { id: 10, name: ' X15 ' },
+  { id: 11, name: ' 115HiQ ' },
 ];
 
 const speakerAmplifierConfig: Record<string, { maxLink: number; maxPerAmp: number; channelsRequired: number }> = {
-  'K1': { maxLink: 4, maxPerAmp: 2, channelsRequired: 4 },
+  'K1': { maxLink: 2, maxPerAmp: 2, channelsRequired: 4 },
   'K2': { maxLink: 3, maxPerAmp: 3, channelsRequired: 4 },
-  'K3': { maxLink: 4, maxPerAmp: 6, channelsRequired: 2 },
-  'KARA II': { maxLink: 4, maxPerAmp: 6, channelsRequired: 2 },
-  'KIVA': { maxLink: 8, maxPerAmp: 12, channelsRequired: 1 },
-  'KS28': { maxLink: 4, maxPerAmp: 4, channelsRequired: 1 },
-  'SB28': { maxLink: 4, maxPerAmp: 4, channelsRequired: 1 },
-  'KS21': { maxLink: 4, maxPerAmp: 8, channelsRequired: 0.5 },
-  'X15': { maxLink: 2, maxPerAmp: 6, channelsRequired: 2 },
-  '115HiQ': { maxLink: 2, maxPerAmp: 6, channelsRequired: 2 }
+  'K3': { maxLink: 3, maxPerAmp: 6, channelsRequired: 2 },
+  'KARA II': { maxLink: 3, maxPerAmp: 6, channelsRequired: 2 },
+  'KIVA': { maxLink: 4, maxPerAmp: 12, channelsRequired: 1 },
+  'KS28': { maxLink: 1, maxPerAmp: 4, channelsRequired: 1 },
+  'SB28': { maxLink: 1, maxPerAmp: 4, channelsRequired: 1 },
+ 'K1-SB': { maxLink: 1, maxPerAmp: 4, channelsRequired: 1 },
+  'KS21': { maxLink: 2, maxPerAmp: 8, channelsRequired: 0.5 },
+  'X15': { maxLink: 3, maxPerAmp: 6, channelsRequired: 2 },
+  '115HiQ': { maxLink: 3, maxPerAmp: 6, channelsRequired: 2 }
 };
 
 export interface SpeakerConfig {
