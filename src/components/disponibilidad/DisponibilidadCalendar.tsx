@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Card } from '@/components/ui/card';
@@ -9,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import type { AvailabilitySchedule } from '@/types/availability';
 import { format } from 'date-fns';
 import type { PresetWithItems } from '@/types/equipment';
+import { useTimezone } from '@/hooks/use-timezone';
 
 interface DisponibilidadCalendarProps {
   selectedDate?: Date;
@@ -19,6 +19,7 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
   const { session, userDepartment } = useSessionManager();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { formatDate, convertToLocal, userTimezone } = useTimezone();
 
   const { data: availabilityData, isLoading: isLoadingAvailability } = useQuery({
     queryKey: ['availability', session?.user?.id, userDepartment],
@@ -116,27 +117,27 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
     available: (date: Date) => {
       return availabilityData?.some(
         schedule => 
-          schedule.date === format(date, 'yyyy-MM-dd') && 
+          schedule.date === formatDate(date, 'yyyy-MM-dd') && 
           schedule.status === 'available'
       ) ?? false;
     },
     unavailable: (date: Date) => {
       return availabilityData?.some(
         schedule => 
-          schedule.date === format(date, 'yyyy-MM-dd') && 
+          schedule.date === formatDate(date, 'yyyy-MM-dd') && 
           schedule.status === 'unavailable'
       ) ?? false;
     },
     tentative: (date: Date) => {
       return availabilityData?.some(
         schedule => 
-          schedule.date === format(date, 'yyyy-MM-dd') && 
+          schedule.date === formatDate(date, 'yyyy-MM-dd') && 
           schedule.status === 'tentative'
       ) ?? false;
     },
     hasPreset: (date: Date) => {
       return presetAssignments?.some(
-        assignment => assignment.date === format(date, 'yyyy-MM-dd')
+        assignment => assignment.date === formatDate(date, 'yyyy-MM-dd')
       ) ?? false;
     }
   };
@@ -150,12 +151,18 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
 
   const isLoading = isLoadingAvailability || isLoadingAssignments;
 
+  const handleDateSelect = (date: Date | undefined) => {
+    if (onDateSelect) {
+      onDateSelect(date ? convertToLocal(date) : undefined);
+    }
+  };
+
   return (
     <Card className="p-4">
       <Calendar
         mode="single"
         selected={selectedDate}
-        onSelect={onDateSelect}
+        onSelect={handleDateSelect}
         className="rounded-md border"
         modifiers={modifiers}
         modifiersStyles={modifiersStyles}

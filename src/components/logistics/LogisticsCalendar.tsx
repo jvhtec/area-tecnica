@@ -156,9 +156,10 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
   };
 
   const handleDayClick = (date: Date) => {
-    if (onDateSelect && isValid(date)) {
-      onDateSelect(date);
-      setCurrentMonth(date);
+    if (onDateSelect) {
+      const localDate = convertToLocal(date);
+      onDateSelect(localDate);
+      setCurrentMonth(localDate);
     }
   };
 
