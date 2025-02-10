@@ -2143,6 +2143,8 @@ export type Database = {
         | "rigging"
         | "controles"
         | "cuadros"
+        | "led"
+        | "strobo"
       job_date_type: "travel" | "setup" | "show" | "off" | "rehearsal"
       job_status: "pending" | "in_progress" | "completed" | "cancelled"
       job_type: "single" | "tour" | "festival" | "dryhire" | "tourdate"
