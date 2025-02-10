@@ -18,9 +18,9 @@ interface WeeklySummaryProps {
   onDateChange: (date: Date) => void;
 }
 
-type EquipmentCategory = 'convencional' | 'robotica' | 'fx' | 'rigging';
+type EquipmentCategory = 'convencional' | 'robotica' | 'controles' | 'fx' | 'cuadros' |  'rigging';
 
-interface Equipment {
+ interface Equipment {
   id: string;
   name: string;
   category: EquipmentCategory;
