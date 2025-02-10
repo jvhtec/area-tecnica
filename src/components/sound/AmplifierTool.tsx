@@ -25,6 +25,15 @@ const soundComponentDatabase = [
   { id: 11, name: ' 115HiQ ' },
 ];
 
+const sectionSpeakers = {
+  mains: ['K1', 'K2', 'K3', 'KARA II'],
+  outs: ['K1', 'K2', 'K3', 'KARA II'],
+  subs: ['KS28', 'SB28', 'K1-SB', 'KS21'],
+  fronts: ['X15', '115HiQ'],
+  delays: ['K1', 'K2', 'K3', 'KARA II'],
+  other: ['KIVA', 'X15', '115HiQ']
+};
+
 const speakerAmplifierConfig: Record<string, { maxLink: number; maxPerAmp: number; channelsRequired: number }> = {
   'K1': { maxLink: 2, maxPerAmp: 2, channelsRequired: 4 },
   'K2': { maxLink: 3, maxPerAmp: 3, channelsRequired: 4 },
@@ -33,7 +42,7 @@ const speakerAmplifierConfig: Record<string, { maxLink: number; maxPerAmp: numbe
   'KIVA': { maxLink: 4, maxPerAmp: 12, channelsRequired: 1 },
   'KS28': { maxLink: 1, maxPerAmp: 4, channelsRequired: 1 },
   'SB28': { maxLink: 1, maxPerAmp: 4, channelsRequired: 1 },
- 'K1-SB': { maxLink: 1, maxPerAmp: 4, channelsRequired: 1 },
+  'K1-SB': { maxLink: 1, maxPerAmp: 4, channelsRequired: 1 },
   'KS21': { maxLink: 2, maxPerAmp: 8, channelsRequired: 0.5 },
   'X15': { maxLink: 3, maxPerAmp: 6, channelsRequired: 2 },
   '115HiQ': { maxLink: 3, maxPerAmp: 6, channelsRequired: 2 }
@@ -76,6 +85,13 @@ export const AmplifierTool = () => {
   });
 
   const [results, setResults] = useState<AmplifierResults | null>(null);
+
+  const getAvailableSpeakers = (section: string) => {
+    const allowedSpeakers = sectionSpeakers[section as keyof typeof sectionSpeakers] || [];
+    return soundComponentDatabase.filter(speaker => 
+      allowedSpeakers.includes(speaker.name.trim())
+    );
+  };
 
   const handleMirroredChange = (section: string, checked: boolean) => {
     setConfig(prev => ({
@@ -122,6 +138,15 @@ export const AmplifierTool = () => {
       const speaker = soundComponentDatabase.find(s => s.id.toString() === value);
       if (speaker) {
         const speakerConfig = speakerAmplifierConfig[speaker.name.trim()];
+        const availableSpeakers = getAvailableSpeakers(section);
+        if (!availableSpeakers.find(s => s.id.toString() === value)) {
+          toast({
+            title: "Invalid speaker selection",
+            description: `This speaker is not available for the ${section} section`,
+            variant: "destructive"
+          });
+          return;
+        }
         setConfig(prev => ({
           ...prev,
           [section]: {
@@ -316,7 +341,7 @@ export const AmplifierTool = () => {
                   <SelectValue placeholder="Select speaker" />
                 </SelectTrigger>
                 <SelectContent>
-                  {soundComponentDatabase.map((speaker) => (
+                  {getAvailableSpeakers(section).map((speaker) => (
                     <SelectItem key={speaker.id} value={speaker.id.toString()}>
                       {speaker.name}
                     </SelectItem>
