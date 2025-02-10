@@ -6,8 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Plus, X } from "lucide-react";
+import { FileText, Plus, X, Repeat } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const soundComponentDatabase = [
   { id: 1, name: ' K1 ', weight: 106 },
@@ -40,6 +41,7 @@ interface SpeakerConfig {
 
 interface SpeakerSection {
   speakers: SpeakerConfig[];
+  mirrored?: boolean;
 }
 
 interface AmplifierResults {
@@ -51,6 +53,7 @@ interface AmplifierResults {
       amps: number;
       details: string[];
       totalAmps: number;
+      mirrored?: boolean;
     };
   };
 }
@@ -58,20 +61,31 @@ interface AmplifierResults {
 export const AmplifierTool = () => {
   const { toast } = useToast();
   const [config, setConfig] = useState<Record<string, SpeakerSection>>({
-    mains: { speakers: [] },
-    outs: { speakers: [] },
+    mains: { speakers: [], mirrored: false },
+    outs: { speakers: [], mirrored: false },
     subs: { speakers: [] },
     fronts: { speakers: [] },
-    delays: { speakers: [] },
+    delays: { speakers: [], mirrored: false },
     other: { speakers: [] }
   });
 
   const [results, setResults] = useState<AmplifierResults | null>(null);
 
+  const handleMirroredChange = (section: string, checked: boolean) => {
+    setConfig(prev => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        mirrored: checked
+      }
+    }));
+  };
+
   const handleAddSpeaker = (section: string) => {
     setConfig(prev => ({
       ...prev,
       [section]: {
+        ...prev[section],
         speakers: [
           ...prev[section].speakers,
           { speakerId: "", quantity: 0, maxLinked: 0 }
@@ -84,6 +98,7 @@ export const AmplifierTool = () => {
     setConfig(prev => ({
       ...prev,
       [section]: {
+        ...prev[section],
         speakers: prev[section].speakers.filter((_, i) => i !== index)
       }
     }));
@@ -104,6 +119,7 @@ export const AmplifierTool = () => {
         setConfig(prev => ({
           ...prev,
           [section]: {
+            ...prev[section],
             speakers: prev[section].speakers.map((speaker, i) => 
               i === index ? {
                 ...speaker,
@@ -137,6 +153,7 @@ export const AmplifierTool = () => {
     setConfig(prev => ({
       ...prev,
       [section]: {
+        ...prev[section],
         speakers: prev[section].speakers.map((speaker, i) =>
           i === index ? { ...speaker, [field]: newValue } : speaker
         )
@@ -147,7 +164,8 @@ export const AmplifierTool = () => {
   const calculateAmplifiersForSpeaker = (
     speakerId: string,
     quantity: number,
-    maxLinked: number
+    maxLinked: number,
+    mirrored: boolean = false
   ): { amps: number; details: string } => {
     if (!speakerId || quantity === 0) {
       return { amps: 0, details: "No speakers configured" };
@@ -165,16 +183,17 @@ export const AmplifierTool = () => {
       return { amps: 0, details: "Speaker configuration not found" };
     }
 
+    const actualQuantity = mirrored ? quantity * 2 : quantity;
     const actualMaxLinked = Math.min(maxLinked || config.maxLink, config.maxLink);
-    const groups = Math.ceil(quantity / actualMaxLinked);
-    const speakersPerGroup = Math.min(quantity, actualMaxLinked);
+    const groups = Math.ceil(actualQuantity / actualMaxLinked);
+    const speakersPerGroup = Math.min(actualQuantity, actualMaxLinked);
     const ampsPerGroup = Math.ceil(speakersPerGroup / config.maxPerAmp);
     const totalAmps = groups * ampsPerGroup;
 
+    const mirrorText = mirrored ? ` × 2 (mirrored clusters)` : '';
     return {
       amps: totalAmps,
-      details: `${quantity} ${speakerName} speakers in ${groups} group${groups !== 1 ? 's' : ''} ` +
-               `(max ${actualMaxLinked} linked) requiring ${totalAmps} amplifier${totalAmps !== 1 ? 's' : ''}`
+      details: `${quantity} ${speakerName} speakers${mirrorText} requiring ${totalAmps} amplifier${totalAmps !== 1 ? 's' : ''}`
     };
   };
 
@@ -186,18 +205,20 @@ export const AmplifierTool = () => {
       perSection: {}
     };
 
-    Object.entries(config).forEach(([section, { speakers }]) => {
+    Object.entries(config).forEach(([section, { speakers, mirrored }]) => {
       const sectionResults = {
         amps: 0,
         details: [] as string[],
-        totalAmps: 0
+        totalAmps: 0,
+        mirrored: mirrored
       };
 
       speakers.forEach(speaker => {
         const speakerResults = calculateAmplifiersForSpeaker(
           speaker.speakerId,
           speaker.quantity,
-          speaker.maxLinked
+          speaker.maxLinked,
+          mirrored
         );
         
         if (speakerResults.amps > 0) {
@@ -227,6 +248,20 @@ export const AmplifierTool = () => {
 
   const renderSpeakerSection = (section: string, title: string) => (
     <div className="space-y-4">
+      {['mains', 'outs', 'delays'].includes(section) && (
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id={`${section}-mirrored`}
+            checked={config[section].mirrored}
+            onCheckedChange={(checked) => handleMirroredChange(section, checked as boolean)}
+          />
+          <Label htmlFor={`${section}-mirrored`} className="flex items-center space-x-2 cursor-pointer">
+            <Repeat className="h-4 w-4" />
+            <span>Mirrored Clusters</span>
+          </Label>
+        </div>
+      )}
+      
       {config[section].speakers.map((speaker, index) => (
         <div key={index} className="relative border rounded-lg p-4">
           <Button
@@ -346,7 +381,9 @@ export const AmplifierTool = () => {
               {Object.entries(results.perSection).map(([section, data]) => (
                 data.totalAmps > 0 && (
                   <div key={section} className="space-y-2">
-                    <div className="font-medium capitalize">{section}</div>
+                    <div className="font-medium capitalize">
+                      {section}{data.mirrored ? ' (Mirrored)' : ''}
+                    </div>
                     {data.details.map((detail, index) => (
                       <div key={index} className="text-sm pl-4">
                         {detail}
