@@ -6,30 +6,22 @@ import {
   CardTitle,
   CardContent,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Calendar } from "lucide-react";
 import { useHojaDeRutaForm } from "@/hooks/useHojaDeRutaForm";
 import { useHojaDeRutaImages } from "@/hooks/useHojaDeRutaImages";
 import { useHojaDeRutaHandlers } from "@/hooks/useHojaDeRutaHandlers";
 import { ImageUploadSection } from "@/components/hoja-de-ruta/sections/ImageUploadSection";
+import { EventDetailsSection } from "@/components/hoja-de-ruta/sections/EventDetailsSection";
+import { ProgramDetailsSection } from "@/components/hoja-de-ruta/sections/ProgramDetailsSection";
 import { VenueDialog } from "@/components/hoja-de-ruta/dialogs/VenueDialog";
 import { ContactsDialog } from "@/components/hoja-de-ruta/dialogs/ContactsDialog";
 import { StaffDialog } from "@/components/hoja-de-ruta/dialogs/StaffDialog";
 import { TravelArrangementsDialog } from "@/components/hoja-de-ruta/dialogs/TravelArrangementsDialog";
 import { RoomAssignmentsDialog } from "@/components/hoja-de-ruta/dialogs/RoomAssignmentsDialog";
 import { generatePDF } from "@/utils/hoja-de-ruta/pdf-generator";
+import { uploadPdfToJob } from "@/utils/hoja-de-ruta/pdf-upload";
 import { useToast } from "@/hooks/use-toast";
 
 const HojaDeRutaGenerator = () => {
@@ -83,16 +75,30 @@ const HojaDeRutaGenerator = () => {
   const { toast } = useToast();
 
   const generateDocument = async () => {
-    generatePDF(
-      eventData,
-      travelArrangements,
-      roomAssignments,
-      imagePreviews,
-      venueMapPreview,
-      selectedJobId,
-      jobs?.find(job => job.id === selectedJobId)?.title || "",
-      toast
-    );
+    try {
+      generatePDF(
+        eventData,
+        travelArrangements,
+        roomAssignments,
+        imagePreviews,
+        venueMapPreview,
+        selectedJobId,
+        jobs?.find(job => job.id === selectedJobId)?.title || "",
+        uploadPdfToJob
+      );
+      
+      toast({
+        title: "PDF generado con éxito",
+        description: "El documento se ha generado y guardado correctamente.",
+      });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({
+        title: "Error",
+        description: "Hubo un error al generar el PDF. Por favor, inténtelo de nuevo.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -108,56 +114,14 @@ const HojaDeRutaGenerator = () => {
             </Alert>
           )}
 
-          <div className="space-y-4">
-            <div className="flex flex-col space-y-2">
-              <Label htmlFor="jobSelect">Seleccione Trabajo</Label>
-              <Select
-                value={selectedJobId || "unselected"}
-                onValueChange={setSelectedJobId}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleccione un trabajo..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {isLoadingJobs ? (
-                    <SelectItem value="loading">Cargando trabajos...</SelectItem>
-                  ) : jobs?.length === 0 ? (
-                    <SelectItem value="unselected">No hay trabajos disponibles</SelectItem>
-                  ) : (
-                    jobs?.map((job: any) => (
-                      <SelectItem key={job.id} value={job.id}>
-                        {job.title}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="eventName">Nombre del Evento</Label>
-              <Input
-                id="eventName"
-                value={eventData.eventName}
-                onChange={(e) =>
-                  setEventData({ ...eventData, eventName: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="eventDates">Fechas del Evento</Label>
-              <div className="relative">
-                <Input
-                  id="eventDates"
-                  value={eventData.eventDates}
-                  onChange={(e) =>
-                    setEventData({ ...eventData, eventDates: e.target.value })
-                  }
-                />
-                <Calendar className="absolute right-3 top-2.5 h-5 w-5 text-muted-foreground" />
-              </div>
-            </div>
-          </div>
+          <EventDetailsSection 
+            selectedJobId={selectedJobId}
+            setSelectedJobId={setSelectedJobId}
+            eventData={eventData}
+            setEventData={setEventData}
+            isLoadingJobs={isLoadingJobs}
+            jobs={jobs}
+          />
 
           <div className="space-y-6">
             <ImageUploadSection
@@ -204,47 +168,10 @@ const HojaDeRutaGenerator = () => {
             removeRoomAssignment={removeRoomAssignment}
           />
 
-          <div>
-            <Label htmlFor="schedule">Programa</Label>
-            <Textarea
-              id="schedule"
-              value={eventData.schedule}
-              onChange={(e) =>
-                setEventData({ ...eventData, schedule: e.target.value })
-              }
-              className="min-h-[200px]"
-              placeholder="Load in: 08:00&#10;Soundcheck: 14:00&#10;Doors: 19:00&#10;Show: 20:00..."
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="powerRequirements">Requisitos Eléctricos</Label>
-            <Textarea
-              id="powerRequirements"
-              value={eventData.powerRequirements}
-              onChange={(e) =>
-                setEventData({
-                  ...eventData,
-                  powerRequirements: e.target.value,
-                })
-              }
-              className="min-h-[150px]"
-              placeholder="Los requisitos eléctricos se completarán automáticamente cuando estén disponibles..."
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="auxiliaryNeeds">Necesidades Auxiliares</Label>
-            <Textarea
-              id="auxiliaryNeeds"
-              value={eventData.auxiliaryNeeds}
-              onChange={(e) =>
-                setEventData({ ...eventData, auxiliaryNeeds: e.target.value })
-              }
-              className="min-h-[150px]"
-              placeholder="Requerimientos del equipo de carga, necesidades de equipamiento..."
-            />
-          </div>
+          <ProgramDetailsSection 
+            eventData={eventData}
+            setEventData={setEventData}
+          />
 
           <Button onClick={generateDocument} className="w-full">
             Generar Hoja de Ruta
