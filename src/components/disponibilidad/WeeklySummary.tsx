@@ -20,7 +20,7 @@ interface WeeklySummaryProps {
 
 type EquipmentCategory = 'convencional' | 'robotica' | 'controles' | 'fx' | 'cuadros' |  'rigging';
 
- interface Equipment {
+interface Equipment {
   id: string;
   name: string;
   category: EquipmentCategory;
@@ -35,7 +35,9 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     const stored = localStorage.getItem('weeklySummaryOpen');
     return stored ? JSON.parse(stored) : true;
   });
-  const [selectedCategories, setSelectedCategories] = useState<EquipmentCategory[]>(['convencional', 'robotica', 'fx', 'rigging']);
+  const [selectedCategories, setSelectedCategories] = useState<EquipmentCategory[]>([
+    'convencional', 'robotica', 'controles', 'fx', 'cuadros', 'rigging'
+  ]);
 
   useEffect(() => {
     localStorage.setItem('weeklySummaryOpen', JSON.stringify(isOpen));
@@ -153,7 +155,9 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
   const categoryLabels: Record<EquipmentCategory, string> = {
     convencional: 'Convencional',
     robotica: 'Robótica',
+    controles: 'Controles',
     fx: 'FX',
+    cuadros: 'Cuadros',
     rigging: 'Rigging'
   };
 
