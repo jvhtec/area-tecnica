@@ -1,8 +1,7 @@
 
 import { supabase } from "@/lib/supabase";
-import { Toast } from "@/components/ui/use-toast";
 
-export const uploadPdfToJob = async (jobId: string, pdfBlob: Blob, fileName: string) => {
+export const uploadPdfToJob = async (jobId: string, pdfBlob: Blob, fileName: string): Promise<void> => {
   try {
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("job-documents")
@@ -25,8 +24,6 @@ export const uploadPdfToJob = async (jobId: string, pdfBlob: Blob, fileName: str
       });
 
     if (insertError) throw insertError;
-
-    return urlData.publicUrl;
   } catch (error) {
     console.error("Error uploading PDF:", error);
     throw error;

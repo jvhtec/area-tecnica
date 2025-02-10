@@ -130,7 +130,7 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
       return mainRecord;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['hoja-de-ruta', jobId]);
+      queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });
       toast({
         title: "Guardado con éxito",
         description: "Los cambios se han guardado correctamente.",
@@ -170,7 +170,7 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['hoja-de-ruta', jobId]);
+      queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });
       toast({
         title: "Arreglos de viaje guardados",
         description: "Los arreglos de viaje se han actualizado correctamente.",
@@ -199,7 +199,7 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['hoja-de-ruta', jobId]);
+      queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });
       toast({
         title: "Asignaciones de habitaciones guardadas",
         description: "Las asignaciones de habitaciones se han actualizado correctamente.",
@@ -226,7 +226,7 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(['hoja-de-ruta', jobId]);
+      queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });
       toast({
         title: "Imágenes guardadas",
         description: "Las imágenes se han actualizado correctamente.",
