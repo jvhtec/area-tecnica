@@ -34,7 +34,7 @@ const sectionSpeakers = {
   mains: ['K1', 'K2', 'K3', 'KARA II', 'TFS900H', 'TFS600A', 'TFS550H'],
   outs: ['K1', 'K2', 'K3', 'KARA II', 'TFS900H', 'TFS600A', 'TFS550H'],
   subs: ['KS28', 'SB28', 'K1-SB', 'KS21', 'TFS900B', 'TFS550L'],
-  fronts: ['X15', '115HiQ', 'TFS550H'],
+  fronts: ['KARA II', 'KIVA', 'TFS550H'],
   delays: ['K1', 'K2', 'K3', 'KARA II', 'TFS900H', 'TFS600A', 'TFS550H'],
   other: ['KIVA', 'X15', '115HiQ']
 };
