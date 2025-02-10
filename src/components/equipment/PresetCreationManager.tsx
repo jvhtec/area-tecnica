@@ -1,4 +1,3 @@
-
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -13,6 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Minus, Save, Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface PresetCreationManagerProps {
   onClose?: () => void;
@@ -38,6 +38,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
   const queryClient = useQueryClient();
   const [presetName, setPresetName] = useState('');
   const [selectedEquipment, setSelectedEquipment] = useState<Record<string, number>>({});
+  const isMobile = useIsMobile();
 
   // Fetch equipment list
   const { data: equipment } = useQuery({
@@ -219,37 +220,43 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
           />
         </div>
 
-        <ScrollArea className="h-[300px] border rounded-md p-4">
+        <ScrollArea className={`${isMobile ? 'h-[400px]' : 'h-[300px]'} border rounded-md p-2 md:p-4`}>
           <Tabs defaultValue="convencional" className="w-full">
-            <TabsList className="w-full flex flex-wrap">
+            <TabsList className="w-full flex overflow-x-auto no-scrollbar">
               {EQUIPMENT_CATEGORIES.map(category => (
-                <TabsTrigger key={category} value={category} className="flex-grow">
+                <TabsTrigger 
+                  key={category} 
+                  value={category} 
+                  className="flex-shrink-0 whitespace-nowrap px-2 md:px-4"
+                >
                   {categoryLabels[category]}
                 </TabsTrigger>
               ))}
             </TabsList>
             
             {EQUIPMENT_CATEGORIES.map(category => (
-              <TabsContent key={category} value={category} className="space-y-4">
+              <TabsContent key={category} value={category} className="mt-4 space-y-3">
                 {equipment
                   ?.filter(item => item.category === category)
                   .map((item) => (
-                    <div key={item.id} className="flex items-center justify-between">
-                      <span>{item.name}</span>
-                      <div className="flex items-center gap-2">
+                    <div key={item.id} className="flex items-center justify-between text-sm md:text-base">
+                      <span className="truncate mr-2">{item.name}</span>
+                      <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
                         <Button
                           variant="outline"
-                          size="icon"
+                          size={isMobile ? "sm" : "icon"}
                           onClick={() => handleQuantityChange(item.id, -1)}
                           disabled={!selectedEquipment[item.id]}
+                          className="h-8 w-8"
                         >
                           <Minus className="h-4 w-4" />
                         </Button>
                         <span className="w-8 text-center">{selectedEquipment[item.id] || 0}</span>
                         <Button
                           variant="outline"
-                          size="icon"
+                          size={isMobile ? "sm" : "icon"}
                           onClick={() => handleQuantityChange(item.id, 1)}
+                          className="h-8 w-8"
                         >
                           <Plus className="h-4 w-4" />
                         </Button>
@@ -294,6 +301,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
                       variant="outline"
                       onClick={() => assignPresetMutation.mutate(preset.id)}
                       disabled={assignPresetMutation.isPending}
+                      className="text-sm"
                     >
                       Assign to {format(selectedDate, 'PP')}
                     </Button>
