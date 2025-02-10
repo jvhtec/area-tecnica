@@ -233,11 +233,10 @@ export const AmplifierTool = () => {
     const actualQuantity = mirrored ? quantity * 2 : quantity;
     const actualMaxLinked = Math.min(maxLinked || config.maxLink, config.maxLink);
     
-    const groups = Math.ceil(actualQuantity / actualMaxLinked);
-    const speakersPerGroup = Math.min(actualMaxLinked, actualQuantity);
-    const channelsPerGroup = speakersPerGroup * config.channelsRequired;
-    const ampsPerGroup = Math.ceil(channelsPerGroup / 4);
-    const totalAmps = groups * ampsPerGroup;
+    const groupCount = Math.ceil(actualQuantity / actualMaxLinked);
+    const channelsPerGroup = config.channelsRequired;
+    const groupsPerAmp = Math.floor(4 / channelsPerGroup);
+    const totalAmps = Math.ceil(groupCount / groupsPerAmp);
 
     const mirrorText = mirrored ? ` × 2 (mirrored clusters)` : '';
     const ampType = isTFSpeaker(speakerName) ? 'PLM20000D' : 'LA12X';
@@ -247,7 +246,7 @@ export const AmplifierTool = () => {
 
     return {
       amps: totalAmps,
-      details: `${quantity} ${speakerName} speakers${mirrorText} (${channelsText} each) requiring ${totalAmps} ${ampType} amplifier${totalAmps !== 1 ? 's' : ''}`
+      details: `${quantity} ${speakerName} speakers${mirrorText} (${channelsText} each, ${actualMaxLinked} linked) requiring ${totalAmps} ${ampType} amplifier${totalAmps !== 1 ? 's' : ''}`
     };
   };
 
