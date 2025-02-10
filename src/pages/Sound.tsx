@@ -11,13 +11,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
-import { Calculator, PieChart, FileText, Sparkles } from 'lucide-react';
+import { Calculator, PieChart, FileText, Sparkles, Zap } from 'lucide-react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ReportGenerator } from "../components/sound/ReportGenerator";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { PdfAnalysis } from "@/components/sound/PdfAnalysis";
+import { AmplifierTool } from "@/components/sound/AmplifierTool";
 import { useNavigate } from "react-router-dom";
 
 const Sound = () => {
@@ -32,6 +33,7 @@ const Sound = () => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [showReportGenerator, setShowReportGenerator] = useState(false);
   const [showAnalysisForm, setShowAnalysisForm] = useState(false);
+  const [showAmplifierTool, setShowAmplifierTool] = useState(false);
   const currentDepartment = "sound";
   
   const { data: jobs } = useJobs();
@@ -157,7 +159,7 @@ const Sound = () => {
         <div className="p-6">
           <h2 className="text-2xl font-semibold mb-4">Tools</h2>
           <Separator className="mb-6" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <Button
               variant="outline"
               size="lg"
@@ -196,6 +198,16 @@ const Sound = () => {
             >
               <Sparkles className="h-6 w-6" />
               <span>AI Rider Analysis</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full h-auto py-4 flex flex-col items-center gap-2"
+              onClick={() => setShowAmplifierTool(true)}
+            >
+              <Zap className="h-6 w-6" />
+              <span>Amplifier Calculator</span>
             </Button>
           </div>
         </div>
@@ -240,6 +252,12 @@ const Sound = () => {
       <Dialog open={showAnalysisForm} onOpenChange={setShowAnalysisForm}>
         <DialogContent className="max-w-4xl">
           <PdfAnalysis />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAmplifierTool} onOpenChange={setShowAmplifierTool}>
+        <DialogContent className="max-w-4xl">
+          <AmplifierTool />
         </DialogContent>
       </Dialog>
     </div>
