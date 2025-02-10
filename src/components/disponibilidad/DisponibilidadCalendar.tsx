@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase';
 import type { AvailabilitySchedule } from '@/types/availability';
 import { format } from 'date-fns';
 import type { PresetWithItems } from '@/types/equipment';
-import { useTimezone } from '@/hooks/use-timezone';
+import { useTimezone } from '@/contexts/TimezoneContext';
 
 interface DisponibilidadCalendarProps {
   selectedDate?: Date;
