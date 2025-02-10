@@ -767,3 +767,83 @@ export function JobCardNew({
       });
       return;
     }
+
+    onDeleteClick(job.id);
+  };
+
+  return (
+    <Card
+      className={cn(
+        "relative overflow-hidden border-l-4 transition-all",
+        collapsed ? "hover:bg-muted/50" : "bg-muted/50"
+      )}
+      style={{
+        borderLeftColor: appliedBorderColor,
+        backgroundColor: appliedBgColor
+      }}
+      onClick={() => onJobClick(job.id)}
+    >
+      <div className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold">{job.title}</h3>
+              {job.job_type === "tourdate" && (
+                <Badge variant="outline" className="capitalize">
+                  {job.job_type}
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              {formatDate(new Date(job.start_time))}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {!job.flex_folders_created && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={createFlexFoldersHandler}
+                title="Create Flex Folders"
+              >
+                <img src={createFolderIcon} alt="Create Flex Folders" className="h-4 w-4" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleEditClick}
+              className="hover:bg-transparent"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleDeleteClick}
+              className="hover:bg-transparent"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCollapsed(!collapsed);
+              }}
+              className="hover:bg-transparent"
+            >
+              {collapsed ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronUp className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
