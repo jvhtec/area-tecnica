@@ -1,20 +1,27 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Department } from "@/types/department";
 import { JobDocument } from "@/types/job";
 import { useCallback } from "react";
+import { convertToUTC, getUserTimezone } from "@/utils/timezone";
 
 export const useJobManagement = (
   selectedDepartment: Department,
   startDate: Date,
   endDate: Date,
-  isProjectManagementPage = false // Add default value
+  isProjectManagementPage = false
 ) => {
   const { toast } = useToast();
 
   const fetchJobs = useCallback(async () => {
     console.log("useJobManagement: Fetching jobs for department:", selectedDepartment);
+    
+    // Convert dates to UTC for database query
+    const utcStartDate = convertToUTC(startDate);
+    const utcEndDate = convertToUTC(endDate);
+    
     const { data, error } = await supabase
       .from("jobs")
       .select(`
@@ -39,9 +46,9 @@ export const useJobManagement = (
         )
       `)
       .eq("job_departments.department", selectedDepartment)
-      .in("job_type", ["single", "festival","tourdate"])
-      .gte("start_time", startDate.toISOString())
-      .lte("start_time", endDate.toISOString())
+      .in("job_type", ["single", "festival", "tourdate"])
+      .gte("start_time", utcStartDate.toISOString())
+      .lte("start_time", utcEndDate.toISOString())
       .order("start_time", { ascending: true });
 
     if (error) {
@@ -51,6 +58,7 @@ export const useJobManagement = (
 
     const jobsWithFilteredDocs = data.map((job) => ({
       ...job,
+      timezone: job.timezone || getUserTimezone(),
       job_documents: job.job_documents.filter((doc: any) => {
         console.log(
           "useJobManagement: Checking document path:",
@@ -60,7 +68,7 @@ export const useJobManagement = (
         );
         return doc.file_path.startsWith(`${selectedDepartment}/`);
       }),
-      isProjectManagementPage // Add this to each job object
+      isProjectManagementPage
     }));
 
     console.log(
