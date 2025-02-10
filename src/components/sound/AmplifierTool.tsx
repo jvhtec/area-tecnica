@@ -22,15 +22,20 @@ const soundComponentDatabase = [
   { id: 8, name: ' K1-SB ', weight: 83 },
   { id: 9, name: ' KS21 ', weight: 49 },
   { id: 10, name: ' X15 ', weight: 21 },
-  { id: 11, name: ' 115HiQ ', weight: 35 }
+  { id: 11, name: ' 115HiQ ', weight: 35 },
+  { id: 12, name: ' TFS900H ', weight: 45 },
+  { id: 13, name: ' TFS600A ', weight: 35 },
+  { id: 14, name: ' TFS550H ', weight: 28 },
+  { id: 15, name: ' TFS900B ', weight: 65 },
+  { id: 16, name: ' TFS550L ', weight: 42 }
 ];
 
 const sectionSpeakers = {
-  mains: ['K1', 'K2', 'K3', 'KARA II'],
-  outs: ['K1', 'K2', 'K3', 'KARA II'],
-  subs: ['KS28', 'SB28', 'K1-SB', 'KS21'],
-  fronts: ['X15', '115HiQ'],
-  delays: ['K1', 'K2', 'K3', 'KARA II'],
+  mains: ['K1', 'K2', 'K3', 'KARA II', 'TFS900H', 'TFS600A', 'TFS550H'],
+  outs: ['K1', 'K2', 'K3', 'KARA II', 'TFS900H', 'TFS600A', 'TFS550H'],
+  subs: ['KS28', 'SB28', 'K1-SB', 'KS21', 'TFS900B', 'TFS550L'],
+  fronts: ['X15', '115HiQ', 'TFS550H'],
+  delays: ['K1', 'K2', 'K3', 'KARA II', 'TFS900H', 'TFS600A', 'TFS550H'],
   other: ['KIVA', 'X15', '115HiQ']
 };
 
@@ -45,7 +50,16 @@ const speakerAmplifierConfig: Record<string, { maxLink: number; maxPerAmp: numbe
   'K1-SB': { maxLink: 1, maxPerAmp: 4, channelsRequired: 1 },
   'KS21': { maxLink: 2, maxPerAmp: 8, channelsRequired: 0.5 },
   'X15': { maxLink: 3, maxPerAmp: 6, channelsRequired: 2 },
-  '115HiQ': { maxLink: 3, maxPerAmp: 6, channelsRequired: 2 }
+  '115HiQ': { maxLink: 3, maxPerAmp: 6, channelsRequired: 2 },
+  'TFS900H': { maxLink: 3, maxPerAmp: 3, channelsRequired: 4 },
+  'TFS600A': { maxLink: 3, maxPerAmp: 3, channelsRequired: 3 },
+  'TFS550H': { maxLink: 3, maxPerAmp: 6, channelsRequired: 2 },
+  'TFS900B': { maxLink: 3, maxPerAmp: 6, channelsRequired: 2 },
+  'TFS550L': { maxLink: 3, maxPerAmp: 12, channelsRequired: 1 }
+};
+
+const isTFSpeaker = (speakerName: string): boolean => {
+  return speakerName.trim().startsWith('TFS');
 };
 
 export interface SpeakerConfig {
@@ -63,6 +77,8 @@ export interface AmplifierResults {
   totalAmplifiersNeeded: number;
   completeRaks: number;
   looseAmplifiers: number;
+  plmRacks: number;
+  loosePLMAmps: number;
   perSection: {
     [key: string]: {
       amps: number;
@@ -222,9 +238,10 @@ export const AmplifierTool = () => {
     const totalAmps = groups * ampsPerGroup;
 
     const mirrorText = mirrored ? ` × 2 (mirrored clusters)` : '';
+    const ampType = isTFSpeaker(speakerName) ? 'PLM20000D' : 'LA12X';
     return {
       amps: totalAmps,
-      details: `${quantity} ${speakerName} speakers${mirrorText} requiring ${totalAmps} amplifier${totalAmps !== 1 ? 's' : ''}`
+      details: `${quantity} ${speakerName} speakers${mirrorText} requiring ${totalAmps} ${ampType} amplifier${totalAmps !== 1 ? 's' : ''}`
     };
   };
 
@@ -233,15 +250,22 @@ export const AmplifierTool = () => {
       totalAmplifiersNeeded: 0,
       completeRaks: 0,
       looseAmplifiers: 0,
+      plmRacks: 0,
+      loosePLMAmps: 0,
       perSection: {}
     };
+
+    let totalLAAmps = 0;
+    let totalPLMAmps = 0;
 
     Object.entries(config).forEach(([section, { speakers, mirrored }]) => {
       const sectionResults = {
         amps: 0,
         details: [] as string[],
         totalAmps: 0,
-        mirrored: mirrored
+        mirrored: mirrored,
+        laAmps: 0,
+        plmAmps: 0
       };
 
       speakers.forEach(speaker => {
@@ -255,6 +279,17 @@ export const AmplifierTool = () => {
         if (speakerResults.amps > 0) {
           sectionResults.amps += speakerResults.amps;
           sectionResults.details.push(speakerResults.details);
+          
+          const speakerObj = soundComponentDatabase.find(s => s.id.toString() === speaker.speakerId);
+          if (speakerObj) {
+            if (isTFSpeaker(speakerObj.name)) {
+              sectionResults.plmAmps += speakerResults.amps;
+              totalPLMAmps += speakerResults.amps;
+            } else {
+              sectionResults.laAmps += speakerResults.amps;
+              totalLAAmps += speakerResults.amps;
+            }
+          }
         }
       });
 
@@ -263,8 +298,11 @@ export const AmplifierTool = () => {
       results.totalAmplifiersNeeded += sectionResults.totalAmps;
     });
 
-    results.completeRaks = Math.floor(results.totalAmplifiersNeeded / 3);
-    results.looseAmplifiers = results.totalAmplifiersNeeded % 3;
+    results.completeRaks = Math.floor(totalLAAmps / 3);
+    results.looseAmplifiers = totalLAAmps % 3;
+    
+    results.plmRacks = Math.floor(totalPLMAmps / 3);
+    results.loosePLMAmps = totalPLMAmps % 3;
 
     setResults(results);
   };
@@ -461,8 +499,18 @@ export const AmplifierTool = () => {
               <div className="pt-4 border-t mt-4">
                 <div className="font-medium">Summary:</div>
                 <div className="text-sm space-y-1">
-                  <div>Total LA-RAKs required: {results.completeRaks}</div>
-                  <div>Additional loose amplifiers: {results.looseAmplifiers}</div>
+                  {results.completeRaks > 0 && (
+                    <div>LA-RAKs required: {results.completeRaks}</div>
+                  )}
+                  {results.looseAmplifiers > 0 && (
+                    <div>Additional loose LA12X amplifiers: {results.looseAmplifiers}</div>
+                  )}
+                  {results.plmRacks > 0 && (
+                    <div>PLM20000 Touring Racks required: {results.plmRacks}</div>
+                  )}
+                  {results.loosePLMAmps > 0 && (
+                    <div>Additional loose PLM20000D amplifiers: {results.loosePLMAmps}</div>
+                  )}
                   <div className="font-medium pt-2">
                     Total amplifiers needed: {results.totalAmplifiersNeeded}
                   </div>
