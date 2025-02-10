@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import {
   Card,
   CardHeader,
@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useHojaDeRutaForm } from "@/hooks/useHojaDeRutaForm";
 import { useHojaDeRutaImages } from "@/hooks/useHojaDeRutaImages";
 import { useHojaDeRutaHandlers } from "@/hooks/useHojaDeRutaHandlers";
+import { useHojaDeRutaPersistence } from "@/hooks/useHojaDeRutaPersistence";
 import { ImageUploadSection } from "@/components/hoja-de-ruta/sections/ImageUploadSection";
 import { EventDetailsSection } from "@/components/hoja-de-ruta/sections/EventDetailsSection";
 import { ProgramDetailsSection } from "@/components/hoja-de-ruta/sections/ProgramDetailsSection";
@@ -74,6 +75,87 @@ const HojaDeRutaGenerator = () => {
 
   const { toast } = useToast();
 
+  // Add persistence hook
+  const {
+    hojaDeRuta,
+    isLoading: isLoadingHojaDeRuta,
+    saveHojaDeRuta,
+    saveTravelArrangements,
+    saveRoomAssignments,
+    saveVenueImages
+  } = useHojaDeRutaPersistence(selectedJobId);
+
+  // Load existing data when job is selected
+  useEffect(() => {
+    if (hojaDeRuta) {
+      setEventData({
+        eventName: hojaDeRuta.event_name || "",
+        eventDates: hojaDeRuta.event_dates || "",
+        venue: {
+          name: hojaDeRuta.venue_name || "",
+          address: hojaDeRuta.venue_address || "",
+        },
+        contacts: hojaDeRuta.contacts || [{ name: "", role: "", phone: "" }],
+        logistics: hojaDeRuta.logistics || {
+          transport: "",
+          loadingDetails: "",
+          unloadingDetails: "",
+        },
+        staff: hojaDeRuta.staff || [{ name: "", surname1: "", surname2: "", position: "" }],
+        schedule: hojaDeRuta.schedule || "",
+        powerRequirements: hojaDeRuta.power_requirements || "",
+        auxiliaryNeeds: hojaDeRuta.auxiliary_needs || "",
+      });
+
+      if (hojaDeRuta.travel) {
+        setTravelArrangements(hojaDeRuta.travel);
+      }
+
+      if (hojaDeRuta.rooms) {
+        setRoomAssignments(hojaDeRuta.rooms);
+      }
+    }
+  }, [hojaDeRuta, setEventData, setTravelArrangements, setRoomAssignments]);
+
+  // Auto-save event data when it changes
+  useEffect(() => {
+    if (selectedJobId && eventData.eventName) {
+      const saveTimeout = setTimeout(() => {
+        saveHojaDeRuta(eventData);
+      }, 500);
+
+      return () => clearTimeout(saveTimeout);
+    }
+  }, [selectedJobId, eventData, saveHojaDeRuta]);
+
+  // Save travel arrangements when they change
+  useEffect(() => {
+    if (selectedJobId && hojaDeRuta?.id && travelArrangements.length > 0) {
+      const saveTimeout = setTimeout(() => {
+        saveTravelArrangements({
+          hojaDeRutaId: hojaDeRuta.id,
+          arrangements: travelArrangements
+        });
+      }, 500);
+
+      return () => clearTimeout(saveTimeout);
+    }
+  }, [selectedJobId, hojaDeRuta?.id, travelArrangements, saveTravelArrangements]);
+
+  // Save room assignments when they change
+  useEffect(() => {
+    if (selectedJobId && hojaDeRuta?.id && roomAssignments.length > 0) {
+      const saveTimeout = setTimeout(() => {
+        saveRoomAssignments({
+          hojaDeRutaId: hojaDeRuta.id,
+          assignments: roomAssignments
+        });
+      }, 500);
+
+      return () => clearTimeout(saveTimeout);
+    }
+  }, [selectedJobId, hojaDeRuta?.id, roomAssignments, saveRoomAssignments]);
+
   const generateDocument = async () => {
     try {
       generatePDF(
@@ -100,6 +182,18 @@ const HojaDeRutaGenerator = () => {
       });
     }
   };
+
+  if (isLoadingHojaDeRuta) {
+    return (
+      <Card className="w-full max-w-3xl mx-auto">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center h-64">
+            <p className="text-muted-foreground">Cargando datos...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full max-w-3xl mx-auto">

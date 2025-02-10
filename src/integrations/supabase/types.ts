@@ -675,6 +675,8 @@ export type Database = {
           event_name: string | null
           id: string
           job_id: string | null
+          last_modified: string | null
+          last_modified_by: string | null
           power_requirements: string | null
           schedule: string | null
           updated_at: string | null
@@ -688,6 +690,8 @@ export type Database = {
           event_name?: string | null
           id?: string
           job_id?: string | null
+          last_modified?: string | null
+          last_modified_by?: string | null
           power_requirements?: string | null
           schedule?: string | null
           updated_at?: string | null
@@ -701,6 +705,8 @@ export type Database = {
           event_name?: string | null
           id?: string
           job_id?: string | null
+          last_modified?: string | null
+          last_modified_by?: string | null
           power_requirements?: string | null
           schedule?: string | null
           updated_at?: string | null
@@ -713,6 +719,13 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hoja_de_ruta_last_modified_by_fkey"
+            columns: ["last_modified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
