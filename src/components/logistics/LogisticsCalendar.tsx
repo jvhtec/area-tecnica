@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -13,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import jsPDF from "jspdf";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { convertToLocalTime, convertToUTC, formatToLocalTime, getUserTimezone } from "@/utils/timezone";
+import { useTimezone } from "@/contexts/TimezoneContext";
 
 interface LogisticsCalendarProps {
   onDateSelect?: (date: Date) => void;
@@ -25,6 +24,7 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const { toast } = useToast();
+  const { formatDate, convertToLocal, userTimezone } = useTimezone();
 
   const { data: events, isLoading } = useQuery({
     queryKey: ['logistics-events'],
@@ -52,8 +52,8 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
       // Convert times to local timezone
       return data.map(event => ({
         ...event,
-        event_time: formatToLocalTime(event.event_time, 'HH:mm'),
-        timezone: event.timezone || getUserTimezone()
+        event_time: formatDate(event.event_time, 'HH:mm'),
+        timezone: event.timezone || userTimezone
       }));
     }
   });
@@ -84,7 +84,7 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
     return events.filter(event => {
       if (!event.event_date) return false;
       try {
-        const eventDate = convertToLocalTime(event.event_date);
+        const eventDate = convertToLocal(event.event_date);
         return isValid(eventDate) && format(eventDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
       } catch (e) {
         console.error('Invalid date in event:', event);

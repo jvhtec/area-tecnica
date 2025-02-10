@@ -6,6 +6,7 @@ import { Department } from "@/types/department";
 import { JobDocument } from "@/types/job";
 import { useCallback } from "react";
 import { convertToUTC, getUserTimezone } from "@/utils/timezone";
+import { useTimezone } from "@/contexts/TimezoneContext";
 
 export const useJobManagement = (
   selectedDepartment: Department,
@@ -14,13 +15,14 @@ export const useJobManagement = (
   isProjectManagementPage = false
 ) => {
   const { toast } = useToast();
+  const { convertToUTC: toUTC } = useTimezone();
 
   const fetchJobs = useCallback(async () => {
     console.log("useJobManagement: Fetching jobs for department:", selectedDepartment);
     
     // Convert dates to UTC for database query
-    const utcStartDate = convertToUTC(startDate);
-    const utcEndDate = convertToUTC(endDate);
+    const utcStartDate = toUTC(startDate);
+    const utcEndDate = toUTC(endDate);
     
     const { data, error } = await supabase
       .from("jobs")
@@ -76,7 +78,7 @@ export const useJobManagement = (
       jobsWithFilteredDocs
     );
     return jobsWithFilteredDocs;
-  }, [selectedDepartment, startDate, endDate, isProjectManagementPage]);
+  }, [selectedDepartment, startDate, endDate, isProjectManagementPage, toUTC]);
 
   const { data: jobs, isLoading: jobsLoading } = useQuery({
     queryKey: ["jobs", selectedDepartment, startDate, endDate],

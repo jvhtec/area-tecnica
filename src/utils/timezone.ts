@@ -1,5 +1,5 @@
 
-import { format, formatInTimeZone, toDate, fromZonedTime, toZonedTime } from 'date-fns-tz';
+import { format, formatInTimeZone, toDate } from 'date-fns-tz';
 import { parseISO } from 'date-fns';
 
 export const DEFAULT_TIMEZONE = 'Europe/Madrid';
@@ -18,16 +18,28 @@ export function formatToLocalTime(date: Date | string | null, formatStr: string 
 
 export function convertToUTC(date: Date | string, timezone: string = getUserTimezone()): Date {
   const dateObj = typeof date === 'string' ? parseISO(date) : date;
-  return fromZonedTime(dateObj, timezone);
+  // Convert the date to UTC while preserving the local time
+  const localDate = toDate(dateObj, { timeZone: timezone });
+  return new Date(
+    Date.UTC(
+      localDate.getFullYear(),
+      localDate.getMonth(),
+      localDate.getDate(),
+      localDate.getHours(),
+      localDate.getMinutes(),
+      localDate.getSeconds(),
+      localDate.getMilliseconds()
+    )
+  );
 }
 
 export function convertToLocalTime(date: Date | string, timezone: string = getUserTimezone()): Date {
   const dateObj = typeof date === 'string' ? parseISO(date) : date;
-  return toZonedTime(dateObj, timezone);
+  return toDate(dateObj, { timeZone: timezone });
 }
 
 export function createLocalDate(isoString?: string): Date {
-  if (!isoString) return toZonedTime(new Date(), getUserTimezone());
-  return toZonedTime(parseISO(isoString), getUserTimezone());
+  if (!isoString) return new Date();
+  return convertToLocalTime(parseISO(isoString));
 }
 
