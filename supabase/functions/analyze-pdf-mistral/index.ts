@@ -9,6 +9,13 @@ const corsHeaders = {
 
 console.log("Edge Function: analyze-pdf-mistral initialized");
 
+// Efficient base64 conversion for large files
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const binString = Array.from(bytes, byte => String.fromCharCode(byte)).join('');
+  return btoa(binString);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -24,9 +31,9 @@ serve(async (req) => {
       throw new Error(`Failed to download PDF: ${response.statusText}`);
     }
 
-    // Convert PDF to base64
+    // Convert PDF to base64 using the efficient method
     const pdfContent = await response.arrayBuffer();
-    const base64Content = btoa(String.fromCharCode(...new Uint8Array(pdfContent)));
+    const base64Content = arrayBufferToBase64(pdfContent);
     console.log('PDF content converted to base64');
 
     // Call Mistral API
