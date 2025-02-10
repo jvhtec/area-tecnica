@@ -1,9 +1,8 @@
-
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useSessionManager } from '@/hooks/useSessionManager';
 import { supabase } from '@/lib/supabase';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -31,6 +30,13 @@ interface EquipmentCreationManagerProps {
 function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEquipmentDialogProps) {
   const [name, setName] = useState(equipment?.name || '');
   const [category, setCategory] = useState<EquipmentCategory>((equipment?.category as EquipmentCategory) || 'convencional');
+
+  useEffect(() => {
+    if (equipment) {
+      setName(equipment.name);
+      setCategory((equipment.category as EquipmentCategory) || 'convencional');
+    }
+  }, [equipment]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,7 +97,6 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [equipmentToDelete, setEquipmentToDelete] = useState<Equipment | null>(null);
 
-  // Fetch equipment list
   const { data: equipmentList } = useQuery({
     queryKey: ['equipment'],
     queryFn: async () => {
