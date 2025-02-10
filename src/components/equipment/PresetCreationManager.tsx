@@ -54,7 +54,10 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
         .eq('user_id', session?.user?.id);
       
       if (error) throw error;
-      return data as PresetWithItems[];
+      return (data || []).map(preset => ({
+        ...preset,
+        items: preset.items || [] // Ensure items is always an array
+      })) as PresetWithItems[];
     },
     enabled: !!session?.user?.id
   });
@@ -278,7 +281,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {preset.items.map((item) => (
+                {preset.items?.map((item) => (
                   <div key={item.id} className="flex justify-between text-sm">
                     <span>{item.equipment.name}</span>
                     <span>x{item.quantity}</span>
