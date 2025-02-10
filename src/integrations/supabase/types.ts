@@ -2162,7 +2162,13 @@ export type Database = {
       task_status: "not_started" | "in_progress" | "completed"
       transport_type: "trailer" | "9m" | "8m" | "6m" | "4m" | "furgoneta" | "rv"
       transportation_type: "van" | "sleeper_bus" | "train" | "plane" | "rv"
-      user_role: "admin" | "user" | "management" | "logistics" | "technician"
+      user_role:
+        | "admin"
+        | "user"
+        | "management"
+        | "logistics"
+        | "technician"
+        | "house_tech"
     }
     CompositeTypes: {
       [_ in never]: never
