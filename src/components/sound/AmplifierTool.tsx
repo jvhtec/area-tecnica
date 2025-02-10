@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText } from "lucide-react";
+import { FileText, Plus, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const soundComponentDatabase = [
@@ -39,12 +39,7 @@ interface SpeakerConfig {
 }
 
 interface SpeakerSection {
-  mains: SpeakerConfig;
-  outs: SpeakerConfig;
-  subs: SpeakerConfig;
-  fronts: SpeakerConfig;
-  delays: SpeakerConfig;
-  other: SpeakerConfig;
+  speakers: SpeakerConfig[];
 }
 
 interface AmplifierResults {
@@ -54,32 +49,54 @@ interface AmplifierResults {
   perSection: {
     [key: string]: {
       amps: number;
-      details: string;
+      details: string[];
+      totalAmps: number;
     };
   };
 }
 
 export const AmplifierTool = () => {
   const { toast } = useToast();
-  const [config, setConfig] = useState<SpeakerSection>({
-    mains: { speakerId: "", quantity: 0, maxLinked: 0 },
-    outs: { speakerId: "", quantity: 0, maxLinked: 0 },
-    subs: { speakerId: "", quantity: 0, maxLinked: 0 },
-    fronts: { speakerId: "", quantity: 0, maxLinked: 0 },
-    delays: { speakerId: "", quantity: 0, maxLinked: 0 },
-    other: { speakerId: "", quantity: 0, maxLinked: 0 }
+  const [config, setConfig] = useState<Record<string, SpeakerSection>>({
+    mains: { speakers: [] },
+    outs: { speakers: [] },
+    subs: { speakers: [] },
+    fronts: { speakers: [] },
+    delays: { speakers: [] },
+    other: { speakers: [] }
   });
 
   const [results, setResults] = useState<AmplifierResults | null>(null);
 
+  const handleAddSpeaker = (section: string) => {
+    setConfig(prev => ({
+      ...prev,
+      [section]: {
+        speakers: [
+          ...prev[section].speakers,
+          { speakerId: "", quantity: 0, maxLinked: 0 }
+        ]
+      }
+    }));
+  };
+
+  const handleRemoveSpeaker = (section: string, index: number) => {
+    setConfig(prev => ({
+      ...prev,
+      [section]: {
+        speakers: prev[section].speakers.filter((_, i) => i !== index)
+      }
+    }));
+  };
+
   const handleConfigChange = (
-    section: keyof SpeakerSection,
+    section: string,
+    index: number,
     field: keyof SpeakerConfig,
     value: string | number
   ) => {
     const newValue = field === 'speakerId' ? value : Number(value);
     
-    // If changing speaker type, reset maxLinked to the default max for that speaker
     if (field === 'speakerId' && typeof value === 'string') {
       const speaker = soundComponentDatabase.find(s => s.id.toString() === value);
       if (speaker) {
@@ -87,19 +104,22 @@ export const AmplifierTool = () => {
         setConfig(prev => ({
           ...prev,
           [section]: {
-            ...prev[section],
-            speakerId: value,
-            maxLinked: speakerConfig ? speakerConfig.maxLink : 0
+            speakers: prev[section].speakers.map((speaker, i) => 
+              i === index ? {
+                ...speaker,
+                speakerId: value,
+                maxLinked: speakerConfig ? speakerConfig.maxLink : 0
+              } : speaker
+            )
           }
         }));
         return;
       }
     }
 
-    // For maxLinked, ensure it doesn't exceed the speaker's maximum
     if (field === 'maxLinked') {
       const speaker = soundComponentDatabase.find(
-        s => s.id.toString() === config[section].speakerId
+        s => s.id.toString() === config[section].speakers[index].speakerId
       );
       if (speaker) {
         const speakerConfig = speakerAmplifierConfig[speaker.name.trim()];
@@ -117,13 +137,14 @@ export const AmplifierTool = () => {
     setConfig(prev => ({
       ...prev,
       [section]: {
-        ...prev[section],
-        [field]: newValue
+        speakers: prev[section].speakers.map((speaker, i) =>
+          i === index ? { ...speaker, [field]: newValue } : speaker
+        )
       }
     }));
   };
 
-  const calculateAmplifiersForSection = (
+  const calculateAmplifiersForSpeaker = (
     speakerId: string,
     quantity: number,
     maxLinked: number
@@ -165,19 +186,31 @@ export const AmplifierTool = () => {
       perSection: {}
     };
 
-    // Calculate for each section
-    Object.entries(config).forEach(([section, sectionConfig]) => {
-      const sectionResults = calculateAmplifiersForSection(
-        sectionConfig.speakerId,
-        sectionConfig.quantity,
-        sectionConfig.maxLinked
-      );
-      
+    Object.entries(config).forEach(([section, { speakers }]) => {
+      const sectionResults = {
+        amps: 0,
+        details: [] as string[],
+        totalAmps: 0
+      };
+
+      speakers.forEach(speaker => {
+        const speakerResults = calculateAmplifiersForSpeaker(
+          speaker.speakerId,
+          speaker.quantity,
+          speaker.maxLinked
+        );
+        
+        if (speakerResults.amps > 0) {
+          sectionResults.amps += speakerResults.amps;
+          sectionResults.details.push(speakerResults.details);
+        }
+      });
+
+      sectionResults.totalAmps = sectionResults.amps;
       results.perSection[section] = sectionResults;
-      results.totalAmplifiersNeeded += sectionResults.amps;
+      results.totalAmplifiersNeeded += sectionResults.totalAmps;
     });
 
-    // Calculate complete racks and loose amplifiers
     results.completeRaks = Math.floor(results.totalAmplifiersNeeded / 3);
     results.looseAmplifiers = results.totalAmplifiersNeeded % 3;
 
@@ -185,7 +218,6 @@ export const AmplifierTool = () => {
   };
 
   const generatePDF = () => {
-    // Will be implemented similar to other tools' PDF generation
     console.log("Generating PDF for config:", config);
     toast({
       title: "PDF Generation",
@@ -193,50 +225,70 @@ export const AmplifierTool = () => {
     });
   };
 
-  const renderSpeakerSection = (section: keyof SpeakerSection, title: string) => (
+  const renderSpeakerSection = (section: string, title: string) => (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor={`${section}-speaker`}>Speaker Type</Label>
-          <Select
-            value={config[section].speakerId}
-            onValueChange={(value) => handleConfigChange(section, "speakerId", value)}
+      {config[section].speakers.map((speaker, index) => (
+        <div key={index} className="relative border rounded-lg p-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-2 top-2"
+            onClick={() => handleRemoveSpeaker(section, index)}
           >
-            <SelectTrigger id={`${section}-speaker`}>
-              <SelectValue placeholder="Select speaker" />
-            </SelectTrigger>
-            <SelectContent>
-              {soundComponentDatabase.map((speaker) => (
-                <SelectItem key={speaker.id} value={speaker.id.toString()}>
-                  {speaker.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+            <X className="h-4 w-4" />
+          </Button>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor={`${section}-${index}-speaker`}>Speaker Type</Label>
+              <Select
+                value={speaker.speakerId}
+                onValueChange={(value) => handleConfigChange(section, index, "speakerId", value)}
+              >
+                <SelectTrigger id={`${section}-${index}-speaker`}>
+                  <SelectValue placeholder="Select speaker" />
+                </SelectTrigger>
+                <SelectContent>
+                  {soundComponentDatabase.map((speaker) => (
+                    <SelectItem key={speaker.id} value={speaker.id.toString()}>
+                      {speaker.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor={`${section}-quantity`}>Quantity</Label>
-          <Input
-            id={`${section}-quantity`}
-            type="number"
-            min="0"
-            value={config[section].quantity}
-            onChange={(e) => handleConfigChange(section, "quantity", e.target.value)}
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor={`${section}-${index}-quantity`}>Quantity</Label>
+              <Input
+                id={`${section}-${index}-quantity`}
+                type="number"
+                min="0"
+                value={speaker.quantity}
+                onChange={(e) => handleConfigChange(section, index, "quantity", e.target.value)}
+              />
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor={`${section}-maxlinked`}>Max Linked</Label>
-          <Input
-            id={`${section}-maxlinked`}
-            type="number"
-            min="0"
-            value={config[section].maxLinked}
-            onChange={(e) => handleConfigChange(section, "maxLinked", e.target.value)}
-          />
+            <div className="space-y-2">
+              <Label htmlFor={`${section}-${index}-maxlinked`}>Max Linked</Label>
+              <Input
+                id={`${section}-${index}-maxlinked`}
+                type="number"
+                min="0"
+                value={speaker.maxLinked}
+                onChange={(e) => handleConfigChange(section, index, "maxLinked", e.target.value)}
+              />
+            </div>
+          </div>
         </div>
-      </div>
+      ))}
+      <Button 
+        variant="outline" 
+        className="w-full"
+        onClick={() => handleAddSpeaker(section)}
+      >
+        <Plus className="h-4 w-4 mr-2" />
+        Add Speaker
+      </Button>
     </div>
   );
 
@@ -290,11 +342,21 @@ export const AmplifierTool = () => {
           <div className="mt-6 p-4 border rounded-lg space-y-4">
             <h3 className="text-lg font-semibold">Required Amplifiers</h3>
             
-            <div className="space-y-2">
+            <div className="space-y-4">
               {Object.entries(results.perSection).map(([section, data]) => (
-                data.amps > 0 && (
-                  <div key={section} className="text-sm">
-                    <span className="font-medium capitalize">{section}</span>: {data.details}
+                data.totalAmps > 0 && (
+                  <div key={section} className="space-y-2">
+                    <div className="font-medium capitalize">{section}</div>
+                    {data.details.map((detail, index) => (
+                      <div key={index} className="text-sm pl-4">
+                        {detail}
+                      </div>
+                    ))}
+                    {data.details.length > 1 && (
+                      <div className="text-sm pl-4 font-medium">
+                        Total amplifiers for {section}: {data.totalAmps}
+                      </div>
+                    )}
                   </div>
                 )
               ))}
@@ -316,4 +378,3 @@ export const AmplifierTool = () => {
     </Card>
   );
 };
-
