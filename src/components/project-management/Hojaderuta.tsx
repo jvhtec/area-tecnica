@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import {
   Card,
   CardHeader,
@@ -25,455 +25,47 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Trash2, Calendar } from "lucide-react";
-import { useJobSelection } from "@/hooks/useJobSelection";
-import { format } from "date-fns";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { Calendar, Trash2 } from "lucide-react";
+import { useHojaDeRutaForm } from "@/hooks/useHojaDeRutaForm";
+import { useHojaDeRutaImages } from "@/hooks/useHojaDeRutaImages";
+import { ImageUploadSection } from "@/components/hoja-de-ruta/sections/ImageUploadSection";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-
-// Extensión de jsPDF para usar autoTable
-interface AutoTableJsPDF extends jsPDF {
-  lastAutoTable?: {
-    finalY: number;
-  };
-}
-
-interface TravelArrangement {
-  transportation_type: "van" | "sleeper_bus" | "train" | "plane" | "RV";
-  pickup_address?: string;
-  pickup_time?: string;
-  flight_train_number?: string;
-  departure_time?: string;
-  arrival_time?: string;
-  notes?: string;
-}
-
-interface RoomAssignment {
-  room_type: "single" | "double";
-  room_number?: string;
-  staff_member1_id?: string;
-  staff_member2_id?: string;
-}
-
-interface EventData {
-  eventName: string;
-  eventDates: string;
-  venue: {
-    name: string;
-    address: string;
-  };
-  contacts: { name: string; role: string; phone: string }[];
-  logistics: {
-    transport: string;
-    loadingDetails: string;
-    unloadingDetails: string;
-  };
-  staff: { name: string; surname1: string; surname2: string; position: string }[];
-  schedule: string;
-  powerRequirements: string;
-  auxiliaryNeeds: string;
-}
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
 const HojaDeRutaGenerator = () => {
+  const {
+    eventData,
+    setEventData,
+    selectedJobId,
+    setSelectedJobId,
+    showAlert,
+    setShowAlert,
+    alertMessage,
+    setAlertMessage,
+    powerRequirements,
+    setPowerRequirements,
+    travelArrangements,
+    setTravelArrangements,
+    roomAssignments,
+    setRoomAssignments,
+    isLoadingJobs,
+    jobs,
+  } = useHojaDeRutaForm();
+
+  const {
+    images,
+    imagePreviews,
+    venueMap,
+    venueMapPreview,
+    handleImageUpload,
+    removeImage,
+    handleVenueMapUpload,
+  } = useHojaDeRutaImages();
+
   const { toast } = useToast();
-  const { data: jobs, isLoading: isLoadingJobs } = useJobSelection();
-  const [showAlert, setShowAlert] = useState(false);
-  const [alertMessage, setAlertMessage] = useState("");
-  const [selectedJobId, setSelectedJobId] = useState<string>("");
 
-  const [eventData, setEventData] = useState<EventData>({
-    eventName: "",
-    eventDates: "",
-    venue: {
-      name: "",
-      address: "",
-    },
-    contacts: [{ name: "", role: "", phone: "" }],
-    logistics: {
-      transport: "",
-      loadingDetails: "",
-      unloadingDetails: "",
-    },
-    staff: [{ name: "", surname1: "", surname2: "", position: "" }],
-    schedule: "",
-    powerRequirements: "",
-    auxiliaryNeeds: "",
-  });
-
-  // ---------------------------
-  // ESTADOS DE IMÁGENES Y ARCHIVOS
-  // ---------------------------
-  const [images, setImages] = useState({
-    venue: [] as File[],
-  });
-  const [imagePreviews, setImagePreviews] = useState({
-    venue: [] as string[],
-  });
-  // Estado para el mapa de ubicación del lugar (archivo único)
-  const [venueMap, setVenueMap] = useState<File | null>(null);
-  const [venueMapPreview, setVenueMapPreview] = useState<string | null>(null);
-
-  const [powerRequirements, setPowerRequirements] = useState<string>("");
-  const [travelArrangements, setTravelArrangements] = useState<TravelArrangement[]>([
-    { transportation_type: "van" },
-  ]);
-  const [roomAssignments, setRoomAssignments] = useState<RoomAssignment[]>([
-    { room_type: "single" },
-  ]);
-
-  // ---------------------------
-  // UTILIDAD: cargar imagen desde URL como DataURL
-  // ---------------------------
-  const loadImageAsDataURL = async (url: string): Promise<string | null> => {
-    try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = () => reject(null);
-        reader.readAsDataURL(blob);
-      });
-    } catch (error) {
-      console.error("Error al cargar la imagen", error);
-      return null;
-    }
-  };
-
-  // ---------------------------
-  // FUNCIONES DE CONSULTA
-  // ---------------------------
-  const fetchPowerRequirements = async (jobId: string) => {
-    try {
-      const { data: requirements, error } = await supabase
-        .from("power_requirement_tables")
-        .select("*")
-        .eq("job_id", jobId);
-
-      if (error) throw error;
-
-      if (requirements && requirements.length > 0) {
-        // Formatear los requisitos eléctricos en texto legible
-        const formattedRequirements = requirements
-          .map((req: any) => {
-            return `${req.department.toUpperCase()} - ${req.table_name}:\n` +
-              `Potencia Total: ${req.total_watts}W\n` +
-              `Corriente por Fase: ${req.current_per_phase}A\n` +
-              `PDU Recomendado: ${req.pdu_type}\n`;
-          })
-          .join("\n");
-        setPowerRequirements(formattedRequirements);
-        setEventData((prev) => ({
-          ...prev,
-          powerRequirements: formattedRequirements,
-        }));
-      }
-    } catch (error: any) {
-      console.error("Error al obtener los requisitos eléctricos:", error);
-      toast({
-        title: "Error",
-        description: "No se pudieron obtener los requisitos eléctricos",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const fetchAssignedStaff = async (jobId: string) => {
-    try {
-      const { data: assignments, error } = await supabase
-        .from("job_assignments")
-        .select(
-          `
-          *,
-          profiles:technician_id (
-            first_name,
-            last_name
-          )
-        `
-        )
-        .eq("job_id", jobId);
-
-      if (error) throw error;
-
-      if (assignments && assignments.length > 0) {
-        const staffList = assignments.map((assignment: any) => ({
-          name: assignment.profiles.first_name,
-          surname1: assignment.profiles.last_name,
-          surname2: "",
-          position:
-            assignment.sound_role ||
-            assignment.lights_role ||
-            assignment.video_role ||
-            "Técnico",
-        }));
-
-        setEventData((prev) => ({
-          ...prev,
-          staff: staffList,
-        }));
-      }
-    } catch (error) {
-      console.error("Error al obtener el personal:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo obtener el personal asignado",
-        variant: "destructive",
-      });
-    }
-  };
-
-  useEffect(() => {
-    if (selectedJobId && jobs) {
-      const selectedJob = jobs.find((job: any) => job.id === selectedJobId);
-      if (selectedJob) {
-        console.log("Trabajo seleccionado:", selectedJob);
-        // Formatear fechas
-        const formattedDates = `${format(
-          new Date(selectedJob.start_time),
-          "dd/MM/yyyy HH:mm"
-        )} - ${format(new Date(selectedJob.end_time), "dd/MM/yyyy HH:mm")}`;
-
-        setEventData((prev) => ({
-          ...prev,
-          eventName: selectedJob.title,
-          eventDates: formattedDates,
-        }));
-
-        fetchPowerRequirements(selectedJob.id);
-        fetchAssignedStaff(selectedJob.id);
-
-        toast({
-          title: "Trabajo Seleccionado",
-          description: "El formulario se ha actualizado con los detalles del trabajo",
-        });
-      }
-    }
-  }, [selectedJobId, jobs]);
-
-  // ---------------------------
-  // MANEJADORES DE IMÁGENES
-  // ---------------------------
-  const handleImageUpload = (
-    type: keyof typeof images,
-    files: FileList | null
-  ) => {
-    if (!files) return;
-    const fileArray = Array.from(files);
-    const newImages = [...(images[type] || []), ...fileArray];
-    setImages({ ...images, [type]: newImages });
-
-    const previews = fileArray.map((file) => URL.createObjectURL(file));
-    setImagePreviews((prev) => ({
-      ...prev,
-      [type]: [...(prev[type] || []), ...previews],
-    }));
-  };
-
-  const removeImage = (type: keyof typeof images, index: number) => {
-    const newImages = [...images[type]];
-    const newPreviews = [...imagePreviews[type]];
-    URL.revokeObjectURL(newPreviews[index]);
-    newImages.splice(index, 1);
-    newPreviews.splice(index, 1);
-    setImages({ ...images, [type]: newImages });
-    setImagePreviews({ ...imagePreviews, [type]: newPreviews });
-  };
-
-  // Manejador para subir el mapa de ubicación del lugar
-  const handleVenueMapUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setVenueMap(file);
-      const preview = URL.createObjectURL(file);
-      setVenueMapPreview(preview);
-    }
-  };
-
-  // ---------------------------
-  // MANEJADORES DE CONTACTOS Y PERSONAL
-  // ---------------------------
-  const handleContactChange = (index: number, field: string, value: string) => {
-    const newContacts = [...eventData.contacts];
-    newContacts[index] = { ...newContacts[index], [field]: value };
-    setEventData({ ...eventData, contacts: newContacts });
-  };
-
-  const handleStaffChange = (index: number, field: string, value: string) => {
-    const newStaff = [...eventData.staff];
-    newStaff[index] = { ...newStaff[index], [field]: value };
-    setEventData({ ...eventData, staff: newStaff });
-  };
-
-  const addContact = () => {
-    setEventData({
-      ...eventData,
-      contacts: [...eventData.contacts, { name: "", role: "", phone: "" }],
-    });
-  };
-
-  const addStaffMember = () => {
-    setEventData({
-      ...eventData,
-      staff: [
-        ...eventData.staff,
-        { name: "", surname1: "", surname2: "", position: "" },
-      ],
-    });
-  };
-
-  // ---------------------------
-  // MANEJADORES DE ARREGLOS DE VIAJE Y ASIGNACIONES DE HABITACIONES
-  // ---------------------------
-  const addTravelArrangement = () => {
-    setTravelArrangements([...travelArrangements, { transportation_type: "van" }]);
-  };
-
-  const removeTravelArrangement = (index: number) => {
-    const newArrangements = [...travelArrangements];
-    newArrangements.splice(index, 1);
-    setTravelArrangements(newArrangements);
-  };
-
-  const updateTravelArrangement = (
-    index: number,
-    field: keyof TravelArrangement,
-    value: string
-  ) => {
-    const newArrangements = [...travelArrangements];
-    newArrangements[index] = { ...newArrangements[index], [field]: value };
-    setTravelArrangements(newArrangements);
-  };
-
-  const addRoomAssignment = () => {
-    setRoomAssignments([...roomAssignments, { room_type: "single" }]);
-  };
-
-  const removeRoomAssignment = (index: number) => {
-    const newAssignments = [...roomAssignments];
-    newAssignments.splice(index, 1);
-    setRoomAssignments(newAssignments);
-  };
-
-  const updateRoomAssignment = (
-    index: number,
-    field: keyof RoomAssignment,
-    value: string
-  ) => {
-    const newAssignments = [...roomAssignments];
-    newAssignments[index] = { ...newAssignments[index], [field]: value };
-    setRoomAssignments(newAssignments);
-  };
-
-  // ---------------------------
-  // COMPONENTE DE SUBIDA DE IMÁGENES
-  // ---------------------------
-  interface ImageUploadSectionProps {
-    type: keyof typeof images;
-    label: string;
-  }
-  const ImageUploadSection = ({ type, label }: ImageUploadSectionProps) => {
-    return (
-      <div className="space-y-4">
-        <Label htmlFor={`${type}-upload`}>{label}</Label>
-        <Input
-          id={`${type}-upload`}
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={(e) => handleImageUpload(type, e.target.files)}
-        />
-        {imagePreviews[type]?.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-            {imagePreviews[type].map((preview, index) => (
-              <div key={index} className="relative group">
-                <img
-                  src={preview}
-                  alt={`${type} vista previa ${index + 1}`}
-                  className="w-full h-32 object-cover rounded-lg"
-                />
-                <button
-                  onClick={() => removeImage(type, index)}
-                  className="absolute top-2 right-2 p-1 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Trash2 className="w-4 h-4 text-white" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // ---------------------------
-  // SUBIDA DEL PDF A SUPABASE
-  // ---------------------------
-  const uploadPdfToJob = async (
-    jobId: string,
-    pdfBlob: Blob,
-    fileName: string
-  ) => {
-    try {
-      console.log("Iniciando subida del PDF:", fileName);
-
-      // Sanitizar el nombre del archivo
-      const sanitizedFileName = fileName
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-zA-Z0-9._-]/g, "_")
-        .replace(/\s+/g, "_");
-
-      const filePath = `${crypto.randomUUID()}-${sanitizedFileName}`;
-      console.log("Subiendo con la ruta sanitizada:", filePath);
-
-      // Subir a Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("job_documents")
-        .upload(filePath, pdfBlob, {
-          contentType: "application/pdf",
-          upsert: false,
-        });
-
-      if (uploadError) {
-        console.error("Error en la subida:", uploadError);
-        throw uploadError;
-      }
-
-      console.log("Archivo subido con éxito:", uploadData);
-
-      // Crear un registro en la base de datos
-      const { error: dbError } = await supabase.from("job_documents").insert({
-        job_id: jobId,
-        file_name: fileName,
-        file_path: filePath,
-        file_type: "application/pdf",
-        file_size: pdfBlob.size,
-      });
-
-      if (dbError) {
-        console.error("Error en la base de datos:", dbError);
-        throw dbError;
-      }
-
-      toast({
-        title: "Éxito",
-        description: "La Hoja de Ruta ha sido generada y subida",
-      });
-    } catch (error: any) {
-      console.error("Fallo en la subida:", error);
-      toast({
-        title: "Fallo en la subida",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  // ---------------------------
-  // GENERAR DOCUMENTO PDF (Todo en español)
-  // ---------------------------
   const generateDocument = async () => {
     if (!selectedJobId) {
       toast({
@@ -490,9 +82,9 @@ const HojaDeRutaGenerator = () => {
     const doc = new jsPDF() as AutoTableJsPDF;
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
-    const bottomMargin = 60; // Reservar 60 puntos en la parte inferior para el logo
+    const bottomMargin = 60;
 
-    // Función auxiliar para agregar una página si la posición actual excede el área segura
+    // Function to check page break
     const checkPageBreak = (currentY: number): number => {
       if (currentY > pageHeight - bottomMargin) {
         doc.addPage();
@@ -501,11 +93,11 @@ const HojaDeRutaGenerator = () => {
       return currentY;
     };
 
-    // Agregar fondo de cabecera en la primera página
+    // Header background
     doc.setFillColor(125, 1, 1);
     doc.rect(0, 0, pageWidth, 40, "F");
 
-    // Título y nombre del evento (centrado, texto blanco)
+    // Title and event name
     doc.setFontSize(24);
     doc.setTextColor(255, 255, 255);
     doc.text("Hoja de Ruta", pageWidth / 2, 20, { align: "center" });
@@ -516,12 +108,12 @@ const HojaDeRutaGenerator = () => {
     doc.setFontSize(12);
     doc.setTextColor(51, 51, 51);
 
-    // Fechas del evento
+    // Event dates
     yPosition = checkPageBreak(yPosition);
     doc.text(`Fechas: ${eventData.eventDates}`, 20, yPosition);
     yPosition += 15;
 
-    // Sección de Información del Lugar
+    // Venue information
     yPosition = checkPageBreak(yPosition);
     doc.setFontSize(14);
     doc.setTextColor(125, 1, 1);
@@ -533,7 +125,8 @@ const HojaDeRutaGenerator = () => {
     yPosition += 7;
     doc.text(`Dirección: ${eventData.venue.address}`, 30, yPosition);
     yPosition += 15;
-    // Insertar el mapa de ubicación del lugar, si está disponible
+
+    // Venue map
     if (venueMapPreview) {
       try {
         const mapWidth = 100;
@@ -545,7 +138,7 @@ const HojaDeRutaGenerator = () => {
       }
     }
 
-    // Sección de Contactos
+    // Contacts section
     if (
       eventData.contacts.some(
         (contact) => contact.name || contact.role || contact.phone
@@ -572,7 +165,7 @@ const HojaDeRutaGenerator = () => {
       yPosition = (doc as any).lastAutoTable.finalY + 15;
     }
 
-    // Sección de Logística
+    // Logistics section
     if (
       eventData.logistics.transport ||
       eventData.logistics.loadingDetails ||
@@ -601,7 +194,7 @@ const HojaDeRutaGenerator = () => {
       });
     }
 
-    // Sección de Personal
+    // Staff section
     if (
       eventData.staff.some(
         (person) => person.name || person.surname1 || person.surname2 || person.position
@@ -629,7 +222,7 @@ const HojaDeRutaGenerator = () => {
       yPosition = (doc as any).lastAutoTable.finalY + 15;
     }
 
-    // Sección de Arreglos de Viaje (tabla)
+    // Travel arrangements section
     if (
       travelArrangements.length > 0 &&
       travelArrangements.some((arr) =>
@@ -639,7 +232,6 @@ const HojaDeRutaGenerator = () => {
       yPosition = checkPageBreak(yPosition);
       doc.setFontSize(14);
       doc.setTextColor(125, 1, 1);
-      // Nota: Si lo deseas, puedes cambiar el título aquí.
       doc.text("Arreglos de Viaje", 20, yPosition);
       yPosition += 10;
       const travelTableData = travelArrangements.map((arr) => [
@@ -658,49 +250,9 @@ const HojaDeRutaGenerator = () => {
         styles: { fontSize: 10 },
       });
       yPosition = (doc as any).lastAutoTable.finalY + 15;
-
-      // Obtener direcciones de recogida únicas
-      const uniquePickupAddresses = Array.from(
-        new Set(
-          travelArrangements
-            .filter((arr) => arr.pickup_address)
-            .map((arr) => arr.pickup_address as string)
-        )
-      );
-
-      // Dado que the URLs you provided are already substituted and uploaded into the public folder,
-      // we assume that the pickup_address value exactly matches the key for the image URL.
-      // For example, if the pickup address is "Nave Sector-Pro. C\Puerto Rico 6, 28971 - Griñon 1",
-      // then the image URL should be something like "/IMG_7834.jpeg". Adjust these keys as needed.
-      const transportationMapPlaceholders: { [key: string]: string } = {
-        "Nave Sector-Pro. C\\Puerto Rico 6, 28971 - Griñon 1": "/lovable-uploads/IMG_7834.jpeg",
-        "C\\ Corregidor Diego de Valderrabano 23, Moratalaz": "/lovable-uploads/IMG_7835.jpeg",
-        "C\\ Entrepeñas 47, Ensanche de Vallecas": "/lovable-uploads/IMG_7836.jpeg",
-      };
-
-      // Imprimir cada dirección única y su imagen asociada
-      for (const pickupAddress of uniquePickupAddresses) {
-        const imageUrl = transportationMapPlaceholders[pickupAddress];
-        if (imageUrl) {
-          yPosition = checkPageBreak(yPosition);
-          doc.setFontSize(10);
-          doc.setTextColor(51, 51, 51);
-          doc.text(`Dirección de Recogida: ${pickupAddress}`, 20, yPosition);
-          yPosition += 7;
-          const imageDataUrl = await loadImageAsDataURL(imageUrl);
-          if (imageDataUrl) {
-            try {
-              doc.addImage(imageDataUrl, "JPEG", 20, yPosition, 100, 60);
-              yPosition += 70;
-            } catch (error) {
-              console.error("Error al agregar la imagen del mapa de transporte:", error);
-            }
-          }
-        }
-      }
     }
 
-    // Sección de Asignaciones de Habitaciones
+    // Room assignments section
     if (
       roomAssignments.length > 0 &&
       roomAssignments.some((room) =>
@@ -728,7 +280,7 @@ const HojaDeRutaGenerator = () => {
       yPosition = (doc as any).lastAutoTable.finalY + 15;
     }
 
-    // Sección de Programa
+    // Schedule section
     if (eventData.schedule) {
       yPosition = checkPageBreak(yPosition);
       doc.setFontSize(14);
@@ -742,7 +294,7 @@ const HojaDeRutaGenerator = () => {
       yPosition += scheduleLines.length * 7 + 15;
     }
 
-    // Sección de Requisitos Eléctricos
+    // Power requirements section
     if (eventData.powerRequirements) {
       yPosition = checkPageBreak(yPosition);
       doc.setFontSize(14);
@@ -756,7 +308,7 @@ const HojaDeRutaGenerator = () => {
       yPosition += powerLines.length * 7 + 15;
     }
 
-    // Sección de Necesidades Auxiliares
+    // Auxiliary needs section
     if (eventData.auxiliaryNeeds) {
       yPosition = checkPageBreak(yPosition);
       doc.setFontSize(14);
@@ -770,7 +322,7 @@ const HojaDeRutaGenerator = () => {
       yPosition += auxLines.length * 7 + 15;
     }
 
-    // Sección de Imágenes del Lugar (si existen)
+    // Venue images section
     if (imagePreviews.venue.length > 0) {
       doc.addPage();
       yPosition = 20;
@@ -802,12 +354,11 @@ const HojaDeRutaGenerator = () => {
       }
     }
 
-    // ---------------------------
-    // AGREGAR LOGO EN CADA PÁGINA
-    // ---------------------------
+    // Load and add logo
     const logo = new Image();
     logo.crossOrigin = "anonymous";
     logo.src = "/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png";
+    
     logo.onload = () => {
       const totalPages = doc.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
@@ -828,6 +379,7 @@ const HojaDeRutaGenerator = () => {
       link.click();
       URL.revokeObjectURL(url);
     };
+    
     logo.onerror = () => {
       console.error("No se pudo cargar el logo");
       const blob = doc.output("blob");
@@ -840,9 +392,6 @@ const HojaDeRutaGenerator = () => {
     };
   };
 
-  // ---------------------------
-  // RETORNO JSX
-  // ---------------------------
   return (
     <Card className="w-full max-w-3xl mx-auto">
       <CardHeader>
@@ -856,7 +405,7 @@ const HojaDeRutaGenerator = () => {
             </Alert>
           )}
 
-          {/* Selección de Trabajo */}
+          {/* Job Selection */}
           <div className="space-y-4">
             <div className="flex flex-col space-y-2">
               <Label htmlFor="jobSelect">Seleccione Trabajo</Label>
@@ -908,12 +457,19 @@ const HojaDeRutaGenerator = () => {
             </div>
           </div>
 
-          {/* Sección de Imágenes */}
+          {/* Image Upload Section */}
           <div className="space-y-6">
-            <ImageUploadSection type="venue" label="Imágenes del Lugar" />
+            <ImageUploadSection
+              type="venue"
+              label="Imágenes del Lugar"
+              images={images}
+              imagePreviews={imagePreviews}
+              onUpload={handleImageUpload}
+              onRemove={removeImage}
+            />
           </div>
 
-          {/* Diálogo de Lugar */}
+          {/* Venue Information Dialog */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="w-full">
@@ -951,7 +507,7 @@ const HojaDeRutaGenerator = () => {
                     }
                   />
                 </div>
-                {/* Subida para el Mapa de Ubicación del Lugar */}
+                {/* Venue Map Upload */}
                 <div>
                   <Label htmlFor="venueMapUpload">Mapa de Ubicación del Lugar</Label>
                   <Input
@@ -972,7 +528,7 @@ const HojaDeRutaGenerator = () => {
             </DialogContent>
           </Dialog>
 
-          {/* Diálogo de Contactos */}
+          {/* Contacts Dialog */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="w-full">
@@ -1016,14 +572,14 @@ const HojaDeRutaGenerator = () => {
             </DialogContent>
           </Dialog>
 
-          {/* Diálogo de Personal */}
+          {/* Staff Dialog */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="w-full">
                 Editar Lista de Personal
               </Button>
             </DialogTrigger>
-             <DialogContent className="max-w-3xl h-[80vh] overflow-y-auto">
+            <DialogContent className="max-w-3xl h-[80vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Lista de Personal</DialogTitle>
               </DialogHeader>
@@ -1067,7 +623,7 @@ const HojaDeRutaGenerator = () => {
             </DialogContent>
           </Dialog>
 
-          {/* Diálogo de Arreglos de Viaje */}
+          {/* Travel Arrangements Dialog */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="w-full">
@@ -1203,15 +759,7 @@ const HojaDeRutaGenerator = () => {
             </DialogContent>
           </Dialog>
 
-          {/* Sección de direcciones únicas de recogida y mapas asociados */}
-          {travelArrangements.length > 0 && (
-            <div>
-              {/* Este bloque se ejecuta durante la generación del PDF */}
-              {/* NOTA: La siguiente parte se inserta directamente en el PDF dentro de generateDocument */}
-            </div>
-          )}
-
-          {/* Diálogo de Asignaciones de Habitaciones */}
+          {/* Room Assignments Dialog */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="w-full">
@@ -1329,7 +877,7 @@ const HojaDeRutaGenerator = () => {
             </DialogContent>
           </Dialog>
 
-          {/* Sección de Programa */}
+          {/* Schedule Section */}
           <div>
             <Label htmlFor="schedule">Programa</Label>
             <Textarea
@@ -1343,7 +891,7 @@ const HojaDeRutaGenerator = () => {
             />
           </div>
 
-          {/* Sección de Requisitos Eléctricos */}
+          {/* Power Requirements Section */}
           <div>
             <Label htmlFor="powerRequirements">Requisitos Eléctricos</Label>
             <Textarea
@@ -1360,7 +908,7 @@ const HojaDeRutaGenerator = () => {
             />
           </div>
 
-          {/* Sección de Necesidades Auxiliares */}
+          {/* Auxiliary Needs Section */}
           <div>
             <Label htmlFor="auxiliaryNeeds">Necesidades Auxiliares</Label>
             <Textarea
