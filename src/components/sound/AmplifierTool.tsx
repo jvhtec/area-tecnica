@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -9,6 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Plus, X, Repeat } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { generateAmplifierPdf } from "@/utils/amplifierCalculationPdf";
 
 const soundComponentDatabase = [
   { id: 1, name: ' K1 ', weight: 106 },
@@ -21,7 +22,7 @@ const soundComponentDatabase = [
 ];
 
 const speakerAmplifierConfig: Record<string, { maxLink: number; maxPerAmp: number; channelsRequired: number }> = {
-  'K1': { maxLink: 3, maxPerAmp: 2, channelsRequired: 4 },
+  'K1': { maxLink: 4, maxPerAmp: 2, channelsRequired: 4 },
   'K2': { maxLink: 3, maxPerAmp: 3, channelsRequired: 4 },
   'K3': { maxLink: 4, maxPerAmp: 6, channelsRequired: 2 },
   'KARA II': { maxLink: 4, maxPerAmp: 6, channelsRequired: 2 },
@@ -33,18 +34,18 @@ const speakerAmplifierConfig: Record<string, { maxLink: number; maxPerAmp: numbe
   '115HiQ': { maxLink: 2, maxPerAmp: 6, channelsRequired: 2 }
 };
 
-interface SpeakerConfig {
+export interface SpeakerConfig {
   speakerId: string;
   quantity: number;
   maxLinked: number;
 }
 
-interface SpeakerSection {
+export interface SpeakerSection {
   speakers: SpeakerConfig[];
   mirrored?: boolean;
 }
 
-interface AmplifierResults {
+export interface AmplifierResults {
   totalAmplifiersNeeded: number;
   completeRaks: number;
   looseAmplifiers: number;
@@ -238,12 +239,39 @@ export const AmplifierTool = () => {
     setResults(results);
   };
 
-  const generatePDF = () => {
-    console.log("Generating PDF for config:", config);
-    toast({
-      title: "PDF Generation",
-      description: "PDF generation will be implemented in the next phase",
-    });
+  const generatePDF = async () => {
+    if (!results) {
+      toast({
+        title: "No calculations",
+        description: "Please calculate amplifier requirements first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const pdfBlob = await generateAmplifierPdf(config, results, soundComponentDatabase);
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `amplifier-requirements-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "PDF Generated",
+        description: "The PDF has been downloaded successfully.",
+      });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const renderSpeakerSection = (section: string, title: string) => (
@@ -332,86 +360,88 @@ export const AmplifierTool = () => {
       <CardHeader>
         <CardTitle>Amplifier Calculator</CardTitle>
       </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="mains" className="space-y-4">
-          <TabsList className="grid grid-cols-3 lg:grid-cols-6">
-            <TabsTrigger value="mains">Mains</TabsTrigger>
-            <TabsTrigger value="outs">Outs</TabsTrigger>
-            <TabsTrigger value="subs">Subs</TabsTrigger>
-            <TabsTrigger value="fronts">Fronts</TabsTrigger>
-            <TabsTrigger value="delays">Delays</TabsTrigger>
-            <TabsTrigger value="other">Other</TabsTrigger>
-          </TabsList>
+      <ScrollArea className="h-[calc(100vh-12rem)]">
+        <CardContent>
+          <Tabs defaultValue="mains" className="space-y-4">
+            <TabsList className="grid grid-cols-3 lg:grid-cols-6">
+              <TabsTrigger value="mains">Mains</TabsTrigger>
+              <TabsTrigger value="outs">Outs</TabsTrigger>
+              <TabsTrigger value="subs">Subs</TabsTrigger>
+              <TabsTrigger value="fronts">Fronts</TabsTrigger>
+              <TabsTrigger value="delays">Delays</TabsTrigger>
+              <TabsTrigger value="other">Other</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="mains">
-            {renderSpeakerSection("mains", "Main Speakers")}
-          </TabsContent>
-          <TabsContent value="outs">
-            {renderSpeakerSection("outs", "Out Speakers")}
-          </TabsContent>
-          <TabsContent value="subs">
-            {renderSpeakerSection("subs", "Subwoofers")}
-          </TabsContent>
-          <TabsContent value="fronts">
-            {renderSpeakerSection("fronts", "Front Fills")}
-          </TabsContent>
-          <TabsContent value="delays">
-            {renderSpeakerSection("delays", "Delay Speakers")}
-          </TabsContent>
-          <TabsContent value="other">
-            {renderSpeakerSection("other", "Other Speakers")}
-          </TabsContent>
-        </Tabs>
+            <TabsContent value="mains">
+              {renderSpeakerSection("mains", "Main Speakers")}
+            </TabsContent>
+            <TabsContent value="outs">
+              {renderSpeakerSection("outs", "Out Speakers")}
+            </TabsContent>
+            <TabsContent value="subs">
+              {renderSpeakerSection("subs", "Subwoofers")}
+            </TabsContent>
+            <TabsContent value="fronts">
+              {renderSpeakerSection("fronts", "Front Fills")}
+            </TabsContent>
+            <TabsContent value="delays">
+              {renderSpeakerSection("delays", "Delay Speakers")}
+            </TabsContent>
+            <TabsContent value="other">
+              {renderSpeakerSection("other", "Other Speakers")}
+            </TabsContent>
+          </Tabs>
 
-        <div className="flex justify-end gap-4 mt-6">
-          <Button onClick={calculateAmplifiers} variant="secondary">
-            Calculate Amplifiers
-          </Button>
-          <Button onClick={generatePDF} className="gap-2">
-            <FileText className="h-4 w-4" />
-            Export PDF
-          </Button>
-        </div>
+          <div className="flex justify-end gap-4 mt-6">
+            <Button onClick={calculateAmplifiers} variant="secondary">
+              Calculate Amplifiers
+            </Button>
+            <Button onClick={generatePDF} className="gap-2">
+              <FileText className="h-4 w-4" />
+              Export PDF
+            </Button>
+          </div>
 
-        {results && (
-          <div className="mt-6 p-4 border rounded-lg space-y-4">
-            <h3 className="text-lg font-semibold">Required Amplifiers</h3>
-            
-            <div className="space-y-4">
-              {Object.entries(results.perSection).map(([section, data]) => (
-                data.totalAmps > 0 && (
-                  <div key={section} className="space-y-2">
-                    <div className="font-medium capitalize">
-                      {section}{data.mirrored ? ' (Mirrored)' : ''}
+          {results && (
+            <div className="mt-6 p-4 border rounded-lg space-y-4">
+              <h3 className="text-lg font-semibold">Required Amplifiers</h3>
+              
+              <div className="space-y-4">
+                {Object.entries(results.perSection).map(([section, data]) => (
+                  data.totalAmps > 0 && (
+                    <div key={section} className="space-y-2">
+                      <div className="font-medium capitalize">
+                        {section}{data.mirrored ? ' (Mirrored)' : ''}
+                      </div>
+                      {data.details.map((detail, index) => (
+                        <div key={index} className="text-sm pl-4">
+                          {detail}
+                        </div>
+                      ))}
+                      {data.details.length > 1 && (
+                        <div className="text-sm pl-4 font-medium">
+                          Total amplifiers for {section}: {data.totalAmps}
+                        </div>
+                      )}
                     </div>
-                    {data.details.map((detail, index) => (
-                      <div key={index} className="text-sm pl-4">
-                        {detail}
-                      </div>
-                    ))}
-                    {data.details.length > 1 && (
-                      <div className="text-sm pl-4 font-medium">
-                        Total amplifiers for {section}: {data.totalAmps}
-                      </div>
-                    )}
-                  </div>
-                )
-              ))}
-            </div>
+                  )
+                ))}
+              </div>
 
-            <div className="pt-4 border-t mt-4">
-              <div className="font-medium">Summary:</div>
-              <div className="text-sm space-y-1">
-                <div>Total LA-RAKs required: {results.completeRaks}</div>
-                <div>Additional loose amplifiers: {results.looseAmplifiers}</div>
-                <div className="font-medium pt-2">
-                  Total amplifiers needed: {results.totalAmplifiersNeeded}
+              <div className="pt-4 border-t mt-4">
+                <div className="font-medium">Summary:</div>
+                <div className="text-sm space-y-1">
+                  <div>Total LA-RAKs required: {results.completeRaks}</div>
+                  <div>Additional loose amplifiers: {results.looseAmplifiers}</div>
+                  <div className="font-medium pt-2">
+                    Total amplifiers needed: {results.totalAmplifiersNeeded}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
-      </CardContent>
+          )}
+        </CardContent>
+      </ScrollArea>
     </Card>
   );
 };
