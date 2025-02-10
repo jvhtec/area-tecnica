@@ -19,7 +19,7 @@ interface WeeklySummaryProps {
   onDateChange: (date: Date) => void;
 }
 
-type EquipmentCategory = 'convencional' | 'robotica' | 'controles' | 'fx' | 'cuadros' |  'rigging';
+type EquipmentCategory = 'convencional' | 'robotica' | 'controles' | 'fx' | 'cuadros' | 'rigging' | 'led' | 'strobo';
 
 interface Equipment {
   id: string;
@@ -37,7 +37,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     return stored ? JSON.parse(stored) : true;
   });
   const [selectedCategories, setSelectedCategories] = useState<EquipmentCategory[]>([
-    'convencional', 'robotica', 'controles', 'fx', 'cuadros', 'rigging'
+    'convencional', 'robotica', 'controles', 'fx', 'cuadros', 'rigging', 'led', 'strobo'
   ]);
 
   useEffect(() => {
@@ -166,7 +166,9 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     controles: 'Controles',
     fx: 'FX',
     cuadros: 'Cuadros',
-    rigging: 'Rigging'
+    rigging: 'Rigging',
+    led: 'LED',
+    strobo: 'Strobo'
   };
 
   const filteredEquipment = stockWithEquipment?.filter(item => 

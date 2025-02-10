@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
-const EQUIPMENT_CATEGORIES = ['convencional', 'robotica', 'fx', 'rigging', 'controles', 'cuadros'] as const;
+const EQUIPMENT_CATEGORIES = ['convencional', 'robotica', 'fx', 'rigging', 'controles', 'cuadros', 'led', 'strobo'] as const;
 type EquipmentCategory = typeof EQUIPMENT_CATEGORIES[number];
 
 interface EditEquipmentDialogProps {
@@ -48,6 +48,17 @@ function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEqui
     onOpenChange(false);
   };
 
+  const categoryLabels: Record<EquipmentCategory, string> = {
+    convencional: 'Convencional',
+    robotica: 'Robótica',
+    controles: 'Controles',
+    fx: 'FX',
+    cuadros: 'Cuadros',
+    rigging: 'Rigging',
+    led: 'LED',
+    strobo: 'Strobo'
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -73,7 +84,7 @@ function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEqui
               <SelectContent>
                 {EQUIPMENT_CATEGORIES.map((cat) => (
                   <SelectItem key={cat} value={cat}>
-                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    {categoryLabels[cat]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -203,6 +214,17 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
     }
   });
 
+  const categoryLabels: Record<EquipmentCategory, string> = {
+    convencional: 'Convencional',
+    robotica: 'Robótica',
+    controles: 'Controles',
+    fx: 'FX',
+    cuadros: 'Cuadros',
+    rigging: 'Rigging',
+    led: 'LED',
+    strobo: 'Strobo'
+  };
+
   return (
     <div className="space-y-6">
       <div className="space-y-4">
@@ -225,7 +247,7 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
             <SelectContent>
               {EQUIPMENT_CATEGORIES.map((cat) => (
                 <SelectItem key={cat} value={cat}>
-                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  {categoryLabels[cat]}
                 </SelectItem>
               ))}
             </SelectContent>
