@@ -9,7 +9,6 @@ const corsHeaders = {
 
 console.log("Edge Function: analyze-pdf-mistral initialized");
 
-// Efficient base64 conversion for large files
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   const binString = Array.from(bytes, byte => String.fromCharCode(byte)).join('');
@@ -33,6 +32,13 @@ serve(async (req) => {
 
     // Convert PDF to base64 using the efficient method
     const pdfContent = await response.arrayBuffer();
+    console.log('PDF size:', pdfContent.byteLength, 'bytes');
+    
+    // Limit the content size if too large (50MB max)
+    if (pdfContent.byteLength > 50 * 1024 * 1024) {
+      throw new Error('PDF file is too large (max 50MB)');
+    }
+
     const base64Content = arrayBufferToBase64(pdfContent);
     console.log('PDF content converted to base64');
 
@@ -54,21 +60,16 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are an expert at analyzing technical documents and extracting equipment information. 
-            I will provide you with a base64 encoded PDF. Focus on identifying any microphones and stands mentioned, 
-            including their quantities. Format your response in valid JSON with this structure:
-            {
-              "microphones": [{"model": "string", "quantity": number}],
-              "stands": [{"type": "string", "quantity": number}]
-            }`
+            content: 'You are a technical document analyzer. Extract microphone and stand information from the provided document and format it as JSON. Only include items with clear quantities mentioned.'
           },
           {
             role: 'user',
-            content: `I have a technical document in base64 format. Please analyze it and extract any mentions of microphones and stands with their quantities. Here's the base64 content: ${base64Content}`
+            content: `Please analyze this technical document and list all microphones and stands with their quantities. Format as JSON with structure: {"microphones":[{"model":"string","quantity":number}],"stands":[{"type":"string","quantity":number}]}. Document content: ${base64Content}`
           }
         ],
-        temperature: 0.2,
-        max_tokens: 4000
+        temperature: 0.1,
+        max_tokens: 2000,
+        top_p: 0.9
       })
     });
 
@@ -86,14 +87,18 @@ serve(async (req) => {
       const analysisText = mistralData.choices[0].message.content;
       console.log('Raw analysis text:', analysisText);
       
-      const analysis = JSON.parse(analysisText);
+      // Clean up the response text by removing any markdown formatting
+      const cleanText = analysisText.replace(/```json\n?|\n?```/g, '').trim();
+      console.log('Cleaned analysis text:', cleanText);
+      
+      const analysis = JSON.parse(cleanText);
 
-      // Validate the structure
+      // Validate and ensure proper structure
       const results = {
         microphones: Array.isArray(analysis.microphones) ? analysis.microphones : [],
         stands: Array.isArray(analysis.stands) ? analysis.stands : [],
         rawAnalysis: {
-          mistral: analysisText
+          mistral: cleanText
         }
       };
 
