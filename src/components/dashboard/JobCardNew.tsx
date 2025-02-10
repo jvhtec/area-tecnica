@@ -546,7 +546,7 @@ export function JobCardNew({
   const { theme } = useTheme();
   const navigate = useNavigate();
   const isDark = theme === "dark";
-  const { formatDate, convertToLocal } = useTimezone();
+  const { formatDate } = useTimezone();
 
   const borderColor = job.color ? job.color : "#7E69AB";
   const appliedBorderColor = isDark ? (job.darkColor ? job.darkColor : borderColor) : borderColor;
@@ -796,7 +796,7 @@ export function JobCardNew({
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Clock className="h-4 w-4" />
-              {formatDate(new Date(job.start_time))}
+              {formatDate(job.start_time)}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -843,7 +843,144 @@ export function JobCardNew({
             </Button>
           </div>
         </div>
+
+        {!collapsed && (
+          <div className="mt-4 space-y-4">
+            {job.location && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <MapPin className="h-4 w-4" />
+                {job.location.name}
+              </div>
+            )}
+
+            {assignedTechnicians.length > 0 && (
+              <div className="flex items-center gap-2 text-sm">
+                <Users className="h-4 w-4" />
+                <div className="flex flex-wrap gap-2">
+                  {assignedTechnicians.map((tech) => (
+                    <Badge key={tech.id} variant="secondary">
+                      {tech.name} ({tech.role})
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {department === "sound" && soundTasks && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">
+                    Tasks: {getCompletedTasks()}/{soundTasks.length}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSoundTaskDialogOpen(true);
+                    }}
+                  >
+                    View Tasks
+                  </Button>
+                </div>
+                <Progress value={calculateTotalProgress()} className="h-2" />
+              </div>
+            )}
+
+            {getTotalPersonnel() > 0 && (
+              <div className="flex items-center gap-2 text-sm">
+                <Users className="h-4 w-4" />
+                <span>Total Personnel: {getTotalPersonnel()}</span>
+              </div>
+            )}
+
+            {job.job_documents && job.job_documents.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium">Documents</h4>
+                <div className="flex flex-wrap gap-2">
+                  {job.job_documents.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center gap-2 rounded-md border p-2"
+                    >
+                      <span className="text-sm">{doc.file_name}</span>
+                      {onDeleteDocument && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteDocument(job.id, doc);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {showUpload && (
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Add upload functionality
+                  }}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload Document
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {soundTaskDialogOpen && (
+        <SoundTaskDialog
+          open={soundTaskDialogOpen}
+          onOpenChange={setSoundTaskDialogOpen}
+          jobId={job.id}
+        />
+      )}
+
+      {lightsTaskDialogOpen && (
+        <LightsTaskDialog
+          open={lightsTaskDialogOpen}
+          onOpenChange={setLightsTaskDialogOpen}
+          jobId={job.id}
+        />
+      )}
+
+      {videoTaskDialogOpen && (
+        <VideoTaskDialog
+          open={videoTaskDialogOpen}
+          onOpenChange={setVideoTaskDialogOpen}
+          jobId={job.id}
+        />
+      )}
+
+      {editJobDialogOpen && (
+        <EditJobDialog
+          open={editJobDialogOpen}
+          onOpenChange={setEditJobDialogOpen}
+          job={job}
+        />
+      )}
+
+      {assignmentDialogOpen && (
+        <JobAssignmentDialog
+          open={assignmentDialogOpen}
+          onOpenChange={setAssignmentDialogOpen}
+          jobId={job.id}
+          department={department}
+        />
+      )}
     </Card>
   );
 }
