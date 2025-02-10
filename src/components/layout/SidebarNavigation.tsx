@@ -20,11 +20,11 @@ export const SidebarNavigation = ({ userRole }: SidebarNavigationProps) => {
   const location = useLocation();
   console.log('Current user role in navigation:', userRole);
 
-  // Only admin, logistics, and management can access project management
-  const isAuthorizedForProjectManagement = ['admin', 'logistics', 'management'].includes(userRole || '');
+  // Only admin, logistics, management, and house_tech can access project management
+  const isAuthorizedForProjectManagement = ['admin', 'logistics', 'management', 'house_tech'].includes(userRole || '');
   
   // Admin, management, and house techs (with proper department) can access department pages
-  const isAuthorizedForDepartments = ['admin', 'management'].includes(userRole || '');
+  const isAuthorizedForDepartments = ['admin', 'management', 'house_tech'].includes(userRole || '');
   
   // Admin and management can access settings
   const isAuthorizedForSettings = ['admin', 'management'].includes(userRole || '');
@@ -152,4 +152,3 @@ export const SidebarNavigation = ({ userRole }: SidebarNavigationProps) => {
     </div>
   );
 };
-

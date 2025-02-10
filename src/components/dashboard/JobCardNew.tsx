@@ -1033,6 +1033,12 @@ export function JobCardNew({
     navigate(`/festival-management/${job.id}/artists`);
   };
 
+  const isHouseTech = userRole === 'house_tech';
+  const canEditJobs = ['admin', 'management', 'logistics'].includes(userRole || '');
+  const canManageArtists = ['admin', 'management', 'logistics', 'house_tech'].includes(userRole || '');
+  const canUploadDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
+  const canCreateFlexFolders = ['admin', 'management', 'logistics'].includes(userRole || '');
+
   return (
     <div className="p-4 bg-gray-50 dark:bg-gray-900">
       <Card
@@ -1068,7 +1074,7 @@ export function JobCardNew({
               </Button>
             </div>
             <div className="flex flex-wrap gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-              {job.job_type === "festival" && isProjectManagementPage && (
+              {job.job_type === "festival" && isProjectManagementPage && canManageArtists && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1078,7 +1084,7 @@ export function JobCardNew({
                   Manage Artists
                 </Button>
               )}
-              {job.job_type !== "dryhire" && isProjectManagementPage && (
+              {!isHouseTech && job.job_type !== "dryhire" && isProjectManagementPage && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1101,7 +1107,7 @@ export function JobCardNew({
               >
                 <RefreshCw className="h-4 w-4" />
               </Button>
-              {canEdit && (
+              {canEditJobs && (
                 <>
                   <Button
                     variant="ghost"
@@ -1122,21 +1128,23 @@ export function JobCardNew({
                   </Button>
                 </>
               )}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={createFlexFoldersHandler}
-                disabled={job.flex_folders_created}
-                title={
-                  job.flex_folders_created
-                    ? "Folders already created"
-                    : "Create Flex folders"
-                }
-                className="hover:bg-accent/50"
-              >
-                <img src={createFolderIcon} alt="Create Flex folders" className="h-4 w-4" />
-              </Button>
-              {job.job_type !== "dryhire" && showUpload && (
+              {canCreateFlexFolders && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={createFlexFoldersHandler}
+                  disabled={job.flex_folders_created}
+                  title={
+                    job.flex_folders_created
+                      ? "Folders already created"
+                      : "Create Flex folders"
+                  }
+                  className="hover:bg-accent/50"
+                >
+                  <img src={createFolderIcon} alt="Create Flex folders" className="h-4 w-4" />
+                </Button>
+              )}
+              {job.job_type !== "dryhire" && showUpload && canUploadDocuments && (
                 <div className="relative">
                   <input
                     type="file"
