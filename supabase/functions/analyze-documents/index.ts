@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -14,40 +15,42 @@ serve(async (req) => {
 
   try {
     const { prompt } = await req.json();
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    const mistralApiKey = Deno.env.get('MISTRAL_API_KEY');
 
-    if (!openAIApiKey) {
-      throw new Error('OpenAI API key not configured');
+    if (!mistralApiKey) {
+      throw new Error('Mistral API key not configured');
     }
 
-    console.log("Calling OpenAI API with prompt...");
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    console.log("Calling Mistral API with prompt...");
+    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
+        'Authorization': `Bearer ${mistralApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'mistral-large-latest',
         messages: [
           { role: 'system', content: 'You are a helpful assistant that analyzes documents.' },
           { role: 'user', content: prompt }
         ],
+        temperature: 0.7,
+        max_tokens: 1000,
       }),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      console.error("OpenAI API error:", error);
-      throw new Error(error.error?.message || 'Error calling OpenAI API');
+      console.error("Mistral API error:", error);
+      throw new Error(error.error?.message || 'Error calling Mistral API');
     }
 
     const data = await response.json();
-    console.log("OpenAI API response:", data);
+    console.log("Mistral API response:", data);
 
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-      console.error("Unexpected OpenAI API response format:", data);
-      throw new Error('Invalid response format from OpenAI API');
+      console.error("Unexpected Mistral API response format:", data);
+      throw new Error('Invalid response format from Mistral API');
     }
 
     const result = data.choices[0].message.content;
