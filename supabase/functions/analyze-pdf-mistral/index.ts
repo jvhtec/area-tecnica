@@ -14,6 +14,59 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binString);
 }
 
+// Function to chunk text into smaller pieces
+function chunkBase64Content(base64Content: string, chunkSize: number = 50000): string[] {
+  const chunks: string[] = [];
+  for (let i = 0; i < base64Content.length; i += chunkSize) {
+    chunks.push(base64Content.slice(i, i + chunkSize));
+  }
+  console.log(`Split content into ${chunks.length} chunks`);
+  return chunks;
+}
+
+// Function to merge analysis results
+function mergeResults(results: any[]): any {
+  const merged = {
+    microphones: [] as Array<{ model: string; quantity: number }>,
+    stands: [] as Array<{ type: string; quantity: number }>,
+  };
+
+  results.forEach(result => {
+    if (result.microphones) {
+      merged.microphones.push(...result.microphones);
+    }
+    if (result.stands) {
+      merged.stands.push(...result.stands);
+    }
+  });
+
+  // Combine duplicate entries by summing quantities
+  const combinedMics = merged.microphones.reduce((acc, curr) => {
+    const existing = acc.find(item => item.model === curr.model);
+    if (existing) {
+      existing.quantity += curr.quantity;
+    } else {
+      acc.push({ ...curr });
+    }
+    return acc;
+  }, [] as Array<{ model: string; quantity: number }>);
+
+  const combinedStands = merged.stands.reduce((acc, curr) => {
+    const existing = acc.find(item => item.type === curr.type);
+    if (existing) {
+      existing.quantity += curr.quantity;
+    } else {
+      acc.push({ ...curr });
+    }
+    return acc;
+  }, [] as Array<{ type: string; quantity: number }>);
+
+  return {
+    microphones: combinedMics,
+    stands: combinedStands
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -65,81 +118,83 @@ serve(async (req) => {
       const base64Content = arrayBufferToBase64(pdfContent);
       console.log('PDF content converted to base64');
 
-      // Call Mistral API
+      // Split content into chunks
+      const chunks = chunkBase64Content(base64Content);
+      console.log(`Processing ${chunks.length} chunks...`);
+
+      // Process each chunk
+      const chunkResults = [];
       const MISTRAL_API_KEY = Deno.env.get('MISTRAL_API_KEY');
       if (!MISTRAL_API_KEY) {
         throw new Error('Mistral API key not found');
       }
 
-      console.log('Calling Mistral API...');
-      const mistralResponse = await fetch('https://api.mistral.ai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${MISTRAL_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'mistral-large-latest',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a technical document analyzer. Extract microphone and stand information from the provided document and format it as JSON. Only include items with clear quantities mentioned.'
-            },
-            {
-              role: 'user',
-              content: `Please analyze this technical document and list all microphones and stands with their quantities. Format as JSON with structure: {"microphones":[{"model":"string","quantity":number}],"stands":[{"type":"string","quantity":number}]}. Document content: ${base64Content}`
-            }
-          ],
-          temperature: 0.1,
-          max_tokens: 2000,
-          top_p: 0.9
-        })
-      });
+      for (let i = 0; i < chunks.length; i++) {
+        console.log(`Processing chunk ${i + 1}/${chunks.length}`);
+        const chunk = chunks[i];
 
-      if (!mistralResponse.ok) {
-        const errorData = await mistralResponse.text();
-        console.error('Mistral API error response:', errorData);
-        throw new Error(`Mistral API error: ${mistralResponse.statusText}\nDetails: ${errorData}`);
+        const mistralResponse = await fetch('https://api.mistral.ai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${MISTRAL_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'mistral-large-latest',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a technical document analyzer. Extract microphone and stand information from the provided document and format it as JSON. Only include items with clear quantities mentioned.'
+              },
+              {
+                role: 'user',
+                content: `Please analyze this portion of a technical document and list all microphones and stands with their quantities. Format as JSON with structure: {"microphones":[{"model":"string","quantity":number}],"stands":[{"type":"string","quantity":number}]}. Document content: ${chunk}`
+              }
+            ],
+            temperature: 0.1,
+            max_tokens: 2000,
+            top_p: 0.9
+          })
+        });
+
+        if (!mistralResponse.ok) {
+          const errorData = await mistralResponse.text();
+          console.error('Mistral API error response:', errorData);
+          throw new Error(`Mistral API error: ${mistralResponse.statusText}\nDetails: ${errorData}`);
+        }
+
+        const mistralData = await mistralResponse.json();
+        console.log(`Received response for chunk ${i + 1}`);
+
+        try {
+          const analysisText = mistralData.choices[0].message.content;
+          const cleanText = analysisText.replace(/```json\n?|\n?```/g, '').trim();
+          const analysis = JSON.parse(cleanText);
+          chunkResults.push(analysis);
+        } catch (parseError) {
+          console.error(`Error parsing chunk ${i + 1} response:`, parseError);
+          continue; // Skip this chunk if parsing fails
+        }
       }
 
-      const mistralData = await mistralResponse.json();
-      console.log('Mistral API response received');
+      // Merge results from all chunks
+      const mergedResults = mergeResults(chunkResults);
+      console.log('Analysis completed, merged results:', mergedResults);
 
-      // Parse Mistral's response
-      try {
-        const analysisText = mistralData.choices[0].message.content;
-        console.log('Raw analysis text:', analysisText);
-        
-        // Clean up the response text by removing any markdown formatting
-        const cleanText = analysisText.replace(/```json\n?|\n?```/g, '').trim();
-        console.log('Cleaned analysis text:', cleanText);
-        
-        const analysis = JSON.parse(cleanText);
-
-        // Validate and ensure proper structure
-        const results = {
-          microphones: Array.isArray(analysis.microphones) ? analysis.microphones : [],
-          stands: Array.isArray(analysis.stands) ? analysis.stands : [],
+      return new Response(
+        JSON.stringify({
+          ...mergedResults,
           rawAnalysis: {
-            mistral: cleanText
+            mistral: 'Processed in chunks due to large file size'
           }
-        };
-
-        console.log('Final analysis results:', results);
-
-        return new Response(
-          JSON.stringify(results),
-          { 
-            headers: { 
-              ...corsHeaders, 
-              'Content-Type': 'application/json' 
-            } 
-          }
-        );
-      } catch (parseError) {
-        console.error('Error parsing Mistral response:', parseError);
-        throw new Error('Failed to parse Mistral analysis results');
-      }
+        }),
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      );
 
     } catch (fetchError) {
       clearTimeout(timeout);
