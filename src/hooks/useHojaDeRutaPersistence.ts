@@ -63,7 +63,7 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
   });
 
   // Create or update hoja de ruta
-  const { mutateAsync: saveHojaDeRuta } = useMutation({
+  const { mutateAsync: saveHojaDeRuta, isLoading: isSaving } = useMutation({
     mutationFn: async (data: EventData) => {
       if (!jobId) throw new Error('No job ID provided');
 
@@ -241,6 +241,7 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
     hojaDeRuta,
     isLoading,
     saveHojaDeRuta,
+    isSaving,
     saveTravelArrangements,
     saveRoomAssignments,
     saveVenueImages

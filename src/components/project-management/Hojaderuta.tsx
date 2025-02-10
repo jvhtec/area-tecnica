@@ -1,5 +1,5 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Card,
   CardHeader,
@@ -24,6 +24,7 @@ import { RoomAssignmentsDialog } from "@/components/hoja-de-ruta/dialogs/RoomAss
 import { generatePDF } from "@/utils/hoja-de-ruta/pdf-generator";
 import { uploadPdfToJob } from "@/utils/hoja-de-ruta/pdf-upload";
 import { useToast } from "@/hooks/use-toast";
+import { Save } from "lucide-react";
 
 const HojaDeRutaGenerator = () => {
   const {
@@ -74,18 +75,20 @@ const HojaDeRutaGenerator = () => {
   );
 
   const { toast } = useToast();
+  const [isDirty, setIsDirty] = useState(false);
 
   // Add persistence hook
   const {
     hojaDeRuta,
     isLoading: isLoadingHojaDeRuta,
     saveHojaDeRuta,
+    isSaving,
     saveTravelArrangements,
     saveRoomAssignments,
     saveVenueImages
   } = useHojaDeRutaPersistence(selectedJobId);
 
-  // Load existing data when job is selected
+  // Set initial data when hojaDeRuta is loaded
   useEffect(() => {
     if (hojaDeRuta) {
       setEventData({
@@ -106,55 +109,39 @@ const HojaDeRutaGenerator = () => {
         powerRequirements: hojaDeRuta.power_requirements || "",
         auxiliaryNeeds: hojaDeRuta.auxiliary_needs || "",
       });
+      setIsDirty(false);
+    }
+  }, [hojaDeRuta, setEventData]);
 
-      if (hojaDeRuta.travel) {
-        setTravelArrangements(hojaDeRuta.travel);
+  // Mark form as dirty when data changes
+  useEffect(() => {
+    if (hojaDeRuta) {
+      setIsDirty(true);
+    }
+  }, [eventData, travelArrangements, roomAssignments]);
+
+  const handleSave = async () => {
+    try {
+      await saveHojaDeRuta(eventData);
+      
+      if (hojaDeRuta?.id) {
+        await Promise.all([
+          saveTravelArrangements({
+            hojaDeRutaId: hojaDeRuta.id,
+            arrangements: travelArrangements
+          }),
+          saveRoomAssignments({
+            hojaDeRutaId: hojaDeRuta.id,
+            assignments: roomAssignments
+          })
+        ]);
       }
-
-      if (hojaDeRuta.rooms) {
-        setRoomAssignments(hojaDeRuta.rooms);
-      }
+      
+      setIsDirty(false);
+    } catch (error) {
+      console.error('Error saving data:', error);
     }
-  }, [hojaDeRuta, setEventData, setTravelArrangements, setRoomAssignments]);
-
-  // Auto-save event data when it changes
-  useEffect(() => {
-    if (selectedJobId && eventData.eventName) {
-      const saveTimeout = setTimeout(() => {
-        saveHojaDeRuta(eventData);
-      }, 500);
-
-      return () => clearTimeout(saveTimeout);
-    }
-  }, [selectedJobId, eventData, saveHojaDeRuta]);
-
-  // Save travel arrangements when they change
-  useEffect(() => {
-    if (selectedJobId && hojaDeRuta?.id && travelArrangements.length > 0) {
-      const saveTimeout = setTimeout(() => {
-        saveTravelArrangements({
-          hojaDeRutaId: hojaDeRuta.id,
-          arrangements: travelArrangements
-        });
-      }, 500);
-
-      return () => clearTimeout(saveTimeout);
-    }
-  }, [selectedJobId, hojaDeRuta?.id, travelArrangements, saveTravelArrangements]);
-
-  // Save room assignments when they change
-  useEffect(() => {
-    if (selectedJobId && hojaDeRuta?.id && roomAssignments.length > 0) {
-      const saveTimeout = setTimeout(() => {
-        saveRoomAssignments({
-          hojaDeRutaId: hojaDeRuta.id,
-          assignments: roomAssignments
-        });
-      }, 500);
-
-      return () => clearTimeout(saveTimeout);
-    }
-  }, [selectedJobId, hojaDeRuta?.id, roomAssignments, saveRoomAssignments]);
+  };
 
   const generateDocument = async () => {
     try {
@@ -267,9 +254,27 @@ const HojaDeRutaGenerator = () => {
             setEventData={setEventData}
           />
 
-          <Button onClick={generateDocument} className="w-full">
-            Generar Hoja de Ruta
-          </Button>
+          <div className="sticky bottom-0 bg-background p-4 border-t flex justify-between items-center gap-4">
+            <Button 
+              variant="default" 
+              className="w-full"
+              onClick={generateDocument}
+            >
+              Generar Hoja de Ruta
+            </Button>
+            
+            {isDirty && (
+              <Button
+                variant="secondary"
+                onClick={handleSave}
+                disabled={isSaving || !isDirty}
+                className="min-w-[200px]"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {isSaving ? "Guardando..." : "Guardar Cambios"}
+              </Button>
+            )}
+          </div>
         </CardContent>
       </ScrollArea>
     </Card>
