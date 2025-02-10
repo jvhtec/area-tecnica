@@ -15,11 +15,14 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
     queryFn: async () => {
       if (!jobId) return null;
 
+      // Get the most recent hoja de ruta entry for this job
       const { data: mainData, error: mainError } = await supabase
         .from('hoja_de_ruta')
         .select('*')
         .eq('job_id', jobId)
-        .single();
+        .order('last_modified', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (mainError) {
         console.error('Error fetching hoja de ruta:', mainError);
