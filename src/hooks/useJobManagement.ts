@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Department } from "@/types/department";
 import { JobDocument } from "@/types/job";
 import { useCallback } from "react";
-import { convertToUTC, getUserTimezone } from "@/utils/timezone";
+import { getUserTimezone } from "@/utils/timezone";
 import { useTimezone } from "@/contexts/TimezoneContext";
 
 export const useJobManagement = (

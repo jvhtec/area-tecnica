@@ -43,3 +43,13 @@ export function createLocalDate(isoString?: string): Date {
   return convertToLocalTime(parseISO(isoString));
 }
 
+// Add new utility functions for common operations
+export function isSameLocalDay(date1: Date | string, date2: Date | string): boolean {
+  const local1 = formatToLocalTime(date1, 'yyyy-MM-dd');
+  const local2 = formatToLocalTime(date2, 'yyyy-MM-dd');
+  return local1 === local2;
+}
+
+export function getLocalDateString(date: Date | string): string {
+  return formatToLocalTime(date, 'yyyy-MM-dd');
+}

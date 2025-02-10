@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext } from 'react';
-import { formatToLocalTime, convertToUTC, convertToLocalTime, getUserTimezone, createLocalDate } from '@/utils/timezone';
+import { formatToLocalTime, convertToUTC, convertToLocalTime, getUserTimezone, createLocalDate, isSameLocalDay, getLocalDateString } from '@/utils/timezone';
 
 interface TimezoneContextType {
   userTimezone: string;
@@ -8,6 +8,8 @@ interface TimezoneContextType {
   convertToLocal: (date: Date | string) => Date;
   formatDate: (date: Date | string | null, format?: string) => string;
   createDate: (isoString?: string) => Date;
+  isSameDay: (date1: Date | string, date2: Date | string) => boolean;
+  getDateString: (date: Date | string) => string;
 }
 
 const TimezoneContext = createContext<TimezoneContextType>({
@@ -16,6 +18,8 @@ const TimezoneContext = createContext<TimezoneContextType>({
   convertToLocal: (date: Date | string) => new Date(),
   formatDate: () => '',
   createDate: () => new Date(),
+  isSameDay: () => false,
+  getDateString: () => '',
 });
 
 export const TimezoneProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -27,6 +31,8 @@ export const TimezoneProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     convertToLocal: (date: Date | string) => convertToLocalTime(date, userTimezone),
     formatDate: (date: Date | string | null, format?: string) => formatToLocalTime(date, format),
     createDate: (isoString?: string) => createLocalDate(isoString),
+    isSameDay: isSameLocalDay,
+    getDateString: getLocalDateString,
   };
 
   return (
@@ -43,4 +49,3 @@ export const useTimezone = () => {
   }
   return context;
 };
-
