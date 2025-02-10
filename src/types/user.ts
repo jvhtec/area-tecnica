@@ -1,4 +1,5 @@
-export type UserRole = 'admin' | 'management' | 'logistics' | 'technician';
+
+export type UserRole = 'admin' | 'management' | 'logistics' | 'technician' | 'house_tech';
 
 export interface User {
   id: string;
@@ -7,3 +8,4 @@ export interface User {
   first_name?: string;
   last_name?: string;
 }
+

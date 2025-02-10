@@ -23,14 +23,14 @@ export const SidebarNavigation = ({ userRole }: SidebarNavigationProps) => {
   // Only admin, logistics, and management can access project management
   const isAuthorizedForProjectManagement = ['admin', 'logistics', 'management'].includes(userRole || '');
   
-  // Only admin and management can access department pages
+  // Admin, management, and house techs (with proper department) can access department pages
   const isAuthorizedForDepartments = ['admin', 'management'].includes(userRole || '');
   
   // Admin and management can access settings
   const isAuthorizedForSettings = ['admin', 'management'].includes(userRole || '');
 
-  // Technicians should only see technician dashboard
-  const isTechnician = userRole === 'technician';
+  // Technicians and house techs should see technician dashboard
+  const isTechnicianOrHouseTech = ['technician', 'house_tech'].includes(userRole || '');
 
   // Don't render navigation until role is loaded
   if (!userRole) {
@@ -41,11 +41,11 @@ export const SidebarNavigation = ({ userRole }: SidebarNavigationProps) => {
   return (
     <div className="space-y-2">
       <div>
-        <Link to={isTechnician ? "/technician-dashboard" : "/dashboard"}>
+        <Link to={isTechnicianOrHouseTech ? "/technician-dashboard" : "/dashboard"}>
           <Button
             variant="ghost"
             className={`w-full justify-start gap-2 ${
-              location.pathname === (isTechnician ? "/technician-dashboard" : "/dashboard") ? "bg-accent" : ""
+              location.pathname === (isTechnicianOrHouseTech ? "/technician-dashboard" : "/dashboard") ? "bg-accent" : ""
             }`}
           >
             <LayoutDashboard className="h-4 w-4" />
@@ -81,7 +81,7 @@ export const SidebarNavigation = ({ userRole }: SidebarNavigationProps) => {
           </>
         )}
 
-        {isAuthorizedForDepartments && (
+        {(isAuthorizedForDepartments || userRole === 'house_tech') && (
           <>
             <Link to="/sound">
               <Button
@@ -121,7 +121,7 @@ export const SidebarNavigation = ({ userRole }: SidebarNavigationProps) => {
           </>
         )}
 
-        {isTechnician && (
+        {isTechnicianOrHouseTech && (
           <Link to="/profile">
             <Button
               variant="ghost"
@@ -152,3 +152,4 @@ export const SidebarNavigation = ({ userRole }: SidebarNavigationProps) => {
     </div>
   );
 };
+
