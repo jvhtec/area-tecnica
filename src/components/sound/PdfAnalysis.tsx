@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,9 +52,9 @@ export const PdfAnalysis = () => {
 
       console.log('File uploaded, public URL:', publicUrl);
 
-      // Call our edge function to analyze the PDF
+      // Call our Mistral-powered edge function to analyze the PDF
       const { data: analysisData, error: analysisError } = await supabase.functions
-        .invoke('analyze-pdf', {
+        .invoke('analyze-pdf-mistral', {
           body: { fileUrl: publicUrl }
         });
 
@@ -67,7 +68,7 @@ export const PdfAnalysis = () => {
 
       toast({
         title: "Analysis Complete",
-        description: "The PDF has been successfully analyzed.",
+        description: "The PDF has been successfully analyzed using Mistral AI.",
       });
 
     } catch (error: any) {
