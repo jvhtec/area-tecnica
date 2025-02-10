@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,14 +53,8 @@ export const PdfAnalysis = () => {
 
       // Call our edge function to analyze the PDF
       const { data: analysisData, error: analysisError } = await supabase.functions
-        .invoke('analyze-documents', {  // Updated function name
-          body: { 
-            prompt: `Please analyze this PDF document from the URL ${publicUrl} and extract information about sound equipment. 
-                    List all microphones and stands mentioned in the document. 
-                    Format the response as a JSON object with two arrays: 
-                    'microphones' (with 'model' and 'quantity' fields) and 
-                    'stands' (with 'type' and 'quantity' fields).`
-          }
+        .invoke('analyze-pdf', {
+          body: { fileUrl: publicUrl }
         });
 
       if (analysisError) {
