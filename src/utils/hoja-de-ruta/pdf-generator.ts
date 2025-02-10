@@ -1,11 +1,11 @@
-import { EventData, TravelArrangement, RoomAssignment } from "@/types/hoja-de-ruta";
-import jsPDF from "jspdf";
+
+import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { EventData, TravelArrangement, RoomAssignment } from "@/types/hoja-de-ruta";
+import { supabase } from "@/lib/supabase";
 
 interface AutoTableJsPDF extends jsPDF {
-  lastAutoTable?: {
-    finalY: number;
-  };
+  lastAutoTable: { finalY: number };
 }
 
 export const generatePDF = async (

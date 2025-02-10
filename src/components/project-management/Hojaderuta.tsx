@@ -63,7 +63,18 @@ const HojaDeRutaGenerator = () => {
     handleVenueMapUpload,
   } = useHojaDeRutaImages();
 
-  const handlers = useHojaDeRutaHandlers(
+  const {
+    handleContactChange,
+    addContact,
+    handleStaffChange,
+    addStaffMember,
+    updateTravelArrangement,
+    addTravelArrangement,
+    removeTravelArrangement,
+    updateRoomAssignment,
+    addRoomAssignment,
+    removeRoomAssignment,
+  } = useHojaDeRutaHandlers(
     eventData,
     setEventData,
     travelArrangements,
@@ -87,19 +98,6 @@ const HojaDeRutaGenerator = () => {
     );
   };
 
-  const {
-    handleContactChange,
-    addContact,
-    handleStaffChange,
-    addStaffMember,
-    updateTravelArrangement,
-    addTravelArrangement,
-    removeTravelArrangement,
-    updateRoomAssignment,
-    addRoomAssignment,
-    removeRoomAssignment,
-  } = handlers;
-
   return (
     <Card className="w-full max-w-3xl mx-auto">
       <CardHeader>
@@ -113,7 +111,6 @@ const HojaDeRutaGenerator = () => {
             </Alert>
           )}
 
-          {/* Job Selection */}
           <div className="space-y-4">
             <div className="flex flex-col space-y-2">
               <Label htmlFor="jobSelect">Seleccione Trabajo</Label>
@@ -165,7 +162,6 @@ const HojaDeRutaGenerator = () => {
             </div>
           </div>
 
-          {/* Image Upload Section */}
           <div className="space-y-6">
             <ImageUploadSection
               type="venue"
@@ -177,7 +173,6 @@ const HojaDeRutaGenerator = () => {
             />
           </div>
 
-          {/* Venue Information Dialog */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="w-full">
@@ -215,7 +210,6 @@ const HojaDeRutaGenerator = () => {
                     }
                   />
                 </div>
-                {/* Venue Map Upload */}
                 <div>
                   <Label htmlFor="venueMapUpload">Mapa de Ubicación del Lugar</Label>
                   <Input
@@ -236,7 +230,6 @@ const HojaDeRutaGenerator = () => {
             </DialogContent>
           </Dialog>
 
-          {/* Contacts Dialog */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="w-full">
@@ -280,7 +273,6 @@ const HojaDeRutaGenerator = () => {
             </DialogContent>
           </Dialog>
 
-          {/* Staff Dialog */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="w-full">
@@ -331,7 +323,6 @@ const HojaDeRutaGenerator = () => {
             </DialogContent>
           </Dialog>
 
-          {/* Travel Arrangements Dialog */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="w-full">
@@ -467,7 +458,6 @@ const HojaDeRutaGenerator = () => {
             </DialogContent>
           </Dialog>
 
-          {/* Room Assignments Dialog */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" className="w-full">
@@ -585,7 +575,6 @@ const HojaDeRutaGenerator = () => {
             </DialogContent>
           </Dialog>
 
-          {/* Schedule Section */}
           <div>
             <Label htmlFor="schedule">Programa</Label>
             <Textarea
@@ -599,7 +588,6 @@ const HojaDeRutaGenerator = () => {
             />
           </div>
 
-          {/* Power Requirements Section */}
           <div>
             <Label htmlFor="powerRequirements">Requisitos Eléctricos</Label>
             <Textarea
@@ -616,7 +604,6 @@ const HojaDeRutaGenerator = () => {
             />
           </div>
 
-          {/* Auxiliary Needs Section */}
           <div>
             <Label htmlFor="auxiliaryNeeds">Necesidades Auxiliares</Label>
             <Textarea
