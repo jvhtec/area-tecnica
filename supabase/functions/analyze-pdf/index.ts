@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { HfInference } from 'https://esm.sh/@huggingface/inference@2.6.4';
@@ -33,59 +34,76 @@ serve(async (req) => {
 
     const hf = new HfInference(Deno.env.get('HUGGING_FACE_API_KEY'));
 
-    // First analyze the content to identify sections
-    const documentAnalysis = await hf.documentQuestionAnswering({
+    // First, find where the equipment list is located
+    const locationAnalysis = await hf.documentQuestionAnswering({
       model: 'impira/layoutlm-document-qa',
       inputs: {
-        question: "What equipment is listed in this document?",
+        question: "On which pages are equipment lists, technical riders, or input lists located? Just respond with page numbers.",
         image: base64Content
       }
     });
 
-    console.log('Document analysis:', documentAnalysis);
+    console.log('Location analysis:', locationAnalysis);
 
-    // Now analyze microphones specifically
+    // Then analyze microphones with a more specific prompt
     const micAnalysis = await hf.documentQuestionAnswering({
       model: 'impira/layoutlm-document-qa',
       inputs: {
-        question: "List all microphones with their quantities",
+        question: "Extract only microphone models and their quantities. Format should be like '2x SM58' or '3 Beta58'. Ignore any other equipment.",
         image: base64Content
       }
     });
 
     console.log('Microphone analysis:', micAnalysis);
 
-    // Analyze stands separately
+    // Analyze stands with a more specific prompt
     const standAnalysis = await hf.documentQuestionAnswering({
       model: 'impira/layoutlm-document-qa',
       inputs: {
-        question: "List all microphone stands and their quantities",
+        question: "Extract only microphone stand types and quantities. Format should be like '4x Tall Boom Stand' or '2 Short Stand'. Ignore any other equipment.",
         image: base64Content
       }
     });
 
     console.log('Stand analysis:', standAnalysis);
 
-    // Parse microphone results - looking for patterns like "2x SM58" or "3 Beta58"
-    const micResults = (micAnalysis.answer || '').split(/[,\n]/).map(item => {
-      const match = item.trim().match(/(\d+)\s*x?\s*([\w\s-]+)/i);
-      if (match) {
-        return {
-          quantity: parseInt(match[1]),
-          model: match[2].trim()
-        };
+    // Improved parsing for microphone results
+    const micResults = (micAnalysis.answer || '').split(/[,\n;]/).map(item => {
+      // Support multiple formats: "2x SM58", "3 Beta58", "SM58 (4)", etc.
+      const patterns = [
+        /(\d+)\s*x?\s*([\w\s-]+)/i,  // "2x SM58" or "3 Beta58"
+        /([\w\s-]+)\s*\((\d+)\)/i,   // "SM58 (4)"
+        /([\w\s-]+)\s*:\s*(\d+)/i    // "SM58: 4"
+      ];
+
+      for (const pattern of patterns) {
+        const match = item.trim().match(pattern);
+        if (match) {
+          return {
+            quantity: parseInt(match[1] || match[2]),
+            model: match[2] || match[1]
+          };
+        }
       }
       return null;
     }).filter(Boolean);
 
-    // Parse stand results
-    const standResults = (standAnalysis.answer || '').split(/[,\n]/).map(item => {
-      const match = item.trim().match(/(\d+)\s*x?\s*([\w\s-]+)/i);
-      if (match) {
-        return {
-          quantity: parseInt(match[1]),
-          type: match[2].trim()
-        };
+    // Improved parsing for stand results
+    const standResults = (standAnalysis.answer || '').split(/[,\n;]/).map(item => {
+      const patterns = [
+        /(\d+)\s*x?\s*([\w\s-]+stand[\w\s-]*)/i,  // "2x Tall Boom Stand"
+        /([\w\s-]+stand[\w\s-]*)\s*\((\d+)\)/i,   // "Tall Boom Stand (4)"
+        /([\w\s-]+stand[\w\s-]*)\s*:\s*(\d+)/i    // "Tall Boom Stand: 4"
+      ];
+
+      for (const pattern of patterns) {
+        const match = item.trim().match(pattern);
+        if (match) {
+          return {
+            quantity: parseInt(match[1] || match[2]),
+            type: (match[2] || match[1]).trim()
+          };
+        }
       }
       return null;
     }).filter(Boolean);
@@ -93,8 +111,9 @@ serve(async (req) => {
     const results = {
       microphones: micResults.length > 0 ? micResults : [],
       stands: standResults.length > 0 ? standResults : [],
+      relevantPages: locationAnalysis.answer,
       rawAnalysis: {
-        document: documentAnalysis.answer,
+        location: locationAnalysis.answer,
         microphones: micAnalysis.answer,
         stands: standAnalysis.answer
       }

@@ -13,10 +13,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface AnalysisResult {
   microphones: Array<{ model: string; quantity: number }>;
   stands: Array<{ type: string; quantity: number }>;
+  relevantPages?: string;
+  rawAnalysis?: {
+    location: string;
+    microphones: string;
+    stands: string;
+  };
 }
 
 export const PdfAnalysis = () => {
@@ -52,9 +59,9 @@ export const PdfAnalysis = () => {
 
       console.log('File uploaded, public URL:', publicUrl);
 
-      // Call our Mistral-powered edge function to analyze the PDF
+      // Call our edge function to analyze the PDF
       const { data: analysisData, error: analysisError } = await supabase.functions
-        .invoke('analyze-pdf-mistral', {
+        .invoke('analyze-pdf', {
           body: { fileUrl: publicUrl }
         });
 
@@ -68,7 +75,7 @@ export const PdfAnalysis = () => {
 
       toast({
         title: "Analysis Complete",
-        description: "The PDF has been successfully analyzed using Mistral AI.",
+        description: "The PDF has been successfully analyzed.",
       });
 
     } catch (error: any) {
@@ -116,6 +123,14 @@ export const PdfAnalysis = () => {
               </Button>
             </div>
           </div>
+
+          {results?.relevantPages && (
+            <Alert>
+              <AlertDescription>
+                Equipment lists found on: {results.relevantPages}
+              </AlertDescription>
+            </Alert>
+          )}
 
           {results && (
             <div className="space-y-4">
