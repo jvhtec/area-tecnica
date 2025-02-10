@@ -1,6 +1,9 @@
+
 import { useState } from "react";
+import { useTimezone } from "@/contexts/TimezoneContext";
 
 export const useTourDates = () => {
+  const { formatDate } = useTimezone();
   const [dates, setDates] = useState<{ date: string; location: string }[]>([
     { date: "", location: "" },
   ]);
@@ -44,3 +47,4 @@ export const useTourDates = () => {
     handleDateChange,
   };
 };
+
