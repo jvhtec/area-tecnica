@@ -1,3 +1,4 @@
+
 import { Card, CardContent } from "@/components/ui/card";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
 
@@ -16,6 +17,7 @@ export const VideoCalendar = ({ date, onSelect, jobs = [] }: VideoCalendarProps)
           onDateSelect={onSelect}
           jobs={jobs}
           department="video"
+          onDateTypeChange={() => {}} // Add empty handler as it's required
         />
       </CardContent>
     </Card>

@@ -14,11 +14,13 @@ import {
 
 interface SidebarNavigationProps {
   userRole: string | null;
+  userDepartment?: string | null;
 }
 
-export const SidebarNavigation = ({ userRole }: SidebarNavigationProps) => {
+export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigationProps) => {
   const location = useLocation();
   console.log('Current user role in navigation:', userRole);
+  console.log('Current user department in navigation:', userDepartment);
 
   // Remove house_tech from project management access
   const isAuthorizedForProjectManagement = ['admin', 'logistics', 'management'].includes(userRole || '');
@@ -123,12 +125,12 @@ export const SidebarNavigation = ({ userRole }: SidebarNavigationProps) => {
         )}
 
         {/* For house techs, only show their specific department */}
-        {isHouseTech && (
-          <Link to={`/${userDepartment?.toLowerCase()}`}>
+        {isHouseTech && userDepartment && (
+          <Link to={`/${userDepartment.toLowerCase()}`}>
             <Button
               variant="ghost"
               className={`w-full justify-start gap-2 ${
-                location.pathname === `/${userDepartment?.toLowerCase()}` ? "bg-accent" : ""
+                location.pathname === `/${userDepartment.toLowerCase()}` ? "bg-accent" : ""
               }`}
             >
               {userDepartment === 'sound' && <Music2 className="h-4 w-4" />}

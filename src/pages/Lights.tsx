@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
@@ -128,6 +127,7 @@ const Lights = () => {
             onDateSelect={setDate}
             jobs={getDepartmentJobs()}
             department={currentDepartment}
+            onDateTypeChange={() => {}} // Add empty handler as it's required
           />
         </div>
         <div className="lg:col-span-4">
