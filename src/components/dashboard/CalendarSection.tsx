@@ -60,6 +60,7 @@ interface CalendarSectionProps {
   onDateSelect: (date: Date | undefined) => void;
   jobs?: any[];
   department?: string;
+  onDateTypeChange: () => void;
 }
 
 interface PrintSettings {
@@ -81,6 +82,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   onDateSelect,
   jobs = [],
   department,
+  onDateTypeChange,
 }) => {
   // Local state
   const [isCollapsed, setIsCollapsed] = useState(false);
