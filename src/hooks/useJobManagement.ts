@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -9,7 +10,7 @@ export const useJobManagement = (
   selectedDepartment: Department,
   startDate: Date,
   endDate: Date,
-  isProjectManagementPage = false // Add default value
+  isProjectManagementPage = false
 ) => {
   const { toast } = useToast();
 
@@ -36,7 +37,8 @@ export const useJobManagement = (
           file_name,
           file_path,
           uploaded_at
-        )
+        ),
+        flex_folders(id)
       `)
       .eq("job_departments.department", selectedDepartment)
       .in("job_type", ["single", "festival","tourdate"])
@@ -60,7 +62,8 @@ export const useJobManagement = (
         );
         return doc.file_path.startsWith(`${selectedDepartment}/`);
       }),
-      isProjectManagementPage // Add this to each job object
+      flex_folders_exist: job.flex_folders.length > 0,
+      isProjectManagementPage
     }));
 
     console.log(

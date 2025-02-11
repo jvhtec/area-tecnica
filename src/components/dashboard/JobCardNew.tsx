@@ -1044,6 +1044,7 @@ export function JobCardNew({
   const canCreateFlexFolders = ['admin', 'management', 'logistics'].includes(userRole || '');
 
   const { data: foldersExist } = useFolderExistence(job.id);
+  const foldersAreCreated = job.flex_folders_created || foldersExist || job.flex_folders_exist;
 
   return (
     <div className="p-4 bg-gray-50 dark:bg-gray-900">
@@ -1140,14 +1141,14 @@ export function JobCardNew({
                   variant="ghost"
                   size="icon"
                   onClick={createFlexFoldersHandler}
-                  disabled={job.flex_folders_created || foldersExist}
+                  disabled={foldersAreCreated}
                   title={
-                    job.flex_folders_created || foldersExist
+                    foldersAreCreated
                       ? "Folders already exist"
                       : "Create Flex folders"
                   }
                   className={
-                    (job.flex_folders_created || foldersExist)
+                    foldersAreCreated
                       ? "opacity-50 cursor-not-allowed"
                       : "hover:bg-accent/50"
                   }
