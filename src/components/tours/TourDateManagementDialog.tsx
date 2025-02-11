@@ -629,8 +629,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
         throw dateError;
       }
 
-      // Update associated job's title with new location
-      const { error: jobError } = await supabase
+      // Get the job associated with this tour date
+      const { data: jobs, error: jobsError } = await supabase
         .from("jobs")
         .update({
           title: `${tourData.name} (${newLocation || 'No Location'})`,
@@ -640,9 +640,9 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
         })
         .eq("tour_date_id", dateId);
 
-      if (jobError) {
-        console.error("Error updating job:", jobError);
-        throw jobError;
+      if (jobsError) {
+        console.error("Error updating job:", jobsError);
+        throw jobsError;
       }
 
       toast({
