@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -49,7 +48,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
         .from("profiles")
         .select("id, first_name, last_name, email, role, department")
         .eq("department", department)
-        .eq("role", "technician");
+        .in("role", ["technician", "house_tech"]); // Modified to include both technician and house_tech roles
 
       if (error) {
         console.error("Error fetching technicians:", error);
@@ -184,7 +183,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
                 <SelectContent>
                   {technicians?.map((tech) => (
                     <SelectItem key={tech.id} value={tech.id}>
-                      {tech.first_name} {tech.last_name}
+                      {tech.first_name} {tech.last_name} {tech.role === 'house_tech' ? '(House Tech)' : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -226,4 +225,3 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
     </Dialog>
   );
 };
-
