@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
@@ -140,6 +141,7 @@ const Video = () => {
             onDateSelect={setDate}
             jobs={getDepartmentJobs()}
             department={currentDepartment}
+            onDateTypeChange={() => {}} // Add empty handler as it's required
           />
         </div>
         <div className="lg:col-span-4">

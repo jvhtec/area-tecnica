@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
 import CreateTourDialog from "@/components/tours/CreateTourDialog";
@@ -141,6 +142,7 @@ const Sound = () => {
             onDateSelect={setDate}
             jobs={getDepartmentJobs()}
             department={currentDepartment}
+            onDateTypeChange={() => {}} // Add empty handler as it's required
           />
         </div>
         <div className="lg:col-span-4">
