@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   Calendar,
@@ -20,7 +20,6 @@ import {
   Edit,
 } from "lucide-react";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
-import { useFolderExistence } from "@/hooks/useFolderExistence";
 
 const BASE_URL = "https://sectorpro.flexrentalsolutions.com/f5/api/element";
 const API_KEY = "82b5m0OKgethSzL1YbrWMUFvxdNkNMjRf82E";
@@ -367,6 +366,26 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
 
   const [createdTourDateIds, setCreatedTourDateIds] = useState<string[]>([]);
   const [isCreatingFolders, setIsCreatingFolders] = useState(false);
+
+  const { data: foldersExistenceMap } = useQuery({
+    queryKey: ["flex-folders-existence", tourDates.map(d => d.id)],
+    queryFn: async () => {
+      if (!tourDates.length) return {};
+
+      const { data, error } = await supabase
+        .from("flex_folders")
+        .select("tour_date_id")
+        .in("tour_date_id", tourDates.map(d => d.id));
+
+      if (error) throw error;
+
+      return data.reduce((acc: Record<string, boolean>, folder) => {
+        acc[folder.tour_date_id] = true;
+        return acc;
+      }, {});
+    },
+    enabled: tourDates.length > 0,
+  });
 
   const handleCreateFoldersForDate = async (dateObj: any) => {
     if (dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id)) return;
@@ -735,7 +754,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
           )}
           <div className="space-y-4">
             {tourDates?.map((dateObj) => {
-              const { data: foldersExist } = useFolderExistence(undefined, dateObj.id);
+              const foldersExist = foldersExistenceMap?.[dateObj.id] || false;
               
               return (
                 <div key={dateObj.id} className="p-3 border rounded-lg">
