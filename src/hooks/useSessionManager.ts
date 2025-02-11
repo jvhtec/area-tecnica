@@ -36,6 +36,21 @@ export const useSessionManager = () => {
       if (profileData) {
         setUserRole(profileData.role);
         setUserDepartment(profileData.department);
+        
+        // Redirect house techs if they're on the wrong department page
+        if (profileData.role === 'house_tech' && profileData.department) {
+          const currentPath = window.location.pathname.toLowerCase();
+          const allowedPaths = [
+            `/${profileData.department.toLowerCase()}`,
+            '/technician-dashboard',
+            '/profile',
+            '/logistics'
+          ];
+          
+          if (!allowedPaths.includes(currentPath)) {
+            window.location.href = `/${profileData.department.toLowerCase()}`;
+          }
+        }
       } else {
         console.log("No profile data found for user");
         setUserRole(null);
@@ -43,7 +58,6 @@ export const useSessionManager = () => {
       }
     } catch (error) {
       console.error("Error in session update:", error);
-      // Don't clear session on profile fetch error
       setUserRole(null);
       setUserDepartment(null);
     } finally {

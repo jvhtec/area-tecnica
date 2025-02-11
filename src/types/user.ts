@@ -7,5 +7,5 @@ export interface User {
   role: UserRole;
   first_name?: string;
   last_name?: string;
+  department?: string;  // Added department field
 }
-

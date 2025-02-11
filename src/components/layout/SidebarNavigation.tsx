@@ -20,17 +20,17 @@ export const SidebarNavigation = ({ userRole }: SidebarNavigationProps) => {
   const location = useLocation();
   console.log('Current user role in navigation:', userRole);
 
-  // Only admin, logistics, management, and house_tech can access project management
-  const isAuthorizedForProjectManagement = ['admin', 'logistics', 'management', 'house_tech'].includes(userRole || '');
-  
-  // Admin, management, and house techs (with proper department) can access department pages
-  const isAuthorizedForDepartments = ['admin', 'management', 'house_tech'].includes(userRole || '');
+  // Remove house_tech from project management access
+  const isAuthorizedForProjectManagement = ['admin', 'logistics', 'management'].includes(userRole || '');
   
   // Admin and management can access settings
   const isAuthorizedForSettings = ['admin', 'management'].includes(userRole || '');
 
   // Technicians and house techs should see technician dashboard
   const isTechnicianOrHouseTech = ['technician', 'house_tech'].includes(userRole || '');
+
+  // House techs should only see their department
+  const isHouseTech = userRole === 'house_tech';
 
   // Don't render navigation until role is loaded
   if (!userRole) {
@@ -81,7 +81,8 @@ export const SidebarNavigation = ({ userRole }: SidebarNavigationProps) => {
           </>
         )}
 
-        {(isAuthorizedForDepartments || userRole === 'house_tech') && (
+        {/* House techs can only see their assigned department */}
+        {!isHouseTech && ['admin', 'management'].includes(userRole) && (
           <>
             <Link to="/sound">
               <Button
@@ -121,7 +122,24 @@ export const SidebarNavigation = ({ userRole }: SidebarNavigationProps) => {
           </>
         )}
 
-        {isTechnicianOrHouseTech && (
+        {/* For house techs, only show their specific department */}
+        {isHouseTech && (
+          <Link to={`/${userDepartment?.toLowerCase()}`}>
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-2 ${
+                location.pathname === `/${userDepartment?.toLowerCase()}` ? "bg-accent" : ""
+              }`}
+            >
+              {userDepartment === 'sound' && <Music2 className="h-4 w-4" />}
+              {userDepartment === 'lights' && <Lightbulb className="h-4 w-4" />}
+              {userDepartment === 'video' && <Video className="h-4 w-4" />}
+              <span>{userDepartment}</span>
+            </Button>
+          </Link>
+        )}
+
+        {(isTechnicianOrHouseTech || isHouseTech) && (
           <Link to="/profile">
             <Button
               variant="ghost"

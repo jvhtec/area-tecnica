@@ -1008,6 +1008,10 @@ export function JobCardNew({
   };
 
   const handleJobCardClick = () => {
+    if (isHouseTech) {
+      return; // Block job card clicks for house techs
+    }
+    
     if (isProjectManagementPage) {
       if (department === "sound") {
         setSoundTaskDialogOpen(true);
@@ -1043,7 +1047,8 @@ export function JobCardNew({
     <div className="p-4 bg-gray-50 dark:bg-gray-900">
       <Card
         className={cn(
-          "mb-4 hover:shadow-md transition-all duration-200 cursor-pointer border-l-4 overflow-hidden"
+          "mb-4 hover:shadow-md transition-all duration-200",
+          !isHouseTech && "cursor-pointer"
         )}
         onClick={handleJobCardClick}
         style={{
@@ -1291,41 +1296,46 @@ export function JobCardNew({
         </div>
       </Card>
 
-      {soundTaskDialogOpen && (
-        <SoundTaskDialog
-          open={soundTaskDialogOpen}
-          onOpenChange={setSoundTaskDialogOpen}
-          jobId={job.id}
-        />
-      )}
-      {lightsTaskDialogOpen && (
-        <LightsTaskDialog
-          open={lightsTaskDialogOpen}
-          onOpenChange={setLightsTaskDialogOpen}
-          jobId={job.id}
-        />
-      )}
-      {videoTaskDialogOpen && (
-        <VideoTaskDialog
-          open={videoTaskDialogOpen}
-          onOpenChange={setVideoTaskDialogOpen}
-          jobId={job.id}
-        />
-      )}
-      {editJobDialogOpen && (
-        <EditJobDialog
-          open={editJobDialogOpen}
-          onOpenChange={setEditJobDialogOpen}
-          job={job}
-        />
-      )}
-      {assignmentDialogOpen && job.job_type !== "dryhire" && (
-        <JobAssignmentDialog
-          open={assignmentDialogOpen}
-          onOpenChange={setAssignmentDialogOpen}
-          jobId={job.id}
-          department={department as Department}
-        />
+      {/* Only render task dialogs if not house tech */}
+      {!isHouseTech && (
+        <>
+          {soundTaskDialogOpen && (
+            <SoundTaskDialog
+              open={soundTaskDialogOpen}
+              onOpenChange={setSoundTaskDialogOpen}
+              jobId={job.id}
+            />
+          )}
+          {lightsTaskDialogOpen && (
+            <LightsTaskDialog
+              open={lightsTaskDialogOpen}
+              onOpenChange={setLightsTaskDialogOpen}
+              jobId={job.id}
+            />
+          )}
+          {videoTaskDialogOpen && (
+            <VideoTaskDialog
+              open={videoTaskDialogOpen}
+              onOpenChange={setVideoTaskDialogOpen}
+              jobId={job.id}
+            />
+          )}
+          {editJobDialogOpen && (
+            <EditJobDialog
+              open={editJobDialogOpen}
+              onOpenChange={setEditJobDialogOpen}
+              job={job}
+            />
+          )}
+          {assignmentDialogOpen && job.job_type !== "dryhire" && (
+            <JobAssignmentDialog
+              open={assignmentDialogOpen}
+              onOpenChange={setAssignmentDialogOpen}
+              jobId={job.id}
+              department={department as Department}
+            />
+          )}
+        </>
       )}
     </div>
   );
