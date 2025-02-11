@@ -360,7 +360,6 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { getOrCreateLocation } = useLocationManagement();
-  const { folderExists } = useFolderExistence();
 
   const [editingTourDate, setEditingTourDate] = useState<any>(null);
   const [editDateValue, setEditDateValue] = useState<string>("");
@@ -787,8 +786,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
                         size="icon"
                         onClick={() => handleCreateFoldersForDate(dateObj)}
                         title="Create Flex folders"
-                        disabled={dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id) || folderExists(dateObj.id)}
-                        className={(dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id) || folderExists(dateObj.id)) ? "opacity-50 cursor-not-allowed" : ""}
+                        disabled={dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id)}
+                        className={(dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id)) ? "opacity-50 cursor-not-allowed" : ""}
                       >
                         <FolderPlus className="h-4 w-4" />
                       </Button>
