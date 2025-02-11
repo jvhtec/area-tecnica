@@ -49,7 +49,12 @@ export const exportWeeklySummaryPDF = async (
         convencional: 'Convencional',
         robotica: 'Robótica',
         fx: 'FX',
-        rigging: 'Rigging'
+        rigging: 'Rigging',
+        controles: 'Controles',
+        cuadros: 'Cuadros',
+        led: 'LED',
+        strobo: 'Strobo',
+        canones: 'Cañones'
       };
       const categoriesText = `Categorías: ${selectedCategories.map(cat => categoryLabels[cat as keyof typeof categoryLabels]).join(', ')}`;
       doc.text(categoriesText, 14, 50);
