@@ -6,8 +6,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
-import { DosFactory } from "js-dos";
-import { Dos } from "js-dos/dist/typescript/js-dos";
+import * as JsDos from 'js-dos';
 
 interface DoomDialogProps {
   open: boolean;
@@ -18,7 +17,7 @@ export const DoomDialog = ({ open, onOpenChange }: DoomDialogProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const dosRef = useRef<Dos | null>(null);
+  const dosRef = useRef<any>(null);
 
   useEffect(() => {
     if (!open || !canvasRef.current) return;
@@ -28,17 +27,19 @@ export const DoomDialog = ({ open, onOpenChange }: DoomDialogProps) => {
       setError(null);
 
       try {
-        const dosFactory = await DosFactory.createDosBox({
-          wdosboxUrl: "/js-dos/wdosbox.js",
-          canvas: canvasRef.current,
+        // Initialize js-dos
+        const dos = JsDos.dos;
+        
+        // Create a new DOS instance
+        const ci = await dos(canvasRef.current, {
+          wdosboxUrl: "/js-dos/wdosbox.js"
         });
+        
+        dosRef.current = ci;
 
-        dosRef.current = dosFactory;
-
-        await dosFactory.run("/doom/DOOM.EXE", {
-          cycles: "max",
-          autolock: false,
-        });
+        // Mount and run DOOM
+        await ci.mount("/doom/");
+        await ci.run("DOOM.EXE", ["-iwad", "DOOM1.WAD"]);
 
         setIsLoading(false);
       } catch (err) {
