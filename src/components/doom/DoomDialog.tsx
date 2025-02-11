@@ -7,6 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import * as JsDos from 'js-dos';
+const { DosFactory } = JsDos;
 
 interface DoomDialogProps {
   open: boolean;
@@ -27,11 +28,8 @@ export const DoomDialog = ({ open, onOpenChange }: DoomDialogProps) => {
       setError(null);
 
       try {
-        // Initialize js-dos
-        const dos = JsDos.dos;
-        
-        // Create a new DOS instance
-        const ci = await dos(canvasRef.current, {
+        // Initialize js-dos using DosFactory
+        const ci = await DosFactory.prototype.dosboxDirect(canvasRef.current, {
           wdosboxUrl: "/js-dos/wdosbox.js"
         });
         
@@ -112,4 +110,3 @@ export const DoomDialog = ({ open, onOpenChange }: DoomDialogProps) => {
     </Dialog>
   );
 };
-
