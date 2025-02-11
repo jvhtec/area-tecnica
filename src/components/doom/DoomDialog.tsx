@@ -6,8 +6,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
-import * as JsDos from 'js-dos';
-const { DosFactory } = JsDos;
+import { DosPlayer } from "js-dos";
+import { DosPlayerFactoryType } from "js-dos/dist/types/js-dos";
 
 interface DoomDialogProps {
   open: boolean;
@@ -18,7 +18,7 @@ export const DoomDialog = ({ open, onOpenChange }: DoomDialogProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const dosRef = useRef<any>(null);
+  const dosRef = useRef<DosPlayer | null>(null);
 
   useEffect(() => {
     if (!open || !canvasRef.current) return;
@@ -28,8 +28,12 @@ export const DoomDialog = ({ open, onOpenChange }: DoomDialogProps) => {
       setError(null);
 
       try {
-        // Initialize js-dos using DosFactory
-        const ci = await DosFactory.prototype.dosboxDirect(canvasRef.current, {
+        // Import js-dos dynamically
+        const DosModule = await import("js-dos");
+        const Dos = DosModule.default as DosPlayerFactoryType;
+        
+        // Create a new DOS instance
+        const ci = await Dos(canvasRef.current, {
           wdosboxUrl: "/js-dos/wdosbox.js"
         });
         
