@@ -561,7 +561,27 @@ export function JobCardNew({
   const [editJobDialogOpen, setEditJobDialogOpen] = useState(false);
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
 
-  const getDateTypeIcon = (jobId: string, date: Date, dateTypes: Record<string, any>) => {
+  const { data: dateTypes = {} } = useQuery({
+    queryKey: ['job-date-types'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("job_date_types")
+        .select("*")
+        .eq("job_id", job.id);
+      
+      if (error) {
+        console.error("Error fetching date types:", error);
+        return {};
+      }
+
+      return data.reduce((acc: Record<string, any>, curr) => ({
+        ...acc,
+        [`${curr.job_id}-${curr.date}`]: curr,
+      }), {});
+    }
+  });
+
+  const getDateTypeIcon = (jobId: string, date: Date) => {
     const key = `${jobId}-${format(date, "yyyy-MM-dd")}`;
     const dateType = dateTypes[key]?.type;
     switch (dateType) {
@@ -1055,7 +1075,7 @@ export function JobCardNew({
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-2 min-w-0">
               <div className="flex items-center gap-1">
-                {getDateTypeIcon(job.id, new Date(job.start_time), dateTypes)}
+                {getDateTypeIcon(job.id, new Date(job.start_time))}
                 <span className="font-medium text-lg truncate">{job.title}</span>
                 {getBadgeForJobType(job.job_type)}
               </div>

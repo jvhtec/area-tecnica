@@ -51,6 +51,7 @@ import {
   Printer,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, queryClient } from "@tanstack/react-query";
 
 //
 // TYPES
@@ -177,6 +178,51 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     saveUserPreferences(newTypes);
     setIsDropdownOpen(false);
   };
+
+  // Use React Query for date types
+  const { data: dateTypes = {}, isLoading: isLoadingDateTypes } = useQuery({
+    queryKey: ['job-date-types'],
+    queryFn: async () => {
+      if (!jobs?.length) return {};
+      const { data, error } = await supabase
+        .from("job_date_types")
+        .select("*")
+        .in("job_id", jobs.map((job: any) => job.id));
+      
+      if (error) {
+        console.error("Error fetching date types:", error);
+        return {};
+      }
+
+      return data.reduce((acc: Record<string, any>, curr) => ({
+        ...acc,
+        [`${curr.job_id}-${curr.date}`]: curr,
+      }), {});
+    },
+    enabled: jobs?.length > 0
+  });
+
+  // Subscribe to real-time updates for date types
+  useEffect(() => {
+    const channel = supabase
+      .channel('job-date-types-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'job_date_types'
+        },
+        (payload) => {
+          queryClient.invalidateQueries({ queryKey: ['job-date-types'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   // Fetch date types for jobs from supabase
   const fetchDateTypes = async () => {

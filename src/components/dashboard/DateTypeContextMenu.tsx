@@ -1,8 +1,10 @@
+
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Plane, Wrench, Star, Moon, Mic } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { format, startOfDay } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface DateTypeContextMenuProps {
   children: React.ReactNode;
@@ -12,17 +14,18 @@ interface DateTypeContextMenuProps {
 }
 
 export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: DateTypeContextMenuProps) => {
+  const queryClient = useQueryClient();
+
   const handleSetDateType = async (type: 'travel' | 'setup' | 'show' | 'off' | 'rehearsal') => {
     try {
       const localDate = startOfDay(date);
       const formattedDate = format(localDate, 'yyyy-MM-dd');
       
-      console.log('Setting date type:', {
-        type,
-        jobId,
-        date: localDate,
-        formattedDate,
-        originalDate: date
+      // Optimistically update the cache
+      queryClient.setQueryData(['job-date-types'], (oldData: any) => {
+        const updatedData = { ...(oldData || {}) };
+        updatedData[`${jobId}-${formattedDate}`] = { type, job_id: jobId, date: formattedDate };
+        return updatedData;
       });
       
       const { error } = await supabase
@@ -37,11 +40,15 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
 
       if (error) throw error;
       
-      toast.success(`Date type set to ${type}`);
+      // Invalidate and refetch to ensure consistency
+      await queryClient.invalidateQueries({ queryKey: ['job-date-types'] });
       onTypeChange();
+      toast.success(`Date type set to ${type}`);
     } catch (error: any) {
       console.error('Error setting date type:', error);
       toast.error('Failed to set date type');
+      // Revert optimistic update on error
+      queryClient.invalidateQueries({ queryKey: ['job-date-types'] });
     }
   };
 
