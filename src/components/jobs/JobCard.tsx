@@ -49,24 +49,28 @@ export const JobCard = ({ job, onEditClick, onDeleteClick, onJobClick, userRole,
                 Manage Festival
               </Button>
             )}
-            <Button 
-              variant="outline" 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                onEditClick(job); 
-              }}
-            >
-              Edit
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                onDeleteClick(job.id); 
-              }}
-            >
-              Delete
-            </Button>
+            {userRole !== "technician" && (
+              <>
+                <Button 
+                  variant="outline" 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    onEditClick(job); 
+                  }}
+                >
+                  Edit
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    onDeleteClick(job.id); 
+                  }}
+                >
+                  Delete
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </CardHeader>
