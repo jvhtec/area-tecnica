@@ -1,3 +1,4 @@
+
 import { CalendarSection } from "./CalendarSection";
 import { TodaySchedule } from "./TodaySchedule";
 import { DepartmentSchedule } from "./DepartmentSchedule";
@@ -12,6 +13,7 @@ interface DashboardContentProps {
   onDeleteClick: (jobId: string) => void;
   onJobClick: (jobId: string) => void;
   userRole: string | null;
+  onDateTypeChange: () => void;  // Added this prop to the interface
 }
 
 export const DashboardContent = ({
@@ -23,6 +25,7 @@ export const DashboardContent = ({
   onDeleteClick,
   onJobClick,
   userRole,
+  onDateTypeChange,
 }: DashboardContentProps) => {
   // Filter functions with null safety
   const filterJobsByDepartment = (department: string) => {
@@ -41,6 +44,7 @@ export const DashboardContent = ({
             date={date} 
             onDateSelect={setDate} 
             jobs={jobs} 
+            onDateTypeChange={onDateTypeChange}
           />
         </div>
         <div className="lg:col-span-4">
