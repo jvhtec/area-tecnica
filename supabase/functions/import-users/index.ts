@@ -48,10 +48,10 @@ serve(async (req) => {
 
     for (const record of records) {
       try {
-        // Create auth user
+        // Create auth user with default password
         const { data: authData, error: authError } = await supabase.auth.admin.createUser({
           email: record.email,
-          password: crypto.randomUUID(), // Generate random password
+          password: 'default',
           email_confirm: true,
           user_metadata: {
             first_name: record.firstName,
@@ -60,6 +60,7 @@ serve(async (req) => {
             department: record.department,
             dni: record.dni,
             residencia: record.residencia,
+            needs_password_change: true
           },
         });
 
