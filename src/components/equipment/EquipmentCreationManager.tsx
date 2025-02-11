@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
-const EQUIPMENT_CATEGORIES = ['convencional', 'robotica', 'fx', 'rigging', 'controles', 'cuadros', 'led', 'strobo'] as const;
+const EQUIPMENT_CATEGORIES = ['convencional', 'robotica', 'fx', 'rigging', 'controles', 'cuadros', 'led', 'strobo', 'canones'] as const;
 type EquipmentCategory = typeof EQUIPMENT_CATEGORIES[number];
 
 interface EditEquipmentDialogProps {
@@ -56,7 +56,8 @@ function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEqui
     cuadros: 'Cuadros',
     rigging: 'Rigging',
     led: 'LED',
-    strobo: 'Strobo'
+    strobo: 'Strobo',
+    canones: 'Cañones'
   };
 
   return (
@@ -222,7 +223,8 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
     cuadros: 'Cuadros',
     rigging: 'Rigging',
     led: 'LED',
-    strobo: 'Strobo'
+    strobo: 'Strobo',
+    canones: 'Cañones'
   };
 
   return (
@@ -272,7 +274,7 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
               <div key={item.id} className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">{item.name}</p>
-                  <p className="text-sm text-muted-foreground capitalize">{item.category}</p>
+                  <p className="text-sm text-muted-foreground capitalize">{categoryLabels[item.category as EquipmentCategory]}</p>
                 </div>
                 <div className="flex gap-2">
                   <Button

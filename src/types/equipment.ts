@@ -12,3 +12,4 @@ export interface PresetWithItems extends Preset {
     equipment: Equipment;
   })[];
 }
+
