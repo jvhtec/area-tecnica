@@ -39,7 +39,7 @@ export const DoomDialog = ({ open, onOpenChange }: DoomDialogProps) => {
 
         // Mount and run DOOM
         await ci.mount("doom.jsdos");
-        await ci.run();
+        await ci.run("DOOM.EXE");  // Specify the executable name as required by js-dos 8.x
 
         setIsLoading(false);
       } catch (err) {
