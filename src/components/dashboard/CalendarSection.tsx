@@ -1,3 +1,4 @@
+<lov-code>
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,7 +52,7 @@ import {
   Printer,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery, queryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 //
 // TYPES
@@ -85,7 +86,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
 }) => {
   // Local state
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [dateTypes, setDateTypes] = useState<Record<string, any>>({});
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [showMilestones, setShowMilestones] = useState(false);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
@@ -180,7 +180,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   };
 
   // Use React Query for date types
-  const { data: dateTypes = {}, isLoading: isLoadingDateTypes } = useQuery({
+  const { data: dateTypesData = {} } = useQuery({
     queryKey: ['job-date-types'],
     queryFn: async () => {
       if (!jobs?.length) return {};
@@ -239,7 +239,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       ...acc,
       [`${curr.job_id}-${curr.date}`]: curr,
     }), {});
-    setDateTypes(typesMap);
   };
 
   useEffect(() => {
@@ -409,7 +408,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
           let eventY = currentY + 8;
           for (const [index, job] of dayJobs.slice(0, 8).entries()) {
             const key = `${job.id}-${format(day, "yyyy-MM-dd")}`;
-            const dateType = dateTypes[key]?.type;
+            const dateType = dateTypesData[key]?.type;
             const typeLabel = dateType ? dateTypeLabels[dateType] : "";
             const baseColor = job.color || "#cccccc";
             const [r, g, b] = hexToRgb(baseColor);
@@ -464,8 +463,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     <JobCard
       job={job}
       date={day}
-      dateTypes={dateTypes}
-      setDateTypes={setDateTypes}
+      dateTypes={dateTypesData}
       setSelectedJob={setSelectedJob}
       setShowMilestones={setShowMilestones}
     />
@@ -746,7 +744,6 @@ interface JobCardProps {
   job: any;
   date: Date;
   dateTypes: Record<string, any>;
-  setDateTypes: React.Dispatch<React.SetStateAction<Record<string, any>>>;
   setSelectedJob: (job: any) => void;
   setShowMilestones: (open: boolean) => void;
 }
@@ -755,7 +752,6 @@ const JobCard: React.FC<JobCardProps> = ({
   job,
   date,
   dateTypes,
-  setDateTypes,
   setSelectedJob,
   setShowMilestones,
 }) => {
@@ -831,13 +827,6 @@ const JobCard: React.FC<JobCardProps> = ({
       date={date}
       onTypeChange={async () => {
         const { data } = await supabase.from("job_date_types").select("*").eq("job_id", job.id);
-        setDateTypes((prev) => ({
-          ...prev,
-          ...data?.reduce((acc: Record<string, any>, curr) => ({
-            ...acc,
-            [`${curr.job_id}-${curr.date}`]: curr,
-          }), {}),
-        }));
       }}
     >
       <TooltipProvider>
@@ -859,44 +848,4 @@ const JobCard: React.FC<JobCardProps> = ({
               <span>{job.title}</span>
             </div>
           </TooltipTrigger>
-          <TooltipContent className="w-64 p-2">
-            <div className="space-y-2">
-              <h4 className="font-semibold">{job.title}</h4>
-              {job.description && <p className="text-sm text-muted-foreground">{job.description}</p>}
-              <div className="flex items-center gap-2 text-sm">
-                <Clock className="h-4 w-4" />
-                <span>
-                  {format(new Date(job.start_time), "MMM d, HH:mm")} -{" "}
-                  {format(new Date(job.end_time), "MMM d, HH:mm")}
-                </span>
-              </div>
-              {job.location?.name && (
-                <div className="flex items-center gap-2 text-sm">
-                  <MapPin className="h-4 w-4" />
-                  <span>{job.location.name}</span>
-                </div>
-              )}
-              <div className="space-y-1">
-                <div className="text-sm font-medium">Departments:</div>
-                <div className="flex flex-wrap gap-1">
-                  {job.job_departments.map((dept: any) => (
-                    <Badge key={dept.department} variant="secondary" className="flex items-center gap-1">
-                      {getDepartmentIcon(dept.department)}
-                      <span className="capitalize">{dept.department}</span>
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Users className="h-4 w-4" />
-                <span>
-                  {currentlyAssigned}/{totalRequired} assigned
-                </span>
-              </div>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    </DateTypeContextMenu>
-  );
-};
+          <TooltipContent className="w-
