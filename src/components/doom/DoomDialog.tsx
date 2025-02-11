@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from 'react';
 import {
   Dialog,
@@ -6,8 +5,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
-import { DosPlayer } from "js-dos";
-import { DosPlayerFactoryType } from "js-dos/dist/types/js-dos";
+import type { DosPlayer } from "js-dos";
 
 interface DoomDialogProps {
   open: boolean;
@@ -29,8 +27,7 @@ export const DoomDialog = ({ open, onOpenChange }: DoomDialogProps) => {
 
       try {
         // Import js-dos dynamically
-        const DosModule = await import("js-dos");
-        const Dos = DosModule.default as DosPlayerFactoryType;
+        const { default: Dos } = await import("js-dos");
         
         // Create a new DOS instance
         const ci = await Dos(canvasRef.current, {
