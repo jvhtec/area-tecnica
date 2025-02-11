@@ -18,7 +18,6 @@ import {
 import {
   Pagination,
   PaginationContent,
-  PaginationEllipsis,
   PaginationItem,
   PaginationLink,
   PaginationNext,
@@ -29,6 +28,11 @@ interface UsersListProps {
   searchQuery?: string;
   roleFilter?: string;
   departmentFilter?: string;
+}
+
+interface QueryResult {
+  data: Profile[];
+  count: number;
 }
 
 const PAGE_SIZE = 10;
@@ -60,12 +64,12 @@ export const UsersList = ({
     checkAuth();
   }, []);
 
-  const { data: users, isLoading, error, isFetching, refetch } = useQuery({
+  const { data: users, isLoading, error, isFetching, refetch } = useQuery<QueryResult>({
     queryKey: ['profiles', searchQuery, roleFilter, departmentFilter, currentPage, sortBy, sortOrder],
     queryFn: async () => {
       if (!isAuthenticated) {
         console.log("Not authenticated, skipping profiles fetch");
-        return [];
+        return { data: [], count: 0 };
       }
 
       console.log("Starting profiles fetch with filters:", { 
@@ -115,7 +119,7 @@ export const UsersList = ({
 
         const validProfiles = profileData.filter(profile => profile && profile.id);
         console.log("Profiles fetch successful:", validProfiles);
-        return { data: validProfiles, count };
+        return { data: validProfiles, count: count || 0 };
       } catch (error) {
         console.error("Unexpected error in profiles fetch:", error);
         throw error;
@@ -187,12 +191,12 @@ export const UsersList = ({
 
       <div className="flex items-center justify-between">
         <div className="flex gap-2">
-          <Select value={groupBy || ''} onValueChange={(value: string) => setGroupBy(value === '' ? null : value as 'department' | 'role')}>
+          <Select value={groupBy || 'none'} onValueChange={(value: string) => setGroupBy(value === 'none' ? null : value as 'department' | 'role')}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Group by..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">No grouping</SelectItem>
+              <SelectItem value="none">No grouping</SelectItem>
               <SelectItem value="department">By Department</SelectItem>
               <SelectItem value="role">By Role</SelectItem>
             </SelectContent>
@@ -230,10 +234,14 @@ export const UsersList = ({
         <Pagination>
           <PaginationContent>
             <PaginationItem>
-              <PaginationPrevious 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-              />
+              >
+                Previous
+              </Button>
             </PaginationItem>
             
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
@@ -248,10 +256,14 @@ export const UsersList = ({
             ))}
 
             <PaginationItem>
-              <PaginationNext 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-              />
+              >
+                Next
+              </Button>
             </PaginationItem>
           </PaginationContent>
         </Pagination>

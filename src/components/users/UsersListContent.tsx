@@ -5,6 +5,7 @@ import { UserCard } from "./UserCard";
 import { EditUserDialog } from "./EditUserDialog";
 import { DeleteUserDialog } from "./DeleteUserDialog";
 import { useUserManagement } from "./hooks/useUserManagement";
+import { Badge } from "@/components/ui/badge";
 import {
   Accordion,
   AccordionContent,
