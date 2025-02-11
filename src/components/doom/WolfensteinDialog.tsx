@@ -31,15 +31,15 @@ export const WolfensteinDialog = ({ open, onOpenChange }: WolfensteinDialogProps
         const jsdos = await import("js-dos/dist/js-dos");
         const Dos = jsdos.default;
         
-        // Create a new DOS instance
+        // Create a new DOS instance with CDN path
         const ci = await Dos(canvasRef.current, {
-          wdosboxUrl: "/js-dos/wdosbox.js"
+          wdosboxUrl: "https://js-dos.com/6.22/current/wdosbox.js"
         });
         
         dosRef.current = ci;
 
         // Mount and run Wolfenstein 3D
-        await ci.mount("wolf3d.jsdos");
+        await ci.mount("https://js-dos.com/wolf3d/wolf3d.jsdos");
         await ci.run("WOLF3D.EXE");
 
         setIsLoading(false);
