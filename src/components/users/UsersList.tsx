@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Profile } from "./types";
@@ -8,7 +9,17 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 
-export const UsersList = () => {
+interface UsersListProps {
+  searchQuery?: string;
+  roleFilter?: string;
+  departmentFilter?: string;
+}
+
+export const UsersList = ({ 
+  searchQuery = "", 
+  roleFilter = "", 
+  departmentFilter = "" 
+}: UsersListProps) => {
   useTabVisibility(['profiles']);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
@@ -28,19 +39,33 @@ export const UsersList = () => {
   }, []);
 
   const { data: users, isLoading, error, isFetching, refetch } = useQuery({
-    queryKey: ['profiles'],
+    queryKey: ['profiles', searchQuery, roleFilter, departmentFilter],
     queryFn: async () => {
       if (!isAuthenticated) {
         console.log("Not authenticated, skipping profiles fetch");
         return [];
       }
 
-      console.log("Starting profiles fetch...");
+      console.log("Starting profiles fetch with filters:", { searchQuery, roleFilter, departmentFilter });
       
       try {
-        const { data: profileData, error: profileError } = await supabase
+        let query = supabase
           .from('profiles')
           .select('id, first_name, last_name, email, role, phone, department, dni, residencia');
+
+        if (roleFilter) {
+          query = query.eq('role', roleFilter);
+        }
+
+        if (departmentFilter) {
+          query = query.eq('department', departmentFilter);
+        }
+
+        if (searchQuery) {
+          query = query.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
+        }
+
+        const { data: profileData, error: profileError } = await query;
 
         if (profileError) {
           console.error("Error in profiles fetch:", profileError);
@@ -52,7 +77,6 @@ export const UsersList = () => {
           return [];
         }
 
-        // Filter out any profiles with undefined or null IDs
         const validProfiles = profileData.filter(profile => profile && profile.id);
         console.log("Profiles fetch successful:", validProfiles);
         return validProfiles;
@@ -61,9 +85,9 @@ export const UsersList = () => {
         throw error;
       }
     },
-    enabled: isAuthenticated, // Only run query when authenticated
-    staleTime: 1000 * 60 * 2, // 2 minutes
-    gcTime: 1000 * 60 * 5, // 5 minutes
+    enabled: isAuthenticated,
+    staleTime: 1000 * 60 * 2,
+    gcTime: 1000 * 60 * 5,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
