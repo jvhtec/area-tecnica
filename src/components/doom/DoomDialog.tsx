@@ -1,11 +1,13 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
+import { DosFactory } from "js-dos";
+import { Dos } from "js-dos/dist/typescript/js-dos";
 
 interface DoomDialogProps {
   open: boolean;
@@ -14,14 +16,49 @@ interface DoomDialogProps {
 
 export const DoomDialog = ({ open, onOpenChange }: DoomDialogProps) => {
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const dosRef = useRef<Dos | null>(null);
 
   useEffect(() => {
-    if (open) {
-      const timer = setTimeout(() => {
+    if (!open || !canvasRef.current) return;
+
+    const initDos = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const dosFactory = await DosFactory.createDosBox({
+          wdosboxUrl: "/js-dos/wdosbox.js",
+          canvas: canvasRef.current,
+        });
+
+        dosRef.current = dosFactory;
+
+        await dosFactory.run("/doom/DOOM.EXE", {
+          cycles: "max",
+          autolock: false,
+        });
+
         setIsLoading(false);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
+      } catch (err) {
+        console.error('Failed to initialize DOS:', err);
+        setError('Failed to load DOOM. Please try again.');
+        setIsLoading(false);
+      }
+    };
+
+    initDos();
+
+    return () => {
+      if (dosRef.current) {
+        try {
+          dosRef.current.exit();
+        } catch (err) {
+          console.error('Error cleaning up DOS:', err);
+        }
+      }
+    };
   }, [open]);
 
   return (
@@ -40,17 +77,28 @@ export const DoomDialog = ({ open, onOpenChange }: DoomDialogProps) => {
             </Button>
           </div>
           
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center bg-black">
             {isLoading ? (
               <div className="text-center space-y-2 animate-pulse">
                 <div className="text-xl">Loading DOOM.EXE...</div>
                 <div className="text-sm">Press any key to continue</div>
               </div>
+            ) : error ? (
+              <div className="text-center text-red-500 space-y-2">
+                <div className="text-xl">{error}</div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => onOpenChange(false)}
+                  className="text-red-500 border-red-500 hover:bg-red-950"
+                >
+                  Close
+                </Button>
+              </div>
             ) : (
-              <iframe
-                src="https://dos.zone/player/?bundleUrl=https%3A%2F%2Fcdn.dos.zone%2Fcustom%2Fdos%2Fdoom.jsdos?anonymous=1"
-                className="w-full h-full border-0"
-                allow="autoplay; fullscreen"
+              <canvas 
+                ref={canvasRef}
+                className="w-full h-full"
+                onContextMenu={(e) => e.preventDefault()}
               />
             )}
           </div>
@@ -63,3 +111,4 @@ export const DoomDialog = ({ open, onOpenChange }: DoomDialogProps) => {
     </Dialog>
   );
 };
+
