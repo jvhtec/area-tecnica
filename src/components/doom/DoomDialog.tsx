@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from 'react';
 import {
   Dialog,
@@ -31,14 +32,14 @@ export const DoomDialog = ({ open, onOpenChange }: DoomDialogProps) => {
         
         // Create a new DOS instance
         const ci = await Dos(canvasRef.current, {
-          wdosboxUrl: "/js-dos/wdosbox.js"
+          wdosboxUrl: "/wdosbox.js"
         });
         
         dosRef.current = ci;
 
         // Mount and run DOOM
-        await ci.mount("/doom/");
-        await ci.run("DOOM.EXE", ["-iwad", "DOOM1.WAD"]);
+        await ci.mount("doom.jsdos");
+        await ci.run();
 
         setIsLoading(false);
       } catch (err) {
