@@ -285,8 +285,11 @@ export const useTourCreationMutation = () => {
 
       for (const dateInfo of validDates) {
         let locationId = null;
+        let locationName = "No Location";
+        
         if (dateInfo.location) {
           locationId = await getOrCreateLocation(dateInfo.location);
+          locationName = dateInfo.location;
         }
         
         const { data: tourDate, error: tourDateError } = await supabase
@@ -296,7 +299,14 @@ export const useTourCreationMutation = () => {
             date: dateInfo.date,
             location_id: locationId,
           })
-          .select()
+          .select(`
+            id,
+            date,
+            location:locations (
+              id,
+              name
+            )
+          `)
           .single();
 
         if (tourDateError) throw tourDateError;
@@ -304,7 +314,7 @@ export const useTourCreationMutation = () => {
         const { data: dateJob, error: dateJobError } = await supabase
           .from("jobs")
           .insert({
-            title: `${title} (Tour Date)`,
+            title: `${title} (${locationName})`,
             description,
             start_time: `${dateInfo.date}T00:00:00`,
             end_time: `${dateInfo.date}T23:59:59`,

@@ -528,14 +528,14 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
       const { data: newJob, error: jobError } = await supabase
         .from("jobs")
         .insert({
-          title: `${tourData.name} (Tour Date)`,
+          title: `${tourData.name} (${location || 'No Location'})`,
           start_time: `${date}T00:00:00`,
           end_time: `${date}T23:59:59`,
           location_id: locationId,
           tour_date_id: newTourDate.id,
-          tour_id: tourId, // Ensure proper linking
+          tour_id: tourId,
           color: tourData.color || "#7E69AB",
-          job_type: "tourdate", // Use "tourdate" to trigger proper folder creation logic
+          job_type: "tourdate",
         })
         .select()
         .single();
@@ -590,7 +590,9 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
       }
       console.log("Editing tour date:", { dateId, newDate, newLocation });
       const locationId = await getOrCreateLocation(newLocation);
-      const { data, error } = await supabase
+      
+      // Update tour date
+      const { data: updatedDate, error: dateError } = await supabase
         .from("tour_dates")
         .update({
           date: newDate,
@@ -603,13 +605,34 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
           location:locations (
             id,
             name
+          ),
+          tours (
+            name
           )
         `)
         .single();
-      if (error) {
-        console.error("Error updating tour date:", error);
-        throw error;
+
+      if (dateError) {
+        console.error("Error updating tour date:", dateError);
+        throw dateError;
       }
+
+      // Update associated job's title with new location
+      const { error: jobError } = await supabase
+        .from("jobs")
+        .update({
+          title: `${updatedDate.tours.name} (${newLocation || 'No Location'})`,
+          start_time: `${newDate}T00:00:00`,
+          end_time: `${newDate}T23:59:59`,
+          location_id: locationId,
+        })
+        .eq("tour_date_id", dateId);
+
+      if (jobError) {
+        console.error("Error updating job:", jobError);
+        throw jobError;
+      }
+
       toast({
         title: "Success",
         description: "Tour date updated successfully",
