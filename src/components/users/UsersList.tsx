@@ -8,12 +8,30 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface UsersListProps {
   searchQuery?: string;
   roleFilter?: string;
   departmentFilter?: string;
 }
+
+const PAGE_SIZE = 10;
 
 export const UsersList = ({ 
   searchQuery = "", 
@@ -22,6 +40,10 @@ export const UsersList = ({
 }: UsersListProps) => {
   useTabVisibility(['profiles']);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [groupBy, setGroupBy] = useState<'department' | 'role' | null>(null);
+  const [sortBy, setSortBy] = useState<'name' | 'email' | 'role' | 'department'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -39,20 +61,23 @@ export const UsersList = ({
   }, []);
 
   const { data: users, isLoading, error, isFetching, refetch } = useQuery({
-    queryKey: ['profiles', searchQuery, roleFilter, departmentFilter],
+    queryKey: ['profiles', searchQuery, roleFilter, departmentFilter, currentPage, sortBy, sortOrder],
     queryFn: async () => {
       if (!isAuthenticated) {
         console.log("Not authenticated, skipping profiles fetch");
         return [];
       }
 
-      console.log("Starting profiles fetch with filters:", { searchQuery, roleFilter, departmentFilter });
+      console.log("Starting profiles fetch with filters:", { 
+        searchQuery, roleFilter, departmentFilter, currentPage, sortBy, sortOrder 
+      });
       
       try {
         let query = supabase
           .from('profiles')
-          .select('id, first_name, last_name, email, role, phone, department, dni, residencia');
+          .select('id, first_name, last_name, email, role, phone, department, dni, residencia', { count: 'exact' });
 
+        // Apply filters
         if (roleFilter) {
           query = query.eq('role', roleFilter);
         }
@@ -65,7 +90,18 @@ export const UsersList = ({
           query = query.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
         }
 
-        const { data: profileData, error: profileError } = await query;
+        // Apply sorting
+        if (sortBy === 'name') {
+          query = query.order('first_name', { ascending: sortOrder === 'asc' });
+        } else {
+          query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+        }
+
+        // Apply pagination
+        const start = (currentPage - 1) * PAGE_SIZE;
+        query = query.range(start, start + PAGE_SIZE - 1);
+
+        const { data: profileData, error: profileError, count } = await query;
 
         if (profileError) {
           console.error("Error in profiles fetch:", profileError);
@@ -74,12 +110,12 @@ export const UsersList = ({
 
         if (!profileData) {
           console.log("No profiles found");
-          return [];
+          return { data: [], count: 0 };
         }
 
         const validProfiles = profileData.filter(profile => profile && profile.id);
         console.log("Profiles fetch successful:", validProfiles);
-        return validProfiles;
+        return { data: validProfiles, count };
       } catch (error) {
         console.error("Unexpected error in profiles fetch:", error);
         throw error;
@@ -94,6 +130,8 @@ export const UsersList = ({
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
+
+  const totalPages = users?.count ? Math.ceil(users.count / PAGE_SIZE) : 0;
 
   if (!isAuthenticated) {
     return (
@@ -133,7 +171,7 @@ export const UsersList = ({
     );
   }
 
-  if (!users?.length) {
+  if (!users?.data?.length) {
     return (
       <Alert>
         <AlertDescription>No users found.</AlertDescription>
@@ -146,7 +184,78 @@ export const UsersList = ({
       {isFetching && !isLoading && (
         <div className="text-xs text-muted-foreground">Refreshing...</div>
       )}
-      <UsersListContent users={users} />
+
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2">
+          <Select value={groupBy || ''} onValueChange={(value: string) => setGroupBy(value === '' ? null : value as 'department' | 'role')}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Group by..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">No grouping</SelectItem>
+              <SelectItem value="department">By Department</SelectItem>
+              <SelectItem value="role">By Role</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={sortBy} onValueChange={(value: 'name' | 'email' | 'role' | 'department') => setSortBy(value)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Sort by..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">Sort by Name</SelectItem>
+              <SelectItem value="email">Sort by Email</SelectItem>
+              <SelectItem value="role">Sort by Role</SelectItem>
+              <SelectItem value="department">Sort by Department</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+          >
+            {sortOrder === 'asc' ? '↑' : '↓'}
+          </Button>
+        </div>
+
+        <div className="text-sm text-muted-foreground">
+          Total: {users.count} users
+        </div>
+      </div>
+
+      <UsersListContent users={users.data} groupBy={groupBy} />
+
+      {totalPages > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious 
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              />
+            </PaginationItem>
+            
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+              <PaginationItem key={page}>
+                <PaginationLink
+                  isActive={currentPage === page}
+                  onClick={() => setCurrentPage(page)}
+                >
+                  {page}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+
+            <PaginationItem>
+              <PaginationNext 
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
     </div>
   );
 };
