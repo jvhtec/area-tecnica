@@ -27,12 +27,12 @@ export const DoomDialog = ({ open, onOpenChange }: DoomDialogProps) => {
       setError(null);
 
       try {
-        // Import js-dos dynamically
-        const { default: Dos } = await import("js-dos");
+        // Import js-dos dynamically with explicit path
+        const { default: Dos } = await import('js-dos/dist/js-dos');
         
         // Create a new DOS instance
         const ci = await Dos(canvasRef.current, {
-          wdosboxUrl: "/wdosbox.js"
+          wdosboxUrl: "/js-dos/wdosbox.js"
         });
         
         dosRef.current = ci;
