@@ -41,7 +41,7 @@ export const FilterBar = ({
           <SelectValue placeholder="Filter by role" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">All roles</SelectItem>
+          <SelectItem value="all">All roles</SelectItem>
           {roles.map((role) => (
             <SelectItem key={role} value={role}>
               {role.charAt(0).toUpperCase() + role.slice(1)}
@@ -54,7 +54,7 @@ export const FilterBar = ({
           <SelectValue placeholder="Filter by department" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">All departments</SelectItem>
+          <SelectItem value="all">All departments</SelectItem>
           {departments.map((dept) => (
             <SelectItem key={dept} value={dept}>
               {dept.charAt(0).toUpperCase() + dept.slice(1)}

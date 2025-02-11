@@ -12,13 +12,13 @@ const Settings = () => {
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const [importUsersOpen, setImportUsersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedRole, setSelectedRole] = useState("");
-  const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [selectedRole, setSelectedRole] = useState("all");
+  const [selectedDepartment, setSelectedDepartment] = useState("all");
 
   const handleClearFilters = () => {
     setSearchQuery("");
-    setSelectedRole("");
-    setSelectedDepartment("");
+    setSelectedRole("all");
+    setSelectedDepartment("all");
   };
 
   return (
@@ -55,8 +55,8 @@ const Settings = () => {
               />
               <UsersList
                 searchQuery={searchQuery}
-                roleFilter={selectedRole}
-                departmentFilter={selectedDepartment}
+                roleFilter={selectedRole === "all" ? "" : selectedRole}
+                departmentFilter={selectedDepartment === "all" ? "" : selectedDepartment}
               />
             </CardContent>
           </Card>
