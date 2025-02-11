@@ -1043,6 +1043,8 @@ export function JobCardNew({
   const canUploadDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
   const canCreateFlexFolders = ['admin', 'management', 'logistics'].includes(userRole || '');
 
+  const { data: foldersExist } = useFolderExistence(job.id);
+
   return (
     <div className="p-4 bg-gray-50 dark:bg-gray-900">
       <Card
@@ -1138,13 +1140,17 @@ export function JobCardNew({
                   variant="ghost"
                   size="icon"
                   onClick={createFlexFoldersHandler}
-                  disabled={job.flex_folders_created}
+                  disabled={job.flex_folders_created || foldersExist}
                   title={
-                    job.flex_folders_created
-                      ? "Folders already created"
+                    job.flex_folders_created || foldersExist
+                      ? "Folders already exist"
                       : "Create Flex folders"
                   }
-                  className="hover:bg-accent/50"
+                  className={
+                    (job.flex_folders_created || foldersExist)
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:bg-accent/50"
+                  }
                 >
                   <img src={createFolderIcon} alt="Create Flex folders" className="h-4 w-4" />
                 </Button>
@@ -1339,4 +1345,21 @@ export function JobCardNew({
       )}
     </div>
   );
+}
+
+function useFolderExistence(jobId: string) {
+  const { data, error } = useQuery({
+    queryKey: ["flex-folders", jobId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("flex_folders")
+        .select("id")
+        .eq("job_id", jobId);
+      return data?.length > 0;
+    },
+    enabled: !!jobId,
+    staleTime: 1000 * 60 * 60 * 24 // 24 hours
+  });
+
+  return { data, error };
 }
