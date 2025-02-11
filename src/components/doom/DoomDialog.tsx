@@ -27,8 +27,9 @@ export const DoomDialog = ({ open, onOpenChange }: DoomDialogProps) => {
       setError(null);
 
       try {
-        // Import js-dos dynamically with explicit path
-        const { default: Dos } = await import('js-dos/dist/js-dos');
+        // Dynamically import js-dos
+        const jsdos = await import("js-dos");
+        const Dos = jsdos.default;
         
         // Create a new DOS instance
         const ci = await Dos(canvasRef.current, {
@@ -39,7 +40,7 @@ export const DoomDialog = ({ open, onOpenChange }: DoomDialogProps) => {
 
         // Mount and run DOOM
         await ci.mount("doom.jsdos");
-        await ci.run("DOOM.EXE");  // Specify the executable name as required by js-dos 8.x
+        await ci.run("DOOM.EXE");
 
         setIsLoading(false);
       } catch (err) {

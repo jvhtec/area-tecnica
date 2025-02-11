@@ -1,5 +1,5 @@
 
-declare module "js-dos/dist/js-dos" {
+declare module "js-dos" {
   export interface DosPlayerConfig {
     wdosboxUrl: string;
   }
@@ -16,4 +16,9 @@ declare module "js-dos/dist/js-dos" {
 
   const Dos: DosPlayerFactoryType;
   export default Dos;
+}
+
+declare module "js-dos/dist/js-dos" {
+  export * from "js-dos";
+  export { default } from "js-dos";
 }
