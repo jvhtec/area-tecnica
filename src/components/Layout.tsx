@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { 
   SidebarProvider, 
@@ -46,13 +47,19 @@ const Layout = () => {
     console.log("Starting sign out process");
 
     try {
+      // Clear all state first
       setSession(null);
       setUserRole(null);
       setUserDepartment(null);
       localStorage.clear();
+      
+      // Sign out from Supabase
       await supabase.auth.signOut();
       console.log("Sign out successful");
+      
+      // Navigate to auth page after everything is cleared
       navigate('/auth', { replace: true });
+      
       toast({
         title: "Success",
         description: "You have been logged out successfully",
@@ -63,6 +70,8 @@ const Layout = () => {
         title: "Notice",
         description: "You have been logged out",
       });
+      // Still navigate to auth page even if there's an error
+      navigate('/auth', { replace: true });
     } finally {
       setIsLoggingOut(false);
     }

@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -85,12 +86,15 @@ export const LoginForm = ({ onShowSignUp }: LoginFormProps) => {
         description: "You have successfully logged in.",
       });
 
-      // Redirect based on role
+      // Handle role-based navigation
       if (profileData.role === 'technician') {
-        navigate("/technician-dashboard");
+        navigate("/technician-dashboard", { replace: true });
+      } else if (profileData.role === 'house_tech' && profileData.department) {
+        navigate(`/${profileData.department.toLowerCase()}`, { replace: true });
       } else {
-        navigate("/dashboard");
+        navigate("/dashboard", { replace: true });
       }
+
     } catch (error: any) {
       console.error("Unexpected error during login:", error);
       setError("An unexpected error occurred. Please try again.");
