@@ -1,8 +1,11 @@
+
+import { useEffect } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Plane, Wrench, Star, Moon, Mic } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { format, startOfDay } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface DateTypeContextMenuProps {
   children: React.ReactNode;
@@ -12,6 +15,33 @@ interface DateTypeContextMenuProps {
 }
 
 export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: DateTypeContextMenuProps) => {
+  const queryClient = useQueryClient();
+
+  // Subscribe to real-time updates for this specific job's date types
+  useEffect(() => {
+    const channel = supabase
+      .channel('job-date-types')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'job_date_types',
+          filter: `job_id=eq.${jobId}`
+        },
+        () => {
+          // Invalidate the query to trigger a refetch
+          queryClient.invalidateQueries({ queryKey: ['job-date-types', jobId] });
+          onTypeChange();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [jobId, queryClient, onTypeChange]);
+
   const handleSetDateType = async (type: 'travel' | 'setup' | 'show' | 'off' | 'rehearsal') => {
     try {
       const localDate = startOfDay(date);
@@ -23,6 +53,12 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         date: localDate,
         formattedDate,
         originalDate: date
+      });
+
+      // Optimistically update the UI
+      queryClient.setQueryData(['job-date-types', jobId], (old: any) => {
+        const key = `${jobId}-${formattedDate}`;
+        return { ...old, [key]: { type, job_id: jobId, date: formattedDate } };
       });
       
       const { error } = await supabase
@@ -42,6 +78,8 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
     } catch (error: any) {
       console.error('Error setting date type:', error);
       toast.error('Failed to set date type');
+      // Invalidate the query to revert to the correct state
+      queryClient.invalidateQueries({ queryKey: ['job-date-types', jobId] });
     }
   };
 

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useCallback } from "react";
 import { Department } from "@/types/department";
 import { useJobs } from "@/hooks/useJobs";
 import { format, isWithinInterval, addWeeks, addMonths, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
@@ -45,7 +46,6 @@ const Dashboard = () => {
   const [selectedDepartment, setSelectedDepartment] = useState<Department>("sound");
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  // Default tours section to expanded (true) if no user preference exists.
   const [showTours, setShowTours] = useState(true);
   const [showMessages, setShowMessages] = useState(false);
   const [newMessageDialogOpen, setNewMessageDialogOpen] = useState(false);
@@ -124,7 +124,7 @@ const Dashboard = () => {
       const { error: jobError } = await supabase
         .from("jobs")
         .delete()
-        .eq("id", jobId);
+        .eq("job_id", jobId);
 
       if (jobError) throw jobError;
 
@@ -143,6 +143,10 @@ const Dashboard = () => {
       });
     }
   };
+
+  const handleDateTypeChange = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+  }, [queryClient]);
 
   const selectedDateJobs = getSelectedDateJobs(date, jobs);
 
@@ -240,6 +244,7 @@ const Dashboard = () => {
         onDeleteClick={handleDeleteClick}
         onJobClick={handleJobClick}
         userRole={userRole}
+        onDateTypeChange={handleDateTypeChange}
       />
 
       {selectedJobId && (
