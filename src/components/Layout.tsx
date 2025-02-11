@@ -23,12 +23,15 @@ import { useToast } from "@/hooks/use-toast";
 import { useSessionManager } from "@/hooks/useSessionManager";
 import { ReloadButton } from "./ui/reload-button";
 import { useQueryClient } from "@tanstack/react-query";
+import { useKonamiCode } from "@/hooks/useKonamiCode";
+import { DoomDialog } from "./doom/DoomDialog";
 
 const Layout = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const queryClient = useQueryClient();
+  const { triggered: doomTriggered, reset: resetDoom } = useKonamiCode();
   
   const {
     session,
@@ -150,6 +153,10 @@ const Layout = () => {
           </main>
         </div>
       </div>
+      <DoomDialog 
+        open={doomTriggered} 
+        onOpenChange={(open) => !open && resetDoom()} 
+      />
     </SidebarProvider>
   );
 };
