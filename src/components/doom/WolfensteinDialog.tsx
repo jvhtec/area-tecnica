@@ -27,25 +27,46 @@ export const WolfensteinDialog = ({ open, onOpenChange }: WolfensteinDialogProps
       setError(null);
 
       try {
+        console.log('Initializing DOS emulator...');
         // Dynamically import js-dos
         const jsdos = await import("js-dos/dist/js-dos");
         const Dos = jsdos.default;
         
-        // Create a new DOS instance with CDN path
+        // Create a new DOS instance with local path
+        console.log('Creating DOS instance with local wdosbox...');
         const ci = await Dos(canvasRef.current, {
-          wdosboxUrl: "https://js-dos.com/6.22/current/wdosbox.js"
+          wdosboxUrl: "/js-dos/wdosbox.js"
         });
         
         dosRef.current = ci;
 
-        // Mount and run Wolfenstein 3D
-        await ci.mount("https://js-dos.com/wolf3d/wolf3d.jsdos");
+        // Mount and run Wolfenstein 3D using local bundle
+        console.log('Mounting Wolfenstein 3D bundle...');
+        await ci.mount("/WOLF3D.jsdos");
+        
+        console.log('Running WOLF3D.EXE...');
         await ci.run("WOLF3D.EXE");
 
+        console.log('Wolfenstein 3D initialized successfully');
         setIsLoading(false);
       } catch (err) {
         console.error('Failed to initialize DOS:', err);
-        setError('Failed to load Wolfenstein 3D. Please try again.');
+        let errorMessage = 'Failed to load Wolfenstein 3D. ';
+        
+        // Check for specific error conditions
+        if (err instanceof Error) {
+          if (err.message.includes('wdosbox.wasm')) {
+            errorMessage += 'WebAssembly file not found.';
+          } else if (err.message.includes('WOLF3D.jsdos')) {
+            errorMessage += 'Game bundle not found.';
+          } else if (err.message.includes('WebGL')) {
+            errorMessage += 'WebGL support is required.';
+          } else {
+            errorMessage += err.message;
+          }
+        }
+        
+        setError(errorMessage);
         setIsLoading(false);
       }
     };
@@ -55,6 +76,7 @@ export const WolfensteinDialog = ({ open, onOpenChange }: WolfensteinDialogProps
     return () => {
       if (dosRef.current) {
         try {
+          console.log('Cleaning up DOS instance...');
           dosRef.current.exit();
         } catch (err) {
           console.error('Error cleaning up DOS:', err);
@@ -83,7 +105,7 @@ export const WolfensteinDialog = ({ open, onOpenChange }: WolfensteinDialogProps
             {isLoading ? (
               <div className="text-center space-y-2 animate-pulse">
                 <div className="text-xl">Loading Wolfenstein 3D...</div>
-                <div className="text-sm">Press any key to continue</div>
+                <div className="text-sm">Please wait...</div>
               </div>
             ) : error ? (
               <div className="text-center text-blue-500 space-y-2">
@@ -106,7 +128,7 @@ export const WolfensteinDialog = ({ open, onOpenChange }: WolfensteinDialogProps
           </div>
           
           <div className="p-2 border-t border-blue-500 text-xs">
-            C:\WOLF3D&gt; _
+            C:\WOLF3D&gt; _ {error && <span className="text-red-500">Error detected</span>}
           </div>
         </div>
       </DialogContent>
