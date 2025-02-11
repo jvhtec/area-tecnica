@@ -591,6 +591,18 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
       console.log("Editing tour date:", { dateId, newDate, newLocation });
       const locationId = await getOrCreateLocation(newLocation);
       
+      // First get the tour name
+      const { data: tourData, error: tourError } = await supabase
+        .from("tours")
+        .select("name")
+        .eq("id", tourId)
+        .single();
+
+      if (tourError) {
+        console.error("Error fetching tour:", tourError);
+        throw tourError;
+      }
+      
       // Update tour date
       const { data: updatedDate, error: dateError } = await supabase
         .from("tour_dates")
@@ -621,7 +633,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
       const { error: jobError } = await supabase
         .from("jobs")
         .update({
-          title: `${updatedDate.tours.name} (${newLocation || 'No Location'})`,
+          title: `${tourData.name} (${newLocation || 'No Location'})`,
           start_time: `${newDate}T00:00:00`,
           end_time: `${newDate}T23:59:59`,
           location_id: locationId,
