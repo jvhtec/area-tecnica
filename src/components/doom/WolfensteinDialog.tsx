@@ -28,7 +28,7 @@ export const WolfensteinDialog = ({ open, onOpenChange }: WolfensteinDialogProps
 
       try {
         // Dynamically import js-dos
-        const jsdos = await import("js-dos");
+        const jsdos = await import("js-dos/dist/js-dos");
         const Dos = jsdos.default;
         
         // Create a new DOS instance
