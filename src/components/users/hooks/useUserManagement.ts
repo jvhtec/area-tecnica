@@ -1,3 +1,4 @@
+
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -11,28 +12,17 @@ export const useUserManagement = () => {
     try {
       console.log("Starting deletion process for user:", user.id);
       
-      // Delete from auth.users first (this requires admin privileges)
-      const { error: authError } = await supabase.auth.admin.deleteUser(
-        user.id
-      );
+      // Call our edge function to delete the user
+      const { error } = await supabase.functions.invoke('delete-user', {
+        body: { userId: user.id }
+      });
 
-      if (authError) {
-        console.error("Auth deletion error:", authError);
-        throw authError;
+      if (error) {
+        console.error("Delete user error:", error);
+        throw error;
       }
-      console.log("Successfully deleted auth user");
 
-      // Delete from profiles table (this will cascade to other tables due to RLS policies)
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', user.id);
-
-      if (profileError) {
-        console.error("Profile deletion error:", profileError);
-        throw profileError;
-      }
-      console.log("Successfully deleted profile");
+      console.log("Successfully deleted user");
 
       toast({
         title: "User deleted",
