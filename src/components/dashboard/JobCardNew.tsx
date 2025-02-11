@@ -692,7 +692,17 @@ export function JobCardNew({
   const createFlexFoldersHandler = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    if (job.flex_folders_created) {
+    // Add comprehensive logging to track folder existence state
+    console.log("Folder existence check:", {
+      jobId: job.id,
+      flexFoldersCreated: job.flex_folders_created,
+      foldersExist,
+      flexFoldersExist: job.flex_folders_exist,
+      combined: foldersAreCreated
+    });
+
+    if (foldersAreCreated) {
+      console.log("Folders already exist, preventing creation");
       toast({
         title: "Folders already created",
         description: "Flex folders have already been created for this job.",
@@ -702,6 +712,23 @@ export function JobCardNew({
     }
 
     try {
+      // Double-check folder existence before proceeding
+      const { data: existingFolders } = await supabase
+        .from("flex_folders")
+        .select("id")
+        .eq("job_id", job.id)
+        .limit(1);
+
+      if (existingFolders && existingFolders.length > 0) {
+        console.log("Found existing folders in final check:", existingFolders);
+        toast({
+          title: "Folders already exist",
+          description: "Flex folders have already been created for this job.",
+          variant: "destructive"
+        });
+        return;
+      }
+
       const startDate = new Date(job.start_time);
       const documentNumber = startDate
         .toISOString()
@@ -714,6 +741,7 @@ export function JobCardNew({
       await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber);
       await updateFolderStatus.mutateAsync();
 
+      console.log("Successfully created folders for job:", job.id);
       toast({
         title: "Success",
         description: "Flex folders have been created successfully."
