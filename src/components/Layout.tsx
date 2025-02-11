@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { 
   SidebarProvider, 
@@ -24,7 +23,7 @@ import { useSessionManager } from "@/hooks/useSessionManager";
 import { ReloadButton } from "./ui/reload-button";
 import { useQueryClient } from "@tanstack/react-query";
 import { useKonamiCode } from "@/hooks/useKonamiCode";
-import { DoomDialog } from "./doom/DoomDialog";
+import { WolfensteinDialog } from "./doom/WolfensteinDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const Layout = () => {
@@ -165,7 +164,7 @@ const Layout = () => {
           </main>
         </div>
       </div>
-      <DoomDialog 
+      <WolfensteinDialog 
         open={doomTriggered} 
         onOpenChange={(open) => !open && resetDoom()} 
       />
