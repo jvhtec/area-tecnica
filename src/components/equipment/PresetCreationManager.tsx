@@ -23,8 +23,9 @@ interface EditEquipmentDialogProps {
   onSave: (equipment: Partial<Equipment>) => void;
 }
 
-interface EquipmentCreationManagerProps {
-  onEquipmentChange?: () => void;
+interface PresetCreationManagerProps {
+  onClose?: () => void;
+  selectedDate?: Date;
 }
 
 function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEquipmentDialogProps) {
@@ -100,7 +101,7 @@ function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEqui
   );
 }
 
-export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreationManagerProps) {
+export function PresetCreationManager({ onClose, selectedDate }: PresetCreationManagerProps) {
   const { session } = useSessionManager();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -147,7 +148,6 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
         title: "Éxito",
         description: "Equipo creado correctamente"
       });
-      onEquipmentChange?.();
     },
     onError: (error) => {
       toast({
@@ -178,7 +178,6 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
         title: "Éxito",
         description: "Equipo actualizado correctamente"
       });
-      onEquipmentChange?.();
     },
     onError: (error) => {
       toast({
@@ -204,7 +203,6 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
         title: "Éxito",
         description: "Equipo eliminado correctamente"
       });
-      onEquipmentChange?.();
     },
     onError: (error) => {
       toast({
