@@ -25,13 +25,15 @@ import { ReloadButton } from "./ui/reload-button";
 import { useQueryClient } from "@tanstack/react-query";
 import { useKonamiCode } from "@/hooks/useKonamiCode";
 import { DoomDialog } from "./doom/DoomDialog";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Layout = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const queryClient = useQueryClient();
-  const { triggered: doomTriggered, reset: resetDoom } = useKonamiCode();
+  const { triggered: doomTriggered, reset: resetDoom, handleLogoTap, tapCount } = useKonamiCode();
+  const isMobile = useIsMobile();
   
   const {
     session,
@@ -130,12 +132,22 @@ const Layout = () => {
             </Button>
             <AboutCard />
             <SidebarSeparator />
-            <div className="px-2 py-4">
+            <div 
+              className="px-2 py-4 cursor-pointer transition-opacity"
+              onClick={handleLogoTap}
+              style={{ opacity: tapCount > 0 ? 0.5 + (tapCount * 0.1) : 1 }}
+            >
               <img
                 src="/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png"
                 alt="Sector Pro Logo"
                 className="h-6 w-auto dark:invert"
+                draggable="false"
               />
+              {isMobile && tapCount > 0 && (
+                <div className="text-xs text-center mt-1 text-muted-foreground">
+                  {5 - tapCount} more taps...
+                </div>
+              )}
             </div>
           </SidebarFooter>
         </Sidebar>
