@@ -53,6 +53,12 @@ export const useKonamiCode = () => {
   useEffect(() => {
     if (!isMobile) {
       const handleKeyDown = (event: KeyboardEvent) => {
+        // Ensure event and event.key are defined before using them
+        if (!event?.key) {
+          console.log('Invalid key event received');
+          return;
+        }
+        
         const key = event.key.toLowerCase();
         console.log('Key pressed:', key);
         
