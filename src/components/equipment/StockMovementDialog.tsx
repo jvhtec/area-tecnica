@@ -41,7 +41,6 @@ export function StockMovementDialog({
         .from('stock_entries')
         .select('*')
         .eq('equipment_id', equipment.id)
-        .eq('user_id', session.user.id)
         .maybeSingle();
 
       // Calculate new base quantity
@@ -80,7 +79,6 @@ export function StockMovementDialog({
           .from('stock_entries')
           .insert({
             equipment_id: equipment.id,
-            user_id: session.user.id,
             base_quantity: newBaseQty
           });
 

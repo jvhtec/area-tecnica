@@ -19,14 +19,11 @@ export function StockManagement() {
 
   // Fetch equipment list and current stock levels
   const { data: equipmentWithStock } = useQuery({
-    queryKey: ['current-stock-levels', session?.user?.id],
+    queryKey: ['current-stock-levels'],
     queryFn: async () => {
-      if (!session?.user?.id) return [];
-
       const { data: stockLevels, error } = await supabase
         .from('current_stock_levels')
         .select('*')
-        .eq('user_id', session.user.id)
         .order('equipment_name');
 
       if (error) throw error;
@@ -68,10 +65,12 @@ export function StockManagement() {
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => handleAddStock({ 
-                        id: item.equipment_id, 
+                      onClick={() => handleAddStock({
+                        id: item.equipment_id,
                         name: item.equipment_name,
-                        category: item.category 
+                        category: item.category,
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
                       })}
                     >
                       <Plus className="h-4 w-4" />
@@ -79,10 +78,12 @@ export function StockManagement() {
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => handleRemoveStock({ 
-                        id: item.equipment_id, 
+                      onClick={() => handleRemoveStock({
+                        id: item.equipment_id,
                         name: item.equipment_name,
-                        category: item.category 
+                        category: item.category,
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
                       })}
                       disabled={currentQuantity <= 0}
                     >
