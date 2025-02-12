@@ -6,25 +6,19 @@ import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Equipment } from '@/types/equipment';
+import type { Equipment, EquipmentCategory } from '@/types/equipment';
+import { EQUIPMENT_CATEGORIES, categoryLabels } from '@/types/equipment';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
-const EQUIPMENT_CATEGORIES = ['convencional', 'robotica', 'fx', 'rigging', 'controles', 'cuadros', 'led', 'strobo', 'canones'] as const;
-type EquipmentCategory = typeof EQUIPMENT_CATEGORIES[number];
-
 interface EditEquipmentDialogProps {
   equipment: Equipment | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (equipment: Partial<Equipment>) => void;
-}
-
-interface EquipmentCreationManagerProps {
-  onEquipmentChange?: () => void;
 }
 
 function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEquipmentDialogProps) {
@@ -46,18 +40,6 @@ function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEqui
       category
     });
     onOpenChange(false);
-  };
-
-  const categoryLabels: Record<EquipmentCategory, string> = {
-    convencional: 'Convencional',
-    robotica: 'Robótica',
-    controles: 'Controles',
-    fx: 'FX',
-    cuadros: 'Cuadros',
-    rigging: 'Rigging',
-    led: 'LED',
-    strobo: 'Strobo',
-    canones: 'Cañones'
   };
 
   return (
@@ -98,6 +80,10 @@ function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEqui
       </DialogContent>
     </Dialog>
   );
+}
+
+interface EquipmentCreationManagerProps {
+  onEquipmentChange?: () => void;
 }
 
 export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreationManagerProps) {
@@ -214,18 +200,6 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
       });
     }
   });
-
-  const categoryLabels: Record<EquipmentCategory, string> = {
-    convencional: 'Convencional',
-    robotica: 'Robótica',
-    controles: 'Controles',
-    fx: 'FX',
-    cuadros: 'Cuadros',
-    rigging: 'Rigging',
-    led: 'LED',
-    strobo: 'Strobo',
-    canones: 'Cañones'
-  };
 
   return (
     <div className="space-y-6">
