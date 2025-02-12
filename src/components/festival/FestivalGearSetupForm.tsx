@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,22 +65,54 @@ export const FestivalGearSetupForm = ({
     fetchExistingSetup();
   }, [jobId, selectedDate]);
 
-  const handleFormSubmit = async (values: any) => {
+  const updateWirelessSystem = (
+    type: 'wireless_systems' | 'iem_systems',
+    index: number,
+    field: string,
+    value: any
+  ) => {
+    setSetup(prev => ({
+      ...prev,
+      [type]: prev[type]?.map((system, i) => 
+        i === index ? { ...system, [field]: value } : system
+      ) || []
+    }));
+  };
+
+  const removeWirelessSystem = (
+    type: 'wireless_systems' | 'iem_systems',
+    index: number
+  ) => {
+    setSetup(prev => ({
+      ...prev,
+      [type]: prev[type]?.filter((_, i) => i !== index) || []
+    }));
+  };
+
+  const addWirelessSystem = (type: 'wireless_systems' | 'iem_systems') => {
+    setSetup(prev => ({
+      ...prev,
+      [type]: [...(prev[type] || []), { model: '', quantity: 0, band: '' }]
+    }));
+  };
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
-      const wirelessSystems = values.wireless_systems.map((system: any) => ({
+      const wirelessSystems = setup.wireless_systems?.map(system => ({
         model: system.model,
-        quantity: parseInt(system.quantity) || 0,
+        quantity: parseInt(system.quantity.toString()) || 0,
         band: system.band || ''
       }));
 
-      const iemSystems = values.iem_systems.map((system: any) => ({
+      const iemSystems = setup.iem_systems?.map(system => ({
         model: system.model,
-        quantity: parseInt(system.quantity) || 0,
+        quantity: parseInt(system.quantity.toString()) || 0,
         band: system.band || ''
       }));
 
       const payload = {
-        ...values,
+        ...setup,
         wireless_systems: wirelessSystems,
         iem_systems: iemSystems,
         job_id: jobId,
@@ -133,11 +166,21 @@ export const FestivalGearSetupForm = ({
             {setup.wireless_systems?.map((system, index) => (
               <div key={index} className="space-y-2">
                 <div className="flex gap-2">
-                  <Input
-                    placeholder="Model"
+                  <Select
                     value={system.model}
-                    onChange={(e) => updateWirelessSystem('wireless_systems', index, 'model', e.target.value)}
-                  />
+                    onValueChange={(value) => updateWirelessSystem('wireless_systems', index, 'model', value)}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select wireless system" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WIRELESS_SYSTEMS.map((model) => (
+                        <SelectItem key={model} value={model}>
+                          {model}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Input
                     type="number"
                     min="0"
@@ -183,11 +226,21 @@ export const FestivalGearSetupForm = ({
             {setup.iem_systems?.map((system, index) => (
               <div key={index} className="space-y-2">
                 <div className="flex gap-2">
-                  <Input
-                    placeholder="Model"
+                  <Select
                     value={system.model}
-                    onChange={(e) => updateWirelessSystem('iem_systems', index, 'model', e.target.value)}
-                  />
+                    onValueChange={(value) => updateWirelessSystem('iem_systems', index, 'model', value)}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select IEM system" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {IEM_SYSTEMS.map((model) => (
+                        <SelectItem key={model} value={model}>
+                          {model}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Input
                     type="number"
                     min="0"
