@@ -668,15 +668,15 @@ export type Database = {
           available_analog_runs: number | null
           available_cat6_runs: number | null
           available_coax_runs: number | null
-          available_dj_booths: number | null
-          available_drum_fills: number | null
           available_hma_runs: number | null
           available_monitors: number | null
           available_opticalcon_duo_runs: number | null
-          available_side_fills: number | null
           created_at: string | null
           date: string
           foh_consoles: Json | null
+          has_dj_booths: boolean | null
+          has_drum_fills: boolean | null
+          has_side_fills: boolean | null
           id: string
           iem_systems: Json | null
           job_id: string | null
@@ -690,15 +690,15 @@ export type Database = {
           available_analog_runs?: number | null
           available_cat6_runs?: number | null
           available_coax_runs?: number | null
-          available_dj_booths?: number | null
-          available_drum_fills?: number | null
           available_hma_runs?: number | null
           available_monitors?: number | null
           available_opticalcon_duo_runs?: number | null
-          available_side_fills?: number | null
           created_at?: string | null
           date: string
           foh_consoles?: Json | null
+          has_dj_booths?: boolean | null
+          has_drum_fills?: boolean | null
+          has_side_fills?: boolean | null
           id?: string
           iem_systems?: Json | null
           job_id?: string | null
@@ -712,15 +712,15 @@ export type Database = {
           available_analog_runs?: number | null
           available_cat6_runs?: number | null
           available_coax_runs?: number | null
-          available_dj_booths?: number | null
-          available_drum_fills?: number | null
           available_hma_runs?: number | null
           available_monitors?: number | null
           available_opticalcon_duo_runs?: number | null
-          available_side_fills?: number | null
           created_at?: string | null
           date?: string
           foh_consoles?: Json | null
+          has_dj_booths?: boolean | null
+          has_drum_fills?: boolean | null
+          has_side_fills?: boolean | null
           id?: string
           iem_systems?: Json | null
           job_id?: string | null

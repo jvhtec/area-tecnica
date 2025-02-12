@@ -10,7 +10,7 @@ import { FestivalGearSetup, ConsoleSetup, WirelessSetup } from "@/types/festival
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Minus, Save } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 
 const consoleOptions = [
   'Yamaha CL5', 'Yamaha PMx', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
@@ -40,17 +40,14 @@ export const FestivalGearSetupForm = ({
     wireless_systems: [],
     iem_systems: [],
     available_monitors: 0,
-    available_side_fills: 0,
-    available_drum_fills: 0,
-    available_dj_booths: 0,
+    has_side_fills: false,
+    has_drum_fills: false,
+    has_dj_booths: false,
     available_cat6_runs: 0,
     available_hma_runs: 0,
     available_coax_runs: 0,
     available_analog_runs: 0,
     available_opticalcon_duo_runs: 0,
-    infrastructure_provided_by: 'festival',
-    wireless_provided_by: 'festival',
-    iem_provided_by: 'festival'
   });
 
   useEffect(() => {
@@ -292,26 +289,6 @@ export const FestivalGearSetupForm = ({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Provided By</Label>
-              <RadioGroup
-                value={setup.wireless_provided_by}
-                onValueChange={(value: 'festival' | 'artist') => 
-                  setSetup(prev => ({ ...prev, wireless_provided_by: value }))
-                }
-                className="flex space-x-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="festival" id="wireless-festival" />
-                  <Label htmlFor="wireless-festival">Festival</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="artist" id="wireless-artist" />
-                  <Label htmlFor="wireless-artist">Artist</Label>
-                </div>
-              </RadioGroup>
-            </div>
-
             {setup.wireless_systems?.map((system, index) => (
               <div key={index} className="space-y-2">
                 <div className="flex gap-2">
@@ -362,26 +339,6 @@ export const FestivalGearSetupForm = ({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Provided By</Label>
-              <RadioGroup
-                value={setup.iem_provided_by}
-                onValueChange={(value: 'festival' | 'artist') => 
-                  setSetup(prev => ({ ...prev, iem_provided_by: value }))
-                }
-                className="flex space-x-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="festival" id="iem-festival" />
-                  <Label htmlFor="iem-festival">Festival</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="artist" id="iem-artist" />
-                  <Label htmlFor="iem-artist">Artist</Label>
-                </div>
-              </RadioGroup>
-            </div>
-
             {setup.iem_systems?.map((system, index) => (
               <div key={index} className="space-y-2">
                 <div className="flex gap-2">
@@ -430,7 +387,7 @@ export const FestivalGearSetupForm = ({
         <CardHeader>
           <CardTitle>Monitor Setup</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <CardContent className="space-y-4">
           <div>
             <Label>Available Monitors</Label>
             <Input
@@ -440,32 +397,34 @@ export const FestivalGearSetupForm = ({
               onChange={(e) => setSetup(prev => ({ ...prev, available_monitors: parseInt(e.target.value) }))}
             />
           </div>
-          <div>
-            <Label>Side Fills (Pairs)</Label>
-            <Input
-              type="number"
-              min="0"
-              value={setup.available_side_fills}
-              onChange={(e) => setSetup(prev => ({ ...prev, available_side_fills: parseInt(e.target.value) }))}
-            />
-          </div>
-          <div>
-            <Label>Drum Fills</Label>
-            <Input
-              type="number"
-              min="0"
-              value={setup.available_drum_fills}
-              onChange={(e) => setSetup(prev => ({ ...prev, available_drum_fills: parseInt(e.target.value) }))}
-            />
-          </div>
-          <div>
-            <Label>DJ Booths</Label>
-            <Input
-              type="number"
-              min="0"
-              value={setup.available_dj_booths}
-              onChange={(e) => setSetup(prev => ({ ...prev, available_dj_booths: parseInt(e.target.value) }))}
-            />
+          
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="has_side_fills">Side Fills Available</Label>
+              <Switch
+                id="has_side_fills"
+                checked={setup.has_side_fills}
+                onCheckedChange={(checked) => setSetup(prev => ({ ...prev, has_side_fills: checked }))}
+              />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <Label htmlFor="has_drum_fills">Drum Fills Available</Label>
+              <Switch
+                id="has_drum_fills"
+                checked={setup.has_drum_fills}
+                onCheckedChange={(checked) => setSetup(prev => ({ ...prev, has_drum_fills: checked }))}
+              />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <Label htmlFor="has_dj_booths">DJ Booths Available</Label>
+              <Switch
+                id="has_dj_booths"
+                checked={setup.has_dj_booths}
+                onCheckedChange={(checked) => setSetup(prev => ({ ...prev, has_dj_booths: checked }))}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -474,73 +433,51 @@ export const FestivalGearSetupForm = ({
         <CardHeader>
           <CardTitle>Infrastructure</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Provided By</Label>
-            <RadioGroup
-              value={setup.infrastructure_provided_by}
-              onValueChange={(value: 'festival' | 'artist') => 
-                setSetup(prev => ({ ...prev, infrastructure_provided_by: value }))
-              }
-              className="flex space-x-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="festival" id="infrastructure-festival" />
-                <Label htmlFor="infrastructure-festival">Festival</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="artist" id="infrastructure-artist" />
-                <Label htmlFor="infrastructure-artist">Artist</Label>
-              </div>
-            </RadioGroup>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label>CAT6 Runs</Label>
+            <Input
+              type="number"
+              min="0"
+              value={setup.available_cat6_runs}
+              onChange={(e) => setSetup(prev => ({ ...prev, available_cat6_runs: parseInt(e.target.value) }))}
+            />
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label>CAT6 Runs</Label>
-              <Input
-                type="number"
-                min="0"
-                value={setup.available_cat6_runs}
-                onChange={(e) => setSetup(prev => ({ ...prev, available_cat6_runs: parseInt(e.target.value) }))}
-              />
-            </div>
-            <div>
-              <Label>HMA Runs</Label>
-              <Input
-                type="number"
-                min="0"
-                value={setup.available_hma_runs}
-                onChange={(e) => setSetup(prev => ({ ...prev, available_hma_runs: parseInt(e.target.value) }))}
-              />
-            </div>
-            <div>
-              <Label>Coax Runs</Label>
-              <Input
-                type="number"
-                min="0"
-                value={setup.available_coax_runs}
-                onChange={(e) => setSetup(prev => ({ ...prev, available_coax_runs: parseInt(e.target.value) }))}
-              />
-            </div>
-            <div>
-              <Label>Analog Runs</Label>
-              <Input
-                type="number"
-                min="0"
-                value={setup.available_analog_runs}
-                onChange={(e) => setSetup(prev => ({ ...prev, available_analog_runs: parseInt(e.target.value) }))}
-              />
-            </div>
-            <div>
-              <Label>Opticalcon DUO Runs</Label>
-              <Input
-                type="number"
-                min="0"
-                value={setup.available_opticalcon_duo_runs}
-                onChange={(e) => setSetup(prev => ({ ...prev, available_opticalcon_duo_runs: parseInt(e.target.value) }))}
-              />
-            </div>
+          <div>
+            <Label>HMA Runs</Label>
+            <Input
+              type="number"
+              min="0"
+              value={setup.available_hma_runs}
+              onChange={(e) => setSetup(prev => ({ ...prev, available_hma_runs: parseInt(e.target.value) }))}
+            />
+          </div>
+          <div>
+            <Label>Coax Runs</Label>
+            <Input
+              type="number"
+              min="0"
+              value={setup.available_coax_runs}
+              onChange={(e) => setSetup(prev => ({ ...prev, available_coax_runs: parseInt(e.target.value) }))}
+            />
+          </div>
+          <div>
+            <Label>Analog Runs</Label>
+            <Input
+              type="number"
+              min="0"
+              value={setup.available_analog_runs}
+              onChange={(e) => setSetup(prev => ({ ...prev, available_analog_runs: parseInt(e.target.value) }))}
+            />
+          </div>
+          <div>
+            <Label>Opticalcon DUO Runs</Label>
+            <Input
+              type="number"
+              min="0"
+              value={setup.available_opticalcon_duo_runs}
+              onChange={(e) => setSetup(prev => ({ ...prev, available_opticalcon_duo_runs: parseInt(e.target.value) }))}
+            />
           </div>
         </CardContent>
       </Card>
