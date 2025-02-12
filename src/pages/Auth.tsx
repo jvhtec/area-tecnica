@@ -12,12 +12,10 @@ const Auth = () => {
   const [showSignUp, setShowSignUp] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Remove dark mode class when entering auth page
   useEffect(() => {
     const originalTheme = document.documentElement.classList.contains("dark");
     document.documentElement.classList.remove("dark");
 
-    // Restore theme when leaving auth page
     return () => {
       if (originalTheme) {
         document.documentElement.classList.add("dark");
@@ -52,6 +50,8 @@ const Auth = () => {
       setSession(session);
       if (session) {
         navigate("/dashboard");
+      } else {
+        setError("Session expired. Please log in again."); // Better user feedback
       }
     });
 
