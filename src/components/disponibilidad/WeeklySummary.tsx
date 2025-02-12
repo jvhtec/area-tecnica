@@ -13,13 +13,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { exportWeeklySummaryPDF } from '@/lib/weeklySummaryPdfExport';
 import { ReloadButton } from '@/components/ui/reload-button';
+import { EquipmentCategory, EQUIPMENT_CATEGORIES, categoryLabels } from '@/types/equipment';
 
 interface WeeklySummaryProps {
   selectedDate: Date;
   onDateChange: (date: Date) => void;
 }
-
-type EquipmentCategory = 'convencional' | 'robotica' | 'controles' | 'fx' | 'cuadros' | 'rigging' | 'led' | 'strobo' | 'canones';
 
 interface Equipment {
   id: string;
@@ -36,9 +35,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     const stored = localStorage.getItem('weeklySummaryOpen');
     return stored ? JSON.parse(stored) : true;
   });
-  const [selectedCategories, setSelectedCategories] = useState<EquipmentCategory[]>([
-    'convencional', 'robotica', 'controles', 'fx', 'cuadros', 'rigging', 'led', 'strobo', 'canones'
-  ]);
+  const [selectedCategories, setSelectedCategories] = useState<EquipmentCategory[]>(EQUIPMENT_CATEGORIES);
 
   useEffect(() => {
     localStorage.setItem('weeklySummaryOpen', JSON.stringify(isOpen));
@@ -160,18 +157,6 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     );
   };
 
-  const categoryLabels: Record<EquipmentCategory, string> = {
-    convencional: 'Convencional',
-    robotica: 'Robótica',
-    controles: 'Controles',
-    fx: 'FX',
-    cuadros: 'Cuadros',
-    rigging: 'Rigging',
-    led: 'LED',
-    strobo: 'Strobo',
-    canones: 'Cañones'
-  };
-
   const filteredEquipment = stockWithEquipment?.filter(item => 
     selectedCategories.includes(item.category as EquipmentCategory)
   );
@@ -237,14 +222,14 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
         <h2 className="text-lg font-semibold">Resumen Semanal</h2>
         <div className="flex items-center gap-2">
           <div className="flex gap-2">
-            {Object.entries(categoryLabels).map(([category, label]) => (
+            {EQUIPMENT_CATEGORIES.map((category) => (
               <Button
                 key={category}
-                variant={selectedCategories.includes(category as EquipmentCategory) ? "default" : "outline"}
+                variant={selectedCategories.includes(category) ? "default" : "outline"}
                 size="sm"
-                onClick={() => toggleCategory(category as EquipmentCategory)}
+                onClick={() => toggleCategory(category)}
               >
-                {label}
+                {categoryLabels[category]}
               </Button>
             ))}
           </div>
@@ -301,7 +286,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
                   return (
                     <TableRow key={item.id}>
                       <TableCell>{item.name}</TableCell>
-                      <TableCell>{categoryLabels[item.category as EquipmentCategory]}</TableCell>
+                      <TableCell>{categoryLabels[item.category]}</TableCell>
                       <TableCell>{item.stock}</TableCell>
                       {weekDates.map((date) => {
                         const used = getUsedQuantity(item.id, date);
