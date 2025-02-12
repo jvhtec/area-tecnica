@@ -30,6 +30,9 @@ export interface FestivalGearSetup {
   available_coax_runs: number;
   available_analog_runs: number;
   available_opticalcon_duo_runs: number;
+  infrastructure_provided_by?: 'festival' | 'artist';
+  wireless_provided_by?: 'festival' | 'artist';
+  iem_provided_by?: 'festival' | 'artist';
   notes?: string;
   created_at?: string;
   updated_at?: string;
