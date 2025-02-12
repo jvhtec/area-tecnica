@@ -1946,7 +1946,6 @@ export type Database = {
           equipment_id: string
           id: string
           updated_at: string | null
-          user_id: string
         }
         Insert: {
           base_quantity: number
@@ -1954,7 +1953,6 @@ export type Database = {
           equipment_id: string
           id?: string
           updated_at?: string | null
-          user_id: string
         }
         Update: {
           base_quantity?: number
@@ -1962,7 +1960,6 @@ export type Database = {
           equipment_id?: string
           id?: string
           updated_at?: string | null
-          user_id?: string
         }
         Relationships: [
           {
