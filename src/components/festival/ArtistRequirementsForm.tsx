@@ -672,4 +672,219 @@ export const ArtistRequirementsForm = () => {
                           value={formData.infra_cat6_quantity || 0}
                           onChange={(e) => setFormData(prev => ({
                             ...prev,
-                            infra_cat6_quantity:
+                            infra_cat6_quantity: parseInt(e.target.value) || 0
+                          }))}
+                        />
+                        {gearSetup && (
+                          <Badge variant="secondary">
+                            {gearSetup.available_cat6_runs} available
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* HMA */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="infra-hma"
+                        checked={formData.infra_hma}
+                        onCheckedChange={(checked) => 
+                          setFormData(prev => ({
+                            ...prev,
+                            infra_hma: checked,
+                            infra_hma_quantity: checked ? 1 : 0
+                          }))
+                        }
+                      />
+                      <Label htmlFor="infra-hma">HMA</Label>
+                    </div>
+                    {formData.infra_hma && (
+                      <div className="flex gap-2 items-center">
+                        <Input
+                          type="number"
+                          min="1"
+                          className={cn(
+                            "w-24",
+                            formData.infrastructure_provided_by === 'festival' &&
+                            !validateFestivalEquipment('hma', formData.infra_hma_quantity || 0) &&
+                            "border-red-500"
+                          )}
+                          value={formData.infra_hma_quantity || 0}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            infra_hma_quantity: parseInt(e.target.value) || 0
+                          }))}
+                        />
+                        {gearSetup && (
+                          <Badge variant="secondary">
+                            {gearSetup.available_hma_runs} available
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Coax */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="infra-coax"
+                        checked={formData.infra_coax}
+                        onCheckedChange={(checked) => 
+                          setFormData(prev => ({
+                            ...prev,
+                            infra_coax: checked,
+                            infra_coax_quantity: checked ? 1 : 0
+                          }))
+                        }
+                      />
+                      <Label htmlFor="infra-coax">Coax</Label>
+                    </div>
+                    {formData.infra_coax && (
+                      <div className="flex gap-2 items-center">
+                        <Input
+                          type="number"
+                          min="1"
+                          className={cn(
+                            "w-24",
+                            formData.infrastructure_provided_by === 'festival' &&
+                            !validateFestivalEquipment('coax', formData.infra_coax_quantity || 0) &&
+                            "border-red-500"
+                          )}
+                          value={formData.infra_coax_quantity || 0}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            infra_coax_quantity: parseInt(e.target.value) || 0
+                          }))}
+                        />
+                        {gearSetup && (
+                          <Badge variant="secondary">
+                            {gearSetup.available_coax_runs} available
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* OpticalCon Duo */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="infra-opticalcon"
+                        checked={formData.infra_opticalcon_duo}
+                        onCheckedChange={(checked) => 
+                          setFormData(prev => ({
+                            ...prev,
+                            infra_opticalcon_duo: checked,
+                            infra_opticalcon_duo_quantity: checked ? 1 : 0
+                          }))
+                        }
+                      />
+                      <Label htmlFor="infra-opticalcon">OpticalCon Duo</Label>
+                    </div>
+                    {formData.infra_opticalcon_duo && (
+                      <div className="flex gap-2 items-center">
+                        <Input
+                          type="number"
+                          min="1"
+                          className={cn(
+                            "w-24",
+                            formData.infrastructure_provided_by === 'festival' &&
+                            !validateFestivalEquipment('opticalcon', formData.infra_opticalcon_duo_quantity || 0) &&
+                            "border-red-500"
+                          )}
+                          value={formData.infra_opticalcon_duo_quantity || 0}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            infra_opticalcon_duo_quantity: parseInt(e.target.value) || 0
+                          }))}
+                        />
+                        {gearSetup && (
+                          <Badge variant="secondary">
+                            {gearSetup.available_opticalcon_duo_runs} available
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Analog Lines */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="infra-analog">Analog Lines</Label>
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        id="infra-analog"
+                        type="number"
+                        min="0"
+                        className={cn(
+                          "w-24",
+                          formData.infrastructure_provided_by === 'festival' &&
+                          !validateFestivalEquipment('analog', formData.infra_analog || 0) &&
+                          "border-red-500"
+                        )}
+                        value={formData.infra_analog || 0}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          infra_analog: parseInt(e.target.value) || 0
+                        }))}
+                      />
+                      {gearSetup && (
+                        <Badge variant="secondary">
+                          {gearSetup.available_analog_runs} available
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="other-infrastructure">Other Infrastructure Requirements</Label>
+                <Input
+                  id="other-infrastructure"
+                  value={formData.other_infrastructure || ''}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    other_infrastructure: e.target.value
+                  }))}
+                  placeholder="Enter any additional infrastructure requirements"
+                />
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label htmlFor="notes">Additional Notes</Label>
+              <Input
+                id="notes"
+                value={formData.notes || ''}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  notes: e.target.value
+                }))}
+                placeholder="Enter any additional notes or requirements"
+              />
+            </div>
+
+            {/* Submit Button */}
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Submitting..." : "Submit Requirements"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default ArtistRequirementsForm;
