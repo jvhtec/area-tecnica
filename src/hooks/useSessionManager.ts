@@ -24,6 +24,7 @@ export const useSessionManager = () => {
       setUserRole(null);
       setUserDepartment(null);
       setIsLoading(false);
+      navigate("/auth"); // Redirect to login if session is invalid
       return;
     }
 
@@ -36,21 +37,6 @@ export const useSessionManager = () => {
       if (profileData) {
         setUserRole(profileData.role);
         setUserDepartment(profileData.department);
-        
-        // Redirect house techs if they're on the wrong department page
-        if (profileData.role === 'house_tech' && profileData.department) {
-          const currentPath = window.location.pathname.toLowerCase();
-          const allowedPaths = [
-            `/${profileData.department.toLowerCase()}`,
-            '/technician-dashboard',
-            '/profile',
-            '/logistics'
-          ];
-          
-          if (!allowedPaths.includes(currentPath)) {
-            window.location.href = `/${profileData.department.toLowerCase()}`;
-          }
-        }
       } else {
         console.log("No profile data found for user");
         setUserRole(null);
@@ -63,7 +49,7 @@ export const useSessionManager = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [fetchUserProfile]);
+  }, [fetchUserProfile, navigate]);
 
   useEffect(() => {
     let mounted = true;
@@ -105,7 +91,18 @@ export const useSessionManager = () => {
     };
   }, [handleSessionUpdate]);
 
-  // Always call useProfileChanges, even if there's no session
+  // Proactively refresh session periodically
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const refreshed = await refreshSession();
+      if (!refreshed) {
+        navigate("/auth"); // Redirect to login on refresh failure
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [refreshSession, navigate]);
+
   useProfileChanges(
     session,
     userRole,
