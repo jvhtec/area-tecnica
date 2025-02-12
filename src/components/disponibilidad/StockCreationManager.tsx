@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { StockEntry, Equipment } from '@/types/equipment';
 import { Input } from '@/components/ui/input';
@@ -30,6 +29,7 @@ type GroupedEquipment = {
 export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps) => {
   const { toast } = useToast();
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
+  const [selectedCurrentStock, setSelectedCurrentStock] = useState<number>(0);
   const [isAdditionDialog, setIsAdditionDialog] = useState(true);
   const [showMovementDialog, setShowMovementDialog] = useState(false);
 
@@ -139,8 +139,9 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
     refetchEquipment();
   };
 
-  const handleMovementClick = (equipment: Equipment, isAddition: boolean) => {
+  const handleMovementClick = (equipment: Equipment, isAddition: boolean, currentQuantity: number) => {
     setSelectedEquipment(equipment);
+    setSelectedCurrentStock(currentQuantity);
     setIsAdditionDialog(isAddition);
     setShowMovementDialog(true);
   };
@@ -178,7 +179,8 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
                           size="icon"
                           onClick={() => handleMovementClick(
                             equipmentList.find(e => e.id === equipment.id)!,
-                            false
+                            false,
+                            equipment.currentQuantity
                           )}
                         >
                           <Minus className="h-4 w-4" />
@@ -195,7 +197,8 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
                           size="icon"
                           onClick={() => handleMovementClick(
                             equipmentList.find(e => e.id === equipment.id)!,
-                            true
+                            true,
+                            equipment.currentQuantity
                           )}
                         >
                           <Plus className="h-4 w-4" />
@@ -216,6 +219,7 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
           onOpenChange={setShowMovementDialog}
           equipment={selectedEquipment}
           isAddition={isAdditionDialog}
+          currentStock={selectedCurrentStock}
         />
       )}
     </div>
