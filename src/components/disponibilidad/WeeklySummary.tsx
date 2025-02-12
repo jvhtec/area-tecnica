@@ -35,7 +35,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     const stored = localStorage.getItem('weeklySummaryOpen');
     return stored ? JSON.parse(stored) : true;
   });
-  const [selectedCategories, setSelectedCategories] = useState<EquipmentCategory[]>(EQUIPMENT_CATEGORIES);
+  const [selectedCategories, setSelectedCategories] = useState<EquipmentCategory[]>([...EQUIPMENT_CATEGORIES]);
 
   useEffect(() => {
     localStorage.setItem('weeklySummaryOpen', JSON.stringify(isOpen));
