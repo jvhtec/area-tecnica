@@ -39,9 +39,10 @@ export const ArtistFormLinkDialog = ({
           status: 'pending'
         })
         .select('token')
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) throw new Error('Failed to generate form link');
 
       const formUrl = `${window.location.origin}/festival/artist-form/${data.token}`;
       setFormLink(formUrl);
@@ -82,19 +83,26 @@ export const ArtistFormLinkDialog = ({
     if (open) {
       // Check for existing unexpired form link
       const checkExistingLink = async () => {
-        const { data, error } = await supabase
-          .from('festival_artist_forms')
-          .select('token')
-          .eq('artist_id', artistId)
-          .eq('status', 'pending')
-          .gt('expires_at', new Date().toISOString())
-          .limit(1)
-          .single();
+        try {
+          const { data, error } = await supabase
+            .from('festival_artist_forms')
+            .select('token')
+            .eq('artist_id', artistId)
+            .eq('status', 'pending')
+            .gt('expires_at', new Date().toISOString())
+            .limit(1)
+            .maybeSingle();
 
-        if (data?.token) {
-          const formUrl = `${window.location.origin}/festival/artist-form/${data.token}`;
-          setFormLink(formUrl);
-        } else {
+          if (error) throw error;
+
+          if (data?.token) {
+            const formUrl = `${window.location.origin}/festival/artist-form/${data.token}`;
+            setFormLink(formUrl);
+          } else {
+            setFormLink("");
+          }
+        } catch (error) {
+          console.error('Error checking existing link:', error);
           setFormLink("");
         }
       };
