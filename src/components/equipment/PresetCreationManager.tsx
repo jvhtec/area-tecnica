@@ -8,7 +8,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PresetEditor } from './PresetEditor';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Copy, Pencil, Trash2 } from 'lucide-react';
 import { PresetWithItems } from '@/types/equipment';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
@@ -22,6 +22,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [editingPreset, setEditingPreset] = useState<PresetWithItems | null>(null);
+  const [copyingPreset, setCopyingPreset] = useState<PresetWithItems | null>(null);
   const [presetToDelete, setPresetToDelete] = useState<PresetWithItems | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -94,8 +95,25 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
           .eq('preset_id', editingPreset.id);
 
         if (deleteError) throw deleteError;
+
+        // Insert updated items
+        if (items.length > 0) {
+          const { error: itemsError } = await supabase
+            .from('preset_items')
+            .insert(
+              items.map(item => ({
+                preset_id: editingPreset.id,
+                equipment_id: item.equipment_id,
+                quantity: item.quantity,
+                created_at: item.created_at,
+                updated_at: item.updated_at
+              }))
+            );
+
+          if (itemsError) throw itemsError;
+        }
       } else {
-        // Create new preset
+        // Create new preset (either new or copy)
         const { data: preset, error: presetError } = await supabase
           .from('presets')
           .insert({
@@ -115,7 +133,9 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
               items.map(item => ({
                 preset_id: preset.id,
                 equipment_id: item.equipment_id,
-                quantity: item.quantity
+                quantity: item.quantity,
+                created_at: item.created_at,
+                updated_at: item.updated_at
               }))
             );
 
@@ -125,6 +145,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
 
       queryClient.invalidateQueries({ queryKey: ['presets'] });
       setEditingPreset(null);
+      setCopyingPreset(null);
       setIsCreating(false);
       toast({
         title: "Success",
@@ -139,13 +160,15 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
     }
   };
 
-  if (isCreating || editingPreset) {
+  if (isCreating || editingPreset || copyingPreset) {
     return (
       <PresetEditor
-        preset={editingPreset}
+        preset={editingPreset || copyingPreset}
+        isCopy={!!copyingPreset}
         onSave={handleSavePreset}
         onCancel={() => {
           setEditingPreset(null);
+          setCopyingPreset(null);
           setIsCreating(false);
         }}
       />
@@ -180,6 +203,19 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
                     </p>
                   </div>
                   <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        const presetCopy = {
+                          ...preset,
+                          name: `Copy of ${preset.name}`
+                        };
+                        setCopyingPreset(presetCopy);
+                      }}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"

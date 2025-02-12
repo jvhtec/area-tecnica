@@ -12,11 +12,12 @@ import { Save, X } from 'lucide-react';
 
 interface PresetEditorProps {
   preset?: PresetWithItems;
+  isCopy?: boolean;
   onSave: (name: string, items: Omit<PresetItem, 'id' | 'preset_id'>[]) => void;
   onCancel: () => void;
 }
 
-export const PresetEditor = ({ preset, onSave, onCancel }: PresetEditorProps) => {
+export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel }: PresetEditorProps) => {
   const [name, setName] = useState(preset?.name || '');
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
     if (!preset?.items) return {};
@@ -70,7 +71,7 @@ export const PresetEditor = ({ preset, onSave, onCancel }: PresetEditorProps) =>
     <Card className="w-full h-[600px] bg-white/80 backdrop-blur-sm">
       <CardHeader>
         <CardTitle>
-          {preset ? 'Edit Preset' : 'Create New Preset'}
+          {isCopy ? 'Copy Preset' : preset ? 'Edit Preset' : 'Create New Preset'}
         </CardTitle>
       </CardHeader>
       <CardContent>
