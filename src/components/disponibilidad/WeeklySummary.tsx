@@ -1,4 +1,3 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, ChevronsUpDown, Download } from 'lucide-react';
@@ -52,24 +51,23 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     queryFn: async () => {
       if (!session?.user?.id) return [];
 
-      // Using a direct join instead of relationship
-      const { data: equipment, error } = await supabase
-        .from('equipment')
-        .select(`
-          *,
-          current_quantity:current_stock_levels!equipment_id(current_quantity)
-        `)
+      // Query directly from current_stock_levels view
+      const { data, error } = await supabase
+        .from('current_stock_levels')
+        .select('*')
         .order('category')
-        .order('name');
+        .order('equipment_name');
 
       if (error) {
         console.error('Error fetching equipment with stock:', error);
         throw error;
       }
 
-      return equipment.map(item => ({
-        ...item,
-        current_quantity: item.current_quantity?.current_quantity || 0
+      return data.map(item => ({
+        id: item.equipment_id,
+        name: item.equipment_name,
+        category: item.category,
+        current_quantity: item.current_quantity || 0
       })) as Equipment[];
     },
     enabled: !!session?.user?.id
