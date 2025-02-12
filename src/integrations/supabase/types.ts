@@ -428,6 +428,44 @@ export type Database = {
           },
         ]
       }
+      festival_artist_forms: {
+        Row: {
+          artist_id: string | null
+          created_at: string | null
+          expires_at: string
+          id: string
+          status: string | null
+          token: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          artist_id?: string | null
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          status?: string | null
+          token?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          artist_id?: string | null
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          status?: string | null
+          token?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "festival_artist_forms_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "festival_artists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       festival_artists: {
         Row: {
           created_at: string | null
