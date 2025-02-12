@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +14,14 @@ import { FestivalGearSetup, ArtistFormData } from "@/types/festival";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const consoleOptions = [
+  'Yamaha CL5', 'Yamaha PMx', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
+  'DiGiCo SD10', 'DiGiCo SD11', 'DiGiCo SD12', 'DiGiCo SD5Q', 'DiGiCo SD7Q',
+  'DiGiCo Q225', 'DiGiCo Q326', 'DiGiCo Q338', 'DiGiCo Q852', 'Avid S6L',
+  'A&H C1500', 'A&H C2500', 'A&H S3000', 'A&H S5000', 'A&H S7000',
+  'Waves LV1 (homemade)', 'Waves LV1 Classic', 'SSL', 'Other'
+];
 
 const wirelessOptions = [
   'Shure AD Series', 'Shure AXT Series', 'Shure UR Series', 'Shure ULX Series',
@@ -268,246 +275,304 @@ export const ArtistRequirementsForm = () => {
               )}
             </div>
 
-            {/* FOH Console Section */}
+            {/* Console Setup Section */}
             <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-lg font-semibold">FOH Console</h3>
-              <RadioGroup
-                value={formData.foh_console_provided_by || 'festival'}
-                onValueChange={(value: 'festival' | 'band') => 
-                  setFormData(prev => ({ ...prev, foh_console_provided_by: value }))
-                }
-                className="flex space-x-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="festival" id="foh-festival" />
-                  <Label htmlFor="foh-festival">Festival Provided</Label>
+              <h3 className="text-lg font-semibold">Console Setup</h3>
+              <div className="grid grid-cols-2 gap-6">
+                {/* FOH Console */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">FOH Console</h4>
+                    <RadioGroup
+                      value={formData.foh_console_provided_by || 'festival'}
+                      onValueChange={(value: 'festival' | 'band') => 
+                        setFormData(prev => ({ ...prev, foh_console_provided_by: value }))
+                      }
+                      className="flex space-x-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="festival" id="foh-festival" />
+                        <Label htmlFor="foh-festival">Festival</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="band" id="foh-band" />
+                        <Label htmlFor="foh-band">Band</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                  
+                  {formData.foh_console_provided_by === 'festival' ? (
+                    <Select
+                      value={formData.foh_console}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, foh_console: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select console" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {gearSetup?.foh_consoles.map((console) => (
+                          <SelectItem key={console.model} value={console.model}>
+                            {console.model}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Select
+                      value={formData.foh_console}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, foh_console: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select console" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {consoleOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="band" id="foh-band" />
-                  <Label htmlFor="foh-band">Band Provided</Label>
-                </div>
-              </RadioGroup>
-              
-              {formData.foh_console_provided_by === 'festival' ? (
-                <Select
-                  value={formData.foh_console}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, foh_console: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select console" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {gearSetup?.foh_consoles.map((console) => (
-                      <SelectItem key={console.model} value={console.model}>
-                        {console.model}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  value={formData.foh_console || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, foh_console: e.target.value }))}
-                  placeholder="Enter console model"
-                />
-              )}
-            </div>
 
-            {/* Monitor Console Section */}
-            <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-lg font-semibold">Monitor Console</h3>
-              <RadioGroup
-                value={formData.mon_console_provided_by || 'festival'}
-                onValueChange={(value: 'festival' | 'band') => 
-                  setFormData(prev => ({ ...prev, mon_console_provided_by: value }))
-                }
-                className="flex space-x-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="festival" id="mon-festival" />
-                  <Label htmlFor="mon-festival">Festival Provided</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="band" id="mon-band" />
-                  <Label htmlFor="mon-band">Band Provided</Label>
-                </div>
-              </RadioGroup>
+                {/* Monitor Console */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Monitor Console</h4>
+                    <RadioGroup
+                      value={formData.mon_console_provided_by || 'festival'}
+                      onValueChange={(value: 'festival' | 'band') => 
+                        setFormData(prev => ({ ...prev, mon_console_provided_by: value }))
+                      }
+                      className="flex space-x-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="festival" id="mon-festival" />
+                        <Label htmlFor="mon-festival">Festival</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="band" id="mon-band" />
+                        <Label htmlFor="mon-band">Band</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
 
-              {formData.mon_console_provided_by === 'festival' ? (
-                <Select
-                  value={formData.mon_console}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, mon_console: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select console" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {gearSetup?.mon_consoles.map((console) => (
-                      <SelectItem key={console.model} value={console.model}>
-                        {console.model}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  value={formData.mon_console || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, mon_console: e.target.value }))}
-                  placeholder="Enter console model"
-                />
-              )}
-            </div>
-
-            {/* Wireless Systems */}
-            <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-lg font-semibold">Wireless Systems</h3>
-              <RadioGroup
-                value={formData.wireless_provided_by || 'festival'}
-                onValueChange={(value: 'festival' | 'band') => 
-                  setFormData(prev => ({ ...prev, wireless_provided_by: value }))
-                }
-                className="flex space-x-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="festival" id="wireless-festival" />
-                  <Label htmlFor="wireless-festival">Festival Provided</Label>
+                  {formData.mon_console_provided_by === 'festival' ? (
+                    <Select
+                      value={formData.mon_console}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, mon_console: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select console" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {gearSetup?.mon_consoles.map((console) => (
+                          <SelectItem key={console.model} value={console.model}>
+                            {console.model}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Select
+                      value={formData.mon_console}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, mon_console: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select console" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {consoleOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="band" id="wireless-band" />
-                  <Label htmlFor="wireless-band">Band Provided</Label>
-                </div>
-              </RadioGroup>
-
-              {formData.wireless_provided_by === 'festival' ? (
-                <Select
-                  value={formData.wireless_model}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, wireless_model: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select wireless system" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {gearSetup?.wireless_systems.map((system) => (
-                      <SelectItem key={system.model} value={system.model}>
-                        {system.model} ({system.quantity} available)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  value={formData.wireless_model || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, wireless_model: e.target.value }))}
-                  placeholder="Enter wireless system model"
-                />
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="wireless-hh">Handheld Quantity</Label>
-                  <Input
-                    id="wireless-hh"
-                    type="number"
-                    min="0"
-                    value={formData.wireless_quantity_hh || 0}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      wireless_quantity_hh: parseInt(e.target.value) || 0 
-                    }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="wireless-bp">Bodypack Quantity</Label>
-                  <Input
-                    id="wireless-bp"
-                    type="number"
-                    min="0"
-                    value={formData.wireless_quantity_bp || 0}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      wireless_quantity_bp: parseInt(e.target.value) || 0 
-                    }))}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="wireless-band">Frequency Band</Label>
-                <Input
-                  id="wireless-band"
-                  value={formData.wireless_band || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, wireless_band: e.target.value }))}
-                  placeholder="e.g., G50, H50"
-                />
               </div>
             </div>
 
-            {/* IEM Systems */}
+            {/* RF & Wireless Setup */}
             <div className="space-y-4 border rounded-lg p-4">
-              <h3 className="text-lg font-semibold">IEM Systems</h3>
-              <RadioGroup
-                value={formData.iem_provided_by || 'festival'}
-                onValueChange={(value: 'festival' | 'band') => 
-                  setFormData(prev => ({ ...prev, iem_provided_by: value }))
-                }
-                className="flex space-x-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="festival" id="iem-festival" />
-                  <Label htmlFor="iem-festival">Festival Provided</Label>
+              <h3 className="text-lg font-semibold">RF & Wireless Setup</h3>
+              <div className="grid grid-cols-2 gap-6">
+                {/* Wireless Systems */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Wireless Systems</h4>
+                    <RadioGroup
+                      value={formData.wireless_provided_by || 'festival'}
+                      onValueChange={(value: 'festival' | 'band') => 
+                        setFormData(prev => ({ ...prev, wireless_provided_by: value }))
+                      }
+                      className="flex space-x-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="festival" id="wireless-festival" />
+                        <Label htmlFor="wireless-festival">Festival</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="band" id="wireless-band" />
+                        <Label htmlFor="wireless-band">Band</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  {formData.wireless_provided_by === 'festival' ? (
+                    <Select
+                      value={formData.wireless_model}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, wireless_model: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select wireless system" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {gearSetup?.wireless_systems.map((system) => (
+                          <SelectItem key={system.model} value={system.model}>
+                            {system.model} ({system.quantity} available)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Select
+                      value={formData.wireless_model}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, wireless_model: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select wireless system" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {wirelessOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="wireless-hh">Handheld Qty</Label>
+                      <Input
+                        id="wireless-hh"
+                        type="number"
+                        min="0"
+                        value={formData.wireless_quantity_hh || 0}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          wireless_quantity_hh: parseInt(e.target.value) || 0 
+                        }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="wireless-bp">Bodypack Qty</Label>
+                      <Input
+                        id="wireless-bp"
+                        type="number"
+                        min="0"
+                        value={formData.wireless_quantity_bp || 0}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          wireless_quantity_bp: parseInt(e.target.value) || 0 
+                        }))}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="wireless-band">Frequency Band</Label>
+                    <Input
+                      id="wireless-band"
+                      value={formData.wireless_band || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, wireless_band: e.target.value }))}
+                      placeholder="e.g., G50, H50"
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="band" id="iem-band" />
-                  <Label htmlFor="iem-band">Band Provided</Label>
+
+                {/* IEM Systems */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">IEM Systems</h4>
+                    <RadioGroup
+                      value={formData.iem_provided_by || 'festival'}
+                      onValueChange={(value: 'festival' | 'band') => 
+                        setFormData(prev => ({ ...prev, iem_provided_by: value }))
+                      }
+                      className="flex space-x-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="festival" id="iem-festival" />
+                        <Label htmlFor="iem-festival">Festival</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="band" id="iem-band" />
+                        <Label htmlFor="iem-band">Band</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  {formData.iem_provided_by === 'festival' ? (
+                    <Select
+                      value={formData.iem_model}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, iem_model: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select IEM system" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {gearSetup?.iem_systems.map((system) => (
+                          <SelectItem key={system.model} value={system.model}>
+                            {system.model} ({system.quantity} available)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Select
+                      value={formData.iem_model}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, iem_model: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select IEM system" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {iemOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  <div>
+                    <Label htmlFor="iem-quantity">Quantity</Label>
+                    <Input
+                      id="iem-quantity"
+                      type="number"
+                      min="0"
+                      value={formData.iem_quantity || 0}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        iem_quantity: parseInt(e.target.value) || 0 
+                      }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="iem-band">Frequency Band</Label>
+                    <Input
+                      id="iem-band"
+                      value={formData.iem_band || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, iem_band: e.target.value }))}
+                      placeholder="e.g., G50, H50"
+                    />
+                  </div>
                 </div>
-              </RadioGroup>
-
-              {formData.iem_provided_by === 'festival' ? (
-                <Select
-                  value={formData.iem_model}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, iem_model: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select IEM system" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {gearSetup?.iem_systems.map((system) => (
-                      <SelectItem key={system.model} value={system.model}>
-                        {system.model} ({system.quantity} available)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  value={formData.iem_model || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, iem_model: e.target.value }))}
-                  placeholder="Enter IEM system model"
-                />
-              )}
-
-              <div>
-                <Label htmlFor="iem-quantity">Quantity</Label>
-                <Input
-                  id="iem-quantity"
-                  type="number"
-                  min="0"
-                  value={formData.iem_quantity || 0}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
-                    iem_quantity: parseInt(e.target.value) || 0 
-                  }))}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="iem-band">Frequency Band</Label>
-                <Input
-                  id="iem-band"
-                  value={formData.iem_band || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, iem_band: e.target.value }))}
-                  placeholder="e.g., G50, H50"
-                />
               </div>
             </div>
 
@@ -523,7 +588,7 @@ export const ArtistRequirementsForm = () => {
                       setFormData(prev => ({ ...prev, monitors_enabled: checked }))
                     }
                   />
-                  <Label htmlFor="monitors-enabled">Enabled</Label>
+                  <Label htmlFor="monitors-enabled">Enable Stage Monitors</Label>
                 </div>
               </div>
 
