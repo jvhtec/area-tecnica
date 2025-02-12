@@ -1742,6 +1742,13 @@ export type Database = {
             foreignKeyName: "preset_items_equipment_id_fkey"
             columns: ["equipment_id"]
             isOneToOne: false
+            referencedRelation: "current_stock_levels"
+            referencedColumns: ["equipment_id"]
+          },
+          {
+            foreignKeyName: "preset_items_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
             referencedRelation: "equipment"
             referencedColumns: ["id"]
           },
@@ -1969,6 +1976,58 @@ export type Database = {
             foreignKeyName: "stock_entries_equipment_id_fkey"
             columns: ["equipment_id"]
             isOneToOne: true
+            referencedRelation: "current_stock_levels"
+            referencedColumns: ["equipment_id"]
+          },
+          {
+            foreignKeyName: "stock_entries_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: true
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_movements: {
+        Row: {
+          created_at: string | null
+          equipment_id: string
+          id: string
+          movement_type: Database["public"]["Enums"]["movement_type"]
+          notes: string | null
+          quantity: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          equipment_id: string
+          id?: string
+          movement_type: Database["public"]["Enums"]["movement_type"]
+          notes?: string | null
+          quantity: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          equipment_id?: string
+          id?: string
+          movement_type?: Database["public"]["Enums"]["movement_type"]
+          notes?: string | null
+          quantity?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "current_stock_levels"
+            referencedColumns: ["equipment_id"]
+          },
+          {
+            foreignKeyName: "stock_movements_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
             referencedRelation: "equipment"
             referencedColumns: ["id"]
           },
@@ -2258,7 +2317,16 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      current_stock_levels: {
+        Row: {
+          category: Database["public"]["Enums"]["equipment_category"] | null
+          current_quantity: number | null
+          equipment_id: string | null
+          equipment_name: string | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       convert_to_timezone: {
@@ -2308,6 +2376,7 @@ export type Database = {
         | "logistics"
         | "administrative"
         | "production"
+      movement_type: "addition" | "subtraction"
       project_status: "pending" | "in_progress" | "completed" | "cancelled"
       provider_type: "festival" | "band"
       room_type: "single" | "double"
