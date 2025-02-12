@@ -20,11 +20,42 @@ export const ArtistRequirementsForm = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [gearSetup, setGearSetup] = useState<FestivalGearSetup | null>(null);
-  const [formData, setFormData] = useState<any>({});
+  const [formData, setFormData] = useState<any>({
+    // Initialize with default values
+    foh_console_provided_by: 'festival',
+    mon_console_provided_by: 'festival',
+    wireless_provided_by: 'festival',
+    iem_provided_by: 'festival',
+    infrastructure_provided_by: 'festival',
+    monitors_enabled: false,
+    monitors_quantity: 0,
+    wireless_quantity_hh: 0,
+    wireless_quantity_bp: 0,
+    iem_quantity: 0,
+    extras_sf: false,
+    extras_df: false,
+    extras_djbooth: false,
+    infra_cat6: false,
+    infra_cat6_quantity: 0,
+    infra_hma: false,
+    infra_hma_quantity: 0,
+    infra_coax: false,
+    infra_coax_quantity: 0,
+    infra_opticalcon_duo: false,
+    infra_opticalcon_duo_quantity: 0,
+    infra_analog: 0
+  });
 
   useEffect(() => {
     const fetchFormData = async () => {
-      if (!token) return;
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "Invalid form token",
+          variant: "destructive"
+        });
+        return;
+      }
       
       try {
         // Get artist ID and form status from token
@@ -32,9 +63,18 @@ export const ArtistRequirementsForm = () => {
           .from('festival_artist_forms')
           .select('artist_id, status')
           .eq('token', token)
-          .single();
+          .maybeSingle();
 
         if (formError) throw formError;
+        if (!formInfo) {
+          toast({
+            title: "Error",
+            description: "Invalid form token",
+            variant: "destructive"
+          });
+          return;
+        }
+        
         if (formInfo.status === 'completed') {
           toast({
             title: "Form Already Submitted",
@@ -47,24 +87,26 @@ export const ArtistRequirementsForm = () => {
         // Get artist data
         const { data: artistData, error: artistError } = await supabase
           .from('festival_artists')
-          .select('*, jobs!inner(*)')
+          .select(`
+            *,
+            jobs:job_id (*)
+          `)
           .eq('id', formInfo.artist_id)
-          .single();
+          .maybeSingle();
 
         if (artistError) throw artistError;
+        if (!artistData) {
+          toast({
+            title: "Error",
+            description: "Artist not found",
+            variant: "destructive"
+          });
+          return;
+        }
 
-        // Get festival gear setup
-        const { data: gearSetupData, error: gearError } = await supabase
-          .from('festival_gear_setups')
-          .select('*')
-          .eq('job_id', artistData.job_id)
-          .eq('date', artistData.date)
-          .single();
-
-        if (gearError) throw gearError;
-
-        setGearSetup(gearSetupData);
-        setFormData({
+        // Update form data with artist info
+        setFormData(prev => ({
+          ...prev,
           name: artistData.name,
           stage: artistData.stage,
           date: artistData.date,
@@ -73,7 +115,22 @@ export const ArtistRequirementsForm = () => {
           soundcheck: artistData.soundcheck,
           soundcheck_start: artistData.soundcheck_start,
           soundcheck_end: artistData.soundcheck_end,
-        });
+        }));
+
+        // Get festival gear setup
+        const { data: gearSetupData, error: gearError } = await supabase
+          .from('festival_gear_setups')
+          .select('*')
+          .eq('job_id', artistData.job_id)
+          .eq('date', artistData.date)
+          .maybeSingle();
+
+        if (gearError) throw gearError;
+        if (gearSetupData) {
+          setGearSetup(gearSetupData);
+        } else {
+          console.warn('No gear setup found for this date');
+        }
       } catch (error: any) {
         console.error('Error fetching form data:', error);
         toast({
@@ -100,9 +157,12 @@ export const ArtistRequirementsForm = () => {
         .from('festival_artist_forms')
         .select('artist_id')
         .eq('token', token)
-        .single();
+        .maybeSingle();
 
       if (formError) throw formError;
+      if (!formInfo) {
+        throw new Error('Form not found');
+      }
 
       // Update artist data
       const { error: updateError } = await supabase
