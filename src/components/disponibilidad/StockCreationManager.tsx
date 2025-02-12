@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { StockEntry, Equipment } from '@/types/equipment';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,7 @@ type GroupedEquipment = {
     name: string;
     category: string;
     quantity: number;
+    currentQuantity: number;
   }>;
 };
 
@@ -46,10 +48,23 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
     }
   });
 
+  // Fetch current stock levels
+  const { data: currentStockLevels = [] } = useQuery({
+    queryKey: ['current-stock-levels'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('current_stock_levels')
+        .select('*');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
   // Initialize localStock with entries for all equipment
   const [localStock, setLocalStock] = useState<StockEntry[]>([]);
 
-  // Group equipment by category
+  // Group equipment by category with current stock levels
   const groupedEquipment = equipmentList.reduce((acc: GroupedEquipment, equipment) => {
     const category = equipment.category || 'uncategorized';
     if (!acc[category]) {
@@ -57,11 +72,14 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
     }
     
     const stockEntry = localStock.find(s => s.equipment_id === equipment.id);
+    const currentLevel = currentStockLevels.find(s => s.equipment_id === equipment.id);
+    
     acc[category].push({
       id: equipment.id,
       name: equipment.name,
       category: equipment.category,
-      quantity: stockEntry?.base_quantity || 0
+      quantity: stockEntry?.base_quantity || 0,
+      currentQuantity: currentLevel?.current_quantity || 0
     });
     
     return acc;
@@ -170,9 +188,9 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
                         <Input
                           type="number"
                           min="0"
-                          value={equipment.quantity}
-                          onChange={(e) => handleQuantityChange(equipment.id, parseInt(e.target.value) || 0)}
-                          className="w-24"
+                          value={equipment.currentQuantity}
+                          readOnly
+                          className="w-24 bg-muted"
                         />
                         <Button
                           variant="outline"
