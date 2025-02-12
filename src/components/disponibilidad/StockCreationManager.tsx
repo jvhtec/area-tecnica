@@ -1,15 +1,15 @@
-
 import { useState, useEffect } from 'react';
 import { StockEntry, Equipment } from '@/types/equipment';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus } from 'lucide-react';
+import { Plus, Minus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { EquipmentCreationManager } from '@/components/equipment/EquipmentCreationManager';
+import { StockMovementDialog } from '@/components/equipment/StockMovementDialog';
 
 interface StockManagerProps {
   stock: StockEntry[];
@@ -27,6 +27,9 @@ type GroupedEquipment = {
 
 export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps) => {
   const { toast } = useToast();
+  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
+  const [isAdditionDialog, setIsAdditionDialog] = useState(true);
+  const [showMovementDialog, setShowMovementDialog] = useState(false);
 
   // Fetch equipment list with proper typing
   const { data: equipmentList = [], refetch: refetchEquipment } = useQuery<Equipment[]>({
@@ -120,6 +123,12 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
     refetchEquipment();
   };
 
+  const handleMovementClick = (equipment: Equipment, isAddition: boolean) => {
+    setSelectedEquipment(equipment);
+    setIsAdditionDialog(isAddition);
+    setShowMovementDialog(true);
+  };
+
   return (
     <div className="space-y-8">
       <div className="space-y-4">
@@ -147,13 +156,35 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
                       <div className="flex-1">
                         <Label>{equipment.name}</Label>
                       </div>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={equipment.quantity}
-                        onChange={(e) => handleQuantityChange(equipment.id, parseInt(e.target.value) || 0)}
-                        className="w-24"
-                      />
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleMovementClick(
+                            equipmentList.find(e => e.id === equipment.id)!,
+                            false
+                          )}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={equipment.quantity}
+                          onChange={(e) => handleQuantityChange(equipment.id, parseInt(e.target.value) || 0)}
+                          className="w-24"
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleMovementClick(
+                            equipmentList.find(e => e.id === equipment.id)!,
+                            true
+                          )}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -162,6 +193,15 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
           </div>
         </ScrollArea>
       </div>
+
+      {selectedEquipment && (
+        <StockMovementDialog
+          open={showMovementDialog}
+          onOpenChange={setShowMovementDialog}
+          equipment={selectedEquipment}
+          isAddition={isAdditionDialog}
+        />
+      )}
     </div>
   );
 };
