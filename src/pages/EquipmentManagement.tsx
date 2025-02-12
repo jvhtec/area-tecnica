@@ -12,23 +12,25 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
 export function EquipmentManagement() {
-  const { session, userRole } = useSessionManager();
+  const { session } = useSessionManager();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Fetch current user's stock
+  // Fetch current stock entries
   const { data: stockEntries = [], error: stockError } = useQuery({
-    queryKey: ['stock-entries', session?.user?.id],
+    queryKey: ['stock-entries'],
     queryFn: async () => {
       if (!session?.user?.id) return [];
       
       const { data, error } = await supabase
         .from('stock_entries')
-        .select('*')
-        .eq('user_id', session.user.id);
+        .select('*');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching stock entries:', error);
+        throw error;
+      }
       return data as StockEntry[];
     },
     enabled: !!session?.user?.id
@@ -41,47 +43,35 @@ export function EquipmentManagement() {
 
       // Process each stock entry individually
       for (const entry of updatedStock) {
-        const existingEntry = stockEntries.find(
-          s => s.equipment_id === entry.equipment_id
-        );
+        const { error: upsertError } = await supabase
+          .from('stock_entries')
+          .upsert({
+            id: entry.id,
+            equipment_id: entry.equipment_id,
+            base_quantity: entry.base_quantity
+          });
 
-        if (existingEntry) {
-          // Update existing entry
-          const { error: updateError } = await supabase
-            .from('stock_entries')
-            .update({ base_quantity: entry.base_quantity })
-            .eq('id', existingEntry.id)
-            .eq('user_id', session.user.id);
-
-          if (updateError) throw updateError;
-        } else {
-          // Insert new entry
-          const { error: insertError } = await supabase
-            .from('stock_entries')
-            .insert({
-              equipment_id: entry.equipment_id,
-              base_quantity: entry.base_quantity,
-              user_id: session.user.id
-            });
-
-          if (insertError) throw insertError;
+        if (upsertError) {
+          console.error('Error updating stock entry:', upsertError);
+          throw upsertError;
         }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['current-stock-levels'] });
       toast({
         title: "Éxito",
         description: "Inventario actualizado correctamente"
       });
     },
     onError: (error) => {
+      console.error('Error in updateStockMutation:', error);
       toast({
         variant: "destructive",
         title: "Error",
         description: "Error al actualizar el inventario"
       });
-      console.error('Error updating stock:', error);
     }
   });
 
