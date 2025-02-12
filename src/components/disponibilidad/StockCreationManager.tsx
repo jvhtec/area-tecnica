@@ -64,28 +64,7 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
   // Initialize localStock with entries for all equipment
   const [localStock, setLocalStock] = useState<StockEntry[]>([]);
 
-  // Group equipment by category with current stock levels
-  const groupedEquipment = equipmentList.reduce((acc: GroupedEquipment, equipment) => {
-    const category = equipment.category || 'uncategorized';
-    if (!acc[category]) {
-      acc[category] = [];
-    }
-    
-    const stockEntry = localStock.find(s => s.equipment_id === equipment.id);
-    const currentLevel = currentStockLevels.find(s => s.equipment_id === equipment.id);
-    
-    acc[category].push({
-      id: equipment.id,
-      name: equipment.name,
-      category: equipment.category,
-      quantity: stockEntry?.base_quantity || 0,
-      currentQuantity: currentLevel?.current_quantity || 0
-    });
-    
-    return acc;
-  }, {});
-
-  // Update localStock when equipment list or stock changes
+  // Initialize localStock when equipment list or stock changes
   useEffect(() => {
     const updatedStock = equipmentList.map(equipment => {
       const existingEntry = stock.find(s => s.equipment_id === equipment.id);
@@ -97,8 +76,7 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
         base_quantity: 0,
         id: crypto.randomUUID(),
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        user_id: '' // This will be set when saving to the database
+        updated_at: new Date().toISOString()
       };
     });
     setLocalStock(updatedStock);
@@ -120,14 +98,34 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
           base_quantity: quantity,
           id: crypto.randomUUID(),
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          user_id: ''
+          updated_at: new Date().toISOString()
         });
       }
       
       return updatedStock;
     });
   };
+
+  // Group equipment by category with current stock levels
+  const groupedEquipment = equipmentList.reduce((acc: GroupedEquipment, equipment) => {
+    const category = equipment.category || 'uncategorized';
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    
+    const stockEntry = localStock.find(s => s.equipment_id === equipment.id);
+    const currentLevel = currentStockLevels.find(s => s.equipment_id === equipment.id);
+    
+    acc[category].push({
+      id: equipment.id,
+      name: equipment.name,
+      category: equipment.category,
+      quantity: stockEntry?.base_quantity || 0,
+      currentQuantity: currentLevel?.current_quantity || 0
+    });
+    
+    return acc;
+  }, {});
 
   const handleSave = () => {
     onStockUpdate(localStock);
