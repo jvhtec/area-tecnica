@@ -1,3 +1,4 @@
+
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, ChevronsUpDown, Download } from 'lucide-react';
@@ -24,7 +25,7 @@ interface Equipment {
   id: string;
   name: string;
   category: EquipmentCategory;
-  stock: number;
+  current_quantity: number;
 }
 
 export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps) {
@@ -46,33 +47,29 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     end: endOfWeek(currentWeekStart)
   });
 
-  const { data: stockWithEquipment, refetch: refetchStock } = useQuery({
+  const { data: stockWithEquipment = [], refetch: refetchStock } = useQuery({
     queryKey: ['equipment-with-stock', session?.user?.id],
     queryFn: async () => {
       if (!session?.user?.id) return [];
 
-      const { data: equipment } = await supabase
+      // Join equipment with current_stock_levels view
+      const { data: equipment, error } = await supabase
         .from('equipment')
-        .select('*')
+        .select(`
+          *,
+          current_stock_levels (
+            current_quantity
+          )
+        `)
         .order('category')
         .order('name');
 
-      const { data: stockEntries } = await supabase
-        .from('stock_entries')
-        .select('*')
-        .eq('user_id', session.user.id);
-
-      if (!equipment) return [];
-
-      const stockMap = (stockEntries || []).reduce((acc, entry) => {
-        acc[entry.equipment_id] = entry.base_quantity;
-        return acc;
-      }, {} as Record<string, number>);
+      if (error) throw error;
 
       return equipment.map(item => ({
         ...item,
-        stock: stockMap[item.id] || 0
-      }));
+        current_quantity: item.current_stock_levels?.current_quantity || 0
+      })) as Equipment[];
     },
     enabled: !!session?.user?.id
   });
@@ -168,7 +165,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
       const pdfRows = filteredEquipment.map(item => {
         const dailyUsage = weekDates.map(date => {
           const used = getUsedQuantity(item.id, date);
-          const remaining = item.stock - used;
+          const remaining = item.current_quantity - used;
           return {
             used,
             remaining,
@@ -177,12 +174,12 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
         });
 
         const maxUsedInWeek = Math.max(...dailyUsage.map(d => d.used));
-        const available = item.stock - maxUsedInWeek;
+        const available = item.current_quantity - maxUsedInWeek;
 
         return {
           name: item.name,
           category: item.category,
-          stock: item.stock,
+          stock: item.current_quantity,
           dailyUsage,
           available
         };
@@ -281,16 +278,16 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
                 {filteredEquipment?.map((item) => {
                   const usedQuantities = weekDates.map(date => getUsedQuantity(item.id, date));
                   const maxUsedInWeek = Math.max(...usedQuantities);
-                  const available = item.stock - maxUsedInWeek;
+                  const available = item.current_quantity - maxUsedInWeek;
 
                   return (
                     <TableRow key={item.id}>
                       <TableCell>{item.name}</TableCell>
                       <TableCell>{categoryLabels[item.category]}</TableCell>
-                      <TableCell>{item.stock}</TableCell>
+                      <TableCell>{item.current_quantity}</TableCell>
                       {weekDates.map((date) => {
                         const used = getUsedQuantity(item.id, date);
-                        const remaining = item.stock - used;
+                        const remaining = item.current_quantity - used;
                         const remainingText = remaining >= 0 ? `(+${remaining})` : `(${remaining})`;
                         const remainingClass = remaining >= 0 ? 'text-green-500' : 'text-red-500';
 
