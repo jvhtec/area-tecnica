@@ -15,6 +15,7 @@ interface StockMovementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   equipment: Equipment;
+  currentStock?: number;
   isAddition?: boolean;
 }
 
@@ -22,6 +23,7 @@ export function StockMovementDialog({
   open,
   onOpenChange,
   equipment,
+  currentStock = 0,
   isAddition = true
 }: StockMovementDialogProps) {
   const [quantity, setQuantity] = useState<number>(1);
@@ -34,22 +36,61 @@ export function StockMovementDialog({
     mutationFn: async () => {
       if (!session?.user?.id) throw new Error('Not authenticated');
       
-      // Always send a positive quantity and use movement_type to indicate direction
-      const { error } = await supabase
+      // Get current stock entry
+      const { data: stockEntry } = await supabase
+        .from('stock_entries')
+        .select('*')
+        .eq('equipment_id', equipment.id)
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+
+      // Calculate new base quantity
+      const movementQty = Math.abs(quantity);
+      const newBaseQty = isAddition ? 
+        (stockEntry?.base_quantity || 0) + movementQty :
+        (stockEntry?.base_quantity || 0) - movementQty;
+
+      if (!isAddition && newBaseQty < 0) {
+        throw new Error('Not enough stock available');
+      }
+
+      // Begin transaction
+      const { error: stockMovementError } = await supabase
         .from('stock_movements')
         .insert({
           equipment_id: equipment.id,
           user_id: session.user.id,
-          quantity: Math.abs(quantity), // Always positive
+          quantity: movementQty,
           movement_type: isAddition ? 'addition' : 'subtraction',
           notes: notes.trim() || null
         });
 
-      if (error) throw error;
+      if (stockMovementError) throw stockMovementError;
+
+      // Update or insert stock entry
+      if (stockEntry) {
+        const { error: updateError } = await supabase
+          .from('stock_entries')
+          .update({ base_quantity: newBaseQty })
+          .eq('id', stockEntry.id);
+
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from('stock_entries')
+          .insert({
+            equipment_id: equipment.id,
+            user_id: session.user.id,
+            base_quantity: newBaseQty
+          });
+
+        if (insertError) throw insertError;
+      }
     },
     onSuccess: () => {
+      // Invalidate both queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ['current-stock-levels'] });
-      queryClient.invalidateQueries({ queryKey: ['stock-entries'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
       toast({
         title: "Success",
         description: `Stock ${isAddition ? 'added' : 'removed'} successfully`
@@ -92,10 +133,16 @@ export function StockMovementDialog({
               id="quantity"
               type="number"
               min="1"
+              max={!isAddition ? currentStock : undefined}
               value={quantity}
               onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
               required
             />
+            {!isAddition && (
+              <p className="text-sm text-muted-foreground">
+                Current stock: {currentStock}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -119,7 +166,7 @@ export function StockMovementDialog({
             </Button>
             <Button 
               type="submit"
-              disabled={stockMovementMutation.isPending}
+              disabled={stockMovementMutation.isPending || (!isAddition && quantity > currentStock)}
             >
               {stockMovementMutation.isPending ? "Processing..." : "Confirm"}
             </Button>
