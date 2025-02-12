@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -9,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 
 interface ArtistManagementDialogProps {
   open: boolean;
@@ -47,7 +47,8 @@ export const ArtistManagementDialog = ({
 }: ArtistManagementDialogProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  
+  const [formLinkDialogOpen, setFormLinkDialogOpen] = useState(false);
+
   const [formData, setFormData] = useState({
     name: "",
     stage: "",
@@ -195,217 +196,160 @@ export const ArtistManagementDialog = ({
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {artist?.id ? "Edit Artist" : "Add New Artist"}
-          </DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="name">Artist Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="stage">Stage Number</Label>
-                <Input
-                  id="stage"
-                  type="number"
-                  min="1"
-                  value={formData.stage}
-                  onChange={(e) =>
-                    setFormData({ ...formData, stage: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="date">Performance Date</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={formData.date}
-                  readOnly
-                  className="bg-gray-100"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label htmlFor="show_start">Show Start</Label>
-                  <Input
-                    id="show_start"
-                    type="time"
-                    value={formData.show_start}
-                    onChange={(e) =>
-                      setFormData({ ...formData, show_start: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="show_end">Show End</Label>
-                  <Input
-                    id="show_end"
-                    type="time"
-                    value={formData.show_end}
-                    onChange={(e) =>
-                      setFormData({ ...formData, show_end: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="soundcheck">Soundcheck</Label>
-                  <Switch
-                    id="soundcheck"
-                    checked={formData.soundcheck}
-                    onCheckedChange={(checked) =>
-                      setFormData({ ...formData, soundcheck: checked })
-                    }
-                  />
-                </div>
-                {formData.soundcheck && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label htmlFor="soundcheck_start">Soundcheck Start</Label>
-                      <Input
-                        id="soundcheck_start"
-                        type="time"
-                        value={formData.soundcheck_start}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            soundcheck_start: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="soundcheck_end">Soundcheck End</Label>
-                      <Input
-                        id="soundcheck_end"
-                        type="time"
-                        value={formData.soundcheck_end}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            soundcheck_end: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="foh_tech">FOH Tech</Label>
-                  <Switch
-                    id="foh_tech"
-                    checked={formData.foh_tech}
-                    onCheckedChange={(checked) =>
-                      setFormData({ ...formData, foh_tech: checked })
-                    }
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="mon_tech">Monitor Tech</Label>
-                  <Switch
-                    id="mon_tech"
-                    checked={formData.mon_tech}
-                    onCheckedChange={(checked) =>
-                      setFormData({ ...formData, mon_tech: checked })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="foh_console">FOH Console</Label>
-                <Select
-                  value={formData.foh_console}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, foh_console: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select FOH console" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {consoleOptions.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <ProviderRadioGroup
-                  value={formData.foh_console_provided_by}
-                  onChange={(value) => setFormData({ ...formData, foh_console_provided_by: value })}
-                  label="FOH Console Provided By"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="mon_console">Monitor Console</Label>
-                <Select
-                  value={formData.mon_console}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, mon_console: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select monitor console" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {consoleOptions.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <ProviderRadioGroup
-                  value={formData.mon_console_provided_by}
-                  onChange={(value) => setFormData({ ...formData, mon_console_provided_by: value })}
-                  label="Monitor Console Provided By"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="border rounded-lg p-4 space-y-4">
-            <h3 className="text-lg font-medium">RF & Wireless Setup</h3>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {artist?.id ? "Edit Artist" : "Add New Artist"}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="wireless_model">Wireless Microphone Model</Label>
+                  <Label htmlFor="name">Artist Name</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="stage">Stage Number</Label>
+                  <Input
+                    id="stage"
+                    type="number"
+                    min="1"
+                    value={formData.stage}
+                    onChange={(e) =>
+                      setFormData({ ...formData, stage: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="date">Performance Date</Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={formData.date}
+                    readOnly
+                    className="bg-gray-100"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label htmlFor="show_start">Show Start</Label>
+                    <Input
+                      id="show_start"
+                      type="time"
+                      value={formData.show_start}
+                      onChange={(e) =>
+                        setFormData({ ...formData, show_start: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="show_end">Show End</Label>
+                    <Input
+                      id="show_end"
+                      type="time"
+                      value={formData.show_end}
+                      onChange={(e) =>
+                        setFormData({ ...formData, show_end: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="soundcheck">Soundcheck</Label>
+                    <Switch
+                      id="soundcheck"
+                      checked={formData.soundcheck}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, soundcheck: checked })
+                      }
+                    />
+                  </div>
+                  {formData.soundcheck && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label htmlFor="soundcheck_start">Soundcheck Start</Label>
+                        <Input
+                          id="soundcheck_start"
+                          type="time"
+                          value={formData.soundcheck_start}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              soundcheck_start: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="soundcheck_end">Soundcheck End</Label>
+                        <Input
+                          id="soundcheck_end"
+                          type="time"
+                          value={formData.soundcheck_end}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              soundcheck_end: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="foh_tech">FOH Tech</Label>
+                    <Switch
+                      id="foh_tech"
+                      checked={formData.foh_tech}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, foh_tech: checked })
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="mon_tech">Monitor Tech</Label>
+                    <Switch
+                      id="mon_tech"
+                      checked={formData.mon_tech}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, mon_tech: checked })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="foh_console">FOH Console</Label>
                   <Select
-                    value={formData.wireless_model}
+                    value={formData.foh_console}
                     onValueChange={(value) =>
-                      setFormData({ ...formData, wireless_model: value })
+                      setFormData({ ...formData, foh_console: value })
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select wireless model" />
+                      <SelectValue placeholder="Select FOH console" />
                     </SelectTrigger>
                     <SelectContent>
-                      {wirelessOptions.map((option) => (
+                      {consoleOptions.map((option) => (
                         <SelectItem key={option} value={option}>
                           {option}
                         </SelectItem>
@@ -413,66 +357,25 @@ export const ArtistManagementDialog = ({
                     </SelectContent>
                   </Select>
                   <ProviderRadioGroup
-                    value={formData.wireless_provided_by}
-                    onChange={(value) => setFormData({ ...formData, wireless_provided_by: value })}
-                    label="Wireless System Provided By"
+                    value={formData.foh_console_provided_by}
+                    onChange={(value) => setFormData({ ...formData, foh_console_provided_by: value })}
+                    label="FOH Console Provided By"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="wireless_quantity_hh">Handheld Quantity</Label>
-                  <Input
-                    id="wireless_quantity_hh"
-                    type="number"
-                    min="0"
-                    value={formData.wireless_quantity_hh}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        wireless_quantity_hh: parseInt(e.target.value) || 0,
-                      })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="wireless_quantity_bp">Bodypack Quantity</Label>
-                  <Input
-                    id="wireless_quantity_bp"
-                    type="number"
-                    min="0"
-                    value={formData.wireless_quantity_bp}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        wireless_quantity_bp: parseInt(e.target.value) || 0,
-                      })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="wireless_band">Frequency Band</Label>
-                  <Input
-                    id="wireless_band"
-                    value={formData.wireless_band}
-                    onChange={(e) =>
-                      setFormData({ ...formData, wireless_band: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="iem_model">IEM Model</Label>
+
+                <div className="space-y-2">
+                  <Label htmlFor="mon_console">Monitor Console</Label>
                   <Select
-                    value={formData.iem_model}
+                    value={formData.mon_console}
                     onValueChange={(value) =>
-                      setFormData({ ...formData, iem_model: value })
+                      setFormData({ ...formData, mon_console: value })
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select IEM model" />
+                      <SelectValue placeholder="Select monitor console" />
                     </SelectTrigger>
                     <SelectContent>
-                      {iemOptions.map((option) => (
+                      {consoleOptions.map((option) => (
                         <SelectItem key={option} value={option}>
                           {option}
                         </SelectItem>
@@ -480,305 +383,422 @@ export const ArtistManagementDialog = ({
                     </SelectContent>
                   </Select>
                   <ProviderRadioGroup
-                    value={formData.iem_provided_by}
-                    onChange={(value) => setFormData({ ...formData, iem_provided_by: value })}
-                    label="IEM System Provided By"
+                    value={formData.mon_console_provided_by}
+                    onChange={(value) => setFormData({ ...formData, mon_console_provided_by: value })}
+                    label="Monitor Console Provided By"
                   />
                 </div>
+              </div>
+            </div>
+
+            <div className="border rounded-lg p-4 space-y-4">
+              <h3 className="text-lg font-medium">RF & Wireless Setup</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="wireless_model">Wireless Microphone Model</Label>
+                    <Select
+                      value={formData.wireless_model}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, wireless_model: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select wireless model" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {wirelessOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <ProviderRadioGroup
+                      value={formData.wireless_provided_by}
+                      onChange={(value) => setFormData({ ...formData, wireless_provided_by: value })}
+                      label="Wireless System Provided By"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="wireless_quantity_hh">Handheld Quantity</Label>
+                    <Input
+                      id="wireless_quantity_hh"
+                      type="number"
+                      min="0"
+                      value={formData.wireless_quantity_hh}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          wireless_quantity_hh: parseInt(e.target.value) || 0,
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="wireless_quantity_bp">Bodypack Quantity</Label>
+                    <Input
+                      id="wireless_quantity_bp"
+                      type="number"
+                      min="0"
+                      value={formData.wireless_quantity_bp}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          wireless_quantity_bp: parseInt(e.target.value) || 0,
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="wireless_band">Frequency Band</Label>
+                    <Input
+                      id="wireless_band"
+                      value={formData.wireless_band}
+                      onChange={(e) =>
+                        setFormData({ ...formData, wireless_band: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="iem_model">IEM Model</Label>
+                    <Select
+                      value={formData.iem_model}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, iem_model: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select IEM model" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {iemOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <ProviderRadioGroup
+                      value={formData.iem_provided_by}
+                      onChange={(value) => setFormData({ ...formData, iem_provided_by: value })}
+                      label="IEM System Provided By"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="iem_quantity">IEM Quantity</Label>
+                    <Input
+                      id="iem_quantity"
+                      type="number"
+                      min="0"
+                      value={formData.iem_quantity}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          iem_quantity: parseInt(e.target.value) || 0,
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="iem_band">IEM Band</Label>
+                    <Input
+                      id="iem_band"
+                      value={formData.iem_band}
+                      onChange={(e) =>
+                        setFormData({ ...formData, iem_band: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="border rounded-lg p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">Monitor Setup</h3>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={formData.monitors_enabled}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, monitors_enabled: checked })
+                    }
+                  />
+                  <Label>Enabled</Label>
+                </div>
+              </div>
+              {formData.monitors_enabled && (
                 <div>
-                  <Label htmlFor="iem_quantity">IEM Quantity</Label>
+                  <Label htmlFor="monitors_quantity">Number of Monitors</Label>
                   <Input
-                    id="iem_quantity"
+                    id="monitors_quantity"
                     type="number"
                     min="0"
-                    value={formData.iem_quantity}
+                    value={formData.monitors_quantity}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        iem_quantity: parseInt(e.target.value) || 0,
+                        monitors_quantity: parseInt(e.target.value) || 0,
                       })
                     }
                   />
                 </div>
+              )}
+            </div>
+
+            <div className="border rounded-lg p-4 space-y-4">
+              <h3 className="text-lg font-medium">Extra Requirements</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={formData.extras_sf}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, extras_sf: checked })
+                    }
+                  />
+                  <Label>Side Fill</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={formData.extras_df}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, extras_df: checked })
+                    }
+                  />
+                  <Label>Drum Fill</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={formData.extras_djbooth}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, extras_djbooth: checked })
+                    }
+                  />
+                  <Label>DJ Booth</Label>
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="extras_wired">Additional Wired Requirements</Label>
+                <Input
+                  id="extras_wired"
+                  value={formData.extras_wired}
+                  onChange={(e) =>
+                    setFormData({ ...formData, extras_wired: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="border rounded-lg p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">Infrastructure</h3>
+                <ProviderRadioGroup
+                  value={formData.infrastructure_provided_by}
+                  onChange={(value) => setFormData({ ...formData, infrastructure_provided_by: value })}
+                  label="Infrastructure Provided By"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={formData.infra_cat6}
+                        onCheckedChange={(checked) =>
+                          setFormData({
+                            ...formData,
+                            infra_cat6: checked,
+                            infra_cat6_quantity: checked ? 1 : 0
+                          })
+                        }
+                      />
+                      <Label>CAT6</Label>
+                    </div>
+                    {formData.infra_cat6 && (
+                      <Input
+                        type="number"
+                        min="1"
+                        className="w-24"
+                        value={formData.infra_cat6_quantity}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            infra_cat6_quantity: parseInt(e.target.value) || 0
+                          })
+                        }
+                      />
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={formData.infra_hma}
+                        onCheckedChange={(checked) =>
+                          setFormData({
+                            ...formData,
+                            infra_hma: checked,
+                            infra_hma_quantity: checked ? 1 : 0
+                          })
+                        }
+                      />
+                      <Label>HMA</Label>
+                    </div>
+                    {formData.infra_hma && (
+                      <Input
+                        type="number"
+                        min="1"
+                        className="w-24"
+                        value={formData.infra_hma_quantity}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            infra_hma_quantity: parseInt(e.target.value) || 0
+                          })
+                        }
+                      />
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={formData.infra_coax}
+                        onCheckedChange={(checked) =>
+                          setFormData({
+                            ...formData,
+                            infra_coax: checked,
+                            infra_coax_quantity: checked ? 1 : 0
+                          })
+                        }
+                      />
+                      <Label>Coax</Label>
+                    </div>
+                    {formData.infra_coax && (
+                      <Input
+                        type="number"
+                        min="1"
+                        className="w-24"
+                        value={formData.infra_coax_quantity}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            infra_coax_quantity: parseInt(e.target.value) || 0
+                          })
+                        }
+                      />
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={formData.infra_opticalcon_duo}
+                        onCheckedChange={(checked) =>
+                          setFormData({
+                            ...formData,
+                            infra_opticalcon_duo: checked,
+                            infra_opticalcon_duo_quantity: checked ? 1 : 0
+                          })
+                        }
+                      />
+                      <Label>OpticalCon Duo</Label>
+                    </div>
+                    {formData.infra_opticalcon_duo && (
+                      <Input
+                        type="number"
+                        min="1"
+                        className="w-24"
+                        value={formData.infra_opticalcon_duo_quantity}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            infra_opticalcon_duo_quantity: parseInt(e.target.value) || 0
+                          })
+                        }
+                      />
+                    )}
+                  </div>
+                </div>
+
                 <div>
-                  <Label htmlFor="iem_band">IEM Band</Label>
+                  <Label htmlFor="infra_analog">Analog Lines</Label>
                   <Input
-                    id="iem_band"
-                    value={formData.iem_band}
+                    id="infra_analog"
+                    type="number"
+                    min="0"
+                    value={formData.infra_analog}
                     onChange={(e) =>
-                      setFormData({ ...formData, iem_band: e.target.value })
+                      setFormData({
+                        ...formData,
+                        infra_analog: parseInt(e.target.value) || 0,
+                      })
                     }
                   />
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div className="border rounded-lg p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium">Monitor Setup</h3>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={formData.monitors_enabled}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, monitors_enabled: checked })
-                  }
-                />
-                <Label>Enabled</Label>
-              </div>
-            </div>
-            {formData.monitors_enabled && (
               <div>
-                <Label htmlFor="monitors_quantity">Number of Monitors</Label>
+                <Label htmlFor="other_infrastructure">Other Infrastructure</Label>
                 <Input
-                  id="monitors_quantity"
-                  type="number"
-                  min="0"
-                  value={formData.monitors_quantity}
+                  id="other_infrastructure"
+                  value={formData.other_infrastructure}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      monitors_quantity: parseInt(e.target.value) || 0,
-                    })
-                  }
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="border rounded-lg p-4 space-y-4">
-            <h3 className="text-lg font-medium">Extra Requirements</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={formData.extras_sf}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, extras_sf: checked })
-                  }
-                />
-                <Label>Side Fill</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={formData.extras_df}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, extras_df: checked })
-                  }
-                />
-                <Label>Drum Fill</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={formData.extras_djbooth}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, extras_djbooth: checked })
-                  }
-                />
-                <Label>DJ Booth</Label>
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="extras_wired">Additional Wired Requirements</Label>
-              <Input
-                id="extras_wired"
-                value={formData.extras_wired}
-                onChange={(e) =>
-                  setFormData({ ...formData, extras_wired: e.target.value })
-                }
-              />
-            </div>
-          </div>
-
-          <div className="border rounded-lg p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium">Infrastructure</h3>
-              <ProviderRadioGroup
-                value={formData.infrastructure_provided_by}
-                onChange={(value) => setFormData({ ...formData, infrastructure_provided_by: value })}
-                label="Infrastructure Provided By"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={formData.infra_cat6}
-                      onCheckedChange={(checked) =>
-                        setFormData({
-                          ...formData,
-                          infra_cat6: checked,
-                          infra_cat6_quantity: checked ? 1 : 0
-                        })
-                      }
-                    />
-                    <Label>CAT6</Label>
-                  </div>
-                  {formData.infra_cat6 && (
-                    <Input
-                      type="number"
-                      min="1"
-                      className="w-24"
-                      value={formData.infra_cat6_quantity}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          infra_cat6_quantity: parseInt(e.target.value) || 0
-                        })
-                      }
-                    />
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={formData.infra_hma}
-                      onCheckedChange={(checked) =>
-                        setFormData({
-                          ...formData,
-                          infra_hma: checked,
-                          infra_hma_quantity: checked ? 1 : 0
-                        })
-                      }
-                    />
-                    <Label>HMA</Label>
-                  </div>
-                  {formData.infra_hma && (
-                    <Input
-                      type="number"
-                      min="1"
-                      className="w-24"
-                      value={formData.infra_hma_quantity}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          infra_hma_quantity: parseInt(e.target.value) || 0
-                        })
-                      }
-                    />
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={formData.infra_coax}
-                      onCheckedChange={(checked) =>
-                        setFormData({
-                          ...formData,
-                          infra_coax: checked,
-                          infra_coax_quantity: checked ? 1 : 0
-                        })
-                      }
-                    />
-                    <Label>Coax</Label>
-                  </div>
-                  {formData.infra_coax && (
-                    <Input
-                      type="number"
-                      min="1"
-                      className="w-24"
-                      value={formData.infra_coax_quantity}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          infra_coax_quantity: parseInt(e.target.value) || 0
-                        })
-                      }
-                    />
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={formData.infra_opticalcon_duo}
-                      onCheckedChange={(checked) =>
-                        setFormData({
-                          ...formData,
-                          infra_opticalcon_duo: checked,
-                          infra_opticalcon_duo_quantity: checked ? 1 : 0
-                        })
-                      }
-                    />
-                    <Label>OpticalCon Duo</Label>
-                  </div>
-                  {formData.infra_opticalcon_duo && (
-                    <Input
-                      type="number"
-                      min="1"
-                      className="w-24"
-                      value={formData.infra_opticalcon_duo_quantity}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          infra_opticalcon_duo_quantity: parseInt(e.target.value) || 0
-                        })
-                      }
-                    />
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="infra_analog">Analog Lines</Label>
-                <Input
-                  id="infra_analog"
-                  type="number"
-                  min="0"
-                  value={formData.infra_analog}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      infra_analog: parseInt(e.target.value) || 0,
+                      other_infrastructure: e.target.value,
                     })
                   }
                 />
               </div>
             </div>
-            <div>
-              <Label htmlFor="other_infrastructure">Other Infrastructure</Label>
-              <Input
-                id="other_infrastructure"
-                value={formData.other_infrastructure}
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <textarea
+                id="notes"
+                className="w-full min-h-[100px] px-3 py-2 border rounded-md"
+                value={formData.notes}
                 onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    other_infrastructure: e.target.value,
-                  })
+                  setFormData({ ...formData, notes: e.target.value })
                 }
               />
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <textarea
-              id="notes"
-              className="w-full min-h-[100px] px-3 py-2 border rounded-md"
-              value={formData.notes}
-              onChange={(e) =>
-                setFormData({ ...formData, notes: e.target.value })
-              }
-            />
-          </div>
+            <div className="flex justify-end gap-2">
+              {artist?.id && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setFormLinkDialogOpen(true)}
+                >
+                  Generate Form Link
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Saving..." : "Save"}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+      {artist && (
+        <ArtistFormLinkDialog
+          open={formLinkDialogOpen}
+          onOpenChange={setFormLinkDialogOpen}
+          artistId={artist.id}
+          artistName={artist.name}
+        />
+      )}
+    </>
   );
 };
-

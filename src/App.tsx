@@ -28,6 +28,8 @@ import FestivalManagement from '@/pages/FestivalManagement';
 import FestivalArtistManagement from '@/pages/FestivalArtistManagement';
 import LightsDisponibilidad from '@/pages/LightsDisponibilidad';
 import { EquipmentManagement } from '@/pages/EquipmentManagement';
+import { ArtistForm } from '@/components/festival/ArtistForm';
+import { FormSubmitted } from '@/components/festival/FormSubmitted';
 
 function App() {
   return (
@@ -36,6 +38,11 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Auth />} />
+            {/* Public Routes */}
+            <Route path="festival">
+              <Route path="artist-form/:token" element={<ArtistForm />} />
+              <Route path="form-submitted" element={<FormSubmitted />} />
+            </Route>
             <Route path="/*" element={<Layout />}>
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="sound" element={<Sound />} />
@@ -75,4 +82,3 @@ function App() {
 }
 
 export default App;
-
