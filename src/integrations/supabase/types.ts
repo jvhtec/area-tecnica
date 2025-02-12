@@ -2296,6 +2296,7 @@ export type Database = {
         | "led"
         | "strobo"
         | "canones"
+        | "estructuras"
       job_date_type: "travel" | "setup" | "show" | "off" | "rehearsal"
       job_status: "pending" | "in_progress" | "completed" | "cancelled"
       job_type: "single" | "tour" | "festival" | "dryhire" | "tourdate"

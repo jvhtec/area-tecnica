@@ -3,6 +3,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { categoryLabels } from '@/types/equipment';
 
 interface DailyUsage {
   used: number;
@@ -45,17 +46,6 @@ export const exportWeeklySummaryPDF = async (
       // Categories section
       doc.setFontSize(12);
       doc.setTextColor(51, 51, 51);
-      const categoryLabels = {
-        convencional: 'Convencional',
-        robotica: 'Robótica',
-        fx: 'FX',
-        rigging: 'Rigging',
-        controles: 'Controles',
-        cuadros: 'Cuadros',
-        led: 'LED',
-        strobo: 'Strobo',
-        canones: 'Cañones'
-      };
       const categoriesText = `Categorías: ${selectedCategories.map(cat => categoryLabels[cat as keyof typeof categoryLabels]).join(', ')}`;
       doc.text(categoriesText, 14, 50);
 
