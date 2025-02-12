@@ -13,6 +13,12 @@ export type StockEntry = {
 };
 export type DayAssignment = Database["public"]["Tables"]["day_assignments"]["Row"];
 
+export interface PresetWithItems extends Preset {
+  items: (PresetItem & {
+    equipment: Equipment;
+  })[];
+}
+
 export const EQUIPMENT_CATEGORIES = ['convencional', 'robotica', 'fx', 'rigging', 'controles', 'cuadros', 'led', 'strobo', 'canones', 'estructuras'] as const;
 export type EquipmentCategory = typeof EQUIPMENT_CATEGORIES[number];
 
