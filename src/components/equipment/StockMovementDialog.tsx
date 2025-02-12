@@ -34,12 +34,13 @@ export function StockMovementDialog({
     mutationFn: async () => {
       if (!session?.user?.id) throw new Error('Not authenticated');
       
+      // Always send a positive quantity and use movement_type to indicate direction
       const { error } = await supabase
         .from('stock_movements')
         .insert({
           equipment_id: equipment.id,
           user_id: session.user.id,
-          quantity: isAddition ? quantity : -quantity,
+          quantity: Math.abs(quantity), // Always positive
           movement_type: isAddition ? 'addition' : 'subtraction',
           notes: notes.trim() || null
         });
