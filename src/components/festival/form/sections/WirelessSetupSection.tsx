@@ -1,22 +1,10 @@
 
 import { ProviderSelector } from "../shared/ProviderSelector";
 import { EquipmentSelect } from "../shared/EquipmentSelect";
-import { QuantityInput } from "../shared/QuantityInput";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { SectionProps } from "@/types/festival-form";
-
-const wirelessOptions = [
-  'Shure AD Series', 'Shure AXT Series', 'Shure UR Series', 'Shure ULX Series',
-  'Shure QLX Series', 'Sennheiser 2000 Series', 'Sennheiser EW500 Series',
-  'Sennheiser EW300 Series', 'Sennheiser EW100 Series', 'Other'
-];
-
-const iemOptions = [
-  'Shure Digital PSM Series', 'Shure PSM1000 Series', 'Shure PSM900 Series',
-  'Shure PSM300 Series', 'Sennheiser 2000 series', 'Sennheiser 300 G4 Series',
-  'Sennheiser 300 G3 Series', 'Wysicom MTK', 'Other'
-];
+import { WIRELESS_SYSTEMS, IEM_SYSTEMS } from "@/types/festival-equipment";
 
 export const WirelessSetupSection = ({ formData, onChange, gearSetup }: SectionProps) => {
   return (
@@ -36,7 +24,7 @@ export const WirelessSetupSection = ({ formData, onChange, gearSetup }: SectionP
             onChange={(value) => onChange({ wireless_model: value })}
             provider={formData.wireless_provided_by}
             festivalOptions={gearSetup?.wireless_systems}
-            bandOptions={wirelessOptions}
+            bandOptions={WIRELESS_SYSTEMS}
             placeholder="Select wireless system"
           />
           <div className="grid grid-cols-2 gap-4">
@@ -89,7 +77,7 @@ export const WirelessSetupSection = ({ formData, onChange, gearSetup }: SectionP
             onChange={(value) => onChange({ iem_model: value })}
             provider={formData.iem_provided_by}
             festivalOptions={gearSetup?.iem_systems}
-            bandOptions={iemOptions}
+            bandOptions={IEM_SYSTEMS}
             placeholder="Select IEM system"
           />
           <div>

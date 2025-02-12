@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,14 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Minus, Save } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-
-const consoleOptions = [
-  'Yamaha CL5', 'Yamaha PMx', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
-  'DiGiCo SD10', 'DiGiCo SD11', 'DiGiCo SD12', 'DiGiCo SD5Q', 'DiGiCo SD7Q',
-  'DiGiCo Q225', 'DiGiCo Q326', 'DiGiCo Q338', 'DiGiCo Q852', 'Avid S6L',
-  'A&H C1500', 'A&H C2500', 'A&H S3000', 'A&H S5000', 'A&H S7000',
-  'Waves LV1 (homemade)', 'Waves LV1 Classic', 'SSL', 'Other'
-];
+import { WIRELESS_SYSTEMS, IEM_SYSTEMS } from "@/types/festival-equipment";
 
 interface FestivalGearSetupFormProps {
   jobId: string;
@@ -72,27 +64,37 @@ export const FestivalGearSetupForm = ({
     fetchExistingSetup();
   }, [jobId, selectedDate]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
+  const handleFormSubmit = async (values: any) => {
     try {
-      const { error } = await supabase
+      const wirelessSystems = values.wireless_systems.map((system: any) => ({
+        model: system.model,
+        quantity: parseInt(system.quantity) || 0,
+        band: system.band || ''
+      }));
+
+      const iemSystems = values.iem_systems.map((system: any) => ({
+        model: system.model,
+        quantity: parseInt(system.quantity) || 0,
+        band: system.band || ''
+      }));
+
+      const payload = {
+        ...values,
+        wireless_systems: wirelessSystems,
+        iem_systems: iemSystems,
+        job_id: jobId,
+        date: selectedDate,
+      };
+
+      await supabase
         .from('festival_gear_setups')
-        .upsert({
-          ...setup,
-          job_id: jobId,
-          date: selectedDate
-        });
+        .upsert(payload);
 
-      if (error) throw error;
-
+      onSave?.();
       toast({
         title: "Success",
         description: "Festival gear setup has been saved.",
       });
-
-      onSave?.();
     } catch (error) {
       console.error('Error saving festival gear setup:', error);
       toast({
@@ -100,69 +102,11 @@ export const FestivalGearSetupForm = ({
         description: "Failed to save festival gear setup.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  const addConsole = (type: 'foh_consoles' | 'mon_consoles') => {
-    setSetup(prev => ({
-      ...prev,
-      [type]: [...(prev[type] || []), { model: '', quantity: 1 }]
-    }));
-  };
-
-  const removeConsole = (type: 'foh_consoles' | 'mon_consoles', index: number) => {
-    setSetup(prev => ({
-      ...prev,
-      [type]: prev[type]?.filter((_, i) => i !== index)
-    }));
-  };
-
-  const updateConsole = (
-    type: 'foh_consoles' | 'mon_consoles',
-    index: number,
-    field: keyof ConsoleSetup,
-    value: string | number
-  ) => {
-    setSetup(prev => ({
-      ...prev,
-      [type]: prev[type]?.map((console, i) =>
-        i === index ? { ...console, [field]: value } : console
-      )
-    }));
-  };
-
-  const addWirelessSystem = (type: 'wireless_systems' | 'iem_systems') => {
-    setSetup(prev => ({
-      ...prev,
-      [type]: [...(prev[type] || []), { model: '', quantity: 1, band: '' }]
-    }));
-  };
-
-  const removeWirelessSystem = (type: 'wireless_systems' | 'iem_systems', index: number) => {
-    setSetup(prev => ({
-      ...prev,
-      [type]: prev[type]?.filter((_, i) => i !== index)
-    }));
-  };
-
-  const updateWirelessSystem = (
-    type: 'wireless_systems' | 'iem_systems',
-    index: number,
-    field: keyof WirelessSetup,
-    value: string | number
-  ) => {
-    setSetup(prev => ({
-      ...prev,
-      [type]: prev[type]?.map((system, i) =>
-        i === index ? { ...system, [field]: value } : system
-      )
-    }));
-  };
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleFormSubmit} className="space-y-8">
       <Card>
         <CardHeader>
           <CardTitle>Basic Setup</CardTitle>
@@ -176,109 +120,6 @@ export const FestivalGearSetupForm = ({
               value={setup.max_stages}
               onChange={(e) => setSetup(prev => ({ ...prev, max_stages: parseInt(e.target.value) }))}
             />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Console Setup</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-4">
-            <div>
-              <Label>FOH Consoles</Label>
-              {setup.foh_consoles?.map((console, index) => (
-                <div key={index} className="flex gap-2 mt-2">
-                  <Select
-                    value={console.model}
-                    onValueChange={(value) => updateConsole('foh_consoles', index, 'model', value)}
-                  >
-                    <SelectTrigger className="flex-grow">
-                      <SelectValue placeholder="Select console" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {consoleOptions.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={console.quantity}
-                    onChange={(e) => updateConsole('foh_consoles', index, 'quantity', parseInt(e.target.value))}
-                    className="w-24"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeConsole('foh_consoles', index)}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => addConsole('foh_consoles')}
-                className="mt-2"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add FOH Console
-              </Button>
-            </div>
-
-            <div>
-              <Label>Monitor Consoles</Label>
-              {setup.mon_consoles?.map((console, index) => (
-                <div key={index} className="flex gap-2 mt-2">
-                  <Select
-                    value={console.model}
-                    onValueChange={(value) => updateConsole('mon_consoles', index, 'model', value)}
-                  >
-                    <SelectTrigger className="flex-grow">
-                      <SelectValue placeholder="Select console" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {consoleOptions.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={console.quantity}
-                    onChange={(e) => updateConsole('mon_consoles', index, 'quantity', parseInt(e.target.value))}
-                    className="w-24"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeConsole('mon_consoles', index)}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => addConsole('mon_consoles')}
-                className="mt-2"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Monitor Console
-              </Button>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -380,118 +221,6 @@ export const FestivalGearSetupForm = ({
               Add IEM System
             </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Monitor Setup</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label>Available Monitors</Label>
-            <Input
-              type="number"
-              min="0"
-              value={setup.available_monitors}
-              onChange={(e) => setSetup(prev => ({ ...prev, available_monitors: parseInt(e.target.value) }))}
-            />
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="has_side_fills">Side Fills Available</Label>
-              <Switch
-                id="has_side_fills"
-                checked={setup.has_side_fills}
-                onCheckedChange={(checked) => setSetup(prev => ({ ...prev, has_side_fills: checked }))}
-              />
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <Label htmlFor="has_drum_fills">Drum Fills Available</Label>
-              <Switch
-                id="has_drum_fills"
-                checked={setup.has_drum_fills}
-                onCheckedChange={(checked) => setSetup(prev => ({ ...prev, has_drum_fills: checked }))}
-              />
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <Label htmlFor="has_dj_booths">DJ Booths Available</Label>
-              <Switch
-                id="has_dj_booths"
-                checked={setup.has_dj_booths}
-                onCheckedChange={(checked) => setSetup(prev => ({ ...prev, has_dj_booths: checked }))}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Infrastructure</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label>CAT6 Runs</Label>
-            <Input
-              type="number"
-              min="0"
-              value={setup.available_cat6_runs}
-              onChange={(e) => setSetup(prev => ({ ...prev, available_cat6_runs: parseInt(e.target.value) }))}
-            />
-          </div>
-          <div>
-            <Label>HMA Runs</Label>
-            <Input
-              type="number"
-              min="0"
-              value={setup.available_hma_runs}
-              onChange={(e) => setSetup(prev => ({ ...prev, available_hma_runs: parseInt(e.target.value) }))}
-            />
-          </div>
-          <div>
-            <Label>Coax Runs</Label>
-            <Input
-              type="number"
-              min="0"
-              value={setup.available_coax_runs}
-              onChange={(e) => setSetup(prev => ({ ...prev, available_coax_runs: parseInt(e.target.value) }))}
-            />
-          </div>
-          <div>
-            <Label>Analog Runs</Label>
-            <Input
-              type="number"
-              min="0"
-              value={setup.available_analog_runs}
-              onChange={(e) => setSetup(prev => ({ ...prev, available_analog_runs: parseInt(e.target.value) }))}
-            />
-          </div>
-          <div>
-            <Label>Opticalcon DUO Runs</Label>
-            <Input
-              type="number"
-              min="0"
-              value={setup.available_opticalcon_duo_runs}
-              onChange={(e) => setSetup(prev => ({ ...prev, available_opticalcon_duo_runs: parseInt(e.target.value) }))}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Additional Notes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Textarea
-            value={setup.notes || ''}
-            onChange={(e) => setSetup(prev => ({ ...prev, notes: e.target.value }))}
-            placeholder="Add any additional notes about the festival gear setup..."
-          />
         </CardContent>
       </Card>
 

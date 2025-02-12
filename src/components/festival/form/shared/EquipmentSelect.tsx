@@ -1,6 +1,15 @@
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { EquipmentSelectProps } from "@/types/festival-form";
+import { WirelessSystem, IEMSystem } from "@/types/festival-equipment";
+
+interface EquipmentSelectProps {
+  value: string;
+  onChange: (value: string) => void;
+  provider: 'festival' | 'band';
+  festivalOptions?: Array<{ model: string; quantity?: number }>;
+  bandOptions: readonly string[];
+  placeholder?: string;
+}
 
 export const EquipmentSelect = ({
   value,
