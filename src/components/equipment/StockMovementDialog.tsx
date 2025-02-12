@@ -60,7 +60,8 @@ export function StockMovementDialog({
           equipment_id: equipment.id,
           quantity: movementQty,
           movement_type: isAddition ? 'addition' : 'subtraction',
-          notes: notes.trim() || null
+          notes: notes.trim() || null,
+          user_id: session.user.id  // Added this line to include the user_id
         });
 
       if (stockMovementError) throw stockMovementError;
