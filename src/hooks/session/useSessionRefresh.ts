@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 export const useSessionRefresh = () => {
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
@@ -42,22 +42,20 @@ export const useSessionRefresh = () => {
   // Handle tab visibility changes
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === "visible") {
         console.log("Tab became visible, scheduling session refresh");
-        // Clear any existing timeout
         if (visibilityTimeoutRef.current) {
           clearTimeout(visibilityTimeoutRef.current);
         }
-        // Add a small delay to ensure browser is ready
         visibilityTimeoutRef.current = setTimeout(() => {
           refreshSession();
         }, 1000);
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (visibilityTimeoutRef.current) {
         clearTimeout(visibilityTimeoutRef.current);
       }
@@ -74,7 +72,7 @@ export const useSessionRefresh = () => {
       }
 
       refreshTimeoutRef.current = setTimeout(() => {
-        if (document.visibilityState === 'visible') {
+        if (document.visibilityState === "visible") {
           console.log("Initiating periodic session refresh");
           refreshSession();
         }
