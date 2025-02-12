@@ -17,7 +17,7 @@ export function EquipmentManagement() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Fetch current stock entries
+  // Fetch current stock entries - removed user_id filter since stock is global
   const { data: stockEntries = [], error: stockError } = useQuery({
     queryKey: ['stock-entries'],
     queryFn: async () => {
