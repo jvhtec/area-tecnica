@@ -663,6 +663,83 @@ export type Database = {
           },
         ]
       }
+      festival_gear_setups: {
+        Row: {
+          available_analog_runs: number | null
+          available_cat6_runs: number | null
+          available_coax_runs: number | null
+          available_dj_booths: number | null
+          available_drum_fills: number | null
+          available_hma_runs: number | null
+          available_monitors: number | null
+          available_opticalcon_duo_runs: number | null
+          available_side_fills: number | null
+          created_at: string | null
+          date: string
+          foh_consoles: Json | null
+          id: string
+          iem_systems: Json | null
+          job_id: string | null
+          max_stages: number | null
+          mon_consoles: Json | null
+          notes: string | null
+          updated_at: string | null
+          wireless_systems: Json | null
+        }
+        Insert: {
+          available_analog_runs?: number | null
+          available_cat6_runs?: number | null
+          available_coax_runs?: number | null
+          available_dj_booths?: number | null
+          available_drum_fills?: number | null
+          available_hma_runs?: number | null
+          available_monitors?: number | null
+          available_opticalcon_duo_runs?: number | null
+          available_side_fills?: number | null
+          created_at?: string | null
+          date: string
+          foh_consoles?: Json | null
+          id?: string
+          iem_systems?: Json | null
+          job_id?: string | null
+          max_stages?: number | null
+          mon_consoles?: Json | null
+          notes?: string | null
+          updated_at?: string | null
+          wireless_systems?: Json | null
+        }
+        Update: {
+          available_analog_runs?: number | null
+          available_cat6_runs?: number | null
+          available_coax_runs?: number | null
+          available_dj_booths?: number | null
+          available_drum_fills?: number | null
+          available_hma_runs?: number | null
+          available_monitors?: number | null
+          available_opticalcon_duo_runs?: number | null
+          available_side_fills?: number | null
+          created_at?: string | null
+          date?: string
+          foh_consoles?: Json | null
+          id?: string
+          iem_systems?: Json | null
+          job_id?: string | null
+          max_stages?: number | null
+          mon_consoles?: Json | null
+          notes?: string | null
+          updated_at?: string | null
+          wireless_systems?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "festival_gear_setups_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       flex_folders: {
         Row: {
           created_at: string
@@ -2245,7 +2322,11 @@ export type Database = {
         | "house_tech"
     }
     CompositeTypes: {
-      [_ in never]: never
+      equipment_details: {
+        model: string | null
+        quantity: number | null
+        notes: string | null
+      }
     }
   }
 }
