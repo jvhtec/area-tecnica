@@ -58,7 +58,6 @@ export function StockMovementDialog({
         .from('stock_movements')
         .insert({
           equipment_id: equipment.id,
-          user_id: session.user.id,
           quantity: movementQty,
           movement_type: isAddition ? 'addition' : 'subtraction',
           notes: notes.trim() || null
