@@ -1,331 +1,235 @@
+
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useSessionManager } from '@/hooks/useSessionManager';
 import { supabase } from '@/lib/supabase';
-import { useState, useEffect } from 'react';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Equipment } from '@/types/equipment';
+import { PresetEditor } from './PresetEditor';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Trash2, Pencil } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Pencil, Trash2 } from 'lucide-react';
+import { PresetWithItems } from '@/types/equipment';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-
-const EQUIPMENT_CATEGORIES = ['convencional', 'robotica', 'fx', 'rigging', 'controles', 'cuadros', 'led', 'strobo', 'canones'] as const;
-type EquipmentCategory = typeof EQUIPMENT_CATEGORIES[number];
-
-interface EditEquipmentDialogProps {
-  equipment: Equipment | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSave: (equipment: Partial<Equipment>) => void;
-}
 
 interface PresetCreationManagerProps {
   onClose?: () => void;
   selectedDate?: Date;
 }
 
-function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEquipmentDialogProps) {
-  const [name, setName] = useState(equipment?.name || '');
-  const [category, setCategory] = useState<EquipmentCategory>((equipment?.category as EquipmentCategory) || 'convencional');
-
-  useEffect(() => {
-    if (equipment) {
-      setName(equipment.name);
-      setCategory((equipment.category as EquipmentCategory) || 'convencional');
-    }
-  }, [equipment]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave({
-      id: equipment?.id,
-      name,
-      category
-    });
-    onOpenChange(false);
-  };
-
-  const categoryLabels: Record<EquipmentCategory, string> = {
-    convencional: 'Convencional',
-    robotica: 'Robótica',
-    controles: 'Controles',
-    fx: 'FX',
-    cuadros: 'Cuadros',
-    rigging: 'Rigging',
-    led: 'LED',
-    strobo: 'Strobo',
-    canones: 'Cañones'
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{equipment ? 'Editar Equipo' : 'Nuevo Equipo'}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Nombre del Equipo</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ingrese nombre del equipo"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="category">Categoría</Label>
-            <Select value={category} onValueChange={(value) => setCategory(value as EquipmentCategory)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccione categoría" />
-              </SelectTrigger>
-              <SelectContent>
-                {EQUIPMENT_CATEGORIES.map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {categoryLabels[cat]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button type="submit">Guardar</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export function PresetCreationManager({ onClose, selectedDate }: PresetCreationManagerProps) {
   const { session } = useSessionManager();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [equipmentName, setEquipmentName] = useState('');
-  const [category, setCategory] = useState<EquipmentCategory>('convencional');
-  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
-  const [equipmentToDelete, setEquipmentToDelete] = useState<Equipment | null>(null);
+  const [editingPreset, setEditingPreset] = useState<PresetWithItems | null>(null);
+  const [presetToDelete, setPresetToDelete] = useState<PresetWithItems | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
-  const { data: equipmentList } = useQuery({
-    queryKey: ['equipment'],
+  // Fetch user's presets
+  const { data: presets } = useQuery({
+    queryKey: ['presets', session?.user?.id],
     queryFn: async () => {
+      if (!session?.user?.id) return [];
+      
       const { data, error } = await supabase
-        .from('equipment')
-        .select('*')
+        .from('presets')
+        .select(`
+          *,
+          items:preset_items (
+            *,
+            equipment:equipment (*)
+          )
+        `)
+        .eq('user_id', session.user.id)
         .order('name');
       
       if (error) throw error;
-      return data as Equipment[];
-    }
+      return data as PresetWithItems[];
+    },
+    enabled: !!session?.user?.id
   });
 
-  const createEquipmentMutation = useMutation({
-    mutationFn: async () => {
-      if (!session?.user?.id) throw new Error('Must be logged in');
-      if (!equipmentName.trim()) throw new Error('Equipment name is required');
-
-      const { data: equipment, error } = await supabase
-        .from('equipment')
-        .insert({
-          name: equipmentName,
-          category: category
-        })
-        .select()
-        .single();
+  const deletePresetMutation = useMutation({
+    mutationFn: async (presetId: string) => {
+      const { error } = await supabase
+        .from('presets')
+        .delete()
+        .eq('id', presetId);
 
       if (error) throw error;
-      return equipment;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
-      setEquipmentName('');
-      setCategory('convencional');
+      queryClient.invalidateQueries({ queryKey: ['presets'] });
       toast({
-        title: "Éxito",
-        description: "Equipo creado correctamente"
+        title: "Success",
+        description: "Preset deleted successfully"
       });
     },
     onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete preset"
+      });
+    }
+  });
+
+  const handleSavePreset = async (name: string, items: any[]) => {
+    try {
+      if (!session?.user?.id) throw new Error('Must be logged in');
+
+      if (editingPreset) {
+        // Update existing preset
+        const { error: presetError } = await supabase
+          .from('presets')
+          .update({ name })
+          .eq('id', editingPreset.id);
+
+        if (presetError) throw presetError;
+
+        // Delete existing items
+        const { error: deleteError } = await supabase
+          .from('preset_items')
+          .delete()
+          .eq('preset_id', editingPreset.id);
+
+        if (deleteError) throw deleteError;
+      } else {
+        // Create new preset
+        const { data: preset, error: presetError } = await supabase
+          .from('presets')
+          .insert({
+            name,
+            user_id: session.user.id
+          })
+          .select()
+          .single();
+
+        if (presetError) throw presetError;
+
+        // Insert new items
+        if (items.length > 0) {
+          const { error: itemsError } = await supabase
+            .from('preset_items')
+            .insert(
+              items.map(item => ({
+                preset_id: preset.id,
+                equipment_id: item.equipment_id,
+                quantity: item.quantity
+              }))
+            );
+
+          if (itemsError) throw itemsError;
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['presets'] });
+      setEditingPreset(null);
+      setIsCreating(false);
+      toast({
+        title: "Success",
+        description: "Preset saved successfully"
+      });
+    } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Error",
         description: error.message
       });
     }
-  });
-
-  const updateEquipmentMutation = useMutation({
-    mutationFn: async (equipment: Partial<Equipment>) => {
-      if (!equipment.id) throw new Error('Equipment ID is required');
-
-      const { error } = await supabase
-        .from('equipment')
-        .update({
-          name: equipment.name,
-          category: equipment.category
-        })
-        .eq('id', equipment.id);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
-      toast({
-        title: "Éxito",
-        description: "Equipo actualizado correctamente"
-      });
-    },
-    onError: (error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Error al actualizar el equipo"
-      });
-    }
-  });
-
-  const deleteEquipmentMutation = useMutation({
-    mutationFn: async (equipmentId: string) => {
-      const { error } = await supabase
-        .from('equipment')
-        .delete()
-        .eq('id', equipmentId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
-      toast({
-        title: "Éxito",
-        description: "Equipo eliminado correctamente"
-      });
-    },
-    onError: (error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Error al eliminar el equipo"
-      });
-    }
-  });
-
-  const categoryLabels: Record<EquipmentCategory, string> = {
-    convencional: 'Convencional',
-    robotica: 'Robótica',
-    controles: 'Controles',
-    fx: 'FX',
-    cuadros: 'Cuadros',
-    rigging: 'Rigging',
-    led: 'LED',
-    strobo: 'Strobo',
-    canones: 'Cañones'
   };
+
+  if (isCreating || editingPreset) {
+    return (
+      <PresetEditor
+        preset={editingPreset}
+        onSave={handleSavePreset}
+        onCancel={() => {
+          setEditingPreset(null);
+          setIsCreating(false);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="equipmentName">Nombre del Equipo</Label>
-          <Input
-            id="equipmentName"
-            value={equipmentName}
-            onChange={(e) => setEquipmentName(e.target.value)}
-            placeholder="Ingrese nombre del equipo"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="category">Categoría</Label>
-          <Select value={category} onValueChange={(value) => setCategory(value as EquipmentCategory)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccione categoría" />
-            </SelectTrigger>
-            <SelectContent>
-              {EQUIPMENT_CATEGORIES.map((cat) => (
-                <SelectItem key={cat} value={cat}>
-                  {categoryLabels[cat]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Button 
-          onClick={() => createEquipmentMutation.mutate()}
-          disabled={createEquipmentMutation.isPending || !equipmentName.trim()}
-          className="w-full"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Añadir Equipo
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Presets</h2>
+        <Button onClick={() => setIsCreating(true)}>
+          Create New Preset
         </Button>
       </div>
 
-      <div className="space-y-4">
-        <h3 className="font-medium">Lista de Equipos</h3>
-        <ScrollArea className="h-[300px] rounded-md border p-4">
-          <div className="space-y-4">
-            {equipmentList?.map((item) => (
-              <div key={item.id} className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{item.name}</p>
-                  <p className="text-sm text-muted-foreground capitalize">{categoryLabels[item.category as EquipmentCategory]}</p>
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Presets</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ScrollArea className="h-[400px]">
+            <div className="space-y-4">
+              {presets?.map((preset) => (
+                <div
+                  key={preset.id}
+                  className="flex items-center justify-between p-4 border rounded-lg"
+                >
+                  <div>
+                    <h3 className="font-medium">{preset.name}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {preset.items.length} items
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setEditingPreset(preset)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setPresetToDelete(preset)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setEditingEquipment(item)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setEquipmentToDelete(item)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
-      </div>
-
-      <EditEquipmentDialog
-        equipment={editingEquipment}
-        open={!!editingEquipment}
-        onOpenChange={(open) => !open && setEditingEquipment(null)}
-        onSave={updateEquipmentMutation.mutate}
-      />
+              ))}
+              {(!presets || presets.length === 0) && (
+                <p className="text-muted-foreground text-center py-4">
+                  No presets created yet
+                </p>
+              )}
+            </div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
 
       <AlertDialog 
-        open={!!equipmentToDelete}
-        onOpenChange={(open) => !open && setEquipmentToDelete(null)}
+        open={!!presetToDelete}
+        onOpenChange={(open) => !open && setPresetToDelete(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Esto eliminará permanentemente el equipo
-              y lo quitará de tu inventario.
+              This action cannot be undone. This will permanently delete the preset
+              and remove it from your inventory.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (equipmentToDelete) {
-                  deleteEquipmentMutation.mutate(equipmentToDelete.id);
-                  setEquipmentToDelete(null);
+                if (presetToDelete) {
+                  deletePresetMutation.mutate(presetToDelete.id);
+                  setPresetToDelete(null);
                 }
               }}
             >
-              Eliminar
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

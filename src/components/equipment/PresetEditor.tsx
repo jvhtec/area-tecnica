@@ -12,7 +12,7 @@ import { Save, X } from 'lucide-react';
 
 interface PresetEditorProps {
   preset?: PresetWithItems;
-  onSave: (preset: { name: string }, items: Omit<PresetItem, 'id' | 'preset_id'>[]) => void;
+  onSave: (name: string, items: Omit<PresetItem, 'id' | 'preset_id'>[]) => void;
   onCancel: () => void;
 }
 
@@ -53,35 +53,32 @@ export const PresetEditor = ({ preset, onSave, onCancel }: PresetEditorProps) =>
   const handleSave = () => {
     if (!name.trim()) return;
 
-    const now = new Date().toISOString();
     const items = Object.entries(quantities)
       .filter(([_, quantity]) => quantity > 0)
       .map(([equipment_id, quantity]) => ({
         equipment_id,
-        quantity,
-        created_at: now,
-        updated_at: now
+        quantity
       }));
 
-    onSave({ name }, items);
+    onSave(name, items);
   };
 
   return (
     <Card className="w-full h-[600px] bg-white/80 backdrop-blur-sm">
       <CardHeader>
         <CardTitle>
-          {preset ? 'Editar Preset' : 'Crear Nuevo Preset'}
+          {preset ? 'Edit Preset' : 'Create New Preset'}
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           <div>
-            <Label htmlFor="preset-name">Nombre del Preset</Label>
+            <Label htmlFor="preset-name">Preset Name</Label>
             <Input
               id="preset-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ingrese nombre del preset..."
+              placeholder="Enter preset name..."
               className="mt-1"
             />
           </div>
@@ -109,11 +106,11 @@ export const PresetEditor = ({ preset, onSave, onCancel }: PresetEditorProps) =>
           <div className="flex justify-end space-x-2 pt-4">
             <Button variant="outline" onClick={onCancel}>
               <X className="mr-2 h-4 w-4" />
-              Cancelar
+              Cancel
             </Button>
             <Button onClick={handleSave} disabled={!name.trim()}>
               <Save className="mr-2 h-4 w-4" />
-              Guardar Preset
+              Save Preset
             </Button>
           </div>
         </div>
