@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,18 +16,12 @@ import { Loader2 } from "lucide-react";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 // Define type for the real-time payload
-interface RealtimeFormPayload extends RealtimePostgresChangesPayload<{
+interface RealtimeFormChange {
+  status: string;
   [key: string]: any;
-}> {
-  new: {
-    status: string;
-    [key: string]: any;
-  };
-  old: {
-    status: string;
-    [key: string]: any;
-  };
 }
+
+type RealtimeFormPayload = RealtimePostgresChangesPayload<RealtimeFormChange>;
 
 export const ArtistRequirementsForm = () => {
   const { token } = useParams();
@@ -168,10 +161,7 @@ export const ArtistRequirementsForm = () => {
 
     const channel = supabase
       .channel('form-status-changes')
-      .on<{
-        [key: string]: any;
-        status: string;
-      }>(
+      .on<RealtimeFormChange>(
         'postgres_changes',
         {
           event: '*',
