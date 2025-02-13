@@ -10,13 +10,12 @@ import { useJobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Checkbox } from '@/components/ui/checkbox';
 
 const videoComponentDatabase = [
   { id: 1, name: 'Pantalla Central', watts: 700 },
   { id: 2, name: 'IMAGE Left', watts: 700 },
   { id: 3, name: 'IMAGE Right', watts: 700 },
-  { id: 4, name: 'LED Screen', watts: 700 }
+  { id: 4, name: 'LED Screen', weight: 700 }
 ];
 
 const VOLTAGE_3PHASE = 400;
@@ -39,9 +38,7 @@ interface Table {
   totalWatts?: number;
   currentPerPhase?: number;
   pduType?: string;
-  customPduType?: string;
   id?: number;
-  includesHoist?: boolean;
 }
 
 const VideoConsumosTool: React.FC = () => {
@@ -54,9 +51,6 @@ const VideoConsumosTool: React.FC = () => {
   const [tableName, setTableName] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
   const [safetyMargin, setSafetyMargin] = useState(0);
-  const [selectedPduType, setSelectedPduType] = useState<string>('default');
-  const [customPduType, setCustomPduType] = useState('');
-  const [includesHoist, setIncludesHoist] = useState(false);
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
@@ -72,7 +66,7 @@ const VideoConsumosTool: React.FC = () => {
 
   const updateInput = (index: number, field: keyof TableRow, value: string) => {
     const newRows = [...currentTable.rows];
-    if (field === 'componentId' && value) {
+    if (field === 'componentId') {
       const component = videoComponentDatabase.find((c) => c.id.toString() === value);
       newRows[index] = {
         ...newRows[index],
@@ -92,7 +86,6 @@ const VideoConsumosTool: React.FC = () => {
   };
 
   const handleJobSelect = (jobId: string) => {
-    if (!jobId) return;
     setSelectedJobId(jobId);
     const job = jobs?.find((j) => j.id === jobId) || null;
     setSelectedJob(job);
@@ -121,9 +114,7 @@ const VideoConsumosTool: React.FC = () => {
           table_name: table.name,
           total_watts: table.totalWatts || 0,
           current_per_phase: table.currentPerPhase || 0,
-          pdu_type: selectedPduType === 'default' ? table.pduType : selectedPduType,
-          custom_pdu_type: customPduType,
-          includes_hoist: includesHoist
+          pdu_type: table.pduType || ''
         });
 
       if (error) throw error;
@@ -155,7 +146,7 @@ const VideoConsumosTool: React.FC = () => {
     const calculatedRows = currentTable.rows.map((row) => {
       const component = videoComponentDatabase.find((c) => c.id.toString() === row.componentId);
       const totalWatts =
-        parseFloat(row.quantity || '0') && parseFloat(row.watts || '0')
+        parseFloat(row.quantity) && parseFloat(row.watts)
           ? parseFloat(row.quantity) * parseFloat(row.watts)
           : 0;
       return {
@@ -170,13 +161,11 @@ const VideoConsumosTool: React.FC = () => {
     const pduSuggestion = recommendPDU(currentPerPhase);
 
     const newTable = {
-      name: tableName,
+      name: `${tableName} (${pduSuggestion})- \n+CEE32A 3P+N+G (MOTORES)`,
       rows: calculatedRows,
       totalWatts,
       currentPerPhase,
-      pduType: selectedPduType === 'default' ? pduSuggestion : selectedPduType,
-      customPduType: customPduType,
-      includesHoist,
+      pduType: pduSuggestion,
       id: Date.now(),
     };
 
@@ -196,9 +185,6 @@ const VideoConsumosTool: React.FC = () => {
       rows: [{ quantity: '', componentId: '', watts: '' }],
     });
     setTableName('');
-    setSelectedPduType('default');
-    setCustomPduType('');
-    setIncludesHoist(false);
   };
 
   const removeTable = (tableId: number) => {
@@ -224,18 +210,6 @@ const VideoConsumosTool: React.FC = () => {
       );
 
       const fileName = `Video Power Report - ${selectedJob.title}.pdf`;
-      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-      const filePath = `video/${selectedJobId}/${crypto.randomUUID()}.pdf`;
-
-      const { error: uploadError } = await supabase.storage.from('task_documents').upload(filePath, file);
-      if (uploadError) throw uploadError;
-
-      toast({
-        title: 'Success',
-        description: 'PDF has been generated and uploaded successfully.',
-      });
-
-      // Also provide download to user
       const url = window.URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -244,11 +218,16 @@ const VideoConsumosTool: React.FC = () => {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch (error: any) {
+
+      toast({
+        title: 'Success',
+        description: 'PDF has been generated successfully.',
+      });
+    } catch (error) {
       console.error('Error exporting PDF:', error);
       toast({
         title: 'Error',
-        description: 'Failed to generate or upload the PDF.',
+        description: 'Failed to generate the PDF.',
         variant: 'destructive',
       });
     }
@@ -292,41 +271,6 @@ const VideoConsumosTool: React.FC = () => {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>PDU Type Override</Label>
-            <Select value={selectedPduType} onValueChange={setSelectedPduType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Use recommended PDU type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="default">Use recommended PDU type</SelectItem>
-                {PDU_TYPES.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-                <SelectItem value="custom">Custom PDU Type</SelectItem>
-              </SelectContent>
-            </Select>
-            {selectedPduType === 'custom' && (
-              <Input
-                placeholder="Enter custom PDU type"
-                value={customPduType}
-                onChange={(e) => setCustomPduType(e.target.value)}
-                className="mt-2"
-              />
-            )}
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="hoistPower"
-              checked={includesHoist}
-              onCheckedChange={(checked) => setIncludesHoist(checked as boolean)}
-            />
-            <Label htmlFor="hoistPower">Requires additional hoist power (CEE32A 3P+N+G)</Label>
-          </div>
-
           <div className="border rounded-lg overflow-hidden">
             <table className="w-full">
               <thead className="bg-muted">
@@ -351,7 +295,7 @@ const VideoConsumosTool: React.FC = () => {
                     <td className="p-4">
                       <Select
                         value={row.componentId}
-                        onValueChange={(value) => value && updateInput(index, 'componentId', value)}
+                        onValueChange={(value) => updateInput(index, 'componentId', value)}
                       >
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select component" />
@@ -384,8 +328,8 @@ const VideoConsumosTool: React.FC = () => {
             </Button>
             {tables.length > 0 && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
-                <FileText className="h-4 w-4" />
-                Export & Upload PDF
+                <FileText className="w-4 h-4" />
+                Export PDF
               </Button>
             )}
           </div>
@@ -426,27 +370,6 @@ const VideoConsumosTool: React.FC = () => {
                     </td>
                     <td className="px-4 py-3">{table.totalWatts?.toFixed(2)} W</td>
                   </tr>
-                  <tr className="border-t bg-muted/50 font-medium">
-                    <td colSpan={3} className="px-4 py-3 text-right">
-                      Current per Phase:
-                    </td>
-                    <td className="px-4 py-3">{table.currentPerPhase?.toFixed(2)} A</td>
-                  </tr>
-                  <tr className="border-t bg-muted/50 font-medium">
-                    <td colSpan={3} className="px-4 py-3 text-right">
-                      PDU Type:
-                    </td>
-                    <td className="px-4 py-3">
-                      {table.customPduType || table.pduType}
-                    </td>
-                  </tr>
-                  {table.includesHoist && (
-                    <tr className="border-t bg-muted/50 font-medium">
-                      <td colSpan={4} className="px-4 py-3">
-                        Additional Hoist Power Required: CEE32A 3P+N+G
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
