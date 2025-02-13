@@ -15,6 +15,19 @@ import { NotesSection } from "./form/sections/NotesSection";
 import { FestivalGearSetup } from "@/types/festival";
 import { Loader2 } from "lucide-react";
 
+// Define type for the real-time payload
+interface RealtimeFormPayload {
+  new: {
+    status: string;
+    [key: string]: any;
+  };
+  old: {
+    status: string;
+    [key: string]: any;
+  };
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+}
+
 export const ArtistRequirementsForm = () => {
   const { token } = useParams();
   const navigate = useNavigate();
@@ -161,9 +174,9 @@ export const ArtistRequirementsForm = () => {
           table: 'festival_artist_forms',
           filter: `token=eq.${token}`,
         },
-        (payload) => {
+        (payload: RealtimeFormPayload) => {
           console.log('Form status changed:', payload);
-          if (payload.new.status === 'completed') {
+          if (payload.new && payload.new.status === 'completed') {
             toast({
               title: "Form Status Updated",
               description: "Your form has been submitted successfully",
