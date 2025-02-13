@@ -6,12 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { FestivalGearSetup, ConsoleSetup, WirelessSetup } from "@/types/festival";
+import { FestivalGearSetup } from "@/types/festival";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Minus, Save } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { WIRELESS_SYSTEMS, IEM_SYSTEMS } from "@/types/festival-equipment";
+import { Save } from "lucide-react";
+import { ConsoleConfig } from "./gear-setup/ConsoleConfig";
+import { InfrastructureConfig } from "./gear-setup/InfrastructureConfig";
+import { StageEquipmentConfig } from "./gear-setup/StageEquipmentConfig";
+import { GearSetupFormData } from "@/types/festival-gear";
 
 interface FestivalGearSetupFormProps {
   jobId: string;
@@ -26,7 +27,7 @@ export const FestivalGearSetupForm = ({
 }: FestivalGearSetupFormProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [setup, setSetup] = useState<Partial<FestivalGearSetup>>({
+  const [setup, setSetup] = useState<GearSetupFormData>({
     max_stages: 1,
     foh_consoles: [],
     mon_consoles: [],
@@ -65,56 +66,13 @@ export const FestivalGearSetupForm = ({
     fetchExistingSetup();
   }, [jobId, selectedDate]);
 
-  const updateWirelessSystem = (
-    type: 'wireless_systems' | 'iem_systems',
-    index: number,
-    field: string,
-    value: any
-  ) => {
-    setSetup(prev => ({
-      ...prev,
-      [type]: prev[type]?.map((system, i) => 
-        i === index ? { ...system, [field]: value } : system
-      ) || []
-    }));
-  };
-
-  const removeWirelessSystem = (
-    type: 'wireless_systems' | 'iem_systems',
-    index: number
-  ) => {
-    setSetup(prev => ({
-      ...prev,
-      [type]: prev[type]?.filter((_, i) => i !== index) || []
-    }));
-  };
-
-  const addWirelessSystem = (type: 'wireless_systems' | 'iem_systems') => {
-    setSetup(prev => ({
-      ...prev,
-      [type]: [...(prev[type] || []), { model: '', quantity: 0, band: '' }]
-    }));
-  };
-
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+
     try {
-      const wirelessSystems = setup.wireless_systems?.map(system => ({
-        model: system.model,
-        quantity: parseInt(system.quantity.toString()) || 0,
-        band: system.band || ''
-      }));
-
-      const iemSystems = setup.iem_systems?.map(system => ({
-        model: system.model,
-        quantity: parseInt(system.quantity.toString()) || 0,
-        band: system.band || ''
-      }));
-
       const payload = {
         ...setup,
-        wireless_systems: wirelessSystems,
-        iem_systems: iemSystems,
         job_id: jobId,
         date: selectedDate,
       };
@@ -135,6 +93,8 @@ export const FestivalGearSetupForm = ({
         description: "Failed to save festival gear setup.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -159,121 +119,85 @@ export const FestivalGearSetupForm = ({
 
       <Card>
         <CardHeader>
-          <CardTitle>Wireless Systems</CardTitle>
+          <CardTitle>Console Setup</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-4">
-            {setup.wireless_systems?.map((system, index) => (
-              <div key={index} className="space-y-2">
-                <div className="flex gap-2">
-                  <Select
-                    value={system.model}
-                    onValueChange={(value) => updateWirelessSystem('wireless_systems', index, 'model', value)}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Select wireless system" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {WIRELESS_SYSTEMS.map((model) => (
-                        <SelectItem key={model} value={model}>
-                          {model}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    type="number"
-                    min="0"
-                    placeholder="Quantity"
-                    value={system.quantity}
-                    onChange={(e) => updateWirelessSystem('wireless_systems', index, 'quantity', parseInt(e.target.value))}
-                    className="w-24"
-                  />
-                  <Input
-                    placeholder="Band"
-                    value={system.band}
-                    onChange={(e) => updateWirelessSystem('wireless_systems', index, 'band', e.target.value)}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeWirelessSystem('wireless_systems', index)}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => addWirelessSystem('wireless_systems')}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Wireless System
-            </Button>
-          </div>
+        <CardContent className="space-y-6">
+          <ConsoleConfig
+            consoles={setup.foh_consoles}
+            onChange={(consoles) => setSetup(prev => ({ ...prev, foh_consoles: consoles }))}
+            label="FOH Consoles"
+          />
+          <ConsoleConfig
+            consoles={setup.mon_consoles}
+            onChange={(consoles) => setSetup(prev => ({ ...prev, mon_consoles: consoles }))}
+            label="Monitor Consoles"
+          />
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>IEM Systems</CardTitle>
+          <CardTitle>Wireless Systems</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-4">
-            {setup.iem_systems?.map((system, index) => (
-              <div key={index} className="space-y-2">
-                <div className="flex gap-2">
-                  <Select
-                    value={system.model}
-                    onValueChange={(value) => updateWirelessSystem('iem_systems', index, 'model', value)}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Select IEM system" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {IEM_SYSTEMS.map((model) => (
-                        <SelectItem key={model} value={model}>
-                          {model}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    type="number"
-                    min="0"
-                    placeholder="Quantity"
-                    value={system.quantity}
-                    onChange={(e) => updateWirelessSystem('iem_systems', index, 'quantity', parseInt(e.target.value))}
-                    className="w-24"
-                  />
-                  <Input
-                    placeholder="Band"
-                    value={system.band}
-                    onChange={(e) => updateWirelessSystem('iem_systems', index, 'band', e.target.value)}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeWirelessSystem('iem_systems', index)}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => addWirelessSystem('iem_systems')}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add IEM System
-            </Button>
-          </div>
+        <CardContent className="space-y-6">
+          <ConsoleConfig
+            consoles={setup.wireless_systems}
+            onChange={(systems) => setSetup(prev => ({ ...prev, wireless_systems: systems }))}
+            label="Wireless Systems"
+          />
+          <ConsoleConfig
+            consoles={setup.iem_systems}
+            onChange={(systems) => setSetup(prev => ({ ...prev, iem_systems: systems }))}
+            label="IEM Systems"
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Stage Equipment</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <StageEquipmentConfig
+            data={{
+              available_monitors: setup.available_monitors,
+              has_side_fills: setup.has_side_fills,
+              has_drum_fills: setup.has_drum_fills,
+              has_dj_booths: setup.has_dj_booths
+            }}
+            onChange={(changes) => setSetup(prev => ({ ...prev, ...changes }))}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Infrastructure</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <InfrastructureConfig
+            data={{
+              available_cat6_runs: setup.available_cat6_runs,
+              available_hma_runs: setup.available_hma_runs,
+              available_coax_runs: setup.available_coax_runs,
+              available_analog_runs: setup.available_analog_runs,
+              available_opticalcon_duo_runs: setup.available_opticalcon_duo_runs
+            }}
+            onChange={(changes) => setSetup(prev => ({ ...prev, ...changes }))}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Additional Notes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Textarea
+            value={setup.notes || ''}
+            onChange={(e) => setSetup(prev => ({ ...prev, notes: e.target.value }))}
+            placeholder="Enter any additional notes about the gear setup..."
+          />
         </CardContent>
       </Card>
 
