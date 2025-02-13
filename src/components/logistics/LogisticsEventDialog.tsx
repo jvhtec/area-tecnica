@@ -41,6 +41,17 @@ const GROUND_TRANSPORT_TYPES = ['van', 'rv', 'sleeper_bus'];
 // Station transport types that need departure station
 const STATION_TRANSPORT_TYPES = ['train', 'plane'];
 
+// Available departments
+const departments: Department[] = [
+  "sound",
+  "lights",
+  "video",
+  "logistics",
+  "rigging",
+  "backline",
+  "production"
+];
+
 interface LogisticsEventDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
