@@ -13,7 +13,7 @@ export const FormStatusBadge = ({ status, className }: FormStatusBadgeProps) => 
       case 'pending':
         return { label: 'Pending', variant: 'secondary' as const };
       case 'completed':
-        return { label: 'Submitted', variant: 'success' as const };
+        return { label: 'Submitted', variant: 'default' as const };
       case 'expired':
         return { label: 'Expired', variant: 'destructive' as const };
       default:

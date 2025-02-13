@@ -407,6 +407,9 @@ export const ArtistTable = ({
                     </Button>
                   </TableCell>
                   <TableCell>
+                    {formStatus && <FormStatusBadge status={formStatus} />}
+                  </TableCell>
+                  <TableCell>
                     <div className="flex items-center gap-2">
                       <Button
                         variant="ghost"
@@ -563,6 +566,7 @@ export const ArtistTable = ({
         open={formDialogOpen}
         onOpenChange={setFormDialogOpen}
         artistId={selectedArtistForForm}
+        artistName={artists.find(a => a.id === selectedArtistForForm)?.name || ''}
       />
 
       <ArtistFormSubmissionDialog
