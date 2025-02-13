@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,13 +16,13 @@ import { FestivalGearSetup } from "@/types/festival";
 import { Loader2 } from "lucide-react";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
-// Define type for the real-time payload
-interface RealtimeFormChange {
+// Define type for the form data
+interface FormData {
   status: string;
   [key: string]: any;
 }
 
-type RealtimeFormPayload = RealtimePostgresChangesPayload<RealtimeFormChange>;
+type RealtimeFormPayload = RealtimePostgresChangesPayload<FormData>;
 
 export const ArtistRequirementsForm = () => {
   const { token } = useParams();
@@ -161,7 +162,7 @@ export const ArtistRequirementsForm = () => {
 
     const channel = supabase
       .channel('form-status-changes')
-      .on<RealtimeFormChange>(
+      .on<FormData>(
         'postgres_changes',
         {
           event: '*',
@@ -171,7 +172,8 @@ export const ArtistRequirementsForm = () => {
         },
         (payload: RealtimeFormPayload) => {
           console.log('Form status changed:', payload);
-          if (payload.new && payload.new.status === 'completed') {
+          const newData = payload.new as FormData;
+          if (newData && newData.status === 'completed') {
             toast({
               title: "Form Status Updated",
               description: "Your form has been submitted successfully",
