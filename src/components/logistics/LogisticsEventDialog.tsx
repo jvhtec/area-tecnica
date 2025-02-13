@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,17 +39,11 @@ const PICKUP_LOCATIONS = [
 // Ground transport types that need pickup location
 const GROUND_TRANSPORT_TYPES = ['van', 'rv', 'sleeper_bus'];
 
-// Station transport types that need departure station
-const STATION_TRANSPORT_TYPES = ['train', 'plane'];
-
 // Available departments
 const departments: Department[] = [
   "sound",
   "lights",
-  "video",
-  "production",
-  "logistics",
-  "administrative"
+  "video"
 ];
 
 interface LogisticsEventDialogProps {
@@ -86,7 +81,6 @@ export const LogisticsEventDialog = ({
   const [licensePlate, setLicensePlate] = useState("");
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
   const [pickupLocation, setPickupLocation] = useState(PICKUP_LOCATIONS[0]);
-  const [departureStation, setDepartureStation] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [color, setColor] = useState("#7E69AB");
 
@@ -120,7 +114,6 @@ export const LogisticsEventDialog = ({
       setLicensePlate("");
       setSelectedDepartments([]);
       setPickupLocation(PICKUP_LOCATIONS[0]);
-      setDepartureStation("");
       setColor("#7E69AB");
     }
   }, [selectedEvent, selectedDate]);
@@ -198,7 +191,6 @@ export const LogisticsEventDialog = ({
         license_plate: licensePlate || null,
         color: color,
         pickup_address: GROUND_TRANSPORT_TYPES.includes(transportType) ? pickupLocation : null,
-        departure_station: STATION_TRANSPORT_TYPES.includes(transportType) ? departureStation : null,
       };
 
       if (selectedEvent) {
@@ -405,18 +397,6 @@ export const LogisticsEventDialog = ({
               </div>
             )}
 
-            {/* Station Transport Fields */}
-            {STATION_TRANSPORT_TYPES.includes(transportType) && (
-              <div className="space-y-2">
-                <Label>Departure Station</Label>
-                <Input
-                  value={departureStation}
-                  onChange={(e) => setDepartureStation(e.target.value)}
-                  placeholder="Enter departure station"
-                />
-              </div>
-            )}
-
             {/* License Plate */}
             <div className="space-y-2">
               <Label>License Plate</Label>
@@ -500,3 +480,4 @@ export const LogisticsEventDialog = ({
     </>
   );
 };
+
