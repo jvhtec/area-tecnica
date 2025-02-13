@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { SimplifiedJobColorPicker } from "@/components/jobs/SimplifiedJobColorPicker";
 
 // Predefined pickup locations for ground transport
 const PICKUP_LOCATIONS = [
@@ -54,6 +55,7 @@ interface LogisticsEventDialogProps {
     job_id: string | null;
     license_plate: string | null;
     title?: string;
+    color?: string;
     departments: { department: Department }[];
   };
 }
@@ -76,11 +78,10 @@ export const LogisticsEventDialog = ({
   const [pickupLocation, setPickupLocation] = useState(PICKUP_LOCATIONS[0]);
   const [departureStation, setDepartureStation] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [color, setColor] = useState("#7E69AB");
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  const departments: Department[] = ["sound", "lights", "video"];
 
   useEffect(() => {
     if (selectedEvent) {
@@ -97,6 +98,7 @@ export const LogisticsEventDialog = ({
       setCustomTitle(selectedEvent.title || "");
       setLicensePlate(selectedEvent.license_plate || "");
       setSelectedDepartments(selectedEvent.departments.map((d) => d.department));
+      setColor(selectedEvent.color || "#7E69AB");
     } else {
       setEventType("load");
       setTransportType("trailer");
@@ -109,6 +111,7 @@ export const LogisticsEventDialog = ({
       setSelectedDepartments([]);
       setPickupLocation(PICKUP_LOCATIONS[0]);
       setDepartureStation("");
+      setColor("#7E69AB");
     }
   }, [selectedEvent, selectedDate]);
 
@@ -183,7 +186,7 @@ export const LogisticsEventDialog = ({
         job_id: selectedJob || null,
         title: customTitle || null,
         license_plate: licensePlate || null,
-        // Add pickup location or departure station based on transport type
+        color: color,
         pickup_address: GROUND_TRANSPORT_TYPES.includes(transportType) ? pickupLocation : null,
         departure_station: STATION_TRANSPORT_TYPES.includes(transportType) ? departureStation : null,
       };
@@ -287,6 +290,15 @@ export const LogisticsEventDialog = ({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Color Picker */}
+            <div className="space-y-2">
+              <Label>Event Color</Label>
+              <SimplifiedJobColorPicker
+                color={color}
+                onChange={setColor}
+              />
             </div>
 
             {/* Custom Title (only required if no job is selected) */}

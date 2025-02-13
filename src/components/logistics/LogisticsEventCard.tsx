@@ -1,3 +1,4 @@
+
 import { Badge } from "@/components/ui/badge";
 import { Package, PackageCheck, Truck } from "lucide-react";
 import { format } from "date-fns";
@@ -18,18 +19,43 @@ export const LogisticsEventCard = ({
   compact = false,
   className 
 }: LogisticsEventCardProps) => {
+  // Default colors based on event type
+  const defaultColor = event.event_type === 'load' ? 'rgb(191, 219, 254)' : 'rgb(187, 247, 208)';
+  const borderColor = event.color || defaultColor;
+  
+  // Create a slightly transparent version of the color for the background
+  const getBgColor = () => {
+    if (!event.color) return '';
+    try {
+      // If it's a hex color, convert it to RGB
+      if (event.color.startsWith('#')) {
+        const r = parseInt(event.color.slice(1, 3), 16);
+        const g = parseInt(event.color.slice(3, 5), 16);
+        const b = parseInt(event.color.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, 0.1)`;
+      }
+      // If it's already RGB, just add transparency
+      return event.color.replace('rgb', 'rgba').replace(')', ', 0.1)');
+    } catch (e) {
+      return '';
+    }
+  };
+
   return (
     <div
       onClick={onClick}
+      style={{
+        borderColor: borderColor,
+        backgroundColor: getBgColor(),
+      }}
       className={cn(
-        `p-2 bg-card border rounded-md cursor-pointer hover:shadow-md transition-shadow
-        ${event.event_type === 'load' ? 'border-blue-200' : 'border-green-200'}`,
+        "p-2 bg-card border rounded-md cursor-pointer hover:shadow-md transition-shadow",
         className
       )}
     >
       {variant === "calendar" ? (
         <div className="flex items-center gap-2">
-          <span className="text-xs">{event.job?.title}</span>
+          <span className="text-xs">{event.title || event.job?.title}</span>
         </div>
       ) : (
         <>
@@ -51,7 +77,7 @@ export const LogisticsEventCard = ({
             </Badge>
           </div>
           
-          <h3 className="font-medium mt-2">{event.job?.title}</h3>
+          <h3 className="font-medium mt-2">{event.title || event.job?.title}</h3>
           <div className="text-sm text-muted-foreground mt-1">
             {format(new Date(`2000-01-01T${event.event_time}`), 'HH:mm')}
           </div>

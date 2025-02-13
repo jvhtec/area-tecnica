@@ -1594,6 +1594,7 @@ export type Database = {
       }
       logistics_events: {
         Row: {
+          color: string | null
           created_at: string | null
           event_date: string
           event_time: string
@@ -1609,6 +1610,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          color?: string | null
           created_at?: string | null
           event_date: string
           event_time: string
@@ -1624,6 +1626,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          color?: string | null
           created_at?: string | null
           event_date?: string
           event_time?: string
