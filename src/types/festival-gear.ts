@@ -64,3 +64,9 @@ export interface InfrastructureConfigProps {
   >;
   onChange: (changes: Partial<GearSetupFormData>) => void;
 }
+
+export interface ConsoleConfigProps {
+  consoles: ConsoleSetup[];
+  onChange: (consoles: ConsoleSetup[]) => void;
+  label: string;
+}

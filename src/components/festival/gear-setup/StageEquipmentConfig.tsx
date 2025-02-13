@@ -16,8 +16,8 @@ export const StageEquipmentConfig = ({ data, onChange }: StageEquipmentConfigPro
             id="available-monitors"
             type="number"
             min="0"
-            value={data.available_monitors}
-            onChange={(e) => onChange({ available_monitors: parseInt(e.target.value) || 0 })}
+            value={data.monitors_quantity}
+            onChange={(e) => onChange({ monitors_quantity: parseInt(e.target.value) || 0 })}
           />
         </div>
 
@@ -26,8 +26,8 @@ export const StageEquipmentConfig = ({ data, onChange }: StageEquipmentConfigPro
             <Label htmlFor="side-fills">Side Fills Available</Label>
             <Switch
               id="side-fills"
-              checked={data.has_side_fills}
-              onCheckedChange={(checked) => onChange({ has_side_fills: checked })}
+              checked={data.extras_sf}
+              onCheckedChange={(checked) => onChange({ extras_sf: checked })}
             />
           </div>
 
@@ -35,8 +35,8 @@ export const StageEquipmentConfig = ({ data, onChange }: StageEquipmentConfigPro
             <Label htmlFor="drum-fills">Drum Fills Available</Label>
             <Switch
               id="drum-fills"
-              checked={data.has_drum_fills}
-              onCheckedChange={(checked) => onChange({ has_drum_fills: checked })}
+              checked={data.extras_df}
+              onCheckedChange={(checked) => onChange({ extras_df: checked })}
             />
           </div>
 
@@ -44,8 +44,8 @@ export const StageEquipmentConfig = ({ data, onChange }: StageEquipmentConfigPro
             <Label htmlFor="dj-booths">DJ Booths Available</Label>
             <Switch
               id="dj-booths"
-              checked={data.has_dj_booths}
-              onCheckedChange={(checked) => onChange({ has_dj_booths: checked })}
+              checked={data.extras_djbooth}
+              onCheckedChange={(checked) => onChange({ extras_djbooth: checked })}
             />
           </div>
         </div>

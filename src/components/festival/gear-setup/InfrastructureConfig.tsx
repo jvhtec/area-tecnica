@@ -15,8 +15,8 @@ export const InfrastructureConfig = ({ data, onChange }: InfrastructureConfigPro
             id="cat6-runs"
             type="number"
             min="0"
-            value={data.available_cat6_runs}
-            onChange={(e) => onChange({ available_cat6_runs: parseInt(e.target.value) || 0 })}
+            value={data.infra_cat6_quantity}
+            onChange={(e) => onChange({ infra_cat6_quantity: parseInt(e.target.value) || 0 })}
           />
         </div>
 
@@ -26,8 +26,8 @@ export const InfrastructureConfig = ({ data, onChange }: InfrastructureConfigPro
             id="hma-runs"
             type="number"
             min="0"
-            value={data.available_hma_runs}
-            onChange={(e) => onChange({ available_hma_runs: parseInt(e.target.value) || 0 })}
+            value={data.infra_hma_quantity}
+            onChange={(e) => onChange({ infra_hma_quantity: parseInt(e.target.value) || 0 })}
           />
         </div>
 
@@ -37,8 +37,8 @@ export const InfrastructureConfig = ({ data, onChange }: InfrastructureConfigPro
             id="coax-runs"
             type="number"
             min="0"
-            value={data.available_coax_runs}
-            onChange={(e) => onChange({ available_coax_runs: parseInt(e.target.value) || 0 })}
+            value={data.infra_coax_quantity}
+            onChange={(e) => onChange({ infra_coax_quantity: parseInt(e.target.value) || 0 })}
           />
         </div>
 
@@ -48,8 +48,8 @@ export const InfrastructureConfig = ({ data, onChange }: InfrastructureConfigPro
             id="analog-runs"
             type="number"
             min="0"
-            value={data.available_analog_runs}
-            onChange={(e) => onChange({ available_analog_runs: parseInt(e.target.value) || 0 })}
+            value={data.infra_analog}
+            onChange={(e) => onChange({ infra_analog: parseInt(e.target.value) || 0 })}
           />
         </div>
 
@@ -59,8 +59,8 @@ export const InfrastructureConfig = ({ data, onChange }: InfrastructureConfigPro
             id="opticalcon-runs"
             type="number"
             min="0"
-            value={data.available_opticalcon_duo_runs}
-            onChange={(e) => onChange({ available_opticalcon_duo_runs: parseInt(e.target.value) || 0 })}
+            value={data.infra_opticalcon_duo_quantity}
+            onChange={(e) => onChange({ infra_opticalcon_duo_quantity: parseInt(e.target.value) || 0 })}
           />
         </div>
       </div>
