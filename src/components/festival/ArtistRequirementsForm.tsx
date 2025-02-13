@@ -13,6 +13,7 @@ import { ExtraRequirementsSection } from "./form/sections/ExtraRequirementsSecti
 import { InfrastructureSection } from "./form/sections/InfrastructureSection";
 import { NotesSection } from "./form/sections/NotesSection";
 import { FestivalGearSetup } from "@/types/festival";
+import { Loader2 } from "lucide-react";
 
 export const ArtistRequirementsForm = () => {
   const { token } = useParams();
@@ -146,16 +147,48 @@ export const ArtistRequirementsForm = () => {
     fetchFormData();
   }, [token, toast]);
 
+  // Add real-time subscription for form status updates
+  useEffect(() => {
+    if (!token) return;
+
+    const channel = supabase
+      .channel('form-status-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'festival_artist_forms',
+          filter: `token=eq.${token}`,
+        },
+        (payload) => {
+          console.log('Form status changed:', payload);
+          if (payload.new.status === 'completed') {
+            toast({
+              title: "Form Status Updated",
+              description: "Your form has been submitted successfully",
+            });
+            navigate('/festival/form-submitted');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [token, navigate, toast]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !formData) return;
 
     setIsLoading(true);
     try {
-      // Get artist ID from token
+      // Get form info from token
       const { data: formInfo, error: formError } = await supabase
         .from('festival_artist_forms')
-        .select('artist_id')
+        .select('artist_id, status')
         .eq('token', token)
         .maybeSingle();
 
@@ -164,45 +197,22 @@ export const ArtistRequirementsForm = () => {
         throw new Error('Form not found');
       }
 
-      // Update artist data
-      const { error: updateError } = await supabase
-        .from('festival_artists')
-        .update({
-          foh_console: formData.foh_console,
-          foh_console_provided_by: formData.foh_console_provided_by,
-          mon_console: formData.mon_console,
-          mon_console_provided_by: formData.mon_console_provided_by,
-          wireless_model: formData.wireless_model,
-          wireless_provided_by: formData.wireless_provided_by,
-          wireless_quantity_hh: formData.wireless_quantity_hh,
-          wireless_quantity_bp: formData.wireless_quantity_bp,
-          wireless_band: formData.wireless_band,
-          iem_model: formData.iem_model,
-          iem_provided_by: formData.iem_provided_by,
-          iem_quantity: formData.iem_quantity,
-          iem_band: formData.iem_band,
-          monitors_enabled: formData.monitors_enabled,
-          monitors_quantity: formData.monitors_quantity,
-          extras_sf: formData.extras_sf,
-          extras_df: formData.extras_df,
-          extras_djbooth: formData.extras_djbooth,
-          extras_wired: formData.extras_wired,
-          infra_cat6: formData.infra_cat6,
-          infra_cat6_quantity: formData.infra_cat6_quantity,
-          infra_hma: formData.infra_hma,
-          infra_hma_quantity: formData.infra_hma_quantity,
-          infra_coax: formData.infra_coax,
-          infra_coax_quantity: formData.infra_coax_quantity,
-          infra_opticalcon_duo: formData.infra_opticalcon_duo,
-          infra_opticalcon_duo_quantity: formData.infra_opticalcon_duo_quantity,
-          infra_analog: formData.infra_analog,
-          infrastructure_provided_by: formData.infrastructure_provided_by,
-          other_infrastructure: formData.other_infrastructure,
-          notes: formData.notes
-        })
-        .eq('id', formInfo.artist_id);
+      if (formInfo.status === 'completed') {
+        throw new Error('This form has already been submitted');
+      }
 
-      if (updateError) throw updateError;
+      // Create form submission
+      const { error: submissionError } = await supabase
+        .from('festival_artist_form_submissions')
+        .insert({
+          form_id: token,
+          artist_id: formInfo.artist_id,
+          form_data: formData,
+          status: 'submitted',
+          submitted_at: new Date().toISOString(),
+        });
+
+      if (submissionError) throw submissionError;
 
       // Mark form as completed
       const { error: completionError } = await supabase
@@ -217,13 +227,12 @@ export const ArtistRequirementsForm = () => {
         description: "Your technical requirements have been submitted successfully.",
       });
 
-      // Redirect to success page
       navigate('/festival/form-submitted');
     } catch (error: any) {
       console.error('Error submitting form:', error);
       toast({
         title: "Error",
-        description: "Could not submit form. Please try again later.",
+        description: error.message || "Could not submit form. Please try again later.",
         variant: "destructive"
       });
     } finally {
@@ -237,74 +246,81 @@ export const ArtistRequirementsForm = () => {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-center">
-              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-4xl mx-auto space-y-8">
+          <div className="flex justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>Artist Technical Requirements Form</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-8">
-            <BasicInfoSection 
-              formData={formData} 
-              onChange={handleFormChange} 
-              gearSetup={gearSetup}
-            />
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-4xl mx-auto space-y-8">
+        <div className="flex flex-col items-center space-y-4">
+          <img 
+            src="/sector pro logo.png" 
+            alt="Company Logo" 
+            className="h-16 object-contain"
+          />
+          <Card>
+            <CardHeader>
+              <CardTitle>Artist Technical Requirements Form</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-8">
+                <BasicInfoSection 
+                  formData={formData} 
+                  onChange={handleFormChange} 
+                  gearSetup={gearSetup}
+                />
 
-            <ConsoleSetupSection 
-              formData={formData} 
-              onChange={handleFormChange} 
-              gearSetup={gearSetup}
-            />
+                <ConsoleSetupSection 
+                  formData={formData} 
+                  onChange={handleFormChange} 
+                  gearSetup={gearSetup}
+                />
 
-            <WirelessSetupSection 
-              formData={formData} 
-              onChange={handleFormChange} 
-              gearSetup={gearSetup}
-            />
+                <WirelessSetupSection 
+                  formData={formData} 
+                  onChange={handleFormChange} 
+                  gearSetup={gearSetup}
+                />
 
-            <MonitorSetupSection 
-              formData={formData} 
-              onChange={handleFormChange} 
-              gearSetup={gearSetup}
-            />
+                <MonitorSetupSection 
+                  formData={formData} 
+                  onChange={handleFormChange} 
+                  gearSetup={gearSetup}
+                />
 
-            <ExtraRequirementsSection 
-              formData={formData} 
-              onChange={handleFormChange} 
-              gearSetup={gearSetup}
-            />
+                <ExtraRequirementsSection 
+                  formData={formData} 
+                  onChange={handleFormChange} 
+                  gearSetup={gearSetup}
+                />
 
-            <InfrastructureSection 
-              formData={formData} 
-              onChange={handleFormChange} 
-              gearSetup={gearSetup}
-            />
+                <InfrastructureSection 
+                  formData={formData} 
+                  onChange={handleFormChange} 
+                  gearSetup={gearSetup}
+                />
 
-            <NotesSection 
-              formData={formData} 
-              onChange={handleFormChange} 
-              gearSetup={gearSetup}
-            />
+                <NotesSection 
+                  formData={formData} 
+                  onChange={handleFormChange} 
+                  gearSetup={gearSetup}
+                />
 
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Submitting..." : "Submit Requirements"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+                <Button type="submit" disabled={isLoading} className="w-full">
+                  {isLoading ? "Submitting..." : "Submit Requirements"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 };
