@@ -46,10 +46,9 @@ const departments: Department[] = [
   "sound",
   "lights",
   "video",
+  "production",
   "logistics",
-  "rigging",
-  "backline",
-  "production"
+  "administrative"
 ];
 
 interface LogisticsEventDialogProps {
