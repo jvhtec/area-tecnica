@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -107,7 +108,7 @@ const VideoConsumosTool: React.FC = () => {
 
   const recommendPDU = (current: number) => {
     if (current < 32) return PDU_TYPES[0];
-    if (current > 63) return PDU_TYPES[2];
+    if (current < 63) return PDU_TYPES[1];
     return PDU_TYPES[2];
   };
 
