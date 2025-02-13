@@ -14,9 +14,12 @@ import { InfrastructureSection } from "./form/sections/InfrastructureSection";
 import { NotesSection } from "./form/sections/NotesSection";
 import { FestivalGearSetup } from "@/types/festival";
 import { Loader2 } from "lucide-react";
+import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 // Define type for the real-time payload
-interface RealtimeFormPayload {
+interface RealtimeFormPayload extends RealtimePostgresChangesPayload<{
+  [key: string]: any;
+}> {
   new: {
     status: string;
     [key: string]: any;
@@ -25,7 +28,6 @@ interface RealtimeFormPayload {
     status: string;
     [key: string]: any;
   };
-  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
 }
 
 export const ArtistRequirementsForm = () => {
@@ -166,7 +168,10 @@ export const ArtistRequirementsForm = () => {
 
     const channel = supabase
       .channel('form-status-changes')
-      .on(
+      .on<{
+        [key: string]: any;
+        status: string;
+      }>(
         'postgres_changes',
         {
           event: '*',
