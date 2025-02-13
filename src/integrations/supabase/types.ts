@@ -428,6 +428,57 @@ export type Database = {
           },
         ]
       }
+      festival_artist_form_submissions: {
+        Row: {
+          artist_id: string | null
+          created_at: string | null
+          form_data: Json
+          form_id: string | null
+          id: string
+          notes: string | null
+          status: string | null
+          submitted_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          artist_id?: string | null
+          created_at?: string | null
+          form_data: Json
+          form_id?: string | null
+          id?: string
+          notes?: string | null
+          status?: string | null
+          submitted_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          artist_id?: string | null
+          created_at?: string | null
+          form_data?: Json
+          form_id?: string | null
+          id?: string
+          notes?: string | null
+          status?: string | null
+          submitted_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "festival_artist_form_submissions_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "festival_artists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "festival_artist_form_submissions_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "festival_artist_forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       festival_artist_forms: {
         Row: {
           artist_id: string | null

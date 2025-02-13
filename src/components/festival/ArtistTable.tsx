@@ -1,7 +1,6 @@
-
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Edit2, Loader2, Mic, Headphones, FileText, Trash2, ChevronDown, ChevronUp, Printer } from "lucide-react";
+import { Edit2, Loader2, Mic, Headphones, FileText, Trash2, ChevronDown, ChevronUp, Printer, Link2 } from "lucide-react";
 import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
@@ -12,6 +11,9 @@ import { ArtistPdfData, exportArtistPDF } from "@/utils/artistPdfExport";
 import { useToast } from "@/hooks/use-toast";
 import { FestivalGearSetup } from "@/types/festival";
 import { supabase } from "@/lib/supabase";
+import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
+import { FormStatusBadge } from "./FormStatusBadge";
+import { ArtistFormSubmissionDialog } from "./ArtistFormSubmissionDialog";
 
 interface ArtistTableProps {
   artists: any[];
@@ -38,6 +40,11 @@ export const ArtistTable = ({
   const [fileDialogOpen, setFileDialogOpen] = useState(false);
   const [selectedArtistForFiles, setSelectedArtistForFiles] = useState<string>("");
   const [gearSetup, setGearSetup] = useState<FestivalGearSetup | null>(null);
+  const [formDialogOpen, setFormDialogOpen] = useState(false);
+  const [selectedArtistForForm, setSelectedArtistForForm] = useState<string>("");
+  const [submissionDialogOpen, setSubmissionDialogOpen] = useState(false);
+  const [selectedArtistForSubmission, setSelectedArtistForSubmission] = useState<string>("");
+  const [formStatuses, setFormStatuses] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -62,6 +69,31 @@ export const ArtistTable = ({
     };
 
     fetchGearSetup();
+  }, [artists]);
+
+  useEffect(() => {
+    const fetchFormStatuses = async () => {
+      const artistIds = artists.map(artist => artist.id);
+      if (artistIds.length === 0) return;
+
+      const { data } = await supabase
+        .from('festival_artist_forms')
+        .select('artist_id, status')
+        .in('artist_id', artistIds)
+        .order('created_at', { ascending: false });
+
+      if (data) {
+        const statuses: Record<string, string> = {};
+        data.forEach(form => {
+          if (!statuses[form.artist_id]) {
+            statuses[form.artist_id] = form.status;
+          }
+        });
+        setFormStatuses(statuses);
+      }
+    };
+
+    fetchFormStatuses();
   }, [artists]);
 
   const toggleRowExpansion = (artistId: string) => {
@@ -273,6 +305,7 @@ export const ArtistTable = ({
             <TableHead>Technical Setup</TableHead>
             <TableHead>RF/IEM</TableHead>
             <TableHead>Files</TableHead>
+            <TableHead>Form Status</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -280,6 +313,7 @@ export const ArtistTable = ({
           {filteredArtists.map((artist) => {
             const issues = checkGearRequirements(artist);
             const hasIssues = Object.keys(issues).length > 0;
+            const formStatus = formStatuses[artist.id];
             
             return (
               <>
@@ -395,15 +429,36 @@ export const ArtistTable = ({
                       >
                         <Printer className="h-4 w-4" />
                       </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedArtistForForm(artist.id);
+                          setFormDialogOpen(true);
+                        }}
+                      >
+                        <Link2 className="h-4 w-4" />
+                      </Button>
+                      {formStatus === 'completed' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedArtistForSubmission(artist.id);
+                            setSubmissionDialogOpen(true);
+                          }}
+                        >
+                          <FileText className="h-4 w-4" />
+                          <span className="sr-only">View Submission</span>
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
                 {expandedRows.includes(artist.id) && (
                   <TableRow>
                     <TableCell colSpan={9} className="bg-muted/50">
-                      <div className="p
-
--4 space-y-4">
+                      <div className="p-4 space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <h4 className="font-medium mb-2">Infrastructure</h4>
@@ -502,6 +557,18 @@ export const ArtistTable = ({
         open={fileDialogOpen}
         onOpenChange={setFileDialogOpen}
         artistId={selectedArtistForFiles}
+      />
+
+      <ArtistFormLinkDialog
+        open={formDialogOpen}
+        onOpenChange={setFormDialogOpen}
+        artistId={selectedArtistForForm}
+      />
+
+      <ArtistFormSubmissionDialog
+        open={submissionDialogOpen}
+        onOpenChange={setSubmissionDialogOpen}
+        artistId={selectedArtistForSubmission}
       />
     </>
   );
