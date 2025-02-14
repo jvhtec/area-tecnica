@@ -4,9 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 
@@ -62,23 +60,39 @@ export const ArtistForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
+    if (!token) {
+      toast({
+        title: "Error",
+        description: "Invalid form URL",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsLoading(true);
     try {
-      // First verify the form token is valid and get the artist_id
+      // First verify the form token is valid and get the form details
       const { data: formInfo, error: formError } = await supabase
         .from('festival_artist_forms')
-        .select('id, artist_id, status')  // Added id to the selection
+        .select('id, artist_id, status, expires_at')
         .eq('token', token)
-        .gt('expires_at', new Date().toISOString())
         .single();
 
-      if (formError || !formInfo) {
-        throw new Error('Invalid or expired form link');
+      if (formError) {
+        throw new Error('Invalid form link');
       }
 
-      if (formInfo.status === 'completed') {
+      if (!formInfo) {
+        throw new Error('Form not found');
+      }
+
+      // Check if form is expired
+      if (new Date(formInfo.expires_at) < new Date()) {
+        throw new Error('This form link has expired');
+      }
+
+      // Check if form is already completed
+      if (formInfo.status !== 'pending') {
         throw new Error('This form has already been submitted');
       }
 
@@ -86,7 +100,7 @@ export const ArtistForm = () => {
       const { error: submissionError } = await supabase
         .from('festival_artist_form_submissions')
         .insert({
-          form_id: formInfo.id,  // Use the actual form id instead of token
+          form_id: formInfo.id,
           artist_id: formInfo.artist_id,
           form_data: formData,
           status: 'submitted',
@@ -99,7 +113,7 @@ export const ArtistForm = () => {
       const { error: updateError } = await supabase
         .from('festival_artist_forms')
         .update({ status: 'completed' })
-        .eq('token', token);
+        .eq('id', formInfo.id);
 
       if (updateError) throw updateError;
 

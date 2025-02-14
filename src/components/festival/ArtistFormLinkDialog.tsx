@@ -28,6 +28,18 @@ export const ArtistFormLinkDialog = ({
   const generateNewLink = async () => {
     setIsLoading(true);
     try {
+      // First, mark any existing pending forms as expired
+      const { error: updateError } = await supabase
+        .from('festival_artist_forms')
+        .update({
+          status: 'expired',
+          expires_at: new Date().toISOString() // Expire immediately
+        })
+        .eq('artist_id', artistId)
+        .eq('status', 'pending');
+
+      if (updateError) throw updateError;
+
       // Create a new form entry that expires in 7 days
       const expiresAt = addDays(new Date(), 7);
       
