@@ -280,7 +280,7 @@ async function createFoldersForDate(
         ];
         for (const sf of personnelSubfolders) {
           const subPayload = {
-            definitionId: FLEX_FOLDER_IDS.subFolder,
+            definitionId: FLEX_FOLDER_IDS.hojaGastos,
             parentElementId: mainFolderElementId,
             open: true,
             locked: false,
