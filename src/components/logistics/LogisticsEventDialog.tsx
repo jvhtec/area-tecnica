@@ -29,16 +29,6 @@ import { Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { SimplifiedJobColorPicker } from "@/components/jobs/SimplifiedJobColorPicker";
 
-// Predefined pickup locations for ground transport
-const PICKUP_LOCATIONS = [
-  "Warehouse - Calle Example 123, Madrid",
-  "Office - Avenida Sample 456, Madrid",
-  "Storage - Plaza Test 789, Madrid"
-];
-
-// Ground transport types that need pickup location
-const GROUND_TRANSPORT_TYPES = ['van', 'rv', 'sleeper_bus'];
-
 // Available departments
 const departments: Department[] = [
   "sound",
@@ -80,7 +70,6 @@ export const LogisticsEventDialog = ({
   const [customTitle, setCustomTitle] = useState("");
   const [licensePlate, setLicensePlate] = useState("");
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
-  const [pickupLocation, setPickupLocation] = useState(PICKUP_LOCATIONS[0]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [color, setColor] = useState("#7E69AB");
 
@@ -113,7 +102,6 @@ export const LogisticsEventDialog = ({
       setCustomTitle("");
       setLicensePlate("");
       setSelectedDepartments([]);
-      setPickupLocation(PICKUP_LOCATIONS[0]);
       setColor("#7E69AB");
     }
   }, [selectedEvent, selectedDate]);
@@ -190,7 +178,6 @@ export const LogisticsEventDialog = ({
         title: customTitle || null,
         license_plate: licensePlate || null,
         color: color,
-        pickup_address: GROUND_TRANSPORT_TYPES.includes(transportType) ? pickupLocation : null,
       };
 
       if (selectedEvent) {
@@ -378,25 +365,6 @@ export const LogisticsEventDialog = ({
               </Select>
             </div>
 
-            {/* Ground Transport Pickup Location */}
-            {GROUND_TRANSPORT_TYPES.includes(transportType) && (
-              <div className="space-y-2">
-                <Label>Pickup Location</Label>
-                <Select value={pickupLocation} onValueChange={setPickupLocation}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PICKUP_LOCATIONS.map((location) => (
-                      <SelectItem key={location} value={location}>
-                        {location}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
             {/* License Plate */}
             <div className="space-y-2">
               <Label>License Plate</Label>
@@ -480,4 +448,3 @@ export const LogisticsEventDialog = ({
     </>
   );
 };
-
