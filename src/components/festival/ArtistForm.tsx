@@ -69,7 +69,7 @@ export const ArtistForm = () => {
       // First verify the form token is valid and get the artist_id
       const { data: formInfo, error: formError } = await supabase
         .from('festival_artist_forms')
-        .select('artist_id, status')
+        .select('id, artist_id, status')  // Added id to the selection
         .eq('token', token)
         .gt('expires_at', new Date().toISOString())
         .single();
@@ -82,11 +82,11 @@ export const ArtistForm = () => {
         throw new Error('This form has already been submitted');
       }
 
-      // Create form submission
+      // Create form submission using the actual form ID
       const { error: submissionError } = await supabase
         .from('festival_artist_form_submissions')
         .insert({
-          form_id: token,
+          form_id: formInfo.id,  // Use the actual form id instead of token
           artist_id: formInfo.artist_id,
           form_data: formData,
           status: 'submitted',
