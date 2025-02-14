@@ -67,34 +67,41 @@ export const ArtistForm = () => {
     setIsLoading(true);
     try {
       // First verify the form token is valid and get the artist_id
-      const { data: formData, error: formError } = await supabase
+      const { data: formInfo, error: formError } = await supabase
         .from('festival_artist_forms')
         .select('artist_id, status')
         .eq('token', token)
         .gt('expires_at', new Date().toISOString())
         .single();
 
-      if (formError || !formData) {
+      if (formError || !formInfo) {
         throw new Error('Invalid or expired form link');
       }
 
-      if (formData.status === 'completed') {
+      if (formInfo.status === 'completed') {
         throw new Error('This form has already been submitted');
       }
 
-      // Update the artist data
-      const { error: updateError } = await supabase
-        .from('festival_artists')
-        .update(formData)
-        .eq('id', formData.artist_id);
+      // Create form submission
+      const { error: submissionError } = await supabase
+        .from('festival_artist_form_submissions')
+        .insert({
+          form_id: token,
+          artist_id: formInfo.artist_id,
+          form_data: formData,
+          status: 'submitted',
+          submitted_at: new Date().toISOString(),
+        });
 
-      if (updateError) throw updateError;
+      if (submissionError) throw submissionError;
 
       // Mark the form as completed
-      await supabase
+      const { error: updateError } = await supabase
         .from('festival_artist_forms')
         .update({ status: 'completed' })
         .eq('token', token);
+
+      if (updateError) throw updateError;
 
       toast({
         title: "Success",
