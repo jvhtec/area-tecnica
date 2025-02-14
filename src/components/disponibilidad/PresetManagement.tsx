@@ -1,10 +1,8 @@
-
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useSessionManager } from '@/hooks/useSessionManager';
 import { supabase } from '@/lib/supabase';
-import type { AvailabilityPreference, AvailabilityStatus } from '@/types/availability';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 const DAYS_OF_WEEK = [
@@ -17,6 +15,16 @@ const DAYS_OF_WEEK = [
   'Saturday'
 ];
 
+// Define AvailabilityPreference type inline
+type AvailabilityPreference = {
+  user_id: string;
+  department: string;
+  day_of_week: number;
+  status: 'available' | 'tentative' | 'unavailable';
+};
+
+type AvailabilityStatus = 'available' | 'tentative' | 'unavailable';
+
 export function PresetManagement() {
   const { session, userDepartment } = useSessionManager();
   const { toast } = useToast();
@@ -26,7 +34,7 @@ export function PresetManagement() {
     queryKey: ['availability-presets', session?.user?.id, userDepartment],
     queryFn: async () => {
       if (!session?.user?.id || !userDepartment) return null;
-      
+
       const { data, error } = await supabase
         .from('availability_preferences')
         .select('*')
@@ -128,7 +136,7 @@ export function PresetManagement() {
       <CardContent className="space-y-4">
         {DAYS_OF_WEEK.map((day, index) => {
           const preset = presets?.find(p => p.day_of_week === index);
-          
+
           return (
             <div key={day} className="flex items-center justify-between">
               <span>{day}</span>
