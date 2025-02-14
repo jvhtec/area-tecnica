@@ -120,7 +120,7 @@ export type Database = {
           id: string
           reason: string | null
           start_date: string
-          status: Database["public"]["Enums"]["availability_status"]
+          status: Database["public"]["Enums"]["global_preset_status"]
           updated_at: string | null
           user_id: string
         }
@@ -131,7 +131,7 @@ export type Database = {
           id?: string
           reason?: string | null
           start_date: string
-          status?: Database["public"]["Enums"]["availability_status"]
+          status?: Database["public"]["Enums"]["global_preset_status"]
           updated_at?: string | null
           user_id: string
         }
@@ -142,54 +142,13 @@ export type Database = {
           id?: string
           reason?: string | null
           start_date?: string
-          status?: Database["public"]["Enums"]["availability_status"]
+          status?: Database["public"]["Enums"]["global_preset_status"]
           updated_at?: string | null
           user_id?: string
         }
         Relationships: [
           {
             foreignKeyName: "availability_exceptions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      availability_preferences: {
-        Row: {
-          created_at: string | null
-          day_of_week: number
-          department: string
-          id: string
-          notes: string | null
-          status: Database["public"]["Enums"]["availability_status"]
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          day_of_week: number
-          department: string
-          id?: string
-          notes?: string | null
-          status?: Database["public"]["Enums"]["availability_status"]
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          day_of_week?: number
-          department?: string
-          id?: string
-          notes?: string | null
-          status?: Database["public"]["Enums"]["availability_status"]
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "availability_preferences_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -204,7 +163,7 @@ export type Database = {
           department: string
           id: string
           notes: string | null
-          status: Database["public"]["Enums"]["availability_status"]
+          status: Database["public"]["Enums"]["global_preset_status"]
           timezone: string | null
           updated_at: string | null
           user_id: string
@@ -215,7 +174,7 @@ export type Database = {
           department: string
           id?: string
           notes?: string | null
-          status?: Database["public"]["Enums"]["availability_status"]
+          status?: Database["public"]["Enums"]["global_preset_status"]
           timezone?: string | null
           updated_at?: string | null
           user_id: string
@@ -226,7 +185,7 @@ export type Database = {
           department?: string
           id?: string
           notes?: string | null
-          status?: Database["public"]["Enums"]["availability_status"]
+          status?: Database["public"]["Enums"]["global_preset_status"]
           timezone?: string | null
           updated_at?: string | null
           user_id?: string
@@ -838,6 +797,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      global_availability_presets: {
+        Row: {
+          created_at: string | null
+          day_of_week: number
+          department: string
+          id: string
+          name: string
+          notes: string | null
+          status: Database["public"]["Enums"]["global_preset_status"]
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          day_of_week: number
+          department: string
+          id?: string
+          name: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["global_preset_status"]
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          day_of_week?: number
+          department?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["global_preset_status"]
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       hoja_de_ruta: {
         Row: {
@@ -2395,7 +2387,6 @@ export type Database = {
     }
     Enums: {
       assignment_status: "invited" | "confirmed" | "declined"
-      availability_status: "available" | "unavailable" | "tentative"
       department:
         | "sound"
         | "lights"
@@ -2415,6 +2406,7 @@ export type Database = {
         | "strobo"
         | "canones"
         | "estructuras"
+      global_preset_status: "available" | "unavailable" | "tentative"
       job_date_type: "travel" | "setup" | "show" | "off" | "rehearsal"
       job_status: "pending" | "in_progress" | "completed" | "cancelled"
       job_type: "single" | "tour" | "festival" | "dryhire" | "tourdate"

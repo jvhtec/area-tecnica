@@ -12,11 +12,11 @@ export interface AvailabilitySchedule {
   updated_at?: string;
 }
 
-export interface AvailabilityPreference {
+export interface GlobalAvailabilityPreset {
   id: string;
-  user_id: string;
-  department: string;
+  name: string;
   day_of_week: number;
+  department: string;
   status: AvailabilityStatus;
   notes?: string;
   created_at?: string;
