@@ -2,9 +2,26 @@
 import { Database } from "@/integrations/supabase/types";
 
 export type Equipment = Database["public"]["Tables"]["equipment"]["Row"];
-export type Preset = Database["public"]["Tables"]["presets"]["Row"];
-export type PresetItem = Database["public"]["Tables"]["preset_items"]["Row"];
-export type DayAssignment = Database["public"]["Tables"]["day_preset_assignments"]["Row"];
+export type StockEntry = Database["public"]["Tables"]["global_stock_entries"]["Row"];
+
+// Define the Preset and PresetItem types based on our new database schema
+export type Preset = {
+  id: string;
+  name: string;
+  user_id: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type PresetItem = {
+  id: string;
+  preset_id: string;
+  equipment_id: string;
+  quantity: number;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+};
 
 export interface PresetWithItems extends Preset {
   items: (PresetItem & {
