@@ -60,6 +60,7 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel }: Prese
       .map(([equipment_id, quantity]) => ({
         equipment_id,
         quantity,
+        notes: '', // Add empty notes field
         created_at: now,
         updated_at: now
       }));
