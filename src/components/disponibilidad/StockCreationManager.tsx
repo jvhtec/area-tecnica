@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { StockEntry, Equipment } from '@/types/equipment';
 import { Input } from '@/components/ui/input';
@@ -48,7 +49,7 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
     }
   });
 
-  // Fetch current stock levels
+  // Fetch current stock levels using the new view
   const { data: currentStockLevels = [] } = useQuery({
     queryKey: ['current-stock-levels'],
     queryFn: async () => {
@@ -225,3 +226,4 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
     </div>
   );
 };
+

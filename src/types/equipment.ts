@@ -2,8 +2,8 @@
 import { Database } from "@/integrations/supabase/types";
 
 export type Equipment = Database["public"]["Tables"]["equipment"]["Row"];
-export type Preset = Database["public"]["Tables"]["presets"]["Row"];
-export type PresetItem = Database["public"]["Tables"]["preset_items"]["Row"];
+export type Preset = Database["public"]["Tables"]["job_equipment_presets"]["Row"];
+export type PresetItem = Database["public"]["Tables"]["job_preset_items"]["Row"];
 export type StockEntry = {
   id: string;
   equipment_id: string;
@@ -34,3 +34,4 @@ export const categoryLabels: Record<EquipmentCategory, string> = {
   canones: 'Cañones',
   estructuras: 'Estructuras'
 };
+

@@ -225,15 +225,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "day_assignments_preset_id_fkey"
-            columns: ["preset_id"]
-            isOneToOne: false
-            referencedRelation: "presets"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       day_preset_assignments: {
         Row: {
@@ -263,15 +255,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "day_preset_assignments_preset_id_fkey"
-            columns: ["preset_id"]
-            isOneToOne: false
-            referencedRelation: "presets"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       direct_messages: {
         Row: {
@@ -831,6 +815,45 @@ export type Database = {
         }
         Relationships: []
       }
+      global_stock_entries: {
+        Row: {
+          base_quantity: number
+          created_at: string | null
+          equipment_id: string
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          base_quantity?: number
+          created_at?: string | null
+          equipment_id: string
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          base_quantity?: number
+          created_at?: string | null
+          equipment_id?: string
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "global_stock_entries_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "current_stock_levels"
+            referencedColumns: ["equipment_id"]
+          },
+          {
+            foreignKeyName: "global_stock_entries_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hoja_de_ruta: {
         Row: {
           auxiliary_needs: string | null
@@ -1265,6 +1288,35 @@ export type Database = {
           },
         ]
       }
+      job_equipment_presets: {
+        Row: {
+          created_at: string | null
+          id: string
+          job_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          job_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          job_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_equipment_presets_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_milestone_definitions: {
         Row: {
           category: Database["public"]["Enums"]["milestone_category"]
@@ -1372,6 +1424,58 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_preset_items: {
+        Row: {
+          created_at: string | null
+          equipment_id: string
+          id: string
+          notes: string | null
+          preset_id: string
+          quantity: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          equipment_id: string
+          id?: string
+          notes?: string | null
+          preset_id: string
+          quantity?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          equipment_id?: string
+          id?: string
+          notes?: string | null
+          preset_id?: string
+          quantity?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_preset_items_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "current_stock_levels"
+            referencedColumns: ["equipment_id"]
+          },
+          {
+            foreignKeyName: "job_preset_items_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_preset_items_preset_id_fkey"
+            columns: ["preset_id"]
+            isOneToOne: false
+            referencedRelation: "job_equipment_presets"
             referencedColumns: ["id"]
           },
         ]
@@ -1758,79 +1862,6 @@ export type Database = {
           },
         ]
       }
-      preset_items: {
-        Row: {
-          created_at: string | null
-          equipment_id: string
-          id: string
-          preset_id: string
-          quantity: number
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          equipment_id: string
-          id?: string
-          preset_id: string
-          quantity: number
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          equipment_id?: string
-          id?: string
-          preset_id?: string
-          quantity?: number
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "preset_items_equipment_id_fkey"
-            columns: ["equipment_id"]
-            isOneToOne: false
-            referencedRelation: "current_stock_levels"
-            referencedColumns: ["equipment_id"]
-          },
-          {
-            foreignKeyName: "preset_items_equipment_id_fkey"
-            columns: ["equipment_id"]
-            isOneToOne: false
-            referencedRelation: "equipment"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "preset_items_preset_id_fkey"
-            columns: ["preset_id"]
-            isOneToOne: false
-            referencedRelation: "presets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      presets: {
-        Row: {
-          created_at: string | null
-          id: string
-          name: string
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          name: string
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          name?: string
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           created_at: string
@@ -1988,45 +2019,6 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      stock_entries: {
-        Row: {
-          base_quantity: number
-          created_at: string | null
-          equipment_id: string
-          id: string
-          updated_at: string | null
-        }
-        Insert: {
-          base_quantity: number
-          created_at?: string | null
-          equipment_id: string
-          id?: string
-          updated_at?: string | null
-        }
-        Update: {
-          base_quantity?: number
-          created_at?: string | null
-          equipment_id?: string
-          id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "stock_entries_equipment_id_fkey"
-            columns: ["equipment_id"]
-            isOneToOne: true
-            referencedRelation: "current_stock_levels"
-            referencedColumns: ["equipment_id"]
-          },
-          {
-            foreignKeyName: "stock_entries_equipment_id_fkey"
-            columns: ["equipment_id"]
-            isOneToOne: true
-            referencedRelation: "equipment"
             referencedColumns: ["id"]
           },
         ]
