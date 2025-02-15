@@ -3,6 +3,7 @@ import { Database } from "@/integrations/supabase/types";
 
 export type Equipment = Database["public"]["Tables"]["equipment"]["Row"];
 export type StockEntry = Database["public"]["Tables"]["global_stock_entries"]["Row"];
+export type StockMovement = Database["public"]["Tables"]["stock_movements"]["Row"];
 
 // Define the Preset and PresetItem types based on our new database schema
 export type Preset = {

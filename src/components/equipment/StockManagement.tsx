@@ -17,7 +17,7 @@ export function StockManagement() {
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [isAdditionDialog, setIsAdditionDialog] = useState(true);
 
-  // Fetch equipment list and current stock levels
+  // Fetch equipment list and current stock levels from the view
   const { data: equipmentWithStock } = useQuery({
     queryKey: ['current-stock-levels'],
     queryFn: async () => {

@@ -17,14 +17,14 @@ export function EquipmentManagement() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Fetch current stock entries - removed user_id filter since stock is global
+  // Fetch current stock entries using the correct table name
   const { data: stockEntries = [], error: stockError } = useQuery({
     queryKey: ['stock-entries'],
     queryFn: async () => {
       if (!session?.user?.id) return [];
       
       const { data, error } = await supabase
-        .from('stock_entries')
+        .from('global_stock_entries')
         .select('*');
 
       if (error) {
@@ -36,7 +36,7 @@ export function EquipmentManagement() {
     enabled: !!session?.user?.id
   });
 
-  // Update stock entries mutation
+  // Update stock entries mutation with correct table name
   const updateStockMutation = useMutation({
     mutationFn: async (updatedStock: StockEntry[]) => {
       if (!session?.user?.id) throw new Error('No user session');
@@ -44,7 +44,7 @@ export function EquipmentManagement() {
       // Process each stock entry individually
       for (const entry of updatedStock) {
         const { error: upsertError } = await supabase
-          .from('stock_entries')
+          .from('global_stock_entries')
           .upsert({
             id: entry.id,
             equipment_id: entry.equipment_id,
