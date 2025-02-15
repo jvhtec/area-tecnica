@@ -54,7 +54,7 @@ export const JobPresetManager = ({ jobId }: JobPresetManagerProps) => {
   });
 
   // Fetch available equipment
-  const { data: equipment = [] } = useQuery<Equipment[]>({
+  const { data: equipmentList = [] } = useQuery<Equipment[]>({
     queryKey: ['equipment'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -99,7 +99,10 @@ export const JobPresetManager = ({ jobId }: JobPresetManagerProps) => {
       const items = Object.entries(localItems).map(([equipmentId, quantity]) => ({
         preset_id: presetId,
         equipment_id: equipmentId,
-        quantity
+        quantity,
+        notes: '', // Add empty notes field
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       }));
 
       // Delete existing items
@@ -134,12 +137,22 @@ export const JobPresetManager = ({ jobId }: JobPresetManagerProps) => {
     }
   });
 
-  const handleQuantityChange = (equipmentId: string, quantity: number) => {
+  const handleQuantityChange = (equipmentId: string, newQuantity: number) => {
     setLocalItems(prev => ({
       ...prev,
-      [equipmentId]: Math.max(0, quantity)
+      [equipmentId]: Math.max(0, newQuantity)
     }));
   };
+
+  // Group equipment by category
+  const groupedEquipment = equipmentList.reduce((grouped: Record<string, Equipment[]>, item) => {
+    const category = item.category || 'uncategorized';
+    if (!grouped[category]) {
+      grouped[category] = [];
+    }
+    grouped[category].push(item);
+    return grouped;
+  }, {});
 
   return (
     <Card>
@@ -158,53 +171,46 @@ export const JobPresetManager = ({ jobId }: JobPresetManagerProps) => {
 
         <ScrollArea className="h-[600px] pr-4">
           <div className="space-y-8">
-            {equipment.reduce((acc: JSX.Element[], equipment) => {
-              const category = equipment.category || 'uncategorized';
-              if (!acc.some(el => el.key === category)) {
-                acc.push(
-                  <div key={category} className="space-y-4">
-                    <h3 className="text-lg font-semibold capitalize">{category}</h3>
-                    <div className="space-y-4">
-                      {equipment.filter(e => e.category === category).map(e => (
-                        <div key={e.id} className="flex items-center space-x-4">
-                          <div className="flex-1">
-                            <Label>{e.name}</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() => handleQuantityChange(e.id, (localItems[e.id] || 0) - 1)}
-                            >
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={localItems[e.id] || 0}
-                              onChange={(e) => handleQuantityChange(e.id, parseInt(e.target.value) || 0)}
-                              className="w-24"
-                            />
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() => handleQuantityChange(e.id, (localItems[e.id] || 0) + 1)}
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+            {Object.entries(groupedEquipment).map(([category, items]) => (
+              <div key={category} className="space-y-4">
+                <h3 className="text-lg font-semibold capitalize">{category}</h3>
+                <div className="space-y-4">
+                  {items.map(equipment => (
+                    <div key={equipment.id} className="flex items-center space-x-4">
+                      <div className="flex-1">
+                        <Label>{equipment.name}</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleQuantityChange(equipment.id, (localItems[equipment.id] || 0) - 1)}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={localItems[equipment.id] || 0}
+                          onChange={(e) => handleQuantityChange(equipment.id, parseInt(e.target.value) || 0)}
+                          className="w-24"
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleQuantityChange(equipment.id, (localItems[equipment.id] || 0) + 1)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                );
-              }
-              return acc;
-            }, [])}
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </ScrollArea>
       </CardContent>
     </Card>
   );
 };
-

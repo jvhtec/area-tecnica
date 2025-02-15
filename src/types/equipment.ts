@@ -14,6 +14,7 @@ export type StockEntry = {
 export type DayAssignment = Database["public"]["Tables"]["day_assignments"]["Row"];
 
 export interface PresetWithItems extends Preset {
+  name?: string; // Add name field
   items: (PresetItem & {
     equipment: Equipment;
   })[];
@@ -34,4 +35,3 @@ export const categoryLabels: Record<EquipmentCategory, string> = {
   canones: 'Cañones',
   estructuras: 'Estructuras'
 };
-
