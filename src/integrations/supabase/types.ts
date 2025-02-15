@@ -255,7 +255,15 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "day_preset_assignments_preset_id_fkey"
+            columns: ["preset_id"]
+            isOneToOne: false
+            referencedRelation: "presets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       direct_messages: {
         Row: {
