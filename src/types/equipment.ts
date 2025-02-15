@@ -2,19 +2,11 @@
 import { Database } from "@/integrations/supabase/types";
 
 export type Equipment = Database["public"]["Tables"]["equipment"]["Row"];
-export type Preset = Database["public"]["Tables"]["job_equipment_presets"]["Row"];
-export type PresetItem = Database["public"]["Tables"]["job_preset_items"]["Row"];
-export type StockEntry = {
-  id: string;
-  equipment_id: string;
-  base_quantity: number;
-  created_at?: string;
-  updated_at?: string;
-};
-export type DayAssignment = Database["public"]["Tables"]["day_assignments"]["Row"];
+export type Preset = Database["public"]["Tables"]["presets"]["Row"];
+export type PresetItem = Database["public"]["Tables"]["preset_items"]["Row"];
+export type DayAssignment = Database["public"]["Tables"]["day_preset_assignments"]["Row"];
 
 export interface PresetWithItems extends Preset {
-  name?: string; // Add name field
   items: (PresetItem & {
     equipment: Equipment;
   })[];

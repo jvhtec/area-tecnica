@@ -9,6 +9,7 @@ import { PresetWithItems, Equipment, PresetItem } from '@/types/equipment';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Save, X } from 'lucide-react';
+import { useSessionManager } from '@/hooks/useSessionManager';
 
 interface PresetEditorProps {
   preset?: PresetWithItems;
@@ -18,6 +19,7 @@ interface PresetEditorProps {
 }
 
 export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel }: PresetEditorProps) => {
+  const { session } = useSessionManager();
   const [name, setName] = useState(preset?.name || '');
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
     if (!preset?.items) return {};
@@ -52,7 +54,7 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel }: Prese
   };
 
   const handleSave = () => {
-    if (!name.trim()) return;
+    if (!name.trim() || !session?.user?.id) return;
 
     const now = new Date().toISOString();
     const items = Object.entries(quantities)
@@ -60,7 +62,7 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel }: Prese
       .map(([equipment_id, quantity]) => ({
         equipment_id,
         quantity,
-        notes: '', // Add empty notes field
+        notes: '',
         created_at: now,
         updated_at: now
       }));
@@ -113,7 +115,7 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel }: Prese
               <X className="mr-2 h-4 w-4" />
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={!name.trim()}>
+            <Button onClick={handleSave} disabled={!name.trim() || !session?.user?.id}>
               <Save className="mr-2 h-4 w-4" />
               Save Preset
             </Button>

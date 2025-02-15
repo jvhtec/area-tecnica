@@ -9,7 +9,7 @@ import { PresetEditor } from './PresetEditor';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Copy, Pencil, Trash2 } from 'lucide-react';
-import { PresetWithItems } from '@/types/equipment';
+import { PresetWithItems, PresetItem } from '@/types/equipment';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface PresetCreationManagerProps {
@@ -52,12 +52,21 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
 
   const deletePresetMutation = useMutation({
     mutationFn: async (presetId: string) => {
-      const { error } = await supabase
+      // Delete preset items first
+      const { error: itemsError } = await supabase
+        .from('preset_items')
+        .delete()
+        .eq('preset_id', presetId);
+
+      if (itemsError) throw itemsError;
+
+      // Then delete the preset
+      const { error: presetError } = await supabase
         .from('presets')
         .delete()
         .eq('id', presetId);
 
-      if (error) throw error;
+      if (presetError) throw presetError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['presets'] });
@@ -67,6 +76,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
       });
     },
     onError: (error) => {
+      console.error('Error deleting preset:', error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -75,7 +85,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
     }
   });
 
-  const handleSavePreset = async (name: string, items: any[]) => {
+  const handleSavePreset = async (name: string, items: Omit<PresetItem, 'id' | 'preset_id'>[]) => {
     try {
       if (!session?.user?.id) throw new Error('Must be logged in');
 
@@ -102,18 +112,15 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
             .from('preset_items')
             .insert(
               items.map(item => ({
-                preset_id: editingPreset.id,
-                equipment_id: item.equipment_id,
-                quantity: item.quantity,
-                created_at: item.created_at,
-                updated_at: item.updated_at
+                ...item,
+                preset_id: editingPreset.id
               }))
             );
 
           if (itemsError) throw itemsError;
         }
       } else {
-        // Create new preset (either new or copy)
+        // Create new preset
         const { data: preset, error: presetError } = await supabase
           .from('presets')
           .insert({
@@ -131,11 +138,8 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
             .from('preset_items')
             .insert(
               items.map(item => ({
-                preset_id: preset.id,
-                equipment_id: item.equipment_id,
-                quantity: item.quantity,
-                created_at: item.created_at,
-                updated_at: item.updated_at
+                ...item,
+                preset_id: preset.id
               }))
             );
 
@@ -152,6 +156,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
         description: "Preset saved successfully"
       });
     } catch (error: any) {
+      console.error('Error saving preset:', error);
       toast({
         variant: "destructive",
         title: "Error",
