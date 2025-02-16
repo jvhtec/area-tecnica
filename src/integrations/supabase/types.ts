@@ -1296,35 +1296,6 @@ export type Database = {
           },
         ]
       }
-      job_equipment_presets: {
-        Row: {
-          created_at: string | null
-          id: string
-          job_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          job_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          job_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "job_equipment_presets_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: true
-            referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       job_milestone_definitions: {
         Row: {
           category: Database["public"]["Enums"]["milestone_category"]
@@ -1432,58 +1403,6 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      job_preset_items: {
-        Row: {
-          created_at: string | null
-          equipment_id: string
-          id: string
-          notes: string | null
-          preset_id: string
-          quantity: number
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          equipment_id: string
-          id?: string
-          notes?: string | null
-          preset_id: string
-          quantity?: number
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          equipment_id?: string
-          id?: string
-          notes?: string | null
-          preset_id?: string
-          quantity?: number
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "job_preset_items_equipment_id_fkey"
-            columns: ["equipment_id"]
-            isOneToOne: false
-            referencedRelation: "current_stock_levels"
-            referencedColumns: ["equipment_id"]
-          },
-          {
-            foreignKeyName: "job_preset_items_equipment_id_fkey"
-            columns: ["equipment_id"]
-            isOneToOne: false
-            referencedRelation: "equipment"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_preset_items_preset_id_fkey"
-            columns: ["preset_id"]
-            isOneToOne: false
-            referencedRelation: "job_equipment_presets"
             referencedColumns: ["id"]
           },
         ]
