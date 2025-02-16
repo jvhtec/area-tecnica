@@ -24,9 +24,11 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
   const isValidDate = selectedDate && isValid(selectedDate);
 
   // Fetch presets with their items
-  const { data: presets } = useQuery({
+  const { data: presets = [] } = useQuery({
     queryKey: ['presets'],
     queryFn: async () => {
+      if (!session?.user?.id) return [];
+      
       const { data, error } = await supabase
         .from('presets')
         .select(`
@@ -39,13 +41,13 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
         .order('name');
       
       if (error) throw error;
-      return data as PresetWithItems[];
+      return (data || []) as PresetWithItems[];
     },
     enabled: !!session?.user?.id
   });
 
-  // Fetch current preset assignments
-  const { data: currentAssignments } = useQuery({
+  // Fetch current assignments
+  const { data: currentAssignments = [] } = useQuery({
     queryKey: ['preset-assignments', selectedDate],
     queryFn: async () => {
       if (!isValidDate) return [];
@@ -57,7 +59,7 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
         .order('order', { ascending: true });
 
       if (error) throw error;
-      return data;
+      return data || [];
     },
     enabled: !!session?.user?.id && isValidDate
   });
@@ -175,7 +177,7 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
           )}
 
           <div className="space-y-2">
-            {presets?.map((preset) => (
+            {presets.map((preset) => (
               <Button
                 key={preset.id}
                 variant="outline"
