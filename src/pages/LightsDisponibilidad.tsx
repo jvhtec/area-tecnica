@@ -1,4 +1,3 @@
-
 import { DisponibilidadCalendar } from '@/components/disponibilidad/DisponibilidadCalendar';
 import { Button } from '@/components/ui/button';
 import { Box, Settings } from 'lucide-react';
@@ -20,9 +19,9 @@ export default function LightsDisponibilidad() {
   const { session } = useSessionManager();
   const { toast } = useToast();
 
-  // Fetch presets for selected date
+  // Fetch preset assignments (removed user_id filter)
   const { data: assignedPresets } = useQuery({
-    queryKey: ['preset-assignments', session?.user?.id, selectedDate],
+    queryKey: ['preset-assignments', selectedDate],
     queryFn: async () => {
       if (!session?.user?.id || !selectedDate) return null;
       
@@ -34,7 +33,6 @@ export default function LightsDisponibilidad() {
             name
           )
         `)
-        .eq('user_id', session.user.id)
         .eq('date', format(selectedDate, 'yyyy-MM-dd'))
         .order('order', { ascending: true });
 

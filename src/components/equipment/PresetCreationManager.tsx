@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -26,9 +25,9 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
   const [presetToDelete, setPresetToDelete] = useState<PresetWithItems | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
-  // Fetch user's presets
+  // Fetch all presets (removed user_id filter)
   const { data: presets } = useQuery({
-    queryKey: ['presets', session?.user?.id],
+    queryKey: ['presets'],
     queryFn: async () => {
       if (!session?.user?.id) return [];
       
@@ -41,7 +40,6 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
             equipment:equipment (*)
           )
         `)
-        .eq('user_id', session.user.id)
         .order('name');
       
       if (error) throw error;
@@ -125,7 +123,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
           .from('presets')
           .insert({
             name,
-            user_id: session.user.id
+            user_id: session.user.id  // We still need to set the creator
           })
           .select()
           .single();

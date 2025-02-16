@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -30,7 +29,7 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
       const { data, error } = await supabase
         .from('presets')
         .select('*')
-        .eq('user_id', session?.user?.id);
+        .order('name');
       
       if (error) throw error;
       return data as PresetWithItems[];
