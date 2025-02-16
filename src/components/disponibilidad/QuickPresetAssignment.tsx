@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -22,13 +23,19 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
   // Validate selectedDate
   const isValidDate = selectedDate && isValid(selectedDate);
 
-  // Fetch user's presets
+  // Fetch presets with their items
   const { data: presets } = useQuery({
     queryKey: ['presets'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('presets')
-        .select('*')
+        .select(`
+          *,
+          items:preset_items (
+            *,
+            equipment:equipment (*)
+          )
+        `)
         .order('name');
       
       if (error) throw error;
@@ -39,14 +46,13 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
 
   // Fetch current preset assignments
   const { data: currentAssignments } = useQuery({
-    queryKey: ['preset-assignments', session?.user?.id, selectedDate],
+    queryKey: ['preset-assignments', selectedDate],
     queryFn: async () => {
       if (!isValidDate) return [];
 
       const { data, error } = await supabase
         .from('day_preset_assignments')
         .select('*, preset:presets(name)')
-        .eq('user_id', session?.user?.id)
         .eq('date', format(selectedDate, 'yyyy-MM-dd'))
         .order('order', { ascending: true });
 
