@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Image, Upload, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +19,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
       .from('festival_logos')
       .select('file_path')
       .eq('job_id', jobId)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Error fetching logo:', error);
@@ -58,7 +58,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
         .from('festival_logos')
         .select('file_path')
         .eq('job_id', jobId)
-        .single();
+        .maybeSingle();
 
       if (existingLogo?.file_path) {
         await supabase.storage
@@ -119,7 +119,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
         .from('festival_logos')
         .select('file_path')
         .eq('job_id', jobId)
-        .single();
+        .maybeSingle();
 
       if (fetchError) throw fetchError;
 
@@ -150,10 +150,10 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
     }
   };
 
-  // Fetch existing logo on component mount
-  useState(() => {
+  // Fix: Use useEffect instead of useState for initialization
+  useEffect(() => {
     fetchExistingLogo();
-  });
+  }, [jobId]); // Add jobId as dependency
 
   return (
     <div className="space-y-4">
