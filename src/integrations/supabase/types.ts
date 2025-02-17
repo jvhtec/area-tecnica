@@ -436,7 +436,7 @@ export type Database = {
           created_at: string | null
           expires_at: string
           id: string
-          status: string | null
+          status: Database["public"]["Enums"]["form_status"]
           token: string | null
           updated_at: string | null
         }
@@ -445,7 +445,7 @@ export type Database = {
           created_at?: string | null
           expires_at: string
           id?: string
-          status?: string | null
+          status?: Database["public"]["Enums"]["form_status"]
           token?: string | null
           updated_at?: string | null
         }
@@ -454,7 +454,7 @@ export type Database = {
           created_at?: string | null
           expires_at?: string
           id?: string
-          status?: string | null
+          status?: Database["public"]["Enums"]["form_status"]
           token?: string | null
           updated_at?: string | null
         }
@@ -2401,6 +2401,7 @@ export type Database = {
         | "strobo"
         | "canones"
         | "estructuras"
+      form_status: "pending" | "submitted" | "expired"
       global_preset_status: "available" | "unavailable" | "tentative"
       job_date_type: "travel" | "setup" | "show" | "off" | "rehearsal"
       job_status: "pending" | "in_progress" | "completed" | "cancelled"
