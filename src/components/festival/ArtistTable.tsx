@@ -661,12 +661,14 @@ export const ArtistTable = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Artist</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this artist? This action cannot be undone.
+              Are you sure you want to delete {selectedArtist?.name}? This action cannot be undone and will delete all associated files and forms.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

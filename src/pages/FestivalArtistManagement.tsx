@@ -52,7 +52,6 @@ const FestivalArtistManagement = () => {
         if (isValid(startDate) && isValid(endDate)) {
           const dates = eachDayOfInterval({ start: startDate, end: endDate });
           setJobDates(dates);
-          // Set the first date as selected date
           const formattedDate = format(dates[0], 'yyyy-MM-dd');
           setSelectedDate(formattedDate);
         }
@@ -62,7 +61,6 @@ const FestivalArtistManagement = () => {
     fetchJobDetails();
   }, [jobId]);
 
-  // Subscribe to real-time updates
   useEffect(() => {
     if (!jobId || !selectedDate) return;
 
@@ -77,7 +75,6 @@ const FestivalArtistManagement = () => {
           filter: `job_id=eq.${jobId}`
         },
         () => {
-          // Refetch artists when changes occur
           fetchArtists();
         }
       )
@@ -88,7 +85,6 @@ const FestivalArtistManagement = () => {
     };
   }, [jobId, selectedDate]);
 
-  // Fetch artists for this job and date
   const fetchArtists = async () => {
     try {
       if (!jobId || !selectedDate) {
@@ -138,6 +134,8 @@ const FestivalArtistManagement = () => {
 
   const handleDeleteArtist = async (artist: any) => {
     try {
+      setIsLoading(true);
+      
       const { error } = await supabase
         .from("festival_artists")
         .delete()
@@ -153,9 +151,11 @@ const FestivalArtistManagement = () => {
       console.error("Error deleting artist:", error);
       toast({
         title: "Error",
-        description: "Could not delete artist",
+        description: "Could not delete artist: " + error.message,
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
