@@ -44,8 +44,7 @@ export const ArtistTable = ({
   const [selectedArtistForForm, setSelectedArtistForForm] = useState<string>("");
   const [submissionDialogOpen, setSubmissionDialogOpen] = useState(false);
   const [selectedArtistForSubmission, setSelectedArtistForSubmission] = useState<string>("");
-  const [formStatuses, setFormStatuses] = useState<Record<string, string>>({});
-  const { toast } = useToast();
+  const [formStatuses, setFormStatuses] = useState<Record<string, { status: string, hasSubmission: boolean }>>({});
 
   useEffect(() => {
     const fetchGearSetup = async () => {
@@ -76,24 +75,117 @@ export const ArtistTable = ({
       const artistIds = artists.map(artist => artist.id);
       if (artistIds.length === 0) return;
 
-      const { data } = await supabase
+      const { data: formsData, error: formsError } = await supabase
         .from('festival_artist_forms')
-        .select('artist_id, status')
+        .select(`
+          artist_id,
+          status,
+          id,
+          submissions:festival_artist_form_submissions(id)
+        `)
         .in('artist_id', artistIds)
         .order('created_at', { ascending: false });
 
-      if (data) {
-        const statuses: Record<string, string> = {};
-        data.forEach(form => {
-          if (!statuses[form.artist_id]) {
-            statuses[form.artist_id] = form.status;
-          }
-        });
-        setFormStatuses(statuses);
+      if (formsError) {
+        console.error('Error fetching form statuses:', formsError);
+        return;
       }
+
+      const statusMap: Record<string, { status: string, hasSubmission: boolean }> = {};
+      formsData?.forEach(form => {
+        if (!statusMap[form.artist_id]) {
+          statusMap[form.artist_id] = {
+            status: form.status,
+            hasSubmission: form.submissions && form.submissions.length > 0
+          };
+        }
+      });
+
+      setFormStatuses(statusMap);
     };
 
     fetchFormStatuses();
+  }, [artists]);
+
+  useEffect(() => {
+    const artistIds = artists.map(artist => artist.id);
+    if (artistIds.length === 0) return;
+
+    const formChannel = supabase
+      .channel('form-status-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'festival_artist_forms',
+          filter: `artist_id=in.(${artistIds.join(',')})`,
+        },
+        async (payload) => {
+          console.log('Form status changed:', payload);
+          const { data: formsData } = await supabase
+            .from('festival_artist_forms')
+            .select(`
+              artist_id,
+              status,
+              id,
+              submissions:festival_artist_form_submissions(id)
+            `)
+            .eq('artist_id', payload.new.artist_id)
+            .single();
+
+          if (formsData) {
+            setFormStatuses(prev => ({
+              ...prev,
+              [formsData.artist_id]: {
+                status: formsData.status,
+                hasSubmission: formsData.submissions && formsData.submissions.length > 0
+              }
+            }));
+          }
+        }
+      )
+      .subscribe();
+
+    const submissionChannel = supabase
+      .channel('submission-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'festival_artist_form_submissions',
+        },
+        async (payload) => {
+          console.log('Form submission changed:', payload);
+          const { data: formData } = await supabase
+            .from('festival_artist_forms')
+            .select(`
+              artist_id,
+              status,
+              id,
+              submissions:festival_artist_form_submissions(id)
+            `)
+            .eq('id', payload.new.form_id)
+            .single();
+
+          if (formData) {
+            setFormStatuses(prev => ({
+              ...prev,
+              [formData.artist_id]: {
+                status: formData.status,
+                hasSubmission: true
+              }
+            }));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(formChannel);
+      supabase.removeChannel(submissionChannel);
+    };
   }, [artists]);
 
   const toggleRowExpansion = (artistId: string) => {
@@ -194,7 +286,6 @@ export const ArtistTable = ({
 
       const blob = await exportArtistPDF(artistData);
 
-      // Create a download link and trigger it
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -223,12 +314,10 @@ export const ArtistTable = ({
 
     const issues: { [key: string]: boolean } = {};
 
-    // Check monitor requirements
     if (artist.monitors_enabled && artist.monitors_quantity > gearSetup.available_monitors) {
       issues.monitors = true;
     }
 
-    // Check infrastructure requirements
     if (artist.infra_cat6 && artist.infra_cat6_quantity > gearSetup.available_cat6_runs) {
       issues.cat6 = true;
     }
@@ -245,7 +334,6 @@ export const ArtistTable = ({
       issues.analog = true;
     }
 
-    // Check special requirements
     if (artist.extras_sf && !gearSetup.has_side_fills) {
       issues.sideFills = true;
     }
@@ -407,7 +495,7 @@ export const ArtistTable = ({
                     </Button>
                   </TableCell>
                   <TableCell>
-                    {formStatus && <FormStatusBadge status={formStatus} />}
+                    {formStatus && <FormStatusBadge status={formStatus.status} />}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -442,7 +530,7 @@ export const ArtistTable = ({
                       >
                         <Link2 className="h-4 w-4" />
                       </Button>
-                      {formStatus === 'completed' && (
+                      {formStatus?.hasSubmission && (
                         <Button
                           variant="ghost"
                           size="sm"
