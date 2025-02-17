@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +15,6 @@ import { FestivalGearSetup } from "@/types/festival";
 import { Loader2 } from "lucide-react";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
-// Define type for the form data
 interface FormData {
   status: string;
   [key: string]: any;
@@ -31,7 +29,6 @@ export const ArtistRequirementsForm = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [gearSetup, setGearSetup] = useState<FestivalGearSetup | null>(null);
   const [formData, setFormData] = useState<any>({
-    // Initialize with default values
     foh_console_provided_by: 'festival',
     mon_console_provided_by: 'festival',
     wireless_provided_by: 'festival',
@@ -68,7 +65,6 @@ export const ArtistRequirementsForm = () => {
       }
       
       try {
-        // Get artist ID and form status from token
         const { data: formInfo, error: formError } = await supabase
           .from('festival_artist_forms')
           .select('artist_id, status')
@@ -94,7 +90,6 @@ export const ArtistRequirementsForm = () => {
           return;
         }
 
-        // Get artist data
         const { data: artistData, error: artistError } = await supabase
           .from('festival_artists')
           .select(`
@@ -114,7 +109,6 @@ export const ArtistRequirementsForm = () => {
           return;
         }
 
-        // Update form data with artist info
         setFormData(prev => ({
           ...prev,
           name: artistData.name,
@@ -127,7 +121,6 @@ export const ArtistRequirementsForm = () => {
           soundcheck_end: artistData.soundcheck_end,
         }));
 
-        // Get festival gear setup
         const { data: gearSetupData, error: gearError } = await supabase
           .from('festival_gear_setups')
           .select('*')
@@ -156,7 +149,6 @@ export const ArtistRequirementsForm = () => {
     fetchFormData();
   }, [token, toast]);
 
-  // Add real-time subscription for form status updates
   useEffect(() => {
     if (!token) return;
 
@@ -195,10 +187,9 @@ export const ArtistRequirementsForm = () => {
 
     setIsLoading(true);
     try {
-      // Get form info from token
       const { data: formInfo, error: formError } = await supabase
         .from('festival_artist_forms')
-        .select('artist_id, status')
+        .select('id, artist_id, status')
         .eq('token', token)
         .maybeSingle();
 
@@ -211,11 +202,10 @@ export const ArtistRequirementsForm = () => {
         throw new Error('This form has already been submitted');
       }
 
-      // Create form submission
       const { error: submissionError } = await supabase
         .from('festival_artist_form_submissions')
         .insert({
-          form_id: token,
+          form_id: formInfo.id,
           artist_id: formInfo.artist_id,
           form_data: formData,
           status: 'submitted',
@@ -224,11 +214,10 @@ export const ArtistRequirementsForm = () => {
 
       if (submissionError) throw submissionError;
 
-      // Mark form as completed
       const { error: completionError } = await supabase
         .from('festival_artist_forms')
         .update({ status: 'completed' })
-        .eq('token', token);
+        .eq('id', formInfo.id);
 
       if (completionError) throw completionError;
 
@@ -271,7 +260,7 @@ export const ArtistRequirementsForm = () => {
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="flex flex-col items-center space-y-4">
           <img 
-            src="/sector pro logo.png" 
+            src="/sector%20pro%20logo.png" 
             alt="Company Logo" 
             className="h-16 object-contain"
           />
