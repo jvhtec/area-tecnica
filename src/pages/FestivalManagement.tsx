@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Users, Music2, Layout, Wrench } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { format, eachDayOfInterval, isValid } from "date-fns";
+import { FestivalGearSetupForm } from "@/components/festival/FestivalGearSetupForm";
 
 interface FestivalJob {
   id: string;
@@ -22,6 +25,8 @@ const FestivalManagement = () => {
   const [job, setJob] = useState<FestivalJob | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [artistCount, setArtistCount] = useState(0);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [jobDates, setJobDates] = useState<Date[]>([]);
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -45,6 +50,16 @@ const FestivalManagement = () => {
 
         setJob(jobData);
         setArtistCount(artistCount || 0);
+
+        const startDate = new Date(jobData.start_time);
+        const endDate = new Date(jobData.end_time);
+        
+        if (isValid(startDate) && isValid(endDate)) {
+          const dates = eachDayOfInterval({ start: startDate, end: endDate });
+          setJobDates(dates);
+          const formattedDate = format(dates[0], 'yyyy-MM-dd');
+          setSelectedDate(formattedDate);
+        }
       } catch (error: any) {
         console.error("Error fetching festival details:", error);
         toast({
@@ -90,53 +105,77 @@ const FestivalManagement = () => {
         </CardHeader>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Artists Section */}
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/artists`)}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Artists
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{artistCount}</p>
-            <p className="text-sm text-muted-foreground">Total Artists</p>
-            <Button className="mt-4 w-full" onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/festival-management/${jobId}/artists`);
-            }}>
-              Manage Artists
-            </Button>
-          </CardContent>
-        </Card>
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="gear">Festival Gear</TabsTrigger>
+        </TabsList>
 
-        {/* Stages Section - Placeholder */}
-        <Card className="opacity-50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Layout className="h-5 w-5" />
-              Stages
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Coming soon</p>
-          </CardContent>
-        </Card>
+        <TabsContent value="overview">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Artists Section */}
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/artists`)}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Artists
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{artistCount}</p>
+                <p className="text-sm text-muted-foreground">Total Artists</p>
+                <Button className="mt-4 w-full" onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/festival-management/${jobId}/artists`);
+                }}>
+                  Manage Artists
+                </Button>
+              </CardContent>
+            </Card>
 
-        {/* Technical Requirements - Placeholder */}
-        <Card className="opacity-50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Wrench className="h-5 w-5" />
-              Technical Requirements
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Coming soon</p>
-          </CardContent>
-        </Card>
-      </div>
+            {/* Stages Section - Placeholder */}
+            <Card className="opacity-50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Layout className="h-5 w-5" />
+                  Stages
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">Coming soon</p>
+              </CardContent>
+            </Card>
+
+            {/* Technical Requirements - Placeholder */}
+            <Card className="opacity-50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wrench className="h-5 w-5" />
+                  Technical Requirements
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">Coming soon</p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="gear">
+          {selectedDate && (
+            <FestivalGearSetupForm 
+              jobId={jobId} 
+              selectedDate={selectedDate}
+              onSave={() => {
+                toast({
+                  title: "Success",
+                  description: "Festival gear setup has been updated.",
+                });
+              }}
+            />
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

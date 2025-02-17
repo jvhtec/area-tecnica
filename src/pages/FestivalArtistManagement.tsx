@@ -12,7 +12,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { format, eachDayOfInterval, isValid } from "date-fns";
 import { ArtistTablePrintDialog } from "@/components/festival/ArtistTablePrintDialog";
 import { exportArtistTablePDF } from "@/utils/artistTablePdfExport";
-import { FestivalGearSetupForm } from "@/components/festival/FestivalGearSetupForm";
 
 const FestivalArtistManagement = () => {
   const { jobId } = useParams();
@@ -266,7 +265,7 @@ const FestivalArtistManagement = () => {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Festival Management</CardTitle>
+          <CardTitle>Artist Management</CardTitle>
           <div className="flex items-center gap-2">
             <Button onClick={() => {
               setPrintDate(selectedDate);
@@ -282,85 +281,61 @@ const FestivalArtistManagement = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="artists" className="w-full">
-            <TabsList className="mb-4">
-              <TabsTrigger value="artists">Artists</TabsTrigger>
-              <TabsTrigger value="gear">Festival Gear</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="artists">
-              <div className="space-y-4">
-                <ArtistTableFilters
-                  searchTerm={searchTerm}
-                  onSearchChange={setSearchTerm}
-                  stageFilter={stageFilter}
-                  onStageFilterChange={setStageFilter}
-                  equipmentFilter={equipmentFilter}
-                  onEquipmentFilterChange={setEquipmentFilter}
-                />
-                
-                {jobDates.length > 0 ? (
-                  <Tabs
-                    value={selectedDate}
-                    onValueChange={setSelectedDate}
-                    className="w-full"
+          <div className="space-y-4">
+            <ArtistTableFilters
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              stageFilter={stageFilter}
+              onStageFilterChange={setStageFilter}
+              equipmentFilter={equipmentFilter}
+              onEquipmentFilterChange={setEquipmentFilter}
+            />
+            
+            {jobDates.length > 0 ? (
+              <Tabs
+                value={selectedDate}
+                onValueChange={setSelectedDate}
+                className="w-full"
+              >
+                <TabsList className="mb-4">
+                  {jobDates.map((date) => (
+                    <TabsTrigger
+                      key={format(date, 'yyyy-MM-dd')}
+                      value={format(date, 'yyyy-MM-dd')}
+                    >
+                      {formatTabDate(date)}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+                {jobDates.map((date) => (
+                  <TabsContent
+                    key={format(date, 'yyyy-MM-dd')}
+                    value={format(date, 'yyyy-MM-dd')}
                   >
-                    <TabsList className="mb-4">
-                      {jobDates.map((date) => (
-                        <TabsTrigger
-                          key={format(date, 'yyyy-MM-dd')}
-                          value={format(date, 'yyyy-MM-dd')}
-                        >
-                          {formatTabDate(date)}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
-                    {jobDates.map((date) => (
-                      <TabsContent
-                        key={format(date, 'yyyy-MM-dd')}
-                        value={format(date, 'yyyy-MM-dd')}
-                      >
-                        <ArtistTable
-                          artists={artists}
-                          isLoading={isLoading}
-                          onEditArtist={handleEditArtist}
-                          onDeleteArtist={handleDeleteArtist}
-                          searchTerm={searchTerm}
-                          stageFilter={stageFilter}
-                          equipmentFilter={equipmentFilter}
-                        />
-                      </TabsContent>
-                    ))}
-                  </Tabs>
-                ) : (
-                  <ArtistTable
-                    artists={artists}
-                    isLoading={isLoading}
-                    onEditArtist={handleEditArtist}
-                    onDeleteArtist={handleDeleteArtist}
-                    searchTerm={searchTerm}
-                    stageFilter={stageFilter}
-                    equipmentFilter={equipmentFilter}
-                  />
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="gear">
-              {selectedDate && (
-                <FestivalGearSetupForm 
-                  jobId={jobId} 
-                  selectedDate={selectedDate}
-                  onSave={() => {
-                    toast({
-                      title: "Success",
-                      description: "Festival gear setup has been updated.",
-                    });
-                  }}
-                />
-              )}
-            </TabsContent>
-          </Tabs>
+                    <ArtistTable
+                      artists={artists}
+                      isLoading={isLoading}
+                      onEditArtist={handleEditArtist}
+                      onDeleteArtist={handleDeleteArtist}
+                      searchTerm={searchTerm}
+                      stageFilter={stageFilter}
+                      equipmentFilter={equipmentFilter}
+                    />
+                  </TabsContent>
+                ))}
+              </Tabs>
+            ) : (
+              <ArtistTable
+                artists={artists}
+                isLoading={isLoading}
+                onEditArtist={handleEditArtist}
+                onDeleteArtist={handleDeleteArtist}
+                searchTerm={searchTerm}
+                stageFilter={stageFilter}
+                equipmentFilter={equipmentFilter}
+              />
+            )}
+          </div>
         </CardContent>
       </Card>
 
