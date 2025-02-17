@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { format, eachDayOfInterval, isValid } from "date-fns";
 import { FestivalGearSetupForm } from "@/components/festival/FestivalGearSetupForm";
+import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
 
 interface FestivalJob {
   id: string;
@@ -95,11 +96,14 @@ const FestivalManagement = () => {
             <div>
               <CardTitle className="text-2xl flex items-center gap-2">
                 <Music2 className="h-6 w-6" />
-                {job.title}
+                {job?.title}
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                {new Date(job.start_time).toLocaleDateString()} - {new Date(job.end_time).toLocaleDateString()}
+                {new Date(job?.start_time || '').toLocaleDateString()} - {new Date(job?.end_time || '').toLocaleDateString()}
               </p>
+            </div>
+            <div>
+              <FestivalLogoManager jobId={jobId} />
             </div>
           </div>
         </CardHeader>

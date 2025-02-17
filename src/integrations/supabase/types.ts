@@ -742,6 +742,47 @@ export type Database = {
           },
         ]
       }
+      festival_logos: {
+        Row: {
+          content_type: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          job_id: string | null
+          uploaded_at: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          content_type?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          job_id?: string | null
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          content_type?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          job_id?: string | null
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "festival_logos_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       flex_folders: {
         Row: {
           created_at: string
