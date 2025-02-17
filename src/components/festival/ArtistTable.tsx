@@ -136,6 +136,8 @@ export const ArtistTable = ({
         },
         async (payload: FormStatusPayload) => {
           console.log('Form status changed:', payload);
+          if (!payload.new || !('artist_id' in payload.new)) return;
+          
           const { data: formsData } = await supabase
             .from('festival_artist_forms')
             .select(`
@@ -171,6 +173,8 @@ export const ArtistTable = ({
         },
         async (payload: SubmissionPayload) => {
           console.log('Form submission changed:', payload);
+          if (!payload.new || !('form_id' in payload.new)) return;
+
           const { data: formData } = await supabase
             .from('festival_artist_forms')
             .select(`
