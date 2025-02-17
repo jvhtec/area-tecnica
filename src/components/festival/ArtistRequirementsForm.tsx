@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -202,6 +203,7 @@ export const ArtistRequirementsForm = () => {
         throw new Error('This form has already been submitted');
       }
 
+      // Start a transaction by using multiple operations
       const { error: submissionError } = await supabase
         .from('festival_artist_form_submissions')
         .insert({
@@ -214,12 +216,13 @@ export const ArtistRequirementsForm = () => {
 
       if (submissionError) throw submissionError;
 
-      const { error: completionError } = await supabase
+      // Update form status to submitted
+      const { error: updateError } = await supabase
         .from('festival_artist_forms')
-        .update({ status: 'completed' })
+        .update({ status: 'submitted' })
         .eq('id', formInfo.id);
 
-      if (completionError) throw completionError;
+      if (updateError) throw updateError;
 
       toast({
         title: "Success",

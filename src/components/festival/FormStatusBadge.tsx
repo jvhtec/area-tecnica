@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface FormStatusBadgeProps {
-  status: string;
+  status: "pending" | "submitted" | "expired";
   className?: string;
 }
 
@@ -12,7 +12,7 @@ export const FormStatusBadge = ({ status, className }: FormStatusBadgeProps) => 
     switch (status) {
       case 'pending':
         return { label: 'Pending', variant: 'secondary' as const };
-      case 'completed':
+      case 'submitted':
         return { label: 'Submitted', variant: 'default' as const };
       case 'expired':
         return { label: 'Expired', variant: 'destructive' as const };

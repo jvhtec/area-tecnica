@@ -26,6 +26,13 @@ interface ArtistTableProps {
   equipmentFilter: string;
 }
 
+type FormStatusType = {
+  [key: string]: { 
+    status: "pending" | "submitted" | "expired";
+    hasSubmission: boolean;
+  };
+};
+
 type FormStatusPayload = RealtimePostgresChangesPayload<{
   artist_id: string;
   status: string;
@@ -57,7 +64,7 @@ export const ArtistTable = ({
   const [selectedArtistForForm, setSelectedArtistForForm] = useState<string>("");
   const [submissionDialogOpen, setSubmissionDialogOpen] = useState(false);
   const [selectedArtistForSubmission, setSelectedArtistForSubmission] = useState<string>("");
-  const [formStatuses, setFormStatuses] = useState<Record<string, { status: string, hasSubmission: boolean }>>({});
+  const [formStatuses, setFormStatuses] = useState<FormStatusType>({});
 
   useEffect(() => {
     const fetchGearSetup = async () => {
