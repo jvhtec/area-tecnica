@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase";
 import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { FormStatusBadge } from "./FormStatusBadge";
 import { ArtistFormSubmissionDialog } from "./ArtistFormSubmissionDialog";
+import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 interface ArtistTableProps {
   artists: any[];
@@ -25,6 +26,17 @@ interface ArtistTableProps {
   equipmentFilter: string;
 }
 
+type FormStatusPayload = RealtimePostgresChangesPayload<{
+  artist_id: string;
+  status: string;
+  id: string;
+}>;
+
+type SubmissionPayload = RealtimePostgresChangesPayload<{
+  form_id: string;
+  id: string;
+}>;
+
 export const ArtistTable = ({ 
   artists, 
   isLoading, 
@@ -34,6 +46,7 @@ export const ArtistTable = ({
   stageFilter,
   equipmentFilter
 }: ArtistTableProps) => {
+  const { toast } = useToast();
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
@@ -121,7 +134,7 @@ export const ArtistTable = ({
           table: 'festival_artist_forms',
           filter: `artist_id=in.(${artistIds.join(',')})`,
         },
-        async (payload) => {
+        async (payload: FormStatusPayload) => {
           console.log('Form status changed:', payload);
           const { data: formsData } = await supabase
             .from('festival_artist_forms')
@@ -156,7 +169,7 @@ export const ArtistTable = ({
           schema: 'public',
           table: 'festival_artist_form_submissions',
         },
-        async (payload) => {
+        async (payload: SubmissionPayload) => {
           console.log('Form submission changed:', payload);
           const { data: formData } = await supabase
             .from('festival_artist_forms')
