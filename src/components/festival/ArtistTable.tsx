@@ -26,9 +26,11 @@ interface ArtistTableProps {
   equipmentFilter: string;
 }
 
+type FormStatus = "pending" | "submitted" | "expired";
+
 type FormStatusType = {
   [key: string]: { 
-    status: "pending" | "submitted" | "expired";
+    status: FormStatus;
     hasSubmission: boolean;
   };
 };
@@ -111,11 +113,12 @@ export const ArtistTable = ({
         return;
       }
 
-      const statusMap: Record<string, { status: string, hasSubmission: boolean }> = {};
+      const statusMap: FormStatusType = {};
       formsData?.forEach(form => {
         if (!statusMap[form.artist_id]) {
+          const status = (form.status as FormStatus) || "pending";
           statusMap[form.artist_id] = {
-            status: form.status,
+            status,
             hasSubmission: form.submissions && form.submissions.length > 0
           };
         }
@@ -160,7 +163,7 @@ export const ArtistTable = ({
             setFormStatuses(prev => ({
               ...prev,
               [formsData.artist_id]: {
-                status: formsData.status,
+                status: formsData.status as FormStatus,
                 hasSubmission: formsData.submissions && formsData.submissions.length > 0
               }
             }));
