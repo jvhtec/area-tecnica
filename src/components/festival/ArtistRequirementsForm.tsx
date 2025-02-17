@@ -29,6 +29,7 @@ export const ArtistRequirementsForm = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [gearSetup, setGearSetup] = useState<FestivalGearSetup | null>(null);
+  const [festivalLogo, setFestivalLogo] = useState<string | null>(null);
   const [formData, setFormData] = useState<any>({
     foh_console_provided_by: 'festival',
     mon_console_provided_by: 'festival',
@@ -108,6 +109,23 @@ export const ArtistRequirementsForm = () => {
             variant: "destructive"
           });
           return;
+        }
+
+        // Fetch festival logo
+        const { data: logoData, error: logoError } = await supabase
+          .from('festival_logos')
+          .select('file_path')
+          .eq('job_id', artistData.job_id)
+          .maybeSingle();
+
+        if (logoError) {
+          console.error('Error fetching festival logo:', logoError);
+        } else if (logoData?.file_path) {
+          const { data: { publicUrl } } = supabase
+            .storage
+            .from('festival-logos')
+            .getPublicUrl(logoData.file_path);
+          setFestivalLogo(publicUrl);
         }
 
         setFormData(prev => ({
@@ -262,11 +280,20 @@ export const ArtistRequirementsForm = () => {
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="flex flex-col items-center space-y-4">
-          <img 
-            src="/sector%20pro%20logo.png" 
-            alt="Company Logo" 
-            className="h-16 object-contain"
-          />
+          <div className="flex items-center gap-4">
+            <img 
+              src="/sector%20pro%20logo.png" 
+              alt="Company Logo" 
+              className="h-16 object-contain"
+            />
+            {festivalLogo && (
+              <img 
+                src={festivalLogo} 
+                alt="Festival Logo" 
+                className="h-16 object-contain"
+              />
+            )}
+          </div>
           <Card>
             <CardHeader>
               <CardTitle>Artist Technical Requirements Form</CardTitle>
