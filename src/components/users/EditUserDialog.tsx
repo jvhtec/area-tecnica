@@ -1,84 +1,97 @@
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Profile } from "./types";
-import { Department } from "@/types/department";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useState, useEffect } from "react";
 
 interface EditUserDialogProps {
-  user: Profile | null;
+  open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (updatedData: Partial<Profile>) => void;
+  user: any;
+  onSubmit: (data: any) => void;
 }
 
-export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogProps) => {
-  if (!user?.id) {
-    console.error("EditUserDialog: No valid user ID provided");
-    return null;
-  }
+export const EditUserDialog = ({
+  open,
+  onOpenChange,
+  user,
+  onSubmit,
+}: EditUserDialogProps) => {
+  const [formData, setFormData] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    department: "",
+    role: "",
+  });
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    
-    // Ensure we have a valid user ID
-    if (!user.id) {
-      console.error("Cannot update user: No valid ID");
-      return;
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        first_name: user.first_name || "",
+        last_name: user.last_name || "",
+        email: user.email || "",
+        department: user.department || "",
+        role: user.role || "",
+      });
     }
+  }, [user]);
 
-    const updatedData: Partial<Profile> = {
-      id: user.id,
-      first_name: formData.get('firstName') as string,
-      last_name: formData.get('lastName') as string,
-      phone: formData.get('phone') as string,
-      department: formData.get('department') as Department,
-      dni: formData.get('dni') as string,
-      residencia: formData.get('residencia') as string,
-      role: formData.get('role') as string,
-    };
-
-    console.log("Submitting user update with data:", updatedData);
-    onSave(updatedData);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({ id: user.id, ...formData });
+    onOpenChange(false);
   };
 
   return (
-    <Dialog open={!!user} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit User Profile</DialogTitle>
+          <DialogTitle>Edit User</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="firstName">First Name</Label>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-4">
             <Input
-              id="firstName"
-              name="firstName"
-              defaultValue={user.first_name || ''}
+              placeholder="First Name"
+              value={formData.first_name}
+              onChange={(e) =>
+                setFormData({ ...formData, first_name: e.target.value })
+              }
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="lastName">Last Name</Label>
             <Input
-              id="lastName"
-              name="lastName"
-              defaultValue={user.last_name || ''}
+              placeholder="Last Name"
+              value={formData.last_name}
+              onChange={(e) =>
+                setFormData({ ...formData, last_name: e.target.value })
+              }
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number</Label>
             <Input
-              id="phone"
-              name="phone"
-              defaultValue={user.phone || ''}
+              type="email"
+              placeholder="Email"
+              value={formData.email}
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="department">Department</Label>
-            <Select name="department" defaultValue={user.department || 'sound'}>
+            <Select
+              value={formData.department}
+              onValueChange={(value) =>
+                setFormData({ ...formData, department: value })
+              }
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
@@ -86,51 +99,26 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
                 <SelectItem value="sound">Sound</SelectItem>
                 <SelectItem value="lights">Lights</SelectItem>
                 <SelectItem value="video">Video</SelectItem>
-                <SelectItem value="production">Production</SelectItem>
-                <SelectItem value="logistics">Logistics</SelectItem>
-                <SelectItem value="administrative">Administrative</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="role">Role</Label>
-            <Select name="role" defaultValue={user.role}>
+            <Select
+              value={formData.role}
+              onValueChange={(value) =>
+                setFormData({ ...formData, role: value })
+              }
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="management">Management</SelectItem>
-                <SelectItem value="logistics">Logistics</SelectItem>
                 <SelectItem value="technician">Technician</SelectItem>
-                <SelectItem value="house_tech">House Tech</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="dni">DNI/NIE</Label>
-            <Input
-              id="dni"
-              name="dni"
-              defaultValue={user.dni || ''}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="residencia">Residencia</Label>
-            <Input
-              id="residencia"
-              name="residencia"
-              defaultValue={user.residencia || ''}
-            />
-          </div>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit">
-              Save Changes
-            </Button>
-          </div>
+          <DialogFooter>
+            <Button type="submit">Save Changes</Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

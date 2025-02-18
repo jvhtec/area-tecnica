@@ -5,6 +5,7 @@ import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSession } from "@/hooks/useSession";
 import { Loader2 } from "lucide-react";
+import { UsersList } from "@/components/users/UsersList";
 
 const Settings = () => {
   const { session, isLoading } = useSession();
@@ -35,7 +36,7 @@ const Settings = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {/* TODO: Add UsersList and CreateUserDialog components when implemented */}
+            <UsersList />
           </CardContent>
         </Card>
 

@@ -1,70 +1,55 @@
 
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Profile } from "./types";
-import { AlertTriangle, Pencil, Trash2 } from "lucide-react";
+import { Edit, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface UserCardProps {
-  user: Profile;
-  onEdit: (user: Profile) => void;
-  onDelete: (user: Profile) => void;
-  showPasswordAlert?: boolean;
+  user: any;
+  onEdit: (user: any) => void;
+  onDelete: (userId: string) => void;
 }
 
-export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false }: UserCardProps) => {
-  const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
-
+export const UserCard = ({ user, onEdit, onDelete }: UserCardProps) => {
   return (
-    <div className="group flex items-center justify-between p-3 border rounded-lg hover:bg-accent/5 transition-colors">
-      <HoverCard>
-        <HoverCardTrigger asChild>
-          <div className="flex items-center gap-3 cursor-pointer">
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2">
-                <span className="font-medium">{fullName || user.email}</span>
-                {showPasswordAlert && (
-                  <AlertTriangle className="h-4 w-4 text-warning" />
-                )}
-              </div>
-              <span className="text-sm text-muted-foreground">{user.email}</span>
-            </div>
-            <div className="flex gap-1">
-              <Badge variant="secondary">{user.role}</Badge>
-              {user.department && (
-                <Badge variant="outline">{user.department}</Badge>
-              )}
-            </div>
+    <Card className="h-full">
+      <CardContent className="p-6 flex flex-col h-full">
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h3 className="font-semibold text-lg">
+              {user.first_name} {user.last_name}
+            </h3>
+            <p className="text-sm text-muted-foreground">{user.email}</p>
           </div>
-        </HoverCardTrigger>
-        <HoverCardContent className="w-80">
-          <div className="space-y-2">
-            <h4 className="text-sm font-semibold">User Details</h4>
-            <div className="text-sm">
-              <p><span className="font-medium">Phone:</span> {user.phone || 'Not provided'}</p>
-              <p><span className="font-medium">DNI/NIE:</span> {user.dni || 'Not provided'}</p>
-              <p><span className="font-medium">Residencia:</span> {user.residencia || 'Not provided'}</p>
-            </div>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onEdit(user)}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onDelete(user.id)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
-        </HoverCardContent>
-      </HoverCard>
-
-      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button 
-          variant="outline" 
-          size="icon"
-          onClick={() => onEdit(user)}
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
-        <Button 
-          variant="outline" 
-          size="icon"
-          onClick={() => onDelete(user)}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
+        </div>
+        
+        <div className="space-y-2 mt-auto">
+          <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+            {user.role}
+          </Badge>
+          {user.department && (
+            <Badge variant="outline" className="ml-2">
+              {user.department}
+            </Badge>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
