@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { FileText, Loader2, Trash2, Upload, X } from "lucide-react";
@@ -23,18 +23,38 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
   const [selectedFile, setSelectedFile] = useState<any>(null);
 
   const fetchFiles = async () => {
-    const { data, error } = await supabase
-      .from("festival_artist_files")
-      .select("*")
-      .eq("artist_id", artistId);
+    try {
+      const { data, error } = await supabase
+        .from("festival_artist_files")
+        .select("*")
+        .eq("artist_id", artistId);
 
-    if (error) {
+      if (error) {
+        console.error("Error fetching files:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch files",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setFiles(data || []);
+    } catch (error) {
       console.error("Error fetching files:", error);
-      return;
+      toast({
+        title: "Error",
+        description: "Failed to fetch files",
+        variant: "destructive",
+      });
     }
-
-    setFiles(data || []);
   };
+
+  useEffect(() => {
+    if (open && artistId) {
+      fetchFiles();
+    }
+  }, [open, artistId]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -45,12 +65,17 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       const fileExt = file.name.split('.').pop();
       const filePath = `${artistId}/${crypto.randomUUID()}.${fileExt}`;
 
+      // First upload the file to storage
       const { error: uploadError } = await supabase.storage
         .from('festival_artist_files')
         .upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Storage upload error:", uploadError);
+        throw uploadError;
+      }
 
+      // Then create the database record
       const { error: dbError } = await supabase
         .from('festival_artist_files')
         .insert({
@@ -61,7 +86,10 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
           file_size: file.size,
         });
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error("Database insert error:", dbError);
+        throw dbError;
+      }
 
       toast({
         title: "Success",
@@ -85,18 +113,26 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
     if (!selectedFile) return;
 
     try {
+      // First delete from storage
       const { error: storageError } = await supabase.storage
         .from('festival_artist_files')
         .remove([selectedFile.file_path]);
 
-      if (storageError) throw storageError;
+      if (storageError) {
+        console.error("Storage delete error:", storageError);
+        throw storageError;
+      }
 
+      // Then delete the database record
       const { error: dbError } = await supabase
         .from('festival_artist_files')
         .delete()
         .eq('id', selectedFile.id);
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error("Database delete error:", dbError);
+        throw dbError;
+      }
 
       toast({
         title: "Success",
@@ -123,7 +159,10 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
         .from('festival_artist_files')
         .download(file.file_path);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Download error:", error);
+        throw error;
+      }
 
       const url = URL.createObjectURL(data);
       const a = document.createElement('a');
@@ -224,3 +263,4 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
     </>
   );
 };
+
