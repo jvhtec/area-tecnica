@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -6,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { FileText, Loader2, Trash2, Upload, X } from "lucide-react";
+import { FileText, Loader2, Trash2, Upload, Eye, X } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { ViewFileDialog } from "./ViewFileDialog";
 
 interface ArtistFileDialogProps {
   open: boolean;
@@ -21,6 +21,9 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
   const [files, setFiles] = useState<any[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [viewingFile, setViewingFile] = useState<any>(null);
+  const [viewFileUrl, setViewFileUrl] = useState<string>("");
 
   const fetchFiles = async () => {
     try {
@@ -180,6 +183,27 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
     }
   };
 
+  const handleViewFile = async (file: any) => {
+    try {
+      const { data } = await supabase.storage
+        .from('festival_artist_files')
+        .createSignedUrl(file.file_path, 3600); // URL valid for 1 hour
+
+      if (data?.signedUrl) {
+        setViewFileUrl(data.signedUrl);
+        setViewingFile(file);
+        setViewDialogOpen(true);
+      }
+    } catch (error) {
+      console.error("Error getting file URL:", error);
+      toast({
+        title: "Error",
+        description: "Failed to view file",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -219,10 +243,21 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
                         <span className="text-sm">{file.file_name}</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        {(file.file_type.startsWith('image/') || file.file_type === 'application/pdf') && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewFile(file)}
+                            title="View file"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => downloadFile(file)}
+                          title="Download file"
                         >
                           <Upload className="h-4 w-4" />
                         </Button>
@@ -233,6 +268,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
                             setSelectedFile(file);
                             setDeleteDialogOpen(true);
                           }}
+                          title="Delete file"
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -260,7 +296,13 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ViewFileDialog
+        open={viewDialogOpen}
+        onOpenChange={setViewDialogOpen}
+        file={viewingFile}
+        url={viewFileUrl}
+      />
     </>
   );
 };
-
