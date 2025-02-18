@@ -9,6 +9,7 @@ import { EditUserDialog } from "./EditUserDialog";
 import { DeleteUserDialog } from "./DeleteUserDialog";
 import { ImportUsersDialog } from "./import/ImportUsersDialog";
 import { FilterBar } from "./filters/FilterBar";
+import { Pagination } from "@/components/ui/pagination";
 
 export const UsersList = () => {
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -19,15 +20,22 @@ export const UsersList = () => {
 
   const {
     users,
+    total,
     isLoading,
     searchQuery,
     setSearchQuery,
     selectedDepartment,
     setSelectedDepartment,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
     createUser,
     updateUser,
     deleteUser,
   } = useUserManagement();
+
+  const totalPages = Math.ceil(total / pageSize);
 
   const handleEditClick = (user: any) => {
     setSelectedUser(user);
@@ -69,6 +77,16 @@ export const UsersList = () => {
         onEditClick={handleEditClick}
         onDeleteClick={handleDeleteClick}
       />
+
+      {total > 0 && (
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      )}
 
       <CreateUserDialog
         open={showCreateDialog}

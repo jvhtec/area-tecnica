@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -7,16 +6,40 @@ import { useToast } from './use-toast';
 export const useUserManagement = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(9); // Default to 9 items per page (3x3 grid)
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: users = [], isLoading } = useQuery({
-    queryKey: ['users', searchQuery, selectedDepartment],
+  const { data, isLoading } = useQuery({
+    queryKey: ['users', searchQuery, selectedDepartment, page, pageSize],
     queryFn: async () => {
+      // First, get total count
+      let countQuery = supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+
+      if (searchQuery) {
+        countQuery = countQuery.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
+      }
+
+      if (selectedDepartment) {
+        countQuery = countQuery.eq('department', selectedDepartment);
+      }
+
+      const { count, error: countError } = await countQuery;
+
+      if (countError) {
+        console.error('Error fetching count:', countError);
+        throw countError;
+      }
+
+      // Then get paginated data
       let query = supabase
         .from('profiles')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range((page - 1) * pageSize, page * pageSize - 1);
 
       if (searchQuery) {
         query = query.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
@@ -33,7 +56,10 @@ export const useUserManagement = () => {
         throw error;
       }
 
-      return data || [];
+      return {
+        users: data || [],
+        total: count || 0,
+      };
     },
   });
 
@@ -118,12 +144,17 @@ export const useUserManagement = () => {
   });
 
   return {
-    users,
+    users: data?.users || [],
+    total: data?.total || 0,
     isLoading,
     searchQuery,
     setSearchQuery,
     selectedDepartment,
     setSelectedDepartment,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
     createUser: createUserMutation.mutate,
     updateUser: updateUserMutation.mutate,
     deleteUser: deleteUserMutation.mutate,
