@@ -7,7 +7,7 @@ import { UsersList } from "@/components/users/UsersList";
 import { useState } from "react";
 import { FilterBar } from "@/components/users/filters/FilterBar";
 import { ImportUsersDialog } from "@/components/users/import/ImportUsersDialog";
-import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
+import { CompanyLogoManager } from "@/components/company/CompanyLogoManager";
 
 const Settings = () => {
   const [createUserOpen, setCreateUserOpen] = useState(false);
@@ -45,7 +45,7 @@ const Settings = () => {
               <CardTitle>Company Assets</CardTitle>
             </CardHeader>
             <CardContent>
-              <FestivalLogoManager jobId="default" />
+              <CompanyLogoManager />
             </CardContent>
           </Card>
 
