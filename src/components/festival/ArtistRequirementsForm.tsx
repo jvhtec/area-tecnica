@@ -30,6 +30,7 @@ export const ArtistRequirementsForm = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [gearSetup, setGearSetup] = useState<FestivalGearSetup | null>(null);
   const [festivalLogo, setFestivalLogo] = useState<string | null>(null);
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const [formData, setFormData] = useState<any>({
     foh_console_provided_by: 'festival',
     mon_console_provided_by: 'festival',
@@ -54,6 +55,24 @@ export const ArtistRequirementsForm = () => {
     infra_opticalcon_duo_quantity: 0,
     infra_analog: 0
   });
+
+  useEffect(() => {
+    const fetchLogos = async () => {
+      try {
+        // Get company logo from storage
+        const { data: { publicUrl: companyUrl } } = supabase
+          .storage
+          .from('company-assets')
+          .getPublicUrl('sector-pro-logo.png');
+        
+        setCompanyLogo(companyUrl);
+      } catch (error) {
+        console.error('Error fetching company logo:', error);
+      }
+    };
+
+    fetchLogos();
+  }, []);
 
   useEffect(() => {
     const fetchFormData = async () => {
@@ -279,76 +298,82 @@ export const ArtistRequirementsForm = () => {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-4xl mx-auto space-y-8">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="flex items-center gap-4">
+        {/* Festival Logo at the top */}
+        {festivalLogo && (
+          <div className="flex justify-center w-full">
             <img 
-              src="/sector%20pro%20logo.png" 
-              alt="Company Logo" 
-              className="h-16 object-contain"
+              src={festivalLogo} 
+              alt="Festival Logo" 
+              className="h-24 object-contain"
             />
-            {festivalLogo && (
-              <img 
-                src={festivalLogo} 
-                alt="Festival Logo" 
-                className="h-16 object-contain"
-              />
-            )}
           </div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Artist Technical Requirements Form</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-8">
-                <BasicInfoSection 
-                  formData={formData} 
-                  onChange={handleFormChange} 
-                  gearSetup={gearSetup}
-                />
+        )}
 
-                <ConsoleSetupSection 
-                  formData={formData} 
-                  onChange={handleFormChange} 
-                  gearSetup={gearSetup}
-                />
+        <Card>
+          <CardHeader>
+            <CardTitle>Artist Technical Requirements Form</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-8">
+              <BasicInfoSection 
+                formData={formData} 
+                onChange={handleFormChange} 
+                gearSetup={gearSetup}
+              />
 
-                <WirelessSetupSection 
-                  formData={formData} 
-                  onChange={handleFormChange} 
-                  gearSetup={gearSetup}
-                />
+              <ConsoleSetupSection 
+                formData={formData} 
+                onChange={handleFormChange} 
+                gearSetup={gearSetup}
+              />
 
-                <MonitorSetupSection 
-                  formData={formData} 
-                  onChange={handleFormChange} 
-                  gearSetup={gearSetup}
-                />
+              <WirelessSetupSection 
+                formData={formData} 
+                onChange={handleFormChange} 
+                gearSetup={gearSetup}
+              />
 
-                <ExtraRequirementsSection 
-                  formData={formData} 
-                  onChange={handleFormChange} 
-                  gearSetup={gearSetup}
-                />
+              <MonitorSetupSection 
+                formData={formData} 
+                onChange={handleFormChange} 
+                gearSetup={gearSetup}
+              />
 
-                <InfrastructureSection 
-                  formData={formData} 
-                  onChange={handleFormChange} 
-                  gearSetup={gearSetup}
-                />
+              <ExtraRequirementsSection 
+                formData={formData} 
+                onChange={handleFormChange} 
+                gearSetup={gearSetup}
+              />
 
-                <NotesSection 
-                  formData={formData} 
-                  onChange={handleFormChange} 
-                  gearSetup={gearSetup}
-                />
+              <InfrastructureSection 
+                formData={formData} 
+                onChange={handleFormChange} 
+                gearSetup={gearSetup}
+              />
 
-                <Button type="submit" disabled={isLoading} className="w-full">
-                  {isLoading ? "Submitting..." : "Submit Requirements"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+              <NotesSection 
+                formData={formData} 
+                onChange={handleFormChange} 
+                gearSetup={gearSetup}
+              />
+
+              <Button type="submit" disabled={isLoading} className="w-full">
+                {isLoading ? "Submitting..." : "Submit Requirements"}
+              </Button>
+
+              {/* Company Logo at the bottom */}
+              {companyLogo && (
+                <div className="flex justify-center w-full pt-8">
+                  <img 
+                    src={companyLogo} 
+                    alt="Company Logo" 
+                    className="h-16 object-contain"
+                  />
+                </div>
+              )}
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
