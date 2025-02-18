@@ -1,3 +1,4 @@
+
 import {
   Dialog,
   DialogContent,
@@ -144,7 +145,10 @@ export const ArtistManagementDialog = ({
               id="stage"
               type="number"
               value={stage}
-              onChange={(e) => setStage(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setStage(value === "" ? "" : Number(value));
+              }}
               className="col-span-3"
             />
           </div>
