@@ -7,6 +7,7 @@ import { UsersList } from "@/components/users/UsersList";
 import { useState } from "react";
 import { FilterBar } from "@/components/users/filters/FilterBar";
 import { ImportUsersDialog } from "@/components/users/import/ImportUsersDialog";
+import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
 
 const Settings = () => {
   const [createUserOpen, setCreateUserOpen] = useState(false);
@@ -39,6 +40,15 @@ const Settings = () => {
 
       <div className="grid md:grid-cols-2 gap-6">
         <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Company Assets</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <FestivalLogoManager jobId="default" />
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Users</CardTitle>
