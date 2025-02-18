@@ -15,7 +15,6 @@ import { FormStatusBadge } from "./FormStatusBadge";
 import { ArtistFormSubmissionDialog } from "./ArtistFormSubmissionDialog";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
-import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 
 interface ArtistTableProps {
   artists: any[];
