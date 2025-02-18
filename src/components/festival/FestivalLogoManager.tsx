@@ -5,7 +5,7 @@ import { Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 
-export const CompanyLogoUploader = () => {
+export const FestivalLogoManager = () => {
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
 
@@ -44,7 +44,7 @@ export const CompanyLogoUploader = () => {
         variant: "destructive",
       });
     } finally {
-      setIsUploading(false);
+      setIsLoading(false);
     }
   };
 
