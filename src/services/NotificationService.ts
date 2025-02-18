@@ -1,4 +1,3 @@
-
 import { supabase } from "@/lib/supabase";
 
 const NTFY_TOPIC = 'sector-pro-notifications';  // You might want to make this configurable or unique per environment
@@ -145,6 +144,77 @@ export class NotificationService {
       console.log('Notification sent successfully');
     } catch (error) {
       console.error('Error sending notification:', error);
+      throw error;
+    }
+  }
+
+  async sendAssignmentNotification(technician_id: string, job_id: string, role: string) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // First create the notification record
+      const { error: dbError } = await supabase
+        .from('assignment_notifications')
+        .insert({
+          job_id,
+          technician_id,
+          message: `You have been assigned as ${role}`,
+          read: false
+        });
+
+      if (dbError) throw dbError;
+
+      // Then send the push notification
+      await this.sendNotification(
+        'New Job Assignment',
+        `You have been assigned as ${role}`,
+        ['assignment']
+      );
+
+      console.log('Assignment notification sent successfully');
+    } catch (error) {
+      console.error('Error sending assignment notification:', error);
+      throw error;
+    }
+  }
+
+  async sendFormSubmissionNotification(artist_name: string, submission_id: string) {
+    try {
+      // Get all management users
+      const { data: managers, error: userError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('role', 'management');
+
+      if (userError) throw userError;
+
+      // Send notification to all management users
+      await this.sendNotification(
+        'New Form Submission',
+        `${artist_name} has submitted their form`,
+        ['form_submission']
+      );
+
+      console.log('Form submission notification sent successfully');
+    } catch (error) {
+      console.error('Error sending form submission notification:', error);
+      throw error;
+    }
+  }
+
+  async sendGearMovementNotification(equipment_name: string, quantity: number, movement_type: 'addition' | 'subtraction') {
+    try {
+      const action = movement_type === 'addition' ? 'added to' : 'removed from';
+      await this.sendNotification(
+        'Equipment Movement',
+        `${quantity} ${equipment_name} ${action} inventory`,
+        ['gear_movement']
+      );
+
+      console.log('Gear movement notification sent successfully');
+    } catch (error) {
+      console.error('Error sending gear movement notification:', error);
       throw error;
     }
   }
