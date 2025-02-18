@@ -26,19 +26,31 @@ export const ArtistFormLinkDialog = ({
   const [isLoading, setIsLoading] = useState(false);
 
   const generateNewLink = async () => {
+    if (!artistId) {
+      toast({
+        title: "Error",
+        description: "Artist ID is required to generate a form link.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
-      // First, mark any existing pending forms as expired
+      // First, mark any existing pending forms for THIS ARTIST as expired
       const { error: updateError } = await supabase
         .from('festival_artist_forms')
         .update({
           status: 'expired',
           expires_at: new Date().toISOString() // Expire immediately
         })
-        .eq('artist_id', artistId)
+        .eq('artist_id', artistId) // Only affect THIS artist's forms
         .eq('status', 'pending');
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Error expiring existing forms:', updateError);
+        throw updateError;
+      }
 
       // Create a new form entry that expires in 7 days
       const expiresAt = addDays(new Date(), 7);
@@ -53,8 +65,14 @@ export const ArtistFormLinkDialog = ({
         .select('token')
         .maybeSingle();
 
-      if (error) throw error;
-      if (!data) throw new Error('Failed to generate form link');
+      if (error) {
+        console.error('Error generating form link:', error);
+        throw error;
+      }
+
+      if (!data?.token) {
+        throw new Error('Failed to generate form token');
+      }
 
       const formUrl = `${window.location.origin}/festival/artist-form/${data.token}`;
       setFormLink(formUrl);
@@ -92,20 +110,23 @@ export const ArtistFormLinkDialog = ({
   };
 
   useEffect(() => {
-    if (open) {
-      // Check for existing unexpired form link
+    if (open && artistId) {
+      // Check for existing unexpired form link for THIS SPECIFIC ARTIST
       const checkExistingLink = async () => {
         try {
           const { data, error } = await supabase
             .from('festival_artist_forms')
             .select('token')
-            .eq('artist_id', artistId)
+            .eq('artist_id', artistId) // Only check THIS artist's forms
             .eq('status', 'pending')
             .gt('expires_at', new Date().toISOString())
             .limit(1)
             .maybeSingle();
 
-          if (error) throw error;
+          if (error) {
+            console.error('Error checking existing link:', error);
+            throw error;
+          }
 
           if (data?.token) {
             const formUrl = `${window.location.origin}/festival/artist-form/${data.token}`;
@@ -116,12 +137,17 @@ export const ArtistFormLinkDialog = ({
         } catch (error) {
           console.error('Error checking existing link:', error);
           setFormLink("");
+          toast({
+            title: "Error",
+            description: "Failed to check existing form link.",
+            variant: "destructive",
+          });
         }
       };
 
       checkExistingLink();
     }
-  }, [open, artistId]);
+  }, [open, artistId, toast]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
