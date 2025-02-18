@@ -8,7 +8,8 @@ import {
   Video,
   Settings,
   Truck,
-  UserCircle
+  UserCircle,
+  ClipboardList
 } from "lucide-react";
 
 interface SidebarNavigationProps {
@@ -134,6 +135,21 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
             >
               {getDepartmentIcon(userDepartment)}
               <span>{userDepartment}</span>
+            </Button>
+          </Link>
+        )}
+
+        {/* Project Management - Available to management, admin, and logistics */}
+        {(['admin', 'logistics', 'management'].includes(userRole)) && (
+          <Link to="/project-management">
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-2 ${
+                location.pathname === "/project-management" ? "bg-accent" : ""
+              }`}
+            >
+              <ClipboardList className="h-4 w-4" />
+              <span>Project Management</span>
             </Button>
           </Link>
         )}
