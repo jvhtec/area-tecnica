@@ -4,9 +4,20 @@ import { NotificationPreferences } from "@/components/notifications/Notification
 import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSession } from "@/hooks/useSession";
+import { Loader2 } from "lucide-react";
 
 const Settings = () => {
-  const { session } = useSession();
+  const { session, isLoading } = useSession();
+
+  if (isLoading) {
+    return (
+      <Container>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </Container>
+    );
+  }
 
   if (!session) {
     return null;
