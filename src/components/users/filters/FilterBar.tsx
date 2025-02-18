@@ -34,14 +34,14 @@ export const FilterBar = ({
         />
       </div>
       <Select
-        value={selectedDepartment || ""}
-        onValueChange={(value) => onDepartmentChange(value || null)}
+        value={selectedDepartment || "all"}
+        onValueChange={(value) => onDepartmentChange(value === "all" ? null : value)}
       >
         <SelectTrigger className="w-[180px]">
           <SelectValue placeholder="All departments" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">All departments</SelectItem>
+          <SelectItem value="all">All departments</SelectItem>
           <SelectItem value="sound">Sound</SelectItem>
           <SelectItem value="lights">Lights</SelectItem>
           <SelectItem value="video">Video</SelectItem>
