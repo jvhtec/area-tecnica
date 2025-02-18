@@ -436,6 +436,7 @@ export type Database = {
           created_at: string | null
           expires_at: string
           id: string
+          shortened_url: string | null
           status: Database["public"]["Enums"]["form_status"]
           token: string | null
           updated_at: string | null
@@ -445,6 +446,7 @@ export type Database = {
           created_at?: string | null
           expires_at: string
           id?: string
+          shortened_url?: string | null
           status?: Database["public"]["Enums"]["form_status"]
           token?: string | null
           updated_at?: string | null
@@ -454,6 +456,7 @@ export type Database = {
           created_at?: string | null
           expires_at?: string
           id?: string
+          shortened_url?: string | null
           status?: Database["public"]["Enums"]["form_status"]
           token?: string | null
           updated_at?: string | null
