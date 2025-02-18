@@ -5,7 +5,11 @@ import { Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 
-export const FestivalLogoManager = () => {
+interface FestivalLogoManagerProps {
+  jobId: string;
+}
+
+const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
 
@@ -44,7 +48,7 @@ export const FestivalLogoManager = () => {
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsUploading(false);
     }
   };
 
@@ -71,3 +75,5 @@ export const FestivalLogoManager = () => {
     </div>
   );
 };
+
+export { FestivalLogoManager };
