@@ -216,6 +216,38 @@ const VideoConsumosTool: React.FC = () => {
     }
 
     try {
+      // First, ensure we have a video task for this job
+      const { data: existingTask, error: taskQueryError } = await supabase
+        .from('video_job_tasks')
+        .select('id')
+        .eq('job_id', selectedJobId)
+        .eq('task_type', 'Consumos')
+        .single();
+
+      if (taskQueryError && taskQueryError.code !== 'PGRST116') {
+        throw taskQueryError;
+      }
+
+      let taskId;
+      if (!existingTask) {
+        // Create a new task if one doesn't exist
+        const { data: newTask, error: createTaskError } = await supabase
+          .from('video_job_tasks')
+          .insert({
+            job_id: selectedJobId,
+            task_type: 'Consumos',
+            status: 'completed',
+            progress: 100
+          })
+          .select('id')
+          .single();
+
+        if (createTaskError) throw createTaskError;
+        taskId = newTask.id;
+      } else {
+        taskId = existingTask.id;
+      }
+
       const pdfBlob = await exportToPDF(
         selectedJob.title,
         tables.map((table) => ({ ...table, toolType: 'consumos' })),
@@ -231,7 +263,7 @@ const VideoConsumosTool: React.FC = () => {
       const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
       const filePath = `video/${selectedJobId}/${crypto.randomUUID()}.pdf`;
 
-      const { error: uploadError, data: uploadData } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('task_documents')
         .upload(filePath, file, {
           contentType: 'application/pdf',
@@ -248,7 +280,7 @@ const VideoConsumosTool: React.FC = () => {
         .insert({
           file_name: fileName,
           file_path: filePath,
-          video_task_id: selectedJobId
+          video_task_id: taskId
         });
 
       if (docError) {
