@@ -231,15 +231,37 @@ const VideoConsumosTool: React.FC = () => {
       const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
       const filePath = `video/${selectedJobId}/${crypto.randomUUID()}.pdf`;
 
-      const { error: uploadError } = await supabase.storage.from('task_documents').upload(filePath, file);
-      if (uploadError) throw uploadError;
+      const { error: uploadError, data: uploadData } = await supabase.storage
+        .from('task_documents')
+        .upload(filePath, file, {
+          contentType: 'application/pdf',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw new Error('Failed to upload PDF');
+      }
+
+      const { error: docError } = await supabase
+        .from('task_documents')
+        .insert({
+          file_name: fileName,
+          file_path: filePath,
+          video_task_id: selectedJobId
+        });
+
+      if (docError) {
+        console.error('Document reference error:', docError);
+        await supabase.storage.from('task_documents').remove([filePath]);
+        throw new Error('Failed to save document reference');
+      }
 
       toast({
         title: 'Success',
         description: 'PDF has been generated and uploaded successfully.',
       });
 
-      // Also provide download to user
       const url = window.URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
