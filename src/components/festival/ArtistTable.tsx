@@ -1,4 +1,3 @@
-
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Edit2, Loader2, Mic, Headphones, FileText, Trash2, ChevronDown, ChevronUp, Printer, Link2 } from "lucide-react";
@@ -16,6 +15,7 @@ import { FormStatusBadge } from "./FormStatusBadge";
 import { ArtistFormSubmissionDialog } from "./ArtistFormSubmissionDialog";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
+import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 
 interface ArtistTableProps {
   artists: any[];
@@ -695,7 +695,7 @@ export const ArtistTable = ({
         artistId={selectedArtistForFiles}
       />
 
-      <ArtistFormLinksDialog
+      <ArtistFormLinkDialog
         open={formDialogOpen}
         onOpenChange={setFormDialogOpen}
         artistId={selectedArtistForForm}
