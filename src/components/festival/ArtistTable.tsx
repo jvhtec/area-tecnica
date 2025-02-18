@@ -15,6 +15,7 @@ import { FormStatusBadge } from "./FormStatusBadge";
 import { ArtistFormSubmissionDialog } from "./ArtistFormSubmissionDialog";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
+import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 
 interface ArtistTableProps {
   artists: any[];
@@ -694,11 +695,9 @@ export const ArtistTable = ({
         artistId={selectedArtistForFiles}
       />
 
-      <ArtistFormLinksDialog
+      <ArtistFormLinkDialog
         open={formDialogOpen}
         onOpenChange={setFormDialogOpen}
-        selectedDate={selectedDate}
-        jobId={jobId}
         artistId={selectedArtistForForm}
         artistName={artists.find(a => a.id === selectedArtistForForm)?.name || ''}
       />
