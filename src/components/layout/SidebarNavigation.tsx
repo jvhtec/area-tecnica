@@ -21,14 +21,11 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
   console.log('Current user role in navigation:', userRole);
   console.log('Current user department in navigation:', userDepartment);
 
-  // House techs and technicians should see technician dashboard
+  // Only show technician dashboard to technicians and house techs
   const isTechnicianOrHouseTech = ['technician', 'house_tech'].includes(userRole || '');
   
-  // House techs have access to logistics
-  const isAuthorizedForLogistics = ['admin', 'logistics', 'management', 'house_tech'].includes(userRole || '');
-
-  // Admin and management can access settings
-  const isAuthorizedForSettings = ['admin', 'management'].includes(userRole || '');
+  // Management users have access to everything
+  const isManagementUser = userRole === 'management';
 
   // Don't render navigation until role is loaded
   if (!userRole) {
@@ -52,7 +49,22 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
   return (
     <div className="space-y-2">
       <div>
-        {/* Technician Dashboard */}
+        {/* Main Dashboard for Management Users */}
+        {isManagementUser && (
+          <Link to="/dashboard">
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-2 ${
+                location.pathname === "/dashboard" ? "bg-accent" : ""
+              }`}
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              <span>Dashboard</span>
+            </Button>
+          </Link>
+        )}
+
+        {/* Technician Dashboard for Technicians/House Techs */}
         {isTechnicianOrHouseTech && (
           <Link to="/technician-dashboard">
             <Button
@@ -67,7 +79,51 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
           </Link>
         )}
 
-        {/* Department Page for House Techs */}
+        {/* Department Pages - Show for Management and House Techs */}
+        {(isManagementUser || userRole === 'house_tech') && (
+          <>
+            {/* Sound Department */}
+            <Link to="/sound">
+              <Button
+                variant="ghost"
+                className={`w-full justify-start gap-2 ${
+                  location.pathname === "/sound" ? "bg-accent" : ""
+                }`}
+              >
+                <Music2 className="h-4 w-4" />
+                <span>Sound</span>
+              </Button>
+            </Link>
+
+            {/* Lights Department */}
+            <Link to="/lights">
+              <Button
+                variant="ghost"
+                className={`w-full justify-start gap-2 ${
+                  location.pathname === "/lights" ? "bg-accent" : ""
+                }`}
+              >
+                <Lightbulb className="h-4 w-4" />
+                <span>Lights</span>
+              </Button>
+            </Link>
+
+            {/* Video Department */}
+            <Link to="/video">
+              <Button
+                variant="ghost"
+                className={`w-full justify-start gap-2 ${
+                  location.pathname === "/video" ? "bg-accent" : ""
+                }`}
+              >
+                <Video className="h-4 w-4" />
+                <span>Video</span>
+              </Button>
+            </Link>
+          </>
+        )}
+
+        {/* Department Page for House Techs - specific to their department */}
         {userRole === 'house_tech' && userDepartment && (
           <Link to={`/${userDepartment.toLowerCase()}`}>
             <Button
@@ -82,8 +138,8 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
           </Link>
         )}
 
-        {/* Logistics Access */}
-        {isAuthorizedForLogistics && (
+        {/* Logistics Access - Available to management, admin, logistics, and house techs */}
+        {(['admin', 'logistics', 'management', 'house_tech'].includes(userRole)) && (
           <Link to="/logistics">
             <Button
               variant="ghost"
@@ -97,23 +153,21 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
           </Link>
         )}
 
-        {/* Profile Access */}
-        {(isTechnicianOrHouseTech || userRole === 'house_tech') && (
-          <Link to="/profile">
-            <Button
-              variant="ghost"
-              className={`w-full justify-start gap-2 ${
-                location.pathname === "/profile" ? "bg-accent" : ""
-              }`}
-            >
-              <UserCircle className="h-4 w-4" />
-              <span>Profile</span>
-            </Button>
-          </Link>
-        )}
+        {/* Profile Access - Available to everyone */}
+        <Link to="/profile">
+          <Button
+            variant="ghost"
+            className={`w-full justify-start gap-2 ${
+              location.pathname === "/profile" ? "bg-accent" : ""
+            }`}
+          >
+            <UserCircle className="h-4 w-4" />
+            <span>Profile</span>
+          </Button>
+        </Link>
 
-        {/* Settings Access */}
-        {isAuthorizedForSettings && (
+        {/* Settings Access - Available to admin and management */}
+        {(['admin', 'management'].includes(userRole)) && (
           <Link to="/settings">
             <Button
               variant="ghost"
