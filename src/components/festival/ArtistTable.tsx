@@ -11,11 +11,11 @@ import { ArtistPdfData, exportArtistPDF } from "@/utils/artistPdfExport";
 import { useToast } from "@/hooks/use-toast";
 import { FestivalGearSetup } from "@/types/festival";
 import { supabase } from "@/lib/supabase";
-import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { FormStatusBadge } from "./FormStatusBadge";
 import { ArtistFormSubmissionDialog } from "./ArtistFormSubmissionDialog";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
+import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 
 interface ArtistTableProps {
   artists: any[];
