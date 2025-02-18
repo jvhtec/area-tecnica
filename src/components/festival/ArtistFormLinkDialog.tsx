@@ -1,91 +1,76 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { Copy, RefreshCcw } from "lucide-react";
-import { useState, useEffect } from "react";
-import { addDays } from "date-fns";
+import { Loader2, Copy, RefreshCcw } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { addDays, format, isAfter } from "date-fns";
 
-interface ArtistFormLinkDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+interface ArtistLinkData {
   artistId: string;
-  artistName: string;
+  name: string;
+  stage: number;
+  token?: string;
+  expires_at?: string;
+  status?: string;
 }
 
-export const ArtistFormLinkDialog = ({
+interface ArtistFormLinksDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  selectedDate: string;
+  jobId: string;
+}
+
+export const ArtistFormLinksDialog = ({
   open,
   onOpenChange,
-  artistId,
-  artistName
-}: ArtistFormLinkDialogProps) => {
+  selectedDate,
+  jobId
+}: ArtistFormLinksDialogProps) => {
   const { toast } = useToast();
-  const [formLink, setFormLink] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [artistLinks, setArtistLinks] = useState<ArtistLinkData[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  const generateNewLink = async () => {
-    if (!artistId) {
-      toast({
-        title: "Error",
-        description: "Artist ID is required to generate a form link.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoading(true);
+  const fetchArtistLinks = async () => {
     try {
-      // First, mark any existing pending forms for THIS ARTIST as expired
-      const { error: updateError } = await supabase
-        .from('festival_artist_forms')
-        .update({
-          status: 'expired',
-          expires_at: new Date().toISOString() // Expire immediately
-        })
-        .eq('artist_id', artistId) // Only affect THIS artist's forms
-        .eq('status', 'pending');
-
-      if (updateError) {
-        console.error('Error expiring existing forms:', updateError);
-        throw updateError;
-      }
-
-      // Create a new form entry that expires in 7 days
-      const expiresAt = addDays(new Date(), 7);
-      
       const { data, error } = await supabase
-        .from('festival_artist_forms')
-        .insert({
-          artist_id: artistId,
-          expires_at: expiresAt.toISOString(),
-          status: 'pending'
-        })
-        .select('token')
-        .maybeSingle();
+        .from('festival_artists')
+        .select(`
+          id,
+          name,
+          stage,
+          festival_artist_forms (
+            token,
+            expires_at,
+            status
+          )
+        `)
+        .eq('job_id', jobId)
+        .eq('date', selectedDate)
+        .order('stage')
+        .order('show_start');
 
-      if (error) {
-        console.error('Error generating form link:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      if (!data?.token) {
-        throw new Error('Failed to generate form token');
-      }
+      const formattedData: ArtistLinkData[] = data.map(artist => ({
+        artistId: artist.id,
+        name: artist.name,
+        stage: artist.stage,
+        token: artist.festival_artist_forms?.[0]?.token,
+        expires_at: artist.festival_artist_forms?.[0]?.expires_at,
+        status: artist.festival_artist_forms?.[0]?.status,
+      }));
 
-      const formUrl = `${window.location.origin}/festival/artist-form/${data.token}`;
-      setFormLink(formUrl);
-      
-      toast({
-        title: "Link generated",
-        description: "New form link has been generated successfully.",
-      });
-    } catch (error: any) {
-      console.error('Error generating form link:', error);
+      setArtistLinks(formattedData);
+    } catch (error) {
+      console.error('Error fetching artist links:', error);
       toast({
         title: "Error",
-        description: "Failed to generate form link.",
+        description: "Failed to fetch artist links",
         variant: "destructive",
       });
     } finally {
@@ -93,105 +78,186 @@ export const ArtistFormLinkDialog = ({
     }
   };
 
-  const copyToClipboard = async () => {
+  useEffect(() => {
+    if (open) {
+      fetchArtistLinks();
+    }
+  }, [open, jobId, selectedDate]);
+
+  const generateLinks = async () => {
+    setIsGenerating(true);
     try {
-      await navigator.clipboard.writeText(formLink);
+      for (const artist of artistLinks) {
+        if (!artist.token || 
+            (artist.expires_at && !isAfter(new Date(artist.expires_at), new Date()))) {
+          // First, mark any existing pending forms for this artist as expired
+          await supabase
+            .from('festival_artist_forms')
+            .update({
+              status: 'expired',
+              expires_at: new Date().toISOString()
+            })
+            .eq('artist_id', artist.artistId)
+            .eq('status', 'pending');
+
+          // Create a new form entry that expires in 7 days
+          const expiresAt = addDays(new Date(), 7);
+          await supabase
+            .from('festival_artist_forms')
+            .insert({
+              artist_id: artist.artistId,
+              expires_at: expiresAt.toISOString(),
+              status: 'pending'
+            });
+        }
+      }
+
+      await fetchArtistLinks();
       toast({
-        title: "Copied",
-        description: "Link copied to clipboard",
+        title: "Success",
+        description: "Generated missing links successfully",
       });
     } catch (error) {
+      console.error('Error generating links:', error);
       toast({
         title: "Error",
-        description: "Failed to copy link",
+        description: "Failed to generate links",
         variant: "destructive",
       });
+    } finally {
+      setIsGenerating(false);
     }
   };
 
-  useEffect(() => {
-    if (open && artistId) {
-      // Check for existing unexpired form link for THIS SPECIFIC ARTIST
-      const checkExistingLink = async () => {
-        try {
-          const { data, error } = await supabase
-            .from('festival_artist_forms')
-            .select('token')
-            .eq('artist_id', artistId) // Only check THIS artist's forms
-            .eq('status', 'pending')
-            .gt('expires_at', new Date().toISOString())
-            .limit(1)
-            .maybeSingle();
+  const copyAllLinks = () => {
+    const groupedByStage = artistLinks.reduce((acc, artist) => {
+      const stage = `Stage ${artist.stage}`;
+      if (!acc[stage]) acc[stage] = [];
+      acc[stage].push(artist);
+      return acc;
+    }, {} as Record<string, ArtistLinkData[]>);
 
-          if (error) {
-            console.error('Error checking existing link:', error);
-            throw error;
-          }
+    let text = `Artist Form Links - ${format(new Date(selectedDate), 'dd/MM/yyyy')}\n\n`;
 
-          if (data?.token) {
-            const formUrl = `${window.location.origin}/festival/artist-form/${data.token}`;
-            setFormLink(formUrl);
-          } else {
-            setFormLink("");
-          }
-        } catch (error) {
-          console.error('Error checking existing link:', error);
-          setFormLink("");
-          toast({
-            title: "Error",
-            description: "Failed to check existing form link.",
-            variant: "destructive",
-          });
-        }
-      };
+    Object.entries(groupedByStage).forEach(([stage, artists]) => {
+      text += `${stage}:\n`;
+      artists.forEach(artist => {
+        const link = artist.token 
+          ? `${window.location.origin}/festival/artist-form/${artist.token}`
+          : 'No link generated yet';
+        text += `${artist.name} - ${link}\n`;
+      });
+      text += '\n';
+    });
 
-      checkExistingLink();
-    }
-  }, [open, artistId, toast]);
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copied",
+      description: "All links copied to clipboard",
+    });
+  };
+
+  const copyStageLinks = (stage: number) => {
+    const stageArtists = artistLinks.filter(a => a.stage === stage);
+    let text = `Stage ${stage} - ${format(new Date(selectedDate), 'dd/MM/yyyy')}\n\n`;
+    
+    stageArtists.forEach(artist => {
+      const link = artist.token 
+        ? `${window.location.origin}/festival/artist-form/${artist.token}`
+        : 'No link generated yet';
+      text += `${artist.name} - ${link}\n`;
+    });
+
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copied",
+      description: `Stage ${stage} links copied to clipboard`,
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <div className="flex justify-center items-center h-40">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  const stages = [...new Set(artistLinks.map(a => a.stage))].sort();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Form Link for {artistName}</DialogTitle>
+          <DialogTitle>Artist Form Links - {format(new Date(selectedDate), 'dd/MM/yyyy')}</DialogTitle>
         </DialogHeader>
-        
-        <div className="space-y-4 mt-4">
-          {formLink ? (
-            <>
-              <div className="flex space-x-2">
-                <Input
-                  value={formLink}
-                  readOnly
-                  className="flex-1"
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={copyToClipboard}
-                  title="Copy link"
-                >
-                  <Copy className="h-4 w-4" />
+
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <Button onClick={generateLinks} disabled={isGenerating}>
+              <RefreshCcw className={`h-4 w-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
+              Generate Missing Links
+            </Button>
+            <Button onClick={copyAllLinks}>
+              <Copy className="h-4 w-4 mr-2" />
+              Copy All Links
+            </Button>
+          </div>
+
+          {stages.map(stage => (
+            <div key={stage} className="space-y-2">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold">Stage {stage}</h3>
+                <Button variant="outline" size="sm" onClick={() => copyStageLinks(stage)}>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy Stage Links
                 </Button>
               </div>
-              <Button
-                onClick={generateNewLink}
-                className="w-full"
-                disabled={isLoading}
-              >
-                <RefreshCcw className="h-4 w-4 mr-2" />
-                Generate New Link
-              </Button>
-            </>
-          ) : (
-            <Button
-              onClick={generateNewLink}
-              className="w-full"
-              disabled={isLoading}
-            >
-              Generate Link
-            </Button>
-          )}
+              <div className="border rounded-lg divide-y">
+                {artistLinks
+                  .filter(artist => artist.stage === stage)
+                  .map(artist => (
+                    <div key={artist.artistId} className="p-3 flex items-center justify-between">
+                      <span className="font-medium">{artist.name}</span>
+                      <div className="flex items-center gap-2">
+                        {artist.token ? (
+                          <>
+                            {artist.status === 'expired' && (
+                              <Badge variant="destructive">Expired</Badge>
+                            )}
+                            {artist.expires_at && isAfter(new Date(artist.expires_at), new Date()) && (
+                              <Badge variant="secondary">
+                                Expires {format(new Date(artist.expires_at), 'dd/MM/yyyy')}
+                              </Badge>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const link = `${window.location.origin}/festival/artist-form/${artist.token}`;
+                                navigator.clipboard.writeText(link);
+                                toast({
+                                  title: "Copied",
+                                  description: "Link copied to clipboard",
+                                });
+                              }}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <Badge variant="outline">No link generated</Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ))}
         </div>
       </DialogContent>
     </Dialog>
