@@ -1,68 +1,78 @@
 
-import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Upload } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { Loader2, Download } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ImportUsersDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export const ImportUsersDialog = ({
-  open,
-  onOpenChange,
-}: ImportUsersDialogProps) => {
+export const ImportUsersDialog = ({ open, onOpenChange }: ImportUsersDialogProps) => {
   const [file, setFile] = useState<File | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      if (file.type !== "text/csv") {
-        toast({
-          title: "Invalid file type",
-          description: "Please upload a CSV file",
-          variant: "destructive",
-        });
-        return;
-      }
-      setFile(file);
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile && selectedFile.type !== "text/csv") {
+      setError("Please upload a CSV file");
+      return;
     }
+    setFile(selectedFile || null);
+    setError(null);
+  };
+
+  const downloadTemplate = () => {
+    const template = "email,firstName,lastName,role,department,phone,dni,residencia\n";
+    const blob = new Blob([template], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "users_template.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
   };
 
   const handleImport = async () => {
     if (!file) return;
 
+    setIsProcessing(true);
+    setError(null);
+
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        if (e.target?.result) {
-          const csvContent = e.target.result as string;
-          // Here you would process the CSV and import users
-          console.log("Processing CSV:", csvContent);
-          toast({
-            title: "Success",
-            description: "Users imported successfully",
-          });
-          onOpenChange(false);
-        }
-      };
-      reader.readAsText(file);
-    } catch (error) {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const { data, error: uploadError } = await supabase.functions.invoke("import-users", {
+        body: formData,
+      });
+
+      if (uploadError) throw uploadError;
+
       toast({
-        title: "Error",
-        description: "Failed to import users",
+        title: "Import successful",
+        description: `Successfully imported ${data.successful.length} users`,
+      });
+
+      onOpenChange(false);
+    } catch (err: any) {
+      console.error("Import error:", err);
+      setError(err.message || "Failed to import users");
+      toast({
+        title: "Import failed",
+        description: "There was an error importing users",
         variant: "destructive",
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -71,44 +81,43 @@ export const ImportUsersDialog = ({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Import Users</DialogTitle>
-          <DialogDescription>
-            Upload a CSV file containing user data
-          </DialogDescription>
         </DialogHeader>
+
         <div className="space-y-4">
-          <div className="flex items-center justify-center w-full">
-            <label
-              htmlFor="dropzone-file"
-              className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-            >
-              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <Upload className="w-10 h-10 mb-3 text-gray-400" />
-                <p className="mb-2 text-sm text-gray-500">
-                  <span className="font-semibold">Click to upload</span> or drag
-                  and drop
-                </p>
-                <p className="text-xs text-gray-500">CSV files only</p>
-              </div>
-              <input
-                id="dropzone-file"
-                type="file"
-                className="hidden"
-                accept=".csv"
-                onChange={handleFileChange}
-              />
-            </label>
-          </div>
-          {file && (
-            <p className="text-sm text-muted-foreground">
-              Selected file: {file.name}
-            </p>
-          )}
-        </div>
-        <DialogFooter>
-          <Button onClick={handleImport} disabled={!file}>
-            Import Users
+          <Button variant="outline" onClick={downloadTemplate} className="w-full">
+            <Download className="mr-2 h-4 w-4" />
+            Download Template
           </Button>
-        </DialogFooter>
+
+          <div className="space-y-2">
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleFileChange}
+              className="w-full"
+            />
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          <Button
+            onClick={handleImport}
+            disabled={!file || isProcessing}
+            className="w-full"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              "Import Users"
+            )}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

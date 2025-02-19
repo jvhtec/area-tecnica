@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
@@ -7,7 +8,6 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { jsPDF } from "jspdf";
-import { notificationService } from "@/services/NotificationService";
 
 interface ArtistFormSubmissionDialogProps {
   open: boolean;
@@ -56,14 +56,7 @@ export const ArtistFormSubmissionDialog = ({
             .limit(1)
             .maybeSingle();
 
-          if (submissionData) {
-            setSubmission(submissionData);
-            // Send notification for new submission
-            await notificationService.sendFormSubmissionNotification(
-              submissionData.form_data?.artist_name || 'An artist',
-              submissionData.id
-            );
-          }
+          setSubmission(submissionData);
         }
       } catch (error) {
         console.error('Error fetching submission:', error);

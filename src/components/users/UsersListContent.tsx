@@ -1,46 +1,122 @@
 
+import { useState } from "react";
+import { Profile } from "./types";
 import { UserCard } from "./UserCard";
-import { Loader2 } from "lucide-react";
+import { EditUserDialog } from "./EditUserDialog";
+import { DeleteUserDialog } from "./DeleteUserDialog";
+import { useUserManagement } from "./hooks/useUserManagement";
+import { Badge } from "@/components/ui/badge";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface UsersListContentProps {
-  users: any[];
-  isLoading: boolean;
-  onEditClick: (user: any) => void;
-  onDeleteClick: (user: any) => void;
+  users: Profile[];
+  groupBy?: 'department' | 'role' | null;
 }
 
-export const UsersListContent = ({
-  users,
-  isLoading,
-  onEditClick,
-  onDeleteClick,
-}: UsersListContentProps) => {
-  if (isLoading) {
+export const UsersListContent = ({ users, groupBy }: UsersListContentProps) => {
+  const [editingUser, setEditingUser] = useState<Profile | null>(null);
+  const [deletingUser, setDeletingUser] = useState<Profile | null>(null);
+  
+  const { handleDelete, handleSaveEdit } = useUserManagement();
+
+  const handleEdit = (user: Profile) => {
+    if (user?.id) {
+      setEditingUser(user);
+    }
+  };
+
+  const handleDeleteClick = (user: Profile) => {
+    if (user?.id) {
+      setDeletingUser(user);
+    }
+  };
+
+  if (!groupBy) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
+      <ScrollArea className="h-[600px]">
+        <div className="space-y-2">
+          {users.map((user) => (
+            user?.id ? (
+              <UserCard
+                key={user.id}
+                user={user}
+                onEdit={handleEdit}
+                onDelete={handleDeleteClick}
+              />
+            ) : null
+          ))}
+        </div>
+
+        <EditUserDialog
+          user={editingUser}
+          onOpenChange={(open) => !open && setEditingUser(null)}
+          onSave={handleSaveEdit}
+        />
+
+        <DeleteUserDialog
+          user={deletingUser}
+          onConfirm={() => deletingUser && handleDelete(deletingUser)}
+          onCancel={() => setDeletingUser(null)}
+        />
+      </ScrollArea>
     );
   }
 
-  if (users.length === 0) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        No users found
-      </div>
-    );
-  }
+  const groupedUsers = users.reduce<Record<string, Profile[]>>((acc, user) => {
+    const key = groupBy === 'department' ? (user.department || 'Unassigned') : (user.role || 'Unassigned');
+    return { ...acc, [key]: [...(acc[key] || []), user] };
+  }, {});
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {users.map((user) => (
-        <UserCard
-          key={user.id}
-          user={user}
-          onEdit={onEditClick}
-          onDelete={onDeleteClick}
-        />
-      ))}
-    </div>
+    <>
+      <Accordion type="multiple" className="w-full">
+        {Object.entries(groupedUsers).map(([group, groupUsers]) => (
+          <AccordionItem key={group} value={group}>
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{group}</span>
+                <Badge variant="secondary" className="ml-2">
+                  {groupUsers.length}
+                </Badge>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent>
+              <ScrollArea className="h-[300px]">
+                <div className="space-y-2">
+                  {groupUsers.map((user) => (
+                    user?.id ? (
+                      <UserCard
+                        key={user.id}
+                        user={user}
+                        onEdit={handleEdit}
+                        onDelete={handleDeleteClick}
+                      />
+                    ) : null
+                  ))}
+                </div>
+              </ScrollArea>
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
+
+      <EditUserDialog
+        user={editingUser}
+        onOpenChange={(open) => !open && setEditingUser(null)}
+        onSave={handleSaveEdit}
+      />
+
+      <DeleteUserDialog
+        user={deletingUser}
+        onConfirm={() => deletingUser && handleDelete(deletingUser)}
+        onCancel={() => setDeletingUser(null)}
+      />
+    </>
   );
 };

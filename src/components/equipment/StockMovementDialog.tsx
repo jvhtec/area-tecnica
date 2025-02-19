@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,6 @@ import { useSessionManager } from "@/hooks/useSessionManager";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Equipment } from "@/types/equipment";
-import { notificationService } from "@/services/NotificationService";
 
 interface StockMovementDialogProps {
   open: boolean;
@@ -61,7 +61,7 @@ export function StockMovementDialog({
           quantity: movementQty,
           movement_type: isAddition ? 'addition' : 'subtraction',
           notes: notes.trim() || null,
-          user_id: session.user.id
+          user_id: session.user.id  // Added this line to include the user_id
         });
 
       if (stockMovementError) throw stockMovementError;
@@ -84,13 +84,6 @@ export function StockMovementDialog({
 
         if (insertError) throw insertError;
       }
-
-      // Send notification
-      await notificationService.sendGearMovementNotification(
-        equipment.name,
-        movementQty,
-        isAddition ? 'addition' : 'subtraction'
-      );
     },
     onSuccess: () => {
       // Invalidate both queries to refresh the UI

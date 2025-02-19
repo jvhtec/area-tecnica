@@ -13,7 +13,6 @@ interface ArtistLinkData {
   name: string;
   stage: number;
   token?: string;
-  shortened_url?: string;
   expires_at?: string;
   status?: string;
 }
@@ -36,17 +35,6 @@ export const ArtistFormLinksDialog = ({
   const [artistLinks, setArtistLinks] = useState<ArtistLinkData[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const shortenUrl = async (url: string) => {
-    try {
-      const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
-      if (!response.ok) throw new Error('Failed to shorten URL');
-      return await response.text();
-    } catch (error) {
-      console.error('Error shortening URL:', error);
-      return null;
-    }
-  };
-
   const fetchArtistLinks = async () => {
     try {
       const { data, error } = await supabase
@@ -57,7 +45,6 @@ export const ArtistFormLinksDialog = ({
           stage,
           festival_artist_forms (
             token,
-            shortened_url,
             expires_at,
             status
           )
@@ -74,7 +61,6 @@ export const ArtistFormLinksDialog = ({
         name: artist.name,
         stage: artist.stage,
         token: artist.festival_artist_forms?.[0]?.token,
-        shortened_url: artist.festival_artist_forms?.[0]?.shortened_url,
         expires_at: artist.festival_artist_forms?.[0]?.expires_at,
         status: artist.festival_artist_forms?.[0]?.status,
       }));
@@ -116,27 +102,13 @@ export const ArtistFormLinksDialog = ({
 
           // Create a new form entry that expires in 7 days
           const expiresAt = addDays(new Date(), 7);
-          const { data: newForm } = await supabase
+          await supabase
             .from('festival_artist_forms')
             .insert({
               artist_id: artist.artistId,
               expires_at: expiresAt.toISOString(),
               status: 'pending'
-            })
-            .select('token')
-            .single();
-
-          if (newForm?.token) {
-            const fullUrl = `${window.location.origin}/festival/artist-form/${newForm.token}`;
-            const shortUrl = await shortenUrl(fullUrl);
-            
-            if (shortUrl) {
-              await supabase
-                .from('festival_artist_forms')
-                .update({ shortened_url: shortUrl })
-                .eq('token', newForm.token);
-            }
-          }
+            });
         }
       }
 
@@ -170,8 +142,9 @@ export const ArtistFormLinksDialog = ({
     Object.entries(groupedByStage).forEach(([stage, artists]) => {
       text += `${stage}:\n`;
       artists.forEach(artist => {
-        const link = artist.shortened_url || 
-          (artist.token ? `${window.location.origin}/festival/artist-form/${artist.token}` : 'No link generated yet');
+        const link = artist.token 
+          ? `${window.location.origin}/festival/artist-form/${artist.token}`
+          : 'No link generated yet';
         text += `${artist.name} - ${link}\n`;
       });
       text += '\n';
@@ -189,8 +162,9 @@ export const ArtistFormLinksDialog = ({
     let text = `Stage ${stage} - ${format(new Date(selectedDate), 'dd/MM/yyyy')}\n\n`;
     
     stageArtists.forEach(artist => {
-      const link = artist.shortened_url || 
-        (artist.token ? `${window.location.origin}/festival/artist-form/${artist.token}` : 'No link generated yet');
+      const link = artist.token 
+        ? `${window.location.origin}/festival/artist-form/${artist.token}`
+        : 'No link generated yet';
       text += `${artist.name} - ${link}\n`;
     });
 
@@ -264,8 +238,7 @@ export const ArtistFormLinksDialog = ({
                               variant="ghost"
                               size="sm"
                               onClick={() => {
-                                const link = artist.shortened_url || 
-                                  `${window.location.origin}/festival/artist-form/${artist.token}`;
+                                const link = `${window.location.origin}/festival/artist-form/${artist.token}`;
                                 navigator.clipboard.writeText(link);
                                 toast({
                                   title: "Copied",
@@ -290,4 +263,3 @@ export const ArtistFormLinksDialog = ({
     </Dialog>
   );
 };
-

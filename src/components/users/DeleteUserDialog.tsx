@@ -1,4 +1,3 @@
-
 import {
   AlertDialog,
   AlertDialogAction,
@@ -9,32 +8,29 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Profile } from "./types";
 
 interface DeleteUserDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  user: any;
+  user: Profile | null;
   onConfirm: () => void;
+  onCancel: () => void;
 }
 
-export const DeleteUserDialog = ({
-  open,
-  onOpenChange,
-  user,
-  onConfirm,
-}: DeleteUserDialogProps) => {
+export const DeleteUserDialog = ({ user, onConfirm, onCancel }: DeleteUserDialogProps) => {
+  if (!user) return null;
+
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog open={!!user} onOpenChange={(open) => !open && onCancel()}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete User</AlertDialogTitle>
+          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
           <AlertDialogDescription>
-            Are you sure you want to delete {user.first_name} {user.last_name}?
-            This action cannot be undone.
+            This action cannot be undone. This will permanently delete the user
+            account and remove their data from our servers.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm}>Delete</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
