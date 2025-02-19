@@ -1,3 +1,4 @@
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Edit2, Loader2, Mic, Headphones, FileText, Trash2, ChevronDown, ChevronUp, Printer, Link2 } from "lucide-react";
@@ -14,6 +15,7 @@ import { supabase } from "@/lib/supabase";
 import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { FormStatusBadge } from "./FormStatusBadge";
 import { ArtistFormSubmissionDialog } from "./ArtistFormSubmissionDialog";
+import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 interface ArtistTableProps {
@@ -710,8 +712,8 @@ export const ArtistTable = ({
       <ArtistFormLinksDialog
         open={formLinksDialogOpen}
         onOpenChange={setFormLinksDialogOpen}
-        selectedDate={selectedDate}
-        jobId={jobId}
+        selectedDate={artists[0]?.date}
+        jobId={artists[0]?.job_id}
       />
     </>
   );

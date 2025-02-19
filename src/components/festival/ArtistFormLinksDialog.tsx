@@ -90,7 +90,6 @@ export const ArtistFormLinksDialog = ({
       for (const artist of artistLinks) {
         if (!artist.token || 
             (artist.expires_at && !isAfter(new Date(artist.expires_at), new Date()))) {
-          // First, mark any existing pending forms for this artist as expired
           await supabase
             .from('festival_artist_forms')
             .update({
@@ -100,7 +99,6 @@ export const ArtistFormLinksDialog = ({
             .eq('artist_id', artist.artistId)
             .eq('status', 'pending');
 
-          // Create a new form entry that expires in 7 days
           const expiresAt = addDays(new Date(), 7);
           await supabase
             .from('festival_artist_forms')

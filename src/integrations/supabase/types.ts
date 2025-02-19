@@ -436,6 +436,7 @@ export type Database = {
           created_at: string | null
           expires_at: string
           id: string
+          shortened_url: string | null
           status: Database["public"]["Enums"]["form_status"]
           token: string | null
           updated_at: string | null
@@ -445,6 +446,7 @@ export type Database = {
           created_at?: string | null
           expires_at: string
           id?: string
+          shortened_url?: string | null
           status?: Database["public"]["Enums"]["form_status"]
           token?: string | null
           updated_at?: string | null
@@ -454,6 +456,7 @@ export type Database = {
           created_at?: string | null
           expires_at?: string
           id?: string
+          shortened_url?: string | null
           status?: Database["public"]["Enums"]["form_status"]
           token?: string | null
           updated_at?: string | null
@@ -1783,6 +1786,85 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          assignments: boolean | null
+          created_at: string | null
+          form_submissions: boolean | null
+          gear_movements: boolean | null
+          id: string
+          messages: boolean | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          assignments?: boolean | null
+          created_at?: string | null
+          form_submissions?: boolean | null
+          gear_movements?: boolean | null
+          id?: string
+          messages?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          assignments?: boolean | null
+          created_at?: string | null
+          form_submissions?: boolean | null
+          gear_movements?: boolean | null
+          id?: string
+          messages?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_subscriptions: {
+        Row: {
+          auth_key: string
+          created_at: string | null
+          endpoint: string
+          id: string
+          p256dh_key: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          auth_key: string
+          created_at?: string | null
+          endpoint: string
+          id?: string
+          p256dh_key: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          auth_key?: string
+          created_at?: string | null
+          endpoint?: string
+          id?: string
+          p256dh_key?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       power_requirement_tables: {
         Row: {
           created_at: string | null
@@ -2456,6 +2538,11 @@ export type Database = {
         | "administrative"
         | "production"
       movement_type: "addition" | "subtraction"
+      notification_channel:
+        | "messages"
+        | "assignments"
+        | "form_submissions"
+        | "gear_movements"
       project_status: "pending" | "in_progress" | "completed" | "cancelled"
       provider_type: "festival" | "band"
       room_type: "single" | "double"
