@@ -67,9 +67,6 @@ export const ArtistTable = ({
   const [submissionDialogOpen, setSubmissionDialogOpen] = useState(false);
   const [selectedArtistForSubmission, setSelectedArtistForSubmission] = useState<string>("");
   const [formStatuses, setFormStatuses] = useState<FormStatusType>({});
-  const [formLinksDialogOpen, setFormLinksDialogOpen] = useState(false);
-  const jobId = artists[0]?.job_id;
-  const selectedDate = artists[0]?.date;
 
   useEffect(() => {
     const fetchGearSetup = async () => {
@@ -412,18 +409,6 @@ export const ArtistTable = ({
 
   return (
     <>
-      {artists.length > 0 && (
-        <div className="mb-4 flex justify-end">
-          <Button
-            onClick={() => setFormLinksDialogOpen(true)}
-            variant="outline"
-          >
-            <Link2 className="h-4 w-4 mr-2" />
-            View All Form Links
-          </Button>
-        </div>
-      )}
-
       <Table>
         <TableHeader>
           <TableRow>
@@ -705,13 +690,6 @@ export const ArtistTable = ({
         open={submissionDialogOpen}
         onOpenChange={setSubmissionDialogOpen}
         artistId={selectedArtistForSubmission}
-      />
-
-      <ArtistFormLinksDialog
-        open={formLinksDialogOpen}
-        onOpenChange={setFormLinksDialogOpen}
-        selectedDate={selectedDate}
-        jobId={jobId}
       />
     </>
   );
