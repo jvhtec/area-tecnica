@@ -37,7 +37,7 @@ const reportSections = [
 
 export const ReportGenerator = () => {
   const { toast } = useToast();
-  const { jobs, isLoading } = useJobSelection();
+  const { data: jobs } = useJobSelection();
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [equipamiento, setEquipamiento] = useState("");
   const [images, setImages] = useState<{ [key: string]: File | null }>({});
@@ -235,10 +235,6 @@ export const ReportGenerator = () => {
     });
   };
 
-  const handleJobSelect = (value: string) => {
-    setSelectedJobId(value);
-  };
-
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader className="pb-4">
@@ -248,12 +244,12 @@ export const ReportGenerator = () => {
         <CardContent className="space-y-4">
           <div>
             <Label htmlFor="jobSelect">Job</Label>
-            <Select value={selectedJobId} onValueChange={handleJobSelect}>
-              <SelectTrigger>
+            <Select value={selectedJobId} onValueChange={setSelectedJobId}>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select a job" />
               </SelectTrigger>
               <SelectContent>
-                {jobs?.map((job) => (
+                {jobs?.map(job => (
                   <SelectItem key={job.id} value={job.id}>
                     {job.title}
                   </SelectItem>

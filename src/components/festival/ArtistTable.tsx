@@ -707,11 +707,11 @@ export const ArtistTable = ({
         artistId={selectedArtistForSubmission}
       />
 
-      <ArtistFormLinkDialog
+      <ArtistFormLinksDialog
         open={formLinksDialogOpen}
         onOpenChange={setFormLinksDialogOpen}
-        artistId={null}
-        artistName="All Artists"
+        selectedDate={selectedDate}
+        jobId={jobId}
       />
     </>
   );
