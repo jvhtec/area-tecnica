@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -111,7 +110,6 @@ export const ArtistRequirementsForm = () => {
           return;
         }
 
-        // Fetch festival logo
         const { data: logoData, error: logoError } = await supabase
           .from('festival_logos')
           .select('file_path')
@@ -221,7 +219,6 @@ export const ArtistRequirementsForm = () => {
         throw new Error('This form has already been submitted');
       }
 
-      // Start a transaction by using multiple operations
       const { error: submissionError } = await supabase
         .from('festival_artist_form_submissions')
         .insert({
@@ -234,7 +231,6 @@ export const ArtistRequirementsForm = () => {
 
       if (submissionError) throw submissionError;
 
-      // Update form status to submitted
       const { error: updateError } = await supabase
         .from('festival_artist_forms')
         .update({ status: 'submitted' })
@@ -279,21 +275,15 @@ export const ArtistRequirementsForm = () => {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-4xl mx-auto space-y-8">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col items-center space-y-8">
+          {festivalLogo && (
             <img 
-              src="/sector%20pro%20logo.png" 
-              alt="Company Logo" 
+              src={festivalLogo} 
+              alt="Festival Logo" 
               className="h-16 object-contain"
             />
-            {festivalLogo && (
-              <img 
-                src={festivalLogo} 
-                alt="Festival Logo" 
-                className="h-16 object-contain"
-              />
-            )}
-          </div>
+          )}
+          
           <Card>
             <CardHeader>
               <CardTitle>Artist Technical Requirements Form</CardTitle>
@@ -348,6 +338,12 @@ export const ArtistRequirementsForm = () => {
               </form>
             </CardContent>
           </Card>
+
+          <img 
+            src="/sector%20pro%20logo.png" 
+            alt="Company Logo" 
+            className="h-16 object-contain mt-8"
+          />
         </div>
       </div>
     </div>
