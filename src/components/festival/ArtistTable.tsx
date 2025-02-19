@@ -707,7 +707,7 @@ export const ArtistTable = ({
         artistId={selectedArtistForSubmission}
       />
 
-      <ArtistFormLinksDialog
+      <ArtistFormLinkDialog
         open={formLinksDialogOpen}
         onOpenChange={setFormLinksDialogOpen}
         selectedDate={selectedDate}
