@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText, ArrowLeft } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
-import { useJobSelection } from '@/hooks/useJobSelection';
+import { useJobSelection } from "@/hooks/useJobSelection";
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
@@ -93,7 +93,7 @@ interface Table {
 const LightsPesosTool: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { data: jobs } = useJobSelection();
+  const { jobs } = useJobSelection();
   const department = 'lights';
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');

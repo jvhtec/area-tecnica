@@ -2,8 +2,30 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
+export interface Job {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  tour_id: string | null;
+  tours: {
+    name: string;
+  } | null;
+}
+
+export interface JobSelection {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  tour_id: string | null;
+  tours: {
+    name: string;
+  } | null;
+}
+
 export const useJobSelection = () => {
-  const { data: jobs = [], isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['jobs-active'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -22,9 +44,9 @@ export const useJobSelection = () => {
         .order('start_time', { ascending: true });
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as Job[];
     },
   });
 
-  return { jobs, isLoading };
+  return { jobs: data || [], isLoading };
 };

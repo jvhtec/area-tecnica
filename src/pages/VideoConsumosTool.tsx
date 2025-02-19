@@ -47,7 +47,7 @@ interface Table {
 const VideoConsumosTool: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { data: jobs } = useJobSelection();
+  const { jobs } = useJobSelection();
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<any>(null);
