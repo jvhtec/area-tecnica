@@ -13,22 +13,11 @@ export interface Job {
   } | null;
 }
 
-export interface JobSelection {
-  id: string;
-  title: string;
-  start_time: string;
-  end_time: string;
-  tour_id: string | null;
-  tours: {
-    name: string;
-  } | null;
-}
-
 export const useJobSelection = () => {
   const { data, isLoading } = useQuery({
     queryKey: ['jobs-active'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: jobsData, error } = await supabase
         .from('jobs')
         .select(`
           id,
@@ -44,7 +33,14 @@ export const useJobSelection = () => {
         .order('start_time', { ascending: true });
 
       if (error) throw error;
-      return (data || []) as Job[];
+      
+      // Ensure the data matches our Job interface
+      const typedJobs = (jobsData || []).map(job => ({
+        ...job,
+        tours: job.tours ? { name: String(job.tours.name) } : null
+      })) as Job[];
+
+      return typedJobs;
     },
   });
 
