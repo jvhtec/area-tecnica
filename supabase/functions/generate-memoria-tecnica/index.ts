@@ -125,7 +125,7 @@ serve(async (req) => {
 
     // Add index title with proper centering
     indexPage.drawText('Tabla de Contenidos', {
-      x: 100,
+      x: 250,
       y: height - 25,
       size: titleFontSize,
       color: rgb(1, 1, 1, 1),
