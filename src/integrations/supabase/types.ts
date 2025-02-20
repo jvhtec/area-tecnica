@@ -1718,6 +1718,59 @@ export type Database = {
           },
         ]
       }
+      memoria_tecnica_documents: {
+        Row: {
+          cover_page_url: string | null
+          created_at: string | null
+          final_document_url: string | null
+          id: string
+          job_id: string | null
+          material_list_url: string | null
+          power_report_url: string | null
+          project_name: string
+          rigging_plot_url: string | null
+          soundvision_report_url: string | null
+          updated_at: string | null
+          weight_report_url: string | null
+        }
+        Insert: {
+          cover_page_url?: string | null
+          created_at?: string | null
+          final_document_url?: string | null
+          id?: string
+          job_id?: string | null
+          material_list_url?: string | null
+          power_report_url?: string | null
+          project_name: string
+          rigging_plot_url?: string | null
+          soundvision_report_url?: string | null
+          updated_at?: string | null
+          weight_report_url?: string | null
+        }
+        Update: {
+          cover_page_url?: string | null
+          created_at?: string | null
+          final_document_url?: string | null
+          id?: string
+          job_id?: string | null
+          material_list_url?: string | null
+          power_report_url?: string | null
+          project_name?: string
+          rigging_plot_url?: string | null
+          soundvision_report_url?: string | null
+          updated_at?: string | null
+          weight_report_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memoria_tecnica_documents_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string
