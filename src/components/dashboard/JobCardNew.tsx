@@ -122,7 +122,8 @@ const DEPARTMENT_SUFFIXES = {
   lights: "L",
   video: "V",
   production: "P",
-  personnel: "HR"
+  personnel: "HR",
+  comercial: "QT"
 };
 
 async function createFlexFolder(payload: Record<string, any>) {
