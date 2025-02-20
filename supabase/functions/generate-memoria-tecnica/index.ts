@@ -38,7 +38,7 @@ serve(async (req) => {
     // Add title in white on header - centered
     const titleFontSize = 24;
     coverPage.drawText('Memoria Tecnica - Sonido', {
-      x: 60,
+      x: 210,
       y: height - 25,
       size: titleFontSize,
       color: rgb(1, 1, 1, 1),
@@ -125,7 +125,7 @@ serve(async (req) => {
 
     // Add index title with proper centering
     indexPage.drawText('Tabla de Contenidos', {
-      x: 250,
+      x: 220,
       y: height - 25,
       size: titleFontSize,
       color: rgb(1, 1, 1, 1),
