@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Upload, File, FilePlus, FileCheck, Loader2 } from "lucide-react";
+import { Upload, File, FilePlus, FileCheck, Loader2, Image as ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { Progress } from "@/components/ui/progress";
@@ -25,6 +25,7 @@ export const MemoriaTecnica = () => {
   const [projectName, setProjectName] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [logo, setLogo] = useState<{ file: File; url: string } | null>(null);
   
   const [documents, setDocuments] = useState<DocumentSection[]>([
     { id: "material", title: "Listado de Material", file: null, landscape: false },
@@ -33,6 +34,29 @@ export const MemoriaTecnica = () => {
     { id: "power", title: "Informe de Consumos", file: null, landscape: false },
     { id: "rigging", title: "Plano de Rigging", file: null, landscape: true }
   ]);
+
+  const handleLogoUpload = async (file: File) => {
+    if (!file.type.includes('image/')) {
+      toast({
+        title: "Error",
+        description: "Solo se permiten archivos de imagen",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const url = URL.createObjectURL(file);
+      setLogo({ file, url });
+    } catch (error) {
+      console.error("Error handling logo:", error);
+      toast({
+        title: "Error",
+        description: "Error al procesar la imagen",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleFileUpload = async (file: File, sectionId: string) => {
     if (!file.type.includes('pdf')) {
@@ -62,7 +86,7 @@ export const MemoriaTecnica = () => {
   };
 
   const uploadToStorage = async (file: File, path: string) => {
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError, data } = await supabase.storage
       .from('memoria-tecnica')
       .upload(path, file);
 
@@ -99,22 +123,44 @@ export const MemoriaTecnica = () => {
     setProgress(0);
 
     try {
-      // Upload each document and get its URL
+      // Upload logo if available
+      let logoUrl = null;
+      if (logo) {
+        const logoPath = `${projectName}/logo_${Date.now()}.${logo.file.name.split('.').pop()}`;
+        logoUrl = await uploadToStorage(logo.file, logoPath);
+      }
+
+      // Upload documents and collect URLs
+      const documentUrls: Record<string, string> = {};
       for (let i = 0; i < availableDocuments.length; i++) {
         const doc = availableDocuments[i];
         if (!doc.file) continue;
 
         const path = `${projectName}/${doc.id}_${Date.now()}.pdf`;
-        await uploadToStorage(doc.file.file, path);
-        setProgress((i + 1) / availableDocuments.length * 100);
+        const url = await uploadToStorage(doc.file.file, path);
+        documentUrls[doc.id] = url;
+        setProgress((i + 1) / availableDocuments.length * 50);
       }
+
+      // Generate merged PDF
+      const response = await supabase.functions.invoke('generate-memoria-tecnica', {
+        body: { documentUrls, projectName, logoUrl }
+      });
+
+      if (response.error) throw response.error;
 
       // Store document metadata in database
       const { error: dbError } = await supabase
         .from('memoria_tecnica_documents')
         .insert({
           project_name: projectName,
-          // Add URLs for each document type
+          logo_url: logoUrl,
+          material_list_url: documentUrls.material,
+          soundvision_report_url: documentUrls.soundvision,
+          weight_report_url: documentUrls.weight,
+          power_report_url: documentUrls.power,
+          rigging_plot_url: documentUrls.rigging,
+          final_document_url: response.data.url
         });
 
       if (dbError) throw dbError;
@@ -123,6 +169,9 @@ export const MemoriaTecnica = () => {
         title: "Éxito",
         description: "Memoria técnica generada correctamente",
       });
+
+      // Open the generated PDF
+      window.open(response.data.url, '_blank');
 
     } catch (error) {
       console.error("Error generating memoria tecnica:", error);
@@ -150,6 +199,50 @@ export const MemoriaTecnica = () => {
               onChange={(e) => setProjectName(e.target.value)}
               placeholder="Ingrese el nombre del proyecto"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Logo (opcional)</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                id="logo-upload"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleLogoUpload(file);
+                }}
+              />
+              <Button
+                variant="outline"
+                asChild
+                className="w-full"
+              >
+                <label htmlFor="logo-upload" className="cursor-pointer flex items-center justify-center gap-2">
+                  {logo ? (
+                    <>
+                      <FileCheck className="h-4 w-4" />
+                      Logo cargado
+                    </>
+                  ) : (
+                    <>
+                      <ImageIcon className="h-4 w-4" />
+                      Subir logo
+                    </>
+                  )}
+                </label>
+              </Button>
+              {logo && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => window.open(logo.url, '_blank')}
+                >
+                  <ImageIcon className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="space-y-4">
