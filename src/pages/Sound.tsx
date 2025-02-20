@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
 import CreateTourDialog from "@/components/tours/CreateTourDialog";
@@ -17,7 +16,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ReportGenerator } from "../components/sound/ReportGenerator";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PdfAnalysis } from "@/components/sound/PdfAnalysis";
 import { AmplifierTool } from "@/components/sound/AmplifierTool";
 import { useNavigate } from "react-router-dom";
@@ -259,24 +258,36 @@ const Sound = () => {
       
       <Dialog open={showReportGenerator} onOpenChange={setShowReportGenerator}>
         <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Generador de Reportes</DialogTitle>
+          </DialogHeader>
           <ReportGenerator />
         </DialogContent>
       </Dialog>
 
       <Dialog open={showAnalysisForm} onOpenChange={setShowAnalysisForm}>
         <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Análisis de PDF</DialogTitle>
+          </DialogHeader>
           <PdfAnalysis />
         </DialogContent>
       </Dialog>
 
       <Dialog open={showAmplifierTool} onOpenChange={setShowAmplifierTool}>
         <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Calculadora de Amplificadores</DialogTitle>
+          </DialogHeader>
           <AmplifierTool />
         </DialogContent>
       </Dialog>
 
       <Dialog open={showMemoriaTecnica} onOpenChange={setShowMemoriaTecnica}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Memoria Técnica</DialogTitle>
+          </DialogHeader>
           <MemoriaTecnica />
         </DialogContent>
       </Dialog>
