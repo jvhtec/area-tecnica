@@ -2,14 +2,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { PDFDocument, rgb } from "https://cdn.skypack.dev/pdf-lib@1.17.1?dts";
 
-// CORS headers for browser requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -19,12 +17,11 @@ serve(async (req) => {
     
     console.log('Starting PDF generation with inputs:', { projectName, logoUrl, documentUrls });
 
-    // Create a new PDF document
     const mergedPdf = await PDFDocument.create();
-    const width = 595; // A4 width in points
-    const height = 842; // A4 height in points
+    const width = 595;
+    const height = 842;
     const headerHeight = 60;
-    const corporateColor = rgb(125/255, 1/255, 1/255); // Corporate color RGB(125,1,1)
+    const corporateColor = rgb(125/255, 1/255, 1/255);
     
     // Create cover page
     const coverPage = mergedPdf.addPage([width, height]);
@@ -44,12 +41,12 @@ serve(async (req) => {
       x: (width - titleFontSize * 7) / 2,
       y: height - 45,
       size: titleFontSize,
-      color: rgb(1, 1, 1), // White
+      color: rgb(1, 1, 1),
     });
 
     // Add centered project name
     const projectNameSize = 24;
-    const estimatedCharWidth = 0.6; // Approximate width of each character
+    const estimatedCharWidth = 0.6;
     coverPage.drawText(projectName.toUpperCase(), {
       x: (width - (projectNameSize * projectName.length * estimatedCharWidth)) / 2,
       y: height / 2,
@@ -85,25 +82,20 @@ serve(async (req) => {
       }
     }
 
-    // Load and add Sector Pro logo at the bottom
-    try {
-      const sectorProLogoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/sector-pro/sector-pro-logo.png`;
-      const sectorProLogoResponse = await fetch(sectorProLogoUrl);
-      const sectorProLogoBytes = new Uint8Array(await sectorProLogoResponse.arrayBuffer());
-      const sectorProLogo = await mergedPdf.embedPng(sectorProLogoBytes);
-      
-      const logoHeight = 50;
-      const logoWidth = (sectorProLogo.width / sectorProLogo.height) * logoHeight;
-      
-      coverPage.drawImage(sectorProLogo, {
-        x: (width - logoWidth) / 2,
-        y: 60,
-        width: logoWidth,
-        height: logoHeight,
-      });
-    } catch (error) {
-      console.error('Error processing Sector Pro logo:', error);
-    }
+    // Add Sector Pro logo at the bottom
+    const sectorProLogo = await PDFDocument.load(await fetch('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png').then(res => res.arrayBuffer()));
+    const [sectorProLogoPage] = sectorProLogo.getPages();
+    const { width: logoWidth, height: logoHeight } = sectorProLogoPage.getSize();
+    
+    const targetLogoHeight = 50;
+    const targetLogoWidth = (logoWidth / logoHeight) * targetLogoHeight;
+    
+    coverPage.drawImage(sectorProLogoPage, {
+      x: (width - targetLogoWidth) / 2,
+      y: 60,
+      width: targetLogoWidth,
+      height: targetLogoHeight,
+    });
 
     // Create index page
     const indexPage = mergedPdf.addPage([width, height]);
@@ -126,22 +118,15 @@ serve(async (req) => {
     });
 
     // Add Sector Pro logo to index page
-    try {
-      const logoHeight = 50;
-      const logoWidth = (sectorProLogo.width / sectorProLogo.height) * logoHeight;
-      
-      indexPage.drawImage(sectorProLogo, {
-        x: (width - logoWidth) / 2,
-        y: 60,
-        width: logoWidth,
-        height: logoHeight,
-      });
-    } catch (error) {
-      console.error('Error processing Sector Pro logo for index:', error);
-    }
+    indexPage.drawImage(sectorProLogoPage, {
+      x: (width - targetLogoWidth) / 2,
+      y: 60,
+      width: targetLogoWidth,
+      height: targetLogoHeight,
+    });
 
     // Define document titles and their mappings
-    const titles: Record<string, string> = {
+    const titles = {
       material: "Listado de Material",
       soundvision: "Informe SoundVision",
       weight: "Informe de Pesos",
@@ -150,13 +135,12 @@ serve(async (req) => {
     };
 
     // Add index items with better spacing
-    let yOffset = height - 200; // Start below logo
+    let yOffset = height - 200;
     const lineSpacing = 40;
-    let pageNumber = 3; // Start from page 3 (after cover and index)
+    let pageNumber = 3;
 
     Object.entries(documentUrls).forEach(([key, _url]) => {
       if (titles[key]) {
-        // Add bullet point and title
         indexPage.drawText(`• ${titles[key]}`, {
           x: 50,
           y: yOffset,
@@ -164,7 +148,6 @@ serve(async (req) => {
           color: rgb(0.1, 0.1, 0.1),
         });
 
-        // Add page number
         indexPage.drawText(pageNumber.toString(), {
           x: width - 50,
           y: yOffset,
@@ -194,10 +177,8 @@ serve(async (req) => {
       }
     }
 
-    // Generate final PDF bytes
     const pdfBytes = await mergedPdf.save();
     
-    // Upload to Supabase Storage
     const timestamp = new Date().toISOString().replace(/[^0-9]/g, '');
     const fileName = `${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.pdf`;
     
@@ -247,3 +228,4 @@ serve(async (req) => {
     );
   }
 });
+
