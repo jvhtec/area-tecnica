@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { PDFDocument, rgb } from "https://cdn.skypack.dev/pdf-lib@1.17.1?dts";
 
@@ -34,23 +35,25 @@ serve(async (req) => {
       color: corporateColor,
     });
 
-    // Add title in white on header - centered with proper color
+    // Add title in white on header - centered
     const titleFontSize = 24;
     coverPage.drawText('MEMORIA TÉCNICA', {
-      x: width / 2,
-      y: height - (headerHeight / 2) + (titleFontSize / 4),
+      x: 20,
+      y: height - 25,
       size: titleFontSize,
       color: rgb(1, 1, 1, 1),
+      maxWidth: width - 40,
       align: 'center'
     });
 
-    // Add centered project name with better vertical positioning
+    // Add centered project name
     const projectNameSize = 24;
     coverPage.drawText(projectName.toUpperCase(), {
-      x: width / 2,
-      y: height / 2,
+      x: 20,
+      y: height / 2 + projectNameSize / 2,
       size: projectNameSize,
       color: rgb(0, 0, 0),
+      maxWidth: width - 40,
       align: 'center'
     });
 
@@ -84,7 +87,7 @@ serve(async (req) => {
       }
     }
 
-    // Add Sector Pro logo at the bottom with reduced size
+    // Add Sector Pro logo at the bottom
     try {
       const sectorProLogoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/company-assets/sector-pro-logo.png`;
       console.log('Fetching Sector Pro logo from:', sectorProLogoUrl);
@@ -120,16 +123,17 @@ serve(async (req) => {
       color: corporateColor,
     });
 
-    // Add index title with proper centering and color
+    // Add index title with proper centering
     indexPage.drawText('TABLA DE CONTENIDOS', {
-      x: width / 2,
-      y: height - (headerHeight / 2) + (titleFontSize / 4),
+      x: 20,
+      y: height - 25,
       size: titleFontSize,
       color: rgb(1, 1, 1, 1),
+      maxWidth: width - 40,
       align: 'center'
     });
 
-    // Add Sector Pro logo to index page with reduced size
+    // Add Sector Pro logo to index page
     try {
       const sectorProLogoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/company-assets/sector-pro-logo.png`;
       const logoResponse = await fetch(sectorProLogoUrl);
@@ -160,17 +164,18 @@ serve(async (req) => {
       rigging: "Plano de Rigging"
     };
 
-    // Add index items with better spacing
-    let yOffset = height - 150;
-    const lineSpacing = 30;
+    // Add index items with proper spacing and alignment
+    let yOffset = height - 100;
+    const lineSpacing = 25;
+    const leftMargin = 40;
 
     Object.entries(documentUrls).forEach(([key, _url]) => {
       if (titles[key]) {
         indexPage.drawText(`• ${titles[key]}`, {
-          x: 50,
+          x: leftMargin,
           y: yOffset,
           size: 12,
-          color: rgb(0.1, 0.1, 0.1),
+          color: rgb(0, 0, 0),
         });
         yOffset -= lineSpacing;
       }
