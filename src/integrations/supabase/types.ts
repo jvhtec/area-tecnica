@@ -1725,6 +1725,7 @@ export type Database = {
           final_document_url: string | null
           id: string
           job_id: string | null
+          logo_url: string | null
           material_list_url: string | null
           power_report_url: string | null
           project_name: string
@@ -1739,6 +1740,7 @@ export type Database = {
           final_document_url?: string | null
           id?: string
           job_id?: string | null
+          logo_url?: string | null
           material_list_url?: string | null
           power_report_url?: string | null
           project_name: string
@@ -1753,6 +1755,7 @@ export type Database = {
           final_document_url?: string | null
           id?: string
           job_id?: string | null
+          logo_url?: string | null
           material_list_url?: string | null
           power_report_url?: string | null
           project_name?: string

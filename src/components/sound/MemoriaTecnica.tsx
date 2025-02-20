@@ -133,11 +133,10 @@ export const MemoriaTecnica = () => {
         } catch (error) {
           console.error('Error uploading logo:', error);
           toast({
-            title: "Error",
-            description: "Error al subir el logo",
-            variant: "destructive",
+            title: "Warning",
+            description: "No se pudo subir el logo, continuando sin él",
           });
-          return;
+          // Continue without logo instead of returning
         }
       }
 
@@ -182,7 +181,7 @@ export const MemoriaTecnica = () => {
         .from('memoria_tecnica_documents')
         .insert({
           project_name: projectName,
-          logo_url: logoUrl,
+          logo_url: logoUrl, // This is now optional
           material_list_url: documentUrls.material,
           soundvision_report_url: documentUrls.soundvision,
           weight_report_url: documentUrls.weight,
