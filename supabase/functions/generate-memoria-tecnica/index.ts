@@ -180,11 +180,14 @@ serve(async (req) => {
 
     const pdfBytes = await mergedPdf.save();
     
-    // Generate filename with the requested format
-    const fileName = `Memoria Técnica - Sonido - ${projectName}.pdf`;
-    const safePath = `memoria-tecnica/${encodeURIComponent(fileName)}`;
+    // Generate a safe filename
+    const baseFileName = `Memoria Técnica - Sonido - ${projectName}.pdf`;
+    const safeFileName = baseFileName
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+      .replace(/[^a-zA-Z0-9- .]/g, '_'); // Replace other special chars with underscore
     
-    console.log('Uploading PDF with filename:', fileName);
+    console.log('Uploading PDF with filename:', safeFileName);
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -193,7 +196,8 @@ serve(async (req) => {
       throw new Error('Missing Supabase configuration');
     }
 
-    const uploadResponse = await fetch(`${supabaseUrl}/storage/v1/object/${safePath}`, {
+    // Use proper storage path format with bucket name
+    const uploadResponse = await fetch(`${supabaseUrl}/storage/v1/object/memoria-tecnica/${safeFileName}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${supabaseKey}`,
@@ -210,7 +214,7 @@ serve(async (req) => {
     }
 
     console.log('PDF uploaded successfully');
-    const publicUrl = `${supabaseUrl}/storage/v1/object/public/${safePath}`;
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/memoria-tecnica/${safeFileName}`;
     
     return new Response(
       JSON.stringify({ url: publicUrl }),
