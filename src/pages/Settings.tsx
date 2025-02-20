@@ -7,6 +7,7 @@ import { UsersList } from "@/components/users/UsersList";
 import { useState } from "react";
 import { FilterBar } from "@/components/users/filters/FilterBar";
 import { ImportUsersDialog } from "@/components/users/import/ImportUsersDialog";
+import { CompanyLogoUploader } from "@/components/CompanyLogoUploader";
 
 const Settings = () => {
   const [createUserOpen, setCreateUserOpen] = useState(false);
@@ -58,6 +59,23 @@ const Settings = () => {
                 roleFilter={selectedRole === "all" ? "" : selectedRole}
                 departmentFilter={selectedDepartment === "all" ? "" : selectedDepartment}
               />
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Company Settings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium">Company Logo</h3>
+                <p className="text-sm text-muted-foreground">
+                  Upload your company logo. This will be used in the Memoria Técnica PDFs and other documents.
+                </p>
+                <CompanyLogoUploader />
+              </div>
             </CardContent>
           </Card>
         </div>
