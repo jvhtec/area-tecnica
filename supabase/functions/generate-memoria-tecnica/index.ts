@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { PDFDocument, rgb } from "https://cdn.skypack.dev/pdf-lib@1.17.1?dts";
 
@@ -17,16 +18,16 @@ serve(async (req) => {
     console.log('Starting PDF generation with inputs:', { projectName, logoUrl, documentUrls });
 
     const mergedPdf = await PDFDocument.create();
-    const width = 595; // A4 width in points (1/72 inch)
-    const height = 842; // A4 height in points
-    const headerHeight = 60; // Increased header height to match the larger banner in the image
-    const corporateColor = rgb(102/255, 0/255, 0/255); // Darker red
-    const whiteColor = rgb(1, 1, 1); // Pure white
+    const width = 595;
+    const height = 842;
+    const headerHeight = 35;
+    const corporateColor = rgb(102/255, 0/255, 0/255);
+    const whiteColor = rgb(1, 1, 1);
     
     // Create cover page
     const coverPage = mergedPdf.addPage([width, height]);
     
-    // Add corporate header (larger and darker red)
+    // Add corporate header
     coverPage.drawRectangle({
       x: 0,
       y: height - headerHeight,
@@ -35,16 +36,16 @@ serve(async (req) => {
       color: corporateColor,
     });
 
-    // Add title in white on header - centered, larger font
-    coverPage.drawText('Memoria Tecnica - Sonido', {
+    // Add title in white on header - centered
+    coverPage.drawText('MEMORIA TÉCNICA', {
       x: width/2,
-      y: height - 30, // Adjusted for larger header and better centering
-      size: 30, // Increased font size to match the bold, larger text in the image
+      y: height - 25,
+      size: 24,
       color: whiteColor,
       align: 'center'
     });
 
-    // Add centered project name (ensuring proper centering)
+    // Add centered project name
     coverPage.drawText(projectName.toUpperCase(), {
       x: width/2,
       y: height/2,
@@ -96,10 +97,10 @@ serve(async (req) => {
     });
 
     // Add index title with proper centering
-    indexPage.drawText('Tabla de Contenidos', {
+    indexPage.drawText('TABLA DE CONTENIDOS', {
       x: width/2,
-      y: height - 30,
-      size: 30,
+      y: height - 25,
+      size: 24,
       color: whiteColor,
       align: 'center'
     });
@@ -114,7 +115,7 @@ serve(async (req) => {
     };
 
     // Add index items with proper spacing and alignment
-    let yOffset = height - 150; // More space from header
+    let yOffset = height - 150;
     const lineSpacing = 30;
     const leftMargin = 50;
 
@@ -173,14 +174,17 @@ serve(async (req) => {
         pages.forEach(page => mergedPdf.addPage(page));
       } catch (error) {
         console.error(`Error processing PDF for ${key}:`, error);
+        throw new Error(`Failed to process PDF for ${titles[key]}: ${error.message}`);
       }
     }
 
     const pdfBytes = await mergedPdf.save();
     
-    const timestamp = new Date().toISOString().replace(/[^0-9]/g, '');
+    // Generate filename with the requested format
     const fileName = `Memoria Técnica - Sonido - ${projectName}.pdf`;
-
+    const safePath = `memoria-tecnica/${encodeURIComponent(fileName)}`;
+    
+    console.log('Uploading PDF with filename:', fileName);
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -189,7 +193,7 @@ serve(async (req) => {
       throw new Error('Missing Supabase configuration');
     }
 
-    const uploadResponse = await fetch(`${supabaseUrl}/storage/v1/object/memoria-tecnica/${fileName}`, {
+    const uploadResponse = await fetch(`${supabaseUrl}/storage/v1/object/${safePath}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${supabaseKey}`,
@@ -199,10 +203,14 @@ serve(async (req) => {
     });
 
     if (!uploadResponse.ok) {
-      throw new Error('Failed to upload merged PDF');
+      console.error('Upload failed with status:', uploadResponse.status);
+      const errorText = await uploadResponse.text();
+      console.error('Upload error details:', errorText);
+      throw new Error(`Failed to upload PDF: ${uploadResponse.statusText}`);
     }
 
-    const publicUrl = `${supabaseUrl}/storage/v1/object/public/memoria-tecnica/${fileName}`;
+    console.log('PDF uploaded successfully');
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/${safePath}`;
     
     return new Response(
       JSON.stringify({ url: publicUrl }),
@@ -217,7 +225,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in PDF generation:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: error.stack 
+      }),
       { 
         headers: { 
           ...corsHeaders,
