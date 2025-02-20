@@ -20,7 +20,7 @@ serve(async (req) => {
     const mergedPdf = await PDFDocument.create();
     const width = 595;
     const height = 842;
-    const headerHeight = 60;
+    const headerHeight = 40;
     const corporateColor = rgb(125/255, 1/255, 1/255);
     
     // Create cover page
@@ -38,20 +38,22 @@ serve(async (req) => {
     // Add title in white on header
     const titleFontSize = 24;
     coverPage.drawText('MEMORIA TÉCNICA', {
-      x: (width - titleFontSize * 7) / 2,
-      y: height - 45,
+      x: width / 2,
+      y: height - 28,
       size: titleFontSize,
       color: rgb(1, 1, 1),
+      font: undefined,
+      align: 'center'
     });
 
     // Add centered project name
     const projectNameSize = 24;
-    const estimatedCharWidth = 0.6;
     coverPage.drawText(projectName.toUpperCase(), {
-      x: (width - (projectNameSize * projectName.length * estimatedCharWidth)) / 2,
+      x: width / 2,
       y: height / 2,
       size: projectNameSize,
       color: rgb(0, 0, 0),
+      align: 'center'
     });
 
     // Add customer logo if provided
@@ -84,7 +86,7 @@ serve(async (req) => {
       }
     }
 
-    // Add Sector Pro logo at the bottom
+    // Add Sector Pro logo at the bottom with smaller size
     try {
       const sectorProLogoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/company-assets/sector-pro-logo.png`;
       console.log('Fetching Sector Pro logo from:', sectorProLogoUrl);
@@ -95,7 +97,7 @@ serve(async (req) => {
       const logoBytes = new Uint8Array(await logoResponse.arrayBuffer());
       const sectorProLogo = await mergedPdf.embedPng(logoBytes);
       
-      const targetLogoHeight = 50;
+      const targetLogoHeight = 30;
       const targetLogoWidth = (sectorProLogo.width / sectorProLogo.height) * targetLogoHeight;
       
       coverPage.drawImage(sectorProLogo, {
@@ -121,11 +123,12 @@ serve(async (req) => {
     });
 
     // Add index title
-    indexPage.drawText('ÍNDICE', {
-      x: (width - titleFontSize * 3) / 2,
-      y: height - 45,
+    indexPage.drawText('TABLA DE CONTENIDOS', {
+      x: width / 2,
+      y: height - 28,
       size: titleFontSize,
       color: rgb(1, 1, 1),
+      align: 'center'
     });
 
     // Try to add Sector Pro logo to index page
@@ -137,7 +140,7 @@ serve(async (req) => {
       const logoBytes = new Uint8Array(await logoResponse.arrayBuffer());
       const sectorProLogo = await mergedPdf.embedPng(logoBytes);
       
-      const targetLogoHeight = 50;
+      const targetLogoHeight = 30;
       const targetLogoWidth = (sectorProLogo.width / sectorProLogo.height) * targetLogoHeight;
       
       indexPage.drawImage(sectorProLogo, {
@@ -162,7 +165,6 @@ serve(async (req) => {
     // Add index items with better spacing
     let yOffset = height - 200;
     const lineSpacing = 40;
-    let pageNumber = 3;
 
     Object.entries(documentUrls).forEach(([key, _url]) => {
       if (titles[key]) {
@@ -172,16 +174,7 @@ serve(async (req) => {
           size: 12,
           color: rgb(0.1, 0.1, 0.1),
         });
-
-        indexPage.drawText(pageNumber.toString(), {
-          x: width - 50,
-          y: yOffset,
-          size: 12,
-          color: rgb(0.1, 0.1, 0.1),
-        });
-
         yOffset -= lineSpacing;
-        pageNumber++;
       }
     });
 
