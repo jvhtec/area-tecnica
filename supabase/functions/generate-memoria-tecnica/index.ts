@@ -83,98 +83,104 @@ serve(async (req) => {
     }
 
     // Add Sector Pro logo at the bottom
-    const sectorProLogo = await PDFDocument.load(await fetch('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png').then(res => res.arrayBuffer()));
-    const [sectorProLogoPage] = sectorProLogo.getPages();
-    const { width: logoWidth, height: logoHeight } = sectorProLogoPage.getSize();
-    
-    const targetLogoHeight = 50;
-    const targetLogoWidth = (logoWidth / logoHeight) * targetLogoHeight;
-    
-    coverPage.drawImage(sectorProLogoPage, {
-      x: (width - targetLogoWidth) / 2,
-      y: 60,
-      width: targetLogoWidth,
-      height: targetLogoHeight,
-    });
+    try {
+      const sectorProLogoUrl = 'https://syldobdcdsgfgjtbuwxm.supabase.co/storage/v1/object/public/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
+      const sectorProLogoResponse = await fetch(sectorProLogoUrl);
+      const sectorProLogoBytes = new Uint8Array(await sectorProLogoResponse.arrayBuffer());
+      const sectorProLogo = await mergedPdf.embedPng(sectorProLogoBytes);
+      
+      const logoHeight = 50;
+      const logoWidth = (sectorProLogo.width / sectorProLogo.height) * logoHeight;
+      
+      coverPage.drawImage(sectorProLogo, {
+        x: (width - logoWidth) / 2,
+        y: 60,
+        width: logoWidth,
+        height: logoHeight,
+      });
 
-    // Create index page
-    const indexPage = mergedPdf.addPage([width, height]);
-    
-    // Add corporate header to index
-    indexPage.drawRectangle({
-      x: 0,
-      y: height - headerHeight,
-      width: width,
-      height: headerHeight,
-      color: corporateColor,
-    });
+      // Create index page
+      const indexPage = mergedPdf.addPage([width, height]);
+      
+      // Add corporate header to index
+      indexPage.drawRectangle({
+        x: 0,
+        y: height - headerHeight,
+        width: width,
+        height: headerHeight,
+        color: corporateColor,
+      });
 
-    // Add index title
-    indexPage.drawText('ÍNDICE', {
-      x: (width - titleFontSize * 3) / 2,
-      y: height - 45,
-      size: titleFontSize,
-      color: rgb(1, 1, 1),
-    });
+      // Add index title
+      indexPage.drawText('ÍNDICE', {
+        x: (width - titleFontSize * 3) / 2,
+        y: height - 45,
+        size: titleFontSize,
+        color: rgb(1, 1, 1),
+      });
 
-    // Add Sector Pro logo to index page
-    indexPage.drawImage(sectorProLogoPage, {
-      x: (width - targetLogoWidth) / 2,
-      y: 60,
-      width: targetLogoWidth,
-      height: targetLogoHeight,
-    });
+      // Add Sector Pro logo to index page
+      indexPage.drawImage(sectorProLogo, {
+        x: (width - logoWidth) / 2,
+        y: 60,
+        width: logoWidth,
+        height: logoHeight,
+      });
 
-    // Define document titles and their mappings
-    const titles = {
-      material: "Listado de Material",
-      soundvision: "Informe SoundVision",
-      weight: "Informe de Pesos",
-      power: "Informe de Consumos",
-      rigging: "Plano de Rigging"
-    };
+      // Define document titles and their mappings
+      const titles = {
+        material: "Listado de Material",
+        soundvision: "Informe SoundVision",
+        weight: "Informe de Pesos",
+        power: "Informe de Consumos",
+        rigging: "Plano de Rigging"
+      };
 
-    // Add index items with better spacing
-    let yOffset = height - 200;
-    const lineSpacing = 40;
-    let pageNumber = 3;
+      // Add index items with better spacing
+      let yOffset = height - 200;
+      const lineSpacing = 40;
+      let pageNumber = 3;
 
-    Object.entries(documentUrls).forEach(([key, _url]) => {
-      if (titles[key]) {
-        indexPage.drawText(`• ${titles[key]}`, {
-          x: 50,
-          y: yOffset,
-          size: 12,
-          color: rgb(0.1, 0.1, 0.1),
-        });
+      Object.entries(documentUrls).forEach(([key, _url]) => {
+        if (titles[key]) {
+          indexPage.drawText(`• ${titles[key]}`, {
+            x: 50,
+            y: yOffset,
+            size: 12,
+            color: rgb(0.1, 0.1, 0.1),
+          });
 
-        indexPage.drawText(pageNumber.toString(), {
-          x: width - 50,
-          y: yOffset,
-          size: 12,
-          color: rgb(0.1, 0.1, 0.1),
-        });
+          indexPage.drawText(pageNumber.toString(), {
+            x: width - 50,
+            y: yOffset,
+            size: 12,
+            color: rgb(0.1, 0.1, 0.1),
+          });
 
-        yOffset -= lineSpacing;
-        pageNumber++;
+          yOffset -= lineSpacing;
+          pageNumber++;
+        }
+      });
+
+      // Append all document PDFs
+      for (const [key, url] of Object.entries(documentUrls)) {
+        if (!url) continue;
+
+        try {
+          console.log(`Fetching PDF from URL: ${url}`);
+          const pdfResponse = await fetch(url);
+          const pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
+          const pdf = await PDFDocument.load(pdfBytes);
+          
+          const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+          pages.forEach(page => mergedPdf.addPage(page));
+        } catch (error) {
+          console.error(`Error processing PDF for ${key}:`, error);
+        }
       }
-    });
 
-    // Append all document PDFs
-    for (const [key, url] of Object.entries(documentUrls)) {
-      if (!url) continue;
-
-      try {
-        console.log(`Fetching PDF from URL: ${url}`);
-        const pdfResponse = await fetch(url);
-        const pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
-        const pdf = await PDFDocument.load(pdfBytes);
-        
-        const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-        pages.forEach(page => mergedPdf.addPage(page));
-      } catch (error) {
-        console.error(`Error processing PDF for ${key}:`, error);
-      }
+    } catch (error) {
+      console.error('Error processing Sector Pro logo:', error);
     }
 
     const pdfBytes = await mergedPdf.save();
@@ -228,4 +234,3 @@ serve(async (req) => {
     );
   }
 });
-
