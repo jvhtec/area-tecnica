@@ -20,7 +20,7 @@ serve(async (req) => {
     const mergedPdf = await PDFDocument.create();
     const width = 595;
     const height = 842;
-    const headerHeight = 35;
+    const headerHeight = 40;
     const corporateColor = rgb(125/255, 1/255, 1/255);
     
     // Create cover page
@@ -37,7 +37,7 @@ serve(async (req) => {
 
     // Add title in white on header - centered
     const titleFontSize = 24;
-    coverPage.drawText('MEMORIA TÉCNICA', {
+    coverPage.drawText('Memoria Tecnica - Sonido', {
       x: 20,
       y: height - 25,
       size: titleFontSize,
@@ -47,15 +47,17 @@ serve(async (req) => {
     });
 
     // Add centered project name
-    const projectNameSize = 24;
-    coverPage.drawText(projectName.toUpperCase(), {
-      x: 20,
-      y: height / 2 + projectNameSize / 2,
-      size: projectNameSize,
-      color: rgb(0, 0, 0),
-      maxWidth: width - 40,
-      align: 'center'
-    });
+    const { width } = coverPage.getSize();
+const projectNameSize = 24;
+const textWidth = font.widthOfTextAtSize(projectName.toUpperCase(), projectNameSize);
+
+coverPage.drawText(projectName.toUpperCase(), {
+  x: (width - textWidth) / 2,  // Center text
+  y: height / 2 + projectNameSize / 2,
+  size: projectNameSize,
+  font,
+  color: rgb(0, 0, 0),
+});
 
     // Add customer logo if provided
     if (logoUrl) {
@@ -124,7 +126,7 @@ serve(async (req) => {
     });
 
     // Add index title with proper centering
-    indexPage.drawText('TABLA DE CONTENIDOS', {
+    indexPage.drawText('Tabla de contenidos', {
       x: 20,
       y: height - 25,
       size: titleFontSize,
