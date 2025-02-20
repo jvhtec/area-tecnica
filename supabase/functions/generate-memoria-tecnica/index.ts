@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { PDFDocument, rgb } from "https://cdn.skypack.dev/pdf-lib@1.17.1?dts";
 
@@ -18,16 +17,16 @@ serve(async (req) => {
     console.log('Starting PDF generation with inputs:', { projectName, logoUrl, documentUrls });
 
     const mergedPdf = await PDFDocument.create();
-    const width = 595;
-    const height = 842;
-    const headerHeight = 35;
+    const width = 595; // A4 width in points (1/72 inch)
+    const height = 842; // A4 height in points
+    const headerHeight = 60; // Increased header height to match the larger banner in the image
     const corporateColor = rgb(102/255, 0/255, 0/255); // Darker red
     const whiteColor = rgb(1, 1, 1); // Pure white
     
     // Create cover page
     const coverPage = mergedPdf.addPage([width, height]);
     
-    // Add corporate header
+    // Add corporate header (larger and darker red)
     coverPage.drawRectangle({
       x: 0,
       y: height - headerHeight,
@@ -36,16 +35,16 @@ serve(async (req) => {
       color: corporateColor,
     });
 
-    // Add title in white on header - centered
+    // Add title in white on header - centered, larger font
     coverPage.drawText('Memoria Tecnica - Sonido', {
       x: width/2,
-      y: height - 25,
-      size: 24,
+      y: height - 30, // Adjusted for larger header and better centering
+      size: 30, // Increased font size to match the bold, larger text in the image
       color: whiteColor,
       align: 'center'
     });
 
-    // Add centered project name
+    // Add centered project name (ensuring proper centering)
     coverPage.drawText(projectName.toUpperCase(), {
       x: width/2,
       y: height/2,
@@ -99,8 +98,8 @@ serve(async (req) => {
     // Add index title with proper centering
     indexPage.drawText('Tabla de Contenidos', {
       x: width/2,
-      y: height - 25,
-      size: 24,
+      y: height - 30,
+      size: 30,
       color: whiteColor,
       align: 'center'
     });
