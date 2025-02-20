@@ -24,7 +24,7 @@ serve(async (req) => {
     const width = 595; // A4 width in points
     const height = 842; // A4 height in points
     const headerHeight = 60;
-    const corporateColor = rgb(0.608, 0.529, 0.961); // #9b87f5
+    const corporateColor = rgb(125/255, 1/255, 1/255); // Corporate color RGB(125,1,1)
     
     // Create cover page
     const coverPage = mergedPdf.addPage([width, height]);
@@ -38,24 +38,26 @@ serve(async (req) => {
       color: corporateColor,
     });
 
-    // Add title in white on purple header
+    // Add title in white on header
     const titleFontSize = 24;
     coverPage.drawText('MEMORIA TÉCNICA', {
-      x: (width - titleFontSize * 7) / 2, // Approximate center
+      x: (width - titleFontSize * 7) / 2,
       y: height - 45,
       size: titleFontSize,
       color: rgb(1, 1, 1), // White
     });
 
-    // Add project name
+    // Add centered project name
+    const projectNameSize = 24;
+    const estimatedCharWidth = 0.6; // Approximate width of each character
     coverPage.drawText(projectName.toUpperCase(), {
-      x: 50,
+      x: (width - (projectNameSize * projectName.length * estimatedCharWidth)) / 2,
       y: height / 2,
-      size: 18,
+      size: projectNameSize,
       color: rgb(0, 0, 0),
     });
 
-    // Add logo if provided
+    // Add customer logo if provided
     if (logoUrl) {
       try {
         console.log('Fetching logo from URL:', logoUrl);
@@ -63,7 +65,6 @@ serve(async (req) => {
         const logoImageBytes = new Uint8Array(await logoResponse.arrayBuffer());
         const logoImage = await mergedPdf.embedJpg(logoImageBytes);
         
-        // Calculate scaled dimensions for logo
         const maxLogoHeight = 100;
         const maxLogoWidth = 200;
         const scaleFactor = Math.min(
@@ -73,7 +74,6 @@ serve(async (req) => {
         const scaledWidth = logoImage.width * scaleFactor;
         const scaledHeight = logoImage.height * scaleFactor;
 
-        // Draw centered logo
         coverPage.drawImage(logoImage, {
           x: (width - scaledWidth) / 2,
           y: height - headerHeight - scaledHeight - 50,
@@ -85,13 +85,25 @@ serve(async (req) => {
       }
     }
 
-    // Add footer
-    coverPage.drawText('Sector Pro Audio', {
-      x: 50,
-      y: 30,
-      size: 10,
-      color: rgb(0.5, 0.5, 0.5),
-    });
+    // Load and add Sector Pro logo at the bottom
+    try {
+      const sectorProLogoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/sector-pro/sector-pro-logo.png`;
+      const sectorProLogoResponse = await fetch(sectorProLogoUrl);
+      const sectorProLogoBytes = new Uint8Array(await sectorProLogoResponse.arrayBuffer());
+      const sectorProLogo = await mergedPdf.embedPng(sectorProLogoBytes);
+      
+      const logoHeight = 50;
+      const logoWidth = (sectorProLogo.width / sectorProLogo.height) * logoHeight;
+      
+      coverPage.drawImage(sectorProLogo, {
+        x: (width - logoWidth) / 2,
+        y: 60,
+        width: logoWidth,
+        height: logoHeight,
+      });
+    } catch (error) {
+      console.error('Error processing Sector Pro logo:', error);
+    }
 
     // Create index page
     const indexPage = mergedPdf.addPage([width, height]);
@@ -113,25 +125,19 @@ serve(async (req) => {
       color: rgb(1, 1, 1),
     });
 
-    // Add smaller logo to index page if available
-    if (logoUrl) {
-      try {
-        const logoResponse = await fetch(logoUrl);
-        const logoImageBytes = new Uint8Array(await logoResponse.arrayBuffer());
-        const logoImage = await mergedPdf.embedJpg(logoImageBytes);
-        
-        const indexLogoHeight = 40;
-        const indexLogoWidth = (logoImage.width / logoImage.height) * indexLogoHeight;
-        
-        indexPage.drawImage(logoImage, {
-          x: (width - indexLogoWidth) / 2,
-          y: height - headerHeight - indexLogoHeight - 30,
-          width: indexLogoWidth,
-          height: indexLogoHeight,
-        });
-      } catch (error) {
-        console.error('Error processing logo for index:', error);
-      }
+    // Add Sector Pro logo to index page
+    try {
+      const logoHeight = 50;
+      const logoWidth = (sectorProLogo.width / sectorProLogo.height) * logoHeight;
+      
+      indexPage.drawImage(sectorProLogo, {
+        x: (width - logoWidth) / 2,
+        y: 60,
+        width: logoWidth,
+        height: logoHeight,
+      });
+    } catch (error) {
+      console.error('Error processing Sector Pro logo for index:', error);
     }
 
     // Define document titles and their mappings
@@ -169,14 +175,6 @@ serve(async (req) => {
         yOffset -= lineSpacing;
         pageNumber++;
       }
-    });
-
-    // Add footer to index page
-    indexPage.drawText('Sector Pro Audio', {
-      x: 50,
-      y: 30,
-      size: 10,
-      color: rgb(0.5, 0.5, 0.5),
     });
 
     // Append all document PDFs
