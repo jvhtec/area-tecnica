@@ -1,9 +1,8 @@
-
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Upload, File, FilePlus, FileCheck, Loader2, Image as ImageIcon } from "lucide-react";
+import { Upload, File, FilePlus, FileCheck, Loader2, Image as ImageIcon, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { Progress } from "@/components/ui/progress";
@@ -26,6 +25,7 @@ export const MemoriaTecnica = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [logo, setLogo] = useState<{ file: File; url: string } | null>(null);
+  const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
   
   const [documents, setDocuments] = useState<DocumentSection[]>([
     { id: "material", title: "Listado de Material", file: null, landscape: false },
@@ -121,9 +121,9 @@ export const MemoriaTecnica = () => {
 
     setIsGenerating(true);
     setProgress(0);
+    setGeneratedPdfUrl(null);
 
     try {
-      // Upload logo if available
       let logoUrl = null;
       if (logo) {
         try {
@@ -136,11 +136,9 @@ export const MemoriaTecnica = () => {
             title: "Warning",
             description: "No se pudo subir el logo, continuando sin él",
           });
-          // Continue without logo instead of returning
         }
       }
 
-      // Upload documents and collect URLs
       const documentUrls: Record<string, string> = {};
       for (let i = 0; i < availableDocuments.length; i++) {
         const doc = availableDocuments[i];
@@ -164,7 +162,6 @@ export const MemoriaTecnica = () => {
 
       setProgress(60);
 
-      // Generate merged PDF
       const response = await supabase.functions.invoke('generate-memoria-tecnica', {
         body: { documentUrls, projectName, logoUrl }
       });
@@ -176,12 +173,11 @@ export const MemoriaTecnica = () => {
 
       setProgress(80);
 
-      // Store document metadata in database
       const { error: dbError } = await supabase
         .from('memoria_tecnica_documents')
         .insert({
           project_name: projectName,
-          logo_url: logoUrl, // This is now optional
+          logo_url: logoUrl,
           material_list_url: documentUrls.material,
           soundvision_report_url: documentUrls.soundvision,
           weight_report_url: documentUrls.weight,
@@ -196,13 +192,13 @@ export const MemoriaTecnica = () => {
       }
 
       setProgress(100);
+      setGeneratedPdfUrl(response.data.url);
 
       toast({
         title: "Éxito",
         description: "Memoria técnica generada correctamente",
       });
 
-      // Open the generated PDF
       window.open(response.data.url, '_blank');
 
     } catch (error) {
@@ -333,6 +329,17 @@ export const MemoriaTecnica = () => {
                   Generando memoria técnica...
                 </p>
               </div>
+            )}
+
+            {generatedPdfUrl && (
+              <Button 
+                variant="outline"
+                className="w-full"
+                onClick={() => window.open(generatedPdfUrl, '_blank')}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Descargar Memoria Técnica
+              </Button>
             )}
 
             <Button 
