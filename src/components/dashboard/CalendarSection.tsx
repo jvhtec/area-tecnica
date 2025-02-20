@@ -180,6 +180,45 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     setIsDropdownOpen(false);
   };
 
+  // Set up real-time subscription for date types
+  useEffect(() => {
+    console.log("Setting up real-time subscription for date types...");
+    
+    const channel = supabase.channel('date-type-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'job_date_types'
+        },
+        async (payload) => {
+          console.log("Date type change detected:", payload);
+          
+          // Fetch updated date types
+          const { data } = await supabase
+            .from("job_date_types")
+            .select("*")
+            .in("job_id", jobs.map((job: any) => job.id));
+            
+          if (data) {
+            const typesMap = data.reduce((acc: Record<string, any>, curr) => ({
+              ...acc,
+              [`${curr.job_id}-${curr.date}`]: curr,
+            }), {});
+            setDateTypes(typesMap);
+          }
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription
+    return () => {
+      console.log("Cleaning up date type subscription...");
+      supabase.removeChannel(channel);
+    };
+  }, [jobs]);
+
   // Fetch date types for jobs from supabase
   const fetchDateTypes = async () => {
     if (!jobs?.length) return;

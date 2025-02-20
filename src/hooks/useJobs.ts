@@ -1,7 +1,72 @@
-import { useQuery } from "@tanstack/react-query";
+
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { useEffect } from "react";
+import { toast } from "sonner";
 
 export const useJobs = () => {
+  const queryClient = useQueryClient();
+
+  // Set up real-time subscriptions
+  useEffect(() => {
+    console.log("Setting up real-time subscriptions for jobs...");
+    
+    const channel = supabase.channel('job-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'jobs'
+        },
+        async (payload) => {
+          console.log("Jobs table change detected:", payload);
+          // Invalidate and refetch
+          await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+          
+          // Show toast notification based on the event
+          if (payload.eventType === 'INSERT') {
+            toast.info("New job created");
+          } else if (payload.eventType === 'DELETE') {
+            toast.info("Job deleted");
+          } else if (payload.eventType === 'UPDATE') {
+            toast.info("Job updated");
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'job_date_types'
+        },
+        async (payload) => {
+          console.log("Job date types change detected:", payload);
+          await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'job_assignments'
+        },
+        async (payload) => {
+          console.log("Job assignments change detected:", payload);
+          await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      console.log("Cleaning up job subscriptions...");
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   return useQuery({
     queryKey: ["jobs"],
     queryFn: async () => {
