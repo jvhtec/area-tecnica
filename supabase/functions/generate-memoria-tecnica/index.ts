@@ -37,8 +37,8 @@ serve(async (req) => {
     });
 
     // Add title in white on header - centered
-    coverPage.drawText('MEMORIA TÉCNICA', {
-      x: width/2,
+    coverPage.drawText('Memoria Tecnica - Sonido', {
+      x: (width/2) -20,
       y: height - 25,
       size: 24,
       color: whiteColor,
@@ -47,7 +47,7 @@ serve(async (req) => {
 
     // Add centered project name
     coverPage.drawText(projectName.toUpperCase(), {
-      x: width/2,
+      x: (width/2) - 10,
       y: height/2,
       size: 24,
       color: rgb(0, 0, 0),
@@ -97,8 +97,8 @@ serve(async (req) => {
     });
 
     // Add index title with proper centering
-    indexPage.drawText('TABLA DE CONTENIDOS', {
-      x: width/2,
+    indexPage.drawText('Tabla de Contenidos', {
+      x: (width/2) - 20,
       y: height - 25,
       size: 24,
       color: whiteColor,
