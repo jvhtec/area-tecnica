@@ -38,7 +38,7 @@ serve(async (req) => {
     // Add title in white on header - centered
     const titleFontSize = 24;
     coverPage.drawText('Memoria Tecnica - Sonido', {
-      x: 180,
+      x: 160,
       y: height - 25,
       size: titleFontSize,
       color: rgb(1, 1, 1, 1),
@@ -49,7 +49,7 @@ serve(async (req) => {
     // Add centered project name
     const projectNameSize = 24;
     coverPage.drawText(projectName.toUpperCase(), {
-      x: (width /2) - 40,
+      x: (width /2) - 30,
       y: height / 2 + projectNameSize / 2,
       size: projectNameSize,
       color: rgb(0, 0, 0),
@@ -125,7 +125,7 @@ serve(async (req) => {
 
     // Add index title with proper centering
     indexPage.drawText('Tabla de Contenidos', {
-      x: 200,
+      x: 180,
       y: height - 25,
       size: titleFontSize,
       color: rgb(1, 1, 1, 1),
@@ -203,7 +203,7 @@ serve(async (req) => {
     const pdfBytes = await mergedPdf.save();
     
     const timestamp = new Date().toISOString().replace(/[^0-9]/g, '');
-    const fileName = `${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.pdf`;
+    const fileName = `Memoria Tecnica - Sonido -''${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.pdf`;
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
