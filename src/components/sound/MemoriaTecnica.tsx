@@ -187,138 +187,140 @@ export const MemoriaTecnica = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold mb-4">Memoria Técnica de Sonido</h2>
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="projectName">Nombre del Proyecto</Label>
-            <Input
-              id="projectName"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              placeholder="Ingrese el nombre del proyecto"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Logo (opcional)</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                id="logo-upload"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleLogoUpload(file);
-                }}
-              />
-              <Button
-                variant="outline"
-                asChild
-                className="w-full"
-              >
-                <label htmlFor="logo-upload" className="cursor-pointer flex items-center justify-center gap-2">
-                  {logo ? (
-                    <>
-                      <FileCheck className="h-4 w-4" />
-                      Logo cargado
-                    </>
-                  ) : (
-                    <>
-                      <ImageIcon className="h-4 w-4" />
-                      Subir logo
-                    </>
-                  )}
-                </label>
-              </Button>
-              {logo && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => window.open(logo.url, '_blank')}
-                >
-                  <ImageIcon className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          </div>
-
+    <div className="h-[calc(100vh-6rem)] overflow-y-auto">
+      <div className="max-w-3xl mx-auto p-6 space-y-6">
+        <div>
+          <h2 className="text-lg font-semibold mb-4">Memoria Técnica de Sonido</h2>
           <div className="space-y-4">
-            {documents.map((doc) => (
-              <div key={doc.id} className="space-y-2">
-                <Label>{doc.title}</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="file"
-                    accept=".pdf"
-                    className="hidden"
-                    id={`file-${doc.id}`}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFileUpload(file, doc.id);
-                    }}
-                  />
-                  <Button
-                    variant="outline"
-                    asChild
-                    className="w-full"
-                  >
-                    <label htmlFor={`file-${doc.id}`} className="cursor-pointer flex items-center justify-center gap-2">
-                      {doc.file ? (
-                        <>
-                          <FileCheck className="h-4 w-4" />
-                          Archivo cargado
-                        </>
-                      ) : (
-                        <>
-                          <FilePlus className="h-4 w-4" />
-                          Subir archivo
-                        </>
-                      )}
-                    </label>
-                  </Button>
-                  {doc.file && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => window.open(doc.file?.url, '_blank')}
-                    >
-                      <File className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {isGenerating && (
-            <div className="space-y-2">
-              <Progress value={progress} />
-              <p className="text-sm text-muted-foreground text-center">
-                Generando memoria técnica...
-              </p>
+            <div>
+              <Label htmlFor="projectName">Nombre del Proyecto</Label>
+              <Input
+                id="projectName"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder="Ingrese el nombre del proyecto"
+              />
             </div>
-          )}
 
-          <Button 
-            onClick={generateMemoriaTecnica} 
-            disabled={isGenerating}
-            className="w-full"
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Generando...
-              </>
-            ) : (
-              <>
-                <Upload className="h-4 w-4 mr-2" />
-                Generar Memoria Técnica
-              </>
+            <div className="space-y-2">
+              <Label>Logo (opcional)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  id="logo-upload"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleLogoUpload(file);
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  asChild
+                  className="w-full"
+                >
+                  <label htmlFor="logo-upload" className="cursor-pointer flex items-center justify-center gap-2">
+                    {logo ? (
+                      <>
+                        <FileCheck className="h-4 w-4" />
+                        Logo cargado
+                      </>
+                    ) : (
+                      <>
+                        <ImageIcon className="h-4 w-4" />
+                        Subir logo
+                      </>
+                    )}
+                  </label>
+                </Button>
+                {logo && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => window.open(logo.url, '_blank')}
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {documents.map((doc) => (
+                <div key={doc.id} className="space-y-2">
+                  <Label>{doc.title}</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="file"
+                      accept=".pdf"
+                      className="hidden"
+                      id={`file-${doc.id}`}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFileUpload(file, doc.id);
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      asChild
+                      className="w-full"
+                    >
+                      <label htmlFor={`file-${doc.id}`} className="cursor-pointer flex items-center justify-center gap-2">
+                        {doc.file ? (
+                          <>
+                            <FileCheck className="h-4 w-4" />
+                            Archivo cargado
+                          </>
+                        ) : (
+                          <>
+                            <FilePlus className="h-4 w-4" />
+                            Subir archivo
+                          </>
+                        )}
+                      </label>
+                    </Button>
+                    {doc.file && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => window.open(doc.file?.url, '_blank')}
+                      >
+                        <File className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {isGenerating && (
+              <div className="space-y-2">
+                <Progress value={progress} />
+                <p className="text-sm text-muted-foreground text-center">
+                  Generando memoria técnica...
+                </p>
+              </div>
             )}
-          </Button>
+
+            <Button 
+              onClick={generateMemoriaTecnica} 
+              disabled={isGenerating}
+              className="w-full"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Generando...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Generar Memoria Técnica
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
