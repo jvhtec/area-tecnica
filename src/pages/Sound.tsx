@@ -21,6 +21,7 @@ import { PdfAnalysis } from "@/components/sound/PdfAnalysis";
 import { AmplifierTool } from "@/components/sound/AmplifierTool";
 import { useNavigate } from "react-router-dom";
 import { MemoriaTecnica } from "@/components/sound/MemoriaTecnica";
+import { CompanyLogoUploader } from "@/components/CompanyLogoUploader";
 
 const Sound = () => {
   const navigate = useNavigate();
@@ -135,6 +136,14 @@ const Sound = () => {
         onCreateTour={() => setIsTourDialogOpen(true)}
         department="Sound"
       />
+
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-4">Company Logo Upload</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Upload the company logo that will be used in the Memoria Técnica PDFs.
+        </p>
+        <CompanyLogoUploader />
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-8">

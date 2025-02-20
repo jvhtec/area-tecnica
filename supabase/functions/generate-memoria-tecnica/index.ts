@@ -57,8 +57,10 @@ serve(async (req) => {
     // Add customer logo if provided
     if (logoUrl) {
       try {
-        console.log('Fetching logo from URL:', logoUrl);
+        console.log('Fetching customer logo from URL:', logoUrl);
         const logoResponse = await fetch(logoUrl);
+        if (!logoResponse.ok) throw new Error(`Failed to fetch logo: ${logoResponse.statusText}`);
+        
         const logoImageBytes = new Uint8Array(await logoResponse.arrayBuffer());
         const logoImage = await mergedPdf.embedJpg(logoImageBytes);
         
@@ -78,24 +80,33 @@ serve(async (req) => {
           height: scaledHeight,
         });
       } catch (error) {
-        console.error('Error processing logo:', error);
+        console.error('Error processing customer logo:', error);
       }
     }
 
     // Add Sector Pro logo at the bottom
-    const sectorProLogo = await PDFDocument.load(await fetch('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png').then(res => res.arrayBuffer()));
-    const [sectorProLogoPage] = sectorProLogo.getPages();
-    const { width: logoWidth, height: logoHeight } = sectorProLogoPage.getSize();
-    
-    const targetLogoHeight = 50;
-    const targetLogoWidth = (logoWidth / logoHeight) * targetLogoHeight;
-    
-    coverPage.drawImage(sectorProLogoPage, {
-      x: (width - targetLogoWidth) / 2,
-      y: 60,
-      width: targetLogoWidth,
-      height: targetLogoHeight,
-    });
+    try {
+      const sectorProLogoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/company-assets/sector-pro-logo.png`;
+      console.log('Fetching Sector Pro logo from:', sectorProLogoUrl);
+      
+      const logoResponse = await fetch(sectorProLogoUrl);
+      if (!logoResponse.ok) throw new Error(`Failed to fetch Sector Pro logo: ${logoResponse.statusText}`);
+      
+      const logoBytes = new Uint8Array(await logoResponse.arrayBuffer());
+      const sectorProLogo = await mergedPdf.embedPng(logoBytes);
+      
+      const targetLogoHeight = 50;
+      const targetLogoWidth = (sectorProLogo.width / sectorProLogo.height) * targetLogoHeight;
+      
+      coverPage.drawImage(sectorProLogo, {
+        x: (width - targetLogoWidth) / 2,
+        y: 60,
+        width: targetLogoWidth,
+        height: targetLogoHeight,
+      });
+    } catch (error) {
+      console.error('Error adding Sector Pro logo:', error);
+    }
 
     // Create index page
     const indexPage = mergedPdf.addPage([width, height]);
@@ -117,13 +128,27 @@ serve(async (req) => {
       color: rgb(1, 1, 1),
     });
 
-    // Add Sector Pro logo to index page
-    indexPage.drawImage(sectorProLogoPage, {
-      x: (width - targetLogoWidth) / 2,
-      y: 60,
-      width: targetLogoWidth,
-      height: targetLogoHeight,
-    });
+    // Try to add Sector Pro logo to index page
+    try {
+      const sectorProLogoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/company-assets/sector-pro-logo.png`;
+      const logoResponse = await fetch(sectorProLogoUrl);
+      if (!logoResponse.ok) throw new Error(`Failed to fetch Sector Pro logo for index: ${logoResponse.statusText}`);
+      
+      const logoBytes = new Uint8Array(await logoResponse.arrayBuffer());
+      const sectorProLogo = await mergedPdf.embedPng(logoBytes);
+      
+      const targetLogoHeight = 50;
+      const targetLogoWidth = (sectorProLogo.width / sectorProLogo.height) * targetLogoHeight;
+      
+      indexPage.drawImage(sectorProLogo, {
+        x: (width - targetLogoWidth) / 2,
+        y: 60,
+        width: targetLogoWidth,
+        height: targetLogoHeight,
+      });
+    } catch (error) {
+      console.error('Error adding Sector Pro logo to index:', error);
+    }
 
     // Define document titles and their mappings
     const titles = {
@@ -167,6 +192,8 @@ serve(async (req) => {
       try {
         console.log(`Fetching PDF from URL: ${url}`);
         const pdfResponse = await fetch(url);
+        if (!pdfResponse.ok) throw new Error(`Failed to fetch PDF: ${pdfResponse.statusText}`);
+        
         const pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
         const pdf = await PDFDocument.load(pdfBytes);
         
@@ -228,4 +255,3 @@ serve(async (req) => {
     );
   }
 });
-
