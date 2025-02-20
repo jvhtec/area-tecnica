@@ -126,8 +126,19 @@ export const MemoriaTecnica = () => {
       // Upload logo if available
       let logoUrl = null;
       if (logo) {
-        const logoPath = `${projectName}/logo_${Date.now()}.${logo.file.name.split('.').pop()}`;
-        logoUrl = await uploadToStorage(logo.file, logoPath);
+        try {
+          const logoPath = `${projectName}/logo_${Date.now()}.${logo.file.name.split('.').pop()}`;
+          logoUrl = await uploadToStorage(logo.file, logoPath);
+          setProgress(10);
+        } catch (error) {
+          console.error('Error uploading logo:', error);
+          toast({
+            title: "Error",
+            description: "Error al subir el logo",
+            variant: "destructive",
+          });
+          return;
+        }
       }
 
       // Upload documents and collect URLs
@@ -136,18 +147,35 @@ export const MemoriaTecnica = () => {
         const doc = availableDocuments[i];
         if (!doc.file) continue;
 
-        const path = `${projectName}/${doc.id}_${Date.now()}.pdf`;
-        const url = await uploadToStorage(doc.file.file, path);
-        documentUrls[doc.id] = url;
-        setProgress((i + 1) / availableDocuments.length * 50);
+        try {
+          const path = `${projectName}/${doc.id}_${Date.now()}.pdf`;
+          const url = await uploadToStorage(doc.file.file, path);
+          documentUrls[doc.id] = url;
+          setProgress((i + 1) / availableDocuments.length * 50);
+        } catch (error) {
+          console.error(`Error uploading document ${doc.id}:`, error);
+          toast({
+            title: "Error",
+            description: `Error al subir el documento ${doc.title}`,
+            variant: "destructive",
+          });
+          return;
+        }
       }
+
+      setProgress(60);
 
       // Generate merged PDF
       const response = await supabase.functions.invoke('generate-memoria-tecnica', {
         body: { documentUrls, projectName, logoUrl }
       });
 
-      if (response.error) throw response.error;
+      if (response.error) {
+        console.error('Error from edge function:', response.error);
+        throw new Error(response.error.message || 'Error al generar la memoria técnica');
+      }
+
+      setProgress(80);
 
       // Store document metadata in database
       const { error: dbError } = await supabase
@@ -163,7 +191,12 @@ export const MemoriaTecnica = () => {
           final_document_url: response.data.url
         });
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error('Database error:', dbError);
+        throw dbError;
+      }
+
+      setProgress(100);
 
       toast({
         title: "Éxito",
@@ -177,7 +210,7 @@ export const MemoriaTecnica = () => {
       console.error("Error generating memoria tecnica:", error);
       toast({
         title: "Error",
-        description: "Error al generar la memoria técnica",
+        description: error.message || "Error al generar la memoria técnica",
         variant: "destructive",
       });
     } finally {

@@ -1,2 +1,11 @@
 
-syldobdcdsgfgjtbuwxm
+[build]
+command = """
+deno task bundle
+"""
+
+[deploy]
+allowed_imports = ["https://deno.land/std/*", "https://esm.sh/*", "https://cdn.skypack.dev/*"]
+
+[env]
+SUPABASE_URL = "syldobdcdsgfgjtbuwxm"

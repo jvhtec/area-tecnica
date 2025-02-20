@@ -1,7 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-import { PDFDocument } from 'https://cdn.skypack.dev/pdf-lib@1.17.1'
+import * as pdfLib from 'https://cdn.skypack.dev/pdf-lib@1.17.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,13 +9,14 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
     const { documentUrls, projectName, logoUrl } = await req.json()
+    console.log('Received request:', { projectName, documentUrls, logoUrl })
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -23,32 +24,57 @@ serve(async (req) => {
     )
 
     // Create a new PDF document
-    const mergedPdf = await PDFDocument.create()
+    const mergedPdf = await pdfLib.PDFDocument.create()
+    console.log('Created new PDF document')
 
-    // Add cover page with logo if available
-    const coverPage = await generateCoverPage(projectName, logoUrl)
-    const [coverPagePage] = await mergedPdf.copyPages(coverPage, [0])
-    mergedPdf.addPage(coverPagePage)
+    // Add cover page
+    if (logoUrl) {
+      try {
+        const coverPage = await generateCoverPage(projectName, logoUrl)
+        const [coverPagePage] = await mergedPdf.copyPages(coverPage, [0])
+        mergedPdf.addPage(coverPagePage)
+        console.log('Added cover page with logo')
+      } catch (error) {
+        console.error('Error generating cover page:', error)
+      }
+    }
 
-    // Add index page
-    const indexPage = await generateIndexPage(documentUrls)
-    const [indexPagePage] = await mergedPdf.copyPages(indexPage, [0])
-    mergedPdf.addPage(indexPagePage)
+    // Add table of contents
+    try {
+      const tocPage = await generateTableOfContents(documentUrls)
+      const [tocPagePage] = await mergedPdf.copyPages(tocPage, [0])
+      mergedPdf.addPage(tocPagePage)
+      console.log('Added table of contents')
+    } catch (error) {
+      console.error('Error generating table of contents:', error)
+    }
 
     // Merge all documents
-    for (const url of Object.values(documentUrls)) {
+    for (const [key, url] of Object.entries(documentUrls)) {
       if (!url) continue
       
-      const response = await fetch(url)
-      const arrayBuffer = await response.arrayBuffer()
-      const pdf = await PDFDocument.load(arrayBuffer)
-      
-      const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices())
-      pages.forEach(page => mergedPdf.addPage(page))
+      try {
+        console.log(`Fetching document: ${key}`)
+        const response = await fetch(url)
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ${key}: ${response.statusText}`)
+        }
+        
+        const arrayBuffer = await response.arrayBuffer()
+        const pdf = await pdfLib.PDFDocument.load(arrayBuffer)
+        console.log(`Loaded PDF for ${key}`)
+        
+        const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices())
+        pages.forEach(page => mergedPdf.addPage(page))
+        console.log(`Added ${pages.length} pages from ${key}`)
+      } catch (error) {
+        console.error(`Error processing document ${key}:`, error)
+      }
     }
 
     // Save the merged PDF
     const mergedPdfBytes = await mergedPdf.save()
+    console.log('Saved merged PDF')
 
     // Upload to Supabase Storage
     const timestamp = new Date().getTime()
@@ -61,7 +87,12 @@ serve(async (req) => {
         upsert: false
       })
 
-    if (uploadError) throw uploadError
+    if (uploadError) {
+      console.error('Upload error:', uploadError)
+      throw uploadError
+    }
+
+    console.log('Uploaded PDF to storage')
 
     const { data: { publicUrl } } = supabase.storage
       .from('memoria-tecnica')
@@ -72,7 +103,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Error in edge function:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
@@ -80,18 +111,20 @@ serve(async (req) => {
   }
 })
 
-async function generateCoverPage(projectName: string, logoUrl: string | null) {
-  const pdfDoc = await PDFDocument.create()
+async function generateCoverPage(projectName: string, logoUrl: string) {
+  const pdfDoc = await pdfLib.PDFDocument.create()
   const page = pdfDoc.addPage()
   const { width, height } = page.getSize()
 
   // Add logo if available
-  if (logoUrl) {
+  try {
     const response = await fetch(logoUrl)
+    if (!response.ok) throw new Error(`Failed to fetch logo: ${response.statusText}`)
+    
     const imageBytes = await response.arrayBuffer()
     let image
     
-    if (logoUrl.endsWith('.png')) {
+    if (logoUrl.toLowerCase().endsWith('.png')) {
       image = await pdfDoc.embedPng(imageBytes)
     } else {
       image = await pdfDoc.embedJpg(imageBytes)
@@ -107,6 +140,8 @@ async function generateCoverPage(projectName: string, logoUrl: string | null) {
       width: scaledWidth,
       height: scaledHeight,
     })
+  } catch (error) {
+    console.error('Error adding logo to cover page:', error)
   }
 
   // Add title
@@ -126,8 +161,8 @@ async function generateCoverPage(projectName: string, logoUrl: string | null) {
   return pdfDoc
 }
 
-async function generateIndexPage(documentUrls: Record<string, string>) {
-  const pdfDoc = await PDFDocument.create()
+async function generateTableOfContents(documentUrls: Record<string, string>) {
+  const pdfDoc = await pdfLib.PDFDocument.create()
   const page = pdfDoc.addPage()
   const { height } = page.getSize()
 
