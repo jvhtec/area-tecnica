@@ -112,8 +112,9 @@ serve(async (req) => {
 
     const pdfBytes = await mergedPdf.save();
     
-    // Generate a safe filename
-    const baseFileName = `Memoria Tecnica - Sonido - ${projectName}.pdf`;
+    // Generate a safe filename with timestamp to avoid conflicts
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const baseFileName = `Memoria-Tecnica-Sonido-${projectName}-${timestamp}.pdf`;
     const safeFileName = baseFileName
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
@@ -129,8 +130,8 @@ serve(async (req) => {
       throw new Error('Missing Supabase configuration');
     }
 
-    // Use the correct storage path format with public bucket access
-    const uploadPath = `${supabaseUrl}/storage/v1/object/public/memoria-tecnica/${encodeURIComponent(safeFileName)}`;
+    // Use the correct upload URL format (without 'public' in the path)
+    const uploadPath = `${supabaseUrl}/storage/v1/object/memoria-tecnica/${encodeURIComponent(safeFileName)}`;
     console.log('Uploading to path:', uploadPath);
 
     const uploadResponse = await fetch(uploadPath, {
@@ -151,6 +152,8 @@ serve(async (req) => {
     }
 
     console.log('PDF uploaded successfully');
+    
+    // After successful upload, construct the public URL for downloading
     const publicUrl = `${supabaseUrl}/storage/v1/object/public/memoria-tecnica/${encodeURIComponent(safeFileName)}`;
     
     return new Response(
