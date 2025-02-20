@@ -62,7 +62,13 @@ serve(async (req) => {
         if (!logoResponse.ok) throw new Error(`Failed to fetch logo: ${logoResponse.statusText}`);
         
         const logoImageBytes = new Uint8Array(await logoResponse.arrayBuffer());
-        const logoImage = await mergedPdf.embedJpg(logoImageBytes);
+        let logoImage;
+        
+        if (logoUrl.toLowerCase().endsWith('.png')) {
+          logoImage = await mergedPdf.embedPng(logoImageBytes);
+        } else {
+          logoImage = await mergedPdf.embedJpg(logoImageBytes);
+        }
         
         const maxLogoHeight = 100;
         const maxLogoWidth = 200;
@@ -84,80 +90,6 @@ serve(async (req) => {
       }
     }
 
-    // Create index page
-    const indexPage = mergedPdf.addPage([width, height]);
-    
-    // Add corporate header to index
-    indexPage.drawRectangle({
-      x: 0,
-      y: height - headerHeight,
-      width: width,
-      height: headerHeight,
-      color: corporateColor,
-    });
-
-    // Add index title with proper centering
-    indexPage.drawText('Tabla de Contenidos', {
-      x: (width/2) - 20,
-      y: height - 25,
-      size: 24,
-      color: whiteColor,
-      align: 'center'
-    });
-
-    // Define document titles and their mappings
-    const titles = {
-      material: "Listado de Material",
-      soundvision: "Informe SoundVision",
-      weight: "Informe de Pesos",
-      power: "Informe de Consumos",
-      rigging: "Plano de Rigging"
-    };
-
-    // Add index items with proper spacing and alignment
-    let yOffset = height - 150;
-    const lineSpacing = 30;
-    const leftMargin = 50;
-
-    Object.entries(documentUrls).forEach(([key, _url]) => {
-      if (titles[key]) {
-        indexPage.drawText(`• ${titles[key]}`, {
-          x: leftMargin,
-          y: yOffset,
-          size: 12,
-          color: rgb(0, 0, 0),
-        });
-        yOffset -= lineSpacing;
-      }
-    });
-
-    // Add Sector Pro logo to both pages
-    try {
-      const sectorProLogoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/company-assets/sector-pro-logo.png`;
-      console.log('Fetching Sector Pro logo from:', sectorProLogoUrl);
-      
-      const logoResponse = await fetch(sectorProLogoUrl);
-      if (!logoResponse.ok) throw new Error(`Failed to fetch Sector Pro logo: ${logoResponse.statusText}`);
-      
-      const logoBytes = new Uint8Array(await logoResponse.arrayBuffer());
-      const sectorProLogo = await mergedPdf.embedPng(logoBytes);
-      
-      const targetLogoHeight = 20;
-      const targetLogoWidth = (sectorProLogo.width / sectorProLogo.height) * targetLogoHeight;
-      
-      // Add logo to both pages
-      [coverPage, indexPage].forEach(page => {
-        page.drawImage(sectorProLogo, {
-          x: (width - targetLogoWidth) / 2,
-          y: 40,
-          width: targetLogoWidth,
-          height: targetLogoHeight,
-        });
-      });
-    } catch (error) {
-      console.error('Error adding Sector Pro logo:', error);
-    }
-
     // Append all document PDFs
     for (const [key, url] of Object.entries(documentUrls)) {
       if (!url) continue;
@@ -174,20 +106,21 @@ serve(async (req) => {
         pages.forEach(page => mergedPdf.addPage(page));
       } catch (error) {
         console.error(`Error processing PDF for ${key}:`, error);
-        throw new Error(`Failed to process PDF for ${titles[key]}: ${error.message}`);
+        throw new Error(`Failed to process PDF: ${error.message}`);
       }
     }
 
     const pdfBytes = await mergedPdf.save();
     
     // Generate a safe filename
-    const baseFileName = `Memoria Técnica - Sonido - ${projectName}.pdf`;
+    const baseFileName = `Memoria Tecnica - Sonido - ${projectName}.pdf`;
     const safeFileName = baseFileName
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
-      .replace(/[^a-zA-Z0-9- .]/g, '_'); // Replace other special chars with underscore
+      .replace(/[^a-zA-Z0-9- .]/g, '_') // Replace other special chars with underscore
+      .trim();
     
-    console.log('Uploading PDF with filename:', safeFileName);
+    console.log('Generated safe filename:', safeFileName);
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -196,12 +129,16 @@ serve(async (req) => {
       throw new Error('Missing Supabase configuration');
     }
 
-    // Use proper storage path format with bucket name
-    const uploadResponse = await fetch(`${supabaseUrl}/storage/v1/object/memoria-tecnica/${safeFileName}`, {
+    // Use the correct storage path format with public bucket access
+    const uploadPath = `${supabaseUrl}/storage/v1/object/public/memoria-tecnica/${encodeURIComponent(safeFileName)}`;
+    console.log('Uploading to path:', uploadPath);
+
+    const uploadResponse = await fetch(uploadPath, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${supabaseKey}`,
         'Content-Type': 'application/pdf',
+        'Cache-Control': 'max-age=3600',
       },
       body: pdfBytes,
     });
@@ -210,11 +147,11 @@ serve(async (req) => {
       console.error('Upload failed with status:', uploadResponse.status);
       const errorText = await uploadResponse.text();
       console.error('Upload error details:', errorText);
-      throw new Error(`Failed to upload PDF: ${uploadResponse.statusText}`);
+      throw new Error(`Storage upload failed: ${uploadResponse.status} - ${errorText}`);
     }
 
     console.log('PDF uploaded successfully');
-    const publicUrl = `${supabaseUrl}/storage/v1/object/public/memoria-tecnica/${safeFileName}`;
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/memoria-tecnica/${encodeURIComponent(safeFileName)}`;
     
     return new Response(
       JSON.stringify({ url: publicUrl }),
@@ -231,7 +168,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: error.message,
-        details: error.stack 
+        details: error.stack,
       }),
       { 
         headers: { 
