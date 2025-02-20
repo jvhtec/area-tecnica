@@ -104,7 +104,8 @@ const DEPARTMENT_IDS = {
   lights: "d5af7892-d124-11e1-bba1-00e08175e43e",
   video: "a89d124d-7a95-4384-943e-49f5c0f46b23",
   production: "890811c3-fe3f-45d7-af6b-7ca4a807e84d",
-  personnel: "b972d682-598d-4802-a390-82e28dc4480e"
+  personnel: "b972d682-598d-4802-a390-82e28dc4480e",
+  comercial: "5251e421-41db-403e-88a6-1cfd6b68c46f"
 };
 
 const RESPONSIBLE_PERSON_IDS = {
@@ -112,7 +113,8 @@ const RESPONSIBLE_PERSON_IDS = {
   lights: "4b559e60-e700-11ea-97d0-2a0a4490a7fb",
   video: "bb9690ac-f22e-4bc4-94a2-6d341ca0138d",
   production: "4ce97ce3-5159-401a-9cf8-542d3e479ade",
-  personnel: "4b618540-e700-11ea-97d0-2a0a4490a7fb"
+  personnel: "4b618540-e700-11ea-97d0-2a0a4490a7fb",
+  comercial: "4bc2df20-e700-11ea-97d0-2a0a4490a7fb"
 };
 
 const DEPARTMENT_SUFFIXES = {
@@ -230,7 +232,7 @@ async function createAllFoldersForJob(
 
     console.log("Using tour folders:", tourData);
 
-    const departments = ["sound", "lights", "video", "production", "personnel"];
+    const departments = ["sound", "lights", "video", "production", "personnel","comercial"];
     const locationName = job.location?.name || "No Location";
     const formattedDate = format(new Date(job.start_time), "MMM d, yyyy");
 
@@ -425,7 +427,7 @@ await supabase
     folder_type: "main_event",
   });
 
-const departments = ["sound", "lights", "video", "production", "personnel"];
+const departments = ["sound", "lights", "video", "production", "personnel","comercial"];
 for (const dept of departments) {
   const deptPayload = {
     definitionId: FLEX_FOLDER_IDS.subFolder,
