@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { FileUpload, File, FilePlus, FileCheck, Loader2 } from "lucide-react";
+import { Upload, File, FilePlus, FileCheck, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { Progress } from "@/components/ui/progress";
@@ -221,7 +221,7 @@ export const MemoriaTecnica = () => {
               </>
             ) : (
               <>
-                <FileUpload className="h-4 w-4 mr-2" />
+                <Upload className="h-4 w-4 mr-2" />
                 Generar Memoria Técnica
               </>
             )}
