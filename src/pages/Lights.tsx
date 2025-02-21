@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
@@ -10,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
-import { Scale, Zap, Calendar } from "lucide-react";
+import { Scale, Zap, Calendar, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
@@ -166,6 +167,14 @@ const Lights = () => {
         >
           <Zap className="h-4 w-4" />
           Calculadora de Potencia
+        </Button>
+        <Button 
+          variant="outline" 
+          onClick={() => navigate('/lights-memoria-tecnica')}
+          className="flex items-center gap-2"
+        >
+          <FileText className="h-4 w-4" />
+          Memoria Técnica
         </Button>
       </div>
 
