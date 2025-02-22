@@ -8,6 +8,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -17,10 +18,15 @@ serve(async (req) => {
     
     console.log('Starting PDF generation with inputs:', { projectName, logoUrl, documentUrls });
 
+    // Create merged PDF
     const mergedPdf = await PDFDocument.create();
+    
+    // Standard page dimensions
     const width = 595;
     const height = 842;
     const headerHeight = 35;
+    
+    // Corporate color (matches the existing brand)
     const corporateColor = rgb(125/255, 1/255, 1/255);
     
     // Create cover page
@@ -35,26 +41,22 @@ serve(async (req) => {
       color: corporateColor,
     });
 
-    // Add title in white on header - centered
-    const titleFontSize = 24;
+    // Add title
     coverPage.drawText('Memoria Tecnica - Iluminación', {
       x: 160,
       y: height - 25,
-      size: titleFontSize,
-      color: rgb(1, 1, 1, 1),
+      size: 24,
+      color: rgb(1, 1, 1),
       maxWidth: width - 40,
-      align: 'center'
     });
 
-    // Add centered project name
-    const projectNameSize = 24;
+    // Add project name
     coverPage.drawText(projectName.toUpperCase(), {
-      x: (width /2) - 30,
-      y: height / 2 + projectNameSize / 2,
-      size: projectNameSize,
+      x: (width / 2) - 30,
+      y: height / 2 + 12,
+      size: 24,
       color: rgb(0, 0, 0),
       maxWidth: width - 40,
-      align: 'center'
     });
 
     // Add customer logo if provided
@@ -62,7 +64,9 @@ serve(async (req) => {
       try {
         console.log('Fetching customer logo from URL:', logoUrl);
         const logoResponse = await fetch(logoUrl);
-        if (!logoResponse.ok) throw new Error(`Failed to fetch logo: ${logoResponse.statusText}`);
+        if (!logoResponse.ok) {
+          throw new Error(`Failed to fetch logo: ${logoResponse.statusText}`);
+        }
         
         const logoImageBytes = new Uint8Array(await logoResponse.arrayBuffer());
         const logoImage = await mergedPdf.embedJpg(logoImageBytes);
@@ -93,19 +97,21 @@ serve(async (req) => {
       console.log('Fetching Sector Pro logo from:', sectorProLogoUrl);
       
       const logoResponse = await fetch(sectorProLogoUrl);
-      if (!logoResponse.ok) throw new Error(`Failed to fetch Sector Pro logo: ${logoResponse.statusText}`);
+      if (!logoResponse.ok) {
+        throw new Error(`Failed to fetch Sector Pro logo: ${logoResponse.statusText}`);
+      }
       
       const logoBytes = new Uint8Array(await logoResponse.arrayBuffer());
       const sectorProLogo = await mergedPdf.embedPng(logoBytes);
       
-      const targetLogoHeight = 20;
-      const targetLogoWidth = (sectorProLogo.width / sectorProLogo.height) * targetLogoHeight;
+      const targetHeight = 20;
+      const targetWidth = (sectorProLogo.width / sectorProLogo.height) * targetHeight;
       
       coverPage.drawImage(sectorProLogo, {
-        x: (width - targetLogoWidth) / 2,
+        x: (width - targetWidth) / 2,
         y: 40,
-        width: targetLogoWidth,
-        height: targetLogoHeight,
+        width: targetWidth,
+        height: targetHeight,
       });
     } catch (error) {
       console.error('Error adding Sector Pro logo:', error);
@@ -118,7 +124,9 @@ serve(async (req) => {
       try {
         console.log(`Fetching PDF from URL: ${url}`);
         const pdfResponse = await fetch(url);
-        if (!pdfResponse.ok) throw new Error(`Failed to fetch PDF: ${pdfResponse.statusText}`);
+        if (!pdfResponse.ok) {
+          throw new Error(`Failed to fetch PDF: ${pdfResponse.statusText}`);
+        }
         
         const pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
         const pdf = await PDFDocument.load(pdfBytes);
@@ -132,30 +140,40 @@ serve(async (req) => {
 
     const pdfBytes = await mergedPdf.save();
     
+    // Create a safe filename
     const timestamp = new Date().toISOString().replace(/[^0-9]/g, '');
-    const fileName = `Memoria Tecnica - Iluminación -${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.pdf`;
+    const safeFileName = `memoria_tecnica_${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.pdf`;
     
+    // Get Supabase configuration
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    if (!supabaseUrl || !supabaseKey) {
+    if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Missing Supabase configuration');
     }
 
-    const uploadResponse = await fetch(`${supabaseUrl}/storage/v1/object/lights-memoria-tecnica/${fileName}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${supabaseKey}`,
-        'Content-Type': 'application/pdf',
-      },
-      body: pdfBytes,
-    });
+    // Upload to Supabase Storage
+    const uploadResponse = await fetch(
+      `${supabaseUrl}/storage/v1/object/lights-memoria-tecnica/${encodeURIComponent(safeFileName)}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/pdf',
+        },
+        body: pdfBytes,
+      }
+    );
 
     if (!uploadResponse.ok) {
-      throw new Error('Failed to upload merged PDF');
+      console.error('Upload failed with status:', uploadResponse.status);
+      const errorText = await uploadResponse.text();
+      console.error('Upload error details:', errorText);
+      throw new Error(`Storage upload failed: ${uploadResponse.status} - ${errorText}`);
     }
 
-    const publicUrl = `${supabaseUrl}/storage/v1/object/public/lights-memoria-tecnica/${fileName}`;
+    // Get the public URL
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/lights-memoria-tecnica/${encodeURIComponent(safeFileName)}`;
     
     return new Response(
       JSON.stringify({ url: publicUrl }),
