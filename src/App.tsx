@@ -28,6 +28,7 @@ import FestivalManagement from '@/pages/FestivalManagement';
 import FestivalArtistManagement from '@/pages/FestivalArtistManagement';
 import LightsDisponibilidad from '@/pages/LightsDisponibilidad';
 import LightsMemoriaTecnica from '@/pages/LightsMemoriaTecnica';
+import VideoMemoriaTecnica from '@/pages/VideoMemoriaTecnica';
 import { EquipmentManagement } from '@/pages/EquipmentManagement';
 import { ArtistRequirementsForm } from '@/components/festival/ArtistRequirementsForm';
 import { FormSubmitted } from '@/components/festival/FormSubmitted';
@@ -64,6 +65,7 @@ function App() {
               <Route path="lights-consumos-tool" element={<LightsConsumosTool />} />
               <Route path="video-consumos-tool" element={<VideoConsumosTool />} />
               <Route path="lights-memoria-tecnica" element={<LightsMemoriaTecnica />} />
+              <Route path="video-memoria-tecnica" element={<VideoMemoriaTecnica />} />
               <Route path="excel-tool" element={<ExcelTool />} />
               <Route path="hoja-de-ruta" element={<HojaDeRuta />} />
               <Route path="labor-po-form" element={<LaborPOForm />} />
