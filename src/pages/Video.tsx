@@ -169,7 +169,15 @@ const Video = () => {
             Power Calculator
           </Button>
         </Link>
+<Link to="/video-memoria-tecnica">
+  <Button variant="outline" className="gap-2">
+    <File className="h-4 w-4" />
+    Memoria Técnica
+  </Button>
+</Link>
+
       </div>
+
 
       <CreateJobDialog
         open={isJobDialogOpen}
