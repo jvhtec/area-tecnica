@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -30,7 +29,6 @@ export const LightMemoriaTecnica = () => {
   
   const [documents, setDocuments] = useState<DocumentSection[]>([
     { id: "material", title: "Listado de Material", file: null, landscape: false },
-    { id: "soundvision", title: "Informe L8", file: null, landscape: false },
     { id: "weight", title: "Informe de Pesos", file: null, landscape: false },
     { id: "power", title: "Informe de Consumos", file: null, landscape: false },
     { id: "rigging", title: "Plano de Rigging", file: null, landscape: true }
@@ -180,7 +178,6 @@ export const LightMemoriaTecnica = () => {
           project_name: projectName,
           logo_url: logoUrl,
           material_list_url: documentUrls.material,
-          soundvision_report_url: documentUrls.soundvision,
           weight_report_url: documentUrls.weight,
           power_report_url: documentUrls.power,
           rigging_plot_url: documentUrls.rigging,

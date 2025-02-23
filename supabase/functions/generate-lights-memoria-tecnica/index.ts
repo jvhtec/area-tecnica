@@ -117,8 +117,45 @@ serve(async (req) => {
       console.error('Error adding Sector Pro logo:', error);
     }
 
-    // Append all document PDFs
-    for (const [key, url] of Object.entries(documentUrls)) {
+    // Create table of contents page
+    const tocPage = mergedPdf.addPage([width, height]);
+    
+    // Add "Tabla de Contenidos" title
+    tocPage.drawText('Tabla de Contenidos', {
+      x: 50,
+      y: height - 100,
+      size: 24,
+      color: rgb(0, 0, 0),
+    });
+
+    // Define the documents order and titles
+    const documentOrder = [
+      { id: 'material', title: 'Listado de Material' },
+      { id: 'weight', title: 'Informe de Pesos' },
+      { id: 'power', title: 'Informe de Consumos' },
+      { id: 'rigging', title: 'Plano de Rigging' },
+    ];
+
+    // Add table of contents entries
+    let entryY = height - 150;
+    let entryNumber = 1;
+
+    documentOrder.forEach(doc => {
+      if (documentUrls[doc.id]) {
+        tocPage.drawText(`${entryNumber}. ${doc.title}`, {
+          x: 50,
+          y: entryY,
+          size: 14,
+          color: rgb(0, 0, 0),
+        });
+        entryY -= 30;
+        entryNumber++;
+      }
+    });
+
+    // Append all document PDFs in order
+    for (const doc of documentOrder) {
+      const url = documentUrls[doc.id];
       if (!url) continue;
 
       try {
@@ -134,7 +171,7 @@ serve(async (req) => {
         const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
         pages.forEach(page => mergedPdf.addPage(page));
       } catch (error) {
-        console.error(`Error processing PDF for ${key}:`, error);
+        console.error(`Error processing PDF for ${doc.id}:`, error);
       }
     }
 
