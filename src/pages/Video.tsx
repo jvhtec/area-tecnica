@@ -13,7 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { Link } from "react-router-dom";
-import { Scale, Zap } from "lucide-react";
+import { Scale, Zap, File } from "lucide-react";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 
