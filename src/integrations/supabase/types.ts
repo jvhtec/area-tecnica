@@ -2585,6 +2585,56 @@ export type Database = {
           },
         ]
       }
+      video_memoria_tecnica_documents: {
+        Row: {
+          created_at: string | null
+          final_document_url: string | null
+          id: string
+          job_id: string | null
+          logo_url: string | null
+          material_list_url: string | null
+          pixel_map_url: string | null
+          power_report_url: string | null
+          project_name: string
+          updated_at: string | null
+          weight_report_url: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          final_document_url?: string | null
+          id?: string
+          job_id?: string | null
+          logo_url?: string | null
+          material_list_url?: string | null
+          pixel_map_url?: string | null
+          power_report_url?: string | null
+          project_name: string
+          updated_at?: string | null
+          weight_report_url?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          final_document_url?: string | null
+          id?: string
+          job_id?: string | null
+          logo_url?: string | null
+          material_list_url?: string | null
+          pixel_map_url?: string | null
+          power_report_url?: string | null
+          project_name?: string
+          updated_at?: string | null
+          weight_report_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_memoria_tecnica_documents_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       current_stock_levels: {
