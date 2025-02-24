@@ -32,6 +32,7 @@ export const useHojaDeRutaForm = () => {
       transport: "",
       loadingDetails: "",
       unloadingDetails: "",
+      equipmentLogistics: "", // Add the new field
     },
     staff: [{ name: "", surname1: "", surname2: "", position: "" }],
     schedule: "",

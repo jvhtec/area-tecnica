@@ -28,6 +28,25 @@ export const ProgramDetailsSection = ({
       </div>
 
       <div>
+        <Label htmlFor="equipmentLogistics">Logística de Equipos</Label>
+        <Textarea
+          id="equipmentLogistics"
+          value={eventData.logistics.equipmentLogistics}
+          onChange={(e) =>
+            setEventData({
+              ...eventData,
+              logistics: {
+                ...eventData.logistics,
+                equipmentLogistics: e.target.value,
+              },
+            })
+          }
+          className="min-h-[150px]"
+          placeholder="Detalles sobre la logística de equipos..."
+        />
+      </div>
+
+      <div>
         <Label htmlFor="powerRequirements">Requisitos Eléctricos</Label>
         <Textarea
           id="powerRequirements"

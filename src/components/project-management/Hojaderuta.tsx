@@ -24,7 +24,7 @@ import { RoomAssignmentsDialog } from "@/components/hoja-de-ruta/dialogs/RoomAss
 import { generatePDF } from "@/utils/hoja-de-ruta/pdf-generator";
 import { uploadPdfToJob } from "@/utils/hoja-de-ruta/pdf-upload";
 import { useToast } from "@/hooks/use-toast";
-import { Save } from "lucide-react";
+import { Save, FileText, Loader2 } from "lucide-react";
 
 const HojaDeRutaGenerator = () => {
   const {
@@ -260,20 +260,28 @@ const HojaDeRutaGenerator = () => {
               className="w-full"
               onClick={generateDocument}
             >
+              <FileText className="w-4 h-4 mr-2" />
               Generar Hoja de Ruta
             </Button>
             
-            {isDirty && (
-              <Button
-                variant="secondary"
-                onClick={handleSave}
-                disabled={isSaving || !isDirty}
-                className="min-w-[200px]"
-              >
-                <Save className="w-4 h-4 mr-2" />
-                {isSaving ? "Guardando..." : "Guardar Cambios"}
-              </Button>
-            )}
+            <Button
+              variant="secondary"
+              onClick={handleSave}
+              disabled={isSaving || !isDirty}
+              className="min-w-[200px]"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Guardar Cambios
+                </>
+              )}
+            </Button>
           </div>
         </CardContent>
       </ScrollArea>
