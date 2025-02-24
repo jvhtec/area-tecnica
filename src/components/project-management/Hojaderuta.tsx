@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import {
   Card,
@@ -75,7 +74,7 @@ const HojaDeRutaGenerator = () => {
   );
 
   const { toast } = useToast();
-  const [isDirty, setIsDirty] = useState(false);
+  const [isDirty, setIsDirty] = useState(true);
 
   // Add persistence hook
   const {
@@ -123,7 +122,7 @@ const HojaDeRutaGenerator = () => {
   const handleSave = async () => {
     try {
       await saveHojaDeRuta(eventData);
-      
+
       if (hojaDeRuta?.id) {
         await Promise.all([
           saveTravelArrangements({
@@ -136,7 +135,7 @@ const HojaDeRutaGenerator = () => {
           })
         ]);
       }
-      
+
       setIsDirty(false);
     } catch (error) {
       console.error('Error saving data:', error);
@@ -155,7 +154,7 @@ const HojaDeRutaGenerator = () => {
         jobs?.find(job => job.id === selectedJobId)?.title || "",
         uploadPdfToJob
       );
-      
+
       toast({
         title: "PDF generado con éxito",
         description: "El documento se ha generado y guardado correctamente.",
@@ -195,7 +194,7 @@ const HojaDeRutaGenerator = () => {
             </Alert>
           )}
 
-          <EventDetailsSection 
+          <EventDetailsSection
             selectedJobId={selectedJobId}
             setSelectedJobId={setSelectedJobId}
             eventData={eventData}
@@ -249,20 +248,20 @@ const HojaDeRutaGenerator = () => {
             removeRoomAssignment={removeRoomAssignment}
           />
 
-          <ProgramDetailsSection 
+          <ProgramDetailsSection
             eventData={eventData}
             setEventData={setEventData}
           />
 
           <div className="sticky bottom-0 bg-background p-4 border-t flex justify-between items-center gap-4">
-            <Button 
-              variant="default" 
+            <Button
+              variant="default"
               className="w-full"
               onClick={generateDocument}
             >
               Generar Hoja de Ruta
             </Button>
-            
+
             {isDirty && (
               <Button
                 variant="secondary"
