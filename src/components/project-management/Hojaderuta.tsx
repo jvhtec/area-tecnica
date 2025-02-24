@@ -86,7 +86,6 @@ const HojaDeRutaGenerator = () => {
     saveRoomAssignments,
   } = useHojaDeRutaPersistence(selectedJobId);
 
-  const [isDirty, setIsDirty] = useState(false);
 
   // Update isDirty when any data changes
   useEffect(() => {
