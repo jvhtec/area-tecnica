@@ -30,6 +30,7 @@ export interface EventData {
     transport: string;
     loadingDetails: string;
     unloadingDetails: string;
+    equipmentLogistics: string; // New field
   };
   staff: { name: string; surname1: string; surname2: string; position: string }[];
   schedule: string;
