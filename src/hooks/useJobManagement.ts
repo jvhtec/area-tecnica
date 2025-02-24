@@ -1,9 +1,10 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Department } from "@/types/department";
 import { JobDocument } from "@/types/job";
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 
 export const useJobManagement = (
   selectedDepartment: Department,
@@ -12,12 +13,9 @@ export const useJobManagement = (
   isProjectManagementPage = false
 ) => {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const fetchJobs = useCallback(async () => {
     console.log("useJobManagement: Fetching jobs for department:", selectedDepartment);
-    console.log("useJobManagement: Start date:", startDate.toISOString());
-    console.log("useJobManagement: End date:", endDate.toISOString());
     const { data, error } = await supabase
       .from("jobs")
       .select(`
@@ -76,28 +74,11 @@ export const useJobManagement = (
   }, [selectedDepartment, startDate, endDate, isProjectManagementPage]);
 
   const { data: jobs, isLoading: jobsLoading } = useQuery({
-    queryKey: ["jobs", selectedDepartment, startDate.toISOString(), endDate.toISOString()],
+    queryKey: ["jobs", selectedDepartment, startDate, endDate],
     queryFn: fetchJobs,
-    staleTime: 1000 * 60 * 5, // Increase staleTime to 5 minutes
+    staleTime: 1000 * 30,
     refetchOnWindowFocus: true
   });
-
-  useEffect(() => {
-    const subscription = supabase
-      .channel('public:jobs')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'jobs' },
-        (payload) => {
-          queryClient.invalidateQueries({ queryKey: ['jobs', selectedDepartment, startDate.toISOString(), endDate.toISOString()] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(subscription);
-    };
-  }, [selectedDepartment, startDate, endDate, queryClient]);
 
   const handleDeleteDocument = async (jobId: string, document: JobDocument) => {
     try {
