@@ -16,7 +16,7 @@ import { Scale, Zap, File } from "lucide-react";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 
-const Production = () => {
+const Operaciones = () => {
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
   const [isTourDialogOpen, setIsTourDialogOpen] = useState(false);
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
@@ -63,7 +63,8 @@ const Production = () => {
     fetchUserRole();
   }, []);
 
-  const getAllJobs = () => {
+  // Add the missing getDepartmentJobs function
+  const getDepartmentJobs = () => {
     if (!jobs) {
       console.log("Video page: No jobs data available");
       return [];
@@ -168,15 +169,13 @@ const Production = () => {
             Power Calculator
           </Button>
         </Link>
-<Link to="/memoria-tecnica-total">
-  <Button variant="outline" className="gap-2">
-    <File className="h-4 w-4" />
-    Memoria Técnica
-  </Button>
-</Link>
-
+        <Link to="/memoria-tecnica-total">
+          <Button variant="outline" className="gap-2">
+            <File className="h-4 w-4" />
+            Memoria Técnica
+          </Button>
+        </Link>
       </div>
-
 
       <CreateJobDialog
         open={isJobDialogOpen}
@@ -201,4 +200,4 @@ const Production = () => {
   );
 };
 
-export default Operations;
+export default Operaciones;
