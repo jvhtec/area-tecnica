@@ -34,11 +34,15 @@ const ProjectManagement = () => {
     true
   );
 
+  console.log("ProjectManagement: Jobs fetched:", unfilteredJobs);
+
   // Filter jobs by selected job type using a case-insensitive comparison.
   const jobs = (unfilteredJobs || []).filter((job: any) => {
     if (selectedJobType === "All") return true;
     return job.job_type?.toLowerCase() === selectedJobType.toLowerCase();
   });
+
+  console.log("ProjectManagement: Filtered jobs:", jobs);
 
   // Check user access and fetch profile role.
   useEffect(() => {
@@ -86,6 +90,7 @@ const ProjectManagement = () => {
           console.error("Error fetching job types:", error);
           return;
         }
+
         const types = Array.from(
           new Set((data || [])
             .map((job: any) => job.job_type)
@@ -129,16 +134,16 @@ const ProjectManagement = () => {
                 ))}
               </select>
             </div>
-            <Button 
-              onClick={() => navigate("/hoja-de-ruta")} 
+            <Button
+              onClick={() => navigate("/hoja-de-ruta")}
               className="flex items-center gap-2"
               variant="outline"
             >
               <FileText className="h-4 w-4" />
               Hoja de Ruta
             </Button>
-            <Button 
-              onClick={() => navigate("/labor-po-form")} 
+            <Button
+              onClick={() => navigate("/labor-po-form")}
               className="flex items-center gap-2"
             >
               <Plus className="h-4 w-4" />

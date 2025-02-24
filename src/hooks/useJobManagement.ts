@@ -1,4 +1,3 @@
-
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +16,8 @@ export const useJobManagement = (
 
   const fetchJobs = useCallback(async () => {
     console.log("useJobManagement: Fetching jobs for department:", selectedDepartment);
+    console.log("useJobManagement: Start date:", startDate.toISOString());
+    console.log("useJobManagement: End date:", endDate.toISOString());
     const { data, error } = await supabase
       .from("jobs")
       .select(`
