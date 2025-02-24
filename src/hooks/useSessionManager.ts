@@ -11,13 +11,15 @@ export const useSessionManager = () => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  
+  const [idleTime, setIdleTime] = useState(0);
+
   const { refreshSession } = useSessionRefresh();
   const { fetchUserProfile } = useProfileData();
 
   const handleSessionUpdate = useCallback(async (currentSession: any) => {
+    setIdleTime(0); // Reset idle time on session update
     console.log("Session update handler called with session:", !!currentSession);
-    
+
     if (!currentSession?.user?.id) {
       console.log("No valid session or user ID, clearing user data");
       setSession(null);
@@ -30,10 +32,10 @@ export const useSessionManager = () => {
 
     console.log("Session found, updating user data for ID:", currentSession.user.id);
     setSession(currentSession);
-    
+
     try {
       const profileData = await fetchUserProfile(currentSession.user.id);
-      
+
       if (profileData) {
         setUserRole(profileData.role);
         setUserDepartment(profileData.department);
@@ -50,6 +52,21 @@ export const useSessionManager = () => {
       setIsLoading(false);
     }
   }, [fetchUserProfile, navigate]);
+
+  useEffect(() => {
+    const idleInterval = setInterval(() => {
+      setIdleTime((prevIdleTime) => prevIdleTime + 1);
+    }, 60000); // Increment idle time every minute
+
+    return () => clearInterval(idleInterval);
+  }, []);
+
+  useEffect(() => {
+    if (idleTime >= 15) { // 15 minutes of idle time
+      refreshSession();
+      setIdleTime(0); // Reset idle time after refresh
+    }
+  }, [idleTime, refreshSession]);
 
   useEffect(() => {
     let mounted = true;
@@ -85,7 +102,7 @@ export const useSessionManager = () => {
     };
 
     setupSession();
-    
+
     return () => {
       mounted = false;
     };
