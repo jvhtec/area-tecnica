@@ -74,10 +74,6 @@ const HojaDeRutaGenerator = () => {
     setRoomAssignments
   );
 
-  const { toast } = useToast();
-  const [isDirty, setIsDirty] = useState(false);
-
-  // Add persistence hook
   const {
     hojaDeRuta,
     isLoading: isLoadingHojaDeRuta,
@@ -85,42 +81,43 @@ const HojaDeRutaGenerator = () => {
     isSaving,
     saveTravelArrangements,
     saveRoomAssignments,
-    saveVenueImages
   } = useHojaDeRutaPersistence(selectedJobId);
 
-  // Set initial data when hojaDeRuta is loaded
+  const [isDirty, setIsDirty] = useState(false);
+
+  // Update isDirty when any data changes
   useEffect(() => {
     if (hojaDeRuta) {
-      setEventData({
-        eventName: hojaDeRuta.event_name || "",
-        eventDates: hojaDeRuta.event_dates || "",
+      const isDataDifferent = JSON.stringify(eventData) !== JSON.stringify({
+        eventName: hojaDeRuta.event_name,
+        eventDates: hojaDeRuta.event_dates,
         venue: {
-          name: hojaDeRuta.venue_name || "",
-          address: hojaDeRuta.venue_address || "",
+          name: hojaDeRuta.venue_name,
+          address: hojaDeRuta.venue_address,
         },
-        contacts: hojaDeRuta.contacts || [{ name: "", role: "", phone: "" }],
+        contacts: hojaDeRuta.contacts || [],
         logistics: hojaDeRuta.logistics || {
           transport: "",
           loadingDetails: "",
           unloadingDetails: "",
+          equipmentLogistics: "",
         },
-        staff: hojaDeRuta.staff || [{ name: "", surname1: "", surname2: "", position: "" }],
+        staff: hojaDeRuta.staff || [],
         schedule: hojaDeRuta.schedule || "",
         powerRequirements: hojaDeRuta.power_requirements || "",
         auxiliaryNeeds: hojaDeRuta.auxiliary_needs || "",
       });
-      setIsDirty(false);
-    }
-  }, [hojaDeRuta, setEventData]);
 
-  // Mark form as dirty when data changes
-  useEffect(() => {
-    if (hojaDeRuta) {
-      setIsDirty(true);
+      const areTravelArrangementsDifferent = JSON.stringify(travelArrangements) !== JSON.stringify(hojaDeRuta.travel || []);
+      const areRoomAssignmentsDifferent = JSON.stringify(roomAssignments) !== JSON.stringify(hojaDeRuta.rooms || []);
+
+      setIsDirty(isDataDifferent || areTravelArrangementsDifferent || areRoomAssignmentsDifferent);
     }
-  }, [eventData, travelArrangements, roomAssignments]);
+  }, [eventData, travelArrangements, roomAssignments, hojaDeRuta]);
 
   const handleSave = async () => {
+    if (!selectedJobId) return;
+
     try {
       await saveHojaDeRuta(eventData);
       
@@ -128,15 +125,14 @@ const HojaDeRutaGenerator = () => {
         await Promise.all([
           saveTravelArrangements({
             hojaDeRutaId: hojaDeRuta.id,
-            arrangements: travelArrangements
+            arrangements: travelArrangements,
           }),
           saveRoomAssignments({
             hojaDeRutaId: hojaDeRuta.id,
-            assignments: roomAssignments
+            assignments: roomAssignments,
           })
         ]);
       }
-      
       setIsDirty(false);
     } catch (error) {
       console.error('Error saving data:', error);
@@ -155,18 +151,8 @@ const HojaDeRutaGenerator = () => {
         jobs?.find(job => job.id === selectedJobId)?.title || "",
         uploadPdfToJob
       );
-      
-      toast({
-        title: "PDF generado con éxito",
-        description: "El documento se ha generado y guardado correctamente.",
-      });
     } catch (error) {
       console.error("Error generating PDF:", error);
-      toast({
-        title: "Error",
-        description: "Hubo un error al generar el PDF. Por favor, inténtelo de nuevo.",
-        variant: "destructive",
-      });
     }
   };
 
