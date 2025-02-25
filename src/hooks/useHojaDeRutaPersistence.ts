@@ -15,6 +15,8 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
     queryFn: async () => {
       if (!jobId) return null;
 
+      console.log("Fetching hoja de ruta data for job:", jobId);
+
       // Get the most recent hoja de ruta entry for this job
       const { data: mainData, error: mainError } = await supabase
         .from('hoja_de_ruta')
@@ -31,6 +33,8 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
 
       // If no data exists, return null
       if (!mainData) return null;
+
+      console.log("Found main hoja de ruta data:", mainData);
 
       // Fetch all related data
       const [
@@ -49,6 +53,15 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
         supabase.from('hoja_de_ruta_images').select('*').eq('hoja_de_ruta_id', mainData.id)
       ]);
 
+      console.log("Fetched related data:", {
+        contacts,
+        staff,
+        logistics,
+        travel,
+        rooms,
+        images
+      });
+
       return {
         ...mainData,
         contacts: contacts || [],
@@ -65,72 +78,89 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
   // Create or update hoja de ruta
   const { mutateAsync: saveHojaDeRuta, isPending: isSaving } = useMutation({
     mutationFn: async (data: EventData) => {
+      console.log("Starting save operation with data:", data);
+      
       if (!jobId) throw new Error('No job ID provided');
 
-      // First, upsert the main hoja_de_ruta record
-      const { data: mainRecord, error: mainError } = await supabase
-        .from('hoja_de_ruta')
-        .upsert({
-          job_id: jobId,
-          event_name: data.eventName,
-          event_dates: data.eventDates,
-          venue_name: data.venue.name,
-          venue_address: data.venue.address,
-          schedule: data.schedule,
-          power_requirements: data.powerRequirements,
-          auxiliary_needs: data.auxiliaryNeeds
-        })
-        .select()
-        .single();
+      try {
+        // First, upsert the main hoja_de_ruta record
+        const { data: mainRecord, error: mainError } = await supabase
+          .from('hoja_de_ruta')
+          .upsert({
+            job_id: jobId,
+            event_name: data.eventName,
+            event_dates: data.eventDates,
+            venue_name: data.venue.name,
+            venue_address: data.venue.address,
+            schedule: data.schedule,
+            power_requirements: data.powerRequirements,
+            auxiliary_needs: data.auxiliaryNeeds
+          })
+          .select()
+          .single();
 
-      if (mainError) throw mainError;
+        if (mainError) throw mainError;
 
-      // Update logistics
-      await supabase
-        .from('hoja_de_ruta_logistics')
-        .upsert({
-          hoja_de_ruta_id: mainRecord.id,
-          transport: data.logistics.transport,
-          loading_details: data.logistics.loadingDetails,
-          unloading_details: data.logistics.unloadingDetails
-        });
+        console.log("Saved main record:", mainRecord);
 
-      // Update contacts (delete and insert new ones)
-      if (data.contacts.length > 0) {
-        await supabase
-          .from('hoja_de_ruta_contacts')
-          .delete()
-          .eq('hoja_de_ruta_id', mainRecord.id);
-
-        await supabase
-          .from('hoja_de_ruta_contacts')
-          .insert(data.contacts.map(contact => ({
+        // Update logistics with all fields including equipment_logistics
+        const { error: logisticsError } = await supabase
+          .from('hoja_de_ruta_logistics')
+          .upsert({
             hoja_de_ruta_id: mainRecord.id,
-            name: contact.name,
-            role: contact.role,
-            phone: contact.phone
-          })));
+            transport: data.logistics.transport,
+            loading_details: data.logistics.loadingDetails,
+            unloading_details: data.logistics.unloadingDetails,
+            equipment_logistics: data.logistics.equipmentLogistics
+          });
+
+        if (logisticsError) throw logisticsError;
+
+        // Update contacts
+        if (data.contacts.length > 0) {
+          await supabase
+            .from('hoja_de_ruta_contacts')
+            .delete()
+            .eq('hoja_de_ruta_id', mainRecord.id);
+
+          const { error: contactsError } = await supabase
+            .from('hoja_de_ruta_contacts')
+            .insert(data.contacts.map(contact => ({
+              hoja_de_ruta_id: mainRecord.id,
+              name: contact.name,
+              role: contact.role,
+              phone: contact.phone
+            })));
+
+          if (contactsError) throw contactsError;
+        }
+
+        // Update staff members
+        if (data.staff.length > 0) {
+          await supabase
+            .from('hoja_de_ruta_staff')
+            .delete()
+            .eq('hoja_de_ruta_id', mainRecord.id);
+
+          const { error: staffError } = await supabase
+            .from('hoja_de_ruta_staff')
+            .insert(data.staff.map(member => ({
+              hoja_de_ruta_id: mainRecord.id,
+              name: member.name,
+              surname1: member.surname1,
+              surname2: member.surname2,
+              position: member.position
+            })));
+
+          if (staffError) throw staffError;
+        }
+
+        console.log("Successfully saved all data");
+        return mainRecord;
+      } catch (error) {
+        console.error("Error in saveHojaDeRuta:", error);
+        throw error;
       }
-
-      // Update staff members
-      if (data.staff.length > 0) {
-        await supabase
-          .from('hoja_de_ruta_staff')
-          .delete()
-          .eq('hoja_de_ruta_id', mainRecord.id);
-
-        await supabase
-          .from('hoja_de_ruta_staff')
-          .insert(data.staff.map(member => ({
-            hoja_de_ruta_id: mainRecord.id,
-            name: member.name,
-            surname1: member.surname1,
-            surname2: member.surname2,
-            position: member.position
-          })));
-      }
-
-      return mainRecord;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });

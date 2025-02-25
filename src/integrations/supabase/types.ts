@@ -1032,6 +1032,7 @@ export type Database = {
       }
       hoja_de_ruta_logistics: {
         Row: {
+          equipment_logistics: string | null
           hoja_de_ruta_id: string | null
           id: string
           loading_details: string | null
@@ -1039,6 +1040,7 @@ export type Database = {
           unloading_details: string | null
         }
         Insert: {
+          equipment_logistics?: string | null
           hoja_de_ruta_id?: string | null
           id?: string
           loading_details?: string | null
@@ -1046,6 +1048,7 @@ export type Database = {
           unloading_details?: string | null
         }
         Update: {
+          equipment_logistics?: string | null
           hoja_de_ruta_id?: string | null
           id?: string
           loading_details?: string | null
