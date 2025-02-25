@@ -5,6 +5,27 @@ import { useJobSelection } from "@/hooks/useJobSelection";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { useHojaDeRutaPersistence } from "./useHojaDeRutaPersistence";
+
+const initialEventData: EventData = {
+  eventName: "",
+  eventDates: "",
+  venue: {
+    name: "",
+    address: "",
+  },
+  contacts: [{ name: "", role: "", phone: "" }],
+  logistics: {
+    transport: "",
+    loadingDetails: "",
+    unloadingDetails: "",
+    equipmentLogistics: "",
+  },
+  staff: [{ name: "", surname1: "", surname2: "", position: "" }],
+  schedule: "",
+  powerRequirements: "",
+  auxiliaryNeeds: "",
+};
 
 export const useHojaDeRutaForm = () => {
   const { toast } = useToast();
@@ -20,25 +41,88 @@ export const useHojaDeRutaForm = () => {
     { room_type: "single" },
   ]);
 
-  const [eventData, setEventData] = useState<EventData>({
-    eventName: "",
-    eventDates: "",
-    venue: {
-      name: "",
-      address: "",
-    },
-    contacts: [{ name: "", role: "", phone: "" }],
-    logistics: {
-      transport: "",
-      loadingDetails: "",
-      unloadingDetails: "",
-      equipmentLogistics: "", // Add the new field
-    },
-    staff: [{ name: "", surname1: "", surname2: "", position: "" }],
-    schedule: "",
-    powerRequirements: "",
-    auxiliaryNeeds: "",
-  });
+  const [eventData, setEventData] = useState<EventData>(initialEventData);
+
+  // Get hoja de ruta data using the persistence hook
+  const { hojaDeRuta, isLoading: isLoadingHojaDeRuta } = useHojaDeRutaPersistence(selectedJobId);
+
+  // Initialize form with existing data when hojaDeRuta changes
+  useEffect(() => {
+    if (hojaDeRuta) {
+      console.log("Initializing form with hojaDeRuta data:", hojaDeRuta);
+      
+      setEventData({
+        eventName: hojaDeRuta.event_name || "",
+        eventDates: hojaDeRuta.event_dates || "",
+        venue: {
+          name: hojaDeRuta.venue_name || "",
+          address: hojaDeRuta.venue_address || "",
+        },
+        contacts: hojaDeRuta.contacts?.length > 0 
+          ? hojaDeRuta.contacts.map((contact: any) => ({
+              name: contact.name || "",
+              role: contact.role || "",
+              phone: contact.phone || "",
+            }))
+          : [{ name: "", role: "", phone: "" }],
+        logistics: {
+          transport: hojaDeRuta.logistics?.transport || "",
+          loadingDetails: hojaDeRuta.logistics?.loading_details || "",
+          unloadingDetails: hojaDeRuta.logistics?.unloading_details || "",
+          equipmentLogistics: hojaDeRuta.logistics?.equipment_logistics || "",
+        },
+        staff: hojaDeRuta.staff?.length > 0
+          ? hojaDeRuta.staff.map((member: any) => ({
+              name: member.name || "",
+              surname1: member.surname1 || "",
+              surname2: member.surname2 || "",
+              position: member.position || "",
+            }))
+          : [{ name: "", surname1: "", surname2: "", position: "" }],
+        schedule: hojaDeRuta.schedule || "",
+        powerRequirements: hojaDeRuta.power_requirements || "",
+        auxiliaryNeeds: hojaDeRuta.auxiliary_needs || "",
+      });
+
+      // Set travel arrangements
+      if (hojaDeRuta.travel && hojaDeRuta.travel.length > 0) {
+        setTravelArrangements(hojaDeRuta.travel.map((arr: any) => ({
+          transportation_type: arr.transportation_type,
+          pickup_address: arr.pickup_address,
+          pickup_time: arr.pickup_time,
+          departure_time: arr.departure_time,
+          arrival_time: arr.arrival_time,
+          flight_train_number: arr.flight_train_number,
+          notes: arr.notes,
+        })));
+      }
+
+      // Set room assignments
+      if (hojaDeRuta.rooms && hojaDeRuta.rooms.length > 0) {
+        setRoomAssignments(hojaDeRuta.rooms.map((room: any) => ({
+          room_type: room.room_type,
+          room_number: room.room_number,
+          staff_member1_id: room.staff_member1_id,
+          staff_member2_id: room.staff_member2_id,
+        })));
+      }
+    } else {
+      // Reset form to initial state when no data is available
+      console.log("No hojaDeRuta data found, resetting form to initial state");
+      setEventData(initialEventData);
+      setTravelArrangements([{ transportation_type: "van" }]);
+      setRoomAssignments([{ room_type: "single" }]);
+    }
+  }, [hojaDeRuta]);
+
+  // Reset form when job selection changes
+  useEffect(() => {
+    if (selectedJobId) {
+      setPowerRequirements("");
+      fetchPowerRequirements(selectedJobId);
+      fetchAssignedStaff(selectedJobId);
+    }
+  }, [selectedJobId]);
 
   const fetchPowerRequirements = async (jobId: string) => {
     try {
@@ -118,33 +202,6 @@ export const useHojaDeRutaForm = () => {
     }
   };
 
-  useEffect(() => {
-    if (selectedJobId && jobs) {
-      const selectedJob = jobs.find((job: any) => job.id === selectedJobId);
-      if (selectedJob) {
-        console.log("Trabajo seleccionado:", selectedJob);
-        const formattedDates = `${format(
-          new Date(selectedJob.start_time),
-          "dd/MM/yyyy HH:mm"
-        )} - ${format(new Date(selectedJob.end_time), "dd/MM/yyyy HH:mm")}`;
-
-        setEventData((prev) => ({
-          ...prev,
-          eventName: selectedJob.title,
-          eventDates: formattedDates,
-        }));
-
-        fetchPowerRequirements(selectedJob.id);
-        fetchAssignedStaff(selectedJob.id);
-
-        toast({
-          title: "Trabajo Seleccionado",
-          description: "El formulario se ha actualizado con los detalles del trabajo",
-        });
-      }
-    }
-  }, [selectedJobId, jobs]);
-
   return {
     eventData,
     setEventData,
@@ -162,5 +219,7 @@ export const useHojaDeRutaForm = () => {
     setRoomAssignments,
     isLoadingJobs,
     jobs,
+    isLoadingHojaDeRuta,
   };
 };
+
