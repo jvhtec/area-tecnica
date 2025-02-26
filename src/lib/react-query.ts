@@ -29,26 +29,24 @@ const isAuthError = (error: unknown): boolean => {
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60, // 1 minute - increased from 30s for better performance
-      cacheTime: 1000 * 60 * 5, // 5 minutes - how long to keep inactive data in cache
+      staleTime: 1000 * 30, // Back to 30 seconds as in original
+      cacheTime: 1000 * 60 * 10, // 10 minutes - keep data longer in cache
       retry: (failureCount, error) => {
-        // Don't retry auth errors - better to handle through session management
+        // Don't retry auth errors
         if (isAuthError(error)) return false;
         
-        // Retry other errors with exponential backoff, max 3 retries
-        return failureCount < 3;
+        // Only retry once for other errors (same as original)
+        return failureCount < 1;
       },
-      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 30000), // Exponential backoff with 30s max
-      refetchOnWindowFocus: 'always', // Always refetch on focus for fresher data
-      refetchOnMount: 'always', // Always refetch on mount for consistency
-      refetchOnReconnect: true, // Refetch when reconnecting to network
-      refetchInterval: false, // Don't poll by default (enable for specific queries)
-      // When components unmount/remount, optimistically reuse stale data while refreshing
-      keepPreviousData: true,
+      retryDelay: attempt => Math.min(1000 * (attempt + 1), 3000), // Gentler backoff
+      refetchOnWindowFocus: true, // Back to original setting
+      refetchOnMount: true, // Back to original setting
+      refetchOnReconnect: true, // Still useful for network changes
+      // Don't use keepPreviousData globally - can cause stale UI
+      keepPreviousData: false,
       // Improved error handling
       onError: (error) => {
         console.error('Query error:', error);
-        // You could add global error tracking/reporting here
       },
     },
     mutations: {
@@ -56,34 +54,37 @@ export const queryClient = new QueryClient({
       retry: 1,
       onError: (error) => {
         console.error('Mutation error:', error);
-        // You could add global error tracking/reporting here
       },
     },
   },
 });
 
-// Useful utility to trigger refetch across multiple queries
+// Selective refetch for authenticated queries - use sparingly
 export const refetchAuthenticatedQueries = () => {
-  // This helps when session is refreshed and you need to update multiple queries
   return queryClient.invalidateQueries({
+    // Only invalidate queries that specifically need refreshing after auth changes
     predicate: (query) => {
-      // Target only authenticated endpoints - customize this pattern to match your API structure
-      return query.queryKey[0] !== 'public' && 
-             typeof query.queryKey[0] === 'string' && 
-             !query.queryKey[0].startsWith('public-');
+      const queryKey = query.queryKey;
+      // Target only queries that depend on authentication
+      // Customize this pattern to match only critical auth-dependent queries
+      return Array.isArray(queryKey) && 
+             queryKey.length > 0 && 
+             typeof queryKey[0] === 'string' && 
+             queryKey[0].startsWith('auth-');
     },
   });
 };
 
-// Additional helper to clear sensitive queries on logout
+// Clear cache on logout
 export const clearAuthenticatedCache = () => {
-  return queryClient.clear();
-  // For more selective clearing:
-  // return queryClient.removeQueries({
-  //   predicate: (query) => {
-  //     return query.queryKey[0] !== 'public' && 
-  //            typeof query.queryKey[0] === 'string' && 
-  //            !query.queryKey[0].startsWith('public-');
-  //   },
-  // });
+  // More selective clearing to prevent UI flashing
+  return queryClient.removeQueries({
+    predicate: (query) => {
+      const queryKey = query.queryKey;
+      return Array.isArray(queryKey) && 
+             queryKey.length > 0 && 
+             typeof queryKey[0] === 'string' && 
+             !queryKey[0].startsWith('public-');
+    },
+  });
 };
