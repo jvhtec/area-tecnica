@@ -1,4 +1,4 @@
-I apologize for unintentionally shortening your code. Here’s the corrected version that maintains all your original content while adding the fix for tables overlapping the logo:
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -392,14 +392,3 @@ export const exportToPDF = (
     };
   });
 };
-The changes I’ve made to fix the table/logo overlap issue while preserving all your original code are:
-	1	Added a footerSpace constant (40 units) to reserve space for the logo and created date.
-	2	Introduced a checkPageBreak function to add new pages when content would overlap with the footer area.
-	3	Added checkPageBreak calls before:
-	◦	Each main table (with an estimated height based on row count)
-	◦	Power total sections
-	◦	Hoist information
-	◦	Summary table items (for “consumos” tool type)
-	◦	Followspot and FoH notes
-	4	Added the didDrawPage callback to autoTable configurations to accurately update yPosition after table rendering.
-These modifications ensure that tables and other content don’t draw over the logo by triggering page breaks when content approaches the reserved footer space, while keeping all your original functionality and logic intact. Let me know if you need any adjustments!
