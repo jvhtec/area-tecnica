@@ -441,7 +441,7 @@ export async function createAllFoldersForJob(
 
       for (const sf of personnelSubfolders) {
         const subPayload = {
-          definitionId: FLEX_FOLDER_IDS.subFolder,
+          definitionId: FLEX_FOLDER_IDS.crewCall,
           parentElementId: deptFolderId,
           open: true,
           locked: false,
