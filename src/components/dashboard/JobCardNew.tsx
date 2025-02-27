@@ -64,6 +64,7 @@ const FLEX_FOLDER_IDS = {
   documentacionTecnica: "3787806c-af2d-11df-b8d5-00e08175e43e",
   presupuestosRecibidos: "3787806c-af2d-11df-b8d5-00e08175e43e",
   hojaGastos: "566d32e0-1a1e-11e0-a472-00e08175e43e",
+  hojaInfo: "702029c3-ba89-4304-98fe-fbc6fc695eb0",
   crewCall: "253878cc-af31-11df-b8d5-00e08175e43e",
   pullSheet: "a220432c-af33-11df-b8d5-00e08175e43e"
 };
@@ -427,6 +428,23 @@ await supabase
     element_id: topFolderId,
     folder_type: "main_event",
   });
+
+  // Add hojaInfo element to the main folder
+  const hojaInfoPayload = {
+    definitionId: FLEX_FOLDER_IDS.hojaInfo,
+    parentElementId: topFolderId,
+    open: true,
+    locked: false,
+    name: `Hoja de Información - ${job.title}`,
+    plannedStartDate: formattedStartDate,
+    plannedEndDate: formattedEndDate,
+    locationId: FLEX_FOLDER_IDS.location,
+    personResponsibleId: FLEX_FOLDER_IDS.mainResponsible,
+    documentNumber: `${documentNumber}IP`,
+  };
+
+  console.log("Creating hojaInfo element:", hojaInfoPayload);
+  await createFlexFolder(hojaInfoPayload);
 
 const departments = ["sound", "lights", "video", "production", "personnel","comercial"];
 for (const dept of departments) {
