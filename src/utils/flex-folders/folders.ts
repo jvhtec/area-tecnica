@@ -163,6 +163,34 @@ export async function createAllFoldersForJob(
         continue;
       }
 
+      // Create department-specific hojaInfo elements for sound, lights, and video
+      if (["sound", "lights", "video"].includes(dept)) {
+        const hojaInfoType = dept === "sound" 
+          ? FLEX_FOLDER_IDS.hojaInfoSx 
+          : dept === "lights" 
+            ? FLEX_FOLDER_IDS.hojaInfoLx 
+            : FLEX_FOLDER_IDS.hojaInfoVx;
+        
+        const hojaInfoSuffix = dept === "sound" ? "SIP" : dept === "lights" ? "LIP" : "VIP";
+        
+        const hojaInfoPayload = {
+          definitionId: hojaInfoType,
+          parentElementId: childRow.element_id,
+          open: true,
+          locked: false,
+          name: `Hoja de Información - ${locationName} - ${formattedDate}`,
+          plannedStartDate: formattedStartDate,
+          plannedEndDate: formattedEndDate,
+          locationId: FLEX_FOLDER_IDS.location,
+          departmentId: DEPARTMENT_IDS[dept as Department],
+          documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${hojaInfoSuffix}`,
+          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+        };
+        
+        console.log(`Creating hojaInfo element for ${dept}:`, hojaInfoPayload);
+        await createFlexFolder(hojaInfoPayload);
+      }
+
       if (dept !== "personnel") {
         const subfolders = [
           {
@@ -299,22 +327,7 @@ export async function createAllFoldersForJob(
       folder_type: "main_event",
     });
 
-  // Add hojaInfo element to the main folder
-  const hojaInfoPayload = {
-    definitionId: FLEX_FOLDER_IDS.hojaInfo,
-    parentElementId: topFolderId,
-    open: true,
-    locked: false,
-    name: `Hoja de Información - ${job.title}`,
-    plannedStartDate: formattedStartDate,
-    plannedEndDate: formattedEndDate,
-    locationId: FLEX_FOLDER_IDS.location,
-    personResponsibleId: FLEX_FOLDER_IDS.mainResponsible,
-    documentNumber: `${documentNumber}IP`,
-  };
-
-  console.log("Creating hojaInfo element:", hojaInfoPayload);
-  await createFlexFolder(hojaInfoPayload);
+  // Removed generic hojaInfo since we'll add department-specific ones
 
   const departments = ["sound", "lights", "video", "production", "personnel", "comercial"];
   for (const dept of departments) {
@@ -354,6 +367,34 @@ export async function createAllFoldersForJob(
     }
 
     const deptFolderId = childRow.element_id;
+
+    // Create department-specific hojaInfo elements for sound, lights, and video
+    if (["sound", "lights", "video"].includes(dept)) {
+      const hojaInfoType = dept === "sound" 
+        ? FLEX_FOLDER_IDS.hojaInfoSx 
+        : dept === "lights" 
+          ? FLEX_FOLDER_IDS.hojaInfoLx 
+          : FLEX_FOLDER_IDS.hojaInfoVx;
+      
+      const hojaInfoSuffix = dept === "sound" ? "SIP" : dept === "lights" ? "LIP" : "VIP";
+      
+      const hojaInfoPayload = {
+        definitionId: hojaInfoType,
+        parentElementId: deptFolderId,
+        open: true,
+        locked: false,
+        name: `Hoja de Información - ${job.title}`,
+        plannedStartDate: formattedStartDate,
+        plannedEndDate: formattedEndDate,
+        locationId: FLEX_FOLDER_IDS.location,
+        departmentId: DEPARTMENT_IDS[dept as Department],
+        documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${hojaInfoSuffix}`,
+        personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+      };
+      
+      console.log(`Creating hojaInfo element for ${dept}:`, hojaInfoPayload);
+      await createFlexFolder(hojaInfoPayload);
+    }
 
     if (dept !== "personnel") {
       const subfolders = [
