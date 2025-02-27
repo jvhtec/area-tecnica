@@ -1,5 +1,7 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JobCardNew } from "./JobCardNew";
+
 interface TodayScheduleProps {
   jobs: any[];
   onEditClick: (job: any) => void;
@@ -8,6 +10,7 @@ interface TodayScheduleProps {
   userRole: string | null;
   selectedDate?: Date;
 }
+
 export const TodaySchedule = ({
   jobs,
   onEditClick,
