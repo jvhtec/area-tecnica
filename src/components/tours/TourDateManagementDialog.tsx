@@ -21,20 +21,73 @@ import {
 } from "lucide-react";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
 
-import {
-  FLEX_FOLDER_IDS,
-  DEPARTMENT_IDS,
-  RESPONSIBLE_PERSON_IDS,
-  DEPARTMENT_SUFFIXES,
-} from "@/utils/flex-folders/constants";
+const BASE_URL = "https://sectorpro.flexrentalsolutions.com/f5/api/element";
+const API_KEY = "82b5m0OKgethSzL1YbrWMUFvxdNkNMjRf82E";
 
-import { createFlexFolder } from "@/utils/flex-folders/api";
+const FLEX_FOLDER_IDS = {
+  subFolder: "358f312c-b051-11df-b8d5-00e08175e43e",
+  location: "2f49c62c-b139-11df-b8d5-00e08175e43e",
+  documentacionTecnica: "3787806c-af2d-11df-b8d5-00e08175e43e",
+  presupuestosRecibidos: "3787806c-af2d-11df-b8d5-00e08175e43e",
+  hojaGastos: "566d32e0-1a1e-11e0-a472-00e08175e43e",
+  hojaInfoSx: "702029c3-ba89-4304-98fe-fbc6fc695eb0",
+  hojaInfoLx: "4db54bad-b5fa-4c1f-85d4-525d991d7b62",
+  hojaInfoVx: "484249f0-6307-47a3-a782-6352ee5ef493",
+  crewCall: "253878cc-af31-11df-b8d5-00e08175e43e",
+  pullSheet: "a220432c-af33-11df-b8d5-00e08175e43e",
+};
+
+const DEPARTMENT_IDS = {
+  sound: "cdd5e372-d124-11e1-bba1-00e08175e43e",
+  lights: "d5af7892-d124-11e1-bba1-00e08175e43e",
+  video: "a89d124d-7a95-4384-943e-49f5c0f46b23",
+  production: "890811c3-fe3f-45d7-af6b-7ca4a807e84d",
+  personnel: "b972d682-598d-4802-a390-82e28dc4480e",
+};
+
+const RESPONSIBLE_PERSON_IDS = {
+  sound: "4b0d98e0-e700-11ea-97d0-2a0a4490a7fb",
+  lights: "4b559e60-e700-11ea-97d0-2a0a4490a7fb",
+  video: "bb9690ac-f22e-4bc4-94a2-6d341ca0138d",
+  production: "4ce97ce3-5159-401a-9cf8-542d3e479ade",
+  personnel: "4b618540-e700-11ea-97d0-2a0a4490a7fb",
+};
+
+const DEPARTMENT_SUFFIXES = {
+  sound: "S",
+  lights: "L",
+  video: "V",
+  production: "P",
+  personnel: "HR",
+};
 
 interface TourDateManagementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tourId: string | null;
   tourDates: any[];
+}
+
+async function createFlexFolder(payload: Record<string, any>) {
+  console.log("Creating Flex folder with payload:", payload);
+  const response = await fetch(BASE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Auth-Token": API_KEY,
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error("Flex folder creation error:", errorData);
+    throw new Error(
+      errorData.exceptionMessage || "Failed to create folder in Flex"
+    );
+  }
+  const data = await response.json();
+  console.log("Created Flex folder:", data);
+  return data;
 }
 
 async function createFoldersForDate(
@@ -183,11 +236,10 @@ async function createFoldersForDate(
           };
           console.log(`Creating subfolder ${sf.name} for ${dept}:`, subPayload);
           const subResponse = await createFlexFolder(subPayload);
-          const subFolderElementId = subResponse.elementId;
           await supabase.from("flex_folders").insert({
             tour_date_id: dateObj.id,
             parent_id: parentRow.id,
-            element_id: subFolderElementId,
+            element_id: subResponse.elementId,
             department: dept,
             folder_type: "tourdate_subfolder",
           });
@@ -196,33 +248,28 @@ async function createFoldersForDate(
 
       // Create department-specific hojaInfo elements for sound, lights, and video
       if (["sound", "lights", "video"].includes(dept)) {
-        const job = { title: 'Default Job Title' }; // Define the job variable
-        const hojaInfoType = dept === "sound"
-          ? FLEX_FOLDER_IDS.hojaInfoSx
-          : dept === "lights"
-            ? FLEX_FOLDER_IDS.hojaInfoLx
+        const hojaInfoType = dept === "sound" 
+          ? FLEX_FOLDER_IDS.hojaInfoSx 
+          : dept === "lights" 
+            ? FLEX_FOLDER_IDS.hojaInfoLx 
             : FLEX_FOLDER_IDS.hojaInfoVx;
-
+        
         const hojaInfoSuffix = dept === "sound" ? "SIP" : dept === "lights" ? "LIP" : "VIP";
-
+        
         const hojaInfoPayload = {
           definitionId: hojaInfoType,
-          parentElementId: mainFolderElementId,
+          parentElementId: childRow.element_id,
           open: true,
           locked: false,
-          name: `Hoja de Información - ${job.title}`,
+          name: `Hoja de Información - ${locationName} - ${formattedDate}`,
           plannedStartDate: formattedStartDate,
           plannedEndDate: formattedEndDate,
           locationId: FLEX_FOLDER_IDS.location,
-          departmentId: DEPARTMENT_IDS[dept as keyof typeof DEPARTMENT_IDS],
+          departmentId: DEPARTMENT_IDS[dept as Department],
           documentNumber: `${documentNumber}${hojaInfoSuffix}`,
-          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as keyof typeof RESPONSIBLE_PERSON_IDS],
+          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
         };
-
-        console.log(`Creating hojaInfo element for ${dept}:`, hojaInfoPayload);
-        await createFlexFolder(hojaInfoPayload);
-      }
-
+        
       if (dept === "sound") {
         const soundSubfolders = [
           { name: `${tourData.name} - Tour Pack`, suffix: "TP" },
@@ -244,11 +291,10 @@ async function createFoldersForDate(
           };
           console.log(`Creating sound extra subfolder ${sf.name}:`, subPayload);
           const subResponse = await createFlexFolder(subPayload);
-          const subFolderElementId = subResponse.elementId;
           await supabase.from("flex_folders").insert({
             tour_date_id: dateObj.id,
             parent_id: parentRow.id,
-            element_id: subFolderElementId,
+            element_id: subResponse.elementId,
             department: dept,
             folder_type: "tourdate_subfolder",
           });
@@ -275,11 +321,10 @@ async function createFoldersForDate(
           };
           console.log(`Creating personnel subfolder ${sf.name}:`, subPayload);
           const subResponse = await createFlexFolder(subPayload);
-          const subFolderElementId = subResponse.elementId;
           await supabase.from("flex_folders").insert({
             tour_date_id: dateObj.id,
             parent_id: parentRow.id,
-            element_id: subFolderElementId,
+            element_id: subResponse.elementId,
             department: dept,
             folder_type: "tourdate_subfolder",
           });
@@ -304,11 +349,10 @@ async function createFoldersForDate(
           };
           console.log(`Creating personnel crew call subfolder ${sf.name}:`, subPayload);
           const subResponse = await createFlexFolder(subPayload);
-          const subFolderElementId = subResponse.elementId;
           await supabase.from("flex_folders").insert({
             tour_date_id: dateObj.id,
             parent_id: parentRow.id,
-            element_id: subFolderElementId,
+            element_id: subResponse.elementId,
             department: dept,
             folder_type: "tourdate_subfolder",
           });
@@ -372,7 +416,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
 
   const handleCreateFoldersForDate = async (dateObj: any) => {
     if (dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id)) return;
-
+    
     try {
       const { data: existingFolders } = await supabase
         .from("flex_folders")
@@ -390,10 +434,10 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
 
       await createFoldersForDate(dateObj, tourId, true);
       setCreatedTourDateIds((prev) => [...prev, dateObj.id]);
-
+      
       queryClient.invalidateQueries({ queryKey: ["flex-folders"] });
       queryClient.invalidateQueries({ queryKey: ["tours"] });
-
+      
       toast({
         title: "Success",
         description: "Folders created for this tour date."
@@ -565,7 +609,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
       }
       console.log("Editing tour date:", { dateId, newDate, newLocation });
       const locationId = await getOrCreateLocation(newLocation);
-
+      
       const { data: tourData, error: tourError } = await supabase
         .from("tours")
         .select("name")
@@ -576,7 +620,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
         console.error("Error fetching tour:", tourError);
         throw tourError;
       }
-
+      
       const { data: updatedDate, error: dateError } = await supabase
         .from("tour_dates")
         .update({
@@ -635,12 +679,12 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
   const handleDeleteDate = async (dateId: string) => {
     try {
       console.log("Starting deletion of tour date:", dateId);
-
+      
       const { error: flexFoldersError } = await supabase
         .from("flex_folders")
         .delete()
         .eq("tour_date_id", dateId);
-
+        
       if (flexFoldersError) {
         console.error("Error deleting flex folders:", flexFoldersError);
         throw flexFoldersError;
@@ -650,31 +694,31 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
         .from("jobs")
         .select("id")
         .eq("tour_date_id", dateId);
-
+        
       if (jobsError) throw jobsError;
-
+      
       if (jobs && jobs.length > 0) {
         const jobIds = jobs.map(j => j.id);
-
+        
         const { error: assignmentsError } = await supabase
           .from("job_assignments")
           .delete()
           .in("job_id", jobIds);
-
+          
         if (assignmentsError) throw assignmentsError;
-
+        
         const { error: departmentsError } = await supabase
           .from("job_departments")
           .delete()
           .in("job_id", jobIds);
-
+          
         if (departmentsError) throw departmentsError;
-
+        
         const { error: jobsDeleteError } = await supabase
           .from("jobs")
           .delete()
           .in("id", jobIds);
-
+          
         if (jobsDeleteError) throw jobsDeleteError;
       }
 
@@ -682,13 +726,13 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
         .from("tour_dates")
         .delete()
         .eq("id", dateId);
-
+        
       if (dateError) throw dateError;
-
+      
       await queryClient.invalidateQueries({ queryKey: ["tours"] });
-      toast({
+      toast({ 
         title: "Success",
-        description: "Tour date deleted successfully"
+        description: "Tour date deleted successfully" 
       });
     } catch (error: any) {
       console.error("Error deleting date:", error);
@@ -738,7 +782,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
           <div className="space-y-4">
             {tourDates?.map((dateObj) => {
               const foldersExist = foldersExistenceMap?.[dateObj.id] || false;
-
+              
               return (
                 <div key={dateObj.id} className="p-3 border rounded-lg">
                   {editingTourDate && editingTourDate.id === dateObj.id ? (
