@@ -1,16 +1,51 @@
-
 import { supabase } from "@/lib/supabase";
 import { Department } from "@/types/department";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
-import { 
-  FLEX_FOLDER_IDS, 
-  DEPARTMENT_IDS, 
-  RESPONSIBLE_PERSON_IDS, 
-  DEPARTMENT_SUFFIXES 
-} from "@/utils/flex-folders/constants";
 
 const BASE_URL = "https://sectorpro.flexrentalsolutions.com/f5/api/element";
 const API_KEY = "82b5m0OKgethSzL1YbrWMUFvxdNkNMjRf82E";
+
+ const FLEX_FOLDER_IDS = {
+  mainFolder: "e281e71c-2c42-49cd-9834-0eb68135e9ac",
+  subFolder: "358f312c-b051-11df-b8d5-00e08175e43e",
+  location: "2f49c62c-b139-11df-b8d5-00e08175e43e",
+  mainResponsible: "4bc2df20-e700-11ea-97d0-2a0a4490a7fb",
+  documentacionTecnica: "3787806c-af2d-11df-b8d5-00e08175e43e",
+  presupuestosRecibidos: "3787806c-af2d-11df-b8d5-00e08175e43e",
+  hojaGastos: "566d32e0-1a1e-11e0-a472-00e08175e43e",
+  hojaInfoSx: "702029c3-ba89-4304-98fe-fbc6fc695eb0",
+  hojaInfoLx: "4db54bad-b5fa-4c1f-85d4-525d991d7b62",
+  hojaInfoVx: "484249f0-6307-47a3-a782-6352ee5ef493",
+  crewCall: "253878cc-af31-11df-b8d5-00e08175e43e",
+  pullSheet: "a220432c-af33-11df-b8d5-00e08175e43e"
+};
+
+const DEPARTMENT_IDS = {
+  sound: "cdd5e372-d124-11e1-bba1-00e08175e43e",
+  lights: "d5af7892-d124-11e1-bba1-00e08175e43e",
+  video: "a89d124d-7a95-4384-943e-49f5c0f46b23",
+  production: "890811c3-fe3f-45d7-af6b-7ca4a807e84d",
+  personnel: "b972d682-598d-4802-a390-82e28dc4480e",
+  comercial: "5251e421-41db-403e-88a6-1cfd6b68c46f"
+};
+
+const RESPONSIBLE_PERSON_IDS = {
+  sound: "4b0d98e0-e700-11ea-97d0-2a0a4490a7fb",
+  lights: "4b559e60-e700-11ea-97d0-2a0a4490a7fb",
+  video: "bb9690ac-f22e-4bc4-94a2-6d341ca0138d",
+  production: "4ce97ce3-5159-401a-9cf8-542d3e479ade",
+  personnel: "4b618540-e700-11ea-97d0-2a0a4490a7fb",
+  comercial: "4bc2df20-e700-11ea-97d0-2a0a4490a7fb"
+};
+
+const DEPARTMENT_SUFFIXES = {
+  sound: "S",
+  lights: "L",
+  video: "V",
+  production: "P",
+  personnel: "HR",
+  comercial: "QT"
+};
 
 interface TourCreationData {
   title: string;
@@ -95,8 +130,7 @@ export const useTourCreationMutation = () => {
         flex_folders_created: true
       };
 
-      // Include all departments to match the job creation
-      const departments = ['sound', 'lights', 'video', 'production', 'personnel', 'comercial'] as const;
+      const departments = ['sound', 'lights', 'video', 'production', 'personnel'] as const;
       
       for (const dept of departments) {
         const subFolderPayload = {
@@ -147,162 +181,53 @@ export const useTourCreationMutation = () => {
             folder_type: "tour_department"
           });
 
-        // Create department-specific hojaInfo elements for sound, lights, and video
-        if (["sound", "lights", "video"].includes(dept)) {
-          const hojaInfoType = dept === "sound" 
-            ? FLEX_FOLDER_IDS.hojaInfoSx 
-            : dept === "lights" 
-              ? FLEX_FOLDER_IDS.hojaInfoLx 
-              : FLEX_FOLDER_IDS.hojaInfoVx;
-          
-          const hojaInfoSuffix = dept === "sound" ? "SIP" : dept === "lights" ? "LIP" : "VIP";
-          
-          const hojaInfoPayload = {
-            definitionId: hojaInfoType,
+        const additionalSubfolders = [
+          {
+            definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos,
+            name: `Presupuestos Recibidos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+            suffix: "PR"
+          },
+          {
+            definitionId: FLEX_FOLDER_IDS.hojaGastos,
+            name: `Hoja de Gastos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+            suffix: "HG"
+          }
+        ];
+
+        for (const sf of additionalSubfolders) {
+          const childPayload = {
+            definitionId: sf.definitionId,
             parentElementId: subFolder.elementId,
             open: true,
             locked: false,
-            name: `Hoja de Información - ${tour.name}`,
+            name: sf.name,
             plannedStartDate: formattedStartDate,
             plannedEndDate: formattedEndDate,
             locationId: FLEX_FOLDER_IDS.location,
             departmentId: DEPARTMENT_IDS[dept],
-            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${hojaInfoSuffix}`,
+            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
             personResponsibleId: RESPONSIBLE_PERSON_IDS[dept]
           };
-          
-          console.log(`Creating hojaInfo element for ${dept}:`, hojaInfoPayload);
+          console.log(`Creating additional subfolder for ${dept} with payload:`, childPayload);
           try {
-            await createFlexFolder(hojaInfoPayload);
-          } catch (err) {
-            console.error(`Exception creating hojaInfo for ${dept}:`, err);
-          }
-        }
-
-        if (dept !== "personnel") {
-          const additionalSubfolders = [
-            {
-              definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
-              name: `Documentación Técnica - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
-              suffix: "DT"
-            },
-            {
-              definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos,
-              name: `Presupuestos Recibidos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
-              suffix: "PR"
-            },
-            {
-              definitionId: FLEX_FOLDER_IDS.hojaGastos,
-              name: `Hoja de Gastos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
-              suffix: "HG"
-            }
-          ];
-
-          for (const sf of additionalSubfolders) {
-            const childPayload = {
-              definitionId: sf.definitionId,
-              parentElementId: subFolder.elementId,
-              open: true,
-              locked: false,
-              name: sf.name,
-              plannedStartDate: formattedStartDate,
-              plannedEndDate: formattedEndDate,
-              locationId: FLEX_FOLDER_IDS.location,
-              departmentId: DEPARTMENT_IDS[dept],
-              documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
-              personResponsibleId: RESPONSIBLE_PERSON_IDS[dept]
-            };
-            console.log(`Creating additional subfolder for ${dept} with payload:`, childPayload);
-            try {
-              await createFlexFolder(childPayload);
-            } catch (err) {
-              console.error(`Exception creating additional subfolder for ${dept}:`, err);
+            const childResponse = await fetch(BASE_URL, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Auth-Token": API_KEY
+              },
+              body: JSON.stringify(childPayload)
+            });
+            if (!childResponse.ok) {
+              const errorData = await childResponse.json();
+              console.error(`Error creating additional subfolder for ${dept}:`, errorData);
               continue;
             }
-          }
-
-          // Add specific folders for sound department
-          if (dept === "sound") {
-            const soundSubfolders = [
-              { name: `${tour.name} - Tour Pack`, suffix: "TP" },
-              { name: `${tour.name} - PA`, suffix: "PA" },
-            ];
-
-            for (const sf of soundSubfolders) {
-              const subPayload = {
-                definitionId: FLEX_FOLDER_IDS.pullSheet,
-                parentElementId: subFolder.elementId,
-                open: true,
-                locked: false,
-                name: sf.name,
-                plannedStartDate: formattedStartDate,
-                plannedEndDate: formattedEndDate,
-                locationId: FLEX_FOLDER_IDS.location,
-                documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
-                departmentId: DEPARTMENT_IDS[dept],
-                personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
-              };
-              
-              try {
-                await createFlexFolder(subPayload);
-              } catch (err) {
-                console.error(`Exception creating sound subfolder for ${sf.name}:`, err);
-              }
-            }
-          }
-        } else if (dept === "personnel") {
-          // Special folders for personnel department
-          const personnelSubfolders = [
-            { name: `Gastos de Personal - ${tour.name}`, suffix: "GP", definitionId: FLEX_FOLDER_IDS.subFolder },
-          ];
-
-          for (const sf of personnelSubfolders) {
-            const childPayload = {
-              definitionId: sf.definitionId,
-              parentElementId: subFolder.elementId,
-              open: true,
-              locked: false,
-              name: sf.name,
-              plannedStartDate: formattedStartDate,
-              plannedEndDate: formattedEndDate,
-              locationId: FLEX_FOLDER_IDS.location,
-              departmentId: DEPARTMENT_IDS[dept],
-              documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
-              personResponsibleId: RESPONSIBLE_PERSON_IDS[dept]
-            };
-            console.log(`Creating personnel subfolder with payload:`, childPayload);
-            try {
-              await createFlexFolder(childPayload);
-            } catch (err) {
-              console.error(`Exception creating personnel subfolder:`, err);
-            }
-          }
-
-          const personnelcrewCall = [
-            { name: `Crew Call Sonido - ${tour.name}`, suffix: "CCS" },  
-            { name: `Crew Call Luces - ${tour.name}`, suffix: "CCL" },
-          ];
-
-          for (const sf of personnelcrewCall) {
-            const crewCallPayload = {
-              definitionId: FLEX_FOLDER_IDS.crewCall,
-              parentElementId: subFolder.elementId,
-              open: true,
-              locked: false,
-              name: sf.name,
-              plannedStartDate: formattedStartDate,
-              plannedEndDate: formattedEndDate,
-              locationId: FLEX_FOLDER_IDS.location,
-              documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
-              departmentId: DEPARTMENT_IDS[dept],
-              personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
-            };
-            
-            try {
-              await createFlexFolder(crewCallPayload);
-            } catch (err) {
-              console.error(`Exception creating crew call folder for ${sf.name}:`, err);
-            }
+            const childFolder = await childResponse.json();
+            console.log(`Additional subfolder created for ${dept}:`, childFolder);
+          } catch (err) {
+            console.error(`Exception creating additional subfolder for ${dept}:`, err);
+            continue;
           }
         }
       }
