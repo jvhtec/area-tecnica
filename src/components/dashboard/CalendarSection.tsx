@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { DateTypeContextMenu } from "./DateTypeContextMenu";
-// import { JobMilestonesDialog } from "@/components/milestones/JobMilestonesDialog";
+import { JobMilestonesDialog } from "@/components/milestones/JobMilestonesDialog";
 import { supabase } from "@/lib/supabase";
 import jsPDF from "jspdf";
 import {
@@ -52,8 +52,9 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+//
 // TYPES
-
+//
 interface CalendarSectionProps {
   date: Date | undefined;
   onDateSelect: (date: Date | undefined) => void;
@@ -73,8 +74,9 @@ interface PrintSettings {
   };
 }
 
+//
 // MAIN COMPONENT
-
+//
 export const CalendarSection: React.FC<CalendarSectionProps> = ({
   date = new Date(),
   onDateSelect,
@@ -181,7 +183,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   // Set up real-time subscription for date types
   useEffect(() => {
     console.log("Setting up real-time subscription for date types...");
-
+    
     const channel = supabase.channel('date-type-updates')
       .on(
         'postgres_changes',
@@ -192,13 +194,13 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
         },
         async (payload) => {
           console.log("Date type change detected:", payload);
-
+          
           // Fetch updated date types
           const { data } = await supabase
             .from("job_date_types")
             .select("*")
             .in("job_id", jobs.map((job: any) => job.id));
-
+            
           if (data) {
             const typesMap = data.reduce((acc: Record<string, any>, curr) => ({
               ...acc,
@@ -248,8 +250,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
         const endDate = job.end_time ? parseISO(job.end_time) : null;
         if (!startDate || !endDate) {
           console.warn("Invalid date found for job:", job);
-          return false;
-        }
           return false;
         }
         const compareDate = format(date, "yyyy-MM-dd");
@@ -502,13 +502,13 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
             onDateSelect={onDateSelect}
           />
         )}
-         {selectedJob && (
-           <JobMilestonesDialog
-           open={showMilestones}
-           onOpenChange={setShowMilestones}
-           jobId={selectedJob.id}
-           jobStartDate={new Date(selectedJob.start_time)}
-           />
+        {selectedJob && (
+          <JobMilestonesDialog
+            open={showMilestones}
+            onOpenChange={setShowMilestones}
+            jobId={selectedJob.id}
+            jobStartDate={new Date(selectedJob.start_time)}
+          />
         )}
       </CardContent>
     </Card>
