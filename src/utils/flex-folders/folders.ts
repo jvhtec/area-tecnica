@@ -1,4 +1,3 @@
-
 import { format } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { Department } from "@/types/department";
@@ -388,7 +387,7 @@ export async function createAllFoldersForJob(
         plannedEndDate: formattedEndDate,
         locationId: FLEX_FOLDER_IDS.location,
         departmentId: DEPARTMENT_IDS[dept as Department],
-        documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${hojaInfoSuffix}`,
+        documentNumber: `${documentNumber}${hojaInfoSuffix}`,
         personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
       };
       
