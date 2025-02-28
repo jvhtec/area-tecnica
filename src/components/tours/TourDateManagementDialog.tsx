@@ -30,6 +30,9 @@ const FLEX_FOLDER_IDS = {
   documentacionTecnica: "3787806c-af2d-11df-b8d5-00e08175e43e",
   presupuestosRecibidos: "3787806c-af2d-11df-b8d5-00e08175e43e",
   hojaGastos: "566d32e0-1a1e-11e0-a472-00e08175e43e",
+  hojaInfoSx: "702029c3-ba89-4304-98fe-fbc6fc695eb0",
+  hojaInfoLx: "4db54bad-b5fa-4c1f-85d4-525d991d7b62",
+  hojaInfoVx: "484249f0-6307-47a3-a782-6352ee5ef493",
   crewCall: "253878cc-af31-11df-b8d5-00e08175e43e",
   pullSheet: "a220432c-af33-11df-b8d5-00e08175e43e",
 };
@@ -243,6 +246,30 @@ async function createFoldersForDate(
         }
       }
 
+      // Create department-specific hojaInfo elements for sound, lights, and video
+      if (["sound", "lights", "video"].includes(dept)) {
+        const hojaInfoType = dept === "sound" 
+          ? FLEX_FOLDER_IDS.hojaInfoSx 
+          : dept === "lights" 
+            ? FLEX_FOLDER_IDS.hojaInfoLx 
+            : FLEX_FOLDER_IDS.hojaInfoVx;
+        
+        const hojaInfoSuffix = dept === "sound" ? "SIP" : dept === "lights" ? "LIP" : "VIP";
+        
+        const hojaInfoPayload = {
+          definitionId: hojaInfoType,
+          parentElementId: childRow.element_id,
+          open: true,
+          locked: false,
+          name: `Hoja de Información - ${locationName} - ${formattedDate}`,
+          plannedStartDate: formattedStartDate,
+          plannedEndDate: formattedEndDate,
+          locationId: FLEX_FOLDER_IDS.location,
+          departmentId: DEPARTMENT_IDS[dept as Department],
+          documentNumber: `${documentNumber}${hojaInfoSuffix}`,
+          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+        };
+        
       if (dept === "sound") {
         const soundSubfolders = [
           { name: `${tourData.name} - Tour Pack`, suffix: "TP" },
