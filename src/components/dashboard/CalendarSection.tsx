@@ -503,12 +503,12 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
           />
         )}
         {selectedJob && (
-          <JobMilestonesDialog
-            open={showMilestones}
-            onOpenChange={setShowMilestones}
-            jobId={selectedJob.id}
-            jobStartDate={new Date(selectedJob.start_time)}
-          />
+          // <JobMilestonesDialog
+          //   open={showMilestones}
+          //   onOpenChange={setShowMilestones}
+          //   jobId={selectedJob.id}
+          //   jobStartDate={new Date(selectedJob.start_time)}
+          // />
         )}
       </CardContent>
     </Card>
