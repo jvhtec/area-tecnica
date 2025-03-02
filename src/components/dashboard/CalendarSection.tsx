@@ -1,4 +1,4 @@
-<lov-code>
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -569,7 +569,7 @@ const PrintDialog: React.FC<PrintDialogProps> = ({
   currentMonth,
   selectedJobTypes,
 }) => {
-  // When the dialog opens, sync its checkbox settings with the dropdown’s selection.
+  // When the dialog opens, sync its checkbox settings with the dropdown's selection.
   useEffect(() => {
     if (showDialog) {
       const newJobTypes = {
@@ -777,7 +777,7 @@ const JobCard: React.FC<JobCardProps> = ({
     }
   };
 
-  // Total up the required personnel from the job’s personnel arrays
+  // Total up the required personnel from the job's personnel arrays
   const getTotalRequiredPersonnel = (job: any) => {
     let total = 0;
     if (job.sound_job_personnel?.length > 0) {
@@ -842,4 +842,41 @@ const JobCard: React.FC<JobCardProps> = ({
           <TooltipContent className="w-64 p-2">
             <div className="space-y-2">
               <h4 className="font-semibold">{job.title}</h4>
-              {job.description && <p className="text
+              {job.description && <p className="text-sm text-muted-foreground">{job.description}</p>}
+              <div className="flex items-center gap-2 text-sm">
+                <Clock className="h-4 w-4" />
+                <span>
+                  {format(new Date(job.start_time), "MMM d, HH:mm")} -{" "}
+                  {format(new Date(job.end_time), "MMM d, HH:mm")}
+                </span>
+              </div>
+              {job.location?.name && (
+                <div className="flex items-center gap-2 text-sm">
+                  <MapPin className="h-4 w-4" />
+                  <span>{job.location.name}</span>
+                </div>
+              )}
+              <div className="space-y-1">
+                <div className="text-sm font-medium">Departments:</div>
+                <div className="flex flex-wrap gap-1">
+                  {job.job_departments.map((dept: any) => (
+                    <Badge key={dept.department} variant="secondary" className="flex items-center gap-1">
+                      {getDepartmentIcon(dept.department)}
+                      <span className="capitalize">{dept.department}</span>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Users className="h-4 w-4" />
+                <span>
+                  {currentlyAssigned}/{totalRequired} assigned
+                </span>
+              </div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </DateTypeContextMenu>
+  );
+};
