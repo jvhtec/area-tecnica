@@ -1,3 +1,4 @@
+<lov-code>
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { DateTypeContextMenu } from "./DateTypeContextMenu";
-import { JobMilestonesDialog } from "@/components/milestones/JobMilestonesDialog";
+// Remove JobMilestonesDialog import since we're disabling it
 import { supabase } from "@/lib/supabase";
 import jsPDF from "jspdf";
 import {
@@ -87,8 +88,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   // Local state
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [dateTypes, setDateTypes] = useState<Record<string, any>>({});
-  const [selectedJob, setSelectedJob] = useState<any>(null);
-  const [showMilestones, setShowMilestones] = useState(false);
+  // Remove selectedJob and showMilestones state since we're disabling the feature
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -461,8 +461,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       date={day}
       dateTypes={dateTypes}
       setDateTypes={setDateTypes}
-      setSelectedJob={setSelectedJob}
-      setShowMilestones={setShowMilestones}
     />
   );
 
@@ -502,14 +500,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
             onDateSelect={onDateSelect}
           />
         )}
-        {selectedJob && (
-          <JobMilestonesDialog
-            open={showMilestones}
-            onOpenChange={setShowMilestones}
-            jobId={selectedJob.id}
-            jobStartDate={new Date(selectedJob.start_time)}
-          />
-        )}
+        {/* Remove JobMilestonesDialog component */}
       </CardContent>
     </Card>
   );
@@ -742,8 +733,7 @@ interface JobCardProps {
   date: Date;
   dateTypes: Record<string, any>;
   setDateTypes: React.Dispatch<React.SetStateAction<Record<string, any>>>;
-  setSelectedJob: (job: any) => void;
-  setShowMilestones: (open: boolean) => void;
+  // Remove setSelectedJob and setShowMilestones from props
 }
 
 const JobCard: React.FC<JobCardProps> = ({
@@ -751,8 +741,7 @@ const JobCard: React.FC<JobCardProps> = ({
   date,
   dateTypes,
   setDateTypes,
-  setSelectedJob,
-  setShowMilestones,
+  // Remove setSelectedJob, setShowMilestones from parameters
 }) => {
   // Return the correct icon based on the date type
   const getDateTypeIcon = (jobId: string, date: Date) => {
@@ -844,11 +833,7 @@ const JobCard: React.FC<JobCardProps> = ({
                 backgroundColor: `${job.color}20`,
                 color: job.color,
               }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedJob(job);
-                setShowMilestones(true);
-              }}
+              // Remove onClick handler that opened the milestones dialog
             >
               {dateTypeIcon}
               <span>{job.title}</span>
@@ -857,41 +842,4 @@ const JobCard: React.FC<JobCardProps> = ({
           <TooltipContent className="w-64 p-2">
             <div className="space-y-2">
               <h4 className="font-semibold">{job.title}</h4>
-              {job.description && <p className="text-sm text-muted-foreground">{job.description}</p>}
-              <div className="flex items-center gap-2 text-sm">
-                <Clock className="h-4 w-4" />
-                <span>
-                  {format(new Date(job.start_time), "MMM d, HH:mm")} -{" "}
-                  {format(new Date(job.end_time), "MMM d, HH:mm")}
-                </span>
-              </div>
-              {job.location?.name && (
-                <div className="flex items-center gap-2 text-sm">
-                  <MapPin className="h-4 w-4" />
-                  <span>{job.location.name}</span>
-                </div>
-              )}
-              <div className="space-y-1">
-                <div className="text-sm font-medium">Departments:</div>
-                <div className="flex flex-wrap gap-1">
-                  {job.job_departments.map((dept: any) => (
-                    <Badge key={dept.department} variant="secondary" className="flex items-center gap-1">
-                      {getDepartmentIcon(dept.department)}
-                      <span className="capitalize">{dept.department}</span>
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Users className="h-4 w-4" />
-                <span>
-                  {currentlyAssigned}/{totalRequired} assigned
-                </span>
-              </div>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    </DateTypeContextMenu>
-  );
-};
+              {job.description && <p className="text
