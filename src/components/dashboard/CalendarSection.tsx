@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +13,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { DateTypeContextMenu } from "./DateTypeContextMenu";
-// Remove JobMilestonesDialog import since we're disabling it
 import { supabase } from "@/lib/supabase";
 import jsPDF from "jspdf";
 import {
@@ -53,9 +51,6 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-//
-// TYPES
-//
 interface CalendarSectionProps {
   date: Date | undefined;
   onDateSelect: (date: Date | undefined) => void;
@@ -75,9 +70,6 @@ interface PrintSettings {
   };
 }
 
-//
-// MAIN COMPONENT
-//
 export const CalendarSection: React.FC<CalendarSectionProps> = ({
   date = new Date(),
   onDateSelect,
@@ -85,10 +77,8 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   department,
   onDateTypeChange,
 }) => {
-  // Local state
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [dateTypes, setDateTypes] = useState<Record<string, any>>({});
-  // Remove selectedJob and showMilestones state since we're disabling the feature
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -104,7 +94,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   });
   const { toast } = useToast();
 
-  // Calendar calculations
   const currentMonth = date || new Date();
   const firstDayOfMonth = startOfMonth(currentMonth);
   const lastDayOfMonth = endOfMonth(currentMonth);
@@ -125,7 +114,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   const allDays = [...prefixDays, ...daysInMonth, ...suffixDays];
   const distinctJobTypes = jobs ? Array.from(new Set(jobs.map((job) => job.job_type).filter(Boolean))) : [];
 
-  // Load user preferences from supabase
   useEffect(() => {
     const loadUserPreferences = async () => {
       try {
@@ -180,7 +168,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     setIsDropdownOpen(false);
   };
 
-  // Set up real-time subscription for date types
   useEffect(() => {
     console.log("Setting up real-time subscription for date types...");
     
@@ -195,7 +182,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
         async (payload) => {
           console.log("Date type change detected:", payload);
           
-          // Fetch updated date types
           const { data } = await supabase
             .from("job_date_types")
             .select("*")
@@ -212,14 +198,12 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       )
       .subscribe();
 
-    // Cleanup subscription
     return () => {
       console.log("Cleaning up date type subscription...");
       supabase.removeChannel(channel);
     };
   }, [jobs]);
 
-  // Fetch date types for jobs from supabase
   const fetchDateTypes = async () => {
     if (!jobs?.length) return;
     const { data, error } = await supabase
@@ -241,7 +225,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     fetchDateTypes();
   }, [jobs]);
 
-  // Returns jobs for a given date based on start/end times, department and selected job types (from the dropdown)
   const getJobsForDate = (date: Date) => {
     if (!jobs) return [];
     return jobs.filter((job) => {
@@ -271,7 +254,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     });
   };
 
-  // Helpers for PDF generation
   const hexToRgb = (hex: string): [number, number, number] => {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
@@ -285,10 +267,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     return luminance > 0.6 ? "#000000" : "#ffffff";
   };
 
-  // Generate a PDF calendar using only the jobs that match the printSettings filters.
-  // (Note: The printSettings are synced with the dropdown selection when the PrintDialog opens.)
   const generatePDF = async (range: "month" | "quarter" | "year") => {
-    // First, filter jobs based on the printSettings.
     const filteredJobs = jobs.filter((job) => {
       const jobType = job.job_type?.toLowerCase();
       return jobType && printSettings.jobTypes[jobType] === true;
@@ -309,6 +288,10 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     const logoHeight = logo ? logoWidth * (logo.height / logo.width) : 0;
     const pageWidth = doc.internal.pageSize.getWidth();
     const logoX = logo ? (pageWidth - logoWidth) / 2 : 0;
+    
+    const logoTopY = 10;
+    const monthTitleY = logo ? logoTopY + logoHeight + 5 : 20;
+    const calendarStartY = monthTitleY + 10;
 
     switch (range) {
       case "month":
@@ -332,7 +315,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     const cellWidth = 40;
     const cellHeight = 30;
     const startX = 10;
-    const startY = 10 + (logo ? logoHeight + 10 : 0);
     const daysOfWeek = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
     const dateTypeLabels: Record<string, string> = {
       travel: "V",
@@ -346,18 +328,18 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       if (pageIndex > 0) doc.addPage("landscape");
 
       if (logo) {
-        doc.addImage(logo, "PNG", logoX, 10, logoWidth, logoHeight);
+        doc.addImage(logo, "PNG", logoX, logoTopY, logoWidth, logoHeight);
       }
 
       doc.setFontSize(16);
-      doc.text(format(monthStart, "MMMM yyyy"), pageWidth / 2, logo ? 10 + logoHeight + 5 : 20, { align: "center" });
+      doc.text(format(monthStart, "MMMM yyyy"), pageWidth / 2, monthTitleY, { align: "center" });
 
       daysOfWeek.forEach((day, index) => {
         doc.setFillColor(41, 128, 185);
-        doc.rect(startX + index * cellWidth, startY, cellWidth, 10, "F");
+        doc.rect(startX + index * cellWidth, calendarStartY, cellWidth, 10, "F");
         doc.setTextColor(255);
         doc.setFontSize(10);
-        doc.text(day, startX + index * cellWidth + 15, startY + 7);
+        doc.text(day, startX + index * cellWidth + 15, calendarStartY + 7);
       });
 
       const monthEnd = endOfMonth(monthStart);
@@ -373,7 +355,9 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       while (allMonthDays.length > 0) {
         weeks.push(allMonthDays.splice(0, 7));
       }
-      let currentY = startY + 10;
+      
+      let currentY = calendarStartY + 10;
+      
       for (const week of weeks) {
         for (const [dayIndex, day] of week.entries()) {
           const x = startX + dayIndex * cellWidth;
@@ -383,7 +367,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
           doc.setTextColor(isSameMonth(day, monthStart) ? 0 : 200);
           doc.setFontSize(12);
           doc.text(format(day, "d"), x + 2, currentY + 5);
-          // For each day, get jobs from the filteredJobs (by printSettings)
           const dayJobs = filteredJobs.filter((job) => {
             try {
               const startDate = job.start_time ? parseISO(job.start_time) : null;
@@ -425,6 +408,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
         }
         currentY += cellHeight;
       }
+      
       if (pageIndex === 0) {
         const legendY = currentY + 10;
         doc.setFontSize(8);
@@ -438,7 +422,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     setShowPrintDialog(false);
   };
 
-  // Navigation handlers
   const handlePreviousMonth = () => {
     const newDate = new Date(currentMonth);
     newDate.setMonth(newDate.getMonth() - 1);
@@ -500,15 +483,10 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
             onDateSelect={onDateSelect}
           />
         )}
-        {/* Remove JobMilestonesDialog component */}
       </CardContent>
     </Card>
   );
 };
-
-//
-// CHILD COMPONENTS
-//
 
 interface CalendarHeaderProps {
   currentMonth: Date;
@@ -569,7 +547,6 @@ const PrintDialog: React.FC<PrintDialogProps> = ({
   currentMonth,
   selectedJobTypes,
 }) => {
-  // When the dialog opens, sync its checkbox settings with the dropdown's selection.
   useEffect(() => {
     if (showDialog) {
       const newJobTypes = {
@@ -733,7 +710,6 @@ interface JobCardProps {
   date: Date;
   dateTypes: Record<string, any>;
   setDateTypes: React.Dispatch<React.SetStateAction<Record<string, any>>>;
-  // Remove setSelectedJob and setShowMilestones from props
 }
 
 const JobCard: React.FC<JobCardProps> = ({
@@ -741,9 +717,7 @@ const JobCard: React.FC<JobCardProps> = ({
   date,
   dateTypes,
   setDateTypes,
-  // Remove setSelectedJob, setShowMilestones from parameters
 }) => {
-  // Return the correct icon based on the date type
   const getDateTypeIcon = (jobId: string, date: Date) => {
     const key = `${jobId}-${format(date, "yyyy-MM-dd")}`;
     const dateType = dateTypes[key]?.type;
@@ -763,7 +737,6 @@ const JobCard: React.FC<JobCardProps> = ({
     }
   };
 
-  // Return the appropriate icon for a department
   const getDepartmentIcon = (dept: string) => {
     switch (dept) {
       case "sound":
@@ -777,7 +750,6 @@ const JobCard: React.FC<JobCardProps> = ({
     }
   };
 
-  // Total up the required personnel from the job's personnel arrays
   const getTotalRequiredPersonnel = (job: any) => {
     let total = 0;
     if (job.sound_job_personnel?.length > 0) {
@@ -833,7 +805,6 @@ const JobCard: React.FC<JobCardProps> = ({
                 backgroundColor: `${job.color}20`,
                 color: job.color,
               }}
-              // Remove onClick handler that opened the milestones dialog
             >
               {dateTypeIcon}
               <span>{job.title}</span>
