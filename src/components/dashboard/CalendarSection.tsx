@@ -287,11 +287,12 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     const logoWidth = 50;
     const logoHeight = logo ? logoWidth * (logo.height / logo.width) : 0;
     const pageWidth = doc.internal.pageSize.getWidth();
-    const logoX = logo ? (pageWidth - logoWidth) / 2 : 0;
     
+    // Define standard vertical spacing values
     const logoTopY = 10;
     const monthTitleY = logo ? logoTopY + logoHeight + 5 : 20;
     const calendarStartY = monthTitleY + 10;
+    const footerSpace = 40; // Space reserved for logo and created date
 
     switch (range) {
       case "month":
@@ -327,13 +328,35 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     for (const [pageIndex, monthStart] of months.entries()) {
       if (pageIndex > 0) doc.addPage("landscape");
 
+      // Re-print header on each page
+      doc.setFillColor(125, 1, 1);
+      doc.rect(0, 0, pageWidth, 40, 'F');
+
+      doc.setFontSize(24);
+      doc.setTextColor(255, 255, 255);
+      const title = range === 'weight'
+        ? "Informe de Distribución de Peso"
+        : "Informe de Distribución de Potencia";
+      doc.text(title, pageWidth / 2, 20, { align: 'center' });
+
+      doc.setFontSize(16);
+      doc.text(jobName || 'Trabajo sin título', pageWidth / 2, 30, { align: 'center' });
+      
+      doc.setFontSize(12);
+      doc.text(`Fecha del Trabajo: ${jobDateStr}`, pageWidth / 2, 38, { align: 'center' });
+
+      // Add logo if available
+      const logoX = logo ? (pageWidth - logoWidth) / 2 : 0;
       if (logo) {
         doc.addImage(logo, "PNG", logoX, logoTopY, logoWidth, logoHeight);
       }
 
+      // Month title - set consistent styling and positioning
       doc.setFontSize(16);
+      doc.setTextColor(51, 51, 51); // Reset to standard text color
       doc.text(format(monthStart, "MMMM yyyy"), pageWidth / 2, monthTitleY, { align: "center" });
 
+      // Days of week header
       daysOfWeek.forEach((day, index) => {
         doc.setFillColor(41, 128, 185);
         doc.rect(startX + index * cellWidth, calendarStartY, cellWidth, 10, "F");
@@ -418,6 +441,22 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
         });
       }
     }
+    
+    // Add company logo to all pages
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      if (logo) {
+        const logoX = (pageWidth - logoWidth) / 2;
+        const yLogoFooter = doc.internal.pageSize.getHeight() - 20;
+        try {
+          doc.addImage(logo, "PNG", logoX, yLogoFooter - logoHeight, logoWidth, logoHeight);
+        } catch (error) {
+          console.error(`Error adding logo on page ${i}:`, error);
+        }
+      }
+    }
+    
     doc.save(`calendar-${range}-${format(new Date(), "yyyy-MM-dd")}.pdf`);
     setShowPrintDialog(false);
   };
