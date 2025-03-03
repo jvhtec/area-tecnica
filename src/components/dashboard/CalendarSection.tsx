@@ -425,21 +425,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       }
     }
     
-    // Add company logo to all pages
-    const pages = doc.internal.pages;
-    for (let i = 1; i < pages.length; i++) {
-      doc.setPage(i);
-      if (logo) {
-        const logoX = (pageWidth - logoWidth) / 2;
-        const yLogoFooter = doc.internal.pageSize.getHeight() - 20;
-        try {
-          doc.addImage(logo, "PNG", logoX, yLogoFooter - logoHeight, logoWidth, logoHeight);
-        } catch (error) {
-          console.error(`Error adding logo on page ${i}:`, error);
-        }
-      }
-    }
-    
     doc.save(`calendar-${range}-${format(new Date(), "yyyy-MM-dd")}.pdf`);
     setShowPrintDialog(false);
   };
