@@ -328,23 +328,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     for (const [pageIndex, monthStart] of months.entries()) {
       if (pageIndex > 0) doc.addPage("landscape");
 
-      // Re-print header on each page
-      doc.setFillColor(125, 1, 1);
-      doc.rect(0, 0, pageWidth, 40, 'F');
-
-      doc.setFontSize(24);
-      doc.setTextColor(255, 255, 255);
-      const title = range === 'weight'
-        ? "Informe de Distribución de Peso"
-        : "Informe de Distribución de Potencia";
-      doc.text(title, pageWidth / 2, 20, { align: 'center' });
-
-      doc.setFontSize(16);
-      doc.text(jobName || 'Trabajo sin título', pageWidth / 2, 30, { align: 'center' });
-      
-      doc.setFontSize(12);
-      doc.text(`Fecha del Trabajo: ${jobDateStr}`, pageWidth / 2, 38, { align: 'center' });
-
       // Add logo if available
       const logoX = logo ? (pageWidth - logoWidth) / 2 : 0;
       if (logo) {
@@ -443,8 +426,8 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     }
     
     // Add company logo to all pages
-    const totalPages = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= totalPages; i++) {
+    const pages = doc.internal.pages;
+    for (let i = 1; i < pages.length; i++) {
       doc.setPage(i);
       if (logo) {
         const logoX = (pageWidth - logoWidth) / 2;
