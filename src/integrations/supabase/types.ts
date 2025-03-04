@@ -1614,6 +1614,7 @@ export type Database = {
           job_id: string | null
           logo_url: string | null
           material_list_url: string | null
+          memoria_completa_url: string | null
           power_report_url: string | null
           project_name: string
           rigging_plot_url: string | null
@@ -1628,6 +1629,7 @@ export type Database = {
           job_id?: string | null
           logo_url?: string | null
           material_list_url?: string | null
+          memoria_completa_url?: string | null
           power_report_url?: string | null
           project_name: string
           rigging_plot_url?: string | null
@@ -1642,6 +1644,7 @@ export type Database = {
           job_id?: string | null
           logo_url?: string | null
           material_list_url?: string | null
+          memoria_completa_url?: string | null
           power_report_url?: string | null
           project_name?: string
           rigging_plot_url?: string | null

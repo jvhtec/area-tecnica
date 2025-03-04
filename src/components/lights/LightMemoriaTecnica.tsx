@@ -31,7 +31,8 @@ export const LightMemoriaTecnica = () => {
     { id: "material", title: "Listado de Material", file: null, landscape: false },
     { id: "weight", title: "Informe de Pesos", file: null, landscape: false },
     { id: "power", title: "Informe de Consumos", file: null, landscape: false },
-    { id: "rigging", title: "Plano de Rigging", file: null, landscape: true }
+    { id: "rigging", title: "Plano de Rigging", file: null, landscape: true },
+    { id: "memoria_completa", title: "Memoria Técnica Completa", file: null, landscape: false }
   ]);
 
   const handleLogoUpload = async (file: File) => {
@@ -108,11 +109,13 @@ export const LightMemoriaTecnica = () => {
       return;
     }
 
-    const availableDocuments = documents.filter(doc => doc.file !== null);
-    if (availableDocuments.length === 0) {
+    const hasMemoriaCompleta = documents.find(doc => doc.id === "memoria_completa" && doc.file !== null);
+    const hasRegularDocuments = documents.filter(doc => doc.id !== "memoria_completa" && doc.file !== null).length > 0;
+    
+    if (!hasMemoriaCompleta && !hasRegularDocuments) {
       toast({
         title: "Error",
-        description: "Por favor, suba al menos un documento",
+        description: "Por favor, suba al menos un documento o la memoria técnica completa",
         variant: "destructive",
       });
       return;
@@ -139,6 +142,8 @@ export const LightMemoriaTecnica = () => {
       }
 
       const documentUrls: Record<string, string> = {};
+      const availableDocuments = documents.filter(doc => doc.file !== null);
+      
       for (let i = 0; i < availableDocuments.length; i++) {
         const doc = availableDocuments[i];
         if (!doc.file) continue;
@@ -181,6 +186,7 @@ export const LightMemoriaTecnica = () => {
           weight_report_url: documentUrls.weight,
           power_report_url: documentUrls.power,
           rigging_plot_url: documentUrls.rigging,
+          memoria_completa_url: documentUrls.memoria_completa,
           final_document_url: response.data.url
         });
 

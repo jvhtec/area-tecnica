@@ -28,6 +28,10 @@ serve(async (req) => {
     
     // Corporate color (matches the existing brand)
     const corporateColor = rgb(125/255, 1/255, 1/255);
+
+    // Check if this is a complete memoria request
+    const isMemoriaCompleta = !!documentUrls.memoria_completa;
+    console.log(`Generation mode: ${isMemoriaCompleta ? 'Complete memoria' : 'Regular memoria'}`);
     
     // Create cover page
     const coverPage = mergedPdf.addPage([width, height]);
@@ -63,16 +67,47 @@ serve(async (req) => {
     if (logoUrl) {
       try {
         console.log('Fetching customer logo from URL:', logoUrl);
-        const logoResponse = await fetch(logoUrl);
+        const logoResponse = await fetch(logoUrl, {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
         if (!logoResponse.ok) {
           throw new Error(`Failed to fetch logo: ${logoResponse.statusText}`);
         }
         
         const logoImageBytes = new Uint8Array(await logoResponse.arrayBuffer());
-        const logoImage = await mergedPdf.embedJpg(logoImageBytes);
+        let logoImage;
+        
+        // Try to detect image type
+        if (logoUrl.toLowerCase().endsWith('.png')) {
+          logoImage = await mergedPdf.embedPng(logoImageBytes);
+        } else if (logoUrl.toLowerCase().endsWith('.jpg') || logoUrl.toLowerCase().endsWith('.jpeg')) {
+          logoImage = await mergedPdf.embedJpg(logoImageBytes);
+        } else {
+          // Try to detect by content
+          const header = logoImageBytes.slice(0, 8);
+          const isPng = header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47;
+          
+          if (isPng) {
+            logoImage = await mergedPdf.embedPng(logoImageBytes);
+          } else {
+            // Default to JPG if unknown
+            logoImage = await mergedPdf.embedJpg(logoImageBytes);
+          }
+        }
+        
+        console.log('Logo successfully embedded, dimensions:', logoImage.width, 'x', logoImage.height);
         
         const maxLogoHeight = 100;
         const maxLogoWidth = 200;
+        
+        // Check if dimensions are valid
+        if (logoImage.width <= 0 || logoImage.height <= 0) {
+          throw new Error('Invalid logo dimensions');
+        }
+        
         const scaleFactor = Math.min(
           maxLogoWidth / logoImage.width,
           maxLogoHeight / logoImage.height
@@ -96,7 +131,12 @@ serve(async (req) => {
       const sectorProLogoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/company-assets/sector-pro-logo.png`;
       console.log('Fetching Sector Pro logo from:', sectorProLogoUrl);
       
-      const logoResponse = await fetch(sectorProLogoUrl);
+      const logoResponse = await fetch(sectorProLogoUrl, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
       if (!logoResponse.ok) {
         throw new Error(`Failed to fetch Sector Pro logo: ${logoResponse.statusText}`);
       }
@@ -117,52 +157,18 @@ serve(async (req) => {
       console.error('Error adding Sector Pro logo:', error);
     }
 
-    // Create table of contents page
-    const tocPage = mergedPdf.addPage([width, height]);
-    
-    // Add "Tabla de Contenidos" title
-    tocPage.drawText('Tabla de Contenidos', {
-      x: 50,
-      y: height - 100,
-      size: 24,
-      color: rgb(0, 0, 0),
-    });
-
-    // Define the documents order and titles
-    const documentOrder = [
-      { id: 'material', title: 'Listado de Material' },
-      { id: 'weight', title: 'Informe de Pesos' },
-      { id: 'power', title: 'Informe de Consumos' },
-      { id: 'rigging', title: 'Plano de Rigging' },
-    ];
-
-    // Add table of contents entries
-    let entryY = height - 150;
-    let entryNumber = 1;
-
-    documentOrder.forEach(doc => {
-      if (documentUrls[doc.id]) {
-        tocPage.drawText(`${entryNumber}. ${doc.title}`, {
-          x: 50,
-          y: entryY,
-          size: 14,
-          color: rgb(0, 0, 0),
-        });
-        entryY -= 30;
-        entryNumber++;
-      }
-    });
-
-    // Append all document PDFs in order
-    for (const doc of documentOrder) {
-      const url = documentUrls[doc.id];
-      if (!url) continue;
-
+    if (isMemoriaCompleta) {
+      // For memoria completa, just append the complete document after the cover page
+      console.log('Appending complete memoria PDF from:', documentUrls.memoria_completa);
       try {
-        console.log(`Fetching PDF from URL: ${url}`);
-        const pdfResponse = await fetch(url);
+        const pdfResponse = await fetch(documentUrls.memoria_completa, {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
         if (!pdfResponse.ok) {
-          throw new Error(`Failed to fetch PDF: ${pdfResponse.statusText}`);
+          throw new Error(`Failed to fetch complete memoria PDF: ${pdfResponse.statusText}`);
         }
         
         const pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
@@ -170,8 +176,77 @@ serve(async (req) => {
         
         const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
         pages.forEach(page => mergedPdf.addPage(page));
+        console.log(`Added ${pages.length} pages from complete memoria`);
       } catch (error) {
-        console.error(`Error processing PDF for ${doc.id}:`, error);
+        console.error('Error processing complete memoria PDF:', error);
+        throw error;
+      }
+    } else {
+      // For regular memoria, create table of contents and append individual documents
+      console.log('Creating regular memoria with individual documents');
+      
+      // Create table of contents page
+      const tocPage = mergedPdf.addPage([width, height]);
+      
+      // Add "Tabla de Contenidos" title
+      tocPage.drawText('Tabla de Contenidos', {
+        x: 50,
+        y: height - 100,
+        size: 24,
+        color: rgb(0, 0, 0),
+      });
+
+      // Define the documents order and titles
+      const documentOrder = [
+        { id: 'material', title: 'Listado de Material' },
+        { id: 'weight', title: 'Informe de Pesos' },
+        { id: 'power', title: 'Informe de Consumos' },
+        { id: 'rigging', title: 'Plano de Rigging' },
+      ];
+
+      // Add table of contents entries
+      let entryY = height - 150;
+      let entryNumber = 1;
+
+      documentOrder.forEach(doc => {
+        if (documentUrls[doc.id]) {
+          tocPage.drawText(`${entryNumber}. ${doc.title}`, {
+            x: 50,
+            y: entryY,
+            size: 14,
+            color: rgb(0, 0, 0),
+          });
+          entryY -= 30;
+          entryNumber++;
+        }
+      });
+
+      // Append all document PDFs in order
+      for (const doc of documentOrder) {
+        const url = documentUrls[doc.id];
+        if (!url) continue;
+
+        try {
+          console.log(`Fetching PDF from URL: ${url}`);
+          const pdfResponse = await fetch(url, {
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          });
+          if (!pdfResponse.ok) {
+            throw new Error(`Failed to fetch PDF: ${pdfResponse.statusText}`);
+          }
+          
+          const pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
+          const pdf = await PDFDocument.load(pdfBytes);
+          
+          const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+          pages.forEach(page => mergedPdf.addPage(page));
+          console.log(`Added ${pages.length} pages from ${doc.id}`);
+        } catch (error) {
+          console.error(`Error processing PDF for ${doc.id}:`, error);
+        }
       }
     }
 
@@ -211,6 +286,8 @@ serve(async (req) => {
 
     // Get the public URL
     const publicUrl = `${supabaseUrl}/storage/v1/object/public/lights-memoria-tecnica/${encodeURIComponent(safeFileName)}`;
+    
+    console.log('Successfully generated memoria tecnica:', publicUrl);
     
     return new Response(
       JSON.stringify({ url: publicUrl }),
