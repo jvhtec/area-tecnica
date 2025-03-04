@@ -61,14 +61,70 @@ serve(async (req) => {
     if (logoUrl) {
       try {
         console.log('Fetching customer logo from URL:', logoUrl);
-        const logoResponse = await fetch(logoUrl);
-        if (!logoResponse.ok) throw new Error(`Failed to fetch logo: ${logoResponse.statusText}`);
         
+        // Add retry mechanism for logo fetch with timeout
+        const fetchWithRetry = async (url: string, retries = 3, timeout = 5000) => {
+          for (let i = 0; i < retries; i++) {
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), timeout);
+              
+              const response = await fetch(url, { 
+                signal: controller.signal,
+                headers: {
+                  'Cache-Control': 'no-cache',
+                  'Pragma': 'no-cache'
+                }
+              });
+              
+              clearTimeout(timeoutId);
+              
+              if (!response.ok) {
+                throw new Error(`Failed to fetch logo: ${response.statusText}`);
+              }
+              
+              return response;
+            } catch (error) {
+              console.error(`Attempt ${i + 1} failed:`, error);
+              if (i === retries - 1) throw error;
+              await new Promise(r => setTimeout(r, 1000)); // Wait before retry
+            }
+          }
+          throw new Error('Max retries reached');
+        };
+        
+        const logoResponse = await fetchWithRetry(logoUrl);
         const logoImageBytes = new Uint8Array(await logoResponse.arrayBuffer());
-        const logoImage = await mergedPdf.embedJpg(logoImageBytes);
+        
+        // Detect image type from URL or mime type
+        let logoImage;
+        if (logoUrl.toLowerCase().endsWith('.png')) {
+          logoImage = await mergedPdf.embedPng(logoImageBytes);
+        } else if (logoUrl.toLowerCase().endsWith('.jpg') || logoUrl.toLowerCase().endsWith('.jpeg')) {
+          logoImage = await mergedPdf.embedJpg(logoImageBytes);
+        } else {
+          // Try to detect by content
+          const header = logoImageBytes.slice(0, 8);
+          const isPng = header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47;
+          
+          if (isPng) {
+            logoImage = await mergedPdf.embedPng(logoImageBytes);
+          } else {
+            // Default to JPG if unknown
+            logoImage = await mergedPdf.embedJpg(logoImageBytes);
+          }
+        }
+        
+        console.log('Logo successfully embedded, dimensions:', logoImage.width, 'x', logoImage.height);
         
         const maxLogoHeight = 100;
         const maxLogoWidth = 200;
+        
+        // Check if dimensions are valid
+        if (logoImage.width <= 0 || logoImage.height <= 0) {
+          throw new Error('Invalid logo dimensions');
+        }
+        
         const scaleFactor = Math.min(
           maxLogoWidth / logoImage.width,
           maxLogoHeight / logoImage.height
@@ -76,12 +132,16 @@ serve(async (req) => {
         const scaledWidth = logoImage.width * scaleFactor;
         const scaledHeight = logoImage.height * scaleFactor;
 
+        console.log('Drawing logo with dimensions:', scaledWidth, 'x', scaledHeight);
+        
         coverPage.drawImage(logoImage, {
           x: (width - scaledWidth) / 2,
           y: height - headerHeight - scaledHeight - 50,
           width: scaledWidth,
           height: scaledHeight,
         });
+        
+        console.log('Logo successfully added to cover page');
       } catch (error) {
         console.error('Error processing customer logo:', error);
       }
@@ -92,7 +152,13 @@ serve(async (req) => {
       const sectorProLogoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/company-assets/sector-pro-logo.png`;
       console.log('Fetching Sector Pro logo from:', sectorProLogoUrl);
       
-      const logoResponse = await fetch(sectorProLogoUrl);
+      const logoResponse = await fetch(sectorProLogoUrl, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
       if (!logoResponse.ok) throw new Error(`Failed to fetch Sector Pro logo: ${logoResponse.statusText}`);
       
       const logoBytes = new Uint8Array(await logoResponse.arrayBuffer());
@@ -136,7 +202,13 @@ serve(async (req) => {
     // Add Sector Pro logo to index page
     try {
       const sectorProLogoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/company-assets/sector-pro-logo.png`;
-      const logoResponse = await fetch(sectorProLogoUrl);
+      const logoResponse = await fetch(sectorProLogoUrl, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
       if (!logoResponse.ok) throw new Error(`Failed to fetch Sector Pro logo for index: ${logoResponse.statusText}`);
       
       const logoBytes = new Uint8Array(await logoResponse.arrayBuffer());
@@ -187,7 +259,13 @@ serve(async (req) => {
 
       try {
         console.log(`Fetching PDF from URL: ${url}`);
-        const pdfResponse = await fetch(url);
+        const pdfResponse = await fetch(url, {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+        
         if (!pdfResponse.ok) throw new Error(`Failed to fetch PDF: ${pdfResponse.statusText}`);
         
         const pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
