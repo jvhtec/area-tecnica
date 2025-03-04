@@ -258,7 +258,7 @@ export async function createAllFoldersForJob(
 
         for (const sf of personnelSubfolders) {
           const subPayload = {
-            definitionId: FLEX_FOLDER_IDS.subFolder,
+            definitionId: FLEX_FOLDER_IDS.hojaGastos,
             parentElementId: childRow.element_id,
             open: true,
             locked: false,
