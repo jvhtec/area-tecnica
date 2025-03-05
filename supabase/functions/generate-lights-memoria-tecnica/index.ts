@@ -29,8 +29,8 @@ serve(async (req) => {
     // Corporate color (matches the existing brand)
     const corporateColor = rgb(125/255, 1/255, 1/255);
 
-    // Check if this is a complete memoria request
-    const isMemoriaCompleta = !!documentUrls.memoria_completa;
+    // Check if this is a complete memoria request - this is our key condition
+    const isMemoriaCompleta = documentUrls.memoria_completa ? true : false;
     console.log(`Generation mode: ${isMemoriaCompleta ? 'Complete memoria' : 'Regular memoria'}`);
     
     // Create cover page
