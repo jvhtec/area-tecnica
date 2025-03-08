@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { format, eachDayOfInterval, isValid } from "date-fns";
 import { ArtistTablePrintDialog } from "@/components/festival/ArtistTablePrintDialog";
 import { exportArtistTablePDF } from "@/utils/artistTablePdfExport";
+import { DateTypeContextMenu } from "@/components/dashboard/DateTypeContextMenu";
+import { useQuery } from "@tanstack/react-query";
 
 const FestivalArtistManagement = () => {
   const { jobId } = useParams();
@@ -31,6 +34,40 @@ const FestivalArtistManagement = () => {
   const [isPrinting, setIsPrinting] = useState(false);
   const [printDate, setPrintDate] = useState("");
   const [printStage, setPrintStage] = useState("");
+  const [dateTypes, setDateTypes] = useState<Record<string, string>>({});
+
+  // Query to fetch job date types
+  const { data: dateTypeData, refetch: refetchDateTypes } = useQuery({
+    queryKey: ['job-date-types', jobId],
+    queryFn: async () => {
+      if (!jobId) return {};
+
+      const { data, error } = await supabase
+        .from('job_date_types')
+        .select('*')
+        .eq('job_id', jobId);
+
+      if (error) {
+        console.error('Error fetching date types:', error);
+        return {};
+      }
+
+      const dateTypeMap: Record<string, string> = {};
+      data.forEach(item => {
+        dateTypeMap[`${jobId}-${item.date}`] = item.type;
+      });
+
+      return dateTypeMap;
+    },
+    enabled: !!jobId
+  });
+
+  // Update date types when query data changes
+  useEffect(() => {
+    if (dateTypeData) {
+      setDateTypes(dateTypeData);
+    }
+  }, [dateTypeData]);
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -162,6 +199,39 @@ const FestivalArtistManagement = () => {
     return format(date, 'EEE, MMM d');
   };
 
+  const getDateTypeColor = (date: Date) => {
+    const formattedDate = format(date, 'yyyy-MM-dd');
+    const key = `${jobId}-${formattedDate}`;
+    const dateType = dateTypes[key];
+    
+    switch (dateType) {
+      case 'travel':
+        return 'border-blue-500';
+      case 'setup':
+        return 'border-amber-500';
+      case 'show':
+        return 'border-green-500';
+      case 'off':
+        return 'border-gray-500';
+      case 'rehearsal':
+        return 'border-purple-500';
+      default:
+        return '';
+    }
+  };
+
+  const isShowDate = (date: Date) => {
+    const formattedDate = format(date, 'yyyy-MM-dd');
+    const key = `${jobId}-${formattedDate}`;
+    return dateTypes[key] === 'show';
+  };
+
+  const getCurrentDateType = () => {
+    if (!selectedDate || !jobId) return null;
+    const key = `${jobId}-${selectedDate}`;
+    return dateTypes[key];
+  };
+
   const handlePrintTable = async () => {
     if (!jobId) return;
     
@@ -249,6 +319,9 @@ const FestivalArtistManagement = () => {
     }
   };
 
+  const currentDateType = getCurrentDateType();
+  const showArtistControls = currentDateType === 'show';
+
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="mb-6">
@@ -274,22 +347,31 @@ const FestivalArtistManagement = () => {
               <Printer className="h-4 w-4 mr-2" />
               Print Schedule
             </Button>
-            <Button onClick={handleAddArtist}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Artist
-            </Button>
+            {showArtistControls ? (
+              <Button onClick={handleAddArtist}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Artist
+              </Button>
+            ) : (
+              <Button disabled title="Artists can only be added on show dates">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Artist
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <ArtistTableFilters
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              stageFilter={stageFilter}
-              onStageFilterChange={setStageFilter}
-              equipmentFilter={equipmentFilter}
-              onEquipmentFilterChange={setEquipmentFilter}
-            />
+            {showArtistControls && (
+              <ArtistTableFilters
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                stageFilter={stageFilter}
+                onStageFilterChange={setStageFilter}
+                equipmentFilter={equipmentFilter}
+                onEquipmentFilterChange={setEquipmentFilter}
+              />
+            )}
             
             {jobDates.length > 0 ? (
               <Tabs
@@ -297,30 +379,50 @@ const FestivalArtistManagement = () => {
                 onValueChange={setSelectedDate}
                 className="w-full"
               >
-                <TabsList className="mb-4">
-                  {jobDates.map((date) => (
-                    <TabsTrigger
-                      key={format(date, 'yyyy-MM-dd')}
-                      value={format(date, 'yyyy-MM-dd')}
-                    >
-                      {formatTabDate(date)}
-                    </TabsTrigger>
-                  ))}
+                <TabsList className="mb-4 flex flex-wrap">
+                  {jobDates.map((date) => {
+                    const formattedDateValue = format(date, 'yyyy-MM-dd');
+                    const dateTypeColor = getDateTypeColor(date);
+                    
+                    return (
+                      <DateTypeContextMenu 
+                        key={formattedDateValue}
+                        jobId={jobId || ''}
+                        date={date}
+                        onTypeChange={() => refetchDateTypes()}
+                      >
+                        <TabsTrigger
+                          value={formattedDateValue}
+                          className={`border-b-2 ${dateTypeColor}`}
+                        >
+                          {formatTabDate(date)}
+                        </TabsTrigger>
+                      </DateTypeContextMenu>
+                    );
+                  })}
                 </TabsList>
                 {jobDates.map((date) => (
                   <TabsContent
                     key={format(date, 'yyyy-MM-dd')}
                     value={format(date, 'yyyy-MM-dd')}
                   >
-                    <ArtistTable
-                      artists={artists}
-                      isLoading={isLoading}
-                      onEditArtist={handleEditArtist}
-                      onDeleteArtist={handleDeleteArtist}
-                      searchTerm={searchTerm}
-                      stageFilter={stageFilter}
-                      equipmentFilter={equipmentFilter}
-                    />
+                    {isShowDate(date) ? (
+                      <ArtistTable
+                        artists={artists}
+                        isLoading={isLoading}
+                        onEditArtist={handleEditArtist}
+                        onDeleteArtist={handleDeleteArtist}
+                        searchTerm={searchTerm}
+                        stageFilter={stageFilter}
+                        equipmentFilter={equipmentFilter}
+                      />
+                    ) : (
+                      <div className="p-8 text-center text-muted-foreground border rounded-md">
+                        <p>This is not configured as a show date.</p>
+                        <p>Artist management is only available on show dates.</p>
+                        <p className="mt-2 text-sm">Right-click on the date tab to change its type.</p>
+                      </div>
+                    )}
                   </TabsContent>
                 ))}
               </Tabs>
@@ -339,13 +441,15 @@ const FestivalArtistManagement = () => {
         </CardContent>
       </Card>
 
-      <ArtistManagementDialog
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        artist={selectedArtist}
-        jobId={jobId}
-        selectedDate={selectedDate}
-      />
+      {showArtistControls && (
+        <ArtistManagementDialog
+          open={isDialogOpen}
+          onOpenChange={setIsDialogOpen}
+          artist={selectedArtist}
+          jobId={jobId}
+          selectedDate={selectedDate}
+        />
+      )}
 
       <ArtistTablePrintDialog
         open={isPrintDialogOpen}
