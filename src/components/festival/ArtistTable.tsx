@@ -1,8 +1,7 @@
-
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Edit2, Loader2, Mic, Headphones, FileText, Trash2, ChevronDown, ChevronUp, Printer, Link2 } from "lucide-react";
-import { format } from "date-fns";
+import { Edit2, Loader2, Mic, Headphones, FileText, Trash2, ChevronDown, ChevronUp, Printer, Link2, Clock } from "lucide-react";
+import { format, parseISO, isBefore, addDays, set } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +16,7 @@ import { FormStatusBadge } from "./FormStatusBadge";
 import { ArtistFormSubmissionDialog } from "./ArtistFormSubmissionDialog";
 import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ArtistTableProps {
   artists: any[];
@@ -26,6 +26,7 @@ interface ArtistTableProps {
   searchTerm: string;
   stageFilter: string;
   equipmentFilter: string;
+  dayStartTime?: string;
 }
 
 type FormStatus = "pending" | "submitted" | "expired";
@@ -55,7 +56,8 @@ export const ArtistTable = ({
   onDeleteArtist,
   searchTerm,
   stageFilter,
-  equipmentFilter
+  equipmentFilter,
+  dayStartTime = "07:00"
 }: ArtistTableProps) => {
   const { toast } = useToast();
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
@@ -72,6 +74,33 @@ export const ArtistTable = ({
   const [formLinksDialogOpen, setFormLinksDialogOpen] = useState(false);
   const jobId = artists[0]?.job_id;
   const selectedDate = artists[0]?.date;
+
+  const formatShowTime = (timeString: string, isAfterMidnight: boolean = false) => {
+    if (!timeString) return '';
+    try {
+      const baseDate = new Date(`2000-01-01T${timeString}`);
+      return (
+        <div className="flex items-center">
+          {format(baseDate, 'HH:mm')}
+          {isAfterMidnight && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Clock className="h-3 w-3 ml-1 text-blue-500" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>After midnight (next day)</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+      );
+    } catch (error) {
+      console.error('Error formatting time:', error);
+      return timeString;
+    }
+  };
 
   useEffect(() => {
     const fetchGearSetup = async () => {
@@ -390,6 +419,20 @@ export const ArtistTable = ({
     return matchesSearch && matchesStage && matchesEquipment;
   });
 
+  const sortedArtists = [...filteredArtists].sort((a, b) => {
+    if (!a.show_start && !b.show_start) return 0;
+    if (!a.show_start) return 1;
+    if (!b.show_start) return -1;
+    
+    const [aHours, aMinutes] = a.show_start.split(':').map(Number);
+    const [bHours, bMinutes] = b.show_start.split(':').map(Number);
+    
+    const aValue = (aHours < 7 ? aHours + 24 : aHours) * 60 + aMinutes;
+    const bValue = (bHours < 7 ? bHours + 24 : bHours) * 60 + bMinutes;
+    
+    return aValue - bValue;
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-4">
@@ -398,7 +441,7 @@ export const ArtistTable = ({
     );
   }
 
-  if (!filteredArtists.length) {
+  if (!sortedArtists.length) {
     return (
       <div className="text-center p-4 text-muted-foreground">
         No artists found matching the current filters.
@@ -442,16 +485,18 @@ export const ArtistTable = ({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredArtists.map((artist) => {
+          {sortedArtists.map((artist) => {
             const issues = checkGearRequirements(artist);
             const hasIssues = Object.keys(issues).length > 0;
             const formStatus = formStatuses[artist.id];
+            const isAfterMidnight = artist.isAfterMidnight;
             
             return (
               <>
                 <TableRow key={artist.id} className={cn(
                   expandedRows.includes(artist.id) && "bg-muted/50",
-                  hasIssues && "bg-red-50/50 dark:bg-red-950/20"
+                  hasIssues && "bg-red-50/50 dark:bg-red-950/20",
+                  isAfterMidnight && "bg-blue-50/30 dark:bg-blue-950/20"
                 )}>
                   <TableCell>
                     <Button
@@ -466,17 +511,31 @@ export const ArtistTable = ({
                       )}
                     </Button>
                   </TableCell>
-                  <TableCell className="font-medium">{artist.name}</TableCell>
+                  <TableCell className="font-medium">
+                    {artist.name}
+                    {isAfterMidnight && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge className="ml-2 bg-blue-500 hover:bg-blue-600">AM</Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>After midnight performance (early morning)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </TableCell>
                   <TableCell>{artist.stage}</TableCell>
                   <TableCell>
-                    {artist.show_start && format(new Date(`2000-01-01T${artist.show_start}`), 'HH:mm')} - 
-                    {artist.show_end && format(new Date(`2000-01-01T${artist.show_end}`), 'HH:mm')}
+                    {formatShowTime(artist.show_start, isAfterMidnight)} - 
+                    {formatShowTime(artist.show_end, isAfterMidnight)}
                   </TableCell>
                   <TableCell>
                     {artist.soundcheck && (
                       <>
-                        {artist.soundcheck_start && format(new Date(`2000-01-01T${artist.soundcheck_start}`), 'HH:mm')} - 
-                        {artist.soundcheck_end && format(new Date(`2000-01-01T${artist.soundcheck_end}`), 'HH:mm')}
+                        {formatShowTime(artist.soundcheck_start)} - 
+                        {formatShowTime(artist.soundcheck_end)}
                       </>
                     )}
                   </TableCell>

@@ -1,4 +1,3 @@
-
 export interface ConsoleSetup {
   model: string;
   quantity: number;
@@ -75,4 +74,12 @@ export interface ArtistFormData {
   infrastructure_provided_by: 'festival' | 'band';
   other_infrastructure: string;
   notes: string;
+}
+
+export interface FestivalSettings {
+  id: string;
+  job_id: string;
+  day_start_time: string; // Format: "07:00"
+  created_at?: string;
+  updated_at?: string;
 }

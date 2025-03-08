@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,9 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
+import { Badge } from "@/components/ui/badge";
+import { Clock } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ArtistManagementDialogProps {
   open: boolean;
@@ -16,6 +20,7 @@ interface ArtistManagementDialogProps {
   artist?: any;
   jobId?: string;
   selectedDate?: string;
+  dayStartTime?: string;
 }
 
 const consoleOptions = [
@@ -43,11 +48,15 @@ export const ArtistManagementDialog = ({
   onOpenChange,
   artist,
   jobId,
-  selectedDate
+  selectedDate,
+  dayStartTime = "07:00"
 }: ArtistManagementDialogProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formLinkDialogOpen, setFormLinkDialogOpen] = useState(false);
+  const [showStartHour, setShowStartHour] = useState<number | null>(null);
+  const [showEndHour, setShowEndHour] = useState<number | null>(null);
+  const [dayStartHour] = useState<number>(parseInt(dayStartTime.split(':')[0]) || 7);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -99,13 +108,47 @@ export const ArtistManagementDialog = ({
         ...artist,
         date: artist.date || selectedDate || "",
       });
+      
+      // Set hours for after-midnight detection
+      if (artist.show_start) {
+        setShowStartHour(parseInt(artist.show_start.split(':')[0]));
+      }
+      if (artist.show_end) {
+        setShowEndHour(parseInt(artist.show_end.split(':')[0]));
+      }
     } else {
       setFormData(prev => ({
         ...prev,
         date: selectedDate || "",
       }));
+      setShowStartHour(null);
+      setShowEndHour(null);
     }
   }, [artist, selectedDate]);
+
+  const handleTimeChange = (timeField: 'show_start' | 'show_end', value: string) => {
+    setFormData({ ...formData, [timeField]: value });
+    
+    if (value) {
+      const hour = parseInt(value.split(':')[0]);
+      if (timeField === 'show_start') {
+        setShowStartHour(hour);
+      } else {
+        setShowEndHour(hour);
+      }
+    } else {
+      if (timeField === 'show_start') {
+        setShowStartHour(null);
+      } else {
+        setShowEndHour(null);
+      }
+    }
+  };
+
+  // Check if a time is after midnight but before the festival day start
+  const isAfterMidnight = (hour: number | null) => {
+    return hour !== null && hour < dayStartHour;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,6 +190,8 @@ export const ArtistManagementDialog = ({
         show_end: formData.show_end || null,
         soundcheck_start: formData.soundcheck_start || null,
         soundcheck_end: formData.soundcheck_end || null,
+        // Add a flag to indicate if this is an after-midnight performance
+        isAfterMidnight: isAfterMidnight(showStartHour),
       };
 
       const { error } = artist?.id
@@ -243,26 +288,58 @@ export const ArtistManagementDialog = ({
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label htmlFor="show_start">Show Start</Label>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="show_start">Show Start</Label>
+                      {isAfterMidnight(showStartHour) && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge className="bg-blue-500 hover:bg-blue-600 flex items-center gap-1">
+                                <Clock className="h-3 w-3" /> AM
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>This time is after midnight (early morning)</p>
+                              <p>On the {dayStartTime} to {dayStartTime} festival day schedule</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </div>
                     <Input
                       id="show_start"
                       type="time"
                       value={formData.show_start}
-                      onChange={(e) =>
-                        setFormData({ ...formData, show_start: e.target.value })
-                      }
+                      onChange={(e) => handleTimeChange('show_start', e.target.value)}
+                      className={isAfterMidnight(showStartHour) ? "border-blue-500" : ""}
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="show_end">Show End</Label>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="show_end">Show End</Label>
+                      {isAfterMidnight(showEndHour) && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge className="bg-blue-500 hover:bg-blue-600 flex items-center gap-1">
+                                <Clock className="h-3 w-3" /> AM
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>This time is after midnight (early morning)</p>
+                              <p>On the {dayStartTime} to {dayStartTime} festival day schedule</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </div>
                     <Input
                       id="show_end"
                       type="time"
                       value={formData.show_end}
-                      onChange={(e) =>
-                        setFormData({ ...formData, show_end: e.target.value })
-                      }
+                      onChange={(e) => handleTimeChange('show_end', e.target.value)}
+                      className={isAfterMidnight(showEndHour) ? "border-blue-500" : ""}
                     />
                   </div>
                 </div>

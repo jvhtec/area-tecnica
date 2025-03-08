@@ -1,20 +1,33 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowLeft, Printer } from "lucide-react";
+import { Plus, ArrowLeft, Printer, Info } from "lucide-react";
 import { ArtistTable } from "@/components/festival/ArtistTable";
 import { ArtistManagementDialog } from "@/components/festival/ArtistManagementDialog";
 import { ArtistTableFilters } from "@/components/festival/ArtistTableFilters";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { format, eachDayOfInterval, isValid } from "date-fns";
+import { 
+  format, 
+  eachDayOfInterval, 
+  isValid, 
+  addDays,
+  subDays,
+  parseISO,
+  isBefore,
+  startOfDay,
+  setHours,
+  setMinutes
+} from "date-fns";
 import { ArtistTablePrintDialog } from "@/components/festival/ArtistTablePrintDialog";
 import { exportArtistTablePDF } from "@/utils/artistTablePdfExport";
 import { DateTypeContextMenu } from "@/components/dashboard/DateTypeContextMenu";
 import { useQuery } from "@tanstack/react-query";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+const DAY_START_HOUR = 7; // Festival day starts at 7:00 AM
 
 const FestivalArtistManagement = () => {
   const { jobId } = useParams();
@@ -26,6 +39,7 @@ const FestivalArtistManagement = () => {
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
   const [jobTitle, setJobTitle] = useState("");
   const [jobDates, setJobDates] = useState<Date[]>([]);
+  const [festivalDates, setFestivalDates] = useState<{display: string, actual: string}[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   const [stageFilter, setStageFilter] = useState("");
@@ -35,6 +49,57 @@ const FestivalArtistManagement = () => {
   const [printDate, setPrintDate] = useState("");
   const [printStage, setPrintStage] = useState("");
   const [dateTypes, setDateTypes] = useState<Record<string, string>>({});
+  const [dayStartTime, setDayStartTime] = useState<string>("07:00");
+
+  // Query to fetch festival settings
+  const { data: festivalSettings } = useQuery({
+    queryKey: ['festival-settings', jobId],
+    queryFn: async () => {
+      if (!jobId) return null;
+
+      // Check if settings exist
+      const { data: existingSettings, error: fetchError } = await supabase
+        .from('festival_settings')
+        .select('*')
+        .eq('job_id', jobId)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error('Error fetching festival settings:', fetchError);
+        return null;
+      }
+
+      // If settings exist, return them
+      if (existingSettings) {
+        return existingSettings;
+      }
+
+      // Otherwise create default settings
+      const { data: newSettings, error: createError } = await supabase
+        .from('festival_settings')
+        .insert({
+          job_id: jobId,
+          day_start_time: "07:00"
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Error creating festival settings:', createError);
+        return null;
+      }
+
+      return newSettings;
+    },
+    enabled: !!jobId
+  });
+
+  // Update day start time when settings are loaded
+  useEffect(() => {
+    if (festivalSettings?.day_start_time) {
+      setDayStartTime(festivalSettings.day_start_time);
+    }
+  }, [festivalSettings]);
 
   // Query to fetch job date types
   const { data: dateTypeData, refetch: refetchDateTypes } = useQuery({
@@ -69,6 +134,28 @@ const FestivalArtistManagement = () => {
     }
   }, [dateTypeData]);
 
+  // Helper function to convert calendar date to festival date
+  const toFestivalDay = (date: Date, time: string): Date => {
+    const [hours, minutes] = time.split(':').map(Number);
+    const showTime = new Date(date);
+    showTime.setHours(hours || 0);
+    showTime.setMinutes(minutes || 0);
+    
+    // If the time is before the day start hour (e.g., 2:00 AM), 
+    // it belongs to the previous festival day
+    if (hours < DAY_START_HOUR) {
+      return addDays(date, -1);
+    }
+    return date;
+  };
+
+  // Helper function to format a festival day label
+  const formatFestivalDay = (date: Date, includeDay = true): string => {
+    const dayStr = includeDay ? 'EEE, ' : '';
+    return format(date, `${dayStr}MMM d`) + 
+      (includeDay ? ` (${format(date, 'yyyy-MM-dd')})` : '');
+  };
+
   useEffect(() => {
     const fetchJobDetails = async () => {
       if (!jobId) return;
@@ -88,6 +175,15 @@ const FestivalArtistManagement = () => {
         if (isValid(startDate) && isValid(endDate)) {
           const dates = eachDayOfInterval({ start: startDate, end: endDate });
           setJobDates(dates);
+          
+          // Create festival days mapping (display date to actual date)
+          const festivalDaysMap = dates.map(date => ({
+            display: formatFestivalDay(date),
+            actual: format(date, 'yyyy-MM-dd')
+          }));
+          setFestivalDates(festivalDaysMap);
+          
+          // Set the first date as the default selected date
           const formattedDate = format(dates[0], 'yyyy-MM-dd');
           setSelectedDate(formattedDate);
         }
@@ -128,7 +224,18 @@ const FestivalArtistManagement = () => {
         return;
       }
       
-      console.log("Fetching artists for job:", jobId, "and date:", selectedDate);
+      // Parse the day start time
+      const [startHour, startMinute] = dayStartTime.split(':').map(Number);
+      
+      // Create the current festival day boundaries
+      const selectedDateObj = parseISO(selectedDate);
+      const festivalDayStart = setMinutes(setHours(selectedDateObj, startHour || 7), startMinute || 0);
+      const nextDayObj = addDays(selectedDateObj, 1);
+      const festivalDayEnd = setMinutes(setHours(nextDayObj, startHour || 7), startMinute || 0);
+      
+      console.log("Fetching artists for festival day:", format(festivalDayStart, 'yyyy-MM-dd HH:mm'), "to", format(festivalDayEnd, 'yyyy-MM-dd HH:mm'));
+      
+      // Fetch artists for this festival day (including after-midnight performances)
       const { data, error } = await supabase
         .from("festival_artists")
         .select("*")
@@ -137,8 +244,24 @@ const FestivalArtistManagement = () => {
         .order("show_start", { ascending: true });
 
       if (error) throw error;
+      
       console.log("Fetched artists:", data);
-      setArtists(data || []);
+      
+      // Process the artists to properly handle after-midnight times
+      const processedArtists = data?.map(artist => {
+        if (!artist.show_start) return artist;
+        
+        // Determine if this is an after-midnight show (for UI indicators)
+        const [hours] = artist.show_start.split(':').map(Number);
+        const isAfterMidnight = hours < startHour;
+        
+        return {
+          ...artist,
+          isAfterMidnight
+        };
+      }) || [];
+      
+      setArtists(processedArtists);
     } catch (error: any) {
       console.error("Error fetching artists:", error);
       toast({
@@ -156,7 +279,7 @@ const FestivalArtistManagement = () => {
       setIsLoading(true);
       fetchArtists();
     }
-  }, [jobId, selectedDate]);
+  }, [jobId, selectedDate, dayStartTime]);
 
   const handleAddArtist = () => {
     setSelectedArtist(null);
@@ -338,7 +461,22 @@ const FestivalArtistManagement = () => {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Artist Management</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Artist Management
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="cursor-help">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-sm">
+                  <p>Festival days run from {dayStartTime} to {dayStartTime} the next day.</p>
+                  <p>Shows after midnight are included in the previous day's schedule.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </CardTitle>
           <div className="flex items-center gap-2">
             <Button onClick={() => {
               setPrintDate(selectedDate);
@@ -391,12 +529,23 @@ const FestivalArtistManagement = () => {
                         date={date}
                         onTypeChange={() => refetchDateTypes()}
                       >
-                        <TabsTrigger
-                          value={formattedDateValue}
-                          className={`border-b-2 ${dateTypeColor}`}
-                        >
-                          {formatTabDate(date)}
-                        </TabsTrigger>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <TabsTrigger
+                                value={formattedDateValue}
+                                className={`border-b-2 ${dateTypeColor}`}
+                              >
+                                {formatTabDate(date)}
+                              </TabsTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Festival day runs from {dayStartTime} to {dayStartTime} the next day</p>
+                              <p>Date: {format(date, 'yyyy-MM-dd')}</p>
+                              <p>Type: {dateTypes[`${jobId}-${formattedDateValue}`] || 'Not set'}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </DateTypeContextMenu>
                     );
                   })}
@@ -415,6 +564,7 @@ const FestivalArtistManagement = () => {
                         searchTerm={searchTerm}
                         stageFilter={stageFilter}
                         equipmentFilter={equipmentFilter}
+                        dayStartTime={dayStartTime}
                       />
                     ) : (
                       <div className="p-8 text-center text-muted-foreground border rounded-md">
@@ -435,6 +585,7 @@ const FestivalArtistManagement = () => {
                 searchTerm={searchTerm}
                 stageFilter={stageFilter}
                 equipmentFilter={equipmentFilter}
+                dayStartTime={dayStartTime}
               />
             )}
           </div>
@@ -448,6 +599,7 @@ const FestivalArtistManagement = () => {
           artist={selectedArtist}
           jobId={jobId}
           selectedDate={selectedDate}
+          dayStartTime={dayStartTime}
         />
       )}
 
