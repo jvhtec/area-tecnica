@@ -17,3 +17,10 @@ export interface SectionProps {
   onChange: (changes: Partial<any>) => void;
   gearSetup?: FestivalGearSetup;
 }
+
+export interface ProviderSelectorProps {
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+  id: string;
+}
