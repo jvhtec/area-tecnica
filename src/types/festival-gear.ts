@@ -70,3 +70,10 @@ export interface ConsoleConfigProps {
   onChange: (consoles: ConsoleSetup[]) => void;
   label: string;
 }
+
+export interface StageSetup {
+  id: string;
+  name: string;
+  description?: string;
+  gear_setup_id: string;
+}

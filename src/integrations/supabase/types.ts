@@ -502,6 +502,7 @@ export type Database = {
           infrastructure_provided_by:
             | Database["public"]["Enums"]["provider_type"]
             | null
+          isaftermidnight: boolean | null
           job_id: string | null
           mic_pack: string | null
           mon_console: string | null
@@ -564,6 +565,7 @@ export type Database = {
           infrastructure_provided_by?:
             | Database["public"]["Enums"]["provider_type"]
             | null
+          isaftermidnight?: boolean | null
           job_id?: string | null
           mic_pack?: string | null
           mon_console?: string | null
@@ -626,6 +628,7 @@ export type Database = {
           infrastructure_provided_by?:
             | Database["public"]["Enums"]["provider_type"]
             | null
+          isaftermidnight?: boolean | null
           job_id?: string | null
           mic_pack?: string | null
           mon_console?: string | null
@@ -781,6 +784,38 @@ export type Database = {
             foreignKeyName: "festival_logos_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: true
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      festival_settings: {
+        Row: {
+          created_at: string | null
+          day_start_time: string
+          id: string
+          job_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          day_start_time?: string
+          id?: string
+          job_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          day_start_time?: string
+          id?: string
+          job_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "festival_settings_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },

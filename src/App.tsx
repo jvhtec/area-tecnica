@@ -1,4 +1,3 @@
-
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -32,6 +31,7 @@ import VideoMemoriaTecnica from '@/pages/VideoMemoriaTecnica';
 import { EquipmentManagement } from '@/pages/EquipmentManagement';
 import { ArtistRequirementsForm } from '@/components/festival/ArtistRequirementsForm';
 import { FormSubmitted } from '@/components/festival/FormSubmitted';
+import { FestivalGearManagement } from '@/pages/FestivalGearManagement';
 
 function App() {
   return (
@@ -76,6 +76,7 @@ function App() {
               {/* Festival Management Routes */}
               <Route path="festival-management/:jobId" element={<FestivalManagement />} />
               <Route path="festival-management/:jobId/artists" element={<FestivalArtistManagement />} />
+              <Route path="/festival-management/:jobId/gear" element={<FestivalGearManagement />} />
             </Route>
           </Routes>
         </BrowserRouter>

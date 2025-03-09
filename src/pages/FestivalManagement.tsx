@@ -8,7 +8,6 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { format, eachDayOfInterval, isValid } from "date-fns";
-import { FestivalGearSetupForm } from "@/components/festival/FestivalGearSetupForm";
 import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
 
 interface FestivalJob {
@@ -109,77 +108,59 @@ const FestivalManagement = () => {
         </CardHeader>
       </Card>
 
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="gear">Festival Gear</TabsTrigger>
-        </TabsList>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Artists Section */}
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/artists`)}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Artists
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{artistCount}</p>
+            <p className="text-sm text-muted-foreground">Total Artists</p>
+            <Button className="mt-4 w-full" onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/festival-management/${jobId}/artists`);
+            }}>
+              Manage Artists
+            </Button>
+          </CardContent>
+        </Card>
 
-        <TabsContent value="overview">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Artists Section */}
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/artists`)}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Artists
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold">{artistCount}</p>
-                <p className="text-sm text-muted-foreground">Total Artists</p>
-                <Button className="mt-4 w-full" onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/festival-management/${jobId}/artists`);
-                }}>
-                  Manage Artists
-                </Button>
-              </CardContent>
-            </Card>
+        {/* Stages & Gear Section */}
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/gear`)}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Layout className="h-5 w-5" />
+              Stages & Gear
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Manage stages and technical equipment</p>
+            <Button className="mt-4 w-full" onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/festival-management/${jobId}/gear`);
+            }}>
+              Manage Gear
+            </Button>
+          </CardContent>
+        </Card>
 
-            {/* Stages Section - Placeholder */}
-            <Card className="opacity-50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Layout className="h-5 w-5" />
-                  Stages
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">Coming soon</p>
-              </CardContent>
-            </Card>
-
-            {/* Technical Requirements - Placeholder */}
-            <Card className="opacity-50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Wrench className="h-5 w-5" />
-                  Technical Requirements
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">Coming soon</p>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="gear">
-          {selectedDate && (
-            <FestivalGearSetupForm 
-              jobId={jobId} 
-              selectedDate={selectedDate}
-              onSave={() => {
-                toast({
-                  title: "Success",
-                  description: "Festival gear setup has been updated.",
-                });
-              }}
-            />
-          )}
-        </TabsContent>
-      </Tabs>
+        {/* Technical Requirements - Placeholder */}
+        <Card className="opacity-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5" />
+              Technical Requirements
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Coming soon</p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

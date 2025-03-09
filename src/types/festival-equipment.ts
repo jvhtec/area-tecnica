@@ -26,15 +26,3 @@ export const IEM_SYSTEMS = [
 
 export type WirelessSystem = typeof WIRELESS_SYSTEMS[number];
 export type IEMSystem = typeof IEM_SYSTEMS[number];
-
-export interface WirelessSetup {
-  model: WirelessSystem;
-  quantity: number;
-  band?: string;
-}
-
-export interface IEMSetup {
-  model: IEMSystem;
-  quantity: number;
-  band?: string;
-}
