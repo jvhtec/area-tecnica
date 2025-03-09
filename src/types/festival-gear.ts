@@ -4,16 +4,12 @@ import { ConsoleSetup, WirelessSetup } from "./festival";
 export interface GearSetupFormData {
   max_stages: number;
   foh_console: string;
-  foh_console_provided_by: 'festival' | 'band';
   mon_console: string;
-  mon_console_provided_by: 'festival' | 'band';
   wireless_model: string;
-  wireless_provided_by: 'festival' | 'band';
   wireless_quantity_hh: number;
   wireless_quantity_bp: number;
   wireless_band: string;
   iem_model: string;
-  iem_provided_by: 'festival' | 'band';
   iem_quantity: number;
   iem_band: string;
   monitors_enabled: boolean;
@@ -31,7 +27,6 @@ export interface GearSetupFormData {
   infra_opticalcon_duo: boolean;
   infra_opticalcon_duo_quantity: number;
   infra_analog: number;
-  infrastructure_provided_by: 'festival' | 'band';
   other_infrastructure: string;
   notes: string;
 }
@@ -59,7 +54,6 @@ export interface InfrastructureConfigProps {
     'infra_opticalcon_duo' |
     'infra_opticalcon_duo_quantity' |
     'infra_analog' |
-    'infrastructure_provided_by' |
     'other_infrastructure'
   >;
   onChange: (changes: Partial<GearSetupFormData>) => void;

@@ -1,5 +1,4 @@
 
-import { ProviderSelector } from "../shared/ProviderSelector";
 import { EquipmentSelect } from "../shared/EquipmentSelect";
 import { SectionProps } from "@/types/festival-form";
 
@@ -18,36 +17,22 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup }: SectionPr
       <div className="grid grid-cols-2 gap-6">
         {/* FOH Console */}
         <div className="space-y-4">
-          <ProviderSelector
-            value={formData.foh_console_provided_by}
-            onChange={(value) => onChange({ foh_console_provided_by: value })}
-            label="FOH Console"
-            id="foh"
-          />
+          <h4 className="font-medium">FOH Console</h4>
           <EquipmentSelect
             value={formData.foh_console}
             onChange={(value) => onChange({ foh_console: value })}
-            provider={formData.foh_console_provided_by}
-            festivalOptions={gearSetup?.foh_consoles}
-            bandOptions={consoleOptions}
+            options={gearSetup?.foh_consoles || consoleOptions}
             placeholder="Select console"
           />
         </div>
 
         {/* Monitor Console */}
         <div className="space-y-4">
-          <ProviderSelector
-            value={formData.mon_console_provided_by}
-            onChange={(value) => onChange({ mon_console_provided_by: value })}
-            label="Monitor Console"
-            id="mon"
-          />
+          <h4 className="font-medium">Monitor Console</h4>
           <EquipmentSelect
             value={formData.mon_console}
             onChange={(value) => onChange({ mon_console: value })}
-            provider={formData.mon_console_provided_by}
-            festivalOptions={gearSetup?.mon_consoles}
-            bandOptions={consoleOptions}
+            options={gearSetup?.mon_consoles || consoleOptions}
             placeholder="Select console"
           />
         </div>

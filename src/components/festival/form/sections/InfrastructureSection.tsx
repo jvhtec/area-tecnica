@@ -2,7 +2,6 @@
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { ProviderSelector } from "../shared/ProviderSelector";
 import { QuantityInput } from "../shared/QuantityInput";
 import { SectionProps } from "@/types/festival-form";
 import { useEquipmentValidation } from "@/hooks/useEquipmentValidation";
@@ -12,15 +11,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
 
   return (
     <div className="space-y-4 border rounded-lg p-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Infrastructure</h3>
-        <ProviderSelector
-          value={formData.infrastructure_provided_by}
-          onChange={(value) => onChange({ infrastructure_provided_by: value })}
-          label=""
-          id="infra"
-        />
-      </div>
+      <h3 className="text-lg font-semibold">Infrastructure</h3>
 
       <div className="grid grid-cols-2 gap-4">
         {/* CAT6 */}

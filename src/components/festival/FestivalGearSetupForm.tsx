@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Save } from "lucide-react";
 import { GearSetupFormData } from "@/types/festival-gear";
 import { ConsoleSetupSection } from "./form/sections/ConsoleSetupSection";
@@ -31,16 +30,12 @@ export const FestivalGearSetupForm = ({
   const [setup, setSetup] = useState<GearSetupFormData>({
     max_stages: 1,
     foh_console: "",
-    foh_console_provided_by: "festival",
     mon_console: "",
-    mon_console_provided_by: "festival",
     wireless_model: "",
-    wireless_provided_by: "festival",
     wireless_quantity_hh: 0,
     wireless_quantity_bp: 0,
     wireless_band: "",
     iem_model: "",
-    iem_provided_by: "festival",
     iem_quantity: 0,
     iem_band: "",
     monitors_enabled: false,
@@ -58,7 +53,6 @@ export const FestivalGearSetupForm = ({
     infra_opticalcon_duo: false,
     infra_opticalcon_duo_quantity: 0,
     infra_analog: 0,
-    infrastructure_provided_by: "festival",
     other_infrastructure: "",
     notes: "",
   });
@@ -147,9 +141,6 @@ export const FestivalGearSetupForm = ({
       await supabase
         .from('festival_gear_setups')
         .upsert(globalSetupPayload);
-
-      // In the future, we can add stage-specific setups here
-      // Currently, we're just using the global setup
 
       onSave?.();
       toast({

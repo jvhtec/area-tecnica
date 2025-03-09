@@ -1,5 +1,4 @@
 
-import { ProviderSelector } from "../shared/ProviderSelector";
 import { EquipmentSelect } from "../shared/EquipmentSelect";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -13,18 +12,11 @@ export const WirelessSetupSection = ({ formData, onChange, gearSetup }: SectionP
       <div className="grid grid-cols-2 gap-6">
         {/* Wireless Systems */}
         <div className="space-y-4">
-          <ProviderSelector
-            value={formData.wireless_provided_by}
-            onChange={(value) => onChange({ wireless_provided_by: value })}
-            label="Wireless Systems"
-            id="wireless"
-          />
+          <h4 className="font-medium">Wireless Systems</h4>
           <EquipmentSelect
             value={formData.wireless_model}
             onChange={(value) => onChange({ wireless_model: value })}
-            provider={formData.wireless_provided_by}
-            festivalOptions={gearSetup?.wireless_systems}
-            bandOptions={WIRELESS_SYSTEMS}
+            options={gearSetup?.wireless_systems || WIRELESS_SYSTEMS}
             placeholder="Select wireless system"
           />
           <div className="grid grid-cols-2 gap-4">
@@ -66,18 +58,11 @@ export const WirelessSetupSection = ({ formData, onChange, gearSetup }: SectionP
 
         {/* IEM Systems */}
         <div className="space-y-4">
-          <ProviderSelector
-            value={formData.iem_provided_by}
-            onChange={(value) => onChange({ iem_provided_by: value })}
-            label="IEM Systems"
-            id="iem"
-          />
+          <h4 className="font-medium">IEM Systems</h4>
           <EquipmentSelect
             value={formData.iem_model}
             onChange={(value) => onChange({ iem_model: value })}
-            provider={formData.iem_provided_by}
-            festivalOptions={gearSetup?.iem_systems}
-            bandOptions={IEM_SYSTEMS}
+            options={gearSetup?.iem_systems || IEM_SYSTEMS}
             placeholder="Select IEM system"
           />
           <div>
