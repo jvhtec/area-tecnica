@@ -13,7 +13,7 @@ export const ExtraRequirementsSection = ({ formData, onChange, gearSetup }: Sect
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <h4 className="font-medium">Side Fill</h4>
-            {!gearSetup?.has_side_fills && (
+            {formData.extras_sf === false && (
               <Badge variant="secondary">Not Available</Badge>
             )}
           </div>
@@ -22,7 +22,6 @@ export const ExtraRequirementsSection = ({ formData, onChange, gearSetup }: Sect
             onValueChange={(value) => 
               onChange({ extras_sf: value === "yes" })
             }
-            disabled={!gearSetup?.has_side_fills}
             className="flex flex-col space-y-1"
           >
             <div className="flex items-center space-x-2">
@@ -39,7 +38,7 @@ export const ExtraRequirementsSection = ({ formData, onChange, gearSetup }: Sect
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <h4 className="font-medium">Drum Fill</h4>
-            {!gearSetup?.has_drum_fills && (
+            {formData.extras_df === false && (
               <Badge variant="secondary">Not Available</Badge>
             )}
           </div>
@@ -48,7 +47,6 @@ export const ExtraRequirementsSection = ({ formData, onChange, gearSetup }: Sect
             onValueChange={(value) => 
               onChange({ extras_df: value === "yes" })
             }
-            disabled={!gearSetup?.has_drum_fills}
             className="flex flex-col space-y-1"
           >
             <div className="flex items-center space-x-2">
@@ -65,7 +63,7 @@ export const ExtraRequirementsSection = ({ formData, onChange, gearSetup }: Sect
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <h4 className="font-medium">DJ Booth</h4>
-            {!gearSetup?.has_dj_booths && (
+            {formData.extras_djbooth === false && (
               <Badge variant="secondary">Not Available</Badge>
             )}
           </div>
@@ -74,7 +72,6 @@ export const ExtraRequirementsSection = ({ formData, onChange, gearSetup }: Sect
             onValueChange={(value) => 
               onChange({ extras_djbooth: value === "yes" })
             }
-            disabled={!gearSetup?.has_dj_booths}
             className="flex flex-col space-y-1"
           >
             <div className="flex items-center space-x-2">
