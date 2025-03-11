@@ -157,7 +157,6 @@ export const FestivalGearSetupForm = ({
 
       // Prepare payload for upsert
       const setupPayload = {
-        id: existingSetupId, // Include ID if we're updating
         job_id: jobId,
         date: selectedDate,
         max_stages: Math.max(setup.max_stages, stageNumber || 1),
@@ -190,26 +189,31 @@ export const FestivalGearSetupForm = ({
         notes: setup.notes
       };
 
-      // Remove id if it's null (for new records)
-      if (!existingSetupId) {
-        delete setupPayload.id;
+      // Add the ID for updates
+      if (existingSetupId) {
+        setupPayload['id'] = existingSetupId;
       }
 
       console.log('Payload for save:', setupPayload);
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('festival_gear_setups')
         .upsert(setupPayload, { 
-          onConflict: 'job_id,date'
-        })
-        .select();
+          onConflict: 'job_id,date' 
+        });
+        
+      // Get the result back
+      const { data, error } = await query.select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Upsert error:', error);
+        throw error;
+      }
 
-      console.log('Saved setup:', data);
+      console.log('Saved setup response:', data);
       
       // Update the existingSetupId with the new ID if this was a new record
-      if (data?.[0]) {
+      if (data && data.length > 0) {
         setExistingSetupId(data[0].id);
         setGearSetup(data[0]);
       }
