@@ -1,0 +1,635 @@
+From b3c4b232edc928e080cb9214dda1bb412c642a8c Mon Sep 17 00:00:00 2001
+From: Manus Agent <agent@example.com>
+Date: Tue, 11 Mar 2025 15:15:42 -0400
+Subject: [PATCH] Implement codebase improvements for session management, data
+ fetching, and stale data handling
+
+---
+ src/hooks/auth/useAuthSession.ts | 235 +++++++++++++++++++++++++++++++
+ src/hooks/useEntityQueries.ts    | 114 +++++++++++++++
+ src/lib/api-service.ts           | 124 ++++++++++++++++
+ src/lib/react-query.ts           |  30 +++-
+ src/lib/subscription-manager.ts  |  76 ++++++++++
+ 5 files changed, 574 insertions(+), 5 deletions(-)
+ create mode 100644 src/hooks/auth/useAuthSession.ts
+ create mode 100644 src/hooks/useEntityQueries.ts
+ create mode 100644 src/lib/api-service.ts
+ create mode 100644 src/lib/subscription-manager.ts
+
+diff --git a/src/hooks/auth/useAuthSession.ts b/src/hooks/auth/useAuthSession.ts
+new file mode 100644
+index 0000000..717602c
+--- /dev/null
++++ b/src/hooks/auth/useAuthSession.ts
+@@ -0,0 +1,235 @@
++import { useCallback, useEffect, useReducer } from "react";
++import { useNavigate } from "react-router-dom";
++import { supabase } from "@/lib/supabase";
++import { Session } from "@supabase/supabase-js";
++
++// Define types for user profile and session state
++export interface UserProfile {
++  id: string;
++  role: string | null;
++  department: string | null;
++  // Add other profile fields as needed
++}
++
++interface SessionState {
++  session: Session | null;
++  userProfile: UserProfile | null;
++  isLoading: boolean;
++  idleTime: number;
++}
++
++// Define action types for the reducer
++type SessionAction =
++  | { type: 'SET_SESSION'; payload: Session | null }
++  | { type: 'SET_USER_PROFILE'; payload: UserProfile | null }
++  | { type: 'SET_LOADING'; payload: boolean }
++  | { type: 'INCREMENT_IDLE_TIME' }
++  | { type: 'RESET_IDLE_TIME' };
++
++// Create reducer for atomic state updates
++const sessionReducer = (state: SessionState, action: SessionAction): SessionState => {
++  switch (action.type) {
++    case 'SET_SESSION':
++      return { ...state, session: action.payload };
++    case 'SET_USER_PROFILE':
++      return { ...state, userProfile: action.payload };
++    case 'SET_LOADING':
++      return { ...state, isLoading: action.payload };
++    case 'INCREMENT_IDLE_TIME':
++      return { ...state, idleTime: state.idleTime + 1 };
++    case 'RESET_IDLE_TIME':
++      return { ...state, idleTime: 0 };
++    default:
++      return state;
++  }
++};
++
++// Unified session management hook
++export const useAuthSession = () => {
++  const navigate = useNavigate();
++  
++  // Use reducer for atomic state updates
++  const [state, dispatch] = useReducer(sessionReducer, {
++    session: null,
++    userProfile: null,
++    isLoading: true,
++    idleTime: 0
++  });
++
++  // Fetch user profile with proper error handling
++  const fetchUserProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
++    try {
++      const { data, error } = await supabase
++        .from('profiles')
++        .select('*')
++        .eq('id', userId)
++        .single();
++
++      if (error) {
++        console.error("Error fetching user profile:", error);
++        return null;
++      }
++
++      return data as UserProfile;
++    } catch (error) {
++      console.error("Exception in fetchUserProfile:", error);
++      return null;
++    }
++  }, []);
++
++  // Consolidated refresh logic with proper error handling
++  const refreshSession = useCallback(async () => {
++    try {
++      dispatch({ type: 'RESET_IDLE_TIME' });
++      
++      const { data, error } = await supabase.auth.refreshSession();
++      
++      if (error) {
++        console.error("Session refresh error:", error);
++        // Handle expired session
++        if (error.message.includes('expired')) {
++          dispatch({ type: 'SET_SESSION', payload: null });
++          dispatch({ type: 'SET_USER_PROFILE', payload: null });
++          navigate('/auth');
++        }
++        return;
++      }
++      
++      if (data.session) {
++        dispatch({ type: 'SET_SESSION', payload: data.session });
++        
++        // Only fetch profile if we don't have it or if user ID changed
++        if (!state.userProfile || state.userProfile.id !== data.session.user.id) {
++          const profile = await fetchUserProfile(data.session.user.id);
++          dispatch({ type: 'SET_USER_PROFILE', payload: profile });
++        }
++      }
++    } catch (error) {
++      console.error("Exception in refreshSession:", error);
++    }
++  }, [fetchUserProfile, navigate, state.userProfile]);
++
++  // Handle session updates
++  const handleSessionUpdate = useCallback(async (currentSession: Session | null) => {
++    dispatch({ type: 'RESET_IDLE_TIME' });
++    
++    if (!currentSession?.user?.id) {
++      dispatch({ type: 'SET_SESSION', payload: null });
++      dispatch({ type: 'SET_USER_PROFILE', payload: null });
++      dispatch({ type: 'SET_LOADING', payload: false });
++      navigate('/auth');
++      return;
++    }
++    
++    // Set session first
++    dispatch({ type: 'SET_SESSION', payload: currentSession });
++    dispatch({ type: 'SET_LOADING', payload: false });
++    
++    try {
++      const profileData = await fetchUserProfile(currentSession.user.id);
++      dispatch({ type: 'SET_USER_PROFILE', payload: profileData });
++    } catch (error) {
++      console.error("Error in session update:", error);
++      dispatch({ type: 'SET_USER_PROFILE', payload: null });
++    }
++  }, [fetchUserProfile, navigate]);
++
++  // Idle time tracking
++  useEffect(() => {
++    const idleInterval = setInterval(() => {
++      dispatch({ type: 'INCREMENT_IDLE_TIME' });
++    }, 60000); // Increment idle time every minute
++    
++    return () => clearInterval(idleInterval);
++  }, []);
++
++  // Refresh session when idle for too long
++  useEffect(() => {
++    if (state.idleTime >= 15) { // 15 minutes of idle time
++      refreshSession();
++    }
++  }, [state.idleTime, refreshSession]);
++
++  // Token expiration prediction and refresh
++  useEffect(() => {
++    if (!state.session) return;
++    
++    // Calculate time until token expiration (default to 4 minutes if can't determine)
++    const expiresAt = state.session.expires_at ? state.session.expires_at * 1000 : Date.now() + 4 * 60 * 1000;
++    const timeUntilExpiry = expiresAt - Date.now();
++    const refreshTime = Math.max(timeUntilExpiry - 5 * 60 * 1000, 60 * 1000); // Refresh 5 minutes before expiry or at least 1 minute
++    
++    const refreshTimer = setTimeout(() => {
++      refreshSession();
++    }, refreshTime);
++    
++    return () => clearTimeout(refreshTimer);
++  }, [state.session, refreshSession]);
++
++  // Initial session setup and auth state subscription
++  useEffect(() => {
++    let subscription: { unsubscribe: () => void } | null = null;
++    
++    const setupSession = async () => {
++      try {
++        // Get initial session
++        const { data: { session: initialSession } } = await supabase.auth.getSession();
++        
++        // Handle initial session first
++        await handleSessionUpdate(initialSession);
++        
++        // Then set up the subscription
++        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
++          async (_event, authStateSession) => {
++            await handleSessionUpdate(authStateSession);
++          }
++        );
++        
++        subscription = authSubscription;
++      } catch (error) {
++        console.error("Error in session setup:", error);
++        dispatch({ type: 'SET_LOADING', payload: false });
++      }
++    };
++    
++    setupSession();
++    
++    return () => {
++      if (subscription) {
++        subscription.unsubscribe();
++      }
++    };
++  }, [handleSessionUpdate]);
++
++  // User activity listeners to reset idle time
++  useEffect(() => {
++    const resetIdleTime = () => {
++      dispatch({ type: 'RESET_IDLE_TIME' });
++    };
++    
++    // Add event listeners for user activity
++    window.addEventListener('mousemove', resetIdleTime);
++    window.addEventListener('keydown', resetIdleTime);
++    window.addEventListener('click', resetIdleTime);
++    window.addEventListener('touchstart', resetIdleTime);
++    
++    return () => {
++      window.removeEventListener('mousemove', resetIdleTime);
++      window.removeEventListener('keydown', resetIdleTime);
++      window.removeEventListener('click', resetIdleTime);
++      window.removeEventListener('touchstart', resetIdleTime);
++    };
++  }, []);
++
++  // Return consolidated session management interface
++  return {
++    session: state.session,
++    userProfile: state.userProfile,
++    isLoading: state.isLoading,
++    refreshSession,
++    
++    // Derived properties for backward compatibility
++    userRole: state.userProfile?.role || null,
++    userDepartment: state.userProfile?.department || null,
++  };
++};
+diff --git a/src/hooks/useEntityQueries.ts b/src/hooks/useEntityQueries.ts
+new file mode 100644
+index 0000000..d9a785f
+--- /dev/null
++++ b/src/hooks/useEntityQueries.ts
+@@ -0,0 +1,114 @@
++import { useQuery, useMutation, UseQueryOptions, UseMutationOptions } from "@tanstack/react-query";
++import { queryClient } from "@/lib/react-query";
++import { ApiService } from "@/lib/api-service";
++
++// Create custom hooks for specific data types with appropriate overrides
++export const useEntityQuery = <T>(
++  entityType: string,
++  id: string,
++  options?: UseQueryOptions<T>
++) => {
++  const apiService = ApiService.getInstance();
++  
++  return useQuery({
++    queryKey: [entityType, id],
++    queryFn: () => apiService.get<T>(`/api/${entityType}/${id}`),
++    ...options,
++  });
++};
++
++// Create a hook for entity list queries
++export const useEntityListQuery = <T>(
++  entityType: string,
++  filters?: Record<string, any>,
++  options?: UseQueryOptions<T[]>
++) => {
++  const apiService = ApiService.getInstance();
++  
++  // Build query string from filters
++  const queryString = filters 
++    ? `?${Object.entries(filters)
++        .map(([key, value]) => `${key}=${encodeURIComponent(String(value))}`)
++        .join('&')}`
++    : '';
++  
++  return useQuery({
++    queryKey: [entityType, 'list', filters],
++    queryFn: () => apiService.get<T[]>(`/api/${entityType}${queryString}`),
++    ...options,
++  });
++};
++
++// Create a hook for entity mutations with optimistic updates
++export const useEntityMutation = <T, TVariables>(
++  entityType: string,
++  options?: UseMutationOptions<T, Error, TVariables> & {
++    optimisticUpdate?: (variables: TVariables) => void;
++    onSuccessInvalidation?: string[];
++  }
++) => {
++  const apiService = ApiService.getInstance();
++  
++  return useMutation({
++    mutationFn: (variables: TVariables) => {
++      // Determine if this is a create, update, or delete operation
++      const isCreate = !('id' in variables as any);
++      const isDelete = 'isDelete' in variables as any && (variables as any).isDelete;
++      
++      if (isDelete) {
++        const id = (variables as any).id;
++        return apiService.delete<T>(`/api/${entityType}/${id}`);
++      } else if (isCreate) {
++        return apiService.post<T>(`/api/${entityType}`, variables);
++      } else {
++        const id = (variables as any).id;
++        return apiService.put<T>(`/api/${entityType}/${id}`, variables);
++      }
++    },
++    onMutate: async (variables) => {
++      // If optimistic update function is provided, use it
++      if (options?.optimisticUpdate) {
++        // Cancel any outgoing refetches
++        await queryClient.cancelQueries({ queryKey: [entityType] });
++        
++        // Save previous state
++        const previousData = queryClient.getQueryData([entityType]);
++        
++        // Perform optimistic update
++        options.optimisticUpdate(variables);
++        
++        // Return previous state for rollback
++        return { previousData };
++      }
++      return {};
++    },
++    onError: (err, variables, context) => {
++      // If we have previous data, roll back to it
++      if (context?.previousData) {
++        queryClient.setQueryData([entityType], context.previousData);
++      }
++      
++      // Call the original onError if it exists
++      if (options?.onError) {
++        options.onError(err, variables, context);
++      }
++    },
++    onSuccess: (data, variables, context) => {
++      // Invalidate relevant queries
++      if (options?.onSuccessInvalidation) {
++        options.onSuccessInvalidation.forEach(key => {
++          queryClient.invalidateQueries({ queryKey: [key] });
++        });
++      } else {
++        // Default invalidation
++        queryClient.invalidateQueries({ queryKey: [entityType] });
++      }
++      
++      // Call the original onSuccess if it exists
++      if (options?.onSuccess) {
++        options.onSuccess(data, variables, context);
++      }
++    },
++    ...options,
++  });
++};
+diff --git a/src/lib/api-service.ts b/src/lib/api-service.ts
+new file mode 100644
+index 0000000..b227a31
+--- /dev/null
++++ b/src/lib/api-service.ts
+@@ -0,0 +1,124 @@
++import { supabase } from "@/lib/supabase";
++
++// Singleton API Service class
++export class ApiService {
++  private static instance: ApiService;
++  private token: string | null = null;
++  
++  private constructor() {}
++  
++  static getInstance(): ApiService {
++    if (!ApiService.instance) {
++      ApiService.instance = new ApiService();
++    }
++    return ApiService.instance;
++  }
++  
++  async getToken(): Promise<string> {
++    if (this.token) return this.token;
++    
++    try {
++      // Fetch token from secure source
++      const { data, error } = await supabase.functions.invoke('get-secret', {
++        body: { secretName: 'X_AUTH_TOKEN' }
++      });
++      
++      if (error) throw new Error('Failed to get auth token');
++      
++      this.token = data.X_AUTH_TOKEN;
++      return this.token;
++    } catch (error) {
++      console.error('Error getting auth token:', error);
++      throw error;
++    }
++  }
++  
++  async get<T>(url: string): Promise<T> {
++    try {
++      const token = await this.getToken();
++      const response = await fetch(url, {
++        headers: {
++          'Content-Type': 'application/json',
++          'X-Auth-Token': token,
++        },
++      });
++      
++      if (!response.ok) {
++        throw new Error(`API error: ${response.statusText}`);
++      }
++      
++      return response.json();
++    } catch (error) {
++      console.error(`GET request failed for ${url}:`, error);
++      throw error;
++    }
++  }
++  
++  async post<T>(url: string, data: any): Promise<T> {
++    try {
++      const token = await this.getToken();
++      const response = await fetch(url, {
++        method: 'POST',
++        headers: {
++          'Content-Type': 'application/json',
++          'X-Auth-Token': token,
++        },
++        body: JSON.stringify(data),
++      });
++      
++      if (!response.ok) {
++        throw new Error(`API error: ${response.statusText}`);
++      }
++      
++      return response.json();
++    } catch (error) {
++      console.error(`POST request failed for ${url}:`, error);
++      throw error;
++    }
++  }
++  
++  async put<T>(url: string, data: any): Promise<T> {
++    try {
++      const token = await this.getToken();
++      const response = await fetch(url, {
++        method: 'PUT',
++        headers: {
++          'Content-Type': 'application/json',
++          'X-Auth-Token': token,
++        },
++        body: JSON.stringify(data),
++      });
++      
++      if (!response.ok) {
++        throw new Error(`API error: ${response.statusText}`);
++      }
++      
++      return response.json();
++    } catch (error) {
++      console.error(`PUT request failed for ${url}:`, error);
++      throw error;
++    }
++  }
++  
++  async delete<T>(url: string): Promise<T> {
++    try {
++      const token = await this.getToken();
++      const response = await fetch(url, {
++        method: 'DELETE',
++        headers: {
++          'Content-Type': 'application/json',
++          'X-Auth-Token': token,
++        },
++      });
++      
++      if (!response.ok) {
++        throw new Error(`API error: ${response.statusText}`);
++      }
++      
++      return response.json();
++    } catch (error) {
++      console.error(`DELETE request failed for ${url}:`, error);
++      throw error;
++    }
++  }
++}
+diff --git a/src/lib/react-query.ts b/src/lib/react-query.ts
+index c209f6b..9076ce0 100644
+--- a/src/lib/react-query.ts
++++ b/src/lib/react-query.ts
+@@ -3,10 +3,30 @@ import { QueryClient } from "@tanstack/react-query";
+ export const queryClient = new QueryClient({
+   defaultOptions: {
+     queries: {
+-      staleTime: 1000 * 30, // 30 seconds
+-      retry: 1, // Retry failed queries only once
+-      refetchOnWindowFocus: true, // Refetch data when the window is refocused
+-      refetchOnMount: true, // Refetch data when the component is remounted
++      staleTime: 1000 * 60 * 2, // Standardize to 2 minutes (from 30 seconds)
++      retry: 2, // Increase retry attempts from 1 to 2
++      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff with max of 30 seconds
++      refetchOnWindowFocus: true, // Keep existing setting
++      refetchOnMount: true, // Keep existing setting
+     },
+   },
+-});
+\ No newline at end of file
++});
++
++// Custom hooks for specific data types with appropriate overrides
++export const useEntityQuery = <T>(
++  entityType: string,
++  id: string,
++  options?: any // Using any temporarily for compatibility
++) => {
++  return {
++    queryKey: [entityType, id],
++    queryFn: () => fetchEntity(entityType, id),
++    ...options,
++  };
++};
++
++// Placeholder function to be implemented or replaced with actual API call
++const fetchEntity = async <T>(entityType: string, id: string): Promise<T> => {
++  // This would be replaced with actual implementation using the ApiService
++  throw new Error("fetchEntity not implemented");
++};
+diff --git a/src/lib/subscription-manager.ts b/src/lib/subscription-manager.ts
+new file mode 100644
+index 0000000..4d16c68
+--- /dev/null
++++ b/src/lib/subscription-manager.ts
+@@ -0,0 +1,76 @@
++import { QueryClient } from "@tanstack/react-query";
++import { supabase } from "@/lib/supabase";
++
++export class SubscriptionManager {
++  private static instance: SubscriptionManager;
++  private queryClient: QueryClient;
++  private subscriptions: Map<string, { unsubscribe: () => void }> = new Map();
++  
++  private constructor(queryClient: QueryClient) {
++    this.queryClient = queryClient;
++  }
++  
++  static getInstance(queryClient: QueryClient): SubscriptionManager {
++    if (!SubscriptionManager.instance) {
++      SubscriptionManager.instance = new SubscriptionManager(queryClient);
++    }
++    return SubscriptionManager.instance;
++  }
++  
++  subscribeToTable(table: string, queryKey: string | string[]) {
++    if (this.subscriptions.has(table)) return;
++    
++    const channel = supabase.channel(`${table}-changes`)
++      .on(
++        'postgres_changes',
++        { event: '*', schema: 'public', table },
++        async (payload) => {
++          // Intelligently invalidate only affected queries
++          const keys = Array.isArray(queryKey) ? queryKey : [queryKey];
++          keys.forEach(key => {
++            this.queryClient.invalidateQueries({ queryKey: [key] });
++          });
++        }
++      )
++      .subscribe();
++    
++    this.subscriptions.set(table, { unsubscribe: () => supabase.removeChannel(channel) });
++  }
++  
++  unsubscribeFromTable(table: string) {
++    const subscription = this.subscriptions.get(table);
++    if (subscription) {
++      subscription.unsubscribe();
++      this.subscriptions.delete(table);
++    }
++  }
++  
++  unsubscribeAll() {
++    this.subscriptions.forEach(subscription => subscription.unsubscribe());
++    this.subscriptions.clear();
++  }
++  
++  // Smart refetching strategy hooks
++  setupVisibilityBasedRefetching() {
++    let lastRefetchTime = Date.now();
++    const THROTTLE_TIME = 10000; // 10 seconds minimum between refetches
++    
++    document.addEventListener('visibilitychange', () => {
++      if (document.visibilityState === 'visible') {
++        const now = Date.now();
++        if (now - lastRefetchTime > THROTTLE_TIME) {
++          // Only refetch when sufficient time has passed since last refetch
++          this.queryClient.invalidateQueries();
++          lastRefetchTime = now;
++        }
++      }
++    });
++  }
++  
++  setupNetworkStatusRefetching() {
++    window.addEventListener('online', () => {
++      // When coming back online, invalidate all queries to get fresh data
++      this.queryClient.invalidateQueries();
++    });
++  }
++}
+-- 
+2.34.1
+
