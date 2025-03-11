@@ -13,7 +13,7 @@ export const ExtraRequirementsSection = ({ formData, onChange, gearSetup }: Sect
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <h4 className="font-medium">Side Fill</h4>
-            {formData.extras_sf === false && (
+            {gearSetup && !gearSetup.has_side_fills && formData.extras_sf && (
               <Badge variant="secondary">Not Available</Badge>
             )}
           </div>
@@ -38,7 +38,7 @@ export const ExtraRequirementsSection = ({ formData, onChange, gearSetup }: Sect
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <h4 className="font-medium">Drum Fill</h4>
-            {formData.extras_df === false && (
+            {gearSetup && !gearSetup.has_drum_fills && formData.extras_df && (
               <Badge variant="secondary">Not Available</Badge>
             )}
           </div>
@@ -63,7 +63,7 @@ export const ExtraRequirementsSection = ({ formData, onChange, gearSetup }: Sect
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <h4 className="font-medium">DJ Booth</h4>
-            {formData.extras_djbooth === false && (
+            {gearSetup && !gearSetup.has_dj_booths && formData.extras_djbooth && (
               <Badge variant="secondary">Not Available</Badge>
             )}
           </div>

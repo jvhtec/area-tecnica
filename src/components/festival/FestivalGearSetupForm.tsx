@@ -70,9 +70,19 @@ export const FestivalGearSetupForm = ({
           .select('*')
           .eq('job_id', jobId)
           .eq('date', selectedDate)
-          .maybeSingle();
+          .single();
 
-        if (setupError) throw setupError;
+        if (setupError) {
+          // If the error is not a "not found" error, throw it
+          if (setupError.code !== 'PGRST116') {
+            throw setupError;
+          }
+          // If the setup doesn't exist, reset the form
+          console.log('No existing setup found for this date');
+          setExistingSetupId(null);
+          setGearSetup(null);
+          return;
+        }
         
         if (setupData) {
           console.log('Found existing setup:', setupData);
@@ -81,8 +91,7 @@ export const FestivalGearSetupForm = ({
           setExistingSetupId(setupData.id);
           
           // Update form values with existing data
-          setSetup(prev => ({
-            ...prev,
+          setSetup({
             max_stages: setupData.max_stages || 1,
             foh_console: setupData.foh_consoles?.[0]?.model || "",
             mon_console: setupData.mon_consoles?.[0]?.model || "",
@@ -110,11 +119,7 @@ export const FestivalGearSetupForm = ({
             infra_analog: setupData.available_analog_runs || 0,
             other_infrastructure: setupData.other_infrastructure || "",
             notes: setupData.notes || ""
-          }));
-        } else {
-          console.log('No existing setup found for this date');
-          // Reset to defaults if no existing setup
-          setExistingSetupId(null);
+          });
         }
       } catch (error) {
         console.error('Error fetching festival gear setup:', error);
@@ -143,6 +148,7 @@ export const FestivalGearSetupForm = ({
 
     try {
       console.log('Saving setup with data:', setup);
+      console.log('Existing setup ID:', existingSetupId);
       
       if (!jobId) throw new Error('No job ID provided');
 
@@ -159,7 +165,7 @@ export const FestivalGearSetupForm = ({
         has_drum_fills: setup.extras_df,
         has_dj_booths: setup.extras_djbooth,
         extras_wired: setup.extras_wired,
-        available_monitors: setup.monitors_quantity,
+        available_monitors: setup.monitors_enabled ? setup.monitors_quantity : 0,
         available_cat6_runs: setup.infra_cat6 ? setup.infra_cat6_quantity : 0,
         available_hma_runs: setup.infra_hma ? setup.infra_hma_quantity : 0,
         available_coax_runs: setup.infra_coax ? setup.infra_coax_quantity : 0,
@@ -189,18 +195,23 @@ export const FestivalGearSetupForm = ({
         delete setupPayload.id;
       }
 
+      console.log('Payload for save:', setupPayload);
+
       const { data, error } = await supabase
         .from('festival_gear_setups')
-        .upsert(setupPayload)
-        .select();
+        .upsert(setupPayload, { 
+          onConflict: 'job_id,date',
+          returning: 'representation'
+        });
 
       if (error) throw error;
 
       console.log('Saved setup:', data);
       
       // Update the existingSetupId with the new ID if this was a new record
-      if (data && data.length > 0 && !existingSetupId) {
+      if (data && data.length > 0) {
         setExistingSetupId(data[0].id);
+        setGearSetup(data[0]);
       }
 
       onSave?.();
