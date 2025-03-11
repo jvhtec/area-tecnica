@@ -57,6 +57,7 @@ export const FestivalGearSetupForm = ({
     notes: "",
   });
   const [gearSetup, setGearSetup] = useState(null);
+  const [existingSetupId, setExistingSetupId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchExistingSetup = async () => {
@@ -74,22 +75,47 @@ export const FestivalGearSetupForm = ({
         if (setupError) throw setupError;
         
         if (setupData) {
+          console.log('Found existing setup:', setupData);
           // Store the gear setup for validation purposes
           setGearSetup(setupData);
+          setExistingSetupId(setupData.id);
           
-          // Update default values for the form
+          // Update form values with existing data
           setSetup(prev => ({
             ...prev,
             max_stages: setupData.max_stages || 1,
-            monitors_enabled: setupData.has_side_fills || false,
+            foh_console: setupData.foh_consoles?.[0]?.model || "",
+            mon_console: setupData.mon_consoles?.[0]?.model || "",
+            wireless_model: setupData.wireless_systems?.[0]?.model || "",
+            wireless_band: setupData.wireless_systems?.[0]?.band || "",
+            iem_model: setupData.iem_systems?.[0]?.model || "",
+            iem_band: setupData.iem_systems?.[0]?.band || "",
+            wireless_quantity_hh: setupData.wireless_systems?.[0]?.quantity_hh || 0,
+            wireless_quantity_bp: setupData.wireless_systems?.[0]?.quantity_bp || 0,
+            iem_quantity: setupData.iem_systems?.[0]?.quantity || 0,
+            monitors_enabled: setupData.available_monitors > 0,
+            monitors_quantity: setupData.available_monitors || 0,
             extras_sf: setupData.has_side_fills || false,
             extras_df: setupData.has_drum_fills || false,
             extras_djbooth: setupData.has_dj_booths || false,
+            extras_wired: setupData.extras_wired || "",
+            infra_cat6: setupData.available_cat6_runs > 0,
+            infra_cat6_quantity: setupData.available_cat6_runs || 0,
+            infra_hma: setupData.available_hma_runs > 0,
+            infra_hma_quantity: setupData.available_hma_runs || 0,
+            infra_coax: setupData.available_coax_runs > 0,
+            infra_coax_quantity: setupData.available_coax_runs || 0,
+            infra_opticalcon_duo: setupData.available_opticalcon_duo_runs > 0,
+            infra_opticalcon_duo_quantity: setupData.available_opticalcon_duo_runs || 0,
+            infra_analog: setupData.available_analog_runs || 0,
+            other_infrastructure: setupData.other_infrastructure || "",
+            notes: setupData.notes || ""
           }));
+        } else {
+          console.log('No existing setup found for this date');
+          // Reset to defaults if no existing setup
+          setExistingSetupId(null);
         }
-        
-        // Now check if there are any stage-specific setups
-        // This would be implemented when we add stage-specific storage
       } catch (error) {
         console.error('Error fetching festival gear setup:', error);
         toast({
@@ -116,31 +142,66 @@ export const FestivalGearSetupForm = ({
     setIsLoading(true);
 
     try {
-      // Update the global festival gear setup
-      const globalSetupPayload = {
+      console.log('Saving setup with data:', setup);
+      
+      if (!jobId) throw new Error('No job ID provided');
+
+      // Create wireless and IEM quantities with proper split between HH and BP
+      const totalWirelessQuantity = setup.wireless_quantity_hh + setup.wireless_quantity_bp;
+
+      // Prepare payload for upsert
+      const setupPayload = {
+        id: existingSetupId, // Include ID if we're updating
         job_id: jobId,
         date: selectedDate,
         max_stages: Math.max(setup.max_stages, stageNumber || 1),
         has_side_fills: setup.extras_sf,
         has_drum_fills: setup.extras_df,
         has_dj_booths: setup.extras_djbooth,
+        extras_wired: setup.extras_wired,
         available_monitors: setup.monitors_quantity,
         available_cat6_runs: setup.infra_cat6 ? setup.infra_cat6_quantity : 0,
         available_hma_runs: setup.infra_hma ? setup.infra_hma_quantity : 0,
         available_coax_runs: setup.infra_coax ? setup.infra_coax_quantity : 0,
         available_opticalcon_duo_runs: setup.infra_opticalcon_duo ? setup.infra_opticalcon_duo_quantity : 0,
         available_analog_runs: setup.infra_analog,
+        other_infrastructure: setup.other_infrastructure,
         // Add console and wireless info as JSON arrays
         foh_consoles: [{ model: setup.foh_console, quantity: 1 }],
         mon_consoles: [{ model: setup.mon_console, quantity: 1 }],
-        wireless_systems: [{ model: setup.wireless_model, quantity: setup.wireless_quantity_hh + setup.wireless_quantity_bp, band: setup.wireless_band }],
-        iem_systems: [{ model: setup.iem_model, quantity: setup.iem_quantity, band: setup.iem_band }],
+        wireless_systems: [{ 
+          model: setup.wireless_model, 
+          quantity: totalWirelessQuantity,
+          quantity_hh: setup.wireless_quantity_hh,
+          quantity_bp: setup.wireless_quantity_bp,
+          band: setup.wireless_band 
+        }],
+        iem_systems: [{ 
+          model: setup.iem_model, 
+          quantity: setup.iem_quantity, 
+          band: setup.iem_band 
+        }],
         notes: setup.notes
       };
 
-      await supabase
+      // Remove id if it's null (for new records)
+      if (!existingSetupId) {
+        delete setupPayload.id;
+      }
+
+      const { data, error } = await supabase
         .from('festival_gear_setups')
-        .upsert(globalSetupPayload);
+        .upsert(setupPayload)
+        .select();
+
+      if (error) throw error;
+
+      console.log('Saved setup:', data);
+      
+      // Update the existingSetupId with the new ID if this was a new record
+      if (data && data.length > 0 && !existingSetupId) {
+        setExistingSetupId(data[0].id);
+      }
 
       onSave?.();
       toast({
@@ -198,7 +259,7 @@ export const FestivalGearSetupForm = ({
 
       <Button type="submit" disabled={isLoading} className="w-full">
         <Save className="h-4 w-4 mr-2" />
-        {isLoading ? "Saving..." : "Save Setup"}
+        {isLoading ? "Saving..." : existingSetupId ? "Update Setup" : "Save Setup"}
       </Button>
     </form>
   );
