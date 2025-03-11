@@ -200,16 +200,16 @@ export const FestivalGearSetupForm = ({
       const { data, error } = await supabase
         .from('festival_gear_setups')
         .upsert(setupPayload, { 
-          onConflict: 'job_id,date',
-          returning: 'representation'
-        });
+          onConflict: 'job_id,date'
+        })
+        .select();
 
       if (error) throw error;
 
       console.log('Saved setup:', data);
       
       // Update the existingSetupId with the new ID if this was a new record
-      if (data && data.length > 0) {
+      if (data?.[0]) {
         setExistingSetupId(data[0].id);
         setGearSetup(data[0]);
       }
