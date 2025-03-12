@@ -681,6 +681,7 @@ export type Database = {
           available_opticalcon_duo_runs: number | null
           created_at: string | null
           date: string
+          extras_wired: string | null
           foh_consoles: Json | null
           has_dj_booths: boolean | null
           has_drum_fills: boolean | null
@@ -691,6 +692,7 @@ export type Database = {
           max_stages: number | null
           mon_consoles: Json | null
           notes: string | null
+          other_infrastructure: string | null
           updated_at: string | null
           wireless_systems: Json | null
         }
@@ -703,6 +705,7 @@ export type Database = {
           available_opticalcon_duo_runs?: number | null
           created_at?: string | null
           date: string
+          extras_wired?: string | null
           foh_consoles?: Json | null
           has_dj_booths?: boolean | null
           has_drum_fills?: boolean | null
@@ -713,6 +716,7 @@ export type Database = {
           max_stages?: number | null
           mon_consoles?: Json | null
           notes?: string | null
+          other_infrastructure?: string | null
           updated_at?: string | null
           wireless_systems?: Json | null
         }
@@ -725,6 +729,7 @@ export type Database = {
           available_opticalcon_duo_runs?: number | null
           created_at?: string | null
           date?: string
+          extras_wired?: string | null
           foh_consoles?: Json | null
           has_dj_booths?: boolean | null
           has_drum_fills?: boolean | null
@@ -735,6 +740,7 @@ export type Database = {
           max_stages?: number | null
           mon_consoles?: Json | null
           notes?: string | null
+          other_infrastructure?: string | null
           updated_at?: string | null
           wireless_systems?: Json | null
         }

@@ -190,7 +190,7 @@ export async function createAllFoldersForJob(
         await createFlexFolder(hojaInfoPayload);
       }
 
-      if (dept !== "personnel") {
+      if (dept !== "personnel" && dept !== "comercial") {
         const subfolders = [
           {
             definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
@@ -395,7 +395,7 @@ export async function createAllFoldersForJob(
       await createFlexFolder(hojaInfoPayload);
     }
 
-    if (dept !== "personnel") {
+    if (dept !== "personnel" && dept !== "comercial") {
       const subfolders = [
         {
           definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
