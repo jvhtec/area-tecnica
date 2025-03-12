@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, UseQueryOptions, UseMutationOptions } from "@tanstack/react-query";
 import { queryClient } from "@/lib/react-query";
 import { ApiService } from "@/lib/api-service";
@@ -57,7 +56,6 @@ export const useEntityMutation = <T, TVariables extends object>(
   
   return useMutation({
     mutationFn: (variables: TVariables) => {
-      // Determine if this is a create, update, or delete operation
       const isCreate = !('id' in variables);
       const isDelete = 'isDelete' in variables && (variables as any).isDelete;
       
@@ -71,19 +69,17 @@ export const useEntityMutation = <T, TVariables extends object>(
         return apiService.put<T>(`/api/${entityType}/${id}`, variables);
       }
     },
-    onMutate: async (variables) => {
-      // If optimistic update function is provided, use it
+    onMutate: async (variables): Promise<MutationContext<T>> => {
       if (options?.optimisticUpdate) {
-        // Cancel any outgoing refetches
         await queryClient.cancelQueries({ queryKey: [entityType] });
         
-        // Save previous state
-        const previousData = queryClient.getQueryData([entityType]);
+        // Get the current data and type cast it
+        const previousData = queryClient.getQueryData<T>([entityType]);
         
         // Perform optimistic update
         options.optimisticUpdate(variables);
         
-        // Return previous state for rollback
+        // Return typed context
         return { previousData };
       }
       return {};
