@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, UseQueryOptions, UseMutationOptions } from "@tanstack/react-query";
 import { queryClient } from "@/lib/react-query";
 import { ApiService } from "@/lib/api-service";
@@ -39,10 +40,15 @@ export const useEntityListQuery = <T>(
   });
 };
 
+// Define a type for the context with previousData
+interface MutationContext<T> {
+  previousData?: T;
+}
+
 // Create a hook for entity mutations with optimistic updates
-export const useEntityMutation = <T, TVariables>(
+export const useEntityMutation = <T, TVariables extends object>(
   entityType: string,
-  options?: UseMutationOptions<T, Error, TVariables> & {
+  options?: UseMutationOptions<T, Error, TVariables, MutationContext<T>> & {
     optimisticUpdate?: (variables: TVariables) => void;
     onSuccessInvalidation?: string[];
   }
@@ -52,8 +58,8 @@ export const useEntityMutation = <T, TVariables>(
   return useMutation({
     mutationFn: (variables: TVariables) => {
       // Determine if this is a create, update, or delete operation
-      const isCreate = !('id' in variables as any);
-      const isDelete = 'isDelete' in variables as any && (variables as any).isDelete;
+      const isCreate = !('id' in variables);
+      const isDelete = 'isDelete' in variables && (variables as any).isDelete;
       
       if (isDelete) {
         const id = (variables as any).id;

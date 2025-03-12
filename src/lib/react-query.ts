@@ -1,4 +1,6 @@
+
 import { QueryClient } from "@tanstack/react-query";
+import { ApiService } from "@/lib/api-service";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,13 +22,13 @@ export const useEntityQuery = <T>(
 ) => {
   return {
     queryKey: [entityType, id],
-    queryFn: () => fetchEntity(entityType, id),
+    queryFn: () => fetchEntity<T>(entityType, id),
     ...options,
   };
 };
 
-// Placeholder function to be implemented or replaced with actual API call
+// Placeholder function to be implemented with actual API calls
 const fetchEntity = async <T>(entityType: string, id: string): Promise<T> => {
-  // This would be replaced with actual implementation using the ApiService
-  throw new Error("fetchEntity not implemented");
+  const apiService = ApiService.getInstance();
+  return apiService.get<T>(`/api/${entityType}/${id}`);
 };
