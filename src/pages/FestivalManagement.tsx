@@ -28,7 +28,7 @@ const FestivalManagement = () => {
   const [artistCount, setArtistCount] = useState(0);
   const [jobDates, setJobDates] = useState<Date[]>([]);
 
-  // Check if current path ends with /scheduling to determine if we're on the scheduling page
+  // Check if current path includes /scheduling to determine if we're on the scheduling page
   const isSchedulingRoute = location.pathname.includes(`/scheduling`);
   
   console.log("FestivalManagement - Current route:", location.pathname);
