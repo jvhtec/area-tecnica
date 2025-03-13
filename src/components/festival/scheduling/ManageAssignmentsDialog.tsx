@@ -72,7 +72,7 @@ export const ManageAssignmentsDialog = ({
       if (assignmentsError) throw assignmentsError;
 
       // Filter technicians if a department is specified for the shift
-      const techsData: AssignmentWithProfile[] = assignmentsData || [];
+      const techsData = assignmentsData as unknown as AssignmentWithProfile[] || [];
       
       let filteredTechs = techsData;
       if (shift.department) {
@@ -314,4 +314,3 @@ export const ManageAssignmentsDialog = ({
     </Dialog>
   );
 };
-
