@@ -26,7 +26,6 @@ const FestivalManagement = () => {
   const [job, setJob] = useState<FestivalJob | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [artistCount, setArtistCount] = useState(0);
-  const [selectedDate, setSelectedDate] = useState("");
   const [jobDates, setJobDates] = useState<Date[]>([]);
 
   // Check if current route is scheduling
@@ -34,7 +33,6 @@ const FestivalManagement = () => {
   
   console.log("Current route:", location.pathname);
   console.log("Is scheduling route:", isSchedulingRoute);
-  console.log("Job dates:", jobDates);
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -65,8 +63,6 @@ const FestivalManagement = () => {
         if (isValid(startDate) && isValid(endDate)) {
           const dates = eachDayOfInterval({ start: startDate, end: endDate });
           setJobDates(dates);
-          const formattedDate = format(dates[0], 'yyyy-MM-dd');
-          setSelectedDate(formattedDate);
           console.log("Generated job dates:", dates);
         }
       } catch (error: any) {

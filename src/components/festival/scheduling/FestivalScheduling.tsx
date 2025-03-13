@@ -25,16 +25,26 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
   const [viewMode, setViewMode] = useState<"list" | "table">("list");
   const { toast } = useToast();
 
-  console.log("FestivalScheduling initialized with jobDates:", jobDates);
+  console.log("FestivalScheduling rendering with jobId:", jobId);
+  console.log("FestivalScheduling rendering with jobDates:", jobDates);
 
+  // Set initial date when jobDates are available
   useEffect(() => {
-    if (jobDates.length > 0 && !selectedDate) {
-      const initialDate = format(jobDates[0], "yyyy-MM-dd");
-      console.log("Setting initial date to:", initialDate);
-      setSelectedDate(initialDate);
+    if (jobDates && jobDates.length > 0 && !selectedDate) {
+      try {
+        const initialDate = format(jobDates[0], "yyyy-MM-dd");
+        console.log("Setting initial date to:", initialDate);
+        setSelectedDate(initialDate);
+      } catch (error) {
+        console.error("Error formatting date:", error);
+        console.log("Raw jobDates[0]:", jobDates[0]);
+      }
+    } else {
+      console.log("No job dates available or selectedDate already set:", selectedDate);
     }
-  }, [jobDates]);
+  }, [jobDates, selectedDate]);
 
+  // Fetch shifts when selectedDate changes
   useEffect(() => {
     if (selectedDate) {
       console.log("Fetching shifts for date:", selectedDate);
@@ -73,11 +83,13 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
         .from("festival_shift_assignments")
         .select(`
           *,
-          profiles (
+          profiles:technician_id(
+            id,
             first_name,
             last_name,
             email,
-            department
+            department,
+            role
           )
         `)
         .in("shift_id", shiftIds);
@@ -152,6 +164,17 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     window.print();
   };
 
+  // If no job dates, show a message
+  if (!jobDates || jobDates.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <p className="text-muted-foreground">No dates available for scheduling.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="mt-6">
       <CardHeader>
@@ -184,18 +207,24 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
             className="w-full"
           >
             <TabsList className="mb-2 flex flex-wrap h-auto">
-              {jobDates.map((date) => {
-                const formattedDate = format(date, "yyyy-MM-dd");
-                const displayDate = format(date, "dd MMM");
-                return (
-                  <TabsTrigger
-                    key={formattedDate}
-                    value={formattedDate}
-                    className="mb-1"
-                  >
-                    {displayDate}
-                  </TabsTrigger>
-                );
+              {jobDates.map((date, index) => {
+                try {
+                  const formattedDate = format(date, "yyyy-MM-dd");
+                  const displayDate = format(date, "dd MMM");
+                  
+                  return (
+                    <TabsTrigger
+                      key={formattedDate || `date-${index}`}
+                      value={formattedDate}
+                      className="mb-1"
+                    >
+                      {displayDate}
+                    </TabsTrigger>
+                  );
+                } catch (error) {
+                  console.error("Error formatting date tab:", error, date);
+                  return null;
+                }
               })}
             </TabsList>
           </Tabs>

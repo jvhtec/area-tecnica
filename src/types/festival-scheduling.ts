@@ -20,10 +20,12 @@ export interface ShiftAssignment {
   role: string;
   created_at?: string;
   profiles?: {
+    id: string;
     first_name: string;
     last_name: string;
     email: string;
     department: string;
+    role: string;
   } | null;
 }
 
