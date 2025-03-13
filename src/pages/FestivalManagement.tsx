@@ -28,8 +28,8 @@ const FestivalManagement = () => {
   const [artistCount, setArtistCount] = useState(0);
   const [jobDates, setJobDates] = useState<Date[]>([]);
 
-  // Check if current route is scheduling
-  const isSchedulingRoute = location.pathname.includes('/scheduling');
+  // Check if current route is scheduling - using endsWith to be more reliable
+  const isSchedulingRoute = location.pathname.endsWith('/scheduling');
   
   console.log("FestivalManagement - Current route:", location.pathname);
   console.log("FestivalManagement - Is scheduling route:", isSchedulingRoute);
@@ -132,7 +132,8 @@ const FestivalManagement = () => {
             setJobDates(uniqueDates);
           } else {
             console.warn("No valid dates found for this job");
-            setJobDates([]);
+            // Create a default date as fallback (today)
+            setJobDates([new Date()]);
           }
         }
       } catch (error: any) {
