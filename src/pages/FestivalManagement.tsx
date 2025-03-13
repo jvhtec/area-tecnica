@@ -3,12 +3,13 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Music2, Layout, Wrench } from "lucide-react";
+import { Users, Music2, Layout, Calendar } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { format, eachDayOfInterval, isValid } from "date-fns";
 import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
+import { FestivalScheduling } from "@/components/festival/scheduling/FestivalScheduling";
 
 interface FestivalJob {
   id: string;
@@ -148,19 +149,30 @@ const FestivalManagement = () => {
           </CardContent>
         </Card>
 
-        {/* Technical Requirements - Placeholder */}
-        <Card className="opacity-50">
+        {/* Scheduling Section (Replacing Technical Requirements) */}
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/scheduling`)}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Wrench className="h-5 w-5" />
-              Technical Requirements
+              <Calendar className="h-5 w-5" />
+              Scheduling
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">Coming soon</p>
+            <p className="text-sm text-muted-foreground">Manage shifts and staff assignments</p>
+            <Button className="mt-4 w-full" onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/festival-management/${jobId}/scheduling`);
+            }}>
+              Manage Schedule
+            </Button>
           </CardContent>
         </Card>
       </div>
+      
+      {/* Scheduling content when on the scheduling route */}
+      {location.pathname.includes('/scheduling') && (
+        <FestivalScheduling jobId={jobId} jobDates={jobDates} />
+      )}
     </div>
   );
 };
