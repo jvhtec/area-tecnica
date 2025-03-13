@@ -64,7 +64,7 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
         setSelectedDate(formatDateToString(today));
       }
     }
-  }, [jobDates]);
+  }, [jobDates, selectedDate]);
 
   // Fetch shifts when selectedDate changes
   useEffect(() => {

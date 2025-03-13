@@ -28,8 +28,8 @@ const FestivalManagement = () => {
   const [artistCount, setArtistCount] = useState(0);
   const [jobDates, setJobDates] = useState<Date[]>([]);
 
-  // Determine exact route match for scheduling
-  const isSchedulingRoute = location.pathname === `/festival-management/${jobId}/scheduling`;
+  // Check if current path ends with /scheduling to determine if we're on the scheduling page
+  const isSchedulingRoute = location.pathname.endsWith(`/scheduling`);
   
   console.log("FestivalManagement - Current route:", location.pathname);
   console.log("FestivalManagement - Is scheduling route:", isSchedulingRoute);
