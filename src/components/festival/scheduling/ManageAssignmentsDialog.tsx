@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -60,7 +59,7 @@ export const ManageAssignmentsDialog = ({
 
       // Filter technicians if a department is specified for the shift
       let techsData = assignmentsData || [];
-      if (shift.department) {
+      if (shift.department && techsData) {
         techsData = techsData.filter(
           (assignment) => assignment.profiles?.department === shift.department
         );
@@ -299,4 +298,3 @@ export const ManageAssignmentsDialog = ({
     </Dialog>
   );
 };
-
