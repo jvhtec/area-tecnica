@@ -9,7 +9,7 @@ import { CreateShiftDialog } from "./CreateShiftDialog";
 import { ShiftsTable } from "./ShiftsTable";
 import { Button } from "@/components/ui/button";
 import { Printer, Plus } from "lucide-react";
-import { useTabVisibility } from "@/hooks/useTabVisibility";
+import { useQueryClient } from "@tanstack/react-query";
 import { FestivalShift, ShiftWithAssignments } from "@/types/festival-scheduling";
 import { format } from "date-fns";
 
@@ -25,13 +25,10 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
   const [isCreateShiftOpen, setIsCreateShiftOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "table">("list");
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // Refresh data when tab becomes visible
-  useTabVisibility(['festival-shifts']);
-
-  console.log("FestivalScheduling component rendered");
-  console.log("Job ID:", jobId);
-  console.log("Job dates:", jobDates);
+  console.log("FestivalScheduling component rendered with job ID:", jobId);
+  console.log("Job dates received:", jobDates);
   
   // Format a date to YYYY-MM-DD string
   const formatDateToString = (date: Date): string => {
@@ -74,6 +71,22 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     } else {
       console.log("Not fetching shifts - missing selectedDate or jobId", { selectedDate, jobId });
     }
+  }, [selectedDate, jobId]);
+
+  // Set up visibilitychange event listener to refetch shifts when tab becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && selectedDate && jobId) {
+        console.log("Tab became visible, refreshing shifts");
+        fetchShifts();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [selectedDate, jobId]);
 
   const fetchShifts = async () => {
