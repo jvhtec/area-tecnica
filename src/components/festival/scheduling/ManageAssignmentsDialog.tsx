@@ -59,21 +59,21 @@ export const ManageAssignmentsDialog = ({
       if (assignmentsError) throw assignmentsError;
 
       // Filter technicians if a department is specified for the shift
-      let techsData = assignmentsData;
+      let techsData = assignmentsData || [];
       if (shift.department) {
-        techsData = assignmentsData.filter(
-          (assignment) => assignment.profiles.department === shift.department
+        techsData = techsData.filter(
+          (assignment) => assignment.profiles?.department === shift.department
         );
       }
 
       // Format technicians data
       const formattedTechnicians = techsData.map((assignment) => ({
         id: assignment.technician_id,
-        first_name: assignment.profiles.first_name,
-        last_name: assignment.profiles.last_name,
-        email: assignment.profiles.email,
-        department: assignment.profiles.department,
-        role: assignment.profiles.role,
+        first_name: assignment.profiles?.first_name,
+        last_name: assignment.profiles?.last_name,
+        email: assignment.profiles?.email,
+        department: assignment.profiles?.department,
+        role: assignment.profiles?.role,
       }));
 
       setTechnicians(formattedTechnicians);
@@ -299,3 +299,4 @@ export const ManageAssignmentsDialog = ({
     </Dialog>
   );
 };
+
