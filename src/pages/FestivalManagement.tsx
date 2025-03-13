@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Users, Music2, Layout, Calendar } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import { format, eachDayOfInterval, isValid, parseISO } from "date-fns";
+import { eachDayOfInterval, isValid, parseISO } from "date-fns";
 import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
 import { FestivalScheduling } from "@/components/festival/scheduling/FestivalScheduling";
 
@@ -31,8 +31,20 @@ const FestivalManagement = () => {
   // Check if current route is scheduling
   const isSchedulingRoute = location.pathname.includes('/scheduling');
   
-  console.log("Current route:", location.pathname);
-  console.log("Is scheduling route:", isSchedulingRoute);
+  console.log("FestivalManagement - Current route:", location.pathname);
+  console.log("FestivalManagement - Is scheduling route:", isSchedulingRoute);
+  console.log("FestivalManagement - Job ID:", jobId);
+
+  // Helper function to safely parse dates
+  const parseDateSafely = (dateString: string): Date | null => {
+    try {
+      const date = new Date(dateString);
+      return isValid(date) ? date : null;
+    } catch (error) {
+      console.error("Error parsing date:", error, dateString);
+      return null;
+    }
+  };
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -70,39 +82,58 @@ const FestivalManagement = () => {
         setJob(jobData);
         setArtistCount(artistCount || 0);
 
-        // Ensure start_time and end_time are valid dates
-        let startDate: Date;
-        let endDate: Date;
+        // Generate dates for the festival duration
+        const startDate = parseDateSafely(jobData.start_time);
+        const endDate = parseDateSafely(jobData.end_time);
         
-        try {
-          startDate = new Date(jobData.start_time);
-          endDate = new Date(jobData.end_time);
-          
-          console.log("Start date:", startDate);
-          console.log("End date:", endDate);
-          
-          if (!isValid(startDate) || !isValid(endDate)) {
-            throw new Error("Invalid dates");
+        console.log("Start date:", startDate);
+        console.log("End date:", endDate);
+        
+        if (startDate && endDate) {
+          try {
+            // Generate days between start and end date
+            const dates = eachDayOfInterval({ start: startDate, end: endDate });
+            console.log("Generated job dates:", dates);
+            setJobDates(dates);
+          } catch (dateError) {
+            console.error("Error generating date interval:", dateError);
+            
+            // Fallback: use just the start and end dates
+            console.log("Using fallback date approach");
+            const dateArray = [];
+            if (startDate) dateArray.push(startDate);
+            if (endDate && endDate.getTime() !== startDate?.getTime()) dateArray.push(endDate);
+            
+            console.log("Fallback dates:", dateArray);
+            setJobDates(dateArray);
           }
-        } catch (error) {
-          console.error("Error parsing dates:", error);
-          toast({
-            title: "Error",
-            description: "Invalid job dates",
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        try {
-          // Generate days between start and end date
-          const dates = eachDayOfInterval({ start: startDate, end: endDate });
-          console.log("Generated job dates:", dates);
-          setJobDates(dates);
-        } catch (dateError) {
-          console.error("Error generating date interval:", dateError);
-          // Fallback: use just the start and end dates
-          setJobDates([startDate, endDate]);
+        } else {
+          console.warn("Invalid dates in job data, checking for date types");
+          
+          // Try to get dates from job_date_types table
+          const { data: dateTypes, error: dateTypesError } = await supabase
+            .from("job_date_types")
+            .select("*")
+            .eq("job_id", jobId);
+            
+          if (dateTypesError) {
+            console.error("Error fetching date types:", dateTypesError);
+          } else if (dateTypes && dateTypes.length > 0) {
+            console.log("Date types found:", dateTypes);
+            
+            // Extract unique dates from date_types
+            const uniqueDates = Array.from(new Set(
+              dateTypes
+                .map(dt => parseDateSafely(dt.date))
+                .filter(Boolean) as Date[]
+            ));
+            
+            console.log("Unique dates from date_types:", uniqueDates);
+            setJobDates(uniqueDates);
+          } else {
+            console.warn("No valid dates found for this job");
+            setJobDates([]);
+          }
         }
       } catch (error: any) {
         console.error("Error fetching festival details:", error);
@@ -217,23 +248,22 @@ const FestivalManagement = () => {
       {/* Scheduling content when on the scheduling route */}
       {isSchedulingRoute && (
         <div>
-          {jobDates && jobDates.length > 0 ? (
-            <>
-              <div className="mb-4">
-                <Button 
-                  variant="outline" 
-                  onClick={() => navigate(`/festival-management/${jobId}`)}
-                  className="flex items-center gap-1"
-                >
-                  Back to Festival
-                </Button>
-              </div>
-              <FestivalScheduling jobId={jobId} jobDates={jobDates} />
-            </>
+          <div className="mb-4">
+            <Button 
+              variant="outline" 
+              onClick={() => navigate(`/festival-management/${jobId}`)}
+              className="flex items-center gap-1"
+            >
+              Back to Festival
+            </Button>
+          </div>
+          
+          {jobDates.length > 0 ? (
+            <FestivalScheduling jobId={jobId} jobDates={jobDates} />
           ) : (
             <Card>
               <CardContent className="p-8 text-center">
-                <p className="text-muted-foreground mb-4">No dates available for scheduling.</p>
+                <p className="text-muted-foreground mb-4">No dates available for scheduling. Please update the festival dates first.</p>
                 <Button onClick={() => navigate(`/festival-management/${jobId}`)}>
                   Go Back
                 </Button>

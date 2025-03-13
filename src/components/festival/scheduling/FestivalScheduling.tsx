@@ -1,6 +1,5 @@
 
 import { useState, useEffect } from "react";
-import { format, parseISO } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +9,7 @@ import { CreateShiftDialog } from "./CreateShiftDialog";
 import { ShiftsTable } from "./ShiftsTable";
 import { Button } from "@/components/ui/button";
 import { Printer, Plus } from "lucide-react";
+import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { FestivalShift, ShiftWithAssignments } from "@/types/festival-scheduling";
 
 interface FestivalSchedulingProps {
@@ -25,62 +25,74 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
   const [viewMode, setViewMode] = useState<"list" | "table">("list");
   const { toast } = useToast();
 
-  console.log("FestivalScheduling rendering with jobId:", jobId);
-  console.log("FestivalScheduling rendering with jobDates:", jobDates);
-  console.log("Job dates length:", jobDates?.length);
-  console.log("Current selected date:", selectedDate);
+  // Refresh data when tab becomes visible
+  useTabVisibility(['festival-shifts']);
+
+  console.log("FestivalScheduling component rendered");
+  console.log("Job ID:", jobId);
+  console.log("Job dates:", jobDates);
+  
+  // Format a date to YYYY-MM-DD string
+  const formatDateToString = (date: Date): string => {
+    try {
+      if (!(date instanceof Date) || isNaN(date.getTime())) {
+        throw new Error("Invalid date object");
+      }
+      
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      console.error("Problematic date value:", date);
+      return "";
+    }
+  };
 
   // Set initial date when jobDates are available
   useEffect(() => {
     if (jobDates && jobDates.length > 0 && !selectedDate) {
       try {
-        const date = jobDates[0];
-        console.log("Raw date object:", date);
-        console.log("Date type:", typeof date);
-        console.log("Is Date object?", date instanceof Date);
-
-        // Make sure we're working with a Date object
-        const dateObj = date instanceof Date ? date : new Date(date);
-        const year = dateObj.getFullYear();
-        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-        const day = String(dateObj.getDate()).padStart(2, '0');
-        const formattedDate = `${year}-${month}-${day}`;
-        
+        const formattedDate = formatDateToString(jobDates[0]);
         console.log("Setting initial date to:", formattedDate);
-        setSelectedDate(formattedDate);
+        
+        if (formattedDate) {
+          setSelectedDate(formattedDate);
+        } else {
+          throw new Error("Could not format initial date");
+        }
       } catch (error) {
-        console.error("Error formatting date:", error);
-        console.log("Raw jobDates[0]:", jobDates[0]);
+        console.error("Error setting initial date:", error);
         
-        // Fallback to current date if there's an error
+        // Fallback to current date
         const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        const formattedToday = `${year}-${month}-${day}`;
-        
+        const formattedToday = formatDateToString(today);
         console.log("Using fallback date:", formattedToday);
         setSelectedDate(formattedToday);
       }
-    } else {
-      console.log("No job dates available or selectedDate already set:", selectedDate);
     }
-  }, [jobDates, selectedDate]);
+  }, [jobDates]);
 
   // Fetch shifts when selectedDate changes
   useEffect(() => {
-    if (selectedDate) {
-      console.log("Fetching shifts for date:", selectedDate);
+    if (selectedDate && jobId) {
+      console.log(`Fetching shifts for date: ${selectedDate} and job: ${jobId}`);
       fetchShifts();
     } else {
-      console.log("Selected date not set yet, not fetching shifts");
+      console.log("Not fetching shifts - missing selectedDate or jobId", { selectedDate, jobId });
     }
-  }, [selectedDate]);
+  }, [selectedDate, jobId]);
 
   const fetchShifts = async () => {
+    if (!selectedDate || !jobId) {
+      console.error("Cannot fetch shifts: missing date or job ID");
+      return;
+    }
+    
     setIsLoading(true);
     try {
-      console.log("Fetching shifts for job:", jobId, "and date:", selectedDate);
+      console.log(`Executing fetch for job: ${jobId}, date: ${selectedDate}`);
       
       // Fetch shifts for selected date
       const { data: shiftsData, error: shiftsError } = await supabase
@@ -97,16 +109,17 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
       
       console.log("Shifts data retrieved:", shiftsData);
 
-      // Get all shift IDs to fetch assignments
-      const shiftIds = shiftsData ? shiftsData.map(shift => shift.id) : [];
-      
-      if (shiftIds.length === 0) {
-        console.log("No shifts found for date:", selectedDate);
+      // If no shifts, set empty array and return early
+      if (!shiftsData || shiftsData.length === 0) {
+        console.log("No shifts found for this date");
         setShifts([]);
         setIsLoading(false);
         return;
       }
 
+      // Get all shift IDs to fetch assignments
+      const shiftIds = shiftsData.map(shift => shift.id);
+      
       // Fetch assignments for all shifts
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from("festival_shift_assignments")
@@ -199,35 +212,6 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     window.print();
   };
 
-  // Format date for display
-  const formatDateDisplay = (date: Date) => {
-    try {
-      // Use a simple and reliable approach
-      const dateObj = date instanceof Date ? date : new Date(date);
-      const day = String(dateObj.getDate()).padStart(2, '0');
-      const month = dateObj.toLocaleString('default', { month: 'short' });
-      return `${day} ${month}`;
-    } catch (error) {
-      console.error("Error formatting date for display:", error, date);
-      return "Invalid date";
-    }
-  };
-
-  // Format date for value
-  const formatDateValue = (date: Date) => {
-    try {
-      // Use a simple and reliable approach
-      const dateObj = date instanceof Date ? date : new Date(date);
-      const year = dateObj.getFullYear();
-      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const day = String(dateObj.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    } catch (error) {
-      console.error("Error formatting date for value:", error, date);
-      return "";
-    }
-  };
-
   // If no job dates, show a message
   if (!jobDates || jobDates.length === 0) {
     console.log("No job dates available");
@@ -273,35 +257,41 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
           >
             <TabsList className="mb-2 flex flex-wrap h-auto">
               {jobDates.map((date, index) => {
-                const dateValue = formatDateValue(date);
-                const displayDate = formatDateDisplay(date);
-                
-                if (!dateValue) return null;
-                
-                return (
-                  <TabsTrigger
-                    key={dateValue || `date-${index}`}
-                    value={dateValue}
-                    className="mb-1"
-                  >
-                    {displayDate}
-                  </TabsTrigger>
-                );
+                try {
+                  const dateValue = formatDateToString(date);
+                  if (!dateValue) return null;
+                  
+                  const displayDate = new Date(dateValue).toLocaleDateString(undefined, {
+                    day: 'numeric',
+                    month: 'short'
+                  });
+                  
+                  return (
+                    <TabsTrigger
+                      key={dateValue || `date-${index}`}
+                      value={dateValue}
+                      className="mb-1"
+                    >
+                      {displayDate}
+                    </TabsTrigger>
+                  );
+                } catch (err) {
+                  console.error("Error rendering date tab:", err);
+                  return null;
+                }
               })}
             </TabsList>
           </Tabs>
-          {jobDates.length > 0 && (
-            <div className="mt-2 flex justify-end">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setViewMode(viewMode === "list" ? "table" : "list")}
-                className="text-xs"
-              >
-                {viewMode === "list" ? "Table View" : "List View"}
-              </Button>
-            </div>
-          )}
+          <div className="mt-2 flex justify-end">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setViewMode(viewMode === "list" ? "table" : "list")}
+              className="text-xs"
+            >
+              {viewMode === "list" ? "Table View" : "List View"}
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
