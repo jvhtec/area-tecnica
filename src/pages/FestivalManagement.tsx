@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Users, Music2, Layout, Calendar } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import { format, eachDayOfInterval, isValid } from "date-fns";
+import { format, eachDayOfInterval, isValid, parseISO } from "date-fns";
 import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
 import { FestivalScheduling } from "@/components/festival/scheduling/FestivalScheduling";
 
@@ -39,6 +39,8 @@ const FestivalManagement = () => {
       try {
         if (!jobId) return;
 
+        console.log("Fetching job details for jobId:", jobId);
+
         const { data: jobData, error: jobError } = await supabase
           .from("jobs")
           .select("*")
@@ -46,6 +48,8 @@ const FestivalManagement = () => {
           .single();
 
         if (jobError) throw jobError;
+
+        console.log("Job data retrieved:", jobData);
 
         const { count: artistCount, error: artistError } = await supabase
           .from("festival_artists")
@@ -57,13 +61,25 @@ const FestivalManagement = () => {
         setJob(jobData);
         setArtistCount(artistCount || 0);
 
+        // Ensure start_time and end_time are valid dates
         const startDate = new Date(jobData.start_time);
         const endDate = new Date(jobData.end_time);
         
+        console.log("Start date:", startDate);
+        console.log("End date:", endDate);
+        
         if (isValid(startDate) && isValid(endDate)) {
+          // Generate days between start and end date
           const dates = eachDayOfInterval({ start: startDate, end: endDate });
-          setJobDates(dates);
           console.log("Generated job dates:", dates);
+          setJobDates(dates);
+        } else {
+          console.error("Invalid dates:", { startDate, endDate });
+          toast({
+            title: "Error",
+            description: "Invalid job dates",
+            variant: "destructive",
+          });
         }
       } catch (error: any) {
         console.error("Error fetching festival details:", error);

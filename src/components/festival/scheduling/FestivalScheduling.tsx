@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,6 +60,14 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     try {
       console.log("Fetching shifts for job:", jobId, "and date:", selectedDate);
       
+      // Check if festival_shifts table exists by making a test query
+      const { data: testData, error: testError } = await supabase
+        .from("festival_shifts")
+        .select("id")
+        .limit(1);
+      
+      console.log("Test query result:", testData, testError);
+
       // Fetch shifts for selected date
       const { data: shiftsData, error: shiftsError } = await supabase
         .from("festival_shifts")
@@ -68,7 +76,10 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
         .eq("date", selectedDate)
         .order("start_time");
 
-      if (shiftsError) throw shiftsError;
+      if (shiftsError) {
+        console.error("Error fetching shifts:", shiftsError);
+        throw shiftsError;
+      }
       
       console.log("Shifts data retrieved:", shiftsData);
 
@@ -97,7 +108,10 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
         `)
         .in("shift_id", shiftIds);
 
-      if (assignmentsError) throw assignmentsError;
+      if (assignmentsError) {
+        console.error("Error fetching shift assignments:", assignmentsError);
+        throw assignmentsError;
+      }
       
       console.log("Assignments data retrieved:", assignmentsData);
 
@@ -115,9 +129,12 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
       console.error("Error fetching shifts:", error);
       toast({
         title: "Error",
-        description: "Could not load shifts",
+        description: "Could not load shifts: " + error.message,
         variant: "destructive",
       });
+      
+      // Set empty shifts to prevent UI from waiting indefinitely
+      setShifts([]);
     } finally {
       setIsLoading(false);
     }
