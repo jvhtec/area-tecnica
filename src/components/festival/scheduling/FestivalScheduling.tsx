@@ -27,19 +27,40 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
 
   console.log("FestivalScheduling rendering with jobId:", jobId);
   console.log("FestivalScheduling rendering with jobDates:", jobDates);
+  console.log("Job dates length:", jobDates?.length);
   console.log("Current selected date:", selectedDate);
 
   // Set initial date when jobDates are available
   useEffect(() => {
     if (jobDates && jobDates.length > 0 && !selectedDate) {
       try {
-        // Convert the Date object to a string in "YYYY-MM-DD" format
-        const formattedDate = formatDateValue(jobDates[0]);
+        const date = jobDates[0];
+        console.log("Raw date object:", date);
+        console.log("Date type:", typeof date);
+        console.log("Is Date object?", date instanceof Date);
+
+        // Make sure we're working with a Date object
+        const dateObj = date instanceof Date ? date : new Date(date);
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        const formattedDate = `${year}-${month}-${day}`;
+        
         console.log("Setting initial date to:", formattedDate);
         setSelectedDate(formattedDate);
       } catch (error) {
         console.error("Error formatting date:", error);
         console.log("Raw jobDates[0]:", jobDates[0]);
+        
+        // Fallback to current date if there's an error
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        const formattedToday = `${year}-${month}-${day}`;
+        
+        console.log("Using fallback date:", formattedToday);
+        setSelectedDate(formattedToday);
       }
     } else {
       console.log("No job dates available or selectedDate already set:", selectedDate);
@@ -51,6 +72,8 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     if (selectedDate) {
       console.log("Fetching shifts for date:", selectedDate);
       fetchShifts();
+    } else {
+      console.log("Selected date not set yet, not fetching shifts");
     }
   }, [selectedDate]);
 
@@ -59,14 +82,6 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     try {
       console.log("Fetching shifts for job:", jobId, "and date:", selectedDate);
       
-      // Check if festival_shifts table exists by making a test query
-      const { data: testData, error: testError } = await supabase
-        .from("festival_shifts")
-        .select("id")
-        .limit(1);
-      
-      console.log("Test query result:", testData, testError);
-
       // Fetch shifts for selected date
       const { data: shiftsData, error: shiftsError } = await supabase
         .from("festival_shifts")
@@ -86,6 +101,7 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
       const shiftIds = shiftsData ? shiftsData.map(shift => shift.id) : [];
       
       if (shiftIds.length === 0) {
+        console.log("No shifts found for date:", selectedDate);
         setShifts([]);
         setIsLoading(false);
         return;
@@ -183,21 +199,14 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     window.print();
   };
 
-  // If no job dates, show a message
-  if (!jobDates || jobDates.length === 0) {
-    return (
-      <Card>
-        <CardContent className="p-8 text-center">
-          <p className="text-muted-foreground">No dates available for scheduling.</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   // Format date for display
   const formatDateDisplay = (date: Date) => {
     try {
-      return format(date, "dd MMM");
+      // Use a simple and reliable approach
+      const dateObj = date instanceof Date ? date : new Date(date);
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      const month = dateObj.toLocaleString('default', { month: 'short' });
+      return `${day} ${month}`;
     } catch (error) {
       console.error("Error formatting date for display:", error, date);
       return "Invalid date";
@@ -207,12 +216,29 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
   // Format date for value
   const formatDateValue = (date: Date) => {
     try {
-      return format(date, 'yyyy-MM-dd');
+      // Use a simple and reliable approach
+      const dateObj = date instanceof Date ? date : new Date(date);
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     } catch (error) {
       console.error("Error formatting date for value:", error, date);
       return "";
     }
   };
+
+  // If no job dates, show a message
+  if (!jobDates || jobDates.length === 0) {
+    console.log("No job dates available");
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <p className="text-muted-foreground">No dates available for scheduling.</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="mt-6">

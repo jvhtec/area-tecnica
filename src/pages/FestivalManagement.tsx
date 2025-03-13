@@ -37,7 +37,10 @@ const FestivalManagement = () => {
   useEffect(() => {
     const fetchJobDetails = async () => {
       try {
-        if (!jobId) return;
+        if (!jobId) {
+          console.log("No jobId provided");
+          return;
+        }
 
         console.log("Fetching job details for jobId:", jobId);
 
@@ -47,7 +50,10 @@ const FestivalManagement = () => {
           .eq("id", jobId)
           .single();
 
-        if (jobError) throw jobError;
+        if (jobError) {
+          console.error("Error fetching job data:", jobError);
+          throw jobError;
+        }
 
         console.log("Job data retrieved:", jobData);
 
@@ -56,30 +62,47 @@ const FestivalManagement = () => {
           .select("*", { count: 'exact' })
           .eq("job_id", jobId);
 
-        if (artistError) throw artistError;
+        if (artistError) {
+          console.error("Error fetching artist count:", artistError);
+          throw artistError;
+        }
 
         setJob(jobData);
         setArtistCount(artistCount || 0);
 
         // Ensure start_time and end_time are valid dates
-        const startDate = new Date(jobData.start_time);
-        const endDate = new Date(jobData.end_time);
+        let startDate: Date;
+        let endDate: Date;
         
-        console.log("Start date:", startDate);
-        console.log("End date:", endDate);
-        
-        if (isValid(startDate) && isValid(endDate)) {
-          // Generate days between start and end date
-          const dates = eachDayOfInterval({ start: startDate, end: endDate });
-          console.log("Generated job dates:", dates);
-          setJobDates(dates);
-        } else {
-          console.error("Invalid dates:", { startDate, endDate });
+        try {
+          startDate = new Date(jobData.start_time);
+          endDate = new Date(jobData.end_time);
+          
+          console.log("Start date:", startDate);
+          console.log("End date:", endDate);
+          
+          if (!isValid(startDate) || !isValid(endDate)) {
+            throw new Error("Invalid dates");
+          }
+        } catch (error) {
+          console.error("Error parsing dates:", error);
           toast({
             title: "Error",
             description: "Invalid job dates",
             variant: "destructive",
           });
+          return;
+        }
+        
+        try {
+          // Generate days between start and end date
+          const dates = eachDayOfInterval({ start: startDate, end: endDate });
+          console.log("Generated job dates:", dates);
+          setJobDates(dates);
+        } catch (dateError) {
+          console.error("Error generating date interval:", dateError);
+          // Fallback: use just the start and end dates
+          setJobDates([startDate, endDate]);
         }
       } catch (error: any) {
         console.error("Error fetching festival details:", error);
@@ -195,7 +218,18 @@ const FestivalManagement = () => {
       {isSchedulingRoute && (
         <div>
           {jobDates && jobDates.length > 0 ? (
-            <FestivalScheduling jobId={jobId} jobDates={jobDates} />
+            <>
+              <div className="mb-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => navigate(`/festival-management/${jobId}`)}
+                  className="flex items-center gap-1"
+                >
+                  Back to Festival
+                </Button>
+              </div>
+              <FestivalScheduling jobId={jobId} jobDates={jobDates} />
+            </>
           ) : (
             <Card>
               <CardContent className="p-8 text-center">
