@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { Printer, Plus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { FestivalShift, ShiftWithAssignments } from "@/types/festival-scheduling";
 import { format } from "date-fns";
+import { useRefreshOnTabVisibility } from "@/hooks/useRefreshOnTabVisibility";
 
 interface FestivalSchedulingProps {
   jobId: string;
@@ -41,55 +42,8 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     }
   };
 
-  // Set initial date when jobDates are available
-  useEffect(() => {
-    if (jobDates && jobDates.length > 0 && !selectedDate) {
-      try {
-        const formattedDate = formatDateToString(jobDates[0]);
-        console.log("Setting initial date to:", formattedDate);
-        
-        if (formattedDate) {
-          setSelectedDate(formattedDate);
-        } else {
-          throw new Error("Could not format initial date");
-        }
-      } catch (error) {
-        console.error("Error setting initial date:", error);
-        
-        // Fallback to current date
-        const today = new Date();
-        setSelectedDate(formatDateToString(today));
-      }
-    }
-  }, [jobDates, selectedDate]);
-
-  // Fetch shifts when selectedDate changes
-  useEffect(() => {
-    if (selectedDate && jobId) {
-      console.log(`Fetching shifts for date: ${selectedDate} and job: ${jobId}`);
-      fetchShifts();
-    } else {
-      console.log("Not fetching shifts - missing selectedDate or jobId", { selectedDate, jobId });
-    }
-  }, [selectedDate, jobId]);
-
-  // Set up visibilitychange event listener to refetch shifts when tab becomes visible
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && selectedDate && jobId) {
-        console.log("Tab became visible, refreshing shifts");
-        fetchShifts();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [selectedDate, jobId]);
-
-  const fetchShifts = async () => {
+  // Define fetchShifts as a useCallback to allow it to be used in the visibility hook
+  const fetchShifts = useCallback(async () => {
     if (!selectedDate || !jobId) {
       console.error("Cannot fetch shifts: missing date or job ID");
       return;
@@ -173,7 +127,47 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedDate, jobId, toast]);
+
+  // Set initial date when jobDates are available
+  useEffect(() => {
+    if (jobDates && jobDates.length > 0 && !selectedDate) {
+      try {
+        const formattedDate = formatDateToString(jobDates[0]);
+        console.log("Setting initial date to:", formattedDate);
+        
+        if (formattedDate) {
+          setSelectedDate(formattedDate);
+        } else {
+          throw new Error("Could not format initial date");
+        }
+      } catch (error) {
+        console.error("Error setting initial date:", error);
+        
+        // Fallback to current date
+        const today = new Date();
+        setSelectedDate(formatDateToString(today));
+      }
+    }
+  }, [jobDates, selectedDate]);
+
+  // Fetch shifts when selectedDate changes
+  useEffect(() => {
+    if (selectedDate && jobId) {
+      console.log(`Fetching shifts for date: ${selectedDate} and job: ${jobId}`);
+      fetchShifts();
+    } else {
+      console.log("Not fetching shifts - missing selectedDate or jobId", { selectedDate, jobId });
+    }
+  }, [selectedDate, jobId, fetchShifts]);
+
+  // Use our custom hook to refresh data when tab becomes visible
+  useRefreshOnTabVisibility(() => {
+    if (selectedDate && jobId) {
+      console.log("Tab became visible, refreshing shifts");
+      fetchShifts();
+    }
+  }, [selectedDate, jobId, fetchShifts]);
 
   const handleShiftCreated = async () => {
     fetchShifts();
