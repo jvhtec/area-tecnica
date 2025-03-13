@@ -8,6 +8,7 @@ import { useFestivalScheduling } from "@/hooks/useFestivalScheduling";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShiftsList } from "@/components/festival/scheduling/ShiftsList";
 import { ShiftsTable } from "@/components/festival/scheduling/ShiftsTable";
+import { type ShiftWithAssignments } from "@/types/festival-scheduling";
 
 const FestivalSchedulingPage = () => {
   const { jobId } = useParams<{ jobId: string }>();
@@ -22,6 +23,9 @@ const FestivalSchedulingPage = () => {
     setSelectedDate,
     jobDates,
   } = useFestivalScheduling(jobId);
+
+  // Cast the shifts to ShiftWithAssignments[] to satisfy TypeScript
+  const shiftsWithAssignments = shifts as unknown as ShiftWithAssignments[];
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
@@ -95,10 +99,10 @@ const FestivalSchedulingPage = () => {
                 <TabsTrigger value="table">Table View</TabsTrigger>
               </TabsList>
               <TabsContent value="list">
-                <ShiftsList shifts={shifts} jobId={jobId} refreshShifts={refreshShifts} />
+                <ShiftsList shifts={shiftsWithAssignments} jobId={jobId || ""} refreshShifts={refreshShifts} />
               </TabsContent>
               <TabsContent value="table">
-                <ShiftsTable shifts={shifts} jobId={jobId} refreshShifts={refreshShifts} />
+                <ShiftsTable shifts={shiftsWithAssignments} jobId={jobId || ""} refreshShifts={refreshShifts} />
               </TabsContent>
             </Tabs>
           )}

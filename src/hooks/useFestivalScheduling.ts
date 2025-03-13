@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns"; // Make sure to import format
 
 interface FestivalShift {
   id: string;
@@ -16,6 +17,8 @@ interface FestivalShift {
     first_name: string;
     last_name: string;
   }[];
+  name?: string; // Add this to match ShiftWithAssignments
+  assignments?: any[]; // Add this to match ShiftWithAssignments
 }
 
 interface UseFestivalSchedulingResult {
@@ -185,8 +188,10 @@ export const useFestivalScheduling = (jobId: string | undefined): UseFestivalSch
         
         return {
           ...shift,
+          name: shift.title || shift.name, // Ensure name exists for compatibility
           assigned_to: assignedTo,
-          profile_data: profileData
+          profile_data: profileData,
+          assignments: shift.shift_assignments || [] // Ensure assignments exists for compatibility
         };
       });
 
