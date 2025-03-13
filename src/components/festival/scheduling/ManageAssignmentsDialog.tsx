@@ -18,6 +18,19 @@ interface ManageAssignmentsDialogProps {
   onAssignmentsUpdated: () => void;
 }
 
+// Define proper types for the assignment data coming from Supabase
+interface AssignmentWithProfile {
+  technician_id: string;
+  profiles?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    department: string;
+    role: string;
+  } | null;
+}
+
 export const ManageAssignmentsDialog = ({
   open,
   onOpenChange,
@@ -59,15 +72,17 @@ export const ManageAssignmentsDialog = ({
       if (assignmentsError) throw assignmentsError;
 
       // Filter technicians if a department is specified for the shift
-      let techsData = assignmentsData || [];
-      if (shift.department && techsData) {
-        techsData = techsData.filter(
+      const techsData: AssignmentWithProfile[] = assignmentsData || [];
+      
+      let filteredTechs = techsData;
+      if (shift.department) {
+        filteredTechs = techsData.filter(
           (assignment) => assignment.profiles && assignment.profiles.department === shift.department
         );
       }
 
       // Format technicians data
-      const formattedTechnicians = techsData.map((assignment) => ({
+      const formattedTechnicians = filteredTechs.map((assignment) => ({
         id: assignment.technician_id,
         first_name: assignment.profiles?.first_name || "",
         last_name: assignment.profiles?.last_name || "",
@@ -299,3 +314,4 @@ export const ManageAssignmentsDialog = ({
     </Dialog>
   );
 };
+
