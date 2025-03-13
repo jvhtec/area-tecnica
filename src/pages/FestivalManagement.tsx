@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Users, Music2, Layout, Calendar } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import { eachDayOfInterval, isValid, parseISO } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
 import { FestivalScheduling } from "@/components/festival/scheduling/FestivalScheduling";
 
@@ -28,23 +28,12 @@ const FestivalManagement = () => {
   const [artistCount, setArtistCount] = useState(0);
   const [jobDates, setJobDates] = useState<Date[]>([]);
 
-  // Check if current route is scheduling - using endsWith to be more reliable
-  const isSchedulingRoute = location.pathname.endsWith('/scheduling');
+  // Determine exact route match for scheduling
+  const isSchedulingRoute = location.pathname === `/festival-management/${jobId}/scheduling`;
   
   console.log("FestivalManagement - Current route:", location.pathname);
   console.log("FestivalManagement - Is scheduling route:", isSchedulingRoute);
   console.log("FestivalManagement - Job ID:", jobId);
-
-  // Helper function to safely parse dates
-  const parseDateSafely = (dateString: string): Date | null => {
-    try {
-      const date = new Date(dateString);
-      return isValid(date) ? date : null;
-    } catch (error) {
-      console.error("Error parsing date:", error, dateString);
-      return null;
-    }
-  };
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -83,16 +72,23 @@ const FestivalManagement = () => {
         setArtistCount(artistCount || 0);
 
         // Generate dates for the festival duration
-        const startDate = parseDateSafely(jobData.start_time);
-        const endDate = parseDateSafely(jobData.end_time);
+        const startDate = new Date(jobData.start_time);
+        const endDate = new Date(jobData.end_time);
         
         console.log("Start date:", startDate);
         console.log("End date:", endDate);
         
-        if (startDate && endDate) {
+        if (isValid(startDate) && isValid(endDate)) {
           try {
-            // Generate days between start and end date
-            const dates = eachDayOfInterval({ start: startDate, end: endDate });
+            // Calculate days between start and end (inclusive)
+            const dates = [];
+            const currentDate = new Date(startDate);
+            
+            while (currentDate <= endDate) {
+              dates.push(new Date(currentDate));
+              currentDate.setDate(currentDate.getDate() + 1);
+            }
+            
             console.log("Generated job dates:", dates);
             setJobDates(dates);
           } catch (dateError) {
@@ -101,8 +97,8 @@ const FestivalManagement = () => {
             // Fallback: use just the start and end dates
             console.log("Using fallback date approach");
             const dateArray = [];
-            if (startDate) dateArray.push(startDate);
-            if (endDate && endDate.getTime() !== startDate?.getTime()) dateArray.push(endDate);
+            if (isValid(startDate)) dateArray.push(startDate);
+            if (isValid(endDate) && endDate.getTime() !== startDate?.getTime()) dateArray.push(endDate);
             
             console.log("Fallback dates:", dateArray);
             setJobDates(dateArray);
@@ -124,9 +120,15 @@ const FestivalManagement = () => {
             // Extract unique dates from date_types
             const uniqueDates = Array.from(new Set(
               dateTypes
-                .map(dt => parseDateSafely(dt.date))
-                .filter(Boolean) as Date[]
-            ));
+                .map(dt => {
+                  try {
+                    return new Date(dt.date);
+                  } catch (e) {
+                    return null;
+                  }
+                })
+                .filter(date => date && isValid(date))
+            )) as Date[];
             
             console.log("Unique dates from date_types:", uniqueDates);
             setJobDates(uniqueDates);

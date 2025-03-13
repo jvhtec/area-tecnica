@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Printer, Plus } from "lucide-react";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { FestivalShift, ShiftWithAssignments } from "@/types/festival-scheduling";
+import { format } from "date-fns";
 
 interface FestivalSchedulingProps {
   jobId: string;
@@ -35,11 +36,7 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
   // Format a date to YYYY-MM-DD string
   const formatDateToString = (date: Date): string => {
     try {
-      if (!(date instanceof Date) || isNaN(date.getTime())) {
-        throw new Error("Invalid date object");
-      }
-      
-      return date.toISOString().split('T')[0];
+      return format(date, 'yyyy-MM-dd');
     } catch (error) {
       console.error("Error formatting date:", error);
       console.error("Problematic date value:", date);
@@ -64,9 +61,7 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
         
         // Fallback to current date
         const today = new Date();
-        const formattedToday = formatDateToString(today);
-        console.log("Using fallback date:", formattedToday);
-        setSelectedDate(formattedToday);
+        setSelectedDate(formatDateToString(today));
       }
     }
   }, [jobDates]);
@@ -88,6 +83,8 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     }
     
     setIsLoading(true);
+    console.log("Starting to fetch shifts");
+    
     try {
       console.log(`Executing fetch for job: ${jobId}, date: ${selectedDate}`);
       
@@ -258,14 +255,11 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
                   const dateValue = formatDateToString(date);
                   if (!dateValue) return null;
                   
-                  const displayDate = new Date(dateValue).toLocaleDateString(undefined, {
-                    day: 'numeric',
-                    month: 'short'
-                  });
+                  const displayDate = format(date, 'MMM d');
                   
                   return (
                     <TabsTrigger
-                      key={dateValue || `date-${index}`}
+                      key={`date-${index}-${dateValue}`}
                       value={dateValue}
                       className="mb-1"
                     >
