@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -61,18 +62,18 @@ export const ManageAssignmentsDialog = ({
       let techsData = assignmentsData || [];
       if (shift.department && techsData) {
         techsData = techsData.filter(
-          (assignment) => assignment.profiles?.department === shift.department
+          (assignment) => assignment.profiles && assignment.profiles.department === shift.department
         );
       }
 
       // Format technicians data
       const formattedTechnicians = techsData.map((assignment) => ({
         id: assignment.technician_id,
-        first_name: assignment.profiles?.first_name,
-        last_name: assignment.profiles?.last_name,
-        email: assignment.profiles?.email,
-        department: assignment.profiles?.department,
-        role: assignment.profiles?.role,
+        first_name: assignment.profiles?.first_name || "",
+        last_name: assignment.profiles?.last_name || "",
+        email: assignment.profiles?.email || "",
+        department: assignment.profiles?.department || "",
+        role: assignment.profiles?.role || "",
       }));
 
       setTechnicians(formattedTechnicians);
