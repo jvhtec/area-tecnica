@@ -1,6 +1,5 @@
-
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, Music2, Layout, Calendar } from "lucide-react";
@@ -22,12 +21,15 @@ interface FestivalJob {
 const FestivalManagement = () => {
   const { jobId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [job, setJob] = useState<FestivalJob | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [artistCount, setArtistCount] = useState(0);
   const [selectedDate, setSelectedDate] = useState("");
   const [jobDates, setJobDates] = useState<Date[]>([]);
+
+  const isSchedulingRoute = location.pathname.includes('/scheduling');
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -109,68 +111,70 @@ const FestivalManagement = () => {
         </CardHeader>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Artists Section */}
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/artists`)}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Artists
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{artistCount}</p>
-            <p className="text-sm text-muted-foreground">Total Artists</p>
-            <Button className="mt-4 w-full" onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/festival-management/${jobId}/artists`);
-            }}>
-              Manage Artists
-            </Button>
-          </CardContent>
-        </Card>
+      {!isSchedulingRoute && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Artists Section */}
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/artists`)}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Artists
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold">{artistCount}</p>
+              <p className="text-sm text-muted-foreground">Total Artists</p>
+              <Button className="mt-4 w-full" onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/festival-management/${jobId}/artists`);
+              }}>
+                Manage Artists
+              </Button>
+            </CardContent>
+          </Card>
 
-        {/* Stages & Gear Section */}
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/gear`)}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Layout className="h-5 w-5" />
-              Stages & Gear
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Manage stages and technical equipment</p>
-            <Button className="mt-4 w-full" onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/festival-management/${jobId}/gear`);
-            }}>
-              Manage Gear
-            </Button>
-          </CardContent>
-        </Card>
+          {/* Stages & Gear Section */}
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/gear`)}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Layout className="h-5 w-5" />
+                Stages & Gear
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">Manage stages and technical equipment</p>
+              <Button className="mt-4 w-full" onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/festival-management/${jobId}/gear`);
+              }}>
+                Manage Gear
+              </Button>
+            </CardContent>
+          </Card>
 
-        {/* Scheduling Section (Replacing Technical Requirements) */}
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/scheduling`)}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Scheduling
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Manage shifts and staff assignments</p>
-            <Button className="mt-4 w-full" onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/festival-management/${jobId}/scheduling`);
-            }}>
-              Manage Schedule
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Scheduling Section (Replacing Technical Requirements) */}
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/scheduling`)}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Scheduling
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">Manage shifts and staff assignments</p>
+              <Button className="mt-4 w-full" onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/festival-management/${jobId}/scheduling`);
+              }}>
+                Manage Schedule
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
       
       {/* Scheduling content when on the scheduling route */}
-      {location.pathname.includes('/scheduling') && (
+      {isSchedulingRoute && jobDates.length > 0 && (
         <FestivalScheduling jobId={jobId} jobDates={jobDates} />
       )}
     </div>
