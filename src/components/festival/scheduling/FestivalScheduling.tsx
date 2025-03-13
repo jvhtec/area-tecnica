@@ -27,12 +27,15 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
 
   console.log("FestivalScheduling rendering with jobId:", jobId);
   console.log("FestivalScheduling rendering with jobDates:", jobDates);
+  console.log("Current selected date:", selectedDate);
 
   // Set initial date when jobDates are available
   useEffect(() => {
     if (jobDates && jobDates.length > 0 && !selectedDate) {
       try {
-        const initialDate = format(jobDates[0], "yyyy-MM-dd");
+        // Convert the Date object to a string in "YYYY-MM-DD" format
+        const date = new Date(jobDates[0]);
+        const initialDate = date.toISOString().split('T')[0];
         console.log("Setting initial date to:", initialDate);
         setSelectedDate(initialDate);
       } catch (error) {
@@ -175,6 +178,26 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     );
   }
 
+  // Format date for display
+  const formatDateDisplay = (date: Date) => {
+    try {
+      return format(date, "dd MMM");
+    } catch (error) {
+      console.error("Error formatting date for display:", error, date);
+      return "Invalid date";
+    }
+  };
+
+  // Format date for value
+  const formatDateValue = (date: Date) => {
+    try {
+      return date.toISOString().split('T')[0]; // YYYY-MM-DD format
+    } catch (error) {
+      console.error("Error formatting date for value:", error, date);
+      return "";
+    }
+  };
+
   return (
     <Card className="mt-6">
       <CardHeader>
@@ -208,23 +231,20 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
           >
             <TabsList className="mb-2 flex flex-wrap h-auto">
               {jobDates.map((date, index) => {
-                try {
-                  const formattedDate = format(date, "yyyy-MM-dd");
-                  const displayDate = format(date, "dd MMM");
-                  
-                  return (
-                    <TabsTrigger
-                      key={formattedDate || `date-${index}`}
-                      value={formattedDate}
-                      className="mb-1"
-                    >
-                      {displayDate}
-                    </TabsTrigger>
-                  );
-                } catch (error) {
-                  console.error("Error formatting date tab:", error, date);
-                  return null;
-                }
+                const dateValue = formatDateValue(date);
+                const displayDate = formatDateDisplay(date);
+                
+                if (!dateValue) return null;
+                
+                return (
+                  <TabsTrigger
+                    key={dateValue || `date-${index}`}
+                    value={dateValue}
+                    className="mb-1"
+                  >
+                    {displayDate}
+                  </TabsTrigger>
+                );
               })}
             </TabsList>
           </Tabs>

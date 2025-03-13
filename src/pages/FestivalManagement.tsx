@@ -178,7 +178,7 @@ const FestivalManagement = () => {
       {/* Scheduling content when on the scheduling route */}
       {isSchedulingRoute && (
         <div>
-          {jobDates.length > 0 ? (
+          {jobDates && jobDates.length > 0 ? (
             <FestivalScheduling jobId={jobId} jobDates={jobDates} />
           ) : (
             <Card>
