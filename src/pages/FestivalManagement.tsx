@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Users, Music2, Layout, Calendar } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { format, eachDayOfInterval, isValid } from "date-fns";
 import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
 import { FestivalScheduling } from "@/components/festival/scheduling/FestivalScheduling";
@@ -29,7 +29,12 @@ const FestivalManagement = () => {
   const [selectedDate, setSelectedDate] = useState("");
   const [jobDates, setJobDates] = useState<Date[]>([]);
 
+  // Check if current route is scheduling
   const isSchedulingRoute = location.pathname.includes('/scheduling');
+  
+  console.log("Current route:", location.pathname);
+  console.log("Is scheduling route:", isSchedulingRoute);
+  console.log("Job dates:", jobDates);
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -62,6 +67,7 @@ const FestivalManagement = () => {
           setJobDates(dates);
           const formattedDate = format(dates[0], 'yyyy-MM-dd');
           setSelectedDate(formattedDate);
+          console.log("Generated job dates:", dates);
         }
       } catch (error: any) {
         console.error("Error fetching festival details:", error);
@@ -152,7 +158,7 @@ const FestivalManagement = () => {
             </CardContent>
           </Card>
 
-          {/* Scheduling Section (Replacing Technical Requirements) */}
+          {/* Scheduling Section */}
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/scheduling`)}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -174,8 +180,21 @@ const FestivalManagement = () => {
       )}
       
       {/* Scheduling content when on the scheduling route */}
-      {isSchedulingRoute && jobDates.length > 0 && (
-        <FestivalScheduling jobId={jobId} jobDates={jobDates} />
+      {isSchedulingRoute && (
+        <div>
+          {jobDates.length > 0 ? (
+            <FestivalScheduling jobId={jobId} jobDates={jobDates} />
+          ) : (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <p className="text-muted-foreground mb-4">No dates available for scheduling.</p>
+                <Button onClick={() => navigate(`/festival-management/${jobId}`)}>
+                  Go Back
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
     </div>
   );

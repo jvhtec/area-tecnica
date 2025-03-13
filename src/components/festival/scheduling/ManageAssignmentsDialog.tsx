@@ -53,6 +53,8 @@ export const ManageAssignmentsDialog = ({
   const fetchAvailableTechnicians = async () => {
     setIsLoading(true);
     try {
+      console.log("Fetching technicians for job", jobId);
+      
       // First get all technicians assigned to this job
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from("job_assignments")
@@ -70,9 +72,12 @@ export const ManageAssignmentsDialog = ({
         .eq("job_id", jobId);
 
       if (assignmentsError) throw assignmentsError;
+      
+      console.log("Raw assignments data:", assignmentsData);
 
-      // Filter technicians if a department is specified for the shift
+      // Cast the data to our interface type
       const techsData = assignmentsData as unknown as AssignmentWithProfile[] || [];
+      console.log("Typed assignments data:", techsData);
       
       let filteredTechs = techsData;
       if (shift.department) {
@@ -91,6 +96,7 @@ export const ManageAssignmentsDialog = ({
         role: assignment.profiles?.role || "",
       }));
 
+      console.log("Formatted technicians:", formattedTechnicians);
       setTechnicians(formattedTechnicians);
     } catch (error: any) {
       console.error("Error fetching technicians:", error);

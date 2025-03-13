@@ -25,14 +25,19 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
   const [viewMode, setViewMode] = useState<"list" | "table">("list");
   const { toast } = useToast();
 
+  console.log("FestivalScheduling initialized with jobDates:", jobDates);
+
   useEffect(() => {
     if (jobDates.length > 0 && !selectedDate) {
-      setSelectedDate(format(jobDates[0], "yyyy-MM-dd"));
+      const initialDate = format(jobDates[0], "yyyy-MM-dd");
+      console.log("Setting initial date to:", initialDate);
+      setSelectedDate(initialDate);
     }
   }, [jobDates]);
 
   useEffect(() => {
     if (selectedDate) {
+      console.log("Fetching shifts for date:", selectedDate);
       fetchShifts();
     }
   }, [selectedDate]);
@@ -40,6 +45,8 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
   const fetchShifts = async () => {
     setIsLoading(true);
     try {
+      console.log("Fetching shifts for job:", jobId, "and date:", selectedDate);
+      
       // Fetch shifts for selected date
       const { data: shiftsData, error: shiftsError } = await supabase
         .from("festival_shifts")
@@ -49,6 +56,8 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
         .order("start_time");
 
       if (shiftsError) throw shiftsError;
+      
+      console.log("Shifts data retrieved:", shiftsData);
 
       // Get all shift IDs to fetch assignments
       const shiftIds = shiftsData ? shiftsData.map(shift => shift.id) : [];
@@ -74,6 +83,8 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
         .in("shift_id", shiftIds);
 
       if (assignmentsError) throw assignmentsError;
+      
+      console.log("Assignments data retrieved:", assignmentsData);
 
       // Combine shifts with their assignments
       const shiftsWithAssignments = shiftsData.map((shift: FestivalShift) => ({
@@ -83,6 +94,7 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
           : []
       }));
 
+      console.log("Shifts with assignments:", shiftsWithAssignments);
       setShifts(shiftsWithAssignments);
     } catch (error: any) {
       console.error("Error fetching shifts:", error);
@@ -166,7 +178,11 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
           </div>
         </div>
         <div className="mt-4">
-          <Tabs defaultValue={selectedDate} onValueChange={setSelectedDate} className="w-full">
+          <Tabs 
+            value={selectedDate} 
+            onValueChange={setSelectedDate} 
+            className="w-full"
+          >
             <TabsList className="mb-2 flex flex-wrap h-auto">
               {jobDates.map((date) => {
                 const formattedDate = format(date, "yyyy-MM-dd");
@@ -183,16 +199,18 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
               })}
             </TabsList>
           </Tabs>
-          <div className="mt-2 flex justify-end">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setViewMode(viewMode === "list" ? "table" : "list")}
-              className="text-xs"
-            >
-              {viewMode === "list" ? "Table View" : "List View"}
-            </Button>
-          </div>
+          {jobDates.length > 0 && (
+            <div className="mt-2 flex justify-end">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setViewMode(viewMode === "list" ? "table" : "list")}
+                className="text-xs"
+              >
+                {viewMode === "list" ? "Table View" : "List View"}
+              </Button>
+            </div>
+          )}
         </div>
       </CardHeader>
       <CardContent>

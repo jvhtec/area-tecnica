@@ -24,7 +24,7 @@ export interface ShiftAssignment {
     last_name: string;
     email: string;
     department: string;
-  };
+  } | null;
 }
 
 export interface ShiftWithAssignments extends FestivalShift {
