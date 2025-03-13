@@ -827,6 +827,88 @@ export type Database = {
           },
         ]
       }
+      festival_shift_assignments: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: string
+          shift_id: string | null
+          technician_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: string
+          shift_id?: string | null
+          technician_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: string
+          shift_id?: string | null
+          technician_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "festival_shift_assignments_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "festival_shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      festival_shifts: {
+        Row: {
+          created_at: string | null
+          date: string
+          department: string | null
+          end_time: string
+          id: string
+          job_id: string | null
+          name: string
+          notes: string | null
+          stage: number | null
+          start_time: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          department?: string | null
+          end_time: string
+          id?: string
+          job_id?: string | null
+          name: string
+          notes?: string | null
+          stage?: number | null
+          start_time: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          department?: string | null
+          end_time?: string
+          id?: string
+          job_id?: string | null
+          name?: string
+          notes?: string | null
+          stage?: number | null
+          start_time?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "festival_shifts_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       flex_folders: {
         Row: {
           created_at: string

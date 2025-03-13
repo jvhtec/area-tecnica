@@ -34,10 +34,9 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     if (jobDates && jobDates.length > 0 && !selectedDate) {
       try {
         // Convert the Date object to a string in "YYYY-MM-DD" format
-        const date = new Date(jobDates[0]);
-        const initialDate = date.toISOString().split('T')[0];
-        console.log("Setting initial date to:", initialDate);
-        setSelectedDate(initialDate);
+        const formattedDate = formatDateValue(jobDates[0]);
+        console.log("Setting initial date to:", formattedDate);
+        setSelectedDate(formattedDate);
       } catch (error) {
         console.error("Error formatting date:", error);
         console.log("Raw jobDates[0]:", jobDates[0]);
@@ -208,7 +207,7 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
   // Format date for value
   const formatDateValue = (date: Date) => {
     try {
-      return date.toISOString().split('T')[0]; // YYYY-MM-DD format
+      return format(date, 'yyyy-MM-dd');
     } catch (error) {
       console.error("Error formatting date for value:", error, date);
       return "";
