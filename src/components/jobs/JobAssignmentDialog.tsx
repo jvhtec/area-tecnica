@@ -33,6 +33,7 @@ export const JobAssignmentDialog = ({
   onOpenChange, 
   jobId, 
   department, 
+  // We'll ignore this prop since we're always allowing duplicates now
   allowDuplicateRoles = false 
 }: JobAssignmentDialogProps) => {
   const [selectedTechnician, setSelectedTechnician] = useState<string>("");
@@ -109,7 +110,6 @@ export const JobAssignmentDialog = ({
 
     try {
       console.log("Assigning technician:", selectedTechnician, "with role:", selectedRole);
-      console.log("Allow duplicate roles:", allowDuplicateRoles);
       
       // Validate assignment
       if (!technicians) {
@@ -118,21 +118,8 @@ export const JobAssignmentDialog = ({
       
       validateAssignment(selectedTechnician, selectedRole, technicians);
 
-      // IMPORTANT: Only check for existing role assignments if duplicate roles aren't allowed
-      if (!allowDuplicateRoles) {
-        // Check for existing assignment with same role
-        const { data: existingAssignments } = await supabase
-          .from("job_assignments")
-          .select("*")
-          .eq("job_id", jobId)
-          .eq(`${department}_role`, selectedRole);
-        
-        console.log("Existing assignments with same role:", existingAssignments);
-
-        if (existingAssignments && existingAssignments.length > 0) {
-          throw new Error(`A technician is already assigned as ${selectedRole}`);
-        }
-      }
+      // IMPORTANT: We're always allowing duplicate roles now, so we don't need to check
+      // for existing assignments with the same role
 
       // Check if this specific technician is already assigned to this job with any role
       const { data: existingTechAssignments } = await supabase
