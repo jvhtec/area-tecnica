@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,17 @@ interface ManageAssignmentsDialogProps {
   jobId: string;
   onAssignmentsUpdated: () => void;
 }
+
+// Sound department roles only
+const SOUND_ROLES = [
+  "FOH Engineer",
+  "Monitor Engineer",
+  "PA Tech",
+  "RF Tech",
+  "System Tech",
+  "Stage Tech",
+  "Audio Assistant"
+];
 
 export const ManageAssignmentsDialog = ({
   open,
@@ -287,17 +299,11 @@ export const ManageAssignmentsDialog = ({
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="FOH Engineer">FOH Engineer</SelectItem>
-                      <SelectItem value="Monitor Engineer">Monitor Engineer</SelectItem>
-                      <SelectItem value="PA Tech">PA Tech</SelectItem>
-                      <SelectItem value="RF Tech">RF Tech</SelectItem>
-                      <SelectItem value="Lighting Tech">Lighting Tech</SelectItem>
-                      <SelectItem value="Lighting Designer">Lighting Designer</SelectItem>
-                      <SelectItem value="Video Tech">Video Tech</SelectItem>
-                      <SelectItem value="Camera Operator">Camera Operator</SelectItem>
-                      <SelectItem value="Rigger">Rigger</SelectItem>
-                      <SelectItem value="Stage Manager">Stage Manager</SelectItem>
-                      <SelectItem value="Backline Tech">Backline Tech</SelectItem>
+                      {SOUND_ROLES.map((role) => (
+                        <SelectItem key={role} value={role}>
+                          {role}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
