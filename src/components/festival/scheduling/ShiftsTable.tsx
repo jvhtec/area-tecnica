@@ -9,16 +9,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
+import { Trash2, Printer } from "lucide-react";
 import { ShiftWithAssignments } from "@/types/festival-scheduling";
+import { useToast } from "@/hooks/use-toast";
+import { exportShiftsTablePDF } from "@/utils/shiftsTablePdfExport";
 
 interface ShiftsTableProps {
   shifts: ShiftWithAssignments[];
   onDeleteShift: (shiftId: string) => void;
   date: string;
+  jobTitle?: string;
 }
 
-export const ShiftsTable = ({ shifts, onDeleteShift, date }: ShiftsTableProps) => {
+export const ShiftsTable = ({ shifts, onDeleteShift, date, jobTitle = "Festival Schedule" }: ShiftsTableProps) => {
+  const { toast } = useToast();
+  
   // Sort shifts by start time
   const sortedShifts = [...shifts].sort((a, b) => 
     a.start_time.localeCompare(b.start_time)
@@ -42,11 +47,67 @@ export const ShiftsTable = ({ shifts, onDeleteShift, date }: ShiftsTableProps) =
     day: 'numeric'
   });
 
+  const handlePrint = async () => {
+    try {
+      const pdfData = {
+        jobTitle,
+        date,
+        shifts: sortedShifts.map(shift => ({
+          name: shift.name,
+          time: {
+            start: shift.start_time,
+            end: shift.end_time
+          },
+          stage: shift.stage,
+          department: shift.department || '',
+          assignments: shift.assignments.map(assignment => ({
+            name: `${assignment.profiles?.first_name || ''} ${assignment.profiles?.last_name || ''}`,
+            role: assignment.role
+          }))
+        }))
+      };
+
+      const blob = await exportShiftsTablePDF(pdfData);
+      
+      // Create a download link for the generated PDF
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${jobTitle.replace(/\s+/g, '_')}_${date}_shifts.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Success",
+        description: "PDF generated successfully",
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "Error",
+        description: "Could not generate PDF",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="print:p-8">
-      <div className="print:block hidden mb-4">
-        <h2 className="text-xl font-bold text-center">Festival Schedule</h2>
-        <p className="text-center text-muted-foreground">{formattedDate}</p>
+      <div className="flex justify-between items-center mb-4">
+        <div className="print:block hidden">
+          <h2 className="text-xl font-bold text-center">{jobTitle}</h2>
+          <p className="text-center text-muted-foreground">{formattedDate}</p>
+        </div>
+        <Button 
+          variant="outline" 
+          className="ml-auto mb-2 print:hidden"
+          onClick={handlePrint}
+        >
+          <Printer className="h-4 w-4 mr-2" />
+          Export to PDF
+        </Button>
       </div>
       
       <Table className="border-collapse border border-border print:border-black">
