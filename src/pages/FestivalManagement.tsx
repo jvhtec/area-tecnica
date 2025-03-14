@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -177,7 +176,7 @@ const FestivalManagement = () => {
     try {
       const { data: artists, error: artistError } = await supabase
         .from("festival_artists")
-        .select("*, technical_info(*), infrastructure_info(*), extras(*)")
+        .select("*")
         .eq("job_id", jobId);
       
       if (artistError) throw artistError;
@@ -189,9 +188,68 @@ const FestivalManagement = () => {
       
       if (stagesError) throw stagesError;
 
+      const { data: technicalInfo, error: technicalError } = await supabase
+        .from("festival_artist_technical_info")
+        .select("*")
+        .eq("job_id", jobId);
+        
+      if (technicalError) {
+        console.error("Error fetching technical info:", technicalError);
+      }
+      
+      const { data: infrastructureInfo, error: infraError } = await supabase
+        .from("festival_artist_infrastructure_info")
+        .select("*")
+        .eq("job_id", jobId);
+        
+      if (infraError) {
+        console.error("Error fetching infrastructure info:", infraError);
+      }
+      
+      const { data: extrasInfo, error: extrasError } = await supabase
+        .from("festival_artist_extras")
+        .select("*")
+        .eq("job_id", jobId);
+        
+      if (extrasError) {
+        console.error("Error fetching extras info:", extrasError);
+      }
+      
+      const techInfoMap = new Map();
+      const infraInfoMap = new Map();
+      const extrasInfoMap = new Map();
+      
+      if (technicalInfo) {
+        technicalInfo.forEach(item => {
+          if (item.artist_id) {
+            techInfoMap.set(item.artist_id, item);
+          }
+        });
+      }
+      
+      if (infrastructureInfo) {
+        infrastructureInfo.forEach(item => {
+          if (item.artist_id) {
+            infraInfoMap.set(item.artist_id, item);
+          }
+        });
+      }
+      
+      if (extrasInfo) {
+        extrasInfo.forEach(item => {
+          if (item.artist_id) {
+            extrasInfoMap.set(item.artist_id, item);
+          }
+        });
+      }
+
       const artistPdfs: Blob[] = [];
       
       for (const artist of artists) {
+        const technical = techInfoMap.get(artist.id) || {};
+        const infrastructure = infraInfoMap.get(artist.id) || {};
+        const extras = extrasInfoMap.get(artist.id) || {};
+        
         const artistData: ArtistPdfData = {
           name: artist.name,
           stage: artist.stage,
@@ -203,9 +261,62 @@ const FestivalManagement = () => {
               end: artist.soundcheck_end || ''
             } : undefined
           },
-          technical: artist.technical_info,
-          infrastructure: artist.infrastructure_info,
-          extras: artist.extras,
+          technical: {
+            fohTech: artist.foh_tech || false,
+            monTech: artist.mon_tech || false,
+            fohConsole: { 
+              model: artist.foh_console || '', 
+              providedBy: artist.foh_console_provided_by || 'festival' 
+            },
+            monConsole: { 
+              model: artist.mon_console || '', 
+              providedBy: artist.mon_console_provided_by || 'festival' 
+            },
+            wireless: {
+              model: artist.wireless_model || '',
+              providedBy: artist.wireless_provided_by || 'festival',
+              handhelds: artist.wireless_quantity_hh || 0,
+              bodypacks: artist.wireless_quantity_bp || 0,
+              band: artist.wireless_band || ''
+            },
+            iem: {
+              model: artist.iem_model || '',
+              providedBy: artist.iem_provided_by || 'festival',
+              quantity: artist.iem_quantity || 0,
+              band: artist.iem_band || ''
+            },
+            monitors: {
+              enabled: artist.monitors_enabled || false,
+              quantity: artist.monitors_quantity || 0
+            }
+          },
+          infrastructure: {
+            providedBy: artist.infrastructure_provided_by || 'festival',
+            cat6: { 
+              enabled: artist.infra_cat6 || false, 
+              quantity: artist.infra_cat6_quantity || 0 
+            },
+            hma: { 
+              enabled: artist.infra_hma || false, 
+              quantity: artist.infra_hma_quantity || 0 
+            },
+            coax: { 
+              enabled: artist.infra_coax || false, 
+              quantity: artist.infra_coax_quantity || 0 
+            },
+            opticalconDuo: { 
+              enabled: artist.infra_opticalcon_duo || false, 
+              quantity: artist.infra_opticalcon_duo_quantity || 0 
+            },
+            analog: artist.infra_analog || 0,
+            other: artist.other_infrastructure || ''
+          },
+          extras: {
+            sideFill: artist.extras_sf || false,
+            drumFill: artist.extras_df || false,
+            djBooth: artist.extras_djbooth || false,
+            wired: artist.extras_wired || ''
+          },
           notes: artist.notes
         };
         
@@ -247,8 +358,41 @@ const FestivalManagement = () => {
                 start: a.soundcheck_start, 
                 end: a.soundcheck_end || '' 
               } : undefined,
-              technical: a.technical_info,
-              extras: a.extras,
+              technical: {
+                fohTech: a.foh_tech || false,
+                monTech: a.mon_tech || false,
+                fohConsole: { 
+                  model: a.foh_console || '', 
+                  providedBy: a.foh_console_provided_by || 'festival' 
+                },
+                monConsole: { 
+                  model: a.mon_console || '', 
+                  providedBy: a.mon_console_provided_by || 'festival' 
+                },
+                wireless: {
+                  model: a.wireless_model || '',
+                  providedBy: a.wireless_provided_by || 'festival',
+                  handhelds: a.wireless_quantity_hh || 0,
+                  bodypacks: a.wireless_quantity_bp || 0,
+                  band: a.wireless_band || ''
+                },
+                iem: {
+                  model: a.iem_model || '',
+                  providedBy: a.iem_provided_by || 'festival',
+                  quantity: a.iem_quantity || 0,
+                  band: a.iem_band || ''
+                },
+                monitors: {
+                  enabled: a.monitors_enabled || false,
+                  quantity: a.monitors_quantity || 0
+                }
+              },
+              extras: {
+                sideFill: a.extras_sf || false,
+                drumFill: a.extras_df || false,
+                djBooth: a.extras_djbooth || false,
+                wired: a.extras_wired || ''
+              },
               notes: a.notes
             }))
           };
@@ -283,18 +427,14 @@ const FestivalManagement = () => {
         }
         
         if (shiftsData && shiftsData.length > 0) {
-          // Map the data to match our ShiftWithAssignments type
           const typedShifts: ShiftWithAssignments[] = shiftsData.map(shift => {
             const typedAssignments = shift.assignments.map(assignment => {
-              // Check if profiles is an array or object and handle appropriately
               let profileData = null;
               
               if (assignment.profiles) {
-                // Type assertion to help TypeScript understand the structure
                 const profilesData = assignment.profiles as any;
                 
                 if (Array.isArray(profilesData) && profilesData.length > 0) {
-                  // If it's an array, use the first element
                   profileData = {
                     id: profilesData[0].id,
                     first_name: profilesData[0].first_name,
@@ -304,7 +444,6 @@ const FestivalManagement = () => {
                     role: profilesData[0].role
                   };
                 } else if (typeof profilesData === 'object' && profilesData !== null) {
-                  // If it's an object, use it directly
                   profileData = {
                     id: profilesData.id,
                     first_name: profilesData.first_name,
@@ -519,3 +658,4 @@ const FestivalManagement = () => {
 };
 
 export default FestivalManagement;
+
