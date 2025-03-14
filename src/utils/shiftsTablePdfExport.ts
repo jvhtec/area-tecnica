@@ -86,6 +86,8 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
     // Fetch festival logo from Supabase
     let festivalLogoUrl = null;
     try {
+      console.log('Fetching festival logo for job ID:', data.jobId);
+      
       // Query the festival_logos table to get the logo path for this job
       const { data: logoData, error: logoError } = await supabase
         .from('festival_logos')
@@ -103,7 +105,9 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
           .getPublicUrl(logoData.file_path);
         
         festivalLogoUrl = publicUrl;
-        console.log('Festival logo URL:', festivalLogoUrl);
+        console.log('Festival logo found, URL:', festivalLogoUrl);
+      } else {
+        console.log('No festival logo found for job ID:', data.jobId);
       }
     } catch (error) {
       console.error('Error processing festival logo:', error);
@@ -154,6 +158,7 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
       
       festivalLogo.onload = () => {
         try {
+          console.log('Festival logo loaded successfully');
           const logoWidth = 20;
           const logoHeight = logoWidth * (festivalLogo.height / festivalLogo.width);
           const xPosition = 10;
@@ -175,6 +180,7 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
         
         defaultFestivalLogo.onload = () => {
           try {
+            console.log('Fallback to default festival logo');
             const logoWidth = 20;
             const logoHeight = logoWidth * (defaultFestivalLogo.height / defaultFestivalLogo.width);
             const xPosition = 10;
@@ -200,6 +206,7 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
       
       defaultFestivalLogo.onload = () => {
         try {
+          console.log('Using default festival logo');
           const logoWidth = 20;
           const logoHeight = logoWidth * (defaultFestivalLogo.height / defaultFestivalLogo.width);
           const xPosition = 10;

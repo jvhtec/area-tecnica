@@ -1,4 +1,3 @@
-
 import { format } from "date-fns";
 import {
   Table,
@@ -56,6 +55,8 @@ export const ShiftsTable = ({
 
   const handleExportPDF = async () => {
     try {
+      console.log("Exporting PDF with jobId:", jobId);
+      
       const pdfData: ShiftsTablePdfData = {
         jobTitle,
         date,
