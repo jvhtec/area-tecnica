@@ -9,6 +9,7 @@ import { Trash2, UserPlus } from "lucide-react";
 import { ShiftWithAssignments, Technician } from "@/types/festival-scheduling";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { useRefreshOnTabVisibility } from "@/hooks/useRefreshOnTabVisibility";
 
 interface ManageAssignmentsDialogProps {
   open: boolean;
@@ -32,54 +33,63 @@ export const ManageAssignmentsDialog = ({
   const [isAddingTech, setIsAddingTech] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchAssignedTechnicians = async () => {
-      try {
-        console.log("Fetching technicians assigned to job:", jobId);
-        setIsLoading(true);
+  const fetchAssignedTechnicians = async () => {
+    try {
+      console.log("Fetching technicians assigned to job:", jobId);
+      setIsLoading(true);
 
-        // Fetch all technicians that are already assigned to this job
-        const { data: jobAssignments, error: assignmentsError } = await supabase
-          .from("job_assignments")
-          .select("technician_id, profiles(id, first_name, last_name, email, department, role)")
-          .eq("job_id", jobId);
+      // Fetch all technicians that are already assigned to this job
+      const { data: jobAssignments, error: assignmentsError } = await supabase
+        .from("job_assignments")
+        .select("technician_id, profiles(id, first_name, last_name, email, department, role)")
+        .eq("job_id", jobId);
 
-        if (assignmentsError) {
-          console.error("Error fetching job assignments:", assignmentsError);
-          throw assignmentsError;
-        }
-
-        console.log("Job assignments fetched:", jobAssignments);
-
-        if (jobAssignments && jobAssignments.length > 0) {
-          // Extract the technician profiles from the job assignments
-          const assignedTechnicians = jobAssignments
-            .filter(assignment => assignment.profiles)
-            .map(assignment => assignment.profiles)
-            .filter(profile => profile.role === 'technician' || profile.role === 'house_tech');
-
-          console.log("Filtered technicians for shift assignment:", assignedTechnicians);
-          setTechnicians(assignedTechnicians);
-        } else {
-          console.log("No technicians assigned to this job");
-          setTechnicians([]);
-        }
-      } catch (error: any) {
-        console.error("Error fetching assigned technicians:", error);
-        toast({
-          title: "Error",
-          description: "Could not load technicians assigned to this job",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
+      if (assignmentsError) {
+        console.error("Error fetching job assignments:", assignmentsError);
+        throw assignmentsError;
       }
-    };
 
+      console.log("Job assignments fetched:", jobAssignments);
+
+      if (jobAssignments && jobAssignments.length > 0) {
+        // Extract the technician profiles from the job assignments
+        const assignedTechnicians = jobAssignments
+          .filter(assignment => assignment.profiles)
+          .map(assignment => assignment.profiles)
+          // Filter only technicians and house_techs
+          .filter(profile => profile?.role === 'technician' || profile?.role === 'house_tech');
+
+        console.log("Filtered technicians for shift assignment:", assignedTechnicians);
+        setTechnicians(assignedTechnicians as Technician[]);
+      } else {
+        console.log("No technicians assigned to this job");
+        setTechnicians([]);
+      }
+    } catch (error: any) {
+      console.error("Error fetching assigned technicians:", error);
+      toast({
+        title: "Error",
+        description: "Could not load technicians assigned to this job",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     if (open && jobId) {
       fetchAssignedTechnicians();
     }
-  }, [open, jobId, toast]);
+  }, [open, jobId]);
+
+  // Refresh the assignments when the tab becomes visible
+  useRefreshOnTabVisibility(() => {
+    if (open && jobId) {
+      fetchAssignedTechnicians();
+      onAssignmentsUpdated();
+    }
+  }, [open, jobId]);
 
   const handleAddAssignment = async () => {
     if (!selectedTechnician || !selectedRole) {
