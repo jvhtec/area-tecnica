@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -8,7 +7,7 @@ import { ShiftsList } from "./ShiftsList";
 import { CreateShiftDialog } from "./CreateShiftDialog";
 import { ShiftsTable } from "./ShiftsTable";
 import { Button } from "@/components/ui/button";
-import { Printer, Plus } from "lucide-react";
+import { Plus, FileDown } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { FestivalShift, ShiftWithAssignments } from "@/types/festival-scheduling";
 import { format } from "date-fns";
@@ -245,10 +244,6 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     }
   };
 
-  const handlePrintSchedule = () => {
-    window.print();
-  };
-
   // If no job dates, show a message
   if (!jobDates || jobDates.length === 0) {
     console.log("No job dates available");
@@ -267,15 +262,6 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <CardTitle>Festival Schedule</CardTitle>
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handlePrintSchedule}
-              className="flex items-center gap-1"
-            >
-              <Printer className="h-4 w-4" />
-              Print
-            </Button>
             <Button 
               size="sm" 
               onClick={() => setIsCreateShiftOpen(true)}
