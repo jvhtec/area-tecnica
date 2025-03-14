@@ -55,7 +55,7 @@ export const ManageAssignmentsDialog = ({
         // Extract the technician profiles from the job assignments
         const techniciansList: Technician[] = [];
         
-        for (const assignment of jobAssignments) {
+        jobAssignments.forEach(assignment => {
           if (assignment.profiles) {
             const profile = assignment.profiles;
             // Only include technicians and house_techs
@@ -70,7 +70,7 @@ export const ManageAssignmentsDialog = ({
               });
             }
           }
-        }
+        });
         
         console.log("Filtered technicians for shift assignment:", techniciansList);
         setTechnicians(techniciansList);
