@@ -2,12 +2,10 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
-import { supabase } from '@/lib/supabase';
 
 export interface ShiftsTablePdfData {
   jobTitle: string;
   date: string;
-  jobId?: string;
   shifts: {
     name: string;
     time: {
@@ -23,8 +21,8 @@ export interface ShiftsTablePdfData {
   }[];
 }
 
-export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Blob> => {
-  return new Promise(async (resolve) => {
+export const exportShiftsTablePDF = (data: ShiftsTablePdfData): Promise<Blob> => {
+  return new Promise((resolve) => {
     // Create PDF in landscape
     const doc = new jsPDF({ orientation: 'landscape' });
     const pageWidth = doc.internal.pageSize.width;
@@ -83,60 +81,23 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
       }
     });
 
-    // Try to load festival logo if jobId is provided
-    let festivalLogoUrl = null;
-    if (data.jobId) {
-      try {
-        const { data: logoData } = await supabase
-          .from('festival_logos')
-          .select('file_path')
-          .eq('job_id', data.jobId)
-          .maybeSingle();
-          
-        if (logoData?.file_path) {
-          const { data: { publicUrl } } = supabase
-            .storage
-            .from('festival-logos')
-            .getPublicUrl(logoData.file_path);
-          festivalLogoUrl = publicUrl;
-        }
-      } catch (error) {
-        console.error('Error fetching festival logo:', error);
-      }
-    }
-
     // Add festival logo (if available)
-    if (festivalLogoUrl) {
-      const festivalLogo = new Image();
-      festivalLogo.crossOrigin = 'anonymous';
-      festivalLogo.src = festivalLogoUrl;
-      
-      festivalLogo.onload = () => {
-        try {
-          const logoWidth = 20;
-          const logoHeight = logoWidth * (festivalLogo.height / festivalLogo.width);
-          const xPosition = 10;
-          const yPosition = pageHeight - 15;
-          doc.addImage(festivalLogo, 'PNG', xPosition, yPosition - logoHeight, logoWidth, logoHeight);
-        } catch (error) {
-          console.error('Error adding festival logo:', error);
-        } finally {
-          // Continue with company logo
-          addCompanyLogo();
-        }
-      };
-      
-      festivalLogo.onerror = () => {
-        console.error('Failed to load festival logo');
-        // Continue with company logo
-        addCompanyLogo();
-      };
-    } else {
-      // No festival logo, add company logo directly
-      addCompanyLogo();
-    }
+    const festivalLogo = new Image();
+    festivalLogo.crossOrigin = 'anonymous';
+    festivalLogo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
+    
+    festivalLogo.onload = () => {
+      try {
+        const logoWidth = 20;
+        const logoHeight = logoWidth * (festivalLogo.height / festivalLogo.width);
+        const xPosition = 10;
+        const yPosition = pageHeight - 15;
+        doc.addImage(festivalLogo, 'PNG', xPosition, yPosition - logoHeight, logoWidth, logoHeight);
+      } catch (error) {
+        console.error('Error adding festival logo:', error);
+      }
 
-    function addCompanyLogo() {
+      // Add company logo
       const companyLogo = new Image();
       companyLogo.crossOrigin = 'anonymous';
       companyLogo.src = '/lovable-uploads/2f12a6ef-587b-4049-ad53-d83fb94064e3.png';
@@ -150,25 +111,60 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
           doc.addImage(companyLogo, 'PNG', xPosition, yPosition - logoHeight, logoWidth, logoHeight);
         } catch (error) {
           console.error('Error adding company logo:', error);
-        } finally {
-          finalizePdf();
         }
+        
+        // Add footer text
+        doc.setFontSize(8);
+        doc.setTextColor(51, 51, 51);
+        doc.text(`Generated: ${createdDate}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        
+        const blob = doc.output('blob');
+        resolve(blob);
       };
       
       companyLogo.onerror = () => {
         console.error('Failed to load company logo');
-        finalizePdf();
+        doc.setFontSize(8);
+        doc.setTextColor(51, 51, 51);
+        doc.text(`Generated: ${createdDate}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        const blob = doc.output('blob');
+        resolve(blob);
       };
-    }
-
-    function finalizePdf() {
-      // Add footer text
-      doc.setFontSize(8);
-      doc.setTextColor(51, 51, 51);
-      doc.text(`Generated: ${createdDate}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+    };
+    
+    festivalLogo.onerror = () => {
+      console.error('Failed to load festival logo');
       
-      const blob = doc.output('blob');
-      resolve(blob);
-    }
+      const companyLogo = new Image();
+      companyLogo.crossOrigin = 'anonymous';
+      companyLogo.src = '/lovable-uploads/2f12a6ef-587b-4049-ad53-d83fb94064e3.png';
+      
+      companyLogo.onload = () => {
+        try {
+          const logoWidth = 25;
+          const logoHeight = logoWidth * (companyLogo.height / companyLogo.width);
+          const xPosition = pageWidth - 35;
+          const yPosition = pageHeight - 15;
+          doc.addImage(companyLogo, 'PNG', xPosition, yPosition - logoHeight, logoWidth, logoHeight);
+        } catch (error) {
+          console.error('Error adding company logo:', error);
+        }
+        
+        doc.setFontSize(8);
+        doc.setTextColor(51, 51, 51);
+        doc.text(`Generated: ${createdDate}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        const blob = doc.output('blob');
+        resolve(blob);
+      };
+      
+      companyLogo.onerror = () => {
+        console.error('Failed to load company logo');
+        doc.setFontSize(8);
+        doc.setTextColor(51, 51, 51);
+        doc.text(`Generated: ${createdDate}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        const blob = doc.output('blob');
+        resolve(blob);
+      };
+    };
   });
 };

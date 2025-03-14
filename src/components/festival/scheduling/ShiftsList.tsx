@@ -19,12 +19,11 @@ import { ManageAssignmentsDialog } from "./ManageAssignmentsDialog";
 interface ShiftsListProps {
   shifts: ShiftWithAssignments[];
   onDeleteShift: (shiftId: string) => void;
-  onEditShift: (shift: ShiftWithAssignments) => void;
-  onShiftUpdated?: () => void;
-  jobId?: string;
+  onShiftUpdated: () => void;
+  jobId: string;
 }
 
-export const ShiftsList = ({ shifts, onDeleteShift, onEditShift, onShiftUpdated, jobId }: ShiftsListProps) => {
+export const ShiftsList = ({ shifts, onDeleteShift, onShiftUpdated, jobId }: ShiftsListProps) => {
   const [editingShift, setEditingShift] = useState<ShiftWithAssignments | null>(null);
   const [managingShift, setManagingShift] = useState<ShiftWithAssignments | null>(null);
 
@@ -36,12 +35,6 @@ export const ShiftsList = ({ shifts, onDeleteShift, onEditShift, onShiftUpdated,
     e.stopPropagation();
     if (confirm("Are you sure you want to delete this shift?")) {
       onDeleteShift(shiftId);
-    }
-  };
-
-  const handleShiftUpdated = () => {
-    if (onShiftUpdated) {
-      onShiftUpdated();
     }
   };
 
@@ -61,10 +54,7 @@ export const ShiftsList = ({ shifts, onDeleteShift, onEditShift, onShiftUpdated,
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  onClick={() => {
-                    setEditingShift(shift);
-                    onEditShift(shift);
-                  }}
+                  onClick={() => setEditingShift(shift)}
                 >
                   <Edit className="h-4 w-4" />
                 </Button>
@@ -89,14 +79,14 @@ export const ShiftsList = ({ shifts, onDeleteShift, onEditShift, onShiftUpdated,
             )}
           </CardHeader>
           <CardContent className="pt-4">
-            {shift.assignments && shift.assignments.length > 0 ? (
+            {shift.assignments.length > 0 ? (
               <div className="space-y-2">
                 {shift.assignments.map((assignment) => (
                   <div key={assignment.id} className="flex justify-between items-center p-2 bg-accent/10 rounded-md">
                     <div className="flex items-center">
                       <Users className="h-4 w-4 mr-2 text-muted-foreground" />
                       <span>
-                        {assignment.profiles?.first_name || 'Unknown'} {assignment.profiles?.last_name || ''}
+                        {assignment.profiles?.first_name} {assignment.profiles?.last_name}
                       </span>
                     </div>
                     <Badge variant="secondary">{assignment.role}</Badge>
@@ -131,17 +121,17 @@ export const ShiftsList = ({ shifts, onDeleteShift, onEditShift, onShiftUpdated,
           open={!!editingShift}
           onOpenChange={(open) => !open && setEditingShift(null)}
           shift={editingShift}
-          onShiftUpdated={handleShiftUpdated}
+          onShiftUpdated={onShiftUpdated}
         />
       )}
 
-      {managingShift && jobId && (
+      {managingShift && (
         <ManageAssignmentsDialog
           open={!!managingShift}
           onOpenChange={(open) => !open && setManagingShift(null)}
           shift={managingShift}
           jobId={jobId}
-          onAssignmentsUpdated={handleShiftUpdated}
+          onAssignmentsUpdated={onShiftUpdated}
         />
       )}
     </div>

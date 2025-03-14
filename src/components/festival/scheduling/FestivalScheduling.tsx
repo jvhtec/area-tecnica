@@ -1,19 +1,17 @@
-
-import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import { ShiftsTable } from "./ShiftsTable";
-import { CreateShiftDialog } from "./CreateShiftDialog";
-import { Button } from "@/components/ui/button";
-import { Calendar, Plus } from "lucide-react";
-import { format, addDays, parse, isSameDay } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { EditShiftDialog } from "./EditShiftDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ShiftsList } from "./ShiftsList";
-import { useQuery } from "@tanstack/react-query";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ShiftWithAssignments } from "@/types/festival-scheduling";
+import { CreateShiftDialog } from "./CreateShiftDialog";
+import { ShiftsTable } from "./ShiftsTable";
+import { Button } from "@/components/ui/button";
+import { Plus, FileDown } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { FestivalShift, ShiftWithAssignments } from "@/types/festival-scheduling";
+import { format } from "date-fns";
+import { useRefreshOnTabVisibility } from "@/hooks/useRefreshOnTabVisibility";
 
 interface FestivalSchedulingProps {
   jobId: string;
@@ -21,229 +19,331 @@ interface FestivalSchedulingProps {
 }
 
 export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [shifts, setShifts] = useState<ShiftWithAssignments[]>([]);
+  const [isCreateShiftOpen, setIsCreateShiftOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "table">("list");
   const { toast } = useToast();
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
-  const [dateRange, setDateRange] = useState<string[]>([]);
-  const [jobInfo, setJobInfo] = useState<{ title: string, start_date: string, end_date: string } | null>(null);
-  const [selectedShift, setSelectedShift] = useState<ShiftWithAssignments | null>(null);
+  const queryClient = useQueryClient();
+
+  console.log("FestivalScheduling component rendered with job ID:", jobId);
+  console.log("Job dates received:", jobDates);
   
-  // Get job info
-  useEffect(() => {
-    const fetchJobInfo = async () => {
-      if (!jobId) return;
+  // Format a date to YYYY-MM-DD string
+  const formatDateToString = (date: Date): string => {
+    try {
+      return format(date, 'yyyy-MM-dd');
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      console.error("Problematic date value:", date);
+      return "";
+    }
+  };
+
+  // Define fetchShifts as a useCallback to allow it to be used in the visibility hook
+  const fetchShifts = useCallback(async () => {
+    if (!selectedDate || !jobId) {
+      console.error("Cannot fetch shifts: missing date or job ID");
+      return;
+    }
+    
+    setIsLoading(true);
+    console.log("Starting to fetch shifts");
+    
+    try {
+      console.log(`Executing fetch for job: ${jobId}, date: ${selectedDate}`);
       
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('title, start_date, end_date')
-        .eq('id', jobId)
-        .single();
+      // Fetch shifts for selected date
+      const { data: shiftsData, error: shiftsError } = await supabase
+        .from("festival_shifts")
+        .select("*")
+        .eq("job_id", jobId)
+        .eq("date", selectedDate)
+        .order("start_time");
+
+      if (shiftsError) {
+        console.error("Error fetching shifts:", shiftsError);
+        throw shiftsError;
+      }
       
-      if (error) {
-        console.error('Error fetching job info:', error);
+      console.log("Shifts data retrieved:", shiftsData);
+
+      // If no shifts, set empty array and return early
+      if (!shiftsData || shiftsData.length === 0) {
+        console.log("No shifts found for this date");
+        setShifts([]);
+        setIsLoading(false);
         return;
       }
+
+      // Get all shift IDs to fetch assignments
+      const shiftIds = shiftsData.map(shift => shift.id);
       
-      if (data) {
-        setJobInfo(data);
-        
-        // Set default selected date to the job start date if in the future
-        const startDate = new Date(data.start_date);
-        if (startDate > new Date()) {
-          setSelectedDate(format(startDate, "yyyy-MM-dd"));
+      try {
+        // Try to fetch assignments for all shifts
+        const { data: assignmentsData, error: assignmentsError } = await supabase
+          .from("festival_shift_assignments")
+          .select(`
+            id,
+            shift_id,
+            technician_id,
+            role
+          `)
+          .in("shift_id", shiftIds);
+
+        if (assignmentsError) {
+          console.error("Error fetching shift assignments:", assignmentsError);
+          // Don't throw here, we'll continue with empty assignments
         }
+
+        // Get technician details separately if we have assignments
+        let technicianProfiles: Record<string, any> = {};
+        
+        if (assignmentsData && assignmentsData.length > 0) {
+          const technicianIds = [...new Set(assignmentsData.map(a => a.technician_id))];
+          
+          const { data: profilesData, error: profilesError } = await supabase
+            .from("profiles")
+            .select("id, first_name, last_name, email, department, role")
+            .in("id", technicianIds);
+            
+          if (profilesError) {
+            console.error("Error fetching technician profiles:", profilesError);
+          } else if (profilesData) {
+            // Create a lookup map for quick access
+            technicianProfiles = profilesData.reduce((acc, profile) => {
+              acc[profile.id] = profile;
+              return acc;
+            }, {} as Record<string, any>);
+          }
+        }
+        
+        // Combine shifts with their assignments and add profile info
+        const shiftsWithAssignments = shiftsData.map((shift: FestivalShift) => {
+          const shiftAssignments = assignmentsData 
+            ? assignmentsData
+                .filter(assignment => assignment.shift_id === shift.id)
+                .map(assignment => ({
+                  ...assignment,
+                  profiles: technicianProfiles[assignment.technician_id] || null
+                }))
+            : [];
+            
+          return {
+            ...shift,
+            assignments: shiftAssignments
+          };
+        });
+
+        console.log("Shifts with assignments:", shiftsWithAssignments);
+        setShifts(shiftsWithAssignments);
+      } catch (error: any) {
+        console.error("Error processing assignments:", error);
+        // Continue with shifts but without assignments
+        const shiftsWithEmptyAssignments = shiftsData.map((shift: FestivalShift) => ({
+          ...shift,
+          assignments: []
+        }));
+        
+        console.log("Shifts without assignments due to error:", shiftsWithEmptyAssignments);
+        setShifts(shiftsWithEmptyAssignments);
       }
-    };
-    
-    fetchJobInfo();
-  }, [jobId]);
-  
-  // Calculate date range from job dates
+    } catch (error: any) {
+      console.error("Error fetching shifts:", error);
+      toast({
+        title: "Error",
+        description: "Could not load shifts: " + error.message,
+        variant: "destructive",
+      });
+      
+      // Set empty shifts to prevent UI from waiting indefinitely
+      setShifts([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedDate, jobId, toast]);
+
+  // Set initial date when jobDates are available
   useEffect(() => {
-    if (!jobDates || jobDates.length === 0) return;
-    
-    const days = jobDates.map(date => format(date, "yyyy-MM-dd"));
-    setDateRange(days);
-    
-    // Set default selected date to the first date in the range if not already set
-    if (!selectedDate || !days.includes(selectedDate)) {
-      setSelectedDate(days[0]);
+    if (jobDates && jobDates.length > 0 && !selectedDate) {
+      try {
+        const formattedDate = formatDateToString(jobDates[0]);
+        console.log("Setting initial date to:", formattedDate);
+        
+        if (formattedDate) {
+          setSelectedDate(formattedDate);
+        } else {
+          throw new Error("Could not format initial date");
+        }
+      } catch (error) {
+        console.error("Error setting initial date:", error);
+        
+        // Fallback to current date
+        const today = new Date();
+        setSelectedDate(formatDateToString(today));
+      }
     }
   }, [jobDates, selectedDate]);
 
-  const { data: shifts, isLoading, refetch } = useQuery({
-    queryKey: ['festival-shifts', jobId, selectedDate],
-    queryFn: async () => {
-      if (!jobId) return [];
-      
-      console.log('Fetching shifts for date:', selectedDate);
-      
-      const { data, error } = await supabase
-        .from('festival_shifts')
-        .select(`
-          *,
-          assignments:festival_shift_assignments(
-            id,
-            technician_id,
-            role,
-            profiles:technician_id(first_name, last_name)
-          )
-        `)
-        .eq('job_id', jobId)
-        .eq('shift_date', selectedDate)
-        .order('start_time', { ascending: true });
-      
-      if (error) {
-        console.error('Error fetching shifts:', error);
-        throw error;
-      }
-      
-      console.log('Fetched shifts:', data);
-      
-      // Ensure assignments is always an array
-      const shiftsWithAssignments = (data || []).map(shift => ({
-        ...shift,
-        assignments: shift.assignments || []
-      }));
-      
-      return shiftsWithAssignments as ShiftWithAssignments[];
+  // Fetch shifts when selectedDate changes
+  useEffect(() => {
+    if (selectedDate && jobId) {
+      console.log(`Fetching shifts for date: ${selectedDate} and job: ${jobId}`);
+      fetchShifts();
+    } else {
+      console.log("Not fetching shifts - missing selectedDate or jobId", { selectedDate, jobId });
     }
-  });
+  }, [selectedDate, jobId, fetchShifts]);
+
+  // Use our custom hook to refresh data when tab becomes visible
+  useRefreshOnTabVisibility(() => {
+    if (selectedDate && jobId) {
+      console.log("Tab became visible, refreshing shifts");
+      fetchShifts();
+    }
+  }, [selectedDate, jobId, fetchShifts]);
+
+  const handleShiftCreated = async () => {
+    fetchShifts();
+    setIsCreateShiftOpen(false);
+    toast({
+      title: "Success",
+      description: "Shift created successfully",
+    });
+  };
 
   const handleDeleteShift = async (shiftId: string) => {
     try {
       // First delete all assignments for this shift
-      const { error: assignmentsError } = await supabase
-        .from('festival_shift_assignments')
+      await supabase
+        .from("festival_shift_assignments")
         .delete()
-        .eq('shift_id', shiftId);
-        
-      if (assignmentsError) throw assignmentsError;
-      
+        .eq("shift_id", shiftId);
+
       // Then delete the shift
       const { error } = await supabase
-        .from('festival_shifts')
+        .from("festival_shifts")
         .delete()
-        .eq('id', shiftId);
-        
+        .eq("id", shiftId);
+
       if (error) throw error;
-      
+
+      fetchShifts();
       toast({
         title: "Success",
-        description: "Shift has been deleted",
+        description: "Shift deleted successfully",
       });
-      
-      refetch();
-    } catch (error) {
-      console.error('Error deleting shift:', error);
+    } catch (error: any) {
+      console.error("Error deleting shift:", error);
       toast({
         title: "Error",
-        description: "Could not delete the shift",
+        description: "Could not delete shift",
         variant: "destructive",
       });
     }
   };
 
+  // If no job dates, show a message
+  if (!jobDates || jobDates.length === 0) {
+    console.log("No job dates available");
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <p className="text-muted-foreground">No dates available for scheduling.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <div className="space-y-6 p-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Festival Schedule</h1>
-        <Button onClick={() => setShowAddDialog(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Shift
-        </Button>
-      </div>
-      
-      {jobInfo && dateRange.length > 0 && (
-        <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center">
-                <Calendar className="h-5 w-5 mr-2" />
-                Select Day
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {dateRange.map((date) => {
-                  const day = parse(date, "yyyy-MM-dd", new Date());
-                  const isSelected = date === selectedDate;
+    <Card className="mt-6">
+      <CardHeader>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <CardTitle>Festival Schedule</CardTitle>
+          <div className="flex gap-2">
+            <Button 
+              size="sm" 
+              onClick={() => setIsCreateShiftOpen(true)}
+              className="flex items-center gap-1"
+            >
+              <Plus className="h-4 w-4" />
+              Create Shift
+            </Button>
+          </div>
+        </div>
+        <div className="mt-4">
+          <Tabs 
+            value={selectedDate} 
+            onValueChange={setSelectedDate} 
+            className="w-full"
+          >
+            <TabsList className="mb-2 flex flex-wrap h-auto">
+              {jobDates.map((date, index) => {
+                try {
+                  const dateValue = formatDateToString(date);
+                  if (!dateValue) return null;
+                  
+                  const displayDate = format(date, 'MMM d');
                   
                   return (
-                    <Button
-                      key={date}
-                      variant={isSelected ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSelectedDate(date)}
+                    <TabsTrigger
+                      key={`date-${index}-${dateValue}`}
+                      value={dateValue}
+                      className="mb-1"
                     >
-                      {format(day, "EEE, MMM d")}
-                    </Button>
+                      {displayDate}
+                    </TabsTrigger>
                   );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Tabs defaultValue="table" className="w-full">
-            <TabsList className="w-full md:w-auto">
-              <TabsTrigger value="table">Table View</TabsTrigger>
-              <TabsTrigger value="list">List View</TabsTrigger>
+                } catch (err) {
+                  console.error("Error rendering date tab:", err);
+                  return null;
+                }
+              })}
             </TabsList>
-            <TabsContent value="table" className="mt-4">
-              {isLoading ? (
-                <div className="text-center py-8">Loading shifts...</div>
-              ) : shifts && shifts.length > 0 ? (
-                <ShiftsTable 
-                  shifts={shifts} 
-                  onDeleteShift={handleDeleteShift} 
-                  date={selectedDate}
-                  jobTitle={jobInfo.title}
-                  jobId={jobId}
-                />
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  No shifts scheduled for this day
-                </div>
-              )}
-            </TabsContent>
-            <TabsContent value="list" className="mt-4">
-              {isLoading ? (
-                <div className="text-center py-8">Loading shifts...</div>
-              ) : shifts && shifts.length > 0 ? (
-                <ShiftsList 
-                  shifts={shifts} 
-                  onDeleteShift={handleDeleteShift}
-                  onEditShift={setSelectedShift}
-                  onShiftUpdated={() => refetch()}
-                  jobId={jobId}
-                />
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  No shifts scheduled for this day
-                </div>
-              )}
-            </TabsContent>
           </Tabs>
+          <div className="mt-2 flex justify-end">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setViewMode(viewMode === "list" ? "table" : "list")}
+              className="text-xs"
+            >
+              {viewMode === "list" ? "Table View" : "List View"}
+            </Button>
+          </div>
         </div>
-      )}
-      
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex justify-center p-8">Loading...</div>
+        ) : shifts.length === 0 ? (
+          <div className="text-center p-8 text-muted-foreground">
+            No shifts scheduled for this date. Click "Create Shift" to add one.
+          </div>
+        ) : viewMode === "list" ? (
+          <ShiftsList 
+            shifts={shifts} 
+            onDeleteShift={handleDeleteShift} 
+            onShiftUpdated={fetchShifts}
+            jobId={jobId}
+          />
+        ) : (
+          <ShiftsTable 
+            shifts={shifts} 
+            onDeleteShift={handleDeleteShift} 
+            date={selectedDate}
+          />
+        )}
+      </CardContent>
+
       <CreateShiftDialog
-        open={showAddDialog}
-        onOpenChange={setShowAddDialog}
-        jobId={jobId || ''}
-        selectedDate={selectedDate}
-        onShiftCreated={() => refetch()}
+        open={isCreateShiftOpen}
+        onOpenChange={setIsCreateShiftOpen}
+        jobId={jobId}
+        onShiftCreated={handleShiftCreated}
+        date={selectedDate}
       />
-      
-      <EditShiftDialog
-        open={!!selectedShift}
-        onOpenChange={() => setSelectedShift(null)}
-        shift={selectedShift}
-        onShiftUpdated={() => {
-          refetch();
-          setSelectedShift(null);
-        }}
-      />
-    </div>
+    </Card>
   );
 };

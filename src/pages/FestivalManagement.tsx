@@ -261,11 +261,8 @@ const FestivalManagement = () => {
             </Button>
           </div>
           
-          {jobDates.length > 0 && jobId ? (
-            <FestivalScheduling 
-              jobId={jobId} 
-              jobDates={jobDates} 
-            />
+          {jobDates.length > 0 ? (
+            <FestivalScheduling jobId={jobId} jobDates={jobDates} />
           ) : (
             <Card>
               <CardContent className="p-8 text-center">
