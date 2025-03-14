@@ -9,10 +9,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Trash2, Printer } from "lucide-react";
+import { Trash2, FileDown } from "lucide-react";
 import { ShiftWithAssignments } from "@/types/festival-scheduling";
 import { useToast } from "@/hooks/use-toast";
-import { exportShiftsTablePDF } from "@/utils/shiftsTablePdfExport";
+import { exportShiftsTablePDF, ShiftsTablePdfData } from "@/utils/shiftsTablePdfExport";
 
 interface ShiftsTableProps {
   shifts: ShiftWithAssignments[];
@@ -47,9 +47,9 @@ export const ShiftsTable = ({ shifts, onDeleteShift, date, jobTitle = "Festival 
     day: 'numeric'
   });
 
-  const handlePrint = async () => {
+  const handleExportPDF = async () => {
     try {
-      const pdfData = {
+      const pdfData: ShiftsTablePdfData = {
         jobTitle,
         date,
         shifts: sortedShifts.map(shift => ({
@@ -61,7 +61,7 @@ export const ShiftsTable = ({ shifts, onDeleteShift, date, jobTitle = "Festival 
           stage: shift.stage,
           department: shift.department || '',
           assignments: shift.assignments.map(assignment => ({
-            name: `${assignment.profiles?.first_name || ''} ${assignment.profiles?.last_name || ''}`,
+            name: `${assignment.profiles?.first_name || ''} ${assignment.profiles?.last_name || ''}`.trim(),
             role: assignment.role
           }))
         }))
@@ -103,9 +103,9 @@ export const ShiftsTable = ({ shifts, onDeleteShift, date, jobTitle = "Festival 
         <Button 
           variant="outline" 
           className="ml-auto mb-2 print:hidden"
-          onClick={handlePrint}
+          onClick={handleExportPDF}
         >
-          <Printer className="h-4 w-4 mr-2" />
+          <FileDown className="h-4 w-4 mr-2" />
           Export to PDF
         </Button>
       </div>
