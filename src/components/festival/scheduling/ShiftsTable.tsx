@@ -1,3 +1,4 @@
+
 import { format } from "date-fns";
 import {
   Table,
@@ -18,15 +19,15 @@ interface ShiftsTableProps {
   onDeleteShift: (shiftId: string) => void;
   date: string;
   jobTitle?: string;
-  jobId?: string; // Added jobId prop
+  jobId?: string;
 }
 
 export const ShiftsTable = ({ 
   shifts, 
   onDeleteShift, 
   date, 
-  jobTitle = "Festival Schedule",
-  jobId = "" // Default to empty string
+  jobTitle = "Festival Schedule", 
+  jobId = ""
 }: ShiftsTableProps) => {
   const { toast } = useToast();
   
@@ -55,12 +56,12 @@ export const ShiftsTable = ({
 
   const handleExportPDF = async () => {
     try {
-      console.log("Exporting PDF with jobId:", jobId);
+      console.log("Exporting PDF with jobId:", jobId, "and jobTitle:", jobTitle);
       
       const pdfData: ShiftsTablePdfData = {
         jobTitle,
         date,
-        jobId, // Pass the jobId to the export function
+        jobId,
         shifts: sortedShifts.map(shift => ({
           name: shift.name,
           time: {

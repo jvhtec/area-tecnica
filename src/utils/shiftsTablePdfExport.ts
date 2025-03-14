@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -30,8 +29,18 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
     const createdDate = format(new Date(), 'dd/MM/yyyy');
+    
+    // Create header without logo first
+    doc.setFillColor(125, 1, 1);  // Corporate red
+    doc.rect(0, 0, pageWidth, 20, 'F');
 
-    // Fetch festival logo from Supabase first (we need it before creating the header)
+    // Set initial text in header (will be updated if logo is found)
+    doc.setFontSize(14);
+    doc.setTextColor(255, 255, 255);  // White
+    doc.text(data.jobTitle, pageWidth / 2, 10, { align: 'center' });
+    doc.text(`Shifts Schedule - ${format(new Date(data.date), 'dd/MM/yyyy')}`, pageWidth / 2, 18, { align: 'center' });
+
+    // Fetch festival logo from Supabase
     let festivalLogoUrl = null;
     try {
       console.log('Fetching festival logo for job ID:', data.jobId);
@@ -62,47 +71,49 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
     }
 
     // Add festival logo to the header (if available)
-    const addFestivalLogoToHeader = () => {
-      return new Promise<void>((logoResolve) => {
-        if (festivalLogoUrl) {
+    if (festivalLogoUrl) {
+      const loadFestivalLogo = () => {
+        return new Promise<void>((logoResolve) => {
           const festivalLogo = new Image();
           festivalLogo.crossOrigin = 'anonymous';
           festivalLogo.src = festivalLogoUrl;
           
           festivalLogo.onload = () => {
             try {
-              console.log('Festival logo loaded successfully for header');
-              const logoHeight = 15;
+              console.log('Festival logo loaded successfully');
+              
+              // Recalculate header with logo
+              doc.setFillColor(125, 1, 1);  // Corporate red
+              doc.rect(0, 0, pageWidth, 20, 'F');
+              
+              // Calculate logo dimensions (keeping aspect ratio)
+              const logoHeight = 16; // Max height
               const logoWidth = logoHeight * (festivalLogo.width / festivalLogo.height);
-              doc.addImage(festivalLogo, 'PNG', 10, 3, logoWidth, logoHeight);
+              
+              // Position logo on left side of header
+              doc.addImage(festivalLogo, 'PNG', 10, 2, logoWidth, logoHeight);
+              
+              // Adjust text position to accommodate logo
+              doc.setFontSize(14);
+              doc.setTextColor(255, 255, 255);  // White
+              doc.text(data.jobTitle, pageWidth / 2, 10, { align: 'center' });
+              doc.text(`Shifts Schedule - ${format(new Date(data.date), 'dd/MM/yyyy')}`, pageWidth / 2, 18, { align: 'center' });
             } catch (error) {
               console.error('Error adding festival logo to header:', error);
+              // If error occurs, keep the header without logo
             }
             logoResolve();
           };
           
           festivalLogo.onerror = () => {
-            console.error('Failed to load festival logo for header');
+            console.error('Failed to load festival logo');
             logoResolve();
           };
-        } else {
-          console.log('No festival logo available for header');
-          logoResolve();
-        }
-      });
-    };
-
-    // Wait for the festival logo to be added to the header
-    await addFestivalLogoToHeader();
-
-    // Create header
-    doc.setFillColor(125, 1, 1);  // Corporate red
-    doc.rect(0, 0, pageWidth, 20, 'F');
-
-    doc.setFontSize(14);
-    doc.setTextColor(255, 255, 255);  // White
-    doc.text(`${data.jobTitle}`, pageWidth / 2, 12, { align: 'center' });
-    doc.text(`Shifts Schedule - ${format(new Date(data.date), 'dd/MM/yyyy')}`, pageWidth / 2, 18, { align: 'center' });
+        });
+      };
+      
+      await loadFestivalLogo();
+    }
 
     // Prepare table data
     const tableBody = data.shifts.map(shift => {
@@ -147,44 +158,48 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
       }
     });
 
-    // Function to add company logo and finalize PDF
-    const finalizeDocument = () => {
-      // Add company logo to bottom right
-      const companyLogo = new Image();
-      companyLogo.crossOrigin = 'anonymous';
-      companyLogo.src = '/lovable-uploads/2f12a6ef-587b-4049-ad53-d83fb94064e3.png';
-      
-      companyLogo.onload = () => {
-        try {
-          const logoWidth = 25;
-          const logoHeight = logoWidth * (companyLogo.height / companyLogo.width);
-          const xPosition = pageWidth - 35;
-          const yPosition = pageHeight - 15;
-          doc.addImage(companyLogo, 'PNG', xPosition, yPosition - logoHeight, logoWidth, logoHeight);
-        } catch (error) {
-          console.error('Error adding company logo:', error);
-        }
+    // Add company logo to bottom right
+    const addCompanyLogo = () => {
+      return new Promise<void>((resolve) => {
+        const companyLogo = new Image();
+        companyLogo.crossOrigin = 'anonymous';
+        companyLogo.src = '/lovable-uploads/2f12a6ef-587b-4049-ad53-d83fb94064e3.png';
         
-        // Add footer text
-        doc.setFontSize(8);
-        doc.setTextColor(51, 51, 51);
-        doc.text(`Generated: ${createdDate}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        companyLogo.onload = () => {
+          try {
+            const logoWidth = 25;
+            const logoHeight = logoWidth * (companyLogo.height / companyLogo.width);
+            const xPosition = pageWidth - 35;
+            const yPosition = pageHeight - 15;
+            doc.addImage(companyLogo, 'PNG', xPosition, yPosition - logoHeight, logoWidth, logoHeight);
+          } catch (error) {
+            console.error('Error adding company logo:', error);
+          }
+          
+          // Add footer text
+          doc.setFontSize(8);
+          doc.setTextColor(51, 51, 51);
+          doc.text(`Generated: ${createdDate}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+          
+          resolve();
+        };
         
-        const blob = doc.output('blob');
-        resolve(blob);
-      };
-      
-      companyLogo.onerror = () => {
-        console.error('Failed to load company logo');
-        doc.setFontSize(8);
-        doc.setTextColor(51, 51, 51);
-        doc.text(`Generated: ${createdDate}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
-        const blob = doc.output('blob');
-        resolve(blob);
-      };
+        companyLogo.onerror = () => {
+          console.error('Failed to load company logo');
+          // Add footer text even if logo fails
+          doc.setFontSize(8);
+          doc.setTextColor(51, 51, 51);
+          doc.text(`Generated: ${createdDate}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+          
+          resolve();
+        };
+      });
     };
 
-    // Finalize the document (we no longer need to add festival logo to the footer)
-    finalizeDocument();
+    await addCompanyLogo();
+    
+    // Output the PDF
+    const blob = doc.output('blob');
+    resolve(blob);
   });
 };
