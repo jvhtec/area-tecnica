@@ -78,6 +78,7 @@ function App() {
               <Route path="festival-management/:jobId" element={<FestivalManagement />} />
               <Route path="festival-management/:jobId/artists" element={<FestivalArtistManagement />} />
               <Route path="festival-management/:jobId/gear" element={<FestivalGearManagement />} />
+              <Route path="festival-management/:jobId/scheduling" element={<FestivalManagement />} />
             </Route>
           </Routes>
         </BrowserRouter>
