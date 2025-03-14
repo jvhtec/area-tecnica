@@ -1,3 +1,4 @@
+
 export interface Assignment {
   id: string;
   job_id: string;
