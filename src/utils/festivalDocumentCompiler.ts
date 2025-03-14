@@ -2,7 +2,7 @@
 import { PDFDocument } from 'pdf-lib';
 import { supabase } from '@/lib/supabase';
 import { exportShiftsTablePDF, ShiftsTablePdfData } from './shiftsTablePdfExport';
-import { exportArtistTablePDF } from './artistTablePdfExport';
+import { exportArtistTablePDF, ArtistTablePdfData } from './artistTablePdfExport';
 import { useToast } from '@/hooks/use-toast';
 
 export interface FestivalDocumentCompilerOptions {
@@ -58,16 +58,16 @@ export const compileFestivalDocumentation = async (options: FestivalDocumentComp
       console.log("Generating artist table PDF...");
       try {
         const artistsBlob = await exportArtistTablePDF({
-          jobId,
+          jobTitle,
           date: selectedDate, 
-          stageFilter: 'all',
+          stage: 'all',
           artists: artistsData
         });
         
         await addPdfToCompilation(compiledPdf, artistsBlob, "Artist Schedule");
       } catch (error) {
         console.error("Error adding artists PDF:", error);
-        toast.toast({
+        toast({
           title: "Warning",
           description: "Could not add artist schedule to compilation",
           variant: "destructive",
@@ -114,7 +114,7 @@ export const compileFestivalDocumentation = async (options: FestivalDocumentComp
     return new Blob([pdfBytes], { type: 'application/pdf' });
   } catch (error) {
     console.error("Error compiling festival documentation:", error);
-    toast.toast({
+    toast({
       title: "Error",
       description: "Could not compile festival documentation",
       variant: "destructive",

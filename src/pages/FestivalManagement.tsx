@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -174,7 +175,7 @@ const FestivalManagement = () => {
         jobTitle: job.title,
         selectedDate,
         shifts: shiftsToUse,
-        toast,
+        toast
       });
       
       const url = URL.createObjectURL(compiledPdf);
