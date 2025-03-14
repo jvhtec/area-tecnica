@@ -31,14 +31,78 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
     const pageHeight = doc.internal.pageSize.height;
     const createdDate = format(new Date(), 'dd/MM/yyyy');
 
-    // Header
+    // Fetch festival logo from Supabase first (we need it before creating the header)
+    let festivalLogoUrl = null;
+    try {
+      console.log('Fetching festival logo for job ID:', data.jobId);
+      
+      // Query the festival_logos table to get the logo path for this job
+      const { data: logoData, error: logoError } = await supabase
+        .from('festival_logos')
+        .select('file_path')
+        .eq('job_id', data.jobId)
+        .maybeSingle();
+
+      if (logoError) {
+        console.error('Error fetching festival logo:', logoError);
+      } else if (logoData?.file_path) {
+        // Get the public URL for the logo
+        const { data: { publicUrl } } = supabase
+          .storage
+          .from('festival-logos')
+          .getPublicUrl(logoData.file_path);
+        
+        festivalLogoUrl = publicUrl;
+        console.log('Festival logo found, URL:', festivalLogoUrl);
+      } else {
+        console.log('No festival logo found for job ID:', data.jobId);
+      }
+    } catch (error) {
+      console.error('Error processing festival logo:', error);
+    }
+
+    // Add festival logo to the header (if available)
+    const addFestivalLogoToHeader = () => {
+      return new Promise<void>((logoResolve) => {
+        if (festivalLogoUrl) {
+          const festivalLogo = new Image();
+          festivalLogo.crossOrigin = 'anonymous';
+          festivalLogo.src = festivalLogoUrl;
+          
+          festivalLogo.onload = () => {
+            try {
+              console.log('Festival logo loaded successfully for header');
+              const logoHeight = 15;
+              const logoWidth = logoHeight * (festivalLogo.width / festivalLogo.height);
+              doc.addImage(festivalLogo, 'PNG', 10, 3, logoWidth, logoHeight);
+            } catch (error) {
+              console.error('Error adding festival logo to header:', error);
+            }
+            logoResolve();
+          };
+          
+          festivalLogo.onerror = () => {
+            console.error('Failed to load festival logo for header');
+            logoResolve();
+          };
+        } else {
+          console.log('No festival logo available for header');
+          logoResolve();
+        }
+      });
+    };
+
+    // Wait for the festival logo to be added to the header
+    await addFestivalLogoToHeader();
+
+    // Create header
     doc.setFillColor(125, 1, 1);  // Corporate red
     doc.rect(0, 0, pageWidth, 20, 'F');
 
     doc.setFontSize(14);
     doc.setTextColor(255, 255, 255);  // White
-    doc.text(`${data.jobTitle} - Shifts Schedule`, pageWidth / 2, 12, { align: 'center' });
-    doc.text(format(new Date(data.date), 'dd/MM/yyyy'), pageWidth / 2, 18, { align: 'center' });
+    doc.text(`${data.jobTitle}`, pageWidth / 2, 12, { align: 'center' });
+    doc.text(`Shifts Schedule - ${format(new Date(data.date), 'dd/MM/yyyy')}`, pageWidth / 2, 18, { align: 'center' });
 
     // Prepare table data
     const tableBody = data.shifts.map(shift => {
@@ -83,39 +147,9 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
       }
     });
 
-    // Fetch festival logo from Supabase
-    let festivalLogoUrl = null;
-    try {
-      console.log('Fetching festival logo for job ID:', data.jobId);
-      
-      // Query the festival_logos table to get the logo path for this job
-      const { data: logoData, error: logoError } = await supabase
-        .from('festival_logos')
-        .select('file_path')
-        .eq('job_id', data.jobId)
-        .maybeSingle();
-
-      if (logoError) {
-        console.error('Error fetching festival logo:', logoError);
-      } else if (logoData?.file_path) {
-        // Get the public URL for the logo
-        const { data: { publicUrl } } = supabase
-          .storage
-          .from('festival-logos')
-          .getPublicUrl(logoData.file_path);
-        
-        festivalLogoUrl = publicUrl;
-        console.log('Festival logo found, URL:', festivalLogoUrl);
-      } else {
-        console.log('No festival logo found for job ID:', data.jobId);
-      }
-    } catch (error) {
-      console.error('Error processing festival logo:', error);
-    }
-
     // Function to add company logo and finalize PDF
     const finalizeDocument = () => {
-      // Add company logo
+      // Add company logo to bottom right
       const companyLogo = new Image();
       companyLogo.crossOrigin = 'anonymous';
       companyLogo.src = '/lovable-uploads/2f12a6ef-587b-4049-ad53-d83fb94064e3.png';
@@ -150,79 +184,7 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
       };
     };
 
-    // If we have a festival logo, add it
-    if (festivalLogoUrl) {
-      const festivalLogo = new Image();
-      festivalLogo.crossOrigin = 'anonymous';
-      festivalLogo.src = festivalLogoUrl;
-      
-      festivalLogo.onload = () => {
-        try {
-          console.log('Festival logo loaded successfully');
-          const logoWidth = 20;
-          const logoHeight = logoWidth * (festivalLogo.height / festivalLogo.width);
-          const xPosition = 10;
-          const yPosition = pageHeight - 15;
-          doc.addImage(festivalLogo, 'PNG', xPosition, yPosition - logoHeight, logoWidth, logoHeight);
-        } catch (error) {
-          console.error('Error adding festival logo:', error);
-        }
-        
-        finalizeDocument();
-      };
-      
-      festivalLogo.onerror = () => {
-        console.error('Failed to load festival logo from Supabase:', festivalLogoUrl);
-        // Fallback to default logo if available
-        const defaultFestivalLogo = new Image();
-        defaultFestivalLogo.crossOrigin = 'anonymous';
-        defaultFestivalLogo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
-        
-        defaultFestivalLogo.onload = () => {
-          try {
-            console.log('Fallback to default festival logo');
-            const logoWidth = 20;
-            const logoHeight = logoWidth * (defaultFestivalLogo.height / defaultFestivalLogo.width);
-            const xPosition = 10;
-            const yPosition = pageHeight - 15;
-            doc.addImage(defaultFestivalLogo, 'PNG', xPosition, yPosition - logoHeight, logoWidth, logoHeight);
-          } catch (error) {
-            console.error('Error adding default festival logo:', error);
-          }
-          
-          finalizeDocument();
-        };
-        
-        defaultFestivalLogo.onerror = () => {
-          console.error('Failed to load default festival logo');
-          finalizeDocument();
-        };
-      };
-    } else {
-      // Use default festival logo if no custom logo found
-      const defaultFestivalLogo = new Image();
-      defaultFestivalLogo.crossOrigin = 'anonymous';
-      defaultFestivalLogo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
-      
-      defaultFestivalLogo.onload = () => {
-        try {
-          console.log('Using default festival logo');
-          const logoWidth = 20;
-          const logoHeight = logoWidth * (defaultFestivalLogo.height / defaultFestivalLogo.width);
-          const xPosition = 10;
-          const yPosition = pageHeight - 15;
-          doc.addImage(defaultFestivalLogo, 'PNG', xPosition, yPosition - logoHeight, logoWidth, logoHeight);
-        } catch (error) {
-          console.error('Error adding default festival logo:', error);
-        }
-        
-        finalizeDocument();
-      };
-      
-      defaultFestivalLogo.onerror = () => {
-        console.error('Failed to load default festival logo');
-        finalizeDocument();
-      };
-    }
+    // Finalize the document (we no longer need to add festival logo to the footer)
+    finalizeDocument();
   });
 };
