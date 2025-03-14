@@ -19,9 +19,16 @@ interface ShiftsTableProps {
   onDeleteShift: (shiftId: string) => void;
   date: string;
   jobTitle?: string;
+  jobId?: string; // Added jobId prop
 }
 
-export const ShiftsTable = ({ shifts, onDeleteShift, date, jobTitle = "Festival Schedule" }: ShiftsTableProps) => {
+export const ShiftsTable = ({ 
+  shifts, 
+  onDeleteShift, 
+  date, 
+  jobTitle = "Festival Schedule",
+  jobId = "" // Default to empty string
+}: ShiftsTableProps) => {
   const { toast } = useToast();
   
   // Sort shifts by start time
@@ -52,6 +59,7 @@ export const ShiftsTable = ({ shifts, onDeleteShift, date, jobTitle = "Festival 
       const pdfData: ShiftsTablePdfData = {
         jobTitle,
         date,
+        jobId, // Pass the jobId to the export function
         shifts: sortedShifts.map(shift => ({
           name: shift.name,
           time: {

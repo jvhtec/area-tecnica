@@ -30,7 +30,6 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
   console.log("FestivalScheduling component rendered with job ID:", jobId);
   console.log("Job dates received:", jobDates);
   
-  // Format a date to YYYY-MM-DD string
   const formatDateToString = (date: Date): string => {
     try {
       return format(date, 'yyyy-MM-dd');
@@ -41,7 +40,6 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     }
   };
 
-  // Define fetchShifts as a useCallback to allow it to be used in the visibility hook
   const fetchShifts = useCallback(async () => {
     if (!selectedDate || !jobId) {
       console.error("Cannot fetch shifts: missing date or job ID");
@@ -54,7 +52,6 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     try {
       console.log(`Executing fetch for job: ${jobId}, date: ${selectedDate}`);
       
-      // Fetch shifts for selected date
       const { data: shiftsData, error: shiftsError } = await supabase
         .from("festival_shifts")
         .select("*")
@@ -69,7 +66,6 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
       
       console.log("Shifts data retrieved:", shiftsData);
 
-      // If no shifts, set empty array and return early
       if (!shiftsData || shiftsData.length === 0) {
         console.log("No shifts found for this date");
         setShifts([]);
@@ -77,11 +73,9 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
         return;
       }
 
-      // Get all shift IDs to fetch assignments
       const shiftIds = shiftsData.map(shift => shift.id);
       
       try {
-        // Try to fetch assignments for all shifts
         const { data: assignmentsData, error: assignmentsError } = await supabase
           .from("festival_shift_assignments")
           .select(`
@@ -97,7 +91,6 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
           // Don't throw here, we'll continue with empty assignments
         }
 
-        // Get technician details separately if we have assignments
         let technicianProfiles: Record<string, any> = {};
         
         if (assignmentsData && assignmentsData.length > 0) {
@@ -111,7 +104,6 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
           if (profilesError) {
             console.error("Error fetching technician profiles:", profilesError);
           } else if (profilesData) {
-            // Create a lookup map for quick access
             technicianProfiles = profilesData.reduce((acc, profile) => {
               acc[profile.id] = profile;
               return acc;
@@ -119,7 +111,6 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
           }
         }
         
-        // Combine shifts with their assignments and add profile info
         const shiftsWithAssignments = shiftsData.map((shift: FestivalShift) => {
           const shiftAssignments = assignmentsData 
             ? assignmentsData
@@ -140,7 +131,6 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
         setShifts(shiftsWithAssignments);
       } catch (error: any) {
         console.error("Error processing assignments:", error);
-        // Continue with shifts but without assignments
         const shiftsWithEmptyAssignments = shiftsData.map((shift: FestivalShift) => ({
           ...shift,
           assignments: []
@@ -157,14 +147,12 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
         variant: "destructive",
       });
       
-      // Set empty shifts to prevent UI from waiting indefinitely
       setShifts([]);
     } finally {
       setIsLoading(false);
     }
   }, [selectedDate, jobId, toast]);
 
-  // Set initial date when jobDates are available
   useEffect(() => {
     if (jobDates && jobDates.length > 0 && !selectedDate) {
       try {
@@ -179,14 +167,12 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
       } catch (error) {
         console.error("Error setting initial date:", error);
         
-        // Fallback to current date
         const today = new Date();
         setSelectedDate(formatDateToString(today));
       }
     }
   }, [jobDates, selectedDate]);
 
-  // Fetch shifts when selectedDate changes
   useEffect(() => {
     if (selectedDate && jobId) {
       console.log(`Fetching shifts for date: ${selectedDate} and job: ${jobId}`);
@@ -196,7 +182,6 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     }
   }, [selectedDate, jobId, fetchShifts]);
 
-  // Use our custom hook to refresh data when tab becomes visible
   useRefreshOnTabVisibility(() => {
     if (selectedDate && jobId) {
       console.log("Tab became visible, refreshing shifts");
@@ -215,13 +200,11 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
 
   const handleDeleteShift = async (shiftId: string) => {
     try {
-      // First delete all assignments for this shift
       await supabase
         .from("festival_shift_assignments")
         .delete()
         .eq("shift_id", shiftId);
 
-      // Then delete the shift
       const { error } = await supabase
         .from("festival_shifts")
         .delete()
@@ -244,7 +227,6 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     }
   };
 
-  // If no job dates, show a message
   if (!jobDates || jobDates.length === 0) {
     console.log("No job dates available");
     return (
@@ -333,6 +315,7 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
             shifts={shifts} 
             onDeleteShift={handleDeleteShift} 
             date={selectedDate}
+            jobId={jobId}
           />
         )}
       </CardContent>
