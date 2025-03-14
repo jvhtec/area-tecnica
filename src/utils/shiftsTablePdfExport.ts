@@ -163,7 +163,7 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
       return new Promise<void>((resolve) => {
         const companyLogo = new Image();
         companyLogo.crossOrigin = 'anonymous';
-        companyLogo.src = '/lovable-uploads/2f12a6ef-587b-4049-ad53-d83fb94064e3.png';
+        companyLogo.src = '/public/sector pro logo.png';
         
         companyLogo.onload = () => {
           try {
