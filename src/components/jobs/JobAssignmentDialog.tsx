@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -109,16 +110,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
       
       validateAssignment(selectedTechnician, selectedRole, technicians);
 
-      // Check for existing assignment with same role
-      const { data: existingAssignments } = await supabase
-        .from("job_assignments")
-        .select("*")
-        .eq("job_id", jobId)
-        .eq(`${department}_role`, selectedRole);
-
-      if (existingAssignments?.length) {
-        throw new Error(`A technician is already assigned as ${selectedRole}`);
-      }
+      // REMOVED: Check for existing assignment with same role - allowing duplicate role assignments
 
       const roleField = `${department}_role` as const;
       const { error } = await supabase

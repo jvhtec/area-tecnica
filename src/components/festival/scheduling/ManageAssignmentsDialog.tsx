@@ -141,20 +141,7 @@ export const ManageAssignmentsDialog = ({
       console.log("Adding assignment with technician_id:", selectedTechnician);
       console.log("Adding assignment with role:", selectedRole);
       
-      // Check if this technician is already assigned to this shift
-      const existingAssignment = shift.assignments.find(
-        (a) => a.technician_id === selectedTechnician
-      );
-
-      if (existingAssignment) {
-        toast({
-          title: "Already Assigned",
-          description: "This technician is already assigned to this shift",
-          variant: "destructive",
-        });
-        setIsAddingTech(false);
-        return;
-      }
+      // REMOVED: Check for existing technician assignment - allowing duplicate role assignments
 
       const { data, error } = await supabase.from("festival_shift_assignments").insert({
         shift_id: shift.id,
