@@ -53,27 +53,26 @@ export const ManageAssignmentsDialog = ({
 
       if (jobAssignments && jobAssignments.length > 0) {
         // Extract the technician profiles from the job assignments
-        const assignedTechnicianProfiles = jobAssignments
-          .filter(assignment => assignment.profiles)
-          .map(assignment => assignment.profiles)
-          // Filter only technicians and house_techs - accessing properties correctly
-          .filter(profile => {
-            return profile && 
-                  (profile.role === 'technician' || profile.role === 'house_tech');
-          });
-
-        console.log("Filtered technicians for shift assignment:", assignedTechnicianProfiles);
+        const techniciansList: Technician[] = [];
         
-        // Convert the filtered profiles to Technician[] by properly mapping them
-        const techniciansList: Technician[] = assignedTechnicianProfiles.map(profile => ({
-          id: profile.id,
-          first_name: profile.first_name,
-          last_name: profile.last_name,
-          email: profile.email,
-          department: profile.department,
-          role: profile.role
-        }));
+        for (const assignment of jobAssignments) {
+          if (assignment.profiles) {
+            const profile = assignment.profiles;
+            // Only include technicians and house_techs
+            if (profile.role === 'technician' || profile.role === 'house_tech') {
+              techniciansList.push({
+                id: profile.id,
+                first_name: profile.first_name,
+                last_name: profile.last_name,
+                email: profile.email,
+                department: profile.department,
+                role: profile.role
+              });
+            }
+          }
+        }
         
+        console.log("Filtered technicians for shift assignment:", techniciansList);
         setTechnicians(techniciansList);
       } else {
         console.log("No technicians assigned to this job");
