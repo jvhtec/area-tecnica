@@ -19,11 +19,12 @@ import { ManageAssignmentsDialog } from "./ManageAssignmentsDialog";
 interface ShiftsListProps {
   shifts: ShiftWithAssignments[];
   onDeleteShift: (shiftId: string) => void;
-  onShiftUpdated: () => void;
-  jobId: string;
+  onEditShift: (shift: ShiftWithAssignments) => void;
+  onShiftUpdated?: () => void;
+  jobId?: string;
 }
 
-export const ShiftsList = ({ shifts, onDeleteShift, onShiftUpdated, jobId }: ShiftsListProps) => {
+export const ShiftsList = ({ shifts, onDeleteShift, onEditShift, onShiftUpdated, jobId }: ShiftsListProps) => {
   const [editingShift, setEditingShift] = useState<ShiftWithAssignments | null>(null);
   const [managingShift, setManagingShift] = useState<ShiftWithAssignments | null>(null);
 
@@ -35,6 +36,12 @@ export const ShiftsList = ({ shifts, onDeleteShift, onShiftUpdated, jobId }: Shi
     e.stopPropagation();
     if (confirm("Are you sure you want to delete this shift?")) {
       onDeleteShift(shiftId);
+    }
+  };
+
+  const handleShiftUpdated = () => {
+    if (onShiftUpdated) {
+      onShiftUpdated();
     }
   };
 
@@ -54,7 +61,10 @@ export const ShiftsList = ({ shifts, onDeleteShift, onShiftUpdated, jobId }: Shi
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  onClick={() => setEditingShift(shift)}
+                  onClick={() => {
+                    setEditingShift(shift);
+                    onEditShift(shift);
+                  }}
                 >
                   <Edit className="h-4 w-4" />
                 </Button>
@@ -121,17 +131,17 @@ export const ShiftsList = ({ shifts, onDeleteShift, onShiftUpdated, jobId }: Shi
           open={!!editingShift}
           onOpenChange={(open) => !open && setEditingShift(null)}
           shift={editingShift}
-          onShiftUpdated={onShiftUpdated}
+          onShiftUpdated={handleShiftUpdated}
         />
       )}
 
-      {managingShift && (
+      {managingShift && jobId && (
         <ManageAssignmentsDialog
           open={!!managingShift}
           onOpenChange={(open) => !open && setManagingShift(null)}
           shift={managingShift}
           jobId={jobId}
-          onAssignmentsUpdated={onShiftUpdated}
+          onAssignmentsUpdated={handleShiftUpdated}
         />
       )}
     </div>

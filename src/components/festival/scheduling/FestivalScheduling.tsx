@@ -15,8 +15,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShiftWithAssignments } from "@/types/festival-scheduling";
 
-export const FestivalScheduling = () => {
-  const { jobId } = useParams<{ jobId: string }>();
+interface FestivalSchedulingProps {
+  jobId: string;
+  jobDates: Date[];
+}
+
+export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps) => {
   const { toast } = useToast();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
@@ -54,22 +58,18 @@ export const FestivalScheduling = () => {
     fetchJobInfo();
   }, [jobId]);
   
-  // Calculate date range
+  // Calculate date range from job dates
   useEffect(() => {
-    if (!jobInfo?.start_date || !jobInfo?.end_date) return;
+    if (!jobDates || jobDates.length === 0) return;
     
-    const startDate = new Date(jobInfo.start_date);
-    const endDate = new Date(jobInfo.end_date);
-    const days = [];
-    let currentDate = startDate;
-    
-    while (currentDate <= endDate) {
-      days.push(format(currentDate, "yyyy-MM-dd"));
-      currentDate = addDays(currentDate, 1);
-    }
-    
+    const days = jobDates.map(date => format(date, "yyyy-MM-dd"));
     setDateRange(days);
-  }, [jobInfo]);
+    
+    // Set default selected date to the first date in the range if not already set
+    if (!selectedDate || !days.includes(selectedDate)) {
+      setSelectedDate(days[0]);
+    }
+  }, [jobDates, selectedDate]);
 
   const { data: shifts, isLoading, refetch } = useQuery({
     queryKey: ['festival-shifts', jobId, selectedDate],
@@ -204,6 +204,8 @@ export const FestivalScheduling = () => {
                   shifts={shifts} 
                   onDeleteShift={handleDeleteShift}
                   onEditShift={setSelectedShift}
+                  onShiftUpdated={() => refetch()}
+                  jobId={jobId}
                 />
               ) : (
                 <div className="text-center py-8 text-muted-foreground">

@@ -17,8 +17,8 @@ interface CreateShiftDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   jobId: string;
+  selectedDate: string;
   onShiftCreated: () => void;
-  date: string;
 }
 
 const formSchema = z.object({
@@ -36,8 +36,8 @@ export const CreateShiftDialog = ({
   open, 
   onOpenChange, 
   jobId, 
-  onShiftCreated,
-  date 
+  selectedDate,
+  onShiftCreated
 }: CreateShiftDialogProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -57,13 +57,13 @@ export const CreateShiftDialog = ({
   const handleSubmit = async (values: FormValues) => {
     console.log("Creating shift with values:", values);
     console.log("For job ID:", jobId);
-    console.log("On date:", date);
+    console.log("On date:", selectedDate);
     
     setIsSubmitting(true);
     try {
       const shiftData = {
         job_id: jobId,
-        date: date,
+        date: selectedDate,
         name: values.name,
         start_time: values.start_time,
         end_time: values.end_time,
