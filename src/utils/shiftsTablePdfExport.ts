@@ -7,6 +7,7 @@ import { ShiftWithAssignments } from '@/types/festival-scheduling';
 export interface ShiftsTablePdfData {
   jobTitle: string;
   date: string;
+  jobId?: string;
   shifts: ShiftWithAssignments[];
 }
 
@@ -64,7 +65,7 @@ export const exportShiftsTablePDF = (data: ShiftsTablePdfData): Promise<Blob> =>
 
         return [
           shift.name,
-          shift.stage || 'N/A',
+          shift.stage ? `Stage ${shift.stage}` : 'N/A',
           `${shift.start_time.substring(0, 5)} - ${shift.end_time.substring(0, 5)}`,
           technicians || 'None'
         ];

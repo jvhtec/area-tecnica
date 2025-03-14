@@ -62,19 +62,7 @@ export const ShiftsTable = ({
         jobTitle,
         date,
         jobId,
-        shifts: sortedShifts.map(shift => ({
-          name: shift.name,
-          time: {
-            start: shift.start_time,
-            end: shift.end_time
-          },
-          stage: shift.stage,
-          department: shift.department || '',
-          assignments: shift.assignments.map(assignment => ({
-            name: `${assignment.profiles?.first_name || ''} ${assignment.profiles?.last_name || ''}`.trim(),
-            role: assignment.role
-          }))
-        }))
+        shifts: sortedShifts
       };
 
       const blob = await exportShiftsTablePDF(pdfData);

@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +12,8 @@ import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
 import { exportArtistTablePDF, ArtistTablePdfData } from "@/utils/artistTablePdfExport";
 import { exportShiftsTablePDF } from "@/utils/shiftsTablePdfExport";
 import { mergePDFs } from "@/utils/pdfMerger";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
+import { ShiftWithAssignments } from "@/types/festival-scheduling";
 
 interface FestivalJob {
   id: string;
@@ -45,18 +45,6 @@ interface Stage {
   number: number;
 }
 
-interface ShiftWithAssignments {
-  id: string;
-  job_id: string;
-  name: string;
-  date: string;
-  start_time: string;
-  end_time: string;
-  department?: string;
-  stage?: string;
-  assignments: any[];
-}
-
 const FestivalManagement = () => {
   const { jobId } = useParams();
   const navigate = useNavigate();
@@ -68,12 +56,7 @@ const FestivalManagement = () => {
   const [jobDates, setJobDates] = useState<Date[]>([]);
   const [isPrinting, setIsPrinting] = useState(false);
 
-  // Check if URL contains "scheduling" to determine if we're on the scheduling page
   const isSchedulingRoute = location.pathname.includes('/scheduling');
-  
-  console.log("FestivalManagement - Current route:", location.pathname);
-  console.log("FestivalManagement - Is scheduling route:", isSchedulingRoute);
-  console.log("FestivalManagement - Job ID:", jobId);
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -111,7 +94,6 @@ const FestivalManagement = () => {
         setJob(jobData);
         setArtistCount(artistCount || 0);
 
-        // Generate dates for the festival duration
         const startDate = new Date(jobData.start_time);
         const endDate = new Date(jobData.end_time);
         
@@ -120,7 +102,6 @@ const FestivalManagement = () => {
         
         if (isValid(startDate) && isValid(endDate)) {
           try {
-            // Calculate days between start and end (inclusive)
             const dates = [];
             const currentDate = new Date(startDate);
             
@@ -134,7 +115,6 @@ const FestivalManagement = () => {
           } catch (dateError) {
             console.error("Error generating date interval:", dateError);
             
-            // Fallback: use just the start and end dates
             console.log("Using fallback date approach");
             const dateArray = [];
             if (isValid(startDate)) dateArray.push(startDate);
@@ -146,7 +126,6 @@ const FestivalManagement = () => {
         } else {
           console.warn("Invalid dates in job data, checking for date types");
           
-          // Try to get dates from job_date_types table
           const { data: dateTypes, error: dateTypesError } = await supabase
             .from("job_date_types")
             .select("*")
@@ -157,7 +136,6 @@ const FestivalManagement = () => {
           } else if (dateTypes && dateTypes.length > 0) {
             console.log("Date types found:", dateTypes);
             
-            // Extract unique dates from date_types
             const uniqueDates = Array.from(new Set(
               dateTypes
                 .map(dt => {
@@ -174,7 +152,6 @@ const FestivalManagement = () => {
             setJobDates(uniqueDates);
           } else {
             console.warn("No valid dates found for this job");
-            // Create a default date as fallback (today)
             setJobDates([new Date()]);
           }
         }
@@ -198,7 +175,6 @@ const FestivalManagement = () => {
     
     setIsPrinting(true);
     try {
-      // 1. Fetch all artists
       const { data: artists, error: artistError } = await supabase
         .from("festival_artists")
         .select("*, technical_info(*), infrastructure_info(*), extras(*)")
@@ -206,7 +182,6 @@ const FestivalManagement = () => {
       
       if (artistError) throw artistError;
       
-      // 2. Fetch all stages
       const { data: stages, error: stagesError } = await supabase
         .from("festival_stages")
         .select("*")
@@ -214,11 +189,9 @@ const FestivalManagement = () => {
       
       if (stagesError) throw stagesError;
 
-      // 3. Generate individual artist PDFs
       const artistPdfs: Blob[] = [];
       
       for (const artist of artists) {
-        // Map artist data to ArtistPdfData format
         const artistData: ArtistPdfData = {
           name: artist.name,
           stage: artist.stage,
@@ -244,12 +217,10 @@ const FestivalManagement = () => {
         }
       }
       
-      // 4. Generate artist table PDFs for each date and stage
       const uniqueDates = [...new Set(artists.map(a => a.date))];
       const artistTablePdfs: Blob[] = [];
       
       for (const date of uniqueDates) {
-        // Group artists by stage for this date
         const stageMap = new Map<number, any[]>();
         
         artists.filter(a => a.date === date).forEach(artist => {
@@ -259,13 +230,11 @@ const FestivalManagement = () => {
           stageMap.get(artist.stage)?.push(artist);
         });
         
-        // Generate table PDF for each stage on this date
         for (const [stageNum, stageArtists] of stageMap.entries()) {
           if (stageArtists.length === 0) continue;
           
           const stageName = stages?.find(s => s.number === stageNum)?.name || `Stage ${stageNum}`;
           
-          // Format for artist table PDF
           const tableData: ArtistTablePdfData = {
             jobTitle: job?.title || 'Festival',
             date: date,
@@ -293,11 +262,9 @@ const FestivalManagement = () => {
         }
       }
       
-      // 5. Generate shifts table PDFs for each date
       const shiftsPdfs: Blob[] = [];
       
       for (const date of uniqueDates) {
-        // Fetch shifts for this date
         const { data: shifts, error: shiftsError } = await supabase
           .from("festival_shifts")
           .select(`
@@ -316,20 +283,20 @@ const FestivalManagement = () => {
         }
         
         if (shifts && shifts.length > 0) {
-          try {
-            const pdf = await exportShiftsTablePDF({
-              jobTitle: job?.title || 'Festival',
-              date: date,
-              shifts: shifts as ShiftWithAssignments[]
-            });
-            shiftsPdfs.push(pdf);
-          } catch (err) {
-            console.error(`Error generating shifts PDF for date ${date}:`, err);
-          }
+          const typedShifts = shifts.map(shift => ({
+            ...shift,
+            stage: shift.stage ? Number(shift.stage) : undefined
+          }));
+          
+          const pdf = await exportShiftsTablePDF({
+            jobTitle: job?.title || 'Festival',
+            date: date,
+            shifts: typedShifts as ShiftWithAssignments[]
+          });
+          shiftsPdfs.push(pdf);
         }
       }
       
-      // 6. Merge all PDFs
       const allPdfs = [...artistPdfs, ...artistTablePdfs, ...shiftsPdfs];
       
       if (allPdfs.length === 0) {
@@ -338,7 +305,6 @@ const FestivalManagement = () => {
       
       const mergedPdf = await mergePDFs(allPdfs);
       
-      // 7. Create a download link and trigger download
       const url = URL.createObjectURL(mergedPdf);
       const a = document.createElement('a');
       a.href = url;
@@ -348,10 +314,17 @@ const FestivalManagement = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
-      toast.success('All documentation generated successfully');
+      toast({
+        title: "Success",
+        description: 'All documentation generated successfully'
+      });
     } catch (error: any) {
       console.error('Error generating documentation:', error);
-      toast.error(`Failed to generate documentation: ${error.message}`);
+      toast({
+        title: "Error",
+        description: `Failed to generate documentation: ${error.message}`,
+        variant: "destructive"
+      });
     } finally {
       setIsPrinting(false);
     }
@@ -406,7 +379,6 @@ const FestivalManagement = () => {
 
       {!isSchedulingRoute && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Artists Section */}
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/artists`)}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -426,7 +398,6 @@ const FestivalManagement = () => {
             </CardContent>
           </Card>
 
-          {/* Stages & Gear Section */}
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/gear`)}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -445,7 +416,6 @@ const FestivalManagement = () => {
             </CardContent>
           </Card>
 
-          {/* Scheduling Section */}
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/scheduling`)}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -466,7 +436,6 @@ const FestivalManagement = () => {
         </div>
       )}
       
-      {/* Scheduling content when on the scheduling route */}
       {isSchedulingRoute && (
         <div>
           <div className="mb-4">
