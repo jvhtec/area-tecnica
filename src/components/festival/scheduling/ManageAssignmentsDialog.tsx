@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -58,17 +57,25 @@ export const ManageAssignmentsDialog = ({
         jobAssignments.forEach(assignment => {
           if (assignment.profiles) {
             const profile = assignment.profiles;
-            // Type check the profile to ensure it has the role property
+            
+            // Type assertion to ensure TypeScript understands this is an object with the required properties
             if (typeof profile === 'object' && 
+                profile !== null && 
                 'role' in profile && 
-                (profile.role === 'technician' || profile.role === 'house_tech')) {
+                (profile.role === 'technician' || profile.role === 'house_tech') &&
+                'id' in profile && 
+                'first_name' in profile && 
+                'last_name' in profile && 
+                'email' in profile && 
+                'department' in profile) {
+              
               techniciansList.push({
-                id: profile.id,
-                first_name: profile.first_name,
-                last_name: profile.last_name,
-                email: profile.email,
-                department: profile.department,
-                role: profile.role
+                id: profile.id as string,
+                first_name: profile.first_name as string,
+                last_name: profile.last_name as string,
+                email: profile.email as string,
+                department: profile.department as string,
+                role: profile.role as string
               });
             }
           }
