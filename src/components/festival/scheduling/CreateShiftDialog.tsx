@@ -55,9 +55,13 @@ export const CreateShiftDialog = ({
   });
 
   const handleSubmit = async (values: FormValues) => {
+    console.log("Creating shift with values:", values);
+    console.log("For job ID:", jobId);
+    console.log("On date:", date);
+    
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from("festival_shifts").insert({
+      const shiftData = {
         job_id: jobId,
         date: date,
         name: values.name,
@@ -66,17 +70,30 @@ export const CreateShiftDialog = ({
         stage: values.stage ? parseInt(values.stage) : null,
         department: values.department || null,
         notes: values.notes || null,
-      });
-
-      if (error) throw error;
+      };
       
+      console.log("Submitting shift data:", shiftData);
+      
+      const { data, error } = await supabase.from("festival_shifts").insert(shiftData).select();
+
+      if (error) {
+        console.error("Error creating shift:", error);
+        throw error;
+      }
+      
+      console.log("Shift created successfully:", data);
       form.reset();
       onShiftCreated();
+      
+      toast({
+        title: "Success",
+        description: "Shift created successfully",
+      });
     } catch (error: any) {
       console.error("Error creating shift:", error);
       toast({
         title: "Error",
-        description: "Could not create shift",
+        description: `Could not create shift: ${error.message}`,
         variant: "destructive",
       });
     } finally {

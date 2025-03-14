@@ -1,14 +1,14 @@
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Users } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Trash2, Plus, UserPlus } from "lucide-react";
 import { ShiftWithAssignments, Technician } from "@/types/festival-scheduling";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
 interface ManageAssignmentsDialogProps {
   open: boolean;
@@ -18,19 +18,6 @@ interface ManageAssignmentsDialogProps {
   onAssignmentsUpdated: () => void;
 }
 
-// Define proper types for the assignment data coming from Supabase
-interface AssignmentWithProfile {
-  technician_id: string;
-  profiles?: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-    department: string;
-    role: string;
-  } | null;
-}
-
 export const ManageAssignmentsDialog = ({
   open,
   onOpenChange,
@@ -38,134 +25,99 @@ export const ManageAssignmentsDialog = ({
   jobId,
   onAssignmentsUpdated,
 }: ManageAssignmentsDialogProps) => {
-  const [isLoading, setIsLoading] = useState(true);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [selectedTechnician, setSelectedTechnician] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAddingTech, setIsAddingTech] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (open) {
-      fetchAvailableTechnicians();
-    }
-  }, [open, shift.department]);
+    const fetchTechnicians = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name, email, department, role")
+          .eq("role", "technician");
 
-  const fetchAvailableTechnicians = async () => {
-    setIsLoading(true);
-    try {
-      console.log("Fetching technicians for job", jobId);
-      
-      // First get all technicians assigned to this job
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from("job_assignments")
-        .select(`
-          technician_id,
-          profiles (
-            id,
-            first_name,
-            last_name,
-            email,
-            department,
-            role
-          )
-        `)
-        .eq("job_id", jobId);
+        if (error) throw error;
 
-      if (assignmentsError) throw assignmentsError;
-      
-      console.log("Raw assignments data:", assignmentsData);
-
-      // Cast the data to our interface type
-      const techsData = assignmentsData as unknown as AssignmentWithProfile[] || [];
-      console.log("Typed assignments data:", techsData);
-      
-      let filteredTechs = techsData;
-      if (shift.department) {
-        filteredTechs = techsData.filter(
-          (assignment) => assignment.profiles && assignment.profiles.department === shift.department
-        );
+        setTechnicians(data || []);
+      } catch (error: any) {
+        console.error("Error fetching technicians:", error);
+        toast({
+          title: "Error",
+          description: "Could not load technicians",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-      // Format technicians data
-      const formattedTechnicians = filteredTechs.map((assignment) => ({
-        id: assignment.technician_id,
-        first_name: assignment.profiles?.first_name || "",
-        last_name: assignment.profiles?.last_name || "",
-        email: assignment.profiles?.email || "",
-        department: assignment.profiles?.department || "",
-        role: assignment.profiles?.role || "",
-      }));
-
-      console.log("Formatted technicians:", formattedTechnicians);
-      setTechnicians(formattedTechnicians);
-    } catch (error: any) {
-      console.error("Error fetching technicians:", error);
-      toast({
-        title: "Error",
-        description: "Could not load technicians",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+    if (open) {
+      fetchTechnicians();
     }
-  };
+  }, [open, toast]);
 
-  const handleAssignTechnician = async () => {
+  const handleAddAssignment = async () => {
     if (!selectedTechnician || !selectedRole) {
       toast({
-        title: "Error",
-        description: "Please select both a technician and a role",
+        title: "Missing Information",
+        description: "Please select a technician and a role",
         variant: "destructive",
       });
       return;
     }
 
+    setIsAddingTech(true);
     try {
-      // Check if technician is already assigned to this shift
-      const { data: existingAssignments, error: checkError } = await supabase
-        .from("festival_shift_assignments")
-        .select("*")
-        .eq("shift_id", shift.id)
-        .eq("technician_id", selectedTechnician);
+      console.log("Adding assignment with shift_id:", shift.id);
+      console.log("Adding assignment with technician_id:", selectedTechnician);
+      console.log("Adding assignment with role:", selectedRole);
+      
+      // Check if this technician is already assigned to this shift
+      const existingAssignment = shift.assignments.find(
+        (a) => a.technician_id === selectedTechnician
+      );
 
-      if (checkError) throw checkError;
-
-      if (existingAssignments && existingAssignments.length > 0) {
+      if (existingAssignment) {
         toast({
-          title: "Error",
+          title: "Already Assigned",
           description: "This technician is already assigned to this shift",
           variant: "destructive",
         });
         return;
       }
 
-      // Add assignment
       const { error } = await supabase.from("festival_shift_assignments").insert({
         shift_id: shift.id,
         technician_id: selectedTechnician,
         role: selectedRole,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error creating assignment:", error);
+        throw error;
+      }
 
-      // Reset selections
       setSelectedTechnician("");
       setSelectedRole("");
-      
-      // Refresh assignments
       onAssignmentsUpdated();
-      
+
       toast({
         title: "Success",
-        description: "Technician assigned successfully",
+        description: "Technician added to shift",
       });
     } catch (error: any) {
-      console.error("Error assigning technician:", error);
+      console.error("Error adding assignment:", error);
       toast({
         title: "Error",
-        description: "Could not assign technician",
+        description: `Could not add technician to shift: ${error.message}`,
         variant: "destructive",
       });
+    } finally {
+      setIsAddingTech(false);
     }
   };
 
@@ -181,71 +133,63 @@ export const ManageAssignmentsDialog = ({
       onAssignmentsUpdated();
       toast({
         title: "Success",
-        description: "Assignment removed successfully",
+        description: "Technician removed from shift",
       });
     } catch (error: any) {
       console.error("Error removing assignment:", error);
       toast({
         title: "Error",
-        description: "Could not remove assignment",
+        description: "Could not remove technician from shift",
         variant: "destructive",
       });
     }
   };
 
-  const getRoleOptions = (department?: string) => {
-    if (!department) {
-      return [
-        "FOH Engineer", "Monitor Engineer", "PA Tech", "RF Tech",
-        "Lighting Designer", "Lighting Tech", "Follow Spot",
-        "Video Director", "Camera Operator", "Video Tech",
-        "Load In", "Load Out", "Runner"
-      ];
-    }
-
-    switch (department) {
-      case "sound":
-        return ["FOH Engineer", "Monitor Engineer", "PA Tech", "RF Tech"];
-      case "lights":
-        return ["Lighting Designer", "Lighting Tech", "Follow Spot"];
-      case "video":
-        return ["Video Director", "Camera Operator", "Video Tech"];
-      case "logistics":
-        return ["Load In", "Load Out", "Runner"];
-      default:
-        return [];
-    }
+  const getTechnicianName = (techId: string) => {
+    const tech = technicians.find((t) => t.id === techId);
+    return tech ? `${tech.first_name} ${tech.last_name}` : "Unknown";
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
-          <DialogTitle>Manage Technicians for {shift.name}</DialogTitle>
+          <DialogTitle>Manage Shift Assignments</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium">Current Assignments</h3>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <h3 className="font-medium">Shift Details</h3>
+            <div className="flex flex-col gap-1 text-sm">
+              <p><span className="font-medium">Name:</span> {shift.name}</p>
+              <p><span className="font-medium">Time:</span> {shift.start_time.slice(0, 5)} - {shift.end_time.slice(0, 5)}</p>
+              {shift.department && (
+                <p><span className="font-medium">Department:</span> {shift.department}</p>
+              )}
+              {shift.stage && (
+                <p><span className="font-medium">Stage:</span> {shift.stage}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="font-medium">Current Assignments</h3>
             {shift.assignments.length > 0 ? (
               <div className="space-y-2">
                 {shift.assignments.map((assignment) => (
-                  <div
-                    key={assignment.id}
-                    className="flex justify-between items-center p-2 bg-accent/10 rounded-md"
-                  >
+                  <div key={assignment.id} className="flex justify-between items-center p-2 bg-accent/10 rounded-md">
                     <div className="flex items-center">
-                      <Users className="h-4 w-4 mr-2 text-muted-foreground" />
                       <span>
                         {assignment.profiles?.first_name} {assignment.profiles?.last_name}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary">{assignment.role}</Badge>
-                      <Button
-                        variant="ghost"
-                        size="icon"
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
                         onClick={() => handleRemoveAssignment(assignment.id)}
+                        className="h-6 w-6"
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -254,67 +198,78 @@ export const ManageAssignmentsDialog = ({
                 ))}
               </div>
             ) : (
-              <div className="text-center py-4 text-muted-foreground">
-                No technicians assigned yet
+              <div className="text-center py-2 text-muted-foreground text-sm">
+                No technicians assigned
               </div>
             )}
           </div>
 
-          <div className="space-y-4 pt-4 border-t">
-            <h3 className="text-sm font-medium">Assign New Technician</h3>
-            
-            <div className="space-y-2">
-              <Label htmlFor="technician">Select Technician</Label>
-              {isLoading ? (
-                <div className="flex items-center justify-center p-2">
-                  <span className="text-sm text-muted-foreground">Loading technicians...</span>
-                </div>
-              ) : (
-                <Select value={selectedTechnician} onValueChange={setSelectedTechnician}>
+          <div className="space-y-3 border-t pt-3">
+            <h3 className="font-medium">Add Technician</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Technician</Label>
+                <Select 
+                  onValueChange={setSelectedTechnician} 
+                  value={selectedTechnician}
+                  disabled={isLoading}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select technician" />
                   </SelectTrigger>
                   <SelectContent>
-                    {technicians.length > 0 ? (
-                      technicians.map((tech) => (
-                        <SelectItem key={tech.id} value={tech.id}>
-                          {tech.first_name} {tech.last_name} ({tech.department})
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="none" disabled>
-                        No technicians available
+                    {technicians.map((tech) => (
+                      <SelectItem key={tech.id} value={tech.id}>
+                        {tech.first_name} {tech.last_name}
                       </SelectItem>
-                    )}
+                    ))}
                   </SelectContent>
                 </Select>
-              )}
-            </div>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="role">Select Role</Label>
-              <Select value={selectedRole} onValueChange={setSelectedRole}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {getRoleOptions(shift.department).map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {role}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Select 
+                  onValueChange={setSelectedRole} 
+                  value={selectedRole}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="FOH Engineer">FOH Engineer</SelectItem>
+                    <SelectItem value="Monitor Engineer">Monitor Engineer</SelectItem>
+                    <SelectItem value="PA Tech">PA Tech</SelectItem>
+                    <SelectItem value="RF Tech">RF Tech</SelectItem>
+                    <SelectItem value="Lighting Tech">Lighting Tech</SelectItem>
+                    <SelectItem value="Lighting Designer">Lighting Designer</SelectItem>
+                    <SelectItem value="Video Tech">Video Tech</SelectItem>
+                    <SelectItem value="Camera Operator">Camera Operator</SelectItem>
+                    <SelectItem value="Rigger">Rigger</SelectItem>
+                    <SelectItem value="Stage Manager">Stage Manager</SelectItem>
+                    <SelectItem value="Backline Tech">Backline Tech</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-
-            <Button
-              className="w-full"
-              onClick={handleAssignTechnician}
-              disabled={!selectedTechnician || !selectedRole || isLoading}
-            >
-              Assign Technician
-            </Button>
           </div>
+        </div>
+
+        <div className="flex justify-between">
+          <Button 
+            variant="outline" 
+            onClick={() => onOpenChange(false)}
+          >
+            Close
+          </Button>
+          <Button 
+            onClick={handleAddAssignment}
+            disabled={!selectedTechnician || !selectedRole || isAddingTech}
+            className="flex items-center gap-1"
+          >
+            <UserPlus className="h-4 w-4" />
+            {isAddingTech ? "Adding..." : "Add Technician"}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
