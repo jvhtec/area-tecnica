@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -52,20 +53,19 @@ export const ManageAssignmentsDialog = ({
 
       if (jobAssignments && jobAssignments.length > 0) {
         // Extract the technician profiles from the job assignments
-        const assignedTechnicians = jobAssignments
+        const assignedTechnicianProfiles = jobAssignments
           .filter(assignment => assignment.profiles)
           .map(assignment => assignment.profiles)
-          // Filter only technicians and house_techs - fix by accessing properties correctly
+          // Filter only technicians and house_techs - accessing properties correctly
           .filter(profile => {
-            // Ensure profile exists and has the expected structure
             return profile && 
                   (profile.role === 'technician' || profile.role === 'house_tech');
           });
 
-        console.log("Filtered technicians for shift assignment:", assignedTechnicians);
+        console.log("Filtered technicians for shift assignment:", assignedTechnicianProfiles);
         
         // Convert the filtered profiles to Technician[] by properly mapping them
-        const techniciansList: Technician[] = assignedTechnicians.map(profile => ({
+        const techniciansList: Technician[] = assignedTechnicianProfiles.map(profile => ({
           id: profile.id,
           first_name: profile.first_name,
           last_name: profile.last_name,
