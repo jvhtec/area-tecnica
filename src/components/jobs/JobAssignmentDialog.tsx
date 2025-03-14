@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -15,6 +16,7 @@ interface JobAssignmentDialogProps {
   onOpenChange: (open: boolean) => void;
   jobId: string;
   department: Department;
+  allowDuplicateRoles?: boolean;
 }
 
 interface Technician {
@@ -26,7 +28,13 @@ interface Technician {
   department: Department;
 }
 
-export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: JobAssignmentDialogProps) => {
+export const JobAssignmentDialog = ({ 
+  open, 
+  onOpenChange, 
+  jobId, 
+  department, 
+  allowDuplicateRoles = false 
+}: JobAssignmentDialogProps) => {
   const [selectedTechnician, setSelectedTechnician] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<string>("");
   const queryClient = useQueryClient();
@@ -109,15 +117,17 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
       
       validateAssignment(selectedTechnician, selectedRole, technicians);
 
-      // Check for existing assignment with same role
-      const { data: existingAssignments } = await supabase
-        .from("job_assignments")
-        .select("*")
-        .eq("job_id", jobId)
-        .eq(`${department}_role`, selectedRole);
+      // Check for existing assignment with same role - only if duplicate roles aren't allowed
+      if (!allowDuplicateRoles) {
+        const { data: existingAssignments } = await supabase
+          .from("job_assignments")
+          .select("*")
+          .eq("job_id", jobId)
+          .eq(`${department}_role`, selectedRole);
 
-      if (existingAssignments?.length) {
-        throw new Error(`A technician is already assigned as ${selectedRole}`);
+        if (existingAssignments?.length) {
+          throw new Error(`A technician is already assigned as ${selectedRole}`);
+        }
       }
 
       const roleField = `${department}_role` as const;

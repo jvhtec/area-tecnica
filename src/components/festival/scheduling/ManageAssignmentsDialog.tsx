@@ -141,7 +141,8 @@ export const ManageAssignmentsDialog = ({
       console.log("Adding assignment with technician_id:", selectedTechnician);
       console.log("Adding assignment with role:", selectedRole);
       
-      // Check if this technician is already assigned to this shift
+      // Check if this specific technician is already assigned to this shift
+      // This prevents duplicate assignments of the same person, but allows multiple people with the same role
       const existingAssignment = shift.assignments.find(
         (a) => a.technician_id === selectedTechnician
       );
