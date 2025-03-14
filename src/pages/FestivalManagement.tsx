@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -284,24 +285,42 @@ const FestivalManagement = () => {
         if (shiftsData && shiftsData.length > 0) {
           // Map the data to match our ShiftWithAssignments type
           const typedShifts: ShiftWithAssignments[] = shiftsData.map(shift => {
-            const typedAssignments = shift.assignments.map(assignment => ({
-              id: assignment.id,
-              shift_id: assignment.shift_id,
-              technician_id: assignment.technician_id,
-              role: assignment.role,
-              // Fix the profiles structure - if it's the first item in the array, use it
-              // If profiles is undefined or empty array, set to null
-              profiles: assignment.profiles && Array.isArray(assignment.profiles) && assignment.profiles.length > 0
-                ? {
-                    id: assignment.profiles[0].id,
-                    first_name: assignment.profiles[0].first_name,
-                    last_name: assignment.profiles[0].last_name,
-                    email: assignment.profiles[0].email,
-                    department: assignment.profiles[0].department,
-                    role: assignment.profiles[0].role
-                  }
-                : null
-            }));
+            const typedAssignments = shift.assignments.map(assignment => {
+              // Check if profiles is an array and handle properly
+              let profileData = null;
+              if (assignment.profiles) {
+                // Extract profile from array if it's an array and not empty
+                if (Array.isArray(assignment.profiles) && assignment.profiles.length > 0) {
+                  const profile = assignment.profiles[0];
+                  profileData = {
+                    id: profile.id,
+                    first_name: profile.first_name,
+                    last_name: profile.last_name,
+                    email: profile.email,
+                    department: profile.department,
+                    role: profile.role
+                  };
+                } else if (!Array.isArray(assignment.profiles)) {
+                  // If it's not an array, use it directly
+                  profileData = {
+                    id: assignment.profiles.id,
+                    first_name: assignment.profiles.first_name,
+                    last_name: assignment.profiles.last_name,
+                    email: assignment.profiles.email,
+                    department: assignment.profiles.department,
+                    role: assignment.profiles.role
+                  };
+                }
+              }
+              
+              return {
+                id: assignment.id,
+                shift_id: assignment.shift_id,
+                technician_id: assignment.technician_id,
+                role: assignment.role,
+                profiles: profileData
+              };
+            });
             
             return {
               id: shift.id,
