@@ -16,9 +16,14 @@ import { useRefreshOnTabVisibility } from "@/hooks/useRefreshOnTabVisibility";
 interface FestivalSchedulingProps {
   jobId: string;
   jobDates: Date[];
+  onDataUpdate?: (shifts: ShiftWithAssignments[]) => void;
 }
 
-export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps) => {
+export const FestivalScheduling = ({ 
+  jobId, 
+  jobDates,
+  onDataUpdate 
+}: FestivalSchedulingProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [shifts, setShifts] = useState<ShiftWithAssignments[]>([]);
@@ -129,6 +134,11 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
 
         console.log("Shifts with assignments:", shiftsWithAssignments);
         setShifts(shiftsWithAssignments);
+      
+        // Notify parent component with the shifts data if callback is provided
+        if (onDataUpdate) {
+          onDataUpdate(shiftsWithAssignments);
+        }
       } catch (error: any) {
         console.error("Error processing assignments:", error);
         const shiftsWithEmptyAssignments = shiftsData.map((shift: FestivalShift) => ({
@@ -151,7 +161,7 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     } finally {
       setIsLoading(false);
     }
-  }, [selectedDate, jobId, toast]);
+  }, [selectedDate, jobId, toast, onDataUpdate]);
 
   useEffect(() => {
     if (jobDates && jobDates.length > 0 && !selectedDate) {

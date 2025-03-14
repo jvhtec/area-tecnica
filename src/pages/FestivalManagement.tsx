@@ -1,14 +1,14 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Music2, Layout, Calendar } from "lucide-react";
+import { Users, Music2, Layout, Calendar, FileDown, Package } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { format, isValid, parseISO } from "date-fns";
 import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
 import { FestivalScheduling } from "@/components/festival/scheduling/FestivalScheduling";
+import { compileFestivalDocumentation } from "@/utils/festivalDocumentCompiler";
 
 interface FestivalJob {
   id: string;
@@ -27,13 +27,10 @@ const FestivalManagement = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [artistCount, setArtistCount] = useState(0);
   const [jobDates, setJobDates] = useState<Date[]>([]);
+  const [isCompiling, setIsCompiling] = useState(false);
+  const [schedulingData, setSchedulingData] = useState<any[]>([]);
 
-  // Check if URL contains "scheduling" to determine if we're on the scheduling page
   const isSchedulingRoute = location.pathname.includes('/scheduling');
-  
-  console.log("FestivalManagement - Current route:", location.pathname);
-  console.log("FestivalManagement - Is scheduling route:", isSchedulingRoute);
-  console.log("FestivalManagement - Job ID:", jobId);
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -71,7 +68,6 @@ const FestivalManagement = () => {
         setJob(jobData);
         setArtistCount(artistCount || 0);
 
-        // Generate dates for the festival duration
         const startDate = new Date(jobData.start_time);
         const endDate = new Date(jobData.end_time);
         
@@ -80,7 +76,6 @@ const FestivalManagement = () => {
         
         if (isValid(startDate) && isValid(endDate)) {
           try {
-            // Calculate days between start and end (inclusive)
             const dates = [];
             const currentDate = new Date(startDate);
             
@@ -94,7 +89,6 @@ const FestivalManagement = () => {
           } catch (dateError) {
             console.error("Error generating date interval:", dateError);
             
-            // Fallback: use just the start and end dates
             console.log("Using fallback date approach");
             const dateArray = [];
             if (isValid(startDate)) dateArray.push(startDate);
@@ -106,7 +100,6 @@ const FestivalManagement = () => {
         } else {
           console.warn("Invalid dates in job data, checking for date types");
           
-          // Try to get dates from job_date_types table
           const { data: dateTypes, error: dateTypesError } = await supabase
             .from("job_date_types")
             .select("*")
@@ -117,7 +110,6 @@ const FestivalManagement = () => {
           } else if (dateTypes && dateTypes.length > 0) {
             console.log("Date types found:", dateTypes);
             
-            // Extract unique dates from date_types
             const uniqueDates = Array.from(new Set(
               dateTypes
                 .map(dt => {
@@ -134,7 +126,6 @@ const FestivalManagement = () => {
             setJobDates(uniqueDates);
           } else {
             console.warn("No valid dates found for this job");
-            // Create a default date as fallback (today)
             setJobDates([new Date()]);
           }
         }
@@ -152,6 +143,68 @@ const FestivalManagement = () => {
 
     fetchJobDetails();
   }, [jobId]);
+
+  const handleCompileDocuments = async () => {
+    if (!jobId || !job) return;
+    
+    setIsCompiling(true);
+    
+    try {
+      if (!isSchedulingRoute && schedulingData.length === 0) {
+        const selectedDate = jobDates.length > 0 ? format(jobDates[0], 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
+        
+        const { data: shiftsData, error: shiftsError } = await supabase
+          .from("festival_shifts")
+          .select("*")
+          .eq("job_id", jobId)
+          .eq("date", selectedDate);
+          
+        if (shiftsError) {
+          throw shiftsError;
+        }
+        
+        setSchedulingData(shiftsData || []);
+      }
+      
+      const shiftsToUse = schedulingData.length > 0 ? schedulingData : [];
+      const selectedDate = jobDates.length > 0 ? format(jobDates[0], 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
+      
+      const compiledPdf = await compileFestivalDocumentation({
+        jobId,
+        jobTitle: job.title,
+        selectedDate,
+        shifts: shiftsToUse,
+        toast,
+      });
+      
+      const url = URL.createObjectURL(compiledPdf);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${job.title.replace(/\s+/g, '_')}_documentation.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Success",
+        description: "Festival documentation compiled successfully",
+      });
+    } catch (error) {
+      console.error('Error compiling documentation:', error);
+      toast({
+        title: "Error",
+        description: "Could not compile festival documentation",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCompiling(false);
+    }
+  };
+
+  const updateSchedulingData = (data: any[]) => {
+    setSchedulingData(data);
+  };
 
   if (!jobId) {
     return <div>Job ID is required</div>;
@@ -179,7 +232,16 @@ const FestivalManagement = () => {
                 {new Date(job?.start_time || '').toLocaleDateString()} - {new Date(job?.end_time || '').toLocaleDateString()}
               </p>
             </div>
-            <div>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={handleCompileDocuments}
+                disabled={isCompiling}
+                className="flex items-center gap-1"
+              >
+                <Package className="h-4 w-4" />
+                {isCompiling ? "Compiling..." : "Compile All Documentation"}
+              </Button>
               <FestivalLogoManager jobId={jobId} />
             </div>
           </div>
@@ -188,7 +250,6 @@ const FestivalManagement = () => {
 
       {!isSchedulingRoute && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Artists Section */}
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/artists`)}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -208,7 +269,6 @@ const FestivalManagement = () => {
             </CardContent>
           </Card>
 
-          {/* Stages & Gear Section */}
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/gear`)}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -227,7 +287,6 @@ const FestivalManagement = () => {
             </CardContent>
           </Card>
 
-          {/* Scheduling Section */}
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/scheduling`)}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -248,7 +307,6 @@ const FestivalManagement = () => {
         </div>
       )}
       
-      {/* Scheduling content when on the scheduling route */}
       {isSchedulingRoute && (
         <div>
           <div className="mb-4">
@@ -262,7 +320,11 @@ const FestivalManagement = () => {
           </div>
           
           {jobDates.length > 0 ? (
-            <FestivalScheduling jobId={jobId} jobDates={jobDates} />
+            <FestivalScheduling 
+              jobId={jobId} 
+              jobDates={jobDates} 
+              onDataUpdate={updateSchedulingData}
+            />
           ) : (
             <Card>
               <CardContent className="p-8 text-center">
