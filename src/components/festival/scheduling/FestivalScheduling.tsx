@@ -76,6 +76,8 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
     queryFn: async () => {
       if (!jobId) return [];
       
+      console.log('Fetching shifts for date:', selectedDate);
+      
       const { data, error } = await supabase
         .from('festival_shifts')
         .select(`
@@ -96,7 +98,15 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
         throw error;
       }
       
-      return data as ShiftWithAssignments[];
+      console.log('Fetched shifts:', data);
+      
+      // Ensure assignments is always an array
+      const shiftsWithAssignments = (data || []).map(shift => ({
+        ...shift,
+        assignments: shift.assignments || []
+      }));
+      
+      return shiftsWithAssignments as ShiftWithAssignments[];
     }
   });
 

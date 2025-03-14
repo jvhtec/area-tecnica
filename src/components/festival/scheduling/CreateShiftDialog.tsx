@@ -63,7 +63,7 @@ export const CreateShiftDialog = ({
     try {
       const shiftData = {
         job_id: jobId,
-        date: selectedDate,
+        shift_date: selectedDate,  // Ensure we're using shift_date instead of date
         name: values.name,
         start_time: values.start_time,
         end_time: values.end_time,

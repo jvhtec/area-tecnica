@@ -89,14 +89,14 @@ export const ShiftsList = ({ shifts, onDeleteShift, onEditShift, onShiftUpdated,
             )}
           </CardHeader>
           <CardContent className="pt-4">
-            {shift.assignments.length > 0 ? (
+            {shift.assignments && shift.assignments.length > 0 ? (
               <div className="space-y-2">
                 {shift.assignments.map((assignment) => (
                   <div key={assignment.id} className="flex justify-between items-center p-2 bg-accent/10 rounded-md">
                     <div className="flex items-center">
                       <Users className="h-4 w-4 mr-2 text-muted-foreground" />
                       <span>
-                        {assignment.profiles?.first_name} {assignment.profiles?.last_name}
+                        {assignment.profiles?.first_name || 'Unknown'} {assignment.profiles?.last_name || ''}
                       </span>
                     </div>
                     <Badge variant="secondary">{assignment.role}</Badge>
