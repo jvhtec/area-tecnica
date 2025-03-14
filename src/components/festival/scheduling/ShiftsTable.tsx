@@ -1,5 +1,5 @@
 
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -37,29 +37,31 @@ export const ShiftsTable = ({
     [shifts]
   );
 
-  const formatTimeRange = (start: string, end: string) => {
+  const formatTimeRange = useCallback((start: string, end: string) => {
     try {
       // Format for display with optional "next day" indicator
       const startHour = parseInt(start.split(':')[0], 10);
       const endHour = parseInt(end.split(':')[0], 10);
+      const startMinute = parseInt(start.split(':')[1], 10);
+      const endMinute = parseInt(end.split(':')[1], 10);
       
       // Check if end time is before start time (next day)
-      if (endHour < startHour || (endHour === startHour && end.split(':')[1] < start.split(':')[1])) {
-        return `${start.slice(0, 5)} - ${end.slice(0, 5)} (next day)`;
-      }
-      return `${start.slice(0, 5)} - ${end.slice(0, 5)}`;
+      const isNextDay = endHour < startHour || 
+                       (endHour === startHour && endMinute < startMinute);
+      
+      return `${start.slice(0, 5)} - ${end.slice(0, 5)}${isNextDay ? ' (next day)' : ''}`;
     } catch (error) {
       console.error("Error formatting time range:", error, "start:", start, "end:", end);
       return `${start || '??'} - ${end || '??'}`;
     }
-  };
+  }, []);
 
-  const handleDeleteClick = (e: React.MouseEvent, shiftId: string) => {
+  const handleDeleteClick = useCallback((e: React.MouseEvent, shiftId: string) => {
     e.stopPropagation();
     if (confirm("Are you sure you want to delete this shift?")) {
       onDeleteShift(shiftId);
     }
-  };
+  }, [onDeleteShift]);
 
   // Safely format the date for display - memoized to prevent re-renders
   const formattedDate = useMemo(() => {
@@ -77,7 +79,7 @@ export const ShiftsTable = ({
     }
   }, [date]);
 
-  const handleExportPDF = async () => {
+  const handleExportPDF = useCallback(async () => {
     try {
       console.log("Exporting PDF with jobId:", jobId, "and jobTitle:", jobTitle);
       
@@ -124,7 +126,7 @@ export const ShiftsTable = ({
         variant: "destructive",
       });
     }
-  };
+  }, [jobId, jobTitle, date, sortedShifts, toast]);
 
   return (
     <div className="print:p-8">

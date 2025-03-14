@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,7 +36,7 @@ export const FestivalScheduling = ({
   console.log("FestivalScheduling component rendered with job ID:", jobId);
   console.log("Job dates received:", jobDates);
   
-  const formatDateToString = (date: Date): string => {
+  const formatDateToString = useCallback((date: Date): string => {
     try {
       return format(date, 'yyyy-MM-dd');
     } catch (error) {
@@ -43,7 +44,28 @@ export const FestivalScheduling = ({
       console.error("Problematic date value:", date);
       return "";
     }
-  };
+  }, []);
+
+  // Select initial date only once when component mounts or when jobDates changes
+  useEffect(() => {
+    if (jobDates && jobDates.length > 0 && !selectedDate) {
+      try {
+        const formattedDate = formatDateToString(jobDates[0]);
+        console.log("Setting initial date to:", formattedDate);
+        
+        if (formattedDate) {
+          setSelectedDate(formattedDate);
+        } else {
+          throw new Error("Could not format initial date");
+        }
+      } catch (error) {
+        console.error("Error setting initial date:", error);
+        
+        const today = new Date();
+        setSelectedDate(formatDateToString(today));
+      }
+    }
+  }, [jobDates, selectedDate, formatDateToString]);
 
   const fetchShifts = useCallback(async () => {
     if (!selectedDate || !jobId) {
@@ -75,6 +97,12 @@ export const FestivalScheduling = ({
         console.log("No shifts found for this date");
         setShifts([]);
         setIsLoading(false);
+        
+        // Also notify parent if callback provided
+        if (onDataUpdate) {
+          onDataUpdate([]);
+        }
+        
         return;
       }
 
@@ -148,6 +176,11 @@ export const FestivalScheduling = ({
         
         console.log("Shifts without assignments due to error:", shiftsWithEmptyAssignments);
         setShifts(shiftsWithEmptyAssignments);
+        
+        // Notify parent even with error
+        if (onDataUpdate) {
+          onDataUpdate(shiftsWithEmptyAssignments);
+        }
       }
     } catch (error: any) {
       console.error("Error fetching shifts:", error);
@@ -158,31 +191,17 @@ export const FestivalScheduling = ({
       });
       
       setShifts([]);
+      
+      // Notify parent of empty shifts on error
+      if (onDataUpdate) {
+        onDataUpdate([]);
+      }
     } finally {
       setIsLoading(false);
     }
   }, [selectedDate, jobId, toast, onDataUpdate]);
 
-  useEffect(() => {
-    if (jobDates && jobDates.length > 0 && !selectedDate) {
-      try {
-        const formattedDate = formatDateToString(jobDates[0]);
-        console.log("Setting initial date to:", formattedDate);
-        
-        if (formattedDate) {
-          setSelectedDate(formattedDate);
-        } else {
-          throw new Error("Could not format initial date");
-        }
-      } catch (error) {
-        console.error("Error setting initial date:", error);
-        
-        const today = new Date();
-        setSelectedDate(formatDateToString(today));
-      }
-    }
-  }, [jobDates, selectedDate]);
-
+  // Only fetch shifts when selectedDate or jobId changes, not on every render
   useEffect(() => {
     if (selectedDate && jobId) {
       console.log(`Fetching shifts for date: ${selectedDate} and job: ${jobId}`);
@@ -192,6 +211,7 @@ export const FestivalScheduling = ({
     }
   }, [selectedDate, jobId, fetchShifts]);
 
+  // Tab visibility handler with proper dependencies
   useRefreshOnTabVisibility(() => {
     if (selectedDate && jobId) {
       console.log("Tab became visible, refreshing shifts");
@@ -199,16 +219,16 @@ export const FestivalScheduling = ({
     }
   }, [selectedDate, jobId, fetchShifts]);
 
-  const handleShiftCreated = async () => {
+  const handleShiftCreated = useCallback(() => {
     fetchShifts();
     setIsCreateShiftOpen(false);
     toast({
       title: "Success",
       description: "Shift created successfully",
     });
-  };
+  }, [fetchShifts, toast]);
 
-  const handleDeleteShift = async (shiftId: string) => {
+  const handleDeleteShift = useCallback(async (shiftId: string) => {
     try {
       await supabase
         .from("festival_shift_assignments")
@@ -235,7 +255,36 @@ export const FestivalScheduling = ({
         variant: "destructive",
       });
     }
-  };
+  }, [fetchShifts, toast]);
+
+  const toggleViewMode = useCallback(() => {
+    setViewMode(viewMode === "list" ? "table" : "list");
+  }, [viewMode]);
+
+  // Memoize date tabs to prevent re-renders
+  const dateTabs = useMemo(() => {
+    return jobDates.map((date, index) => {
+      try {
+        const dateValue = formatDateToString(date);
+        if (!dateValue) return null;
+        
+        const displayDate = format(date, 'MMM d');
+        
+        return (
+          <TabsTrigger
+            key={`date-${index}-${dateValue}`}
+            value={dateValue}
+            className="mb-1"
+          >
+            {displayDate}
+          </TabsTrigger>
+        );
+      } catch (err) {
+        console.error("Error rendering date tab:", err);
+        return null;
+      }
+    });
+  }, [jobDates, formatDateToString]);
 
   if (!jobDates || jobDates.length === 0) {
     console.log("No job dates available");
@@ -271,34 +320,14 @@ export const FestivalScheduling = ({
             className="w-full"
           >
             <TabsList className="mb-2 flex flex-wrap h-auto">
-              {jobDates.map((date, index) => {
-                try {
-                  const dateValue = formatDateToString(date);
-                  if (!dateValue) return null;
-                  
-                  const displayDate = format(date, 'MMM d');
-                  
-                  return (
-                    <TabsTrigger
-                      key={`date-${index}-${dateValue}`}
-                      value={dateValue}
-                      className="mb-1"
-                    >
-                      {displayDate}
-                    </TabsTrigger>
-                  );
-                } catch (err) {
-                  console.error("Error rendering date tab:", err);
-                  return null;
-                }
-              })}
+              {dateTabs}
             </TabsList>
           </Tabs>
           <div className="mt-2 flex justify-end">
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => setViewMode(viewMode === "list" ? "table" : "list")}
+              onClick={toggleViewMode}
               className="text-xs"
             >
               {viewMode === "list" ? "Table View" : "List View"}
