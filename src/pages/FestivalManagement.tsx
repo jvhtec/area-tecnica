@@ -359,8 +359,8 @@ const FestivalManagement = () => {
                 end: a.soundcheck_end || '' 
               } : undefined,
               technical: {
-                fohTech: a.foh_tech || false,
-                monTech: a.mon_tech || false,
+                fohTech: !!a.foh_tech,
+                monTech: !!a.mon_tech,
                 fohConsole: { 
                   model: a.foh_console || '', 
                   providedBy: a.foh_console_provided_by || 'festival' 
@@ -370,30 +370,25 @@ const FestivalManagement = () => {
                   providedBy: a.mon_console_provided_by || 'festival' 
                 },
                 wireless: {
-                  model: a.wireless_model || '',
-                  providedBy: a.wireless_provided_by || 'festival',
-                  handhelds: a.wireless_quantity_hh || 0,
-                  bodypacks: a.wireless_quantity_bp || 0,
-                  band: a.wireless_band || ''
+                  hh: Number(a.wireless_quantity_hh) || 0,
+                  bp: Number(a.wireless_quantity_bp) || 0,
+                  providedBy: a.wireless_provided_by || 'festival'
                 },
                 iem: {
-                  model: a.iem_model || '',
-                  providedBy: a.iem_provided_by || 'festival',
-                  quantity: a.iem_quantity || 0,
-                  band: a.iem_band || ''
+                  quantity: Number(a.iem_quantity) || 0,
+                  providedBy: a.iem_provided_by || 'festival'
                 },
                 monitors: {
-                  enabled: a.monitors_enabled || false,
-                  quantity: a.monitors_quantity || 0
+                  enabled: !!a.monitors_enabled,
+                  quantity: Number(a.monitors_quantity) || 0
                 }
               },
               extras: {
-                sideFill: a.extras_sf || false,
-                drumFill: a.extras_df || false,
-                djBooth: a.extras_djbooth || false,
-                wired: a.extras_wired || ''
+                sideFill: !!a.extras_sf,
+                drumFill: !!a.extras_df,
+                djBooth: !!a.extras_djbooth
               },
-              notes: a.notes
+              notes: a.notes || ''
             }))
           };
           
@@ -658,4 +653,3 @@ const FestivalManagement = () => {
 };
 
 export default FestivalManagement;
-
