@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -16,7 +15,6 @@ interface JobAssignmentDialogProps {
   onOpenChange: (open: boolean) => void;
   jobId: string;
   department: Department;
-  allowDuplicateRoles?: boolean;
 }
 
 interface Technician {
@@ -28,14 +26,7 @@ interface Technician {
   department: Department;
 }
 
-export const JobAssignmentDialog = ({ 
-  open, 
-  onOpenChange, 
-  jobId, 
-  department, 
-  // We'll ignore this prop since we're always allowing duplicates now
-  allowDuplicateRoles = false 
-}: JobAssignmentDialogProps) => {
+export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: JobAssignmentDialogProps) => {
   const [selectedTechnician, setSelectedTechnician] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<string>("");
   const queryClient = useQueryClient();
@@ -57,7 +48,7 @@ export const JobAssignmentDialog = ({
         .from("profiles")
         .select("id, first_name, last_name, email, role, department")
         .eq("department", department)
-        .in("role", ["technician", "house_tech"]);
+        .in("role", ["technician", "house_tech"]); // Modified to include both technician and house_tech roles
 
       if (error) {
         console.error("Error fetching technicians:", error);
@@ -118,46 +109,25 @@ export const JobAssignmentDialog = ({
       
       validateAssignment(selectedTechnician, selectedRole, technicians);
 
-      // IMPORTANT: We're always allowing duplicate roles now, so we don't need to check
-      // for existing assignments with the same role
-
-      // Check if this specific technician is already assigned to this job with any role
-      const { data: existingTechAssignments } = await supabase
+      // Check for existing assignment with same role
+      const { data: existingAssignments } = await supabase
         .from("job_assignments")
         .select("*")
         .eq("job_id", jobId)
-        .eq("technician_id", selectedTechnician);
-      
-      console.log("Existing tech assignments:", existingTechAssignments);
-      
-      // If technician is already assigned, update their role instead of creating a new assignment
-      const roleField = `${department}_role` as const;
-      
-      let error;
-      
-      if (existingTechAssignments?.length) {
-        // Update existing assignment
-        ({ error } = await supabase
-          .from("job_assignments")
-          .update({
-            [roleField]: selectedRole
-          })
-          .eq("job_id", jobId)
-          .eq("technician_id", selectedTechnician));
-          
-        console.log("Updated existing assignment");
-      } else {
-        // Create new assignment
-        ({ error } = await supabase
-          .from("job_assignments")
-          .insert({
-            job_id: jobId,
-            technician_id: selectedTechnician,
-            [roleField]: selectedRole,
-          }));
-          
-        console.log("Created new assignment");
+        .eq(`${department}_role`, selectedRole);
+
+      if (existingAssignments?.length) {
+        throw new Error(`A technician is already assigned as ${selectedRole}`);
       }
+
+      const roleField = `${department}_role` as const;
+      const { error } = await supabase
+        .from("job_assignments")
+        .insert({
+          job_id: jobId,
+          technician_id: selectedTechnician,
+          [roleField]: selectedRole,
+        });
 
       if (error) {
         console.error("Error assigning technician:", error);
@@ -170,10 +140,6 @@ export const JobAssignmentDialog = ({
       // Reset form and close dialog
       setSelectedTechnician("");
       setSelectedRole("");
-      
-      // Refresh assignment data
-      await queryClient.invalidateQueries({ queryKey: ["job-assignments", jobId] });
-      
       handleDialogChange(false);
       
     } catch (error: any) {
@@ -241,7 +207,7 @@ export const JobAssignmentDialog = ({
             </Select>
           </div>
 
-          <JobAssignments jobId={jobId} department={department} userRole="admin" />
+          <JobAssignments jobId={jobId} department={department} />
 
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => handleDialogChange(false)}>

@@ -1,4 +1,3 @@
-
 import { JobCard } from "@/components/jobs/JobCard";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
