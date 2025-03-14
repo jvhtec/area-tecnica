@@ -81,39 +81,75 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
       // Get all shift IDs to fetch assignments
       const shiftIds = shiftsData.map(shift => shift.id);
       
-      // Fetch assignments for all shifts
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from("festival_shift_assignments")
-        .select(`
-          *,
-          profiles:technician_id(
+      try {
+        // Try to fetch assignments for all shifts
+        const { data: assignmentsData, error: assignmentsError } = await supabase
+          .from("festival_shift_assignments")
+          .select(`
             id,
-            first_name,
-            last_name,
-            email,
-            department,
+            shift_id,
+            technician_id,
             role
-          )
-        `)
-        .in("shift_id", shiftIds);
+          `)
+          .in("shift_id", shiftIds);
 
-      if (assignmentsError) {
-        console.error("Error fetching shift assignments:", assignmentsError);
-        throw assignmentsError;
+        if (assignmentsError) {
+          console.error("Error fetching shift assignments:", assignmentsError);
+          // Don't throw here, we'll continue with empty assignments
+        }
+
+        // Get technician details separately if we have assignments
+        let technicianProfiles: Record<string, any> = {};
+        
+        if (assignmentsData && assignmentsData.length > 0) {
+          const technicianIds = [...new Set(assignmentsData.map(a => a.technician_id))];
+          
+          const { data: profilesData, error: profilesError } = await supabase
+            .from("profiles")
+            .select("id, first_name, last_name, email, department, role")
+            .in("id", technicianIds);
+            
+          if (profilesError) {
+            console.error("Error fetching technician profiles:", profilesError);
+          } else if (profilesData) {
+            // Create a lookup map for quick access
+            technicianProfiles = profilesData.reduce((acc, profile) => {
+              acc[profile.id] = profile;
+              return acc;
+            }, {} as Record<string, any>);
+          }
+        }
+        
+        // Combine shifts with their assignments and add profile info
+        const shiftsWithAssignments = shiftsData.map((shift: FestivalShift) => {
+          const shiftAssignments = assignmentsData 
+            ? assignmentsData
+                .filter(assignment => assignment.shift_id === shift.id)
+                .map(assignment => ({
+                  ...assignment,
+                  profiles: technicianProfiles[assignment.technician_id] || null
+                }))
+            : [];
+            
+          return {
+            ...shift,
+            assignments: shiftAssignments
+          };
+        });
+
+        console.log("Shifts with assignments:", shiftsWithAssignments);
+        setShifts(shiftsWithAssignments);
+      } catch (error: any) {
+        console.error("Error processing assignments:", error);
+        // Continue with shifts but without assignments
+        const shiftsWithEmptyAssignments = shiftsData.map((shift: FestivalShift) => ({
+          ...shift,
+          assignments: []
+        }));
+        
+        console.log("Shifts without assignments due to error:", shiftsWithEmptyAssignments);
+        setShifts(shiftsWithEmptyAssignments);
       }
-      
-      console.log("Assignments data retrieved:", assignmentsData);
-
-      // Combine shifts with their assignments
-      const shiftsWithAssignments = shiftsData.map((shift: FestivalShift) => ({
-        ...shift,
-        assignments: assignmentsData
-          ? assignmentsData.filter(assignment => assignment.shift_id === shift.id)
-          : []
-      }));
-
-      console.log("Shifts with assignments:", shiftsWithAssignments);
-      setShifts(shiftsWithAssignments);
     } catch (error: any) {
       console.error("Error fetching shifts:", error);
       toast({
