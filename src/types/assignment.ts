@@ -17,4 +17,5 @@ export interface Assignment {
     department: string;
     role?: string;
   } | null;
+  shift_id?: string;
 }

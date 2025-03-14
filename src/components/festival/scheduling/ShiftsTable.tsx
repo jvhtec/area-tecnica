@@ -1,5 +1,5 @@
 
-import { format } from "date-fns";
+import { useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -31,19 +31,20 @@ export const ShiftsTable = ({
 }: ShiftsTableProps) => {
   const { toast } = useToast();
   
-  // Sort shifts by start time
-  const sortedShifts = [...shifts].sort((a, b) => 
-    a.start_time.localeCompare(b.start_time)
+  // Memoize sorted shifts to prevent unnecessary re-renders
+  const sortedShifts = useMemo(() => 
+    [...shifts].sort((a, b) => a.start_time.localeCompare(b.start_time)),
+    [shifts]
   );
 
   const formatTimeRange = (start: string, end: string) => {
     try {
-      // Check if the end time is before the start time (indicating next day)
+      // Format for display with optional "next day" indicator
       const startHour = parseInt(start.split(':')[0], 10);
       const endHour = parseInt(end.split(':')[0], 10);
       
-      // Format for display with optional "next day" indicator
-      if (endHour < startHour) {
+      // Check if end time is before start time (next day)
+      if (endHour < startHour || (endHour === startHour && end.split(':')[1] < start.split(':')[1])) {
         return `${start.slice(0, 5)} - ${end.slice(0, 5)} (next day)`;
       }
       return `${start.slice(0, 5)} - ${end.slice(0, 5)}`;
@@ -60,8 +61,8 @@ export const ShiftsTable = ({
     }
   };
 
-  // Safely format the date for display
-  const formattedDate = (() => {
+  // Safely format the date for display - memoized to prevent re-renders
+  const formattedDate = useMemo(() => {
     try {
       if (!date) return "Schedule";
       return new Date(date).toLocaleDateString(undefined, {
@@ -74,7 +75,7 @@ export const ShiftsTable = ({
       console.error("Error formatting date:", error, "date:", date);
       return date || "Schedule";
     }
-  })();
+  }, [date]);
 
   const handleExportPDF = async () => {
     try {

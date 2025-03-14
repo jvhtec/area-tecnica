@@ -1,6 +1,5 @@
 
-import { useState } from "react";
-import { format } from "date-fns";
+import { useState, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -27,14 +26,20 @@ export const ShiftsList = ({ shifts, onDeleteShift, onShiftUpdated, jobId }: Shi
   const [editingShift, setEditingShift] = useState<ShiftWithAssignments | null>(null);
   const [managingShift, setManagingShift] = useState<ShiftWithAssignments | null>(null);
 
+  // Memoize the sorted shifts to prevent unnecessary re-renders
+  const sortedShifts = useMemo(() => 
+    [...shifts].sort((a, b) => a.start_time.localeCompare(b.start_time)),
+    [shifts]
+  );
+
   const formatTimeRange = (start: string, end: string) => {
     try {
-      // Check if the end time is before the start time (indicating next day)
+      // Format for display with optional "next day" indicator
       const startHour = parseInt(start.split(':')[0], 10);
       const endHour = parseInt(end.split(':')[0], 10);
       
-      // Format for display with optional "next day" indicator
-      if (endHour < startHour) {
+      // Check if end time is before start time (next day)
+      if (endHour < startHour || (endHour === startHour && end.split(':')[1] < start.split(':')[1])) {
         return `${start.slice(0, 5)} - ${end.slice(0, 5)} (next day)`;
       }
       return `${start.slice(0, 5)} - ${end.slice(0, 5)}`;
@@ -50,11 +55,6 @@ export const ShiftsList = ({ shifts, onDeleteShift, onShiftUpdated, jobId }: Shi
       onDeleteShift(shiftId);
     }
   };
-
-  // Sort shifts by start time for consistent display
-  const sortedShifts = [...shifts].sort((a, b) => 
-    a.start_time.localeCompare(b.start_time)
-  );
 
   return (
     <div className="space-y-4">
