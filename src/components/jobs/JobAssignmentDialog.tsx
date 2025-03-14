@@ -109,6 +109,7 @@ export const JobAssignmentDialog = ({
 
     try {
       console.log("Assigning technician:", selectedTechnician, "with role:", selectedRole);
+      console.log("Allow duplicate roles:", allowDuplicateRoles);
       
       // Validate assignment
       if (!technicians) {
@@ -124,20 +125,51 @@ export const JobAssignmentDialog = ({
           .select("*")
           .eq("job_id", jobId)
           .eq(`${department}_role`, selectedRole);
+        
+        console.log("Existing assignments:", existingAssignments);
 
         if (existingAssignments?.length) {
           throw new Error(`A technician is already assigned as ${selectedRole}`);
         }
       }
 
-      const roleField = `${department}_role` as const;
-      const { error } = await supabase
+      // Check if this specific technician is already assigned to this job with any role
+      const { data: existingTechAssignments } = await supabase
         .from("job_assignments")
-        .insert({
-          job_id: jobId,
-          technician_id: selectedTechnician,
-          [roleField]: selectedRole,
-        });
+        .select("*")
+        .eq("job_id", jobId)
+        .eq("technician_id", selectedTechnician);
+      
+      console.log("Existing tech assignments:", existingTechAssignments);
+      
+      // If technician is already assigned, update their role instead of creating a new assignment
+      const roleField = `${department}_role` as const;
+      
+      let error;
+      
+      if (existingTechAssignments?.length) {
+        // Update existing assignment
+        ({ error } = await supabase
+          .from("job_assignments")
+          .update({
+            [roleField]: selectedRole
+          })
+          .eq("job_id", jobId)
+          .eq("technician_id", selectedTechnician));
+          
+        console.log("Updated existing assignment");
+      } else {
+        // Create new assignment
+        ({ error } = await supabase
+          .from("job_assignments")
+          .insert({
+            job_id: jobId,
+            technician_id: selectedTechnician,
+            [roleField]: selectedRole,
+          }));
+          
+        console.log("Created new assignment");
+      }
 
       if (error) {
         console.error("Error assigning technician:", error);
@@ -150,6 +182,10 @@ export const JobAssignmentDialog = ({
       // Reset form and close dialog
       setSelectedTechnician("");
       setSelectedRole("");
+      
+      // Refresh assignment data
+      await queryClient.invalidateQueries({ queryKey: ["job-assignments", jobId] });
+      
       handleDialogChange(false);
       
     } catch (error: any) {
@@ -217,7 +253,7 @@ export const JobAssignmentDialog = ({
             </Select>
           </div>
 
-          <JobAssignments jobId={jobId} department={department} />
+          <JobAssignments jobId={jobId} department={department} userRole="admin" />
 
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => handleDialogChange(false)}>
