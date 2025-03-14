@@ -3,14 +3,14 @@ import { PDFDocument } from 'pdf-lib';
 import { supabase } from '@/lib/supabase';
 import { exportShiftsTablePDF, ShiftsTablePdfData } from './shiftsTablePdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from './artistTablePdfExport';
-import { useToast } from '@/hooks/use-toast';
 
+// Changed the interface to accept a toast function directly
 export interface FestivalDocumentCompilerOptions {
   jobId: string;
   jobTitle: string;
   selectedDate: string;
   shifts: any[];
-  toast: ReturnType<typeof useToast>;
+  toast: (props: { title: string; description: string; variant?: "default" | "destructive" }) => void;
 }
 
 export const compileFestivalDocumentation = async (options: FestivalDocumentCompilerOptions): Promise<Blob> => {

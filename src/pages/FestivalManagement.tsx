@@ -170,12 +170,13 @@ const FestivalManagement = () => {
       const shiftsToUse = schedulingData.length > 0 ? schedulingData : [];
       const selectedDate = jobDates.length > 0 ? format(jobDates[0], 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
       
+      // Pass only the toast function, not the entire object
       const compiledPdf = await compileFestivalDocumentation({
         jobId,
         jobTitle: job.title,
         selectedDate,
         shifts: shiftsToUse,
-        toast
+        toast: (props) => toast(props)
       });
       
       const url = URL.createObjectURL(compiledPdf);
