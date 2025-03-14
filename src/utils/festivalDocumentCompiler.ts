@@ -34,15 +34,24 @@ export const compileFestivalDocumentation = async (options: FestivalDocumentComp
         },
         stage: shift.stage,
         department: shift.department || '',
-        assignments: shift.assignments.map((assignment: any) => ({
+        assignments: shift.assignments?.map((assignment: any) => ({
           name: `${assignment.profiles?.first_name || ''} ${assignment.profiles?.last_name || ''}`.trim(),
           role: assignment.role
-        }))
+        })) || []
       }))
     };
     
-    const shiftsBlob = await exportShiftsTablePDF(shiftsData);
-    await addPdfToCompilation(compiledPdf, shiftsBlob, "Shifts Schedule");
+    try {
+      const shiftsBlob = await exportShiftsTablePDF(shiftsData);
+      await addPdfToCompilation(compiledPdf, shiftsBlob, "Shifts Schedule");
+    } catch (error) {
+      console.error("Error generating shifts schedule PDF:", error);
+      toast({
+        title: "Warning",
+        description: "Could not add shifts schedule to compilation",
+        variant: "destructive",
+      });
+    }
     
     // 2. Look for any artist data in the database
     console.log("Fetching artist data...");
@@ -91,8 +100,33 @@ export const compileFestivalDocumentation = async (options: FestivalDocumentComp
           try {
             console.log("Adding artist form PDF:", form.artist_name);
             
-            // Fetch the PDF from the URL
-            const response = await fetch(form.pdf_url);
+            // Implement a retry mechanism for fetch operations
+            const fetchWithRetry = async (url: string, retries = 3) => {
+              for (let i = 0; i < retries; i++) {
+                try {
+                  const response = await fetch(url, {
+                    headers: {
+                      'Cache-Control': 'no-cache',
+                      'Pragma': 'no-cache'
+                    }
+                  });
+                  
+                  if (!response.ok) {
+                    throw new Error(`Failed with status: ${response.status}`);
+                  }
+                  
+                  return response;
+                } catch (err) {
+                  console.error(`Attempt ${i+1} failed:`, err);
+                  if (i === retries - 1) throw err;
+                  // Wait before retrying
+                  await new Promise(r => setTimeout(r, 1000));
+                }
+              }
+            };
+            
+            // Fetch the PDF from the URL with retry
+            const response = await fetchWithRetry(form.pdf_url);
             const pdfBlob = await response.blob();
             
             await addPdfToCompilation(
@@ -102,6 +136,11 @@ export const compileFestivalDocumentation = async (options: FestivalDocumentComp
             );
           } catch (error) {
             console.error(`Error adding form PDF for ${form.artist_name}:`, error);
+            toast({
+              title: "Warning",
+              description: `Could not add requirements for ${form.artist_name}`,
+              variant: "destructive",
+            });
           }
         }
       }
@@ -130,21 +169,40 @@ export const compileFestivalDocumentation = async (options: FestivalDocumentComp
 // Helper function to add a PDF blob to the compiled document
 async function addPdfToCompilation(compiledPdf: PDFDocument, pdfBlob: Blob, sectionTitle: string): Promise<void> {
   try {
+    // Convert blob to array buffer with more robust error handling
     const arrayBuffer = await pdfBlob.arrayBuffer();
-    const sourcePdf = await PDFDocument.load(new Uint8Array(arrayBuffer));
+    if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+      throw new Error("Empty PDF data received");
+    }
     
-    // Copy all pages from the source PDF
-    const copiedPages = await compiledPdf.copyPages(
-      sourcePdf, 
-      sourcePdf.getPageIndices()
-    );
-    
-    // Add each copied page to the target document
-    copiedPages.forEach((page) => {
-      compiledPdf.addPage(page);
-    });
-    
-    console.log(`Added ${copiedPages.length} pages from ${sectionTitle}`);
+    try {
+      // Load the source PDF with more robust error handling
+      const sourcePdf = await PDFDocument.load(new Uint8Array(arrayBuffer), {
+        ignoreEncryption: true,
+      });
+      
+      if (!sourcePdf) {
+        throw new Error("Failed to load source PDF");
+      }
+      
+      const pageIndices = sourcePdf.getPageIndices();
+      if (pageIndices.length === 0) {
+        console.warn(`PDF for ${sectionTitle} has no pages, skipping`);
+        return;
+      }
+      
+      // Copy all pages from the source PDF
+      const copiedPages = await compiledPdf.copyPages(sourcePdf, pageIndices);
+      
+      // Add each copied page to the target document
+      copiedPages.forEach((page) => {
+        if (page) compiledPdf.addPage(page);
+      });
+      
+      console.log(`Added ${copiedPages.length} pages from ${sectionTitle}`);
+    } catch (error) {
+      throw new Error(`Error processing PDF for ${sectionTitle}: ${error.message}`);
+    }
   } catch (error) {
     console.error(`Error adding ${sectionTitle} to compilation:`, error);
     throw error;
