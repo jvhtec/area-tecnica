@@ -286,29 +286,32 @@ const FestivalManagement = () => {
           // Map the data to match our ShiftWithAssignments type
           const typedShifts: ShiftWithAssignments[] = shiftsData.map(shift => {
             const typedAssignments = shift.assignments.map(assignment => {
-              // Check if profiles is an array and handle properly
+              // Check if profiles is an array or object and handle appropriately
               let profileData = null;
+              
               if (assignment.profiles) {
-                // Extract profile from array if it's an array and not empty
-                if (Array.isArray(assignment.profiles) && assignment.profiles.length > 0) {
-                  const profile = assignment.profiles[0];
+                // Type assertion to help TypeScript understand the structure
+                const profilesData = assignment.profiles as any;
+                
+                if (Array.isArray(profilesData) && profilesData.length > 0) {
+                  // If it's an array, use the first element
                   profileData = {
-                    id: profile.id,
-                    first_name: profile.first_name,
-                    last_name: profile.last_name,
-                    email: profile.email,
-                    department: profile.department,
-                    role: profile.role
+                    id: profilesData[0].id,
+                    first_name: profilesData[0].first_name,
+                    last_name: profilesData[0].last_name,
+                    email: profilesData[0].email,
+                    department: profilesData[0].department,
+                    role: profilesData[0].role
                   };
-                } else if (!Array.isArray(assignment.profiles)) {
-                  // If it's not an array, use it directly
+                } else if (typeof profilesData === 'object' && profilesData !== null) {
+                  // If it's an object, use it directly
                   profileData = {
-                    id: assignment.profiles.id,
-                    first_name: assignment.profiles.first_name,
-                    last_name: assignment.profiles.last_name,
-                    email: assignment.profiles.email,
-                    department: assignment.profiles.department,
-                    role: assignment.profiles.role
+                    id: profilesData.id,
+                    first_name: profilesData.first_name,
+                    last_name: profilesData.last_name,
+                    email: profilesData.email,
+                    department: profilesData.department,
+                    role: profilesData.role
                   };
                 }
               }
