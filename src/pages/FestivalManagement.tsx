@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,9 +11,8 @@ import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
 import { FestivalScheduling } from "@/components/festival/scheduling/FestivalScheduling";
 import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
 import { exportArtistTablePDF, ArtistTablePdfData } from "@/utils/artistTablePdfExport";
-import { exportShiftsTablePDF } from "@/utils/shiftsTablePdfExport";
+import { exportShiftsTablePDF, ShiftsTablePdfData } from "@/utils/shiftsTablePdfExport";
 import { mergePDFs } from "@/utils/pdfMerger";
-import { toast } from "@/hooks/use-toast";
 import { ShiftWithAssignments } from "@/types/festival-scheduling";
 
 interface FestivalJob {
@@ -265,7 +265,7 @@ const FestivalManagement = () => {
       const shiftsPdfs: Blob[] = [];
       
       for (const date of uniqueDates) {
-        const { data: shifts, error: shiftsError } = await supabase
+        const { data: shiftsData, error: shiftsError } = await supabase
           .from("festival_shifts")
           .select(`
             id, job_id, name, date, start_time, end_time, department, stage,
@@ -282,17 +282,45 @@ const FestivalManagement = () => {
           continue;
         }
         
-        if (shifts && shifts.length > 0) {
-          const typedShifts = shifts.map(shift => ({
-            ...shift,
-            stage: shift.stage ? Number(shift.stage) : undefined
-          }));
+        if (shiftsData && shiftsData.length > 0) {
+          // Map the data to match our ShiftWithAssignments type
+          const typedShifts: ShiftWithAssignments[] = shiftsData.map(shift => {
+            const typedAssignments = shift.assignments.map(assignment => ({
+              id: assignment.id,
+              shift_id: assignment.shift_id,
+              technician_id: assignment.technician_id,
+              role: assignment.role,
+              // Fix the profiles structure - it should be a single object or null, not an array
+              profiles: assignment.profiles ? {
+                id: assignment.profiles.id,
+                first_name: assignment.profiles.first_name,
+                last_name: assignment.profiles.last_name,
+                email: assignment.profiles.email,
+                department: assignment.profiles.department,
+                role: assignment.profiles.role
+              } : null
+            }));
+            
+            return {
+              id: shift.id,
+              job_id: shift.job_id,
+              date: shift.date,
+              start_time: shift.start_time,
+              end_time: shift.end_time,
+              name: shift.name,
+              department: shift.department || undefined,
+              stage: shift.stage ? Number(shift.stage) : undefined,
+              assignments: typedAssignments
+            };
+          });
           
           const pdf = await exportShiftsTablePDF({
             jobTitle: job?.title || 'Festival',
             date: date,
-            shifts: typedShifts as ShiftWithAssignments[]
+            jobId: jobId,
+            shifts: typedShifts
           });
+          
           shiftsPdfs.push(pdf);
         }
       }
