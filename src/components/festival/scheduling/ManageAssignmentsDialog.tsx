@@ -57,10 +57,11 @@ export const ManageAssignmentsDialog = ({
         
         jobAssignments.forEach(assignment => {
           if (assignment.profiles) {
-            // Here profiles is a single object, not an array
             const profile = assignment.profiles;
-            // Only include technicians and house_techs
-            if (profile.role === 'technician' || profile.role === 'house_tech') {
+            // Type check the profile to ensure it has the role property
+            if (typeof profile === 'object' && 
+                'role' in profile && 
+                (profile.role === 'technician' || profile.role === 'house_tech')) {
               techniciansList.push({
                 id: profile.id,
                 first_name: profile.first_name,
