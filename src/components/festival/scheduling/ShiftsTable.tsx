@@ -37,7 +37,20 @@ export const ShiftsTable = ({
   );
 
   const formatTimeRange = (start: string, end: string) => {
-    return `${start.slice(0, 5)} - ${end.slice(0, 5)}`;
+    try {
+      // Check if the end time is before the start time (indicating next day)
+      const startHour = parseInt(start.split(':')[0], 10);
+      const endHour = parseInt(end.split(':')[0], 10);
+      
+      // Format for display with optional "next day" indicator
+      if (endHour < startHour) {
+        return `${start.slice(0, 5)} - ${end.slice(0, 5)} (next day)`;
+      }
+      return `${start.slice(0, 5)} - ${end.slice(0, 5)}`;
+    } catch (error) {
+      console.error("Error formatting time range:", error, "start:", start, "end:", end);
+      return `${start || '??'} - ${end || '??'}`;
+    }
   };
 
   const handleDeleteClick = (e: React.MouseEvent, shiftId: string) => {
@@ -47,12 +60,21 @@ export const ShiftsTable = ({
     }
   };
 
-  const formattedDate = new Date(date).toLocaleDateString(undefined, {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long', 
-    day: 'numeric'
-  });
+  // Safely format the date for display
+  const formattedDate = (() => {
+    try {
+      if (!date) return "Schedule";
+      return new Date(date).toLocaleDateString(undefined, {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long', 
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error("Error formatting date:", error, "date:", date);
+      return date || "Schedule";
+    }
+  })();
 
   const handleExportPDF = async () => {
     try {
@@ -132,44 +154,52 @@ export const ShiftsTable = ({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedShifts.map((shift) => (
-            <TableRow key={shift.id} className="hover:bg-accent/5">
-              <TableCell className="border border-border print:border-black font-medium print:text-black">
-                {shift.name}
-              </TableCell>
-              <TableCell className="border border-border print:border-black print:text-black">
-                {formatTimeRange(shift.start_time, shift.end_time)}
-              </TableCell>
-              <TableCell className="border border-border print:border-black print:text-black">
-                {shift.stage ? `Stage ${shift.stage}` : '-'}
-              </TableCell>
-              <TableCell className="border border-border print:border-black print:text-black">
-                {shift.department || '-'}
-              </TableCell>
-              <TableCell className="border border-border print:border-black print:text-black">
-                {shift.assignments.length > 0 ? (
-                  <ul className="list-disc list-inside">
-                    {shift.assignments.map((assignment) => (
-                      <li key={assignment.id} className="text-sm">
-                        {assignment.profiles?.first_name} {assignment.profiles?.last_name} ({assignment.role})
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <span className="text-muted-foreground print:text-gray-500">No technicians assigned</span>
-                )}
-              </TableCell>
-              <TableCell className="border border-border print:hidden">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => handleDeleteClick(e, shift.id)}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
+          {sortedShifts.length > 0 ? (
+            sortedShifts.map((shift) => (
+              <TableRow key={shift.id} className="hover:bg-accent/5">
+                <TableCell className="border border-border print:border-black font-medium print:text-black">
+                  {shift.name}
+                </TableCell>
+                <TableCell className="border border-border print:border-black print:text-black">
+                  {formatTimeRange(shift.start_time, shift.end_time)}
+                </TableCell>
+                <TableCell className="border border-border print:border-black print:text-black">
+                  {shift.stage ? `Stage ${shift.stage}` : '-'}
+                </TableCell>
+                <TableCell className="border border-border print:border-black print:text-black">
+                  {shift.department || '-'}
+                </TableCell>
+                <TableCell className="border border-border print:border-black print:text-black">
+                  {shift.assignments.length > 0 ? (
+                    <ul className="list-disc list-inside">
+                      {shift.assignments.map((assignment) => (
+                        <li key={assignment.id} className="text-sm">
+                          {assignment.profiles?.first_name} {assignment.profiles?.last_name} ({assignment.role})
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <span className="text-muted-foreground print:text-gray-500">No technicians assigned</span>
+                  )}
+                </TableCell>
+                <TableCell className="border border-border print:hidden">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => handleDeleteClick(e, shift.id)}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={6} className="text-center py-4">
+                No shifts found for this date
               </TableCell>
             </TableRow>
-          ))}
+          )}
         </TableBody>
       </Table>
     </div>
