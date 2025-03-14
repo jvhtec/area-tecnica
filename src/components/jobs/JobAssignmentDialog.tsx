@@ -56,7 +56,7 @@ export const JobAssignmentDialog = ({
         .from("profiles")
         .select("id, first_name, last_name, email, role, department")
         .eq("department", department)
-        .in("role", ["technician", "house_tech"]); // Modified to include both technician and house_tech roles
+        .in("role", ["technician", "house_tech"]);
 
       if (error) {
         console.error("Error fetching technicians:", error);
@@ -118,17 +118,18 @@ export const JobAssignmentDialog = ({
       
       validateAssignment(selectedTechnician, selectedRole, technicians);
 
-      // Check for existing assignment with same role - only if duplicate roles aren't allowed
+      // IMPORTANT: Only check for existing role assignments if duplicate roles aren't allowed
       if (!allowDuplicateRoles) {
+        // Check for existing assignment with same role
         const { data: existingAssignments } = await supabase
           .from("job_assignments")
           .select("*")
           .eq("job_id", jobId)
           .eq(`${department}_role`, selectedRole);
         
-        console.log("Existing assignments:", existingAssignments);
+        console.log("Existing assignments with same role:", existingAssignments);
 
-        if (existingAssignments?.length) {
+        if (existingAssignments && existingAssignments.length > 0) {
           throw new Error(`A technician is already assigned as ${selectedRole}`);
         }
       }
