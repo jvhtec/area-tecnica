@@ -909,6 +909,41 @@ export type Database = {
           },
         ]
       }
+      festival_stages: {
+        Row: {
+          created_at: string | null
+          id: string
+          job_id: string | null
+          name: string
+          number: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          job_id?: string | null
+          name: string
+          number: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          job_id?: string | null
+          name?: string
+          number?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "festival_stages_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       flex_folders: {
         Row: {
           created_at: string

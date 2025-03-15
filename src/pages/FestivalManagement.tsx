@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -181,12 +182,16 @@ const FestivalManagement = () => {
       
       if (artistError) throw artistError;
       
+      // Check if festival_stages table exists, and handle gracefully if not
       const { data: stages, error: stagesError } = await supabase
         .from("festival_stages")
         .select("*")
         .eq("job_id", jobId);
       
-      if (stagesError) throw stagesError;
+      if (stagesError) {
+        console.warn("Error fetching stages, using default stage names:", stagesError);
+        // Continue with default stage names
+      }
 
       const { data: technicalInfo, error: technicalError } = await supabase
         .from("festival_artist_technical_info")
@@ -344,6 +349,7 @@ const FestivalManagement = () => {
         for (const [stageNum, stageArtists] of stageMap.entries()) {
           if (stageArtists.length === 0) continue;
           
+          // Find stage name from stages array or default to "Stage X"
           const stageName = stages?.find(s => s.number === stageNum)?.name || `Stage ${stageNum}`;
           
           const tableData: ArtistTablePdfData = {
