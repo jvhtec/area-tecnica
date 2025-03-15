@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -327,7 +326,11 @@ const FestivalManagement = () => {
         
         try {
           const pdf = await exportArtistPDF(artistData);
-          artistPdfs.push(pdf);
+          if (pdf && pdf.size > 0) {
+            artistPdfs.push(pdf);
+          } else {
+            console.warn(`Generated empty PDF for artist ${artist.name}, skipping`);
+          }
         } catch (err) {
           console.error(`Error generating PDF for artist ${artist.name}:`, err);
         }
@@ -358,49 +361,56 @@ const FestivalManagement = () => {
             stage: stageName,
             artists: stageArtists.map(a => ({
               name: a.name,
-              stage: a.stage,
-              showTime: { start: a.show_start, end: a.show_end },
+              stage: Number(a.stage),
+              showTime: { 
+                start: String(a.show_start), 
+                end: String(a.show_end) 
+              },
               soundcheck: a.soundcheck_start ? { 
-                start: a.soundcheck_start, 
-                end: a.soundcheck_end || '' 
+                start: String(a.soundcheck_start), 
+                end: String(a.soundcheck_end || '') 
               } : undefined,
               technical: {
-                fohTech: !!a.foh_tech,
-                monTech: !!a.mon_tech,
+                fohTech: Boolean(a.foh_tech),
+                monTech: Boolean(a.mon_tech),
                 fohConsole: { 
-                  model: a.foh_console || '', 
-                  providedBy: a.foh_console_provided_by || 'festival' 
+                  model: String(a.foh_console || ''), 
+                  providedBy: String(a.foh_console_provided_by || 'festival') 
                 },
                 monConsole: { 
-                  model: a.mon_console || '', 
-                  providedBy: a.mon_console_provided_by || 'festival' 
+                  model: String(a.mon_console || ''), 
+                  providedBy: String(a.mon_console_provided_by || 'festival') 
                 },
                 wireless: {
                   hh: Number(a.wireless_quantity_hh) || 0,
                   bp: Number(a.wireless_quantity_bp) || 0,
-                  providedBy: a.wireless_provided_by || 'festival'
+                  providedBy: String(a.wireless_provided_by || 'festival')
                 },
                 iem: {
                   quantity: Number(a.iem_quantity) || 0,
-                  providedBy: a.iem_provided_by || 'festival'
+                  providedBy: String(a.iem_provided_by || 'festival')
                 },
                 monitors: {
-                  enabled: !!a.monitors_enabled,
+                  enabled: Boolean(a.monitors_enabled),
                   quantity: Number(a.monitors_quantity) || 0
                 }
               },
               extras: {
-                sideFill: !!a.extras_sf,
-                drumFill: !!a.extras_df,
-                djBooth: !!a.extras_djbooth
+                sideFill: Boolean(a.extras_sf),
+                drumFill: Boolean(a.extras_df),
+                djBooth: Boolean(a.extras_djbooth)
               },
-              notes: a.notes || ''
+              notes: String(a.notes || '')
             }))
           };
           
           try {
             const pdf = await exportArtistTablePDF(tableData);
-            artistTablePdfs.push(pdf);
+            if (pdf && pdf.size > 0) {
+              artistTablePdfs.push(pdf);
+            } else {
+              console.warn(`Generated empty table PDF for ${date} Stage ${stageNum}, skipping`);
+            }
           } catch (err) {
             console.error(`Error generating table PDF for ${date} Stage ${stageNum}:`, err);
           }
@@ -489,13 +499,18 @@ const FestivalManagement = () => {
         }
       }
       
-      const allPdfs = [...artistPdfs, ...artistTablePdfs, ...shiftsPdfs];
+      const allPdfs = [...artistPdfs, ...artistTablePdfs, ...shiftsPdfs].filter(pdf => pdf && pdf.size > 0);
       
       if (allPdfs.length === 0) {
-        throw new Error('No documents were generated');
+        throw new Error('No valid documents were generated');
       }
       
+      console.log(`Attempting to merge ${allPdfs.length} PDFs`);
       const mergedPdf = await mergePDFs(allPdfs);
+      
+      if (!mergedPdf || mergedPdf.size === 0) {
+        throw new Error('Generated PDF is empty');
+      }
       
       const url = URL.createObjectURL(mergedPdf);
       const a = document.createElement('a');
