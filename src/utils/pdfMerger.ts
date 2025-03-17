@@ -1,3 +1,4 @@
+
 import { PDFDocument, rgb } from 'pdf-lib';
 import { exportArtistPDF, ArtistPdfData } from './artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from './artistTablePdfExport';
@@ -778,8 +779,8 @@ export const generateAndMergeFestivalPDFs = async (
               wireless: {
                 model: String(artist.wireless_model || ''),
                 providedBy: String(artist.wireless_provided_by || 'festival'),
-                handhelds: Number(artist.wireless_quantity_hh || 0),
-                bodypacks: Number(artist.wireless_quantity_bp || 0),
+                handhelds: Number(a.wireless_quantity_hh || 0),
+                bodypacks: Number(a.wireless_quantity_bp || 0),
                 band: String(artist.wireless_band || '')
               },
               iem: {
@@ -846,6 +847,9 @@ export const generateAndMergeFestivalPDFs = async (
       { title: "Individual Artist Requirements", pageCount: individualArtistPdfs.length }
     ];
     
+    console.log(`Table of contents sections:`, tocSections);
+    console.log(`Shift PDFs count:`, shiftPdfs.length);
+    
     // Create cover and TOC
     const coverPage = await generateCoverPage(jobId, jobTitle, logoUrl);
     const tableOfContents = await generateTableOfContents(tocSections, logoUrl);
@@ -861,6 +865,17 @@ export const generateAndMergeFestivalPDFs = async (
     ];
     
     console.log(`Total PDFs to merge: ${allPdfs.length}`);
+    console.log(`PDF counts - Gear: ${gearPdfs.length}, Shifts: ${shiftPdfs.length}, Artist Tables: ${artistTablePdfs.length}, Individual Artists: ${individualArtistPdfs.length}`);
+    
+    // Log detailed info about each shifts PDF for debugging
+    if (shiftPdfs.length > 0) {
+      console.log("Shift PDFs details:");
+      shiftPdfs.forEach((pdf, index) => {
+        console.log(`Shift PDF ${index+1}: Size: ${pdf.size} bytes, Type: ${pdf.type}`);
+      });
+    } else {
+      console.warn("No shift PDFs were generated, check if there are shifts in the database");
+    }
     
     if (allPdfs.length <= 2) { // Only cover and TOC
       throw new Error('No valid documents were generated beyond cover and TOC');
