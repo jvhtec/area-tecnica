@@ -3,23 +3,52 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useJobs } from "@/hooks/useJobs";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { JobCard } from "@/components/jobs/JobCard";
 import { Separator } from "@/components/ui/separator";
 import { Tent } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 const Festivals = () => {
   const navigate = useNavigate();
   const { data: jobs, isLoading } = useJobs();
   const [festivalJobs, setFestivalJobs] = useState<any[]>([]);
+  const [festivalLogos, setFestivalLogos] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (jobs) {
       // Filter jobs to only include those with job_type 'festival'
       const festivals = jobs.filter(job => job.job_type === 'festival');
       setFestivalJobs(festivals);
+      
+      // Fetch logos for all festival jobs
+      festivals.forEach(fetchFestivalLogo);
     }
   }, [jobs]);
+
+  const fetchFestivalLogo = async (job: any) => {
+    const { data, error } = await supabase
+      .from('festival_logos')
+      .select('file_path')
+      .eq('job_id', job.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching logo:', error);
+      return;
+    }
+
+    if (data?.file_path) {
+      const { data: { publicUrl } } = supabase
+        .storage
+        .from('festival-logos')
+        .getPublicUrl(data.file_path);
+      
+      setFestivalLogos(prev => ({
+        ...prev,
+        [job.id]: publicUrl
+      }));
+    }
+  };
 
   const handleJobClick = (jobId: string) => {
     navigate(`/festival-management/${jobId}`);
@@ -56,10 +85,11 @@ const Festivals = () => {
                   <JobCard 
                     job={job} 
                     onJobClick={() => handleJobClick(job.id)} 
-                    onEditClick={(job) => handleJobClick(job.id)} 
+                    onEditClick={() => {}} // Empty function as we're removing edit functionality
                     onDeleteClick={() => {}}
                     userRole="management"
                     department="sound"
+                    festivalLogo={festivalLogos[job.id]}
                   />
                 </div>
               ))}

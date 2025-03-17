@@ -14,9 +14,10 @@ interface JobCardProps {
   userRole: string | null;
   department: string;
   selectedDate?: Date;
+  festivalLogo?: string;
 }
 
-export const JobCard = ({ job, onEditClick, onDeleteClick, onJobClick, userRole, department, selectedDate }: JobCardProps) => {
+export const JobCard = ({ job, onEditClick, onDeleteClick, onJobClick, userRole, department, selectedDate, festivalLogo }: JobCardProps) => {
   const navigate = useNavigate();
 
   const handleFestivalManage = (e: React.MouseEvent) => {
@@ -49,7 +50,7 @@ export const JobCard = ({ job, onEditClick, onDeleteClick, onJobClick, userRole,
                 Manage Festival
               </Button>
             )}
-            {userRole !== "technician" && (
+            {userRole !== "technician" && userRole !== "management" && (
               <>
                 <Button 
                   variant="outline" 
@@ -75,6 +76,15 @@ export const JobCard = ({ job, onEditClick, onDeleteClick, onJobClick, userRole,
         </div>
       </CardHeader>
       <div className="p-4">
+        {festivalLogo && (
+          <div className="mb-4 h-32 flex justify-center items-center">
+            <img 
+              src={festivalLogo} 
+              alt={`${job.title} logo`} 
+              className="max-h-full max-w-full object-contain"
+            />
+          </div>
+        )}
         <p className="text-sm text-muted-foreground">
           {job.description}
         </p>
