@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -61,7 +62,7 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
       const pageHeight = doc.internal.pageSize.height;
       const createdDate = format(new Date(), 'dd/MM/yyyy');
 
-      // Header
+      // Header with correct corporate red color (125, 1, 1)
       doc.setFillColor(125, 1, 1);  // Corporate red
       doc.rect(0, 0, pageWidth, 20, 'F');
       
@@ -183,8 +184,8 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
             lineWidth: 0.1,
           },
           headStyles: {
-            fillColor: [125, 1, 1],  // Fixed: Using RGB values directly for corporate red
-            textColor: [255, 255, 255],  // Fixed: Using RGB values directly for white
+            fillColor: [125, 1, 1],  // Corporate red
+            textColor: [255, 255, 255],
             fontSize: 8,
             fontStyle: 'bold',
             halign: 'left',
@@ -210,38 +211,40 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
           }
         });
 
-        // Add company logo at the bottom
+        // Try to add sector pro logo at the bottom
         try {
           // Add a small company logo at the bottom right
-          const companyLogoUrl = 'public/sector pro logo.png';
-          const companyImg = new Image();
-          companyImg.onload = () => {
+          const sectorLogoPath = '/sector pro logo.png';
+          console.log("Attempting to add Sector Pro logo from:", sectorLogoPath);
+          
+          const sectorImg = new Image();
+          sectorImg.onload = () => {
             try {
-              // Logo at bottom right
-              const logoWidth = 20;
-              const ratio = companyImg.width / companyImg.height;
+              // Logo at bottom center
+              const logoWidth = 30;
+              const ratio = sectorImg.width / sectorImg.height;
               const logoHeight = logoWidth / ratio;
               
               doc.addImage(
-                companyImg, 
+                sectorImg, 
                 'PNG', 
-                pageWidth - logoWidth - 10, // X position (right aligned)
-                pageHeight - logoHeight - 10, // Y position (bottom aligned)
+                pageWidth/2 - logoWidth/2, // Center horizontally
+                pageHeight - logoHeight - 10, // Position at the bottom
                 logoWidth,
                 logoHeight
               );
               
-              // Footer with date
+              // Add footer with date
               doc.setFontSize(8);
               doc.setTextColor(51, 51, 51);
-              doc.text(`Generated: ${createdDate}`, pageWidth - 35, pageHeight - 10, { align: 'right' });
+              doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
               
               // Resolve with the PDF blob
               const blob = doc.output('blob');
               resolve(blob);
             } catch (err) {
-              console.error('Error adding company logo to PDF:', err);
-              // Continue without company logo
+              console.error('Error adding Sector Pro logo to PDF:', err);
+              // Add just the footer text
               doc.setFontSize(8);
               doc.setTextColor(51, 51, 51);
               doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
@@ -249,17 +252,21 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
               resolve(blob);
             }
           };
-          companyImg.onerror = () => {
-            // If company logo fails to load, just add the footer text
+          
+          sectorImg.onerror = () => {
+            console.error('Failed to load Sector Pro logo');
+            // Add just the footer text
             doc.setFontSize(8);
             doc.setTextColor(51, 51, 51);
             doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
             const blob = doc.output('blob');
             resolve(blob);
           };
-          companyImg.src = companyLogoUrl;
+          
+          sectorImg.src = sectorLogoPath;
         } catch (logoErr) {
-          // If any error occurs, just add the footer text
+          console.error('Error trying to add Sector Pro logo:', logoErr);
+          // Add just the footer text
           doc.setFontSize(8);
           doc.setTextColor(51, 51, 51);
           doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });

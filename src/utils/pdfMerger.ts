@@ -1,4 +1,3 @@
-
 import { PDFDocument, rgb } from 'pdf-lib';
 import { exportArtistPDF, ArtistPdfData } from './artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from './artistTablePdfExport';
@@ -8,49 +7,31 @@ import { supabase } from '@/lib/supabase';
 
 export const fetchLogoUrl = async (jobId: string): Promise<string | undefined> => {
   try {
-    const { data, error } = await supabase
-      .from("festival_settings")
-      .select("logo_url")
+    const { data: logoData, error: logoError } = await supabase
+      .from("festival_logos")
+      .select("file_path")
       .eq("job_id", jobId)
-      .single();
+      .maybeSingle();
       
-    if (error) {
-      console.error("Error fetching festival logo:", error);
-      return undefined;
+    if (logoError) {
+      console.error("Error fetching festival logo:", logoError);
     }
     
-    if (data?.logo_url) {
-      const logoPath = data.logo_url;
-      console.log("Retrieved logo path:", logoPath);
-      
-      if (logoPath.startsWith('http')) {
-        return logoPath;
-      } 
-      else {
-        try {
-          let bucket = 'festival-assets';
-          let path = logoPath;
+    if (logoData?.file_path) {
+      try {
+        const { data: publicUrlData } = supabase.storage
+          .from('festival-logos')
+          .getPublicUrl(logoData.file_path);
           
-          if (logoPath.includes('/')) {
-            const parts = logoPath.split('/', 1);
-            bucket = parts[0];
-            path = logoPath.substring(bucket.length + 1);
-          }
-          
-          console.log(`Getting public URL for bucket: ${bucket}, path: ${path}`);
-          const { data: publicUrlData } = supabase.storage
-            .from(bucket)
-            .getPublicUrl(path);
-            
-          if (publicUrlData?.publicUrl) {
-            console.log("Generated public URL:", publicUrlData.publicUrl);
-            return publicUrlData.publicUrl;
-          }
-        } catch (storageErr) {
-          console.error("Error getting public URL:", storageErr);
+        if (publicUrlData?.publicUrl) {
+          console.log("Generated logo public URL:", publicUrlData.publicUrl);
+          return publicUrlData.publicUrl;
         }
+      } catch (storageErr) {
+        console.error("Error getting logo public URL:", storageErr);
       }
     }
+    
     return undefined;
   } catch (err) {
     console.error("Error in logo fetch:", err);
@@ -99,7 +80,7 @@ const generateCoverPage = async (
       y: height - 100,
       width: width,
       height: 100,
-      color: rgb(0.87, 0.22, 0.2),
+      color: rgb(125/255, 1/255, 1/255),
     });
     
     page.drawText("FESTIVAL DOCUMENTATION", {
@@ -127,13 +108,14 @@ const generateCoverPage = async (
     
     if (logoUrl) {
       try {
+        console.log("Attempting to load logo on cover page:", logoUrl);
         const logoResponse = await fetch(logoUrl);
         const logoImageData = await logoResponse.arrayBuffer();
         let logoImage;
         
         if (logoUrl.toLowerCase().endsWith('.png')) {
           logoImage = await pdfDoc.embedPng(logoImageData);
-        } else if (logoUrl.toLowerCase().endsWith('.jpg') || logoUrl.toLowerCase().endsWith('.jpeg')) {
+        } else {
           logoImage = await pdfDoc.embedJpg(logoImageData);
         }
         
@@ -147,10 +129,13 @@ const generateCoverPage = async (
             width: imgWidth,
             height: imgHeight,
           });
+          console.log("Logo successfully added to cover page");
         }
       } catch (logoError) {
         console.error("Error adding logo to cover page:", logoError);
       }
+    } else {
+      console.log("No logo URL provided for cover page");
     }
     
     page.drawText("Complete Technical Documentation", {
@@ -184,7 +169,7 @@ const generateTableOfContents = async (
       y: height - 100,
       width: width,
       height: 100,
-      color: rgb(0.87, 0.22, 0.2),
+      color: rgb(125/255, 1/255, 1/255),
     });
     
     page.drawText("TABLE OF CONTENTS", {
@@ -196,13 +181,14 @@ const generateTableOfContents = async (
     
     if (logoUrl) {
       try {
+        console.log("Attempting to load logo on TOC page:", logoUrl);
         const logoResponse = await fetch(logoUrl);
         const logoImageData = await logoResponse.arrayBuffer();
         let logoImage;
         
         if (logoUrl.toLowerCase().endsWith('.png')) {
           logoImage = await pdfDoc.embedPng(logoImageData);
-        } else if (logoUrl.toLowerCase().endsWith('.jpg') || logoUrl.toLowerCase().endsWith('.jpeg')) {
+        } else {
           logoImage = await pdfDoc.embedJpg(logoImageData);
         }
         
@@ -216,10 +202,13 @@ const generateTableOfContents = async (
             width: imgWidth,
             height: imgHeight,
           });
+          console.log("Logo successfully added to TOC page");
         }
       } catch (logoError) {
         console.error("Error adding logo to TOC:", logoError);
       }
+    } else {
+      console.log("No logo URL provided for TOC page");
     }
     
     let currentY = height - 150;
@@ -396,11 +385,7 @@ export const generateAndMergeFestivalPDFs = async (
     
     if (artistError) throw artistError;
     
-    // We'll skip querying these tables since they don't exist yet
-    // and handle artist data directly from the main table
-    const techInfoMap = new Map();
-    const infraInfoMap = new Map();
-    const extrasInfoMap = new Map();
+    console.log(`Found ${artists?.length || 0} artists for festival documentation`);
     
     const uniqueDates = [...new Set(artists?.map(a => a.date) || [])];
     
@@ -436,7 +421,7 @@ export const generateAndMergeFestivalPDFs = async (
             const stageObj = stages?.find(s => s.number === stageNum);
             const stageName = stageObj ? stageObj.name : `Stage ${stageNum}`;
             
-            const pdf = await generateStageGearPDF(jobId, date, stageNum, stageName);
+            const pdf = await generateStageGearPDF(jobId, date, stageNum, stageName, logoUrl);
             
             console.log(`Generated gear setup PDF for stage ${stageNum}, size: ${pdf.size} bytes`);
             if (pdf && pdf.size > 0) {
@@ -460,7 +445,6 @@ export const generateAndMergeFestivalPDFs = async (
       console.log(`Fetching shifts data for date ${date}`);
       
       try {
-        // Modify the shifts query to avoid the foreign key relationship error
         const { data: shiftsData, error: shiftsError } = await supabase
           .from("festival_shifts")
           .select(`
@@ -474,7 +458,8 @@ export const generateAndMergeFestivalPDFs = async (
           continue;
         }
         
-        // Fetch assignments separately
+        console.log(`Retrieved ${shiftsData?.length || 0} shifts for date ${date}`);
+        
         const shiftsWithAssignments = await Promise.all((shiftsData || []).map(async (shift) => {
           try {
             const { data: assignmentsData, error: assignmentsError } = await supabase
@@ -489,7 +474,6 @@ export const generateAndMergeFestivalPDFs = async (
               return { ...shift, assignments: [] };
             }
             
-            // For each assignment, get the technician profile
             const assignmentsWithProfiles = await Promise.all((assignmentsData || []).map(async (assignment) => {
               if (!assignment.technician_id) {
                 return { ...assignment, profiles: null };
@@ -521,11 +505,9 @@ export const generateAndMergeFestivalPDFs = async (
           }
         }));
         
-        console.log(`Found ${shiftsWithAssignments?.length || 0} shifts for date ${date}`);
-        
         if (shiftsWithAssignments && shiftsWithAssignments.length > 0) {
           try {
-            console.log(`Generating shifts PDF for date ${date}`);
+            console.log(`Generating shifts PDF for date ${date} with ${shiftsWithAssignments.length} shifts`);
             
             const typedShifts = shiftsWithAssignments.map(shift => {
               return {
@@ -549,12 +531,11 @@ export const generateAndMergeFestivalPDFs = async (
               logoUrl
             };
             
-            console.log(`Creating shifts table PDF with ${typedShifts.length} shifts`);
+            console.log(`Creating shifts table PDF with ${typedShifts.length} shifts and logoUrl: ${logoUrl}`);
             const shiftPdf = await exportShiftsTablePDF(shiftsTableData);
             
             console.log(`Generated shifts PDF for date ${date}, size: ${shiftPdf.size} bytes, type: ${shiftPdf.type}`);
             if (shiftPdf && shiftPdf.size > 0) {
-              // Add the shift PDF to the shiftPdfs array
               shiftPdfs.push(shiftPdf);
               console.log(`Added shift PDF to array. Current count: ${shiftPdfs.length}`);
             } else {
@@ -753,12 +734,6 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
-    // Log details of shift PDFs collection
-    console.log(`Shifts PDFs collection details:`);
-    shiftPdfs.forEach((pdf, index) => {
-      console.log(`Shift PDF ${index+1}: Size: ${pdf.size} bytes, Type: ${pdf.type}`);
-    });
-    
     const tocSections = [
       { title: "Stage Equipment Setup", pageCount: gearPdfs.length },
       { title: "Staff Shift Schedules", pageCount: shiftPdfs.length },
@@ -803,3 +778,4 @@ export const generateAndMergeFestivalPDFs = async (
     throw error;
   }
 };
+

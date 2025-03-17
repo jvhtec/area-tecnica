@@ -3,14 +3,13 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { ShiftWithAssignments } from '@/types/festival-scheduling';
-import { supabase } from '@/lib/supabase';
 
 export interface ShiftsTablePdfData {
   jobTitle: string;
   date: string;
   jobId?: string;
   shifts: ShiftWithAssignments[];
-  logoUrl?: string; // Add logo URL option
+  logoUrl?: string; // Logo URL option
 }
 
 export const exportShiftsTablePDF = (data: ShiftsTablePdfData): Promise<Blob> => {
@@ -22,7 +21,7 @@ export const exportShiftsTablePDF = (data: ShiftsTablePdfData): Promise<Blob> =>
       const pageHeight = doc.internal.pageSize.height;
       const createdDate = format(new Date(), 'dd/MM/yyyy');
 
-      // Header
+      // Header with correct corporate red color (125, 1, 1)
       doc.setFillColor(125, 1, 1);  // Corporate red
       doc.rect(0, 0, pageWidth, 20, 'F');
 
@@ -114,7 +113,7 @@ export const exportShiftsTablePDF = (data: ShiftsTablePdfData): Promise<Blob> =>
             ];
           });
 
-          // Add table to PDF
+          // Add table to PDF with consistent corporate red color
           autoTable(doc, {
             startY: yPosition,
             head: [['Shift Name', 'Stage', 'Time', 'Assigned Technicians']],
@@ -151,19 +150,58 @@ export const exportShiftsTablePDF = (data: ShiftsTablePdfData): Promise<Blob> =>
           }
         }
 
-        // Add footer with date
+        // Add footer with date and try to add sector pro logo
         doc.setFontSize(8);
         doc.setTextColor(51, 51, 51);
         doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
         
-        // Output the PDF
+        // Try to add Sector Pro logo at the bottom center
         try {
+          // Logo at bottom center
+          const sectorLogoPath = '/sector pro logo.png';
+          console.log("Attempting to add Sector Pro logo from:", sectorLogoPath);
+          
+          const sectorImg = new Image();
+          sectorImg.onload = () => {
+            try {
+              const logoWidth = 30;
+              const ratio = sectorImg.width / sectorImg.height;
+              const logoHeight = logoWidth / ratio;
+              
+              doc.addImage(
+                sectorImg, 
+                'PNG', 
+                pageWidth/2 - logoWidth/2, // Center horizontally 
+                pageHeight - logoHeight - 10, // Position at the bottom
+                logoWidth,
+                logoHeight
+              );
+              
+              // Now resolve with the final PDF
+              const blob = doc.output('blob');
+              console.log(`Shifts PDF generated successfully, blob size: ${blob.size}`);
+              resolve(blob);
+            } catch (err) {
+              console.error("Error adding Sector Pro logo to PDF:", err);
+              // If logo fails, just return the PDF without it
+              const blob = doc.output('blob');
+              resolve(blob);
+            }
+          };
+          
+          sectorImg.onerror = (err) => {
+            console.error("Could not load Sector Pro logo:", err);
+            // If logo loading fails, just return the PDF without it
+            const blob = doc.output('blob');
+            resolve(blob);
+          };
+          
+          sectorImg.src = sectorLogoPath;
+        } catch (logoErr) {
+          console.error("Exception trying to add Sector Pro logo:", logoErr);
+          // Return PDF without the logo
           const blob = doc.output('blob');
-          console.log(`Shifts PDF generated successfully, blob size: ${blob.size}`);
           resolve(blob);
-        } catch (err) {
-          console.error("Error creating PDF blob:", err);
-          reject(err);
         }
       }).catch(err => {
         console.error("Error in PDF generation:", err);

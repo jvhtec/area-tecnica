@@ -27,11 +27,19 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
     }
 
     if (data?.file_path) {
-      const { data: { publicUrl } } = supabase
-        .storage
-        .from('festival-logos')
-        .getPublicUrl(data.file_path);
-      setLogoUrl(publicUrl);
+      try {
+        const { data: publicUrlData } = supabase
+          .storage
+          .from('festival-logos')
+          .getPublicUrl(data.file_path);
+          
+        if (publicUrlData?.publicUrl) {
+          console.log("Found existing logo:", publicUrlData.publicUrl);
+          setLogoUrl(publicUrlData.publicUrl);
+        }
+      } catch (e) {
+        console.error('Error getting logo public URL:', e);
+      }
     }
   };
 
@@ -95,6 +103,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
         .from('festival-logos')
         .getPublicUrl(filePath);
 
+      console.log("Uploaded new logo, public URL:", publicUrl);
       setLogoUrl(publicUrl);
 
       toast({
@@ -150,10 +159,9 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
     }
   };
 
-  // Fix: Use useEffect instead of useState for initialization
   useEffect(() => {
     fetchExistingLogo();
-  }, [jobId]); // Add jobId as dependency
+  }, [jobId]); 
 
   return (
     <div className="space-y-4">
