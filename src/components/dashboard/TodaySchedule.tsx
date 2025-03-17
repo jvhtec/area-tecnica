@@ -10,6 +10,7 @@ interface TodayScheduleProps {
   userRole: string | null;
   selectedDate?: Date;
   isLoading?: boolean;
+  hideTasks?: boolean; // New prop to hide tasks for technicians
 }
 
 export const TodaySchedule = ({
@@ -19,7 +20,8 @@ export const TodaySchedule = ({
   onJobClick,
   userRole,
   selectedDate,
-  isLoading = false
+  isLoading = false,
+  hideTasks = false // Default to showing tasks
 }: TodayScheduleProps) => {
   console.log("TodaySchedule received jobs:", jobs);
 
@@ -79,6 +81,7 @@ export const TodaySchedule = ({
                 onJobClick={onJobClick} 
                 userRole={userRole} 
                 department={job.department || jobData.department || "sound"} 
+                hideTasks={hideTasks} // Pass the hideTasks prop to JobCardNew
               />
             );
           })}

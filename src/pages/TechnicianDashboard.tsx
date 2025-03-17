@@ -129,7 +129,7 @@ const TechnicianDashboard = () => {
         const endDate = getTimeSpanEndDate();
         console.log("Fetching assignments until:", endDate);
         
-        // Fetch regular job assignments - Fix the order syntax
+        // Fetch regular job assignments
         const { data: jobAssignments, error: jobAssignmentsError } = await supabase
           .from('job_assignments')
           .select(`
@@ -293,6 +293,7 @@ const TechnicianDashboard = () => {
               onJobClick={handleJobClick} 
               userRole="technician"
               isLoading={isLoading}
+              hideTasks={true}  // Hide tasks for technicians
             />
           ) : (
             <AssignmentsList 

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -59,6 +60,7 @@ export interface JobCardNewProps {
   showUpload?: boolean;
   showManageArtists?: boolean;
   isProjectManagementPage?: boolean;
+  hideTasks?: boolean; // New prop to hide tasks for technicians
 }
 
 export function JobCardNew({
@@ -72,7 +74,8 @@ export function JobCardNew({
   onDeleteDocument,
   showUpload = false,
   showManageArtists = false,
-  isProjectManagementPage = false
+  isProjectManagementPage = false,
+  hideTasks = false // Default to showing tasks
 }: JobCardNewProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -810,7 +813,8 @@ export function JobCardNew({
             )}
           </div>
 
-          {!collapsed && job.job_type !== "dryhire" && (
+          {/* Only show personnel and tasks if hideTasks is false */}
+          {!collapsed && job.job_type !== "dryhire" && !hideTasks && (
             <>
               {department === "sound" && personnel && (
                 <>
