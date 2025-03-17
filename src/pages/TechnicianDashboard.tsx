@@ -86,18 +86,6 @@ const TechnicianDashboard = () => {
           queryClient.invalidateQueries({ queryKey: ['assignments'] });
         }
       )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'festival_shift_assignments'
-        },
-        (payload) => {
-          console.log("Received real-time update for festival assignments:", payload);
-          queryClient.invalidateQueries({ queryKey: ['assignments'] });
-        }
-      )
       .subscribe();
 
     return () => {
@@ -122,7 +110,7 @@ const TechnicianDashboard = () => {
     }
   };
 
-  // Fetch assignments data
+  // Fetch assignments data - simplified approach
   const { data: assignments = [], isLoading, refetch } = useQuery({
     queryKey: ['assignments', timeSpan, userDepartment],
     queryFn: async () => {
@@ -141,7 +129,7 @@ const TechnicianDashboard = () => {
         console.log("Fetching assignments until:", endDate);
         
         // Fetch regular job assignments
-        const { data: regularAssignments, error: regularError } = await supabase
+        const { data: jobAssignments, error: jobAssignmentsError } = await supabase
           .from('job_assignments')
           .select(`
             job_id,
@@ -150,7 +138,7 @@ const TechnicianDashboard = () => {
             lights_role,
             video_role,
             assigned_at,
-            jobs!inner (
+            jobs (
               id,
               title,
               description,
@@ -175,68 +163,18 @@ const TechnicianDashboard = () => {
           .lte('jobs.start_time', endDate.toISOString())
           .order('jobs.start_time', { ascending: true });
 
-        if (regularError) {
-          console.error("Error fetching regular assignments:", regularError);
+        if (jobAssignmentsError) {
+          console.error("Error fetching job assignments:", jobAssignmentsError);
           toast.error("Error loading assignments");
-          throw regularError;
+          throw jobAssignmentsError;
         }
 
-        console.log("Fetched regular assignments:", regularAssignments || []);
+        console.log("Fetched job assignments:", jobAssignments || []);
         
-        // Fetch festival assignments
-        const { data: festivalShiftAssignments, error: festivalError } = await supabase
-          .from('festival_shift_assignments')
-          .select(`
-            id,
-            shift_id,
-            technician_id,
-            role,
-            created_at,
-            festival_shifts!inner(
-              id,
-              job_id,
-              name,
-              date,
-              start_time,
-              end_time,
-              notes,
-              stage,
-              department,
-              jobs(
-                id,
-                title,
-                description,
-                color,
-                job_documents(
-                  id,
-                  file_name,
-                  file_path,
-                  uploaded_at
-                ),
-                festival_stages(
-                  id,
-                  name
-                )
-              )
-            )
-          `)
-          .eq('technician_id', user.id)
-          .order('created_at', { ascending: false });
-
-        if (festivalError) {
-          console.error("Error fetching festival assignments:", festivalError);
-          toast.error("Error loading festival assignments");
-          throw festivalError;
-        }
-
-        console.log("Fetched festival assignments:", festivalShiftAssignments || []);
-        
-        // Combine both types of assignments
-        let allAssignments = [];
-        
-        // Transform regular assignments
-        if (regularAssignments && regularAssignments.length > 0) {
-          const transformedRegularAssignments = regularAssignments.map(assignment => {
+        // Transform job assignments
+        const transformedJobs = jobAssignments
+          .filter(assignment => assignment.jobs) // Filter out any null jobs
+          .map(assignment => {
             // Determine the department based on roles
             let department = "unknown";
             if (assignment.sound_role) department = "sound";
@@ -248,83 +186,25 @@ const TechnicianDashboard = () => {
               job_id: assignment.job_id,
               technician_id: assignment.technician_id,
               department,
-              sound_role: assignment.sound_role,
-              lights_role: assignment.lights_role,
-              video_role: assignment.video_role,
+              role: assignment.sound_role || assignment.lights_role || assignment.video_role || "Assigned",
               jobs: assignment.jobs
             };
           });
-          
-          allAssignments = [...transformedRegularAssignments];
-        }
         
-        // Transform festival assignments
-        if (festivalShiftAssignments && festivalShiftAssignments.length > 0) {
-          const transformedFestivalAssignments = festivalShiftAssignments.map(assignment => {
-            // Access the festival_shifts field from the assignment
-            const shift = assignment.festival_shifts;
-            // Access the jobs field from the shift
-            const jobData = shift.jobs;
-            
-            return {
-              id: `festival-${assignment.id}`,
-              job_id: shift.job_id,
-              technician_id: assignment.technician_id,
-              role: assignment.role,
-              department: shift.department || "unknown",
-              festival_jobs: {
-                id: jobData.id,
-                title: jobData.title,
-                description: jobData.description,
-                color: jobData.color,
-                day: shift.date,
-                start_time: `${shift.date}T${shift.start_time}`,
-                end_time: `${shift.date}T${shift.end_time}`,
-                festival_stage: jobData.festival_stages && jobData.festival_stages.length > 0 
-                  ? jobData.festival_stages[0] 
-                  : { name: `Stage ${shift.stage || ''}` },
-                job_documents: jobData.job_documents,
-                festival: {
-                  name: jobData.title,
-                  start_date: shift.date
-                }
+        // If user department is specified, filter by department
+        const filteredJobs = userDepartment
+          ? transformedJobs.filter(job => {
+              if (job.jobs && job.jobs.job_departments) {
+                return job.jobs.job_departments.some(
+                  (dept: any) => dept.department.toLowerCase() === userDepartment.toLowerCase()
+                );
               }
-            };
-          });
-          
-          allAssignments = [...allAssignments, ...transformedFestivalAssignments];
-        }
+              return false;
+            })
+          : transformedJobs;
         
-        console.log("Combined assignments:", allAssignments);
-        console.log("Combined assignments count:", allAssignments.length);
-        
-        // Filter assignments based on user department if available
-        if (userDepartment && allAssignments.length > 0) {
-          console.log("Filtering assignments by department:", userDepartment);
-          
-          const filteredData = allAssignments.filter(assignment => {
-            // For regular jobs
-            if (assignment.jobs && assignment.jobs.job_departments) {
-              return assignment.jobs.job_departments.some(
-                (dept: any) => dept.department.toLowerCase() === userDepartment.toLowerCase()
-              );
-            }
-            
-            // For festival jobs
-            if (assignment.festival_jobs) {
-              return assignment.department.toLowerCase() === userDepartment.toLowerCase() ||
-                     !assignment.department; // Include if no department specified
-            }
-            
-            return false;
-          });
-          
-          console.log("Filtered assignments:", filteredData);
-          console.log("Filtered assignments count:", filteredData.length);
-          return filteredData || [];
-        }
-        
-        return allAssignments || [];
+        console.log("Final filtered assignments:", filteredJobs);
+        return filteredJobs || [];
       } catch (error) {
         console.error("Error fetching assignments:", error);
         toast.error("Failed to load assignments");
