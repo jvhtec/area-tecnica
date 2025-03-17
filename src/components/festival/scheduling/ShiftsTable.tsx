@@ -1,4 +1,3 @@
-
 import { format } from "date-fns";
 import {
   Table,
@@ -52,7 +51,29 @@ export const ShiftsTable = ({
         }
         
         if (data?.logo_url) {
-          setLogoUrl(data.logo_url);
+          // Get public URL for the logo
+          const logoPath = data.logo_url;
+          console.log("Retrieved logo path:", logoPath);
+          
+          // If it's already a full URL, use it directly
+          if (logoPath.startsWith('http')) {
+            setLogoUrl(logoPath);
+          } 
+          // Otherwise, get the public URL from storage
+          else {
+            try {
+              const { data: publicUrlData } = supabase.storage
+                .from('festival-assets')
+                .getPublicUrl(logoPath);
+                
+              if (publicUrlData?.publicUrl) {
+                console.log("Generated public URL:", publicUrlData.publicUrl);
+                setLogoUrl(publicUrlData.publicUrl);
+              }
+            } catch (storageErr) {
+              console.error("Error getting public URL:", storageErr);
+            }
+          }
         }
       } catch (err) {
         console.error("Error in logo fetch:", err);
@@ -95,7 +116,7 @@ export const ShiftsTable = ({
         date,
         jobId,
         shifts: sortedShifts,
-        logoUrl: logoUrl
+        logoUrl
       };
 
       const blob = await exportShiftsTablePDF(pdfData);
