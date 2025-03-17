@@ -1,3 +1,4 @@
+
 import { format } from "date-fns";
 import {
   Table,
@@ -32,12 +33,27 @@ export const ShiftsTable = ({
 }: ShiftsTableProps) => {
   const { toast } = useToast();
   const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
+  const [jobTitle, setJobTitle] = useState<string>("");
   
   useEffect(() => {
-    const fetchLogo = async () => {
+    const fetchJobAndLogo = async () => {
       if (!jobId) return;
       
       try {
+        // Fetch job title
+        const { data: jobData, error: jobError } = await supabase
+          .from("jobs")
+          .select("title")
+          .eq("id", jobId)
+          .single();
+          
+        if (jobError) {
+          console.error("Error fetching job title:", jobError);
+        } else if (jobData) {
+          setJobTitle(jobData.title);
+        }
+        
+        // Fetch logo
         const { data, error } = await supabase
           .from("festival_settings")
           .select("logo_url")
@@ -82,11 +98,11 @@ export const ShiftsTable = ({
           }
         }
       } catch (err) {
-        console.error("Error in logo fetch:", err);
+        console.error("Error in fetch:", err);
       }
     };
     
-    fetchLogo();
+    fetchJobAndLogo();
   }, [jobId]);
   
   const sortedShifts = [...shifts].sort((a, b) => 
@@ -206,13 +222,15 @@ export const ShiftsTable = ({
                 )}
               </TableCell>
               <TableCell className="border border-border print:hidden">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => handleDeleteClick(e, shift.id)}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
+                {!isViewOnly && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => handleDeleteClick(e, shift.id)}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                )}
               </TableCell>
             </TableRow>
           ))}

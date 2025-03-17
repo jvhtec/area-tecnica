@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -21,7 +22,7 @@ interface ManageAssignmentsDialogProps {
   onOpenChange: (open: boolean) => void;
   shift: ShiftWithAssignments;
   onAssignmentsUpdated: () => void;
-  isViewOnly?: boolean; // Add isViewOnly prop
+  isViewOnly?: boolean;
 }
 
 export const ManageAssignmentsDialog = ({ 
@@ -29,7 +30,7 @@ export const ManageAssignmentsDialog = ({
   onOpenChange, 
   shift, 
   onAssignmentsUpdated,
-  isViewOnly = false // Default to false
+  isViewOnly = false
 }: ManageAssignmentsDialogProps) => {
   const [technicianId, setTechnicianId] = useState("");
   const [role, setRole] = useState("technician");
@@ -53,8 +54,8 @@ export const ManageAssignmentsDialog = ({
     },
   });
 
-  const addAssignmentMutation = useMutation(
-    async () => {
+  const addAssignmentMutation = useMutation({
+    mutationFn: async () => {
       if (!technicianId || !shift?.id) {
         throw new Error("Technician and shift ID are required");
       }
@@ -69,28 +70,26 @@ export const ManageAssignmentsDialog = ({
       }
       return data;
     },
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(["festivalShifts"]);
-        onAssignmentsUpdated();
-        toast({
-          title: "Success",
-          description: "Technician assigned successfully",
-        });
-      },
-      onError: (error: any) => {
-        console.error("Error adding assignment:", error);
-        toast({
-          title: "Error",
-          description: "Could not assign technician",
-          variant: "destructive",
-        });
-      },
-    }
-  );
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["festivalShifts"] });
+      onAssignmentsUpdated();
+      toast({
+        title: "Success",
+        description: "Technician assigned successfully",
+      });
+    },
+    onError: (error: any) => {
+      console.error("Error adding assignment:", error);
+      toast({
+        title: "Error",
+        description: "Could not assign technician",
+        variant: "destructive",
+      });
+    },
+  });
 
-  const removeAssignmentMutation = useMutation(
-    async (assignmentId: string) => {
+  const removeAssignmentMutation = useMutation({
+    mutationFn: async (assignmentId: string) => {
       const { data, error } = await supabase
         .from("festival_shift_assignments")
         .delete()
@@ -102,25 +101,23 @@ export const ManageAssignmentsDialog = ({
       }
       return data;
     },
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(["festivalShifts"]);
-        onAssignmentsUpdated();
-        toast({
-          title: "Success",
-          description: "Technician unassigned successfully",
-        });
-      },
-      onError: (error: any) => {
-        console.error("Error removing assignment:", error);
-        toast({
-          title: "Error",
-          description: "Could not unassign technician",
-          variant: "destructive",
-        });
-      },
-    }
-  );
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["festivalShifts"] });
+      onAssignmentsUpdated();
+      toast({
+        title: "Success",
+        description: "Technician unassigned successfully",
+      });
+    },
+    onError: (error: any) => {
+      console.error("Error removing assignment:", error);
+      toast({
+        title: "Error",
+        description: "Could not unassign technician",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleAddAssignment = async () => {
     try {
@@ -167,7 +164,7 @@ export const ManageAssignmentsDialog = ({
         ) : techniciansError ? (
           <div className="text-red-500">Error loading technicians.</div>
         ) : (
-          !isViewOnly && ( // Only show add staff UI if not view-only
+          !isViewOnly && (
             <div className="space-y-4">
               <div className="grid gap-2">
                 <Label htmlFor="technician">Technician</Label>
@@ -197,8 +194,8 @@ export const ManageAssignmentsDialog = ({
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={handleAddAssignment} disabled={addAssignmentMutation.isLoading}>
-                {addAssignmentMutation.isLoading ? "Assigning..." : "Assign Technician"}
+              <Button onClick={handleAddAssignment} disabled={addAssignmentMutation.isPending}>
+                {addAssignmentMutation.isPending ? "Assigning..." : "Assign Technician"}
               </Button>
             </div>
           )
@@ -211,7 +208,7 @@ export const ManageAssignmentsDialog = ({
               <div>
                 {assignment.profiles?.first_name} {assignment.profiles?.last_name} - {assignment.role}
               </div>
-              {!isViewOnly && ( // Only show remove buttons if not view-only
+              {!isViewOnly && (
                 <Button 
                   variant="ghost" 
                   size="sm" 

@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,7 @@ export const ShiftsList = ({ shifts, onDeleteShift, onShiftUpdated, jobId, isVie
             <div className="flex justify-between items-center">
               <CardTitle className="text-base">{shift.name}</CardTitle>
               <div className="flex gap-2">
-                {!isViewOnly && ( // Only show edit/delete buttons if not view-only
+                {!isViewOnly && (
                   <>
                     <Button
                       variant="ghost"
@@ -74,10 +75,10 @@ export const ShiftsList = ({ shifts, onDeleteShift, onShiftUpdated, jobId, isVie
                 <span className="font-medium">End Time:</span> {shift.end_time}
               </div>
               <div>
-                <span className="font-medium">Role:</span> {shift.role}
+                <span className="font-medium">Department:</span> {shift.department || "N/A"}
               </div>
               <div>
-                <span className="font-medium">Notes:</span> {shift.notes}
+                <span className="font-medium">Notes:</span> {shift.notes || "N/A"}
               </div>
             </div>
           </CardContent>
@@ -99,7 +100,7 @@ export const ShiftsList = ({ shifts, onDeleteShift, onShiftUpdated, jobId, isVie
           onOpenChange={setManageAssignmentsOpen}
           shift={currentShift}
           onAssignmentsUpdated={onShiftUpdated}
-          isViewOnly={isViewOnly} // Pass isViewOnly to the ManageAssignmentsDialog
+          isViewOnly={isViewOnly}
         />
       )}
     </div>
