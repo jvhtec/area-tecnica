@@ -15,9 +15,20 @@ interface JobCardProps {
   department: string;
   selectedDate?: Date;
   festivalLogo?: string;
+  hideFestivalControls?: boolean;
 }
 
-export const JobCard = ({ job, onEditClick, onDeleteClick, onJobClick, userRole, department, selectedDate, festivalLogo }: JobCardProps) => {
+export const JobCard = ({ 
+  job, 
+  onEditClick, 
+  onDeleteClick, 
+  onJobClick, 
+  userRole, 
+  department, 
+  selectedDate, 
+  festivalLogo, 
+  hideFestivalControls = false 
+}: JobCardProps) => {
   const navigate = useNavigate();
 
   const handleFestivalManage = (e: React.MouseEvent) => {
@@ -47,7 +58,7 @@ export const JobCard = ({ job, onEditClick, onDeleteClick, onJobClick, userRole,
             )}
           </CardTitle>
           <div className="flex items-center gap-2">
-            {job.job_type === 'festival' && canManageFestival && (
+            {job.job_type === 'festival' && canManageFestival && !hideFestivalControls && (
               <Button 
                 variant="outline" 
                 onClick={handleFestivalManage}
@@ -55,7 +66,7 @@ export const JobCard = ({ job, onEditClick, onDeleteClick, onJobClick, userRole,
                 {userRole === 'technician' ? 'View Festival' : 'Manage Festival'}
               </Button>
             )}
-            {canEditJobs && (
+            {canEditJobs && !hideFestivalControls && (
               <>
                 <Button 
                   variant="outline" 

@@ -97,6 +97,9 @@ const Festivals = () => {
   // Check if user can print documentation
   const canPrintDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
 
+  // Use empty functions for onEditClick and onDeleteClick since we don't want those buttons
+  const emptyFunction = () => {};
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <Card>
@@ -129,11 +132,12 @@ const Festivals = () => {
                     <JobCard 
                       job={job} 
                       onJobClick={() => handleJobClick(job.id)} 
-                      onEditClick={() => {}} 
-                      onDeleteClick={() => {}}
+                      onEditClick={emptyFunction} 
+                      onDeleteClick={emptyFunction}
                       userRole={userRole}
                       department="sound"
                       festivalLogo={festivalLogos[job.id]}
+                      hideFestivalControls={true}
                     />
                   </div>
                   {canPrintDocuments && (

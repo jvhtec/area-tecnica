@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Edit, Users } from "lucide-react";
+import { Users } from "lucide-react";
 import { EditShiftDialog } from "./EditShiftDialog";
 import { ManageAssignmentsDialog } from "./ManageAssignmentsDialog";
 import { ShiftWithAssignments } from "@/types/festival-scheduling";
@@ -12,7 +12,7 @@ interface ShiftsListProps {
   onDeleteShift: (shiftId: string) => void;
   onShiftUpdated: () => void;
   jobId: string;
-  isViewOnly?: boolean; // Add isViewOnly prop
+  isViewOnly?: boolean;
 }
 
 export const ShiftsList = ({ shifts, onDeleteShift, onShiftUpdated, jobId, isViewOnly = false }: ShiftsListProps) => {
