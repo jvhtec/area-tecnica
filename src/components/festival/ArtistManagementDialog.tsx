@@ -182,7 +182,8 @@ export const ArtistManagementDialog = ({
 
     setIsLoading(true);
     try {
-      const data = {
+      // Ensure all required string fields have a value
+      const cleanedData = {
         ...formData,
         job_id: jobId,
         stage: formData.stage ? parseInt(formData.stage) : null,
@@ -190,16 +191,27 @@ export const ArtistManagementDialog = ({
         show_end: formData.show_end || null,
         soundcheck_start: formData.soundcheck_start || null,
         soundcheck_end: formData.soundcheck_end || null,
-        // Add a flag to indicate if this is an after-midnight performance
-        isAfterMidnight: isAfterMidnight(showStartHour),
+        foh_console: formData.foh_console || "",
+        mon_console: formData.mon_console || "",
+        wireless_model: formData.wireless_model || "",
+        wireless_band: formData.wireless_band || "",
+        iem_model: formData.iem_model || "",
+        iem_band: formData.iem_band || "",
+        extras_wired: formData.extras_wired || "",
+        other_infrastructure: formData.other_infrastructure || "",
+        notes: formData.notes || "",
+        // Use lowercase property name to match database column
+        isaftermidnight: isAfterMidnight(showStartHour),
       };
+
+      console.log("Saving artist with data:", cleanedData);
 
       const { error } = artist?.id
         ? await supabase
             .from("festival_artists")
-            .update(data)
+            .update(cleanedData)
             .eq("id", artist.id)
-        : await supabase.from("festival_artists").insert(data);
+        : await supabase.from("festival_artists").insert(cleanedData);
 
       if (error) throw error;
 

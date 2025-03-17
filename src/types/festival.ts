@@ -1,3 +1,4 @@
+
 export interface ConsoleSetup {
   model: string;
   quantity: number;

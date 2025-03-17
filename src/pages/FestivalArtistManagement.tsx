@@ -51,13 +51,11 @@ const FestivalArtistManagement = () => {
   const [dateTypes, setDateTypes] = useState<Record<string, string>>({});
   const [dayStartTime, setDayStartTime] = useState<string>("07:00");
 
-  // Query to fetch festival settings
   const { data: festivalSettings } = useQuery({
     queryKey: ['festival-settings', jobId],
     queryFn: async () => {
       if (!jobId) return null;
 
-      // Check if settings exist
       const { data: existingSettings, error: fetchError } = await supabase
         .from('festival_settings')
         .select('*')
@@ -69,12 +67,10 @@ const FestivalArtistManagement = () => {
         return null;
       }
 
-      // If settings exist, return them
       if (existingSettings) {
         return existingSettings;
       }
 
-      // Otherwise create default settings
       const { data: newSettings, error: createError } = await supabase
         .from('festival_settings')
         .insert({
@@ -94,14 +90,12 @@ const FestivalArtistManagement = () => {
     enabled: !!jobId
   });
 
-  // Update day start time when settings are loaded
   useEffect(() => {
     if (festivalSettings?.day_start_time) {
       setDayStartTime(festivalSettings.day_start_time);
     }
   }, [festivalSettings]);
 
-  // Query to fetch job date types
   const { data: dateTypeData, refetch: refetchDateTypes } = useQuery({
     queryKey: ['job-date-types', jobId],
     queryFn: async () => {
@@ -127,29 +121,24 @@ const FestivalArtistManagement = () => {
     enabled: !!jobId
   });
 
-  // Update date types when query data changes
   useEffect(() => {
     if (dateTypeData) {
       setDateTypes(dateTypeData);
     }
   }, [dateTypeData]);
 
-  // Helper function to convert calendar date to festival date
   const toFestivalDay = (date: Date, time: string): Date => {
     const [hours, minutes] = time.split(':').map(Number);
     const showTime = new Date(date);
     showTime.setHours(hours || 0);
     showTime.setMinutes(minutes || 0);
     
-    // If the time is before the day start hour (e.g., 2:00 AM), 
-    // it belongs to the previous festival day
     if (hours < DAY_START_HOUR) {
       return addDays(date, -1);
     }
     return date;
   };
 
-  // Helper function to format a festival day label
   const formatFestivalDay = (date: Date, includeDay = true): string => {
     const dayStr = includeDay ? 'EEE, ' : '';
     return format(date, `${dayStr}MMM d`) + 
@@ -176,14 +165,12 @@ const FestivalArtistManagement = () => {
           const dates = eachDayOfInterval({ start: startDate, end: endDate });
           setJobDates(dates);
           
-          // Create festival days mapping (display date to actual date)
           const festivalDaysMap = dates.map(date => ({
             display: formatFestivalDay(date),
             actual: format(date, 'yyyy-MM-dd')
           }));
           setFestivalDates(festivalDaysMap);
           
-          // Set the first date as the default selected date
           const formattedDate = format(dates[0], 'yyyy-MM-dd');
           setSelectedDate(formattedDate);
         }
@@ -224,10 +211,8 @@ const FestivalArtistManagement = () => {
         return;
       }
       
-      // Parse the day start time
       const [startHour, startMinute] = dayStartTime.split(':').map(Number);
       
-      // Create the current festival day boundaries
       const selectedDateObj = parseISO(selectedDate);
       const festivalDayStart = setMinutes(setHours(selectedDateObj, startHour || 7), startMinute || 0);
       const nextDayObj = addDays(selectedDateObj, 1);
@@ -235,7 +220,6 @@ const FestivalArtistManagement = () => {
       
       console.log("Fetching artists for festival day:", format(festivalDayStart, 'yyyy-MM-dd HH:mm'), "to", format(festivalDayEnd, 'yyyy-MM-dd HH:mm'));
       
-      // Fetch artists for this festival day (including after-midnight performances)
       const { data, error } = await supabase
         .from("festival_artists")
         .select("*")
@@ -247,11 +231,9 @@ const FestivalArtistManagement = () => {
       
       console.log("Fetched artists:", data);
       
-      // Process the artists to properly handle after-midnight times
       const processedArtists = data?.map(artist => {
         if (!artist.show_start) return artist;
         
-        // Determine if this is an after-midnight show (for UI indicators)
         const [hours] = artist.show_start.split(':').map(Number);
         const isAfterMidnight = hours < startHour;
         
