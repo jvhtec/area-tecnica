@@ -91,7 +91,7 @@ const TechnicianDashboard = () => {
         {
           event: '*',
           schema: 'public',
-          table: 'festival_assignments'
+          table: 'festival_shift_assignments'
         },
         (payload) => {
           console.log("Received real-time update for festival assignments:", payload);
@@ -140,17 +140,16 @@ const TechnicianDashboard = () => {
         const endDate = getTimeSpanEndDate();
         console.log("Fetching assignments until:", endDate);
         
-        // Fetch regular job assignments
+        // Fetch regular job assignments - updating this query to fix the error
         const { data: regularAssignments, error: regularError } = await supabase
           .from('job_assignments')
           .select(`
-            id,
             job_id,
             technician_id,
             sound_role,
             lights_role,
             video_role,
-            created_at,
+            assigned_at,
             jobs!inner (
               id,
               title,
@@ -174,7 +173,7 @@ const TechnicianDashboard = () => {
           .eq('technician_id', user.id)
           .gte('jobs.start_time', new Date().toISOString())
           .lte('jobs.start_time', endDate.toISOString())
-          .order('jobs(start_time)', { ascending: true });
+          .order('jobs.start_time', { ascending: true });
 
         if (regularError) {
           console.error("Error fetching regular assignments:", regularError);
@@ -184,31 +183,40 @@ const TechnicianDashboard = () => {
 
         console.log("Fetched regular assignments:", regularAssignments || []);
         
-        // Fetch festival assignments
+        // Fetch festival assignments - using festival_shift_assignments instead of festival_assignments
         const { data: festivalAssignments, error: festivalError } = await supabase
-          .from('festival_assignments')
+          .from('festival_shift_assignments')
           .select(`
             id,
+            shift_id,
             technician_id,
-            festival_job_id,
             role,
             created_at,
-            festival_jobs(
+            festival_shifts!inner(
               id,
-              title,
-              festival_id,
-              festival_stage_id,
-              day,
+              job_id,
+              name,
+              date,
               start_time,
               end_time,
-              color,
-              festival(name, start_date, end_date),
-              festival_stage(name),
-              job_documents(
+              notes,
+              stage,
+              department,
+              jobs(
                 id,
-                file_name,
-                file_path,
-                uploaded_at
+                title,
+                description,
+                color,
+                job_documents(
+                  id,
+                  file_name,
+                  file_path,
+                  uploaded_at
+                ),
+                festival_stages(
+                  id,
+                  name
+                )
               )
             )
           `)
@@ -226,8 +234,8 @@ const TechnicianDashboard = () => {
         // Combine both types of assignments
         let allAssignments = [];
         
-        if (regularAssignments) {
-          // Transform regular assignments to include department information
+        // Transform regular assignments
+        if (regularAssignments && regularAssignments.length > 0) {
           const transformedRegularAssignments = regularAssignments.map(assignment => {
             // Determine the department based on roles
             let department = "unknown";
@@ -236,23 +244,51 @@ const TechnicianDashboard = () => {
             else if (assignment.video_role) department = "video";
             
             return {
-              ...assignment,
-              department
+              id: `job-${assignment.job_id}`,
+              job_id: assignment.job_id,
+              technician_id: assignment.technician_id,
+              department,
+              sound_role: assignment.sound_role,
+              lights_role: assignment.lights_role,
+              video_role: assignment.video_role,
+              jobs: assignment.jobs
             };
           });
           
           allAssignments = [...transformedRegularAssignments];
         }
         
-        if (festivalAssignments) {
-          // Transform festival assignments to match the structure expected by the AssignmentsList component
-          const transformedFestivalAssignments = festivalAssignments.map(assignment => ({
-            id: assignment.id,
-            job_id: assignment.festival_job_id,
-            technician_id: assignment.technician_id,
-            department: assignment.role,
-            festival_jobs: assignment.festival_jobs
-          }));
+        // Transform festival assignments
+        if (festivalAssignments && festivalAssignments.length > 0) {
+          const transformedFestivalAssignments = festivalAssignments.map(assignment => {
+            const shift = assignment.festival_shifts;
+            const jobData = shift.jobs;
+            
+            return {
+              id: `festival-${assignment.id}`,
+              job_id: shift.job_id,
+              technician_id: assignment.technician_id,
+              role: assignment.role,
+              department: shift.department || "unknown",
+              festival_jobs: {
+                id: jobData.id,
+                title: jobData.title,
+                description: jobData.description,
+                color: jobData.color,
+                day: shift.date,
+                start_time: `${shift.date}T${shift.start_time}`,
+                end_time: `${shift.date}T${shift.end_time}`,
+                festival_stage: jobData.festival_stages && jobData.festival_stages.length > 0 
+                  ? jobData.festival_stages[0] 
+                  : { name: `Stage ${shift.stage || ''}` },
+                job_documents: jobData.job_documents,
+                festival: {
+                  name: jobData.title,
+                  start_date: shift.date
+                }
+              }
+            };
+          });
           
           allAssignments = [...allAssignments, ...transformedFestivalAssignments];
         }
@@ -274,8 +310,8 @@ const TechnicianDashboard = () => {
             
             // For festival jobs
             if (assignment.festival_jobs) {
-              // Festival jobs will be shown to all relevant department technicians
-              return true;
+              return assignment.department.toLowerCase() === userDepartment.toLowerCase() ||
+                     !assignment.department; // Include if no department specified
             }
             
             return false;
@@ -376,7 +412,7 @@ const TechnicianDashboard = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {assignments.length > 0 ? (
+          {assignments && assignments.length > 0 ? (
             <TodaySchedule 
               jobs={assignments} 
               onEditClick={handleEditClick} 
