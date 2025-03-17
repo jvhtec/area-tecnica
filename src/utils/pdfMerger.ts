@@ -1,4 +1,3 @@
-
 import { PDFDocument } from 'pdf-lib';
 import { exportArtistPDF, ArtistPdfData } from './artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from './artistTablePdfExport';
@@ -55,6 +54,279 @@ export const fetchLogoUrl = async (jobId: string): Promise<string | undefined> =
   } catch (err) {
     console.error("Error in logo fetch:", err);
     return undefined;
+  }
+};
+
+// Create a cover page with basic festival information
+const generateCoverPage = async (
+  jobId: string,
+  jobTitle: string,
+  logoUrl?: string
+): Promise<Blob> => {
+  try {
+    console.log("Generating cover page for festival documentation");
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([595.28, 841.89]); // A4 size
+    
+    const { width, height } = page.getSize();
+    
+    // Get festival dates for the cover page
+    const { data: jobData } = await supabase
+      .from("jobs")
+      .select("start_time, end_time")
+      .eq("id", jobId)
+      .single();
+      
+    let dateRangeText = "";
+    if (jobData?.start_time && jobData?.end_time) {
+      const startDate = new Date(jobData.start_time);
+      const endDate = new Date(jobData.end_time);
+      
+      const options: Intl.DateTimeFormatOptions = { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      };
+      
+      if (startDate.getTime() === endDate.getTime()) {
+        dateRangeText = startDate.toLocaleDateString(undefined, options);
+      } else {
+        dateRangeText = `${startDate.toLocaleDateString(undefined, options)} - ${endDate.toLocaleDateString(undefined, options)}`;
+      }
+    }
+    
+    // Add a red header bar
+    page.drawRectangle({
+      x: 0,
+      y: height - 100,
+      width: width,
+      height: 100,
+      color: { r: 0.87, g: 0.22, b: 0.2 },
+    });
+    
+    // Add title with large font
+    page.drawText("FESTIVAL DOCUMENTATION", {
+      x: 50,
+      y: height - 60,
+      size: 24,
+      color: { r: 1, g: 1, b: 1 },
+    });
+    
+    // Add festival title
+    page.drawText(jobTitle, {
+      x: 50,
+      y: height / 2 + 50,
+      size: 36,
+      color: { r: 0, g: 0, b: 0 },
+    });
+    
+    // Add date range if available
+    if (dateRangeText) {
+      page.drawText(dateRangeText, {
+        x: 50,
+        y: height / 2,
+        size: 16,
+        color: { r: 0.3, g: 0.3, b: 0.3 },
+      });
+    }
+    
+    // Add "Complete Technical Documentation" text
+    page.drawText("Complete Technical Documentation", {
+      x: 50,
+      y: height / 2 - 50,
+      size: 16,
+      color: { r: 0.5, g: 0.5, b: 0.5 },
+    });
+    
+    // Add logo if available
+    if (logoUrl) {
+      try {
+        const logoResponse = await fetch(logoUrl);
+        const logoImageData = await logoResponse.arrayBuffer();
+        let logoImage;
+        
+        // Determine the type of image and embed it
+        if (logoUrl.toLowerCase().endsWith('.png')) {
+          logoImage = await pdfDoc.embedPng(logoImageData);
+        } else if (logoUrl.toLowerCase().endsWith('.jpg') || logoUrl.toLowerCase().endsWith('.jpeg')) {
+          logoImage = await pdfDoc.embedJpg(logoImageData);
+        }
+        
+        if (logoImage) {
+          const imgWidth = 150;
+          const imgHeight = (logoImage.height / logoImage.width) * imgWidth;
+          
+          page.drawImage(logoImage, {
+            x: width - imgWidth - 50,
+            y: height / 2 - (imgHeight / 2),
+            width: imgWidth,
+            height: imgHeight,
+          });
+        }
+      } catch (logoError) {
+        console.error("Error adding logo to cover page:", logoError);
+      }
+    }
+    
+    // Add footer with page number
+    page.drawText("Page 1", {
+      x: width / 2,
+      y: 30,
+      size: 10,
+      color: { r: 0.5, g: 0.5, b: 0.5 },
+    });
+    
+    // Add generation date
+    const currentDate = new Date().toLocaleDateString();
+    page.drawText(`Generated on: ${currentDate}`, {
+      x: 50,
+      y: 50,
+      size: 10,
+      color: { r: 0.5, g: 0.5, b: 0.5 },
+    });
+    
+    const pdfBytes = await pdfDoc.save();
+    return new Blob([pdfBytes], { type: 'application/pdf' });
+  } catch (error) {
+    console.error("Error generating cover page:", error);
+    throw error;
+  }
+};
+
+// Create a table of contents page
+const generateTableOfContents = async (
+  sections: { title: string; pageCount: number }[],
+  logoUrl?: string
+): Promise<Blob> => {
+  try {
+    console.log("Generating table of contents");
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([595.28, 841.89]); // A4 size
+    
+    const { width, height } = page.getSize();
+    
+    // Add a red header bar
+    page.drawRectangle({
+      x: 0,
+      y: height - 100,
+      width: width,
+      height: 100,
+      color: { r: 0.87, g: 0.22, b: 0.2 },
+    });
+    
+    // Add title
+    page.drawText("TABLE OF CONTENTS", {
+      x: 50,
+      y: height - 60,
+      size: 24,
+      color: { r: 1, g: 1, b: 1 },
+    });
+    
+    // Add logo if available
+    if (logoUrl) {
+      try {
+        const logoResponse = await fetch(logoUrl);
+        const logoImageData = await logoResponse.arrayBuffer();
+        let logoImage;
+        
+        if (logoUrl.toLowerCase().endsWith('.png')) {
+          logoImage = await pdfDoc.embedPng(logoImageData);
+        } else if (logoUrl.toLowerCase().endsWith('.jpg') || logoUrl.toLowerCase().endsWith('.jpeg')) {
+          logoImage = await pdfDoc.embedJpg(logoImageData);
+        }
+        
+        if (logoImage) {
+          const imgWidth = 100;
+          const imgHeight = (logoImage.height / logoImage.width) * imgWidth;
+          
+          page.drawImage(logoImage, {
+            x: width - imgWidth - 50,
+            y: height - 60 - (imgHeight / 2) + 10,
+            width: imgWidth,
+            height: imgHeight,
+          });
+        }
+      } catch (logoError) {
+        console.error("Error adding logo to TOC:", logoError);
+      }
+    }
+    
+    // List sections with page numbers
+    let currentY = height - 150;
+    let pageCounter = 3; // Start at 3 because cover + TOC = 2 pages
+    
+    // Draw table header
+    page.drawText("Section", {
+      x: 50,
+      y: currentY,
+      size: 14,
+      color: { r: 0, g: 0, b: 0 },
+    });
+    
+    page.drawText("Page", {
+      x: width - 100,
+      y: currentY,
+      size: 14,
+      color: { r: 0, g: 0, b: 0 },
+    });
+    
+    currentY -= 20;
+    
+    // Draw line separator
+    page.drawLine({
+      start: { x: 50, y: currentY },
+      end: { x: width - 50, y: currentY },
+      thickness: 1,
+      color: { r: 0.8, g: 0.8, b: 0.8 },
+    });
+    
+    currentY -= 30;
+    
+    // Add each section to the TOC
+    for (const section of sections) {
+      page.drawText(section.title, {
+        x: 50,
+        y: currentY,
+        size: 12,
+        color: { r: 0, g: 0, b: 0 },
+      });
+      
+      page.drawText(pageCounter.toString(), {
+        x: width - 100,
+        y: currentY,
+        size: 12,
+        color: { r: 0, g: 0, b: 0 },
+      });
+      
+      // Add dots between section name and page number
+      let dotX = 250;
+      while (dotX < width - 105) {
+        page.drawText(".", {
+          x: dotX,
+          y: currentY,
+          size: 12,
+          color: { r: 0.7, g: 0.7, b: 0.7 },
+        });
+        dotX += 10;
+      }
+      
+      pageCounter += section.pageCount;
+      currentY -= 30;
+    }
+    
+    // Add footer with page number
+    page.drawText("Page 2", {
+      x: width / 2,
+      y: 30,
+      size: 10,
+      color: { r: 0.5, g: 0.5, b: 0.5 },
+    });
+    
+    const pdfBytes = await pdfDoc.save();
+    return new Blob([pdfBytes], { type: 'application/pdf' });
+  } catch (error) {
+    console.error("Error generating table of contents:", error);
+    throw error;
   }
 };
 
@@ -146,7 +418,11 @@ export const generateAndMergeFestivalPDFs = async (
   const logoUrl = await fetchLogoUrl(jobId);
   console.log("Logo URL for PDFs:", logoUrl);
   
-  const allPdfs: Blob[] = [];
+  // Organize PDFs in groups for easier tracking and TOC generation
+  const gearPdfs: Blob[] = [];
+  const shiftPdfs: Blob[] = [];
+  const artistTablePdfs: Blob[] = [];
+  const individualArtistPdfs: Blob[] = [];
   
   try {
     // Fetch artist data
@@ -216,196 +492,62 @@ export const generateAndMergeFestivalPDFs = async (
       });
     }
 
-    console.log(`Starting PDF generation for ${artists?.length || 0} artists`);
-    
-    // Generate individual artist PDFs
-    if (artists && artists.length > 0) {
-      for (const artist of artists) {
-        try {
-          console.log(`Generating PDF for artist: ${artist.name}`);
-          
-          const artistData: ArtistPdfData = {
-            name: artist.name || 'Unnamed Artist',
-            stage: artist.stage || 1,
-            date: artist.date || '',
-            schedule: {
-              show: { 
-                start: artist.show_start || '', 
-                end: artist.show_end || '' 
-              },
-              soundcheck: artist.soundcheck_start ? {
-                start: artist.soundcheck_start || '',
-                end: artist.soundcheck_end || ''
-              } : undefined
-            },
-            technical: {
-              fohTech: Boolean(artist.foh_tech || false),
-              monTech: Boolean(artist.mon_tech || false),
-              fohConsole: { 
-                model: String(artist.foh_console || ''), 
-                providedBy: String(artist.foh_console_provided_by || 'festival') 
-              },
-              monConsole: { 
-                model: String(artist.mon_console || ''), 
-                providedBy: String(artist.mon_console_provided_by || 'festival') 
-              },
-              wireless: {
-                model: String(artist.wireless_model || ''),
-                providedBy: String(artist.wireless_provided_by || 'festival'),
-                handhelds: Number(artist.wireless_quantity_hh || 0),
-                bodypacks: Number(artist.wireless_quantity_bp || 0),
-                band: String(artist.wireless_band || '')
-              },
-              iem: {
-                model: String(artist.iem_model || ''),
-                providedBy: String(artist.iem_provided_by || 'festival'),
-                quantity: Number(artist.iem_quantity || 0),
-                band: String(artist.iem_band || '')
-              },
-              monitors: {
-                enabled: Boolean(artist.monitors_enabled || false),
-                quantity: Number(artist.monitors_quantity || 0)
-              }
-            },
-            infrastructure: {
-              providedBy: String(artist.infrastructure_provided_by || 'festival'),
-              cat6: { 
-                enabled: Boolean(artist.infra_cat6 || false), 
-                quantity: Number(artist.infra_cat6_quantity || 0) 
-              },
-              hma: { 
-                enabled: Boolean(artist.infra_hma || false), 
-                quantity: Number(artist.infra_hma_quantity || 0) 
-              },
-              coax: { 
-                enabled: Boolean(artist.infra_coax || false), 
-                quantity: Number(artist.infra_coax_quantity || 0) 
-              },
-              opticalconDuo: { 
-                enabled: Boolean(artist.infra_opticalcon_duo || false), 
-                quantity: Number(artist.infra_opticalcon_duo_quantity || 0) 
-              },
-              analog: Number(artist.infra_analog || 0),
-              other: String(artist.other_infrastructure || '')
-            },
-            extras: {
-              sideFill: Boolean(artist.extras_sf || false),
-              drumFill: Boolean(artist.extras_df || false),
-              djBooth: Boolean(artist.extras_djbooth || false),
-              wired: String(artist.extras_wired || '')
-            },
-            notes: artist.notes ? String(artist.notes) : undefined,
-            logoUrl
-          };
-          
-          const pdf = await exportArtistPDF(artistData);
-          console.log(`Generated PDF for artist ${artist.name}, size: ${pdf.size} bytes`);
-          if (pdf && pdf.size > 0) {
-            allPdfs.push(pdf);
-          } else {
-            console.warn(`Generated empty PDF for artist ${artist.name}, skipping`);
-          }
-        } catch (err) {
-          console.error(`Error generating PDF for artist ${artist.name}:`, err);
-        }
-      }
-    }
-    
-    console.log(`Generated ${allPdfs.length} artist PDFs`);
-    
     // Extract unique dates from artists
     const uniqueDates = [...new Set(artists?.map(a => a.date) || [])];
     
-    // Generate stage-specific artist table PDFs for each date
+    // ====== 1. FIRST GENERATE GEAR SETUP PDFS ======
+    console.log("Starting gear setup PDF generation for dates:", uniqueDates);
     for (const date of uniqueDates) {
       if (!date) continue;
       
-      const stageMap = new Map<number, any[]>();
-      
-      artists?.filter(a => a.date === date).forEach(artist => {
-        if (!stageMap.has(artist.stage)) {
-          stageMap.set(artist.stage, []);
-        }
-        stageMap.get(artist.stage)?.push(artist);
-      });
-      
-      const { data: stages } = await supabase
-        .from("festival_stages")
+      console.log(`Fetching gear setup data for date ${date}`);
+      const { data: gearSetupData, error: gearSetupError } = await supabase
+        .from("festival_gear_setups")
         .select("*")
-        .eq("job_id", jobId);
+        .eq("job_id", jobId)
+        .eq("date", date)
+        .single();
       
-      for (const [stageNum, stageArtists] of stageMap.entries()) {
-        if (stageArtists.length === 0) continue;
+      if (gearSetupError) {
+        console.error(`Error fetching gear setup for date ${date}:`, gearSetupError);
+        continue;
+      }
+      
+      if (gearSetupData) {
+        const maxStages = gearSetupData.max_stages || 1;
+        console.log(`Found gear setup with ${maxStages} stages for date ${date}`);
         
-        const stageObj = stages?.find(s => s.number === stageNum);
-        const stageName = stageObj ? stageObj.name : `Stage ${stageNum}`;
+        // Fetch stage names
+        const { data: stages } = await supabase
+          .from("festival_stages")
+          .select("*")
+          .eq("job_id", jobId);
         
-        const tableData: ArtistTablePdfData = {
-          jobTitle: jobTitle || 'Festival',
-          date: date,
-          stage: stageName,
-          artists: stageArtists.map(a => ({
-            name: String(a.name || ''),
-            stage: Number(a.stage || 1),
-            showTime: { 
-              start: String(a.show_start || ''), 
-              end: String(a.show_end || '') 
-            },
-            soundcheck: a.soundcheck_start ? { 
-              start: String(a.soundcheck_start || ''), 
-              end: String(a.soundcheck_end || '') 
-            } : undefined,
-            technical: {
-              fohTech: Boolean(a.foh_tech || false),
-              monTech: Boolean(a.mon_tech || false),
-              fohConsole: { 
-                model: String(a.foh_console || ''), 
-                providedBy: String(a.foh_console_provided_by || 'festival') 
-              },
-              monConsole: { 
-                model: String(a.mon_console || ''), 
-                providedBy: String(a.mon_console_provided_by || 'festival') 
-              },
-              wireless: {
-                hh: Number(a.wireless_quantity_hh || 0),
-                bp: Number(a.wireless_quantity_bp || 0),
-                providedBy: String(a.wireless_provided_by || 'festival')
-              },
-              iem: {
-                quantity: Number(a.iem_quantity || 0),
-                providedBy: String(a.iem_provided_by || 'festival')
-              },
-              monitors: {
-                enabled: Boolean(a.monitors_enabled || false),
-                quantity: Number(a.monitors_quantity || 0)
-              }
-            },
-            extras: {
-              sideFill: Boolean(a.extras_sf || false),
-              drumFill: Boolean(a.extras_df || false),
-              djBooth: Boolean(a.extras_djbooth || false)
-            },
-            notes: String(a.notes || '')
-          })),
-          logoUrl
-        };
-        
-        try {
-          console.log(`Generating table PDF for ${date} Stage ${stageNum}`);
-          const pdf = await exportArtistTablePDF(tableData);
-          console.log(`Generated table PDF, size: ${pdf.size} bytes`);
-          if (pdf && pdf.size > 0) {
-            allPdfs.push(pdf);
-          } else {
-            console.warn(`Generated empty table PDF for ${date} Stage ${stageNum}, skipping`);
+        // Generate PDF for each stage
+        for (let stageNum = 1; stageNum <= maxStages; stageNum++) {
+          try {
+            console.log(`Generating gear setup PDF for stage ${stageNum} on date ${date}`);
+            const stageObj = stages?.find(s => s.number === stageNum);
+            const stageName = stageObj ? stageObj.name : `Stage ${stageNum}`;
+            
+            const pdf = await generateStageGearPDF(jobId, date, stageNum, stageName);
+            
+            console.log(`Generated gear setup PDF for stage ${stageNum}, size: ${pdf.size} bytes`);
+            if (pdf && pdf.size > 0) {
+              gearPdfs.push(pdf);
+            } else {
+              console.warn(`Generated empty gear setup PDF for stage ${stageNum}, skipping`);
+            }
+          } catch (err) {
+            console.error(`Error generating gear setup PDF for stage ${stageNum}:`, err);
           }
-        } catch (err) {
-          console.error(`Error generating table PDF for ${date} Stage ${stageNum}:`, err);
         }
+      } else {
+        console.log(`No gear setup found for date ${date}, skipping gear setup PDF generation`);
       }
     }
     
-    // Generate shift table PDFs for each date
+    // ====== 2. GENERATE SHIFT TABLE PDFS ======
     console.log("Starting shift table PDF generation for dates:", uniqueDates);
     for (const date of uniqueDates) {
       if (!date) continue;
@@ -497,7 +639,7 @@ export const generateAndMergeFestivalPDFs = async (
           
           console.log(`Generated shifts PDF for date ${date}, size: ${pdf.size} bytes`);
           if (pdf && pdf.size > 0) {
-            allPdfs.push(pdf);
+            shiftPdfs.push(pdf);
           } else {
             console.warn(`Generated empty shifts PDF for date ${date}, skipping`);
           }
@@ -509,62 +651,219 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
-    // Generate gear setup PDFs for each date and stage
-    console.log("Starting gear setup PDF generation for dates:", uniqueDates);
+    // ====== 3. GENERATE ARTIST TABLE PDFS ======
+    // Generate stage-specific artist table PDFs for each date
     for (const date of uniqueDates) {
       if (!date) continue;
       
-      console.log(`Fetching gear setup data for date ${date}`);
-      const { data: gearSetupData, error: gearSetupError } = await supabase
-        .from("festival_gear_setups")
-        .select("*")
-        .eq("job_id", jobId)
-        .eq("date", date)
-        .single();
+      const stageMap = new Map<number, any[]>();
       
-      if (gearSetupError) {
-        console.error(`Error fetching gear setup for date ${date}:`, gearSetupError);
-        continue;
-      }
-      
-      if (gearSetupData) {
-        const maxStages = gearSetupData.max_stages || 1;
-        console.log(`Found gear setup with ${maxStages} stages for date ${date}`);
-        
-        // Fetch stage names
-        const { data: stages } = await supabase
-          .from("festival_stages")
-          .select("*")
-          .eq("job_id", jobId);
-        
-        // Generate PDF for each stage
-        for (let stageNum = 1; stageNum <= maxStages; stageNum++) {
-          try {
-            console.log(`Generating gear setup PDF for stage ${stageNum} on date ${date}`);
-            const stageObj = stages?.find(s => s.number === stageNum);
-            const stageName = stageObj ? stageObj.name : `Stage ${stageNum}`;
-            
-            const pdf = await generateStageGearPDF(jobId, date, stageNum, stageName);
-            
-            console.log(`Generated gear setup PDF for stage ${stageNum}, size: ${pdf.size} bytes`);
-            if (pdf && pdf.size > 0) {
-              allPdfs.push(pdf);
-            } else {
-              console.warn(`Generated empty gear setup PDF for stage ${stageNum}, skipping`);
-            }
-          } catch (err) {
-            console.error(`Error generating gear setup PDF for stage ${stageNum}:`, err);
-          }
+      artists?.filter(a => a.date === date).forEach(artist => {
+        if (!stageMap.has(artist.stage)) {
+          stageMap.set(artist.stage, []);
         }
-      } else {
-        console.log(`No gear setup found for date ${date}, skipping gear setup PDF generation`);
+        stageMap.get(artist.stage)?.push(artist);
+      });
+      
+      const { data: stages } = await supabase
+        .from("festival_stages")
+        .select("*")
+        .eq("job_id", jobId);
+      
+      for (const [stageNum, stageArtists] of stageMap.entries()) {
+        if (stageArtists.length === 0) continue;
+        
+        const stageObj = stages?.find(s => s.number === stageNum);
+        const stageName = stageObj ? stageObj.name : `Stage ${stageNum}`;
+        
+        const tableData: ArtistTablePdfData = {
+          jobTitle: jobTitle || 'Festival',
+          date: date,
+          stage: stageName,
+          artists: stageArtists.map(a => ({
+            name: String(a.name || ''),
+            stage: Number(a.stage || 1),
+            showTime: { 
+              start: String(a.show_start || ''), 
+              end: String(a.show_end || '') 
+            },
+            soundcheck: a.soundcheck_start ? { 
+              start: String(a.soundcheck_start || ''), 
+              end: String(a.soundcheck_end || '') 
+            } : undefined,
+            technical: {
+              fohTech: Boolean(a.foh_tech || false),
+              monTech: Boolean(a.mon_tech || false),
+              fohConsole: { 
+                model: String(a.foh_console || ''), 
+                providedBy: String(a.foh_console_provided_by || 'festival') 
+              },
+              monConsole: { 
+                model: String(a.mon_console || ''), 
+                providedBy: String(a.mon_console_provided_by || 'festival') 
+              },
+              wireless: {
+                hh: Number(a.wireless_quantity_hh || 0),
+                bp: Number(a.wireless_quantity_bp || 0),
+                providedBy: String(a.wireless_provided_by || 'festival')
+              },
+              iem: {
+                quantity: Number(a.iem_quantity || 0),
+                providedBy: String(a.iem_provided_by || 'festival')
+              },
+              monitors: {
+                enabled: Boolean(a.monitors_enabled || false),
+                quantity: Number(a.monitors_quantity || 0)
+              }
+            },
+            extras: {
+              sideFill: Boolean(a.extras_sf || false),
+              drumFill: Boolean(a.extras_df || false),
+              djBooth: Boolean(a.extras_djbooth || false)
+            },
+            notes: String(a.notes || '')
+          })),
+          logoUrl
+        };
+        
+        try {
+          console.log(`Generating table PDF for ${date} Stage ${stageNum}`);
+          const pdf = await exportArtistTablePDF(tableData);
+          console.log(`Generated table PDF, size: ${pdf.size} bytes`);
+          if (pdf && pdf.size > 0) {
+            artistTablePdfs.push(pdf);
+          } else {
+            console.warn(`Generated empty table PDF for ${date} Stage ${stageNum}, skipping`);
+          }
+        } catch (err) {
+          console.error(`Error generating table PDF for ${date} Stage ${stageNum}:`, err);
+        }
       }
     }
     
+    // ====== 4. GENERATE INDIVIDUAL ARTIST PDFS ======
+    console.log(`Starting PDF generation for ${artists?.length || 0} artists`);
+    
+    // Generate individual artist PDFs
+    if (artists && artists.length > 0) {
+      for (const artist of artists) {
+        try {
+          console.log(`Generating PDF for artist: ${artist.name}`);
+          
+          const artistData: ArtistPdfData = {
+            name: artist.name || 'Unnamed Artist',
+            stage: artist.stage || 1,
+            date: artist.date || '',
+            schedule: {
+              show: { 
+                start: artist.show_start || '', 
+                end: artist.show_end || '' 
+              },
+              soundcheck: artist.soundcheck_start ? {
+                start: artist.soundcheck_start || '',
+                end: artist.soundcheck_end || ''
+              } : undefined
+            },
+            technical: {
+              fohTech: Boolean(artist.foh_tech || false),
+              monTech: Boolean(artist.mon_tech || false),
+              fohConsole: { 
+                model: String(artist.foh_console || ''), 
+                providedBy: String(artist.foh_console_provided_by || 'festival') 
+              },
+              monConsole: { 
+                model: String(artist.mon_console || ''), 
+                providedBy: String(artist.mon_console_provided_by || 'festival') 
+              },
+              wireless: {
+                model: String(artist.wireless_model || ''),
+                providedBy: String(artist.wireless_provided_by || 'festival'),
+                handhelds: Number(artist.wireless_quantity_hh || 0),
+                bodypacks: Number(artist.wireless_quantity_bp || 0),
+                band: String(artist.wireless_band || '')
+              },
+              iem: {
+                model: String(artist.iem_model || ''),
+                providedBy: String(artist.iem_provided_by || 'festival'),
+                quantity: Number(artist.iem_quantity || 0),
+                band: String(artist.iem_band || '')
+              },
+              monitors: {
+                enabled: Boolean(artist.monitors_enabled || false),
+                quantity: Number(artist.monitors_quantity || 0)
+              }
+            },
+            infrastructure: {
+              providedBy: String(artist.infrastructure_provided_by || 'festival'),
+              cat6: { 
+                enabled: Boolean(artist.infra_cat6 || false), 
+                quantity: Number(artist.infra_cat6_quantity || 0) 
+              },
+              hma: { 
+                enabled: Boolean(artist.infra_hma || false), 
+                quantity: Number(artist.infra_hma_quantity || 0) 
+              },
+              coax: { 
+                enabled: Boolean(artist.infra_coax || false), 
+                quantity: Number(artist.infra_coax_quantity || 0) 
+              },
+              opticalconDuo: { 
+                enabled: Boolean(artist.infra_opticalcon_duo || false), 
+                quantity: Number(artist.infra_opticalcon_duo_quantity || 0) 
+              },
+              analog: Number(artist.infra_analog || 0),
+              other: String(artist.other_infrastructure || '')
+            },
+            extras: {
+              sideFill: Boolean(artist.extras_sf || false),
+              drumFill: Boolean(artist.extras_df || false),
+              djBooth: Boolean(artist.extras_djbooth || false),
+              wired: String(artist.extras_wired || '')
+            },
+            notes: artist.notes ? String(artist.notes) : undefined,
+            logoUrl
+          };
+          
+          const pdf = await exportArtistPDF(artistData);
+          console.log(`Generated PDF for artist ${artist.name}, size: ${pdf.size} bytes`);
+          if (pdf && pdf.size > 0) {
+            individualArtistPdfs.push(pdf);
+          } else {
+            console.warn(`Generated empty PDF for artist ${artist.name}, skipping`);
+          }
+        } catch (err) {
+          console.error(`Error generating PDF for artist ${artist.name}:`, err);
+        }
+      }
+    }
+    
+    // ====== CREATE TOC AND COMBINE EVERYTHING ======
+    // Create a table of contents
+    const tocSections = [
+      { title: "Stage Equipment Setup", pageCount: gearPdfs.length },
+      { title: "Staff Shift Schedules", pageCount: shiftPdfs.length },
+      { title: "Artist Schedule Tables", pageCount: artistTablePdfs.length },
+      { title: "Individual Artist Requirements", pageCount: individualArtistPdfs.length }
+    ];
+    
+    // Create cover and TOC
+    const coverPage = await generateCoverPage(jobId, jobTitle, logoUrl);
+    const tableOfContents = await generateTableOfContents(tocSections, logoUrl);
+    
+    // Combine everything in the desired order
+    const allPdfs = [
+      coverPage,
+      tableOfContents,
+      ...gearPdfs,
+      ...shiftPdfs,
+      ...artistTablePdfs,
+      ...individualArtistPdfs
+    ];
+    
     console.log(`Total PDFs to merge: ${allPdfs.length}`);
     
-    if (allPdfs.length === 0) {
-      throw new Error('No valid documents were generated');
+    if (allPdfs.length <= 2) { // Only cover and TOC
+      throw new Error('No valid documents were generated beyond cover and TOC');
     }
     
     return await mergePDFs(allPdfs);
@@ -574,4 +873,3 @@ export const generateAndMergeFestivalPDFs = async (
     throw error;
   }
 };
-
