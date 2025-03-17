@@ -1,3 +1,4 @@
+
 import { PDFDocument } from 'pdf-lib';
 import { exportArtistPDF, ArtistPdfData } from './artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from './artistTablePdfExport';
@@ -430,58 +431,59 @@ export const generateAndMergeFestivalPDFs = async (
       console.log(`Found ${shiftsData?.length || 0} shifts for date ${date}`);
       
       if (shiftsData && shiftsData.length > 0) {
-        console.log(`Generating shifts PDF for date ${date}`);
-        const typedShifts = shiftsData.map(shift => {
-          const typedAssignments = (shift.assignments || []).map(assignment => {
-            let profileData = null;
-            
-            if (assignment.profiles) {
-              const profilesData = assignment.profiles as any;
+        try {
+          console.log(`Generating shifts PDF for date ${date}`);
+          const typedShifts = shiftsData.map(shift => {
+            const typedAssignments = (shift.assignments || []).map(assignment => {
+              let profileData = null;
               
-              if (Array.isArray(profilesData) && profilesData.length > 0) {
-                profileData = {
-                  id: profilesData[0].id,
-                  first_name: profilesData[0].first_name,
-                  last_name: profilesData[0].last_name,
-                  email: profilesData[0].email,
-                  department: profilesData[0].department,
-                  role: profilesData[0].role
-                };
-              } else if (typeof profilesData === 'object' && profilesData !== null) {
-                profileData = {
-                  id: profilesData.id,
-                  first_name: profilesData.first_name,
-                  last_name: profilesData.last_name,
-                  email: profilesData.email,
-                  department: profilesData.department,
-                  role: profilesData.role
-                };
+              if (assignment.profiles) {
+                const profilesData = assignment.profiles as any;
+                
+                if (Array.isArray(profilesData) && profilesData.length > 0) {
+                  profileData = {
+                    id: profilesData[0].id,
+                    first_name: profilesData[0].first_name,
+                    last_name: profilesData[0].last_name,
+                    email: profilesData[0].email,
+                    department: profilesData[0].department,
+                    role: profilesData[0].role
+                  };
+                } else if (typeof profilesData === 'object' && profilesData !== null) {
+                  profileData = {
+                    id: profilesData.id,
+                    first_name: profilesData.first_name,
+                    last_name: profilesData.last_name,
+                    email: profilesData.email,
+                    department: profilesData.department,
+                    role: profilesData.role
+                  };
+                }
               }
-            }
+              
+              return {
+                id: assignment.id,
+                shift_id: assignment.shift_id,
+                technician_id: assignment.technician_id,
+                role: assignment.role,
+                profiles: profileData
+              };
+            });
             
             return {
-              id: assignment.id,
-              shift_id: assignment.shift_id,
-              technician_id: assignment.technician_id,
-              role: assignment.role,
-              profiles: profileData
+              id: shift.id,
+              job_id: shift.job_id,
+              date: shift.date,
+              start_time: shift.start_time,
+              end_time: shift.end_time,
+              name: shift.name,
+              department: shift.department || undefined,
+              stage: shift.stage ? Number(shift.stage) : undefined,
+              assignments: typedAssignments
             };
           });
           
-          return {
-            id: shift.id,
-            job_id: shift.job_id,
-            date: shift.date,
-            start_time: shift.start_time,
-            end_time: shift.end_time,
-            name: shift.name,
-            department: shift.department || undefined,
-            stage: shift.stage ? Number(shift.stage) : undefined,
-            assignments: typedAssignments
-          };
-        });
-        
-        try {
+          // Create the shifts table PDF data
           const shiftsTableData: ShiftsTablePdfData = {
             jobTitle: jobTitle || 'Festival',
             date: date,
