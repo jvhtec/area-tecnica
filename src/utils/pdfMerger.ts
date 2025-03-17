@@ -1,8 +1,8 @@
-
 import { PDFDocument } from 'pdf-lib';
 import { exportArtistPDF, ArtistPdfData } from './artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from './artistTablePdfExport';
 import { exportShiftsTablePDF, ShiftsTablePdfData } from './shiftsTablePdfExport';
+import { generateStageGearPDF } from './gearSetupPdfExport';
 import { supabase } from '@/lib/supabase';
 
 export const fetchLogoUrl = async (jobId: string): Promise<string | undefined> => {
@@ -507,6 +507,58 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
+    // Generate gear setup PDFs for each date and stage
+    console.log("Starting gear setup PDF generation for dates:", uniqueDates);
+    for (const date of uniqueDates) {
+      if (!date) continue;
+      
+      console.log(`Fetching gear setup data for date ${date}`);
+      const { data: gearSetupData, error: gearSetupError } = await supabase
+        .from("festival_gear_setups")
+        .select("*")
+        .eq("job_id", jobId)
+        .eq("date", date)
+        .single();
+      
+      if (gearSetupError) {
+        console.error(`Error fetching gear setup for date ${date}:`, gearSetupError);
+        continue;
+      }
+      
+      if (gearSetupData) {
+        const maxStages = gearSetupData.max_stages || 1;
+        console.log(`Found gear setup with ${maxStages} stages for date ${date}`);
+        
+        // Fetch stage names
+        const { data: stages } = await supabase
+          .from("festival_stages")
+          .select("*")
+          .eq("job_id", jobId);
+        
+        // Generate PDF for each stage
+        for (let stageNum = 1; stageNum <= maxStages; stageNum++) {
+          try {
+            console.log(`Generating gear setup PDF for stage ${stageNum} on date ${date}`);
+            const stageObj = stages?.find(s => s.number === stageNum);
+            const stageName = stageObj ? stageObj.name : `Stage ${stageNum}`;
+            
+            const pdf = await generateStageGearPDF(jobId, date, stageNum, stageName);
+            
+            console.log(`Generated gear setup PDF for stage ${stageNum}, size: ${pdf.size} bytes`);
+            if (pdf && pdf.size > 0) {
+              allPdfs.push(pdf);
+            } else {
+              console.warn(`Generated empty gear setup PDF for stage ${stageNum}, skipping`);
+            }
+          } catch (err) {
+            console.error(`Error generating gear setup PDF for stage ${stageNum}:`, err);
+          }
+        }
+      } else {
+        console.log(`No gear setup found for date ${date}, skipping gear setup PDF generation`);
+      }
+    }
+    
     console.log(`Total PDFs to merge: ${allPdfs.length}`);
     
     if (allPdfs.length === 0) {
@@ -520,3 +572,4 @@ export const generateAndMergeFestivalPDFs = async (
     throw error;
   }
 };
+

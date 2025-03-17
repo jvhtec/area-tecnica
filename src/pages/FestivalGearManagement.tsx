@@ -1,10 +1,9 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ArrowLeft, Plus, Copy, Save, Wrench } from "lucide-react";
+import { ArrowLeft, Plus, Copy, Save, Wrench, Printer, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
@@ -14,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { generateStageGearPDF } from "@/utils/gearSetupPdfExport";
 
 const FestivalGearManagement = () => {
   const { jobId } = useParams();
@@ -29,6 +29,7 @@ const FestivalGearManagement = () => {
   const [gearSetup, setGearSetup] = useState<FestivalGearSetup | null>(null);
   const [isCreateStageDialogOpen, setIsCreateStageDialogOpen] = useState(false);
   const [newStageName, setNewStageName] = useState("");
+  const [isPrinting, setIsPrinting] = useState(false);
 
   useEffect(() => {
     if (!jobId) return;
@@ -74,7 +75,6 @@ const FestivalGearManagement = () => {
 
     const fetchFestivalGearSetup = async () => {
       try {
-        // First, check if we have a setup for this date
         const { data: setupData, error: setupError } = await supabase
           .from("festival_gear_setups")
           .select("*")
@@ -87,7 +87,6 @@ const FestivalGearManagement = () => {
         if (setupData) {
           setGearSetup(setupData);
           setMaxStages(setupData.max_stages || 1);
-          // Generate stages array based on max_stages
           const stagesArray = Array.from({ length: setupData.max_stages || 1 }, (_, i) => i + 1);
           setStages(stagesArray);
         } else {
@@ -117,7 +116,6 @@ const FestivalGearManagement = () => {
     try {
       setIsLoading(true);
       
-      // Update or create the gear setup with new max_stages
       const { error } = await supabase
         .from("festival_gear_setups")
         .upsert({
@@ -128,7 +126,6 @@ const FestivalGearManagement = () => {
 
       if (error) throw error;
 
-      // Update local state
       setMaxStages(newMaxStages);
       const stagesArray = Array.from({ length: newMaxStages }, (_, i) => i + 1);
       setStages(stagesArray);
@@ -158,6 +155,43 @@ const FestivalGearManagement = () => {
       title: "Success",
       description: "Festival gear setup has been updated.",
     });
+  };
+
+  const handlePrintGearSetup = async () => {
+    if (!jobId || !selectedDate) return;
+    
+    setIsPrinting(true);
+    try {
+      console.log(`Generating PDF for Stage ${selectedStage} on ${selectedDate}`);
+      const pdf = await generateStageGearPDF(jobId, selectedDate, selectedStage);
+      
+      if (!pdf || pdf.size === 0) {
+        throw new Error('Generated PDF is empty');
+      }
+      
+      const url = URL.createObjectURL(pdf);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${jobTitle}_Stage${selectedStage}_GearSetup.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Success",
+        description: 'Gear setup documentation generated successfully'
+      });
+    } catch (error: any) {
+      console.error('Error generating gear setup PDF:', error);
+      toast({
+        title: "Error",
+        description: `Failed to generate documentation: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   return (
@@ -242,10 +276,24 @@ const FestivalGearManagement = () => {
       {selectedDate && !isLoading && (
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Wrench className="h-5 w-5" />
-              Stage {selectedStage} Gear Setup
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Wrench className="h-5 w-5" />
+                Stage {selectedStage} Gear Setup
+              </CardTitle>
+              <Button 
+                onClick={handlePrintGearSetup} 
+                disabled={isPrinting}
+                variant="outline"
+              >
+                {isPrinting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Printer className="h-4 w-4 mr-2" />
+                )}
+                Print Gear Setup
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="mb-4">
@@ -287,7 +335,6 @@ const FestivalGearManagement = () => {
           <DialogFooter>
             <Button 
               onClick={() => {
-                // Add stage logic would go here
                 handleAddStage();
                 setIsCreateStageDialogOpen(false);
               }}
