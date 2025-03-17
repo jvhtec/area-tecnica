@@ -33,6 +33,7 @@ import { EquipmentManagement } from '@/pages/EquipmentManagement';
 import { ArtistRequirementsForm } from '@/components/festival/ArtistRequirementsForm';
 import { FormSubmitted } from '@/components/festival/FormSubmitted';
 import FestivalGearManagement from '@/pages/FestivalGearManagement';
+import Festivals from '@/pages/Festivals';
 
 function App() {
   return (
@@ -57,6 +58,7 @@ function App() {
               <Route path="project-management" element={<ProjectManagement />} />
               <Route path="technician" element={<TechnicianDashboard />} />
               <Route path="equipment-management" element={<EquipmentManagement />} />
+              <Route path="festivals" element={<Festivals />} />
               
               {/* Tools Routes */}
               <Route path="pesos-tool" element={<PesosTool />} />

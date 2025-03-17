@@ -9,7 +9,8 @@ import {
   Settings,
   Truck,
   UserCircle,
-  ClipboardList
+  ClipboardList,
+  Tent
 } from "lucide-react";
 
 interface SidebarNavigationProps {
@@ -119,6 +120,19 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
               >
                 <Video className="h-4 w-4" />
                 <span>Video</span>
+              </Button>
+            </Link>
+            
+            {/* Festivals */}
+            <Link to="/festivals">
+              <Button
+                variant="ghost"
+                className={`w-full justify-start gap-2 ${
+                  location.pathname === "/festivals" ? "bg-accent" : ""
+                }`}
+              >
+                <Tent className="h-4 w-4" />
+                <span>Festivals</span>
               </Button>
             </Link>
           </>

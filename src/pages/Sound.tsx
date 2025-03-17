@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
 import CreateTourDialog from "@/components/tours/CreateTourDialog";
@@ -11,7 +12,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
-import { Calculator, PieChart, FileText, Sparkles, Zap, FileStack } from 'lucide-react';
+import { Calculator, PieChart, FileText, Sparkles, Zap, FileStack, Tent } from 'lucide-react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -162,7 +163,7 @@ const Sound = () => {
         <div className="p-6">
           <h2 className="text-2xl font-semibold mb-4">Tools</h2>
           <Separator className="mb-6" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
             <Button
               variant="outline"
               size="lg"
@@ -221,6 +222,16 @@ const Sound = () => {
             >
               <FileStack className="h-6 w-6" />
               <span>Memoria Técnica</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full h-auto py-4 flex flex-col items-center gap-2"
+              onClick={() => navigate('/festivals')}
+            >
+              <Tent className="h-6 w-6" />
+              <span>Festivals</span>
             </Button>
           </div>
         </div>
