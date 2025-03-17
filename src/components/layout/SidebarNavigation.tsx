@@ -32,6 +32,9 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
   // Check if user is in sound department
   const isSoundDepartment = userDepartment?.toLowerCase() === 'sound';
 
+  // Check if user is house tech from sound department
+  const isSoundHouseTech = userRole === 'house_tech' && isSoundDepartment;
+
   // Don't render navigation until role is loaded
   if (!userRole) {
     console.log('User role not yet loaded, waiting...');
@@ -126,8 +129,8 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
               </Button>
             </Link>
             
-            {/* Festivals - Only show for management users and sound department users */}
-            {(isManagementUser || isSoundDepartment) && (
+            {/* Festivals - Only show for management users and house techs from sound department */}
+            {(isManagementUser || isSoundHouseTech) && (
               <Link to="/festivals">
                 <Button
                   variant="ghost"
