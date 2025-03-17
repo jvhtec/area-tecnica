@@ -151,14 +151,62 @@ export const exportShiftsTablePDF = (data: ShiftsTablePdfData): Promise<Blob> =>
           }
         }
 
-        // Footer with date
-        doc.setFontSize(8);
-        doc.setTextColor(51, 51, 51);
-        doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
-        
-        // Resolve with the PDF blob
-        const blob = doc.output('blob');
-        resolve(blob);
+        // Add company logo at the bottom
+        try {
+          // Add a small company logo at the bottom right
+          const companyLogoUrl = 'public/sector pro logo.png';
+          const companyImg = new Image();
+          companyImg.onload = () => {
+            try {
+              // Logo at bottom right
+              const logoWidth = 20;
+              const ratio = companyImg.width / companyImg.height;
+              const logoHeight = logoWidth / ratio;
+              
+              doc.addImage(
+                companyImg, 
+                'PNG', 
+                pageWidth - logoWidth - 10, // X position (right aligned)
+                pageHeight - logoHeight - 10, // Y position (bottom aligned)
+                logoWidth,
+                logoHeight
+              );
+              
+              // Footer with date
+              doc.setFontSize(8);
+              doc.setTextColor(51, 51, 51);
+              doc.text(`Generated: ${createdDate}`, pageWidth - 35, pageHeight - 10, { align: 'right' });
+              
+              // Resolve with the PDF blob
+              const blob = doc.output('blob');
+              resolve(blob);
+            } catch (err) {
+              console.error('Error adding company logo to PDF:', err);
+              // Continue without company logo
+              doc.setFontSize(8);
+              doc.setTextColor(51, 51, 51);
+              doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
+              const blob = doc.output('blob');
+              resolve(blob);
+            }
+          };
+          companyImg.onerror = () => {
+            // If company logo fails to load, just add the footer text
+            doc.setFontSize(8);
+            doc.setTextColor(51, 51, 51);
+            doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
+            const blob = doc.output('blob');
+            resolve(blob);
+          };
+          companyImg.src = companyLogoUrl;
+        } catch (logoErr) {
+          // If any error occurs, just add the footer text
+          doc.setFontSize(8);
+          doc.setTextColor(51, 51, 51);
+          doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
+          const blob = doc.output('blob');
+          resolve(blob);
+        }
       }).catch(err => {
         console.error("Error in PDF generation:", err);
         reject(err);
