@@ -55,7 +55,6 @@ const Festivals = () => {
   };
 
   const handleJobClick = (jobId: string) => {
-    // When clicking a job card, navigate to the view-only festival management page
     navigate(`/festival-management/${jobId}`);
   };
 
@@ -98,9 +97,6 @@ const Festivals = () => {
   // Check if user can print documentation
   const canPrintDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
 
-  // Pass an empty function for edit/delete since we're hiding these on the festivals page
-  const emptyFunction = () => {};
-
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <Card>
@@ -133,8 +129,8 @@ const Festivals = () => {
                     <JobCard 
                       job={job} 
                       onJobClick={() => handleJobClick(job.id)} 
-                      onEditClick={emptyFunction} 
-                      onDeleteClick={emptyFunction}
+                      onEditClick={() => {}} 
+                      onDeleteClick={() => {}}
                       userRole={userRole}
                       department="sound"
                       festivalLogo={festivalLogos[job.id]}
