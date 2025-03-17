@@ -55,7 +55,7 @@ export const ArtistManagementDialog = ({
   const [formLinkDialogOpen, setFormLinkDialogOpen] = useState(false);
   const [showStartHour, setShowStartHour] = useState<number | null>(null);
   const [showEndHour, setShowEndHour] = useState<number | null>(null);
-  const [dayStartHour] = useState<number>(parseInt(dayStartTime.split(':')[0]) || 7);
+  const [dayStartHour] = useState<number>(parseInt(dayStartTime?.split(':')[0]) || 7);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -181,6 +181,7 @@ export const ArtistManagementDialog = ({
 
     setIsLoading(true);
     try {
+      // Prepare data for submission, ensuring all required fields have valid values
       const data = {
         ...formData,
         job_id: jobId,
@@ -190,6 +191,11 @@ export const ArtistManagementDialog = ({
         show_end: formData.show_end || null,
         soundcheck_start: formData.soundcheck_start || null,
         soundcheck_end: formData.soundcheck_end || null,
+        // Ensure required fields that have check constraints have valid values
+        foh_console: formData.foh_console || "", // Empty string rather than null
+        mon_console: formData.mon_console || "", // Empty string rather than null
+        wireless_model: formData.wireless_model || "", // Empty string rather than null
+        iem_model: formData.iem_model || "", // Empty string rather than null
       };
 
       const { error } = artist?.id
