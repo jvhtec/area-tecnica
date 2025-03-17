@@ -1,5 +1,4 @@
-
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, rgb } from 'pdf-lib';
 import { exportArtistPDF, ArtistPdfData } from './artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from './artistTablePdfExport';
 import { exportShiftsTablePDF, ShiftsTablePdfData } from './shiftsTablePdfExport';
@@ -102,7 +101,7 @@ const generateCoverPage = async (
       y: height - 100,
       width: width,
       height: 100,
-      color: { type: 'RGB', red: 0.87, green: 0.22, blue: 0.2 },
+      color: rgb(0.87, 0.22, 0.2),
     });
     
     // Add title with large font
@@ -110,7 +109,7 @@ const generateCoverPage = async (
       x: 50,
       y: height - 60,
       size: 24,
-      color: { type: 'RGB', red: 1, green: 1, blue: 1 },
+      color: rgb(1, 1, 1),
     });
     
     // Add festival title
@@ -118,7 +117,7 @@ const generateCoverPage = async (
       x: 50,
       y: height / 2 + 50,
       size: 36,
-      color: { type: 'RGB', red: 0, green: 0, blue: 0 },
+      color: rgb(0, 0, 0),
     });
     
     // Add date range if available
@@ -127,7 +126,7 @@ const generateCoverPage = async (
         x: 50,
         y: height / 2,
         size: 16,
-        color: { type: 'RGB', red: 0.3, green: 0.3, blue: 0.3 },
+        color: rgb(0.3, 0.3, 0.3),
       });
     }
     
@@ -136,7 +135,7 @@ const generateCoverPage = async (
       x: 50,
       y: height / 2 - 50,
       size: 16,
-      color: { type: 'RGB', red: 0.5, green: 0.5, blue: 0.5 },
+      color: rgb(0.5, 0.5, 0.5),
     });
     
     // Add logo if available
@@ -174,7 +173,7 @@ const generateCoverPage = async (
       x: width / 2,
       y: 30,
       size: 10,
-      color: { type: 'RGB', red: 0.5, green: 0.5, blue: 0.5 },
+      color: rgb(0.5, 0.5, 0.5),
     });
     
     // Add generation date
@@ -183,7 +182,7 @@ const generateCoverPage = async (
       x: 50,
       y: 50,
       size: 10,
-      color: { type: 'RGB', red: 0.5, green: 0.5, blue: 0.5 },
+      color: rgb(0.5, 0.5, 0.5),
     });
     
     const pdfBytes = await pdfDoc.save();
@@ -212,7 +211,7 @@ const generateTableOfContents = async (
       y: height - 100,
       width: width,
       height: 100,
-      color: { type: 'RGB', red: 0.87, green: 0.22, blue: 0.2 },
+      color: rgb(0.87, 0.22, 0.2),
     });
     
     // Add title
@@ -220,7 +219,7 @@ const generateTableOfContents = async (
       x: 50,
       y: height - 60,
       size: 24,
-      color: { type: 'RGB', red: 1, green: 1, blue: 1 },
+      color: rgb(1, 1, 1),
     });
     
     // Add logo if available
@@ -261,14 +260,14 @@ const generateTableOfContents = async (
       x: 50,
       y: currentY,
       size: 14,
-      color: { type: 'RGB', red: 0, green: 0, blue: 0 },
+      color: rgb(0, 0, 0),
     });
     
     page.drawText("Page", {
       x: width - 100,
       y: currentY,
       size: 14,
-      color: { type: 'RGB', red: 0, green: 0, blue: 0 },
+      color: rgb(0, 0, 0),
     });
     
     currentY -= 20;
@@ -278,7 +277,7 @@ const generateTableOfContents = async (
       start: { x: 50, y: currentY },
       end: { x: width - 50, y: currentY },
       thickness: 1,
-      color: { type: 'RGB', red: 0.8, green: 0.8, blue: 0.8 },
+      color: rgb(0.8, 0.8, 0.8),
     });
     
     currentY -= 30;
@@ -289,14 +288,14 @@ const generateTableOfContents = async (
         x: 50,
         y: currentY,
         size: 12,
-        color: { type: 'RGB', red: 0, green: 0, blue: 0 },
+        color: rgb(0, 0, 0),
       });
       
       page.drawText(pageCounter.toString(), {
         x: width - 100,
         y: currentY,
         size: 12,
-        color: { type: 'RGB', red: 0, green: 0, blue: 0 },
+        color: rgb(0, 0, 0),
       });
       
       // Add dots between section name and page number
@@ -306,7 +305,7 @@ const generateTableOfContents = async (
           x: dotX,
           y: currentY,
           size: 12,
-          color: { type: 'RGB', red: 0.7, green: 0.7, blue: 0.7 },
+          color: rgb(0.7, 0.7, 0.7),
         });
         dotX += 10;
       }
@@ -320,7 +319,7 @@ const generateTableOfContents = async (
       x: width / 2,
       y: 30,
       size: 10,
-      color: { type: 'RGB', red: 0.5, green: 0.5, blue: 0.5 },
+      color: rgb(0.5, 0.5, 0.5),
     });
     
     const pdfBytes = await pdfDoc.save();
