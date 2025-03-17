@@ -7,12 +7,15 @@ import { JobCard } from "@/components/jobs/JobCard";
 import { Separator } from "@/components/ui/separator";
 import { Tent } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
+import { generateAndMergeFestivalPDFs } from "@/utils/pdfMerger";
 
 const Festivals = () => {
   const navigate = useNavigate();
   const { data: jobs, isLoading } = useJobs();
   const [festivalJobs, setFestivalJobs] = useState<any[]>([]);
   const [festivalLogos, setFestivalLogos] = useState<Record<string, string>>({});
+  const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
 
   useEffect(() => {
     if (jobs) {
@@ -54,6 +57,31 @@ const Festivals = () => {
     navigate(`/festival-management/${jobId}`);
   };
 
+  const handleGenerateDocumentation = async (jobId: string, jobTitle: string) => {
+    try {
+      setGeneratingPdf(jobId);
+      toast.info("Generating documentation. This may take a moment...");
+
+      const pdfBlob = await generateAndMergeFestivalPDFs(jobId, jobTitle);
+      
+      // Create a download link
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${jobTitle.replace(/\s+/g, '_')}_Documentation.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success("Documentation generated successfully!");
+    } catch (error) {
+      console.error("Error generating documentation:", error);
+      toast.error("Failed to generate documentation. Please try again.");
+    } finally {
+      setGeneratingPdf(null);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <Card>
@@ -87,6 +115,7 @@ const Festivals = () => {
                     onJobClick={() => handleJobClick(job.id)} 
                     onEditClick={() => {}} // Empty function as we're removing edit functionality
                     onDeleteClick={() => {}}
+                    onGenerateDocumentation={handleGenerateDocumentation}
                     userRole="management"
                     department="sound"
                     festivalLogo={festivalLogos[job.id]}

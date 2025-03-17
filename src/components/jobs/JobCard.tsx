@@ -1,5 +1,5 @@
 
-import { Music, CalendarDays } from "lucide-react";
+import { Music, CalendarDays, FileText } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Job } from "@/types/job";
@@ -11,18 +11,36 @@ interface JobCardProps {
   onEditClick: (job: Job) => void;
   onDeleteClick: (jobId: string) => void;
   onJobClick: (jobId: string) => void;
+  onGenerateDocumentation?: (jobId: string, jobTitle: string) => void;
   userRole: string | null;
   department: string;
   selectedDate?: Date;
   festivalLogo?: string;
 }
 
-export const JobCard = ({ job, onEditClick, onDeleteClick, onJobClick, userRole, department, selectedDate, festivalLogo }: JobCardProps) => {
+export const JobCard = ({ 
+  job, 
+  onEditClick, 
+  onDeleteClick, 
+  onJobClick, 
+  onGenerateDocumentation,
+  userRole, 
+  department, 
+  selectedDate, 
+  festivalLogo 
+}: JobCardProps) => {
   const navigate = useNavigate();
 
   const handleFestivalManage = (e: React.MouseEvent) => {
     e.stopPropagation();
     navigate(`/festival-management/${job.id}`);
+  };
+
+  const handleGenerateDocumentation = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onGenerateDocumentation) {
+      onGenerateDocumentation(job.id, job.title);
+    }
   };
 
   return (
@@ -43,12 +61,21 @@ export const JobCard = ({ job, onEditClick, onDeleteClick, onJobClick, userRole,
           </CardTitle>
           <div className="flex items-center gap-2">
             {job.job_type === 'festival' && (
-              <Button 
-                variant="outline" 
-                onClick={handleFestivalManage}
-              >
-                Manage Festival
-              </Button>
+              <>
+                <Button 
+                  variant="outline" 
+                  onClick={handleGenerateDocumentation}
+                  title="Generate All Documentation"
+                >
+                  <FileText className="h-4 w-4" />
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={handleFestivalManage}
+                >
+                  Manage Festival
+                </Button>
+              </>
             )}
             {userRole !== "technician" && userRole !== "management" && (
               <>
