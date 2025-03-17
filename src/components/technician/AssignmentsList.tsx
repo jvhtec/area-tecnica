@@ -1,10 +1,11 @@
 
 import { JobCard } from "@/components/jobs/JobCard";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { Download, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { ReloadButton } from "@/components/ui/reload-button";
 
 interface JobDocument {
   id: string;
@@ -16,15 +17,18 @@ interface JobDocument {
 interface Assignment {
   job_id: string;
   jobs: any;
+  festival_jobs?: any;
 }
 
 interface AssignmentsListProps {
   assignments: Assignment[];
   loading: boolean;
+  onRefresh: () => Promise<void>;
 }
 
-export const AssignmentsList = ({ assignments, loading }: AssignmentsListProps) => {
+export const AssignmentsList = ({ assignments, loading, onRefresh }: AssignmentsListProps) => {
   const { toast } = useToast();
+  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
     console.log("Setting up real-time subscription for job assignments");
@@ -76,6 +80,7 @@ export const AssignmentsList = ({ assignments, loading }: AssignmentsListProps) 
       });
     } catch (error: any) {
       console.error("Download error:", error);
+      setHasError(true);
       toast({
         title: "Download Failed",
         description: error.message,
@@ -87,24 +92,49 @@ export const AssignmentsList = ({ assignments, loading }: AssignmentsListProps) 
   // For debugging
   useEffect(() => {
     console.log("Current assignments data:", assignments);
+    if (assignments && assignments.length > 0) {
+      setHasError(false);
+    }
   }, [assignments]);
 
   if (loading) {
-    return <p className="text-muted-foreground">Loading assignments...</p>;
+    return (
+      <div className="flex items-center justify-center p-8">
+        <p className="text-muted-foreground">Loading assignments...</p>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 space-y-4">
+        <div className="flex items-center text-yellow-500 gap-2">
+          <AlertTriangle />
+          <p>There was an error loading your assignments</p>
+        </div>
+        <ReloadButton onReload={onRefresh} />
+      </div>
+    );
   }
 
   if (!assignments || assignments.length === 0) {
-    return <p className="text-muted-foreground">No upcoming assignments found.</p>;
+    return (
+      <div className="flex flex-col items-center justify-center p-8 space-y-4">
+        <p className="text-muted-foreground">No upcoming assignments found.</p>
+        <ReloadButton onReload={onRefresh} />
+      </div>
+    );
   }
 
   return (
     <div className="grid gap-4">
       {assignments.map((assignment) => {
-        // Add a debug log for each assignment
         console.log("Rendering assignment:", assignment);
         
-        // Skip assignments without valid job data
-        if (!assignment.jobs) {
+        // Handle both regular and festival jobs
+        const jobData = assignment.jobs || assignment.festival_jobs;
+        
+        if (!jobData) {
           console.warn("Missing job data for assignment:", assignment.job_id);
           return null;
         }
@@ -112,18 +142,18 @@ export const AssignmentsList = ({ assignments, loading }: AssignmentsListProps) 
         return (
           <div key={assignment.job_id} className="space-y-4">
             <JobCard
-              job={assignment.jobs}
+              job={jobData}
               onEditClick={() => {}}
               onDeleteClick={() => {}}
               onJobClick={() => {}}
               department="sound"
               userRole="technician"
             />
-            {assignment.jobs.job_documents?.length > 0 && (
+            {jobData.job_documents?.length > 0 && (
               <div className="ml-4 space-y-2">
                 <h3 className="text-sm font-medium">Documents:</h3>
                 <div className="grid gap-2">
-                  {assignment.jobs.job_documents.map((doc: JobDocument) => (
+                  {jobData.job_documents.map((doc: JobDocument) => (
                     <Button
                       key={doc.id}
                       variant="outline"
@@ -141,6 +171,9 @@ export const AssignmentsList = ({ assignments, loading }: AssignmentsListProps) 
           </div>
         );
       })}
+      <div className="flex justify-end mt-2">
+        <ReloadButton onReload={onRefresh} className="ml-auto" />
+      </div>
     </div>
   );
 };

@@ -8,7 +8,7 @@ import { TimeSpanSelector } from "@/components/technician/TimeSpanSelector";
 import { MessageManagementDialog } from "@/components/technician/MessageManagementDialog";
 import { AssignmentsList } from "@/components/technician/AssignmentsList";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Dialog } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -25,23 +25,39 @@ const TechnicianDashboard = () => {
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const shouldShowMessages = searchParams.get('showMessages') === 'true';
+    console.log("Should show messages:", shouldShowMessages);
     setShowMessages(shouldShowMessages);
   }, [location.search]);
 
   useEffect(() => {
     const fetchUserDepartment = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          console.error("No user found");
+          return;
+        }
 
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('department')
-        .eq('id', user.id)
-        .single();
+        console.log("Fetching profile for user:", user.id);
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('department')
+          .eq('id', user.id)
+          .single();
 
-      if (profileData) {
-        console.log("User department fetched:", profileData.department);
-        setUserDepartment(profileData.department);
+        if (error) {
+          console.error("Error fetching user profile:", error);
+          return;
+        }
+
+        if (profileData) {
+          console.log("User department fetched:", profileData.department);
+          setUserDepartment(profileData.department);
+        } else {
+          console.warn("No profile data found");
+        }
+      } catch (error) {
+        console.error("Error in fetchUserDepartment:", error);
       }
     };
 
@@ -64,6 +80,18 @@ const TechnicianDashboard = () => {
         (payload) => {
           console.log("Received real-time update:", payload);
           // Invalidate and refetch assignments
+          queryClient.invalidateQueries({ queryKey: ['assignments'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'festival_assignments'
+        },
+        (payload) => {
+          console.log("Received real-time update for festival assignments:", payload);
           queryClient.invalidateQueries({ queryKey: ['assignments'] });
         }
       )
@@ -92,20 +120,24 @@ const TechnicianDashboard = () => {
   };
 
   const { data: assignments = [], isLoading, refetch } = useQuery({
-    queryKey: ['assignments', timeSpan],
+    queryKey: ['assignments', timeSpan, userDepartment],
     queryFn: async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return [];
+        if (!user) {
+          console.error("No user found");
+          return [];
+        }
 
         console.log("Fetching assignments for user:", user.id);
         console.log("Current timeSpan:", timeSpan);
+        console.log("User department:", userDepartment);
         
         const endDate = getTimeSpanEndDate();
         console.log("Fetching assignments until:", endDate);
         
-        // Modified query to properly fetch job details including festival jobs
-        const { data, error } = await supabase
+        // Fetch regular job assignments
+        const { data: regularAssignments, error: regularError } = await supabase
           .from('job_assignments')
           .select(`
             *,
@@ -126,29 +158,88 @@ const TechnicianDashboard = () => {
           .lte('jobs.start_time', endDate.toISOString())
           .order('jobs(start_time)', { ascending: true });
 
-        if (error) {
-          console.error("Error fetching assignments:", error);
-          throw error;
+        if (regularError) {
+          console.error("Error fetching regular assignments:", regularError);
+          toast.error("Error loading assignments");
+        }
+
+        console.log("Fetched regular assignments:", regularAssignments || []);
+        
+        // Fetch festival assignments
+        const { data: festivalAssignments, error: festivalError } = await supabase
+          .from('festival_assignments')
+          .select(`
+            *,
+            festival_jobs(
+              *,
+              festival(name, start_date, end_date),
+              festival_stage(name),
+              job_documents(
+                id,
+                file_name,
+                file_path,
+                uploaded_at
+              )
+            )
+          `)
+          .eq('technician_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (festivalError) {
+          console.error("Error fetching festival assignments:", festivalError);
+          toast.error("Error loading festival assignments");
+        }
+
+        console.log("Fetched festival assignments:", festivalAssignments || []);
+        
+        // Combine both types of assignments
+        let allAssignments = [];
+        
+        if (regularAssignments) {
+          allAssignments = regularAssignments;
         }
         
-        console.log("Fetched assignments:", data);
+        if (festivalAssignments) {
+          // Transform festival assignments to match the structure expected by the AssignmentsList component
+          const transformedFestivalAssignments = festivalAssignments.map(assignment => ({
+            job_id: assignment.id,
+            festival_jobs: assignment.festival_jobs
+          }));
+          
+          allAssignments = [...allAssignments, ...transformedFestivalAssignments];
+        }
+        
+        console.log("Combined assignments:", allAssignments);
         
         // Filter assignments based on user department if available
-        if (userDepartment) {
+        if (userDepartment && allAssignments.length > 0) {
           console.log("Filtering assignments by department:", userDepartment);
-          const filteredData = data.filter(assignment => {
-            // Check if job has this department
-            return assignment.jobs.job_departments.some(
-              (dept: any) => dept.department === userDepartment
-            );
+          
+          const filteredData = allAssignments.filter(assignment => {
+            // For regular jobs
+            if (assignment.jobs && assignment.jobs.job_departments) {
+              return assignment.jobs.job_departments.some(
+                (dept: any) => dept.department.toLowerCase() === userDepartment.toLowerCase()
+              );
+            }
+            
+            // For festival jobs
+            if (assignment.festival_jobs) {
+              // Festival jobs will be shown to all relevant department technicians
+              return true;
+            }
+            
+            return false;
           });
+          
           console.log("Filtered assignments:", filteredData);
           return filteredData || [];
         }
         
-        return data || [];
+        return allAssignments || [];
       } catch (error) {
         console.error("Error fetching assignments:", error);
+        toast.error("Failed to load assignments");
         return [];
       }
     },
@@ -176,6 +267,13 @@ const TechnicianDashboard = () => {
     }
   };
 
+  // Debug output
+  useEffect(() => {
+    console.log("Current assignments state:", assignments);
+    console.log("User department:", userDepartment);
+    console.log("Show messages dialog:", showMessages);
+  }, [assignments, userDepartment, showMessages]);
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
@@ -186,6 +284,7 @@ const TechnicianDashboard = () => {
             size="icon"
             onClick={handleRefresh}
             disabled={isLoading || isRefreshing}
+            title="Refresh assignments"
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </Button>
@@ -208,13 +307,19 @@ const TechnicianDashboard = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <AssignmentsList assignments={assignments} loading={isLoading} />
+          <AssignmentsList 
+            assignments={assignments} 
+            loading={isLoading} 
+            onRefresh={handleRefresh}
+          />
         </CardContent>
       </Card>
 
       {showMessages && (
         <Dialog open={showMessages} onOpenChange={handleCloseMessages}>
-          <MessageManagementDialog department={userDepartment} trigger={false} />
+          <DialogContent className="max-w-2xl">
+            <MessageManagementDialog department={userDepartment} trigger={false} />
+          </DialogContent>
         </Dialog>
       )}
     </div>
