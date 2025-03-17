@@ -396,61 +396,12 @@ export const generateAndMergeFestivalPDFs = async (
     
     if (artistError) throw artistError;
     
-    const { data: technicalInfo, error: technicalError } = await supabase
-      .from("festival_artist_technical_info")
-      .select("*")
-      .eq("job_id", jobId);
-      
-    if (technicalError) {
-      console.error("Error fetching technical info:", technicalError);
-    }
-    
-    const { data: infrastructureInfo, error: infraError } = await supabase
-      .from("festival_artist_infrastructure_info")
-      .select("*")
-      .eq("job_id", jobId);
-      
-    if (infraError) {
-      console.error("Error fetching infrastructure info:", infraError);
-    }
-    
-    const { data: extrasInfo, error: extrasError } = await supabase
-      .from("festival_artist_extras")
-      .select("*")
-      .eq("job_id", jobId);
-      
-    if (extrasError) {
-      console.error("Error fetching extras info:", extrasError);
-    }
-    
+    // We'll skip querying these tables since they don't exist yet
+    // and handle artist data directly from the main table
     const techInfoMap = new Map();
     const infraInfoMap = new Map();
     const extrasInfoMap = new Map();
     
-    if (technicalInfo) {
-      technicalInfo.forEach(item => {
-        if (item.artist_id) {
-          techInfoMap.set(item.artist_id, item);
-        }
-      });
-    }
-    
-    if (infrastructureInfo) {
-      infrastructureInfo.forEach(item => {
-        if (item.artist_id) {
-          infraInfoMap.set(item.artist_id, item);
-        }
-      });
-    }
-    
-    if (extrasInfo) {
-      extrasInfo.forEach(item => {
-        if (item.artist_id) {
-          extrasInfoMap.set(item.artist_id, item);
-        }
-      });
-    }
-
     const uniqueDates = [...new Set(artists?.map(a => a.date) || [])];
     
     console.log("Starting gear setup PDF generation for dates:", uniqueDates);
@@ -507,102 +458,116 @@ export const generateAndMergeFestivalPDFs = async (
       if (!date) continue;
       
       console.log(`Fetching shifts data for date ${date}`);
-      const { data: shiftsData, error: shiftsError } = await supabase
-        .from("festival_shifts")
-        .select(`
-          id, job_id, name, date, start_time, end_time, department, stage,
-          assignments:festival_shift_assignments(
-            id, shift_id, technician_id, role,
-            profiles:technician_id(id, first_name, last_name, email, department, role)
-          )
-        `)
-        .eq("job_id", jobId)
-        .eq("date", date);
       
-      if (shiftsError) {
-        console.error(`Error fetching shifts for date ${date}:`, shiftsError);
-        continue;
-      }
-      
-      console.log(`Found ${shiftsData?.length || 0} shifts for date ${date}`);
-      
-      if (shiftsData && shiftsData.length > 0) {
-        try {
-          console.log(`Generating shifts PDF for date ${date}`);
-          const typedShifts = shiftsData.map(shift => {
-            const typedAssignments = (shift.assignments || []).map(assignment => {
-              let profileData = null;
+      try {
+        // Modify the shifts query to avoid the foreign key relationship error
+        const { data: shiftsData, error: shiftsError } = await supabase
+          .from("festival_shifts")
+          .select(`
+            id, job_id, name, date, start_time, end_time, department, stage
+          `)
+          .eq("job_id", jobId)
+          .eq("date", date);
+        
+        if (shiftsError) {
+          console.error(`Error fetching shifts for date ${date}:`, shiftsError);
+          continue;
+        }
+        
+        // Fetch assignments separately
+        const shiftsWithAssignments = await Promise.all((shiftsData || []).map(async (shift) => {
+          try {
+            const { data: assignmentsData, error: assignmentsError } = await supabase
+              .from("festival_shift_assignments")
+              .select(`
+                id, shift_id, technician_id, role
+              `)
+              .eq("shift_id", shift.id);
               
-              if (assignment.profiles) {
-                const profilesData = assignment.profiles as any;
-                
-                if (Array.isArray(profilesData) && profilesData.length > 0) {
-                  profileData = {
-                    id: profilesData[0].id,
-                    first_name: profilesData[0].first_name,
-                    last_name: profilesData[0].last_name,
-                    email: profilesData[0].email,
-                    department: profilesData[0].department,
-                    role: profilesData[0].role
-                  };
-                } else if (typeof profilesData === 'object' && profilesData !== null) {
-                  profileData = {
-                    id: profilesData.id,
-                    first_name: profilesData.first_name,
-                    last_name: profilesData.last_name,
-                    email: profilesData.email,
-                    department: profilesData.department,
-                    role: profilesData.role
-                  };
-                }
+            if (assignmentsError) {
+              console.error(`Error fetching assignments for shift ${shift.id}:`, assignmentsError);
+              return { ...shift, assignments: [] };
+            }
+            
+            // For each assignment, get the technician profile
+            const assignmentsWithProfiles = await Promise.all((assignmentsData || []).map(async (assignment) => {
+              if (!assignment.technician_id) {
+                return { ...assignment, profiles: null };
               }
               
+              try {
+                const { data: profileData, error: profileError } = await supabase
+                  .from("profiles")
+                  .select(`id, first_name, last_name, email, department, role`)
+                  .eq("id", assignment.technician_id)
+                  .single();
+                  
+                if (profileError) {
+                  console.error(`Error fetching profile for technician ${assignment.technician_id}:`, profileError);
+                  return { ...assignment, profiles: null };
+                }
+                
+                return { ...assignment, profiles: profileData };
+              } catch (err) {
+                console.error(`Error processing profile data for technician ${assignment.technician_id}:`, err);
+                return { ...assignment, profiles: null };
+              }
+            }));
+            
+            return { ...shift, assignments: assignmentsWithProfiles || [] };
+          } catch (err) {
+            console.error(`Error processing assignments for shift ${shift.id}:`, err);
+            return { ...shift, assignments: [] };
+          }
+        }));
+        
+        console.log(`Found ${shiftsWithAssignments?.length || 0} shifts for date ${date}`);
+        
+        if (shiftsWithAssignments && shiftsWithAssignments.length > 0) {
+          try {
+            console.log(`Generating shifts PDF for date ${date}`);
+            
+            const typedShifts = shiftsWithAssignments.map(shift => {
               return {
-                id: assignment.id,
-                shift_id: assignment.shift_id,
-                technician_id: assignment.technician_id,
-                role: assignment.role,
-                profiles: profileData
+                id: shift.id,
+                job_id: shift.job_id,
+                date: shift.date,
+                start_time: shift.start_time,
+                end_time: shift.end_time,
+                name: shift.name,
+                department: shift.department || undefined,
+                stage: shift.stage ? Number(shift.stage) : undefined,
+                assignments: shift.assignments || []
               };
             });
             
-            return {
-              id: shift.id,
-              job_id: shift.job_id,
-              date: shift.date,
-              start_time: shift.start_time,
-              end_time: shift.end_time,
-              name: shift.name,
-              department: shift.department || undefined,
-              stage: shift.stage ? Number(shift.stage) : undefined,
-              assignments: typedAssignments
+            const shiftsTableData: ShiftsTablePdfData = {
+              jobTitle: jobTitle || 'Festival',
+              date: date,
+              jobId: jobId,
+              shifts: typedShifts,
+              logoUrl
             };
-          });
-          
-          const shiftsTableData: ShiftsTablePdfData = {
-            jobTitle: jobTitle || 'Festival',
-            date: date,
-            jobId: jobId,
-            shifts: typedShifts,
-            logoUrl
-          };
-          
-          console.log(`Creating shifts table PDF with ${typedShifts.length} shifts`);
-          const shiftPdf = await exportShiftsTablePDF(shiftsTableData);
-          
-          console.log(`Generated shifts PDF for date ${date}, size: ${shiftPdf.size} bytes, type: ${shiftPdf.type}`);
-          if (shiftPdf && shiftPdf.size > 0) {
-            // Add the shift PDF to the shiftPdfs array
-            shiftPdfs.push(shiftPdf);
-            console.log(`Added shift PDF to array. Current count: ${shiftPdfs.length}`);
-          } else {
-            console.warn(`Generated empty shifts PDF for date ${date}, skipping`);
+            
+            console.log(`Creating shifts table PDF with ${typedShifts.length} shifts`);
+            const shiftPdf = await exportShiftsTablePDF(shiftsTableData);
+            
+            console.log(`Generated shifts PDF for date ${date}, size: ${shiftPdf.size} bytes, type: ${shiftPdf.type}`);
+            if (shiftPdf && shiftPdf.size > 0) {
+              // Add the shift PDF to the shiftPdfs array
+              shiftPdfs.push(shiftPdf);
+              console.log(`Added shift PDF to array. Current count: ${shiftPdfs.length}`);
+            } else {
+              console.warn(`Generated empty shifts PDF for date ${date}, skipping`);
+            }
+          } catch (err) {
+            console.error(`Error generating shifts PDF for date ${date}:`, err);
           }
-        } catch (err) {
-          console.error(`Error generating shifts PDF for date ${date}:`, err);
+        } else {
+          console.log(`No shifts found for date ${date}, skipping shifts PDF generation`);
         }
-      } else {
-        console.log(`No shifts found for date ${date}, skipping shifts PDF generation`);
+      } catch (err) {
+        console.error(`Error processing shifts for date ${date}:`, err);
       }
     }
     

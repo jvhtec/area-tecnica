@@ -151,61 +151,19 @@ export const exportShiftsTablePDF = (data: ShiftsTablePdfData): Promise<Blob> =>
           }
         }
 
-        // Add company logo at the bottom
+        // Add footer with date
+        doc.setFontSize(8);
+        doc.setTextColor(51, 51, 51);
+        doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
+        
+        // Output the PDF
         try {
-          // Add a small company logo at the bottom right
-          const companyLogoUrl = 'public/sector pro logo.png';
-          const companyImg = new Image();
-          companyImg.onload = () => {
-            try {
-              // Logo at bottom right
-              const logoWidth = 20;
-              const ratio = companyImg.width / companyImg.height;
-              const logoHeight = logoWidth / ratio;
-              
-              doc.addImage(
-                companyImg, 
-                'PNG', 
-                pageWidth - logoWidth - 10, // X position (right aligned)
-                pageHeight - logoHeight - 10, // Y position (bottom aligned)
-                logoWidth,
-                logoHeight
-              );
-              
-              // Footer with date
-              doc.setFontSize(8);
-              doc.setTextColor(51, 51, 51);
-              doc.text(`Generated: ${createdDate}`, pageWidth - 35, pageHeight - 10, { align: 'right' });
-              
-              // Resolve with the PDF blob
-              const blob = doc.output('blob');
-              resolve(blob);
-            } catch (err) {
-              console.error('Error adding company logo to PDF:', err);
-              // Continue without company logo
-              doc.setFontSize(8);
-              doc.setTextColor(51, 51, 51);
-              doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
-              const blob = doc.output('blob');
-              resolve(blob);
-            }
-          };
-          companyImg.onerror = () => {
-            // If company logo fails to load, just add the footer text
-            doc.setFontSize(8);
-            doc.setTextColor(51, 51, 51);
-            doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
-            const blob = doc.output('blob');
-            resolve(blob);
-          };
-          companyImg.src = companyLogoUrl;
-        } catch (logoErr) {
-          // If any error occurs, just add the footer text
-          doc.setFontSize(8);
-          doc.setTextColor(51, 51, 51);
-          doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
           const blob = doc.output('blob');
+          console.log(`Shifts PDF generated successfully, blob size: ${blob.size}`);
           resolve(blob);
+        } catch (err) {
+          console.error("Error creating PDF blob:", err);
+          reject(err);
         }
       }).catch(err => {
         console.error("Error in PDF generation:", err);
