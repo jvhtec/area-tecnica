@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, RefreshCw } from "lucide-react";
@@ -238,8 +239,9 @@ const TechnicianDashboard = () => {
     
     console.log("Found job:", job);
     
-    const isFestivalJob = 
-      (job.jobs && job.jobs.job_type === 'festival');
+    const isFestivalJob = job.jobs && 
+      (typeof job.jobs === 'object' && 'job_type' in job.jobs) && 
+      job.jobs.job_type === 'festival';
     
     console.log("Is festival job:", isFestivalJob);
     

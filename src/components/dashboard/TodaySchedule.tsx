@@ -73,7 +73,13 @@ export const TodaySchedule = ({
             }
 
             // Check if this is a festival job
-            const isFestivalJob = jobData && jobData.job_type === 'festival';
+            let isFestivalJob = false;
+            
+            if (typeof jobData === 'object') {
+              if ('job_type' in jobData) {
+                isFestivalJob = jobData.job_type === 'festival';
+              }
+            }
             
             console.log("Is festival job check for:", { 
               jobId,
