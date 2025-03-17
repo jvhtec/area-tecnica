@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -597,7 +596,7 @@ export function JobCardNew({
 
   const handleFestivalArtistsClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigate(`/festival-management/${job.id}/artists`);
+    navigate(`/festival-management/${job.id}`);
   };
 
   const isHouseTech = userRole === 'house_tech';
