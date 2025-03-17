@@ -13,6 +13,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
+import { useRefreshOnTabVisibility } from "@/hooks/useRefreshOnTabVisibility";
 
 const TechnicianDashboard = () => {
   const [timeSpan, setTimeSpan] = useState<string>("1week");
@@ -194,9 +195,9 @@ const TechnicianDashboard = () => {
         // If user department is specified, filter by department
         const filteredJobs = userDepartment
           ? transformedJobs.filter(job => {
-              if (job.jobs && job.jobs.job_departments) {
+              if (job.jobs && Array.isArray(job.jobs.job_departments)) {
                 return job.jobs.job_departments.some(
-                  (dept: any) => dept.department.toLowerCase() === userDepartment.toLowerCase()
+                  (dept: any) => dept.department && dept.department.toLowerCase() === userDepartment.toLowerCase()
                 );
               }
               return false;
@@ -218,6 +219,9 @@ const TechnicianDashboard = () => {
     gcTime: 1000 * 60 * 5, // 5 minutes
     retry: 3
   });
+
+  // Refresh data when the tab becomes visible
+  useRefreshOnTabVisibility(refetch, []);
 
   const handleCloseMessages = () => {
     setShowMessages(false);
