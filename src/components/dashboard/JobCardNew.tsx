@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -31,7 +30,8 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
-  Eye
+  Eye,
+  Download
 } from "lucide-react";
 
 // Dialogs
@@ -772,7 +772,9 @@ export function JobCardNew({
                     </div>
                   </div>
                 )}
-                {isProjectManagementPage && documents.length > 0 && (
+                
+                {/* Always show documents for technicians and admins, regardless of hideTasks setting */}
+                {documents.length > 0 && (
                   <div className="mt-4 space-y-2">
                     <div className="text-sm font-medium">Documents</div>
                     <div className="space-y-2">
@@ -793,16 +795,28 @@ export function JobCardNew({
                               variant="ghost"
                               size="icon"
                               onClick={() => handleViewDocument(doc)}
+                              title="View"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleDeleteDocument(doc)}
+                              onClick={() => handleDownload(doc)}
+                              title="Download"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Download className="h-4 w-4" />
                             </Button>
+                            {['admin', 'management'].includes(userRole || '') && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteDocument(doc)}
+                                title="Delete"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -914,19 +928,9 @@ export function JobCardNew({
   );
 }
 
-function useFolderExistence(jobId: string) {
-  const { data, error } = useQuery({
-    queryKey: ["flex-folders", jobId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("flex_folders")
-        .select("id")
-        .eq("job_id", jobId);
-      return data?.length > 0;
-    },
-    enabled: !!jobId,
-    staleTime: 1000 * 60 * 60 * 24 // 24 hours
-  });
-
-  return { data, error };
-}
+// Add document download function
+const handleDownload = async (doc: JobDocument) => {
+  try {
+    console.log('Starting download for document:', doc.file_name);
+    
+    const { data, error } = await supabase.
