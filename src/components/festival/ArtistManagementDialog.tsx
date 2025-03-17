@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -191,8 +190,6 @@ export const ArtistManagementDialog = ({
         show_end: formData.show_end || null,
         soundcheck_start: formData.soundcheck_start || null,
         soundcheck_end: formData.soundcheck_end || null,
-        // Add a flag to indicate if this is an after-midnight performance
-        isAfterMidnight: isAfterMidnight(showStartHour),
       };
 
       const { error } = artist?.id
