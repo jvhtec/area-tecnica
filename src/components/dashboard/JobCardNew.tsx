@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -40,6 +41,9 @@ import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
+
+// Import the useFolderExistence hook
+import { useFolderExistence } from "@/hooks/useFolderExistence";
 
 export interface JobDocument {
   id: string;
@@ -933,4 +937,32 @@ const handleDownload = async (doc: JobDocument) => {
   try {
     console.log('Starting download for document:', doc.file_name);
     
-    const { data, error } = await supabase.
+    const { data, error } = await supabase.storage
+      .from('job_documents')
+      .createSignedUrl(doc.file_path, 60);
+    
+    if (error) {
+      console.error('Error creating signed URL for download:', error);
+      throw error;
+    }
+    
+    if (!data?.signedUrl) {
+      throw new Error('Failed to generate download URL');
+    }
+    
+    console.log('Download URL created:', data.signedUrl);
+    
+    // Create a temporary link element to download the file
+    const link = document.createElement('a');
+    link.href = data.signedUrl;
+    link.download = doc.file_name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+  } catch (err: any) {
+    console.error('Error in handleDownload:', err);
+    // We can't use toast here because this is outside the component
+    alert(`Error downloading document: ${err.message}`);
+  }
+};
