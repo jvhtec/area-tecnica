@@ -57,7 +57,6 @@ export const fetchLogoUrl = async (jobId: string): Promise<string | undefined> =
   }
 };
 
-// Create a cover page with basic festival information
 const generateCoverPage = async (
   jobId: string,
   jobTitle: string,
@@ -70,7 +69,6 @@ const generateCoverPage = async (
     
     const { width, height } = page.getSize();
     
-    // Get festival dates for the cover page
     const { data: jobData } = await supabase
       .from("jobs")
       .select("start_time, end_time")
@@ -95,7 +93,6 @@ const generateCoverPage = async (
       }
     }
     
-    // Add a red header bar
     page.drawRectangle({
       x: 0,
       y: height - 100,
@@ -104,7 +101,6 @@ const generateCoverPage = async (
       color: rgb(0.87, 0.22, 0.2),
     });
     
-    // Add title with large font
     page.drawText("FESTIVAL DOCUMENTATION", {
       x: 50,
       y: height - 60,
@@ -112,7 +108,6 @@ const generateCoverPage = async (
       color: rgb(1, 1, 1),
     });
     
-    // Add festival title
     page.drawText(jobTitle, {
       x: 50,
       y: height / 2 + 50,
@@ -120,7 +115,6 @@ const generateCoverPage = async (
       color: rgb(0, 0, 0),
     });
     
-    // Add date range if available
     if (dateRangeText) {
       page.drawText(dateRangeText, {
         x: 50,
@@ -130,22 +124,12 @@ const generateCoverPage = async (
       });
     }
     
-    // Add "Complete Technical Documentation" text
-    page.drawText("Complete Technical Documentation", {
-      x: 50,
-      y: height / 2 - 50,
-      size: 16,
-      color: rgb(0.5, 0.5, 0.5),
-    });
-    
-    // Add logo if available
     if (logoUrl) {
       try {
         const logoResponse = await fetch(logoUrl);
         const logoImageData = await logoResponse.arrayBuffer();
         let logoImage;
         
-        // Determine the type of image and embed it
         if (logoUrl.toLowerCase().endsWith('.png')) {
           logoImage = await pdfDoc.embedPng(logoImageData);
         } else if (logoUrl.toLowerCase().endsWith('.jpg') || logoUrl.toLowerCase().endsWith('.jpeg')) {
@@ -168,20 +152,10 @@ const generateCoverPage = async (
       }
     }
     
-    // Add footer with page number
-    page.drawText("Page 1", {
-      x: width / 2,
-      y: 30,
-      size: 10,
-      color: rgb(0.5, 0.5, 0.5),
-    });
-    
-    // Add generation date
-    const currentDate = new Date().toLocaleDateString();
-    page.drawText(`Generated on: ${currentDate}`, {
+    page.drawText("Complete Technical Documentation", {
       x: 50,
-      y: 50,
-      size: 10,
+      y: height / 2 - 50,
+      size: 16,
       color: rgb(0.5, 0.5, 0.5),
     });
     
@@ -193,7 +167,6 @@ const generateCoverPage = async (
   }
 };
 
-// Create a table of contents page
 const generateTableOfContents = async (
   sections: { title: string; pageCount: number }[],
   logoUrl?: string
@@ -205,7 +178,6 @@ const generateTableOfContents = async (
     
     const { width, height } = page.getSize();
     
-    // Add a red header bar
     page.drawRectangle({
       x: 0,
       y: height - 100,
@@ -214,7 +186,6 @@ const generateTableOfContents = async (
       color: rgb(0.87, 0.22, 0.2),
     });
     
-    // Add title
     page.drawText("TABLE OF CONTENTS", {
       x: 50,
       y: height - 60,
@@ -222,7 +193,6 @@ const generateTableOfContents = async (
       color: rgb(1, 1, 1),
     });
     
-    // Add logo if available
     if (logoUrl) {
       try {
         const logoResponse = await fetch(logoUrl);
@@ -251,11 +221,9 @@ const generateTableOfContents = async (
       }
     }
     
-    // List sections with page numbers
     let currentY = height - 150;
-    let pageCounter = 3; // Start at 3 because cover + TOC = 2 pages
+    let pageCounter = 3;
     
-    // Draw table header
     page.drawText("Section", {
       x: 50,
       y: currentY,
@@ -272,7 +240,6 @@ const generateTableOfContents = async (
     
     currentY -= 20;
     
-    // Draw line separator
     page.drawLine({
       start: { x: 50, y: currentY },
       end: { x: width - 50, y: currentY },
@@ -282,7 +249,6 @@ const generateTableOfContents = async (
     
     currentY -= 30;
     
-    // Add each section to the TOC
     for (const section of sections) {
       page.drawText(section.title, {
         x: 50,
@@ -298,7 +264,6 @@ const generateTableOfContents = async (
         color: rgb(0, 0, 0),
       });
       
-      // Add dots between section name and page number
       let dotX = 250;
       while (dotX < width - 105) {
         page.drawText(".", {
@@ -314,7 +279,6 @@ const generateTableOfContents = async (
       currentY -= 30;
     }
     
-    // Add footer with page number
     page.drawText("Page 2", {
       x: width / 2,
       y: 30,
@@ -418,14 +382,12 @@ export const generateAndMergeFestivalPDFs = async (
   const logoUrl = await fetchLogoUrl(jobId);
   console.log("Logo URL for PDFs:", logoUrl);
   
-  // Organize PDFs in groups for easier tracking and TOC generation
   const gearPdfs: Blob[] = [];
   const shiftPdfs: Blob[] = [];
   const artistTablePdfs: Blob[] = [];
   const individualArtistPdfs: Blob[] = [];
   
   try {
-    // Fetch artist data
     const { data: artists, error: artistError } = await supabase
       .from("festival_artists")
       .select("*")
@@ -433,7 +395,6 @@ export const generateAndMergeFestivalPDFs = async (
     
     if (artistError) throw artistError;
     
-    // Fetch technical info
     const { data: technicalInfo, error: technicalError } = await supabase
       .from("festival_artist_technical_info")
       .select("*")
@@ -443,7 +404,6 @@ export const generateAndMergeFestivalPDFs = async (
       console.error("Error fetching technical info:", technicalError);
     }
     
-    // Fetch infrastructure info
     const { data: infrastructureInfo, error: infraError } = await supabase
       .from("festival_artist_infrastructure_info")
       .select("*")
@@ -453,7 +413,6 @@ export const generateAndMergeFestivalPDFs = async (
       console.error("Error fetching infrastructure info:", infraError);
     }
     
-    // Fetch extras info
     const { data: extrasInfo, error: extrasError } = await supabase
       .from("festival_artist_extras")
       .select("*")
@@ -463,7 +422,6 @@ export const generateAndMergeFestivalPDFs = async (
       console.error("Error fetching extras info:", extrasError);
     }
     
-    // Create maps for different types of artist info
     const techInfoMap = new Map();
     const infraInfoMap = new Map();
     const extrasInfoMap = new Map();
@@ -492,10 +450,8 @@ export const generateAndMergeFestivalPDFs = async (
       });
     }
 
-    // Extract unique dates from artists
     const uniqueDates = [...new Set(artists?.map(a => a.date) || [])];
     
-    // ====== 1. FIRST GENERATE GEAR SETUP PDFS ======
     console.log("Starting gear setup PDF generation for dates:", uniqueDates);
     for (const date of uniqueDates) {
       if (!date) continue;
@@ -517,13 +473,11 @@ export const generateAndMergeFestivalPDFs = async (
         const maxStages = gearSetupData.max_stages || 1;
         console.log(`Found gear setup with ${maxStages} stages for date ${date}`);
         
-        // Fetch stage names
         const { data: stages } = await supabase
           .from("festival_stages")
           .select("*")
           .eq("job_id", jobId);
         
-        // Generate PDF for each stage
         for (let stageNum = 1; stageNum <= maxStages; stageNum++) {
           try {
             console.log(`Generating gear setup PDF for stage ${stageNum} on date ${date}`);
@@ -547,7 +501,6 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
-    // ====== 2. GENERATE SHIFT TABLE PDFS ======
     console.log("Starting shift table PDF generation for dates:", uniqueDates);
     for (const date of uniqueDates) {
       if (!date) continue;
@@ -625,7 +578,6 @@ export const generateAndMergeFestivalPDFs = async (
             };
           });
           
-          // Create the shifts table PDF data
           const shiftsTableData: ShiftsTablePdfData = {
             jobTitle: jobTitle || 'Festival',
             date: date,
@@ -651,8 +603,6 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
-    // ====== 3. GENERATE ARTIST TABLE PDFS ======
-    // Generate stage-specific artist table PDFs for each date
     for (const date of uniqueDates) {
       if (!date) continue;
       
@@ -741,10 +691,8 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
-    // ====== 4. GENERATE INDIVIDUAL ARTIST PDFS ======
     console.log(`Starting PDF generation for ${artists?.length || 0} artists`);
     
-    // Generate individual artist PDFs
     if (artists && artists.length > 0) {
       for (const artist of artists) {
         try {
@@ -837,8 +785,6 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
-    // ====== CREATE TOC AND COMBINE EVERYTHING ======
-    // Create a table of contents
     const tocSections = [
       { title: "Stage Equipment Setup", pageCount: gearPdfs.length },
       { title: "Staff Shift Schedules", pageCount: shiftPdfs.length },
@@ -849,11 +795,9 @@ export const generateAndMergeFestivalPDFs = async (
     console.log(`Table of contents sections:`, tocSections);
     console.log(`Shift PDFs count:`, shiftPdfs.length);
     
-    // Create cover and TOC
     const coverPage = await generateCoverPage(jobId, jobTitle, logoUrl);
     const tableOfContents = await generateTableOfContents(tocSections, logoUrl);
     
-    // Combine everything in the desired order
     const allPdfs = [
       coverPage,
       tableOfContents,
@@ -866,7 +810,6 @@ export const generateAndMergeFestivalPDFs = async (
     console.log(`Total PDFs to merge: ${allPdfs.length}`);
     console.log(`PDF counts - Gear: ${gearPdfs.length}, Shifts: ${shiftPdfs.length}, Artist Tables: ${artistTablePdfs.length}, Individual Artists: ${individualArtistPdfs.length}`);
     
-    // Log detailed info about each shifts PDF for debugging
     if (shiftPdfs.length > 0) {
       console.log("Shift PDFs details:");
       shiftPdfs.forEach((pdf, index) => {
@@ -876,6 +819,13 @@ export const generateAndMergeFestivalPDFs = async (
       console.warn("No shift PDFs were generated, check if there are shifts in the database");
     }
     
-    if (allPdfs.length <= 2) { // Only cover and TOC
+    if (allPdfs.length <= 2) {
       throw new Error('No valid documents were generated beyond cover and TOC');
     }
+    
+    return await mergePDFs(allPdfs);
+  } catch (error) {
+    console.error('Error generating festival PDFs:', error);
+    throw error;
+  }
+};
