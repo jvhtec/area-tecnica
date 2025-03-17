@@ -75,7 +75,6 @@ const generateCoverPage = async (
       }
     }
     
-    // Draw the red header rectangle with the correct corporate red color
     page.drawRectangle({
       x: 0,
       y: height - 100,
@@ -165,7 +164,6 @@ const generateTableOfContents = async (
     
     const { width, height } = page.getSize();
     
-    // Draw the red header rectangle with the correct corporate red color
     page.drawRectangle({
       x: 0,
       y: height - 100,
