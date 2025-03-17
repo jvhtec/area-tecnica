@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, RefreshCw } from "lucide-react";
@@ -39,6 +40,7 @@ const TechnicianDashboard = () => {
         .single();
 
       if (profileData) {
+        console.log("User department fetched:", profileData.department);
         setUserDepartment(profileData.department);
       }
     };
@@ -102,6 +104,7 @@ const TechnicianDashboard = () => {
         const endDate = getTimeSpanEndDate();
         console.log("Fetching assignments until:", endDate);
         
+        // Modified query to properly fetch job details including festival jobs
         const { data, error } = await supabase
           .from('job_assignments')
           .select(`
@@ -109,6 +112,7 @@ const TechnicianDashboard = () => {
             jobs!inner (
               *,
               location:locations(name),
+              job_departments(department),
               job_documents(
                 id,
                 file_name,
@@ -128,6 +132,20 @@ const TechnicianDashboard = () => {
         }
         
         console.log("Fetched assignments:", data);
+        
+        // Filter assignments based on user department if available
+        if (userDepartment) {
+          console.log("Filtering assignments by department:", userDepartment);
+          const filteredData = data.filter(assignment => {
+            // Check if job has this department
+            return assignment.jobs.job_departments.some(
+              (dept: any) => dept.department === userDepartment
+            );
+          });
+          console.log("Filtered assignments:", filteredData);
+          return filteredData || [];
+        }
+        
         return data || [];
       } catch (error) {
         console.error("Error fetching assignments:", error);
