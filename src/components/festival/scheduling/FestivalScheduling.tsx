@@ -16,9 +16,10 @@ import { useRefreshOnTabVisibility } from "@/hooks/useRefreshOnTabVisibility";
 interface FestivalSchedulingProps {
   jobId: string;
   jobDates: Date[];
+  isViewOnly?: boolean;
 }
 
-export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps) => {
+export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: FestivalSchedulingProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [shifts, setShifts] = useState<ShiftWithAssignments[]>([]);
@@ -29,6 +30,7 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
 
   console.log("FestivalScheduling component rendered with job ID:", jobId);
   console.log("Job dates received:", jobDates);
+  console.log("Is view only mode:", isViewOnly);
   
   const formatDateToString = (date: Date): string => {
     try {
@@ -244,14 +246,16 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <CardTitle>Festival Schedule</CardTitle>
           <div className="flex gap-2">
-            <Button 
-              size="sm" 
-              onClick={() => setIsCreateShiftOpen(true)}
-              className="flex items-center gap-1"
-            >
-              <Plus className="h-4 w-4" />
-              Create Shift
-            </Button>
+            {!isViewOnly && (
+              <Button 
+                size="sm" 
+                onClick={() => setIsCreateShiftOpen(true)}
+                className="flex items-center gap-1"
+              >
+                <Plus className="h-4 w-4" />
+                Create Shift
+              </Button>
+            )}
           </div>
         </div>
         <div className="mt-4">
@@ -301,7 +305,7 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
           <div className="flex justify-center p-8">Loading...</div>
         ) : shifts.length === 0 ? (
           <div className="text-center p-8 text-muted-foreground">
-            No shifts scheduled for this date. Click "Create Shift" to add one.
+            No shifts scheduled for this date. {!isViewOnly && "Click \"Create Shift\" to add one."}
           </div>
         ) : viewMode === "list" ? (
           <ShiftsList 
@@ -309,6 +313,7 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
             onDeleteShift={handleDeleteShift} 
             onShiftUpdated={fetchShifts}
             jobId={jobId}
+            isViewOnly={isViewOnly}
           />
         ) : (
           <ShiftsTable 
@@ -316,17 +321,20 @@ export const FestivalScheduling = ({ jobId, jobDates }: FestivalSchedulingProps)
             onDeleteShift={handleDeleteShift} 
             date={selectedDate}
             jobId={jobId}
+            isViewOnly={isViewOnly}
           />
         )}
       </CardContent>
 
-      <CreateShiftDialog
-        open={isCreateShiftOpen}
-        onOpenChange={setIsCreateShiftOpen}
-        jobId={jobId}
-        onShiftCreated={handleShiftCreated}
-        date={selectedDate}
-      />
+      {!isViewOnly && (
+        <CreateShiftDialog
+          open={isCreateShiftOpen}
+          onOpenChange={setIsCreateShiftOpen}
+          jobId={jobId}
+          onShiftCreated={handleShiftCreated}
+          date={selectedDate}
+        />
+      )}
     </Card>
   );
 };

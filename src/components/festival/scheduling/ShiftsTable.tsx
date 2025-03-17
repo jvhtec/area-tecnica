@@ -1,4 +1,3 @@
-
 import { format } from "date-fns";
 import {
   Table,
@@ -20,21 +19,20 @@ interface ShiftsTableProps {
   shifts: ShiftWithAssignments[];
   onDeleteShift: (shiftId: string) => void;
   date: string;
-  jobTitle?: string;
-  jobId?: string;
+  jobId: string;
+  isViewOnly?: boolean;
 }
 
 export const ShiftsTable = ({ 
   shifts, 
   onDeleteShift, 
   date, 
-  jobTitle = "Festival Schedule", 
-  jobId = ""
+  jobId, 
+  isViewOnly = false 
 }: ShiftsTableProps) => {
   const { toast } = useToast();
   const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
   
-  // Fetch festival logo when component mounts
   useEffect(() => {
     const fetchLogo = async () => {
       if (!jobId) return;
@@ -52,18 +50,14 @@ export const ShiftsTable = ({
         }
         
         if (data?.logo_url) {
-          // Get public URL for the logo
           const logoPath = data.logo_url;
           console.log("Retrieved logo path:", logoPath);
           
-          // If it's already a full URL, use it directly
           if (logoPath.startsWith('http')) {
             setLogoUrl(logoPath);
           } 
-          // Otherwise, get the public URL from storage
           else {
             try {
-              // Extract bucket and file path if it's in the format 'bucket/path'
               let bucket = 'festival-assets';
               let path = logoPath;
               
@@ -95,7 +89,6 @@ export const ShiftsTable = ({
     fetchLogo();
   }, [jobId]);
   
-  // Sort shifts by start time
   const sortedShifts = [...shifts].sort((a, b) => 
     a.start_time.localeCompare(b.start_time)
   );
@@ -133,7 +126,6 @@ export const ShiftsTable = ({
 
       const blob = await exportShiftsTablePDF(pdfData);
       
-      // Create a download link for the generated PDF
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

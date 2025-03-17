@@ -1,324 +1,234 @@
-
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Trash2, UserPlus } from "lucide-react";
-import { ShiftWithAssignments, Technician } from "@/types/festival-scheduling";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import { useRefreshOnTabVisibility } from "@/hooks/useRefreshOnTabVisibility";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FestivalShift, ShiftWithAssignments } from "@/types/festival-scheduling";
 
 interface ManageAssignmentsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   shift: ShiftWithAssignments;
-  jobId: string;
   onAssignmentsUpdated: () => void;
+  isViewOnly?: boolean; // Add isViewOnly prop
 }
 
-// Sound department roles only
-const SOUND_ROLES = [
-  "FOH Engineer",
-  "Monitor Engineer",
-  "PA Tech",
-  "RF Tech",
-  "System Tech",
-  "Stage Tech",
-  "Audio Assistant"
-];
-
-export const ManageAssignmentsDialog = ({
-  open,
-  onOpenChange,
-  shift,
-  jobId,
+export const ManageAssignmentsDialog = ({ 
+  open, 
+  onOpenChange, 
+  shift, 
   onAssignmentsUpdated,
+  isViewOnly = false // Default to false
 }: ManageAssignmentsDialogProps) => {
-  const [technicians, setTechnicians] = useState<Technician[]>([]);
-  const [selectedTechnician, setSelectedTechnician] = useState<string>("");
-  const [selectedRole, setSelectedRole] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAddingTech, setIsAddingTech] = useState(false);
+  const [technicianId, setTechnicianId] = useState("");
+  const [role, setRole] = useState("technician");
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const fetchAssignedTechnicians = async () => {
-    try {
-      console.log("Fetching technicians assigned to job:", jobId);
-      setIsLoading(true);
-
-      // Fetch all technicians that are already assigned to this job
-      const { data: jobAssignments, error: assignmentsError } = await supabase
-        .from("job_assignments")
-        .select("technician_id, profiles(id, first_name, last_name, email, department, role)")
-        .eq("job_id", jobId);
-
-      if (assignmentsError) {
-        console.error("Error fetching job assignments:", assignmentsError);
-        throw assignmentsError;
-      }
-
-      console.log("Job assignments fetched:", jobAssignments);
-
-      if (jobAssignments && jobAssignments.length > 0) {
-        // Extract the technician profiles from the job assignments
-        const techniciansList: Technician[] = [];
-        
-        jobAssignments.forEach(assignment => {
-          if (assignment.profiles) {
-            const profile = assignment.profiles;
-            
-            // Type assertion to ensure TypeScript understands this is an object with the required properties
-            if (typeof profile === 'object' && 
-                profile !== null && 
-                'role' in profile && 
-                (profile.role === 'technician' || profile.role === 'house_tech') &&
-                'id' in profile && 
-                'first_name' in profile && 
-                'last_name' in profile && 
-                'email' in profile && 
-                'department' in profile) {
-              
-              techniciansList.push({
-                id: profile.id as string,
-                first_name: profile.first_name as string,
-                last_name: profile.last_name as string,
-                email: profile.email as string,
-                department: profile.department as string,
-                role: profile.role as string
-              });
-            }
-          }
-        });
-        
-        console.log("Filtered technicians for shift assignment:", techniciansList);
-        setTechnicians(techniciansList);
-      } else {
-        console.log("No technicians assigned to this job");
-        setTechnicians([]);
-      }
-    } catch (error: any) {
-      console.error("Error fetching assigned technicians:", error);
-      toast({
-        title: "Error",
-        description: "Could not load technicians assigned to this job",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (open && jobId) {
-      fetchAssignedTechnicians();
-    }
-  }, [open, jobId]);
-
-  // Refresh the assignments when the tab becomes visible
-  useRefreshOnTabVisibility(() => {
-    if (open && jobId) {
-      fetchAssignedTechnicians();
-      onAssignmentsUpdated();
-    }
-  }, [open, jobId]);
-
-  const handleAddAssignment = async () => {
-    if (!selectedTechnician || !selectedRole) {
-      toast({
-        title: "Missing Information",
-        description: "Please select a technician and a role",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsAddingTech(true);
-    try {
-      console.log("Adding assignment with shift_id:", shift.id);
-      console.log("Adding assignment with technician_id:", selectedTechnician);
-      console.log("Adding assignment with role:", selectedRole);
-      
-      // REMOVED: Check for existing technician assignment - allowing duplicate role assignments
-
-      const { data, error } = await supabase.from("festival_shift_assignments").insert({
-        shift_id: shift.id,
-        technician_id: selectedTechnician,
-        role: selectedRole,
-      }).select();
+  const { data: technicians, isLoading: isLoadingTechnicians, error: techniciansError } = useQuery({
+    queryKey: ["technicians"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, email, department, role")
+        .eq("department", "sound")
+        .eq("role", "technician");
 
       if (error) {
-        console.error("Error creating assignment:", error);
+        console.error("Error fetching technicians:", error);
         throw error;
       }
+      return data;
+    },
+  });
 
-      setSelectedTechnician("");
-      setSelectedRole("");
-      onAssignmentsUpdated();
+  const addAssignmentMutation = useMutation(
+    async () => {
+      if (!technicianId || !shift?.id) {
+        throw new Error("Technician and shift ID are required");
+      }
 
-      toast({
-        title: "Success",
-        description: "Technician added to shift",
-      });
+      const { data, error } = await supabase
+        .from("festival_shift_assignments")
+        .insert([{ shift_id: shift.id, technician_id: technicianId, role: role }]);
+
+      if (error) {
+        console.error("Error adding assignment:", error);
+        throw error;
+      }
+      return data;
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(["festivalShifts"]);
+        onAssignmentsUpdated();
+        toast({
+          title: "Success",
+          description: "Technician assigned successfully",
+        });
+      },
+      onError: (error: any) => {
+        console.error("Error adding assignment:", error);
+        toast({
+          title: "Error",
+          description: "Could not assign technician",
+          variant: "destructive",
+        });
+      },
+    }
+  );
+
+  const removeAssignmentMutation = useMutation(
+    async (assignmentId: string) => {
+      const { data, error } = await supabase
+        .from("festival_shift_assignments")
+        .delete()
+        .eq("id", assignmentId);
+
+      if (error) {
+        console.error("Error removing assignment:", error);
+        throw error;
+      }
+      return data;
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(["festivalShifts"]);
+        onAssignmentsUpdated();
+        toast({
+          title: "Success",
+          description: "Technician unassigned successfully",
+        });
+      },
+      onError: (error: any) => {
+        console.error("Error removing assignment:", error);
+        toast({
+          title: "Error",
+          description: "Could not unassign technician",
+          variant: "destructive",
+        });
+      },
+    }
+  );
+
+  const handleAddAssignment = async () => {
+    try {
+      await addAssignmentMutation.mutateAsync();
     } catch (error: any) {
       console.error("Error adding assignment:", error);
       toast({
         title: "Error",
-        description: `Could not add technician to shift: ${error.message}`,
+        description: "Could not assign technician",
         variant: "destructive",
       });
-    } finally {
-      setIsAddingTech(false);
     }
   };
 
   const handleRemoveAssignment = async (assignmentId: string) => {
     try {
-      const { error } = await supabase
-        .from("festival_shift_assignments")
-        .delete()
-        .eq("id", assignmentId);
-
-      if (error) throw error;
-
-      onAssignmentsUpdated();
-      toast({
-        title: "Success",
-        description: "Technician removed from shift",
-      });
+      await removeAssignmentMutation.mutateAsync(assignmentId);
     } catch (error: any) {
       console.error("Error removing assignment:", error);
       toast({
         title: "Error",
-        description: "Could not remove technician from shift",
+        description: "Could not unassign technician",
         variant: "destructive",
       });
     }
   };
-
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px]">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Manage Shift Assignments</DialogTitle>
+          <DialogTitle>
+            {isViewOnly ? "View Staff for" : "Manage Staff for"} {shift.name}
+          </DialogTitle>
+          <DialogDescription>
+            {isViewOnly 
+              ? "View staff assigned to this shift" 
+              : "Add or remove staff from this shift"}
+          </DialogDescription>
         </DialogHeader>
-
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <h3 className="font-medium">Shift Details</h3>
-            <div className="flex flex-col gap-1 text-sm">
-              <p><span className="font-medium">Name:</span> {shift.name}</p>
-              <p><span className="font-medium">Time:</span> {shift.start_time.slice(0, 5)} - {shift.end_time.slice(0, 5)}</p>
-              {shift.department && (
-                <p><span className="font-medium">Department:</span> {shift.department}</p>
-              )}
-              {shift.stage && (
-                <p><span className="font-medium">Stage:</span> {shift.stage}</p>
+        
+        {isLoadingTechnicians ? (
+          <div className="flex justify-center p-4">Loading technicians...</div>
+        ) : techniciansError ? (
+          <div className="text-red-500">Error loading technicians.</div>
+        ) : (
+          !isViewOnly && ( // Only show add staff UI if not view-only
+            <div className="space-y-4">
+              <div className="grid gap-2">
+                <Label htmlFor="technician">Technician</Label>
+                <Select onValueChange={setTechnicianId}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a technician" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {technicians?.map((technician) => (
+                      <SelectItem key={technician.id} value={technician.id}>
+                        {technician.first_name} {technician.last_name} ({technician.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="role">Role</Label>
+                <Select onValueChange={setRole}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="technician">Technician</SelectItem>
+                    <SelectItem value="stagehand">Stagehand</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={handleAddAssignment} disabled={addAssignmentMutation.isLoading}>
+                {addAssignmentMutation.isLoading ? "Assigning..." : "Assign Technician"}
+              </Button>
+            </div>
+          )
+        )}
+        
+        <div className="space-y-4">
+          <h3 className="text-sm font-medium">Assigned Staff</h3>
+          {shift.assignments.map(assignment => (
+            <div key={assignment.id} className="flex items-center justify-between p-2 bg-accent/20 rounded-md">
+              <div>
+                {assignment.profiles?.first_name} {assignment.profiles?.last_name} - {assignment.role}
+              </div>
+              {!isViewOnly && ( // Only show remove buttons if not view-only
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => handleRemoveAssignment(assignment.id)}
+                >
+                  Remove
+                </Button>
               )}
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <h3 className="font-medium">Current Assignments</h3>
-            {shift.assignments.length > 0 ? (
-              <div className="space-y-2">
-                {shift.assignments.map((assignment) => (
-                  <div key={assignment.id} className="flex justify-between items-center p-2 bg-accent/10 rounded-md">
-                    <div className="flex items-center">
-                      <span>
-                        {assignment.profiles?.first_name} {assignment.profiles?.last_name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary">{assignment.role}</Badge>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => handleRemoveAssignment(assignment.id)}
-                        className="h-6 w-6"
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-2 text-muted-foreground text-sm">
-                No technicians assigned
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-3 border-t pt-3">
-            <h3 className="font-medium">Add Technician</h3>
-            {technicians.length > 0 ? (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Technician</Label>
-                  <Select 
-                    onValueChange={setSelectedTechnician} 
-                    value={selectedTechnician}
-                    disabled={isLoading}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select technician" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {technicians.map((tech) => (
-                        <SelectItem key={tech.id} value={tech.id}>
-                          {tech.first_name} {tech.last_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Role</Label>
-                  <Select 
-                    onValueChange={setSelectedRole} 
-                    value={selectedRole}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SOUND_ROLES.map((role) => (
-                        <SelectItem key={role} value={role}>
-                          {role}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-2 text-muted-foreground">
-                No technicians assigned to this job. Please assign technicians to the job first.
-              </div>
-            )}
-          </div>
+          ))}
         </div>
-
-        <div className="flex justify-between">
-          <Button 
-            variant="outline" 
-            onClick={() => onOpenChange(false)}
-          >
+        
+        <DialogFooter>
+          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          <Button 
-            onClick={handleAddAssignment}
-            disabled={!selectedTechnician || !selectedRole || isAddingTech || technicians.length === 0}
-            className="flex items-center gap-1"
-          >
-            <UserPlus className="h-4 w-4" />
-            {isAddingTech ? "Adding..." : "Add Technician"}
-          </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
