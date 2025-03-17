@@ -149,7 +149,7 @@ const TechnicianDashboard = () => {
               color,
               status,
               location:locations(name),
-              job_departments(department),
+              job_departments!job_id(department),
               job_documents(
                 id,
                 file_name,
