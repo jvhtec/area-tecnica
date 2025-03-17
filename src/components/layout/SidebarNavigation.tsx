@@ -28,6 +28,9 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
   
   // Management users have access to everything
   const isManagementUser = userRole === 'management';
+  
+  // Check if user is in sound department
+  const isSoundDepartment = userDepartment?.toLowerCase() === 'sound';
 
   // Don't render navigation until role is loaded
   if (!userRole) {
@@ -123,18 +126,20 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
               </Button>
             </Link>
             
-            {/* Festivals */}
-            <Link to="/festivals">
-              <Button
-                variant="ghost"
-                className={`w-full justify-start gap-2 ${
-                  location.pathname === "/festivals" ? "bg-accent" : ""
-                }`}
-              >
-                <Tent className="h-4 w-4" />
-                <span>Festivals</span>
-              </Button>
-            </Link>
+            {/* Festivals - Only show for management users and sound department users */}
+            {(isManagementUser || isSoundDepartment) && (
+              <Link to="/festivals">
+                <Button
+                  variant="ghost"
+                  className={`w-full justify-start gap-2 ${
+                    location.pathname === "/festivals" ? "bg-accent" : ""
+                  }`}
+                >
+                  <Tent className="h-4 w-4" />
+                  <span>Festivals</span>
+                </Button>
+              </Link>
+            )}
           </>
         )}
 
