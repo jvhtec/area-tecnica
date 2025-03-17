@@ -143,9 +143,23 @@ const TechnicianDashboard = () => {
         const { data: regularAssignments, error: regularError } = await supabase
           .from('job_assignments')
           .select(`
-            *,
+            id,
+            job_id,
+            technician_id,
+            sound_role,
+            lights_role,
+            video_role,
+            created_at,
             jobs!inner (
-              *,
+              id,
+              title,
+              description,
+              start_time,
+              end_time,
+              location_id,
+              job_type,
+              color,
+              status,
               location:locations(name),
               job_departments(department),
               job_documents(
@@ -172,9 +186,20 @@ const TechnicianDashboard = () => {
         const { data: festivalAssignments, error: festivalError } = await supabase
           .from('festival_assignments')
           .select(`
-            *,
+            id,
+            technician_id,
+            festival_job_id,
+            role,
+            created_at,
             festival_jobs(
-              *,
+              id,
+              title,
+              festival_id,
+              festival_stage_id,
+              day,
+              start_time,
+              end_time,
+              color,
               festival(name, start_date, end_date),
               festival_stage(name),
               job_documents(
@@ -205,7 +230,9 @@ const TechnicianDashboard = () => {
         if (festivalAssignments) {
           // Transform festival assignments to match the structure expected by the AssignmentsList component
           const transformedFestivalAssignments = festivalAssignments.map(assignment => ({
-            job_id: assignment.id,
+            id: assignment.id,
+            job_id: assignment.festival_job_id,
+            technician_id: assignment.technician_id,
             festival_jobs: assignment.festival_jobs
           }));
           
@@ -213,6 +240,7 @@ const TechnicianDashboard = () => {
         }
         
         console.log("Combined assignments:", allAssignments);
+        console.log("Combined assignments count:", allAssignments.length);
         
         // Filter assignments based on user department if available
         if (userDepartment && allAssignments.length > 0) {
@@ -236,6 +264,7 @@ const TechnicianDashboard = () => {
           });
           
           console.log("Filtered assignments:", filteredData);
+          console.log("Filtered assignments count:", filteredData.length);
           return filteredData || [];
         }
         

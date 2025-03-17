@@ -16,7 +16,9 @@ interface JobDocument {
 }
 
 interface Assignment {
+  id: string;
   job_id: string;
+  technician_id: string;
   jobs?: any;
   festival_jobs?: any;
 }
@@ -103,6 +105,7 @@ export const AssignmentsList = ({ assignments, loading, onRefresh }: Assignments
     console.log("AssignmentsList - Current assignments data:", assignments);
     if (assignments && assignments.length > 0) {
       setHasError(false);
+      console.log("AssignmentsList - First assignment:", assignments[0]);
     }
   }, [assignments]);
 
@@ -149,7 +152,7 @@ export const AssignmentsList = ({ assignments, loading, onRefresh }: Assignments
         }
         
         return (
-          <div key={assignment.job_id} className="space-y-4">
+          <div key={assignment.id} className="space-y-4">
             <JobCard
               job={jobData}
               onEditClick={() => {}}

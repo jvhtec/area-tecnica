@@ -21,6 +21,8 @@ export const TodaySchedule = ({
   selectedDate,
   isLoading = false
 }: TodayScheduleProps) => {
+  console.log("TodaySchedule received jobs:", jobs);
+
   if (isLoading) {
     return (
       <Card>
@@ -58,17 +60,28 @@ export const TodaySchedule = ({
       </CardHeader>
       <CardContent className="p-1">
         <div className="space-y-4">
-          {jobs.map(job => (
-            <JobCardNew 
-              key={job.id || job.job_id} 
-              job={job.jobs || job.festival_jobs || job} 
-              onEditClick={onEditClick} 
-              onDeleteClick={onDeleteClick} 
-              onJobClick={onJobClick} 
-              userRole={userRole} 
-              department="sound" 
-            />
-          ))}
+          {jobs.map(job => {
+            console.log("Rendering job in TodaySchedule:", job);
+            const jobData = job.jobs || job.festival_jobs || job;
+            const jobId = job.id || job.job_id || (jobData && jobData.id);
+            
+            if (!jobId) {
+              console.warn("Job is missing ID:", job);
+              return null;
+            }
+            
+            return (
+              <JobCardNew 
+                key={jobId} 
+                job={jobData} 
+                onEditClick={onEditClick} 
+                onDeleteClick={onDeleteClick} 
+                onJobClick={onJobClick} 
+                userRole={userRole} 
+                department="sound" 
+              />
+            );
+          })}
         </div>
       </CardContent>
     </Card>
