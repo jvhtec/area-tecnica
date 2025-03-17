@@ -1,3 +1,4 @@
+
 import { PDFDocument, rgb } from 'pdf-lib';
 import { exportArtistPDF, ArtistPdfData } from './artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from './artistTablePdfExport';
@@ -587,11 +588,13 @@ export const generateAndMergeFestivalPDFs = async (
           };
           
           console.log(`Creating shifts table PDF with ${typedShifts.length} shifts`);
-          const pdf = await exportShiftsTablePDF(shiftsTableData);
+          const shiftPdf = await exportShiftsTablePDF(shiftsTableData);
           
-          console.log(`Generated shifts PDF for date ${date}, size: ${pdf.size} bytes`);
-          if (pdf && pdf.size > 0) {
-            shiftPdfs.push(pdf);
+          console.log(`Generated shifts PDF for date ${date}, size: ${shiftPdf.size} bytes, type: ${shiftPdf.type}`);
+          if (shiftPdf && shiftPdf.size > 0) {
+            // Add the shift PDF to the shiftPdfs array
+            shiftPdfs.push(shiftPdf);
+            console.log(`Added shift PDF to array. Current count: ${shiftPdfs.length}`);
           } else {
             console.warn(`Generated empty shifts PDF for date ${date}, skipping`);
           }
@@ -785,6 +788,12 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
+    // Log details of shift PDFs collection
+    console.log(`Shifts PDFs collection details:`);
+    shiftPdfs.forEach((pdf, index) => {
+      console.log(`Shift PDF ${index+1}: Size: ${pdf.size} bytes, Type: ${pdf.type}`);
+    });
+    
     const tocSections = [
       { title: "Stage Equipment Setup", pageCount: gearPdfs.length },
       { title: "Staff Shift Schedules", pageCount: shiftPdfs.length },
@@ -808,10 +817,10 @@ export const generateAndMergeFestivalPDFs = async (
     ];
     
     console.log(`Total PDFs to merge: ${allPdfs.length}`);
-    console.log(`PDF counts - Gear: ${gearPdfs.length}, Shifts: ${shiftPdfs.length}, Artist Tables: ${artistTablePdfs.length}, Individual Artists: ${individualArtistPdfs.length}`);
+    console.log(`PDF counts by section - Cover: 1, TOC: 1, Gear: ${gearPdfs.length}, Shifts: ${shiftPdfs.length}, Artist Tables: ${artistTablePdfs.length}, Individual Artists: ${individualArtistPdfs.length}`);
     
     if (shiftPdfs.length > 0) {
-      console.log("Shift PDFs details:");
+      console.log("Shift PDFs details before merging:");
       shiftPdfs.forEach((pdf, index) => {
         console.log(`Shift PDF ${index+1}: Size: ${pdf.size} bytes, Type: ${pdf.type}`);
       });
