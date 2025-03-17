@@ -113,10 +113,10 @@ const TechnicianDashboard = () => {
 
   // Fetch assignments data - simplified approach
   const { data: assignments = [], isLoading, refetch } = useQuery({
-    queryKey: ['assignments', timeSpan, userDepartment],
+    queryKey: ['assignments', timeSpan],
     queryFn: async () => {
       try {
-        console.log("Fetching assignments with timeSpan:", timeSpan, "and department:", userDepartment);
+        console.log("Fetching assignments with timeSpan:", timeSpan);
         
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
@@ -150,7 +150,6 @@ const TechnicianDashboard = () => {
               color,
               status,
               location:locations(name),
-              job_departments!job_id(department),
               job_documents(
                 id,
                 file_name,
@@ -192,20 +191,8 @@ const TechnicianDashboard = () => {
             };
           });
         
-        // If user department is specified, filter by department
-        const filteredJobs = userDepartment
-          ? transformedJobs.filter(job => {
-              if (job.jobs && Array.isArray(job.jobs.job_departments)) {
-                return job.jobs.job_departments.some(
-                  (dept: any) => dept.department && dept.department.toLowerCase() === userDepartment.toLowerCase()
-                );
-              }
-              return false;
-            })
-          : transformedJobs;
-        
-        console.log("Final filtered assignments:", filteredJobs);
-        return filteredJobs || [];
+        console.log("Final transformed assignments:", transformedJobs);
+        return transformedJobs || [];
       } catch (error) {
         console.error("Error fetching assignments:", error);
         toast.error("Failed to load assignments");
