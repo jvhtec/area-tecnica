@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -13,6 +12,7 @@ import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { Badge } from "@/components/ui/badge";
 import { Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ArtistFormData } from "@/types/festival";
 
 interface ArtistManagementDialogProps {
   open: boolean;
@@ -58,9 +58,10 @@ export const ArtistManagementDialog = ({
   const [showEndHour, setShowEndHour] = useState<number | null>(null);
   const [dayStartHour] = useState<number>(parseInt(dayStartTime?.split(':')[0]) || 7);
 
-  const [formData, setFormData] = useState({
+  const initialFormData: ArtistFormData = {
     name: "",
     stage: "",
+    date: selectedDate || "",
     show_start: "",
     show_end: "",
     soundcheck: false,
@@ -98,13 +99,15 @@ export const ArtistManagementDialog = ({
     infra_opticalcon_duo_quantity: 0,
     infrastructure_provided_by: "festival",
     other_infrastructure: "",
-    notes: "",
-    date: selectedDate || "",
-  });
+    notes: ""
+  };
+
+  const [formData, setFormData] = useState<ArtistFormData>(initialFormData);
 
   useEffect(() => {
     if (artist) {
       setFormData({
+        ...initialFormData,
         ...artist,
         date: artist.date || selectedDate || "",
       });
@@ -118,7 +121,7 @@ export const ArtistManagementDialog = ({
       }
     } else {
       setFormData(prev => ({
-        ...prev,
+        ...initialFormData,
         date: selectedDate || "",
       }));
       setShowStartHour(null);
@@ -186,13 +189,14 @@ export const ArtistManagementDialog = ({
       const data = {
         ...formData,
         job_id: jobId,
-        // Only parse stage as integer if it's provided
-        stage: formData.stage ? parseInt(formData.stage) : null,
+        // Convert empty strings to null for optional fields with time type
         show_start: formData.show_start || null,
         show_end: formData.show_end || null,
         soundcheck_start: formData.soundcheck_start || null,
         soundcheck_end: formData.soundcheck_end || null,
-        // Ensure required fields that have check constraints have valid values
+        // Only parse stage as integer if it's provided
+        stage: formData.stage ? parseInt(formData.stage.toString()) : null,
+        // Ensure all text fields have default values to satisfy DB constraints
         foh_console: formData.foh_console || "", 
         mon_console: formData.mon_console || "", 
         wireless_model: formData.wireless_model || "", 
@@ -204,15 +208,19 @@ export const ArtistManagementDialog = ({
         notes: formData.notes || ""
       };
 
-      // Remove isAfterMidnight property if it was added during processing
+      // Remove any generated UI properties that might cause DB constraint issues
       const { isAfterMidnight, ...cleanData } = data as any;
+
+      console.log("Submitting artist data:", cleanData);
 
       const { error } = artist?.id
         ? await supabase
             .from("festival_artists")
             .update(cleanData)
             .eq("id", artist.id)
-        : await supabase.from("festival_artists").insert(cleanData);
+        : await supabase
+            .from("festival_artists")
+            .insert(cleanData);
 
       if (error) throw error;
 
@@ -447,7 +455,7 @@ export const ArtistManagementDialog = ({
                   </Select>
                   <ProviderRadioGroup
                     value={formData.foh_console_provided_by}
-                    onChange={(value) => setFormData({ ...formData, foh_console_provided_by: value })}
+                    onChange={(value) => setFormData({ ...formData, foh_console_provided_by: value as "festival" | "band" })}
                     label="FOH Console Provided By"
                   />
                 </div>
@@ -473,7 +481,7 @@ export const ArtistManagementDialog = ({
                   </Select>
                   <ProviderRadioGroup
                     value={formData.mon_console_provided_by}
-                    onChange={(value) => setFormData({ ...formData, mon_console_provided_by: value })}
+                    onChange={(value) => setFormData({ ...formData, mon_console_provided_by: value as "festival" | "band" })}
                     label="Monitor Console Provided By"
                   />
                 </div>
@@ -505,7 +513,7 @@ export const ArtistManagementDialog = ({
                     </Select>
                     <ProviderRadioGroup
                       value={formData.wireless_provided_by}
-                      onChange={(value) => setFormData({ ...formData, wireless_provided_by: value })}
+                      onChange={(value) => setFormData({ ...formData, wireless_provided_by: value as "festival" | "band" })}
                       label="Wireless System Provided By"
                     />
                   </div>
@@ -572,7 +580,7 @@ export const ArtistManagementDialog = ({
                     </Select>
                     <ProviderRadioGroup
                       value={formData.iem_provided_by}
-                      onChange={(value) => setFormData({ ...formData, iem_provided_by: value })}
+                      onChange={(value) => setFormData({ ...formData, iem_provided_by: value as "festival" | "band" })}
                       label="IEM System Provided By"
                     />
                   </div>
@@ -685,7 +693,7 @@ export const ArtistManagementDialog = ({
                 <h3 className="text-lg font-medium">Infrastructure</h3>
                 <ProviderRadioGroup
                   value={formData.infrastructure_provided_by}
-                  onChange={(value) => setFormData({ ...formData, infrastructure_provided_by: value })}
+                  onChange={(value) => setFormData({ ...formData, infrastructure_provided_by: value as "festival" | "band" })}
                   label="Infrastructure Provided By"
                 />
               </div>
@@ -891,3 +899,4 @@ export const ArtistManagementDialog = ({
     </>
   );
 };
+
