@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JobCardNew } from "./JobCardNew";
 
@@ -10,7 +9,7 @@ interface TodayScheduleProps {
   userRole: string | null;
   selectedDate?: Date;
   isLoading?: boolean;
-  hideTasks?: boolean; // New prop to hide tasks for technicians
+  hideTasks?: boolean;
 }
 
 export const TodaySchedule = ({
@@ -21,7 +20,7 @@ export const TodaySchedule = ({
   userRole,
   selectedDate,
   isLoading = false,
-  hideTasks = false // Default to showing tasks
+  hideTasks = false
 }: TodayScheduleProps) => {
   console.log("TodaySchedule received jobs:", jobs);
 
@@ -72,9 +71,18 @@ export const TodaySchedule = ({
               return null;
             }
 
-            // Check if this is a festival job
-            const isFestivalJob = (jobData.job_type === 'festival') || 
-                                  (job.festival_jobs != null);
+            const isFestivalJob = 
+              (jobData && jobData.job_type === 'festival') || 
+              (job.festival_jobs != null) || 
+              (job.jobs && job.jobs.job_type === 'festival');
+            
+            console.log("Is festival job check:", { 
+              jobId,
+              isFestivalJob, 
+              jobType: jobData?.job_type, 
+              hasFestivalJobs: job.festival_jobs != null,
+              jobDataType: job.jobs?.job_type
+            });
             
             return (
               <JobCardNew 
@@ -85,8 +93,8 @@ export const TodaySchedule = ({
                 onJobClick={onJobClick} 
                 userRole={userRole} 
                 department={job.department || jobData.department || "sound"} 
-                hideTasks={hideTasks} // Pass the hideTasks prop to JobCardNew
-                showManageArtists={isFestivalJob} // Show manage artists button for festival jobs
+                hideTasks={hideTasks}
+                showManageArtists={isFestivalJob}
               />
             );
           })}

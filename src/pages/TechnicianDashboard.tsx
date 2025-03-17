@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, RefreshCw } from "lucide-react";
@@ -24,7 +23,6 @@ const TechnicianDashboard = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // Set up UI effects for showing messages dialog
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const shouldShowMessages = searchParams.get('showMessages') === 'true';
@@ -32,7 +30,6 @@ const TechnicianDashboard = () => {
     setShowMessages(shouldShowMessages);
   }, [location.search]);
 
-  // Fetch user department
   useEffect(() => {
     const fetchUserDepartment = async () => {
       try {
@@ -68,7 +65,6 @@ const TechnicianDashboard = () => {
     fetchUserDepartment();
   }, []);
 
-  // Set up real-time subscription for job assignments
   useEffect(() => {
     console.log("Setting up real-time subscription for assignments");
     
@@ -83,7 +79,6 @@ const TechnicianDashboard = () => {
         },
         (payload) => {
           console.log("Received real-time update:", payload);
-          // Invalidate and refetch assignments
           queryClient.invalidateQueries({ queryKey: ['assignments'] });
         }
       )
@@ -111,7 +106,6 @@ const TechnicianDashboard = () => {
     }
   };
 
-  // Fetch assignments data - simplified approach
   const { data: assignments = [], isLoading, refetch } = useQuery({
     queryKey: ['assignments', timeSpan],
     queryFn: async () => {
@@ -129,7 +123,6 @@ const TechnicianDashboard = () => {
         const endDate = getTimeSpanEndDate();
         console.log("Fetching assignments until:", endDate);
         
-        // Fetch regular job assignments
         const { data: jobAssignments, error: jobAssignmentsError } = await supabase
           .from('job_assignments')
           .select(`
@@ -161,7 +154,7 @@ const TechnicianDashboard = () => {
           .eq('technician_id', user.id)
           .gte('jobs.start_time', new Date().toISOString())
           .lte('jobs.start_time', endDate.toISOString())
-          .order('jobs(start_time)');  // Fixed order syntax
+          .order('jobs(start_time)');
 
         if (jobAssignmentsError) {
           console.error("Error fetching job assignments:", jobAssignmentsError);
@@ -171,11 +164,9 @@ const TechnicianDashboard = () => {
 
         console.log("Fetched job assignments:", jobAssignments || []);
         
-        // Transform job assignments
         const transformedJobs = jobAssignments
-          .filter(assignment => assignment.jobs) // Filter out any null jobs
+          .filter(assignment => assignment.jobs)
           .map(assignment => {
-            // Determine the department based on roles
             let department = "unknown";
             if (assignment.sound_role) department = "sound";
             else if (assignment.lights_role) department = "lights";
@@ -202,12 +193,11 @@ const TechnicianDashboard = () => {
     refetchOnWindowFocus: true,
     refetchOnMount: true,
     refetchOnReconnect: true,
-    staleTime: 1000 * 60 * 2, // 2 minutes
-    gcTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 2,
+    gcTime: 1000 * 60 * 5,
     retry: 3
   });
 
-  // Refresh data when the tab becomes visible
   useRefreshOnTabVisibility(refetch, []);
 
   const handleCloseMessages = () => {
@@ -229,7 +219,6 @@ const TechnicianDashboard = () => {
     }
   };
 
-  // Debug output
   useEffect(() => {
     console.log("Current assignments state:", assignments);
     console.log("User department:", userDepartment);
@@ -239,17 +228,18 @@ const TechnicianDashboard = () => {
 
   const handleJobClick = (jobId: string) => {
     console.log("Job clicked:", jobId);
-    // Implementation for job click if needed
+    const job = assignments.find(a => a.job_id === jobId || a.jobs?.id === jobId);
+    if (job && (job.jobs?.job_type === 'festival' || job.festival_jobs)) {
+      navigate(`/festival-management/${jobId}`);
+    }
   };
 
   const handleEditClick = (job: any) => {
     console.log("Edit job clicked:", job);
-    // Implementation for edit click if needed
   };
 
   const handleDeleteClick = (jobId: string) => {
     console.log("Delete job clicked:", jobId);
-    // Implementation for delete click if needed
   };
 
   return (
@@ -293,7 +283,7 @@ const TechnicianDashboard = () => {
               onJobClick={handleJobClick} 
               userRole="technician"
               isLoading={isLoading}
-              hideTasks={true}  // Hide tasks for technicians
+              hideTasks={true}
             />
           ) : (
             <AssignmentsList 

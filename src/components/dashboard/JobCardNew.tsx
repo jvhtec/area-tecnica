@@ -600,6 +600,7 @@ export function JobCardNew({
 
   const handleFestivalArtistsClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    console.log("Navigating to festival management:", job.id);
     navigate(`/festival-management/${job.id}`);
   };
 
@@ -611,6 +612,14 @@ export function JobCardNew({
 
   const { data: foldersExist } = useFolderExistence(job.id);
   const foldersAreCreated = job.flex_folders_created || foldersExist || job.flex_folders_exist;
+
+  console.log("Job card rendering with:", {
+    jobType: job.job_type,
+    showManageArtists,
+    userRole,
+    canManageArtists,
+    isProjectManagementPage
+  });
 
   return (
     <div className="p-4 bg-gray-50 dark:bg-gray-900">
