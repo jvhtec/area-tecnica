@@ -1,3 +1,4 @@
+
 import { PDFDocument, rgb } from 'pdf-lib';
 import { exportArtistPDF, ArtistPdfData } from './artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from './artistTablePdfExport';
@@ -75,12 +76,13 @@ const generateCoverPage = async (
       }
     }
     
+    // Draw the red header rectangle with the correct corporate red color
     page.drawRectangle({
       x: 0,
       y: height - 100,
       width: width,
       height: 100,
-      color: rgb(125/255, 1/255, 1/255),
+      color: rgb(125/255, 1/255, 1/255), // Corporate red
     });
     
     page.drawText("FESTIVAL DOCUMENTATION", {
@@ -164,12 +166,13 @@ const generateTableOfContents = async (
     
     const { width, height } = page.getSize();
     
+    // Draw the red header rectangle with the correct corporate red color
     page.drawRectangle({
       x: 0,
       y: height - 100,
       width: width,
       height: 100,
-      color: rgb(125/255, 1/255, 1/255),
+      color: rgb(125/255, 1/255, 1/255), // Corporate red
     });
     
     page.drawText("TABLE OF CONTENTS", {
@@ -778,4 +781,3 @@ export const generateAndMergeFestivalPDFs = async (
     throw error;
   }
 };
-
