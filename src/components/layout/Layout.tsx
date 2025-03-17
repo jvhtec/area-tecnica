@@ -11,7 +11,7 @@ import {
   SidebarTrigger
 } from "@/components/ui/sidebar";
 import { LogOut } from "lucide-react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
@@ -21,16 +21,20 @@ import { AboutCard } from "@/components/layout/AboutCard";
 import { NotificationBadge } from "@/components/layout/NotificationBadge";
 import { useToast } from "@/hooks/use-toast";
 import { useSessionManager } from "@/hooks/useSessionManager";
+import { useQueryClient } from "@tanstack/react-query";
+import { ReloadButton } from "@/components/ui/reload-button";
+import { useKonamiCode } from "@/hooks/useKonamiCode";
+import { WolfensteinDialog } from "@/components/doom/WolfensteinDialog";
+import { useIsMobile } from "@/hooks/use-mobile";
 
-interface LayoutProps {
-  children: React.ReactNode;
-}
-
-const Layout = ({ children }: LayoutProps) => {
+const Layout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const queryClient = useQueryClient();
+  const { triggered: doomTriggered, reset: resetDoom, handleLogoTap, tapCount } = useKonamiCode();
+  const isMobile = useIsMobile();
   
   const {
     session,
@@ -79,6 +83,11 @@ const Layout = ({ children }: LayoutProps) => {
     }
   };
 
+  const handleReload = async () => {
+    console.log("Reloading all queries");
+    await queryClient.refetchQueries();
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -87,10 +96,9 @@ const Layout = ({ children }: LayoutProps) => {
     );
   }
 
-  // Only redirect if we're certain there's no session
-  if (!session && !isLoading) {
+  if (!session) {
     console.log("No session found in Layout, redirecting to auth");
-    navigate('/auth');
+    navigate('/auth', { replace: true });
     return null;
   }
 
@@ -126,12 +134,22 @@ const Layout = ({ children }: LayoutProps) => {
             </Button>
             <AboutCard />
             <SidebarSeparator />
-            <div className="px-2 py-4">
+            <div 
+              className="px-2 py-4 cursor-pointer transition-opacity"
+              onClick={handleLogoTap}
+              style={{ opacity: tapCount > 0 ? 0.5 + (tapCount * 0.1) : 1 }}
+            >
               <img
                 src="/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png"
                 alt="Sector Pro Logo"
                 className="h-6 w-auto dark:invert"
+                draggable="false"
               />
+              {isMobile && tapCount > 0 && (
+                <div className="text-xs text-center mt-1 text-muted-foreground">
+                  {5 - tapCount} more taps...
+                </div>
+              )}
             </div>
           </SidebarFooter>
         </Sidebar>
@@ -140,12 +158,19 @@ const Layout = ({ children }: LayoutProps) => {
             <div className="flex items-center gap-2">
               <SidebarTrigger />
             </div>
+            <div className="flex items-center gap-2">
+              <ReloadButton onReload={handleReload} />
+            </div>
           </header>
           <main className="p-6">
-            {children}
+            <Outlet />
           </main>
         </div>
       </div>
+      <WolfensteinDialog 
+        open={doomTriggered} 
+        onOpenChange={(open) => !open && resetDoom()} 
+      />
     </SidebarProvider>
   );
 };

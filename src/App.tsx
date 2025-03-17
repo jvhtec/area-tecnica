@@ -4,7 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { queryClient } from '@/lib/react-query';
-import Layout from '@/components/Layout';
+import Layout from '@/components/layout/Layout';
 import Auth from '@/pages/Auth';
 import Dashboard from '@/pages/Dashboard';
 import Sound from '@/pages/Sound';
@@ -48,40 +48,42 @@ function App() {
               <Route path="artist-form/:token" element={<ArtistRequirementsForm />} />
               <Route path="form-submitted" element={<FormSubmitted />} />
             </Route>
-            <Route path="/technician-dashboard" element={<Layout><TechnicianDashboard /></Layout>} />
-            <Route path="/*" element={<Layout />}>
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="sound" element={<Sound />} />
-              <Route path="lights" element={<Lights />} />
-              <Route path="video" element={<Video />} />
-              <Route path="logistics" element={<Logistics />} />
-              <Route path="profile" element={<Profile />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="project-management" element={<ProjectManagement />} />
-              <Route path="equipment-management" element={<EquipmentManagement />} />
-              <Route path="festivals" element={<Festivals />} />
+            
+            {/* Protected Routes */}
+            <Route element={<Layout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/sound" element={<Sound />} />
+              <Route path="/lights" element={<Lights />} />
+              <Route path="/video" element={<Video />} />
+              <Route path="/logistics" element={<Logistics />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/project-management" element={<ProjectManagement />} />
+              <Route path="/equipment-management" element={<EquipmentManagement />} />
+              <Route path="/festivals" element={<Festivals />} />
+              <Route path="/technician-dashboard" element={<TechnicianDashboard />} />
               
               {/* Tools Routes */}
-              <Route path="pesos-tool" element={<PesosTool />} />
-              <Route path="lights-pesos-tool" element={<LightsPesosTool />} />
-              <Route path="video-pesos-tool" element={<VideoPesosTool />} />
-              <Route path="consumos-tool" element={<ConsumosTool />} />
-              <Route path="lights-consumos-tool" element={<LightsConsumosTool />} />
-              <Route path="video-consumos-tool" element={<VideoConsumosTool />} />
-              <Route path="lights-memoria-tecnica" element={<LightsMemoriaTecnica />} />
-              <Route path="video-memoria-tecnica" element={<VideoMemoriaTecnica />} />
-              <Route path="excel-tool" element={<ExcelTool />} />
-              <Route path="hoja-de-ruta" element={<HojaDeRuta />} />
-              <Route path="labor-po-form" element={<LaborPOForm />} />
+              <Route path="/pesos-tool" element={<PesosTool />} />
+              <Route path="/lights-pesos-tool" element={<LightsPesosTool />} />
+              <Route path="/video-pesos-tool" element={<VideoPesosTool />} />
+              <Route path="/consumos-tool" element={<ConsumosTool />} />
+              <Route path="/lights-consumos-tool" element={<LightsConsumosTool />} />
+              <Route path="/video-consumos-tool" element={<VideoConsumosTool />} />
+              <Route path="/lights-memoria-tecnica" element={<LightsMemoriaTecnica />} />
+              <Route path="/video-memoria-tecnica" element={<VideoMemoriaTecnica />} />
+              <Route path="/excel-tool" element={<ExcelTool />} />
+              <Route path="/hoja-de-ruta" element={<HojaDeRuta />} />
+              <Route path="/labor-po-form" element={<LaborPOForm />} />
               
               {/* Disponibilidad Routes */}
-              <Route path="lights-disponibilidad" element={<LightsDisponibilidad />} />
+              <Route path="/lights-disponibilidad" element={<LightsDisponibilidad />} />
               
               {/* Festival Management Routes */}
-              <Route path="festival-management/:jobId" element={<FestivalManagement />} />
-              <Route path="festival-management/:jobId/artists" element={<FestivalArtistManagement />} />
-              <Route path="festival-management/:jobId/gear" element={<FestivalGearManagement />} />
-              <Route path="festival-management/:jobId/scheduling" element={<FestivalManagement />} />
+              <Route path="/festival-management/:jobId" element={<FestivalManagement />} />
+              <Route path="/festival-management/:jobId/artists" element={<FestivalArtistManagement />} />
+              <Route path="/festival-management/:jobId/gear" element={<FestivalGearManagement />} />
+              <Route path="/festival-management/:jobId/scheduling" element={<FestivalManagement />} />
             </Route>
           </Routes>
         </BrowserRouter>
