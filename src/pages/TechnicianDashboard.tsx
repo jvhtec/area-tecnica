@@ -22,6 +22,7 @@ const TechnicianDashboard = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  // Set up UI effects for showing messages dialog
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const shouldShowMessages = searchParams.get('showMessages') === 'true';
@@ -29,6 +30,7 @@ const TechnicianDashboard = () => {
     setShowMessages(shouldShowMessages);
   }, [location.search]);
 
+  // Fetch user department
   useEffect(() => {
     const fetchUserDepartment = async () => {
       try {
@@ -119,10 +121,13 @@ const TechnicianDashboard = () => {
     }
   };
 
+  // Fetch assignments data
   const { data: assignments = [], isLoading, refetch } = useQuery({
     queryKey: ['assignments', timeSpan, userDepartment],
     queryFn: async () => {
       try {
+        console.log("Fetching assignments with timeSpan:", timeSpan, "and department:", userDepartment);
+        
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           console.error("No user found");
@@ -130,8 +135,6 @@ const TechnicianDashboard = () => {
         }
 
         console.log("Fetching assignments for user:", user.id);
-        console.log("Current timeSpan:", timeSpan);
-        console.log("User department:", userDepartment);
         
         const endDate = getTimeSpanEndDate();
         console.log("Fetching assignments until:", endDate);
@@ -196,7 +199,7 @@ const TechnicianDashboard = () => {
         let allAssignments = [];
         
         if (regularAssignments) {
-          allAssignments = regularAssignments;
+          allAssignments = [...regularAssignments];
         }
         
         if (festivalAssignments) {
@@ -271,8 +274,9 @@ const TechnicianDashboard = () => {
   useEffect(() => {
     console.log("Current assignments state:", assignments);
     console.log("User department:", userDepartment);
-    console.log("Show messages dialog:", showMessages);
-  }, [assignments, userDepartment, showMessages]);
+    console.log("isLoading:", isLoading);
+    console.log("Assignment count:", assignments?.length);
+  }, [assignments, userDepartment, isLoading]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
