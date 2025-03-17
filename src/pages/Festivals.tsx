@@ -55,13 +55,14 @@ const Festivals = () => {
                 <div key={job.id} onClick={() => handleJobClick(job.id)} className="cursor-pointer">
                   <JobCard 
                     job={job} 
-                    onClick={() => {}} 
+                    onJobClick={() => handleJobClick(job.id)} 
                     onEditClick={(e) => {
                       e.stopPropagation();
                       handleJobClick(job.id);
                     }} 
                     onDeleteClick={() => {}}
                     userRole="management"
+                    department="sound"
                   />
                 </div>
               ))}
