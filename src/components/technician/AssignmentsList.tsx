@@ -1,130 +1,27 @@
 
-import { JobCard } from "@/components/jobs/JobCard";
 import { Button } from "@/components/ui/button";
-import { Download, AlertTriangle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
-import { useEffect, useState } from "react";
-import { ReloadButton } from "@/components/ui/reload-button";
-import { toast } from "sonner";
-
-interface JobDocument {
-  id: string;
-  file_name: string;
-  file_path: string;
-  uploaded_at: string;
-}
-
-interface Assignment {
-  id: string;
-  job_id: string;
-  technician_id: string;
-  jobs?: any;
-  festival_jobs?: any;
-}
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { RefreshCw } from "lucide-react";
 
 interface AssignmentsListProps {
-  assignments: Assignment[];
+  assignments: any[];
   loading: boolean;
-  onRefresh: () => Promise<void>;
+  onRefresh: () => void;
 }
 
-export const AssignmentsList = ({ assignments, loading, onRefresh }: AssignmentsListProps) => {
-  const { toast: uiToast } = useToast();
-  const [hasError, setHasError] = useState(false);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    console.log("Setting up real-time subscription for job assignments");
-    
-    const channel = supabase
-      .channel('job_assignments_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'job_assignments'
-        },
-        async (payload) => {
-          console.log("Received real-time update for job assignments:", payload);
-          // The parent component will handle the refresh through React Query
-        }
-      )
-      .subscribe();
-
-    return () => {
-      console.log("Cleaning up real-time subscription");
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const handleDownload = async (jobDocument: JobDocument) => {
-    try {
-      setDownloadingId(jobDocument.id);
-      console.log("Downloading document:", jobDocument);
-      
-      const { data, error } = await supabase.storage
-        .from('job_documents')
-        .download(jobDocument.file_path);
-
-      if (error) throw error;
-
-      const url = URL.createObjectURL(data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = jobDocument.file_name;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast.success(`Downloading ${jobDocument.file_name}`);
-      
-      uiToast({
-        title: "Download Started",
-        description: `Downloading ${jobDocument.file_name}`,
-      });
-    } catch (error: any) {
-      console.error("Download error:", error);
-      setHasError(true);
-      toast.error(`Download failed: ${error.message}`);
-      
-      uiToast({
-        title: "Download Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setDownloadingId(null);
-    }
-  };
-
-  // Debug logs
-  useEffect(() => {
-    console.log("AssignmentsList - Current assignments data:", assignments);
-    if (assignments && assignments.length > 0) {
-      setHasError(false);
-      console.log("AssignmentsList - First assignment:", assignments[0]);
-    }
-  }, [assignments]);
+export const AssignmentsList = ({ 
+  assignments = [], 
+  loading = false,
+  onRefresh 
+}: AssignmentsListProps) => {
+  console.log("AssignmentsList rendered with:", { assignments, loading });
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <p className="text-muted-foreground">Loading assignments...</p>
-      </div>
-    );
-  }
-
-  if (hasError) {
-    return (
       <div className="flex flex-col items-center justify-center p-8 space-y-4">
-        <div className="flex items-center text-yellow-500 gap-2">
-          <AlertTriangle />
-          <p>There was an error loading your assignments</p>
-        </div>
-        <ReloadButton onReload={onRefresh} />
+        <RefreshCw className="h-12 w-12 animate-spin text-muted-foreground" />
+        <p className="text-muted-foreground">Cargando asignaciones...</p>
       </div>
     );
   }
@@ -132,64 +29,99 @@ export const AssignmentsList = ({ assignments, loading, onRefresh }: Assignments
   if (!assignments || assignments.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-8 space-y-4">
-        <p className="text-muted-foreground">No upcoming assignments found.</p>
-        <ReloadButton onReload={onRefresh} />
+        <p className="text-muted-foreground">No se encontraron asignaciones.</p>
+        <Button onClick={onRefresh} variant="outline" className="gap-2">
+          <RefreshCw className="h-4 w-4" />
+          Refrescar
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="space-y-4">
       {assignments.map((assignment) => {
-        console.log("Rendering assignment:", assignment);
-        
-        // Handle both regular and festival jobs
+        // Handle both regular and festival assignments
         const jobData = assignment.jobs || assignment.festival_jobs;
         
         if (!jobData) {
-          console.warn("Missing job data for assignment:", assignment.job_id);
+          console.warn("Missing job data for assignment:", assignment);
           return null;
         }
         
+        // Format date and time
+        let formattedDate = "Fecha desconocida";
+        try {
+          if (jobData.start_time) {
+            formattedDate = format(new Date(jobData.start_time), "PPP", { locale: es });
+          } else if (jobData.day && jobData.festival?.start_date) {
+            // For festival jobs, calculate the date based on the festival start date and day number
+            const festivalStart = new Date(jobData.festival.start_date);
+            const eventDate = new Date(festivalStart);
+            eventDate.setDate(festivalStart.getDate() + (parseInt(jobData.day) - 1));
+            formattedDate = format(eventDate, "PPP", { locale: es });
+          }
+        } catch (error) {
+          console.error("Error formatting date:", error, jobData);
+        }
+        
+        // Determine job type
+        const isFestivalJob = !!assignment.festival_jobs;
+        
+        // Get location
+        const location = isFestivalJob 
+          ? `${jobData.festival?.name || 'Festival'} - ${jobData.festival_stage?.name || 'Escenario'}`
+          : jobData.location?.name || 'Sin ubicación';
+        
+        // Get role
+        let role = "Técnico";
+        if (isFestivalJob) {
+          role = assignment.role || "Técnico";
+        } else {
+          if (assignment.sound_role) role = assignment.sound_role;
+          else if (assignment.lights_role) role = assignment.lights_role;
+          else if (assignment.video_role) role = assignment.video_role;
+        }
+        
+        // Determine card background color based on job color or department
+        let bgColor = "bg-card";
+        if (jobData.color) {
+          bgColor = `bg-[${jobData.color}] bg-opacity-10`;
+        }
+        
         return (
-          <div key={assignment.id} className="space-y-4">
-            <JobCard
-              job={jobData}
-              onEditClick={() => {}}
-              onDeleteClick={() => {}}
-              onJobClick={() => {}}
-              department="sound"
-              userRole="technician"
-            />
-            {jobData.job_documents && jobData.job_documents.length > 0 && (
-              <div className="ml-4 space-y-2">
-                <h3 className="text-sm font-medium">Documents:</h3>
-                <div className="grid gap-2">
-                  {jobData.job_documents.map((doc: JobDocument) => (
-                    <Button
-                      key={doc.id}
-                      variant="outline"
-                      size="sm"
-                      className="w-full justify-start gap-2"
-                      onClick={() => handleDownload(doc)}
-                      disabled={downloadingId === doc.id}
-                    >
-                      <Download className="h-4 w-4" />
-                      {doc.file_name}
-                      {downloadingId === doc.id && (
-                        <span className="ml-2 text-xs text-muted-foreground">Downloading...</span>
-                      )}
-                    </Button>
-                  ))}
+          <div 
+            key={assignment.id} 
+            className={`border rounded-lg p-4 ${bgColor} hover:bg-secondary/10 transition-colors`}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="font-semibold">{jobData.title || "Sin título"}</h3>
+                <p className="text-sm text-muted-foreground">{location}</p>
+                <p className="text-sm text-muted-foreground">{formattedDate}</p>
+                {jobData.start_time && jobData.end_time && (
+                  <p className="text-sm text-muted-foreground">
+                    {format(new Date(jobData.start_time), "HH:mm")} - {format(new Date(jobData.end_time), "HH:mm")}
+                  </p>
+                )}
+                <div className="mt-2">
+                  <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                    {role}
+                  </span>
                 </div>
               </div>
-            )}
+              
+              {jobData.job_documents && jobData.job_documents.length > 0 && (
+                <div className="flex flex-col items-end">
+                  <span className="text-xs text-muted-foreground">
+                    {jobData.job_documents.length} documento{jobData.job_documents.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         );
       })}
-      <div className="flex justify-end mt-2">
-        <ReloadButton onReload={onRefresh} className="ml-auto" />
-      </div>
     </div>
   );
 };

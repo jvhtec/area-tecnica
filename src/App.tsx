@@ -42,11 +42,13 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Auth />} />
+            <Route path="/auth" element={<Auth />} />
             {/* Public Routes */}
             <Route path="festival">
               <Route path="artist-form/:token" element={<ArtistRequirementsForm />} />
               <Route path="form-submitted" element={<FormSubmitted />} />
             </Route>
+            <Route path="/technician-dashboard" element={<Layout><TechnicianDashboard /></Layout>} />
             <Route path="/*" element={<Layout />}>
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="sound" element={<Sound />} />
@@ -56,7 +58,6 @@ function App() {
               <Route path="profile" element={<Profile />} />
               <Route path="settings" element={<Settings />} />
               <Route path="project-management" element={<ProjectManagement />} />
-              <Route path="technician" element={<TechnicianDashboard />} />
               <Route path="equipment-management" element={<EquipmentManagement />} />
               <Route path="festivals" element={<Festivals />} />
               

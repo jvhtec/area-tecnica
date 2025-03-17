@@ -12,6 +12,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 
 const TechnicianDashboard = () => {
   const [timeSpan, setTimeSpan] = useState<string>("1week");
@@ -178,6 +179,7 @@ const TechnicianDashboard = () => {
         if (regularError) {
           console.error("Error fetching regular assignments:", regularError);
           toast.error("Error loading assignments");
+          throw regularError;
         }
 
         console.log("Fetched regular assignments:", regularAssignments || []);
@@ -216,6 +218,7 @@ const TechnicianDashboard = () => {
         if (festivalError) {
           console.error("Error fetching festival assignments:", festivalError);
           toast.error("Error loading festival assignments");
+          throw festivalError;
         }
 
         console.log("Fetched festival assignments:", festivalAssignments || []);
@@ -224,7 +227,21 @@ const TechnicianDashboard = () => {
         let allAssignments = [];
         
         if (regularAssignments) {
-          allAssignments = [...regularAssignments];
+          // Transform regular assignments to include department information
+          const transformedRegularAssignments = regularAssignments.map(assignment => {
+            // Determine the department based on roles
+            let department = "unknown";
+            if (assignment.sound_role) department = "sound";
+            else if (assignment.lights_role) department = "lights";
+            else if (assignment.video_role) department = "video";
+            
+            return {
+              ...assignment,
+              department
+            };
+          });
+          
+          allAssignments = [...transformedRegularAssignments];
         }
         
         if (festivalAssignments) {
@@ -233,6 +250,7 @@ const TechnicianDashboard = () => {
             id: assignment.id,
             job_id: assignment.festival_job_id,
             technician_id: assignment.technician_id,
+            department: assignment.role,
             festival_jobs: assignment.festival_jobs
           }));
           
@@ -310,6 +328,21 @@ const TechnicianDashboard = () => {
     console.log("Assignment count:", assignments?.length);
   }, [assignments, userDepartment, isLoading]);
 
+  const handleJobClick = (jobId: string) => {
+    console.log("Job clicked:", jobId);
+    // Implementation for job click if needed
+  };
+
+  const handleEditClick = (job: any) => {
+    console.log("Edit job clicked:", job);
+    // Implementation for edit click if needed
+  };
+
+  const handleDeleteClick = (jobId: string) => {
+    console.log("Delete job clicked:", jobId);
+    // Implementation for delete click if needed
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
@@ -343,11 +376,22 @@ const TechnicianDashboard = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <AssignmentsList 
-            assignments={assignments} 
-            loading={isLoading} 
-            onRefresh={handleRefresh}
-          />
+          {assignments.length > 0 ? (
+            <TodaySchedule 
+              jobs={assignments} 
+              onEditClick={handleEditClick} 
+              onDeleteClick={handleDeleteClick} 
+              onJobClick={handleJobClick} 
+              userRole="technician"
+              isLoading={isLoading}
+            />
+          ) : (
+            <AssignmentsList 
+              assignments={assignments} 
+              loading={isLoading} 
+              onRefresh={handleRefresh}
+            />
+          )}
         </CardContent>
       </Card>
 

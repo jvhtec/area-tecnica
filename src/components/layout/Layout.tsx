@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { 
   SidebarProvider, 
@@ -10,8 +11,8 @@ import {
   SidebarTrigger
 } from "@/components/ui/sidebar";
 import { LogOut } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { UserInfo } from "@/components/layout/UserInfo";
@@ -27,6 +28,7 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   
@@ -39,6 +41,14 @@ const Layout = ({ children }: LayoutProps) => {
     setUserRole,
     setUserDepartment
   } = useSessionManager();
+
+  // Redirect technicians to technician dashboard if they somehow get to the regular dashboard
+  useEffect(() => {
+    if (!isLoading && userRole === 'technician' && location.pathname === '/dashboard') {
+      console.log('Technician on dashboard, redirecting to technician dashboard');
+      navigate('/technician-dashboard');
+    }
+  }, [userRole, location.pathname, isLoading, navigate]);
 
   const handleSignOut = async () => {
     if (isLoggingOut) return;
