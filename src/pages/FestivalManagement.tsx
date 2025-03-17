@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -175,6 +174,58 @@ const FestivalManagement = () => {
     
     setIsPrinting(true);
     try {
+      console.log("Starting all documentation print process");
+      
+      // First, try to get the festival logo URL
+      let logoUrl: string | undefined = undefined;
+      try {
+        const { data: logoData, error: logoError } = await supabase
+          .from("festival_settings")
+          .select("logo_url")
+          .eq("job_id", jobId)
+          .single();
+          
+        if (!logoError && logoData?.logo_url) {
+          // Get public URL for the logo
+          const logoPath = logoData.logo_url;
+          console.log("Retrieved logo path:", logoPath);
+          
+          // If it's already a full URL, use it directly
+          if (logoPath.startsWith('http')) {
+            logoUrl = logoPath;
+          } 
+          // Otherwise, get the public URL from storage
+          else {
+            try {
+              // Extract bucket and file path if it's in the format 'bucket/path'
+              let bucket = 'festival-assets';
+              let path = logoPath;
+              
+              if (logoPath.includes('/')) {
+                const parts = logoPath.split('/', 1);
+                bucket = parts[0];
+                path = logoPath.substring(bucket.length + 1);
+              }
+              
+              console.log(`Getting public URL for bucket: ${bucket}, path: ${path}`);
+              const { data: publicUrlData } = supabase.storage
+                .from(bucket)
+                .getPublicUrl(path);
+                
+              if (publicUrlData?.publicUrl) {
+                console.log("Generated public URL:", publicUrlData.publicUrl);
+                logoUrl = publicUrlData.publicUrl;
+              }
+            } catch (storageErr) {
+              console.error("Error getting public URL:", storageErr);
+            }
+          }
+        }
+      } catch (logoError) {
+        console.error("Error fetching logo:", logoError);
+        // Continue without logo
+      }
+      
       const { data: artists, error: artistError } = await supabase
         .from("festival_artists")
         .select("*")
@@ -248,11 +299,13 @@ const FestivalManagement = () => {
         });
       }
 
+      console.log(`Starting PDF generation for ${artists?.length || 0} artists`);
       const artistPdfs: Blob[] = [];
       
       if (artists && artists.length > 0) {
         for (const artist of artists) {
           try {
+            console.log(`Generating PDF for artist: ${artist.name}`);
             const technical = techInfoMap.get(artist.id) || {};
             const infrastructure = infraInfoMap.get(artist.id) || {};
             const extras = extrasInfoMap.get(artist.id) || {};
@@ -331,6 +384,7 @@ const FestivalManagement = () => {
             };
             
             const pdf = await exportArtistPDF(artistData);
+            console.log(`Generated PDF for artist ${artist.name}, size: ${pdf.size} bytes`);
             if (pdf && pdf.size > 0) {
               artistPdfs.push(pdf);
             } else {
@@ -341,6 +395,8 @@ const FestivalManagement = () => {
           }
         }
       }
+      
+      console.log(`Generated ${artistPdfs.length} artist PDFs`);
       
       const uniqueDates = [...new Set(artists?.map(a => a.date) || [])];
       const artistTablePdfs: Blob[] = [];
@@ -410,11 +466,14 @@ const FestivalManagement = () => {
                 djBooth: Boolean(a.extras_djbooth || false)
               },
               notes: String(a.notes || '')
-            }))
+            })),
+            logoUrl // Add logo URL to table PDF
           };
           
           try {
+            console.log(`Generating table PDF for ${date} Stage ${stageNum}`);
             const pdf = await exportArtistTablePDF(tableData);
+            console.log(`Generated table PDF, size: ${pdf.size} bytes`);
             if (pdf && pdf.size > 0) {
               artistTablePdfs.push(pdf);
             } else {
@@ -425,6 +484,8 @@ const FestivalManagement = () => {
           }
         }
       }
+      
+      console.log(`Generated ${artistTablePdfs.length} artist table PDFs`);
       
       const shiftsPdfs: Blob[] = [];
       
@@ -449,6 +510,7 @@ const FestivalManagement = () => {
         }
         
         if (shiftsData && shiftsData.length > 0) {
+          console.log(`Generating shifts PDF for date ${date}`);
           const typedShifts: ShiftWithAssignments[] = shiftsData.map(shift => {
             const typedAssignments = (shift.assignments || []).map(assignment => {
               let profileData = null;
@@ -504,11 +566,15 @@ const FestivalManagement = () => {
               jobTitle: job?.title || 'Festival',
               date: date,
               jobId: jobId,
-              shifts: typedShifts
+              shifts: typedShifts,
+              logoUrl // Add logo URL to shifts PDF
             });
             
+            console.log(`Generated shifts PDF for date ${date}, size: ${pdf.size} bytes`);
             if (pdf && pdf.size > 0) {
               shiftsPdfs.push(pdf);
+            } else {
+              console.warn(`Generated empty shifts PDF for date ${date}, skipping`);
             }
           } catch (err) {
             console.error(`Error generating shifts PDF for date ${date}:`, err);
@@ -516,7 +582,12 @@ const FestivalManagement = () => {
         }
       }
       
+      console.log(`Generated ${shiftsPdfs.length} shifts PDFs`);
+      
       const allPdfs = [...artistPdfs, ...artistTablePdfs, ...shiftsPdfs].filter(pdf => pdf && pdf.size > 0);
+      
+      console.log(`Total PDFs to merge: ${allPdfs.length} `);
+      console.log(`PDF sizes: ${allPdfs.map(pdf => pdf.size).join(', ')} bytes`);
       
       if (allPdfs.length === 0) {
         throw new Error('No valid documents were generated');
@@ -525,6 +596,7 @@ const FestivalManagement = () => {
       console.log(`Attempting to merge ${allPdfs.length} PDFs`);
       const mergedPdf = await mergePDFs(allPdfs);
       
+      console.log(`Merged PDF created, size: ${mergedPdf.size} bytes`);
       if (!mergedPdf || mergedPdf.size === 0) {
         throw new Error('Generated PDF is empty');
       }
@@ -691,3 +763,4 @@ const FestivalManagement = () => {
 };
 
 export default FestivalManagement;
+

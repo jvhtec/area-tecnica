@@ -1,3 +1,4 @@
+
 import { format } from "date-fns";
 import {
   Table,
@@ -62,9 +63,20 @@ export const ShiftsTable = ({
           // Otherwise, get the public URL from storage
           else {
             try {
+              // Extract bucket and file path if it's in the format 'bucket/path'
+              let bucket = 'festival-assets';
+              let path = logoPath;
+              
+              if (logoPath.includes('/')) {
+                const parts = logoPath.split('/', 1);
+                bucket = parts[0];
+                path = logoPath.substring(bucket.length + 1);
+              }
+              
+              console.log(`Getting public URL for bucket: ${bucket}, path: ${path}`);
               const { data: publicUrlData } = supabase.storage
-                .from('festival-assets')
-                .getPublicUrl(logoPath);
+                .from(bucket)
+                .getPublicUrl(path);
                 
               if (publicUrlData?.publicUrl) {
                 console.log("Generated public URL:", publicUrlData.publicUrl);

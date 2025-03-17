@@ -32,16 +32,34 @@ export const mergePDFs = async (pdfBlobs: Blob[]): Promise<Blob> => {
         // Convert blob to ArrayBuffer
         const arrayBuffer = await pdfBlob.arrayBuffer();
         
-        // Load the PDF document from bytes
-        const pdfDoc = await PDFDocument.load(arrayBuffer);
-        
-        // Get all pages from the document
-        const pages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
-        console.log(`Copied ${pages.length} pages from PDF ${i+1}`);
-        
-        // Add each page to the merged document
-        for (const page of pages) {
-          mergedPdf.addPage(page);
+        try {
+          // Load the PDF document from bytes
+          const pdfDoc = await PDFDocument.load(arrayBuffer, { 
+            ignoreEncryption: true,
+            throwOnInvalidObject: false
+          });
+          
+          // Get all pages from the document
+          const pageIndices = pdfDoc.getPageIndices();
+          console.log(`PDF ${i+1} has ${pageIndices.length} pages`);
+          
+          if (pageIndices.length === 0) {
+            console.warn(`PDF ${i+1} has no pages, skipping`);
+            continue;
+          }
+          
+          const pages = await mergedPdf.copyPages(pdfDoc, pageIndices);
+          console.log(`Copied ${pages.length} pages from PDF ${i+1}`);
+          
+          // Add each page to the merged document
+          for (const page of pages) {
+            mergedPdf.addPage(page);
+          }
+        } catch (pdfError) {
+          console.error(`Error processing PDF content at index ${i}:`, pdfError);
+          // Log detailed info about the problematic PDF
+          console.log(`Problematic PDF size: ${pdfBlob.size} bytes`);
+          // Continue with other PDFs rather than failing completely
         }
       } catch (err) {
         console.error(`Error processing PDF at index ${i}:`, err);
@@ -50,11 +68,14 @@ export const mergePDFs = async (pdfBlobs: Blob[]): Promise<Blob> => {
     }
     
     // Check if we have any pages in the merged document
-    if (mergedPdf.getPageCount() === 0) {
+    const pageCount = mergedPdf.getPageCount();
+    console.log(`Merged document has ${pageCount} pages`);
+    
+    if (pageCount === 0) {
       throw new Error('No valid pages found in the provided PDFs');
     }
     
-    console.log(`Successfully merged ${mergedPdf.getPageCount()} pages`);
+    console.log(`Successfully merged ${pageCount} pages`);
     // Save the merged PDF as bytes
     const mergedPdfBytes = await mergedPdf.save();
     
