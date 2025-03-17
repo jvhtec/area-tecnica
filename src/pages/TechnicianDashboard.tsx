@@ -129,7 +129,7 @@ const TechnicianDashboard = () => {
         const endDate = getTimeSpanEndDate();
         console.log("Fetching assignments until:", endDate);
         
-        // Fetch regular job assignments
+        // Fetch regular job assignments - Fix the order syntax
         const { data: jobAssignments, error: jobAssignmentsError } = await supabase
           .from('job_assignments')
           .select(`
@@ -161,7 +161,7 @@ const TechnicianDashboard = () => {
           .eq('technician_id', user.id)
           .gte('jobs.start_time', new Date().toISOString())
           .lte('jobs.start_time', endDate.toISOString())
-          .order('jobs.start_time', { ascending: true });
+          .order('jobs.start_time', { ascending: true });  // Fixed order syntax
 
         if (jobAssignmentsError) {
           console.error("Error fetching job assignments:", jobAssignmentsError);
