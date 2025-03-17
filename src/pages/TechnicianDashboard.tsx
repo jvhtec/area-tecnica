@@ -140,7 +140,7 @@ const TechnicianDashboard = () => {
         const endDate = getTimeSpanEndDate();
         console.log("Fetching assignments until:", endDate);
         
-        // Fetch regular job assignments - updating this query to fix the error
+        // Fetch regular job assignments
         const { data: regularAssignments, error: regularError } = await supabase
           .from('job_assignments')
           .select(`
@@ -183,8 +183,8 @@ const TechnicianDashboard = () => {
 
         console.log("Fetched regular assignments:", regularAssignments || []);
         
-        // Fetch festival assignments - using festival_shift_assignments instead of festival_assignments
-        const { data: festivalAssignments, error: festivalError } = await supabase
+        // Fetch festival assignments
+        const { data: festivalShiftAssignments, error: festivalError } = await supabase
           .from('festival_shift_assignments')
           .select(`
             id,
@@ -229,7 +229,7 @@ const TechnicianDashboard = () => {
           throw festivalError;
         }
 
-        console.log("Fetched festival assignments:", festivalAssignments || []);
+        console.log("Fetched festival assignments:", festivalShiftAssignments || []);
         
         // Combine both types of assignments
         let allAssignments = [];
@@ -259,9 +259,11 @@ const TechnicianDashboard = () => {
         }
         
         // Transform festival assignments
-        if (festivalAssignments && festivalAssignments.length > 0) {
-          const transformedFestivalAssignments = festivalAssignments.map(assignment => {
+        if (festivalShiftAssignments && festivalShiftAssignments.length > 0) {
+          const transformedFestivalAssignments = festivalShiftAssignments.map(assignment => {
+            // Access the festival_shifts field from the assignment
             const shift = assignment.festival_shifts;
+            // Access the jobs field from the shift
             const jobData = shift.jobs;
             
             return {
