@@ -33,10 +33,11 @@ export const mergePDFs = async (pdfBlobs: Blob[]): Promise<Blob> => {
         const arrayBuffer = await pdfBlob.arrayBuffer();
         
         try {
-          // Load the PDF document from bytes
+          // Load the PDF document with additional options to handle problematic PDFs
           const pdfDoc = await PDFDocument.load(arrayBuffer, { 
             ignoreEncryption: true,
-            throwOnInvalidObject: false
+            throwOnInvalidObject: false,
+            updateMetadata: false
           });
           
           // Get all pages from the document
@@ -48,12 +49,16 @@ export const mergePDFs = async (pdfBlobs: Blob[]): Promise<Blob> => {
             continue;
           }
           
-          const pages = await mergedPdf.copyPages(pdfDoc, pageIndices);
-          console.log(`Copied ${pages.length} pages from PDF ${i+1}`);
-          
-          // Add each page to the merged document
-          for (const page of pages) {
-            mergedPdf.addPage(page);
+          // Copy pages with error handling for each individual page
+          for (const pageIndex of pageIndices) {
+            try {
+              const [copiedPage] = await mergedPdf.copyPages(pdfDoc, [pageIndex]);
+              mergedPdf.addPage(copiedPage);
+              console.log(`Copied page ${pageIndex+1} from PDF ${i+1}`);
+            } catch (pageError) {
+              console.error(`Error copying page ${pageIndex+1} from PDF ${i+1}:`, pageError);
+              // Continue with next page
+            }
           }
         } catch (pdfError) {
           console.error(`Error processing PDF content at index ${i}:`, pdfError);
