@@ -58,7 +58,7 @@ export const JobCard = ({
             )}
           </CardTitle>
           <div className="flex items-center gap-2">
-            {job.job_type === 'festival' && canManageFestival && !hideFestivalControls && (
+            {job.job_type === 'festival' && canManageFestival && (
               <Button 
                 variant="outline" 
                 onClick={handleFestivalManage}

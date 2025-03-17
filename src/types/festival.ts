@@ -1,4 +1,3 @@
-
 export interface ConsoleSetup {
   model: string;
   quantity: number;
@@ -37,7 +36,7 @@ export interface FestivalGearSetup {
 
 export interface ArtistFormData {
   readonly name: string;
-  readonly stage: number | string;
+  readonly stage: number;
   readonly date: string;
   readonly show_start: string;
   readonly show_end: string;
@@ -46,10 +45,8 @@ export interface ArtistFormData {
   readonly soundcheck_end?: string;
   foh_console: string;
   foh_console_provided_by: 'festival' | 'band';
-  foh_tech: boolean;
   mon_console: string;
   mon_console_provided_by: 'festival' | 'band';
-  mon_tech: boolean;
   wireless_model: string;
   wireless_provided_by: 'festival' | 'band';
   wireless_quantity_hh: number;
