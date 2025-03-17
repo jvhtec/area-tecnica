@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JobCardNew } from "./JobCardNew";
 
@@ -63,25 +64,21 @@ export const TodaySchedule = ({
         <div className="space-y-4">
           {jobs.map(job => {
             console.log("Rendering job in TodaySchedule:", job);
-            const jobData = job.jobs || job.festival_jobs || job;
-            const jobId = job.id || job.job_id || (jobData && jobData.id);
+            const jobData = job.jobs || job;
+            const jobId = job.id || job.job_id || (jobData && (jobData.id || job.job_id));
             
             if (!jobId) {
               console.warn("Job is missing ID:", job);
               return null;
             }
 
-            const isFestivalJob = 
-              (jobData && jobData.job_type === 'festival') || 
-              (job.festival_jobs != null) || 
-              (job.jobs && job.jobs.job_type === 'festival');
+            // Check if this is a festival job
+            const isFestivalJob = jobData && jobData.job_type === 'festival';
             
-            console.log("Is festival job check:", { 
+            console.log("Is festival job check for:", { 
               jobId,
               isFestivalJob, 
-              jobType: jobData?.job_type, 
-              hasFestivalJobs: job.festival_jobs != null,
-              jobDataType: job.jobs?.job_type
+              jobType: jobData?.job_type
             });
             
             return (

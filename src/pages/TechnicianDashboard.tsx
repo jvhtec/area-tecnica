@@ -228,8 +228,22 @@ const TechnicianDashboard = () => {
 
   const handleJobClick = (jobId: string) => {
     console.log("Job clicked:", jobId);
-    const job = assignments.find(a => a.job_id === jobId || a.jobs?.id === jobId);
-    if (job && (job.jobs?.job_type === 'festival' || job.festival_jobs)) {
+    
+    const job = assignments.find(a => a.job_id === jobId);
+    
+    if (!job) {
+      console.log("Job not found in assignments", jobId);
+      return;
+    }
+    
+    console.log("Found job:", job);
+    
+    const isFestivalJob = 
+      (job.jobs && job.jobs.job_type === 'festival');
+    
+    console.log("Is festival job:", isFestivalJob);
+    
+    if (isFestivalJob) {
       navigate(`/festival-management/${jobId}`);
     }
   };
