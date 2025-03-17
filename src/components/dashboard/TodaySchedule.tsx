@@ -71,6 +71,10 @@ export const TodaySchedule = ({
               console.warn("Job is missing ID:", job);
               return null;
             }
+
+            // Check if this is a festival job
+            const isFestivalJob = (jobData.job_type === 'festival') || 
+                                  (job.festival_jobs != null);
             
             return (
               <JobCardNew 
@@ -82,7 +86,7 @@ export const TodaySchedule = ({
                 userRole={userRole} 
                 department={job.department || jobData.department || "sound"} 
                 hideTasks={hideTasks} // Pass the hideTasks prop to JobCardNew
-                showManageArtists={job.job_type === 'festival'} // Show manage artists button for festival jobs
+                showManageArtists={isFestivalJob} // Show manage artists button for festival jobs
               />
             );
           })}

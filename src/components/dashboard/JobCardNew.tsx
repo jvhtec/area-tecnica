@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -10,13 +9,13 @@ import { Department } from "@/types/department";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { useNavigate } from "react-router-dom";
 
-// Import refactored folder creation utilities
 import { 
   createAllFoldersForJob
 } from "@/utils/flex-folders";
 
-// UI Components & Icons
-import { Card } from "@/components/ui/card";
+import { 
+  Card 
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plane, Wrench, Star, Moon, Mic } from "lucide-react";
@@ -35,14 +34,12 @@ import {
   Download
 } from "lucide-react";
 
-// Dialogs
 import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
 import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 
-// Import the useFolderExistence hook
 import { useFolderExistence } from "@/hooks/useFolderExistence";
 
 export interface JobDocument {
@@ -64,7 +61,7 @@ export interface JobCardNewProps {
   showUpload?: boolean;
   showManageArtists?: boolean;
   isProjectManagementPage?: boolean;
-  hideTasks?: boolean; // New prop to hide tasks for technicians
+  hideTasks?: boolean;
 }
 
 export function JobCardNew({
@@ -79,7 +76,7 @@ export function JobCardNew({
   showUpload = false,
   showManageArtists = false,
   isProjectManagementPage = false,
-  hideTasks = false // Default to showing tasks
+  hideTasks = false
 }: JobCardNewProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -233,7 +230,6 @@ export function JobCardNew({
   const createFlexFoldersHandler = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // Add comprehensive logging to track folder existence state
     console.log("Folder existence check:", {
       jobId: job.id,
       flexFoldersCreated: job.flex_folders_created,
@@ -253,7 +249,8 @@ export function JobCardNew({
     }
 
     try {
-      // Double-check folder existence before proceeding
+      console.log("Starting folder creation for job:", job.id);
+
       const { data: existingFolders } = await supabase
         .from("flex_folders")
         .select("id")
@@ -608,7 +605,7 @@ export function JobCardNew({
 
   const isHouseTech = userRole === 'house_tech';
   const canEditJobs = ['admin', 'management', 'logistics'].includes(userRole || '');
-  const canManageArtists = ['admin', 'management', 'logistics', 'house_tech'].includes(userRole || '');
+  const canManageArtists = ['admin', 'management', 'logistics', 'technician', 'house_tech'].includes(userRole || '');
   const canUploadDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
   const canCreateFlexFolders = ['admin', 'management', 'logistics'].includes(userRole || '');
 
@@ -658,7 +655,7 @@ export function JobCardNew({
                   onClick={handleFestivalArtistsClick}
                   className="hover:bg-accent/50"
                 >
-                  Manage Artists
+                  {userRole === 'technician' || userRole === 'house_tech' ? 'View Festival' : 'Manage Festival'}
                 </Button>
               )}
               {!isHouseTech && job.job_type !== "dryhire" && isProjectManagementPage && (
@@ -777,7 +774,6 @@ export function JobCardNew({
                   </div>
                 )}
                 
-                {/* Always show documents for technicians and admins, regardless of hideTasks setting */}
                 {documents.length > 0 && (
                   <div className="mt-4 space-y-2">
                     <div className="text-sm font-medium">Documents</div>
@@ -831,7 +827,6 @@ export function JobCardNew({
             )}
           </div>
 
-          {/* Only show personnel and tasks if hideTasks is false */}
           {!collapsed && job.job_type !== "dryhire" && !hideTasks && (
             <>
               {department === "sound" && personnel && (
@@ -887,7 +882,6 @@ export function JobCardNew({
         </div>
       </Card>
 
-      {/* Only render task dialogs if not house tech */}
       {!isHouseTech && (
         <>
           {soundTaskDialogOpen && (
@@ -932,7 +926,6 @@ export function JobCardNew({
   );
 }
 
-// Add document download function
 const handleDownload = async (doc: JobDocument) => {
   try {
     console.log('Starting download for document:', doc.file_name);
@@ -952,7 +945,6 @@ const handleDownload = async (doc: JobDocument) => {
     
     console.log('Download URL created:', data.signedUrl);
     
-    // Create a temporary link element to download the file
     const link = document.createElement('a');
     link.href = data.signedUrl;
     link.download = doc.file_name;
@@ -962,7 +954,6 @@ const handleDownload = async (doc: JobDocument) => {
     
   } catch (err: any) {
     console.error('Error in handleDownload:', err);
-    // We can't use toast here because this is outside the component
     alert(`Error downloading document: ${err.message}`);
   }
 };
