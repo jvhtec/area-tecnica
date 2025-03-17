@@ -13,6 +13,8 @@ import { Trash2, FileDown } from "lucide-react";
 import { ShiftWithAssignments } from "@/types/festival-scheduling";
 import { useToast } from "@/hooks/use-toast";
 import { exportShiftsTablePDF, ShiftsTablePdfData } from "@/utils/shiftsTablePdfExport";
+import { supabase } from "@/lib/supabase";
+import { useState, useEffect } from "react";
 
 interface ShiftsTableProps {
   shifts: ShiftWithAssignments[];
@@ -30,6 +32,35 @@ export const ShiftsTable = ({
   jobId = ""
 }: ShiftsTableProps) => {
   const { toast } = useToast();
+  const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
+  
+  // Fetch festival logo when component mounts
+  useEffect(() => {
+    const fetchLogo = async () => {
+      if (!jobId) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from("festival_settings")
+          .select("logo_url")
+          .eq("job_id", jobId)
+          .single();
+          
+        if (error) {
+          console.error("Error fetching festival logo:", error);
+          return;
+        }
+        
+        if (data?.logo_url) {
+          setLogoUrl(data.logo_url);
+        }
+      } catch (err) {
+        console.error("Error in logo fetch:", err);
+      }
+    };
+    
+    fetchLogo();
+  }, [jobId]);
   
   // Sort shifts by start time
   const sortedShifts = [...shifts].sort((a, b) => 
@@ -57,12 +88,14 @@ export const ShiftsTable = ({
   const handleExportPDF = async () => {
     try {
       console.log("Exporting PDF with jobId:", jobId, "and jobTitle:", jobTitle);
+      console.log("Using logo URL:", logoUrl);
       
       const pdfData: ShiftsTablePdfData = {
         jobTitle,
         date,
         jobId,
-        shifts: sortedShifts
+        shifts: sortedShifts,
+        logoUrl: logoUrl
       };
 
       const blob = await exportShiftsTablePDF(pdfData);
