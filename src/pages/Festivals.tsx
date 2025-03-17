@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useJobs } from "@/hooks/useJobs";
@@ -9,7 +8,7 @@ import { Tent, Printer, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
-import { generateAndMergeFestivalPDFs } from "@/utils/pdfMerger";
+import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 
 const Festivals = () => {
   const navigate = useNavigate();
@@ -20,11 +19,9 @@ const Festivals = () => {
 
   useEffect(() => {
     if (jobs) {
-      // Filter jobs to only include those with job_type 'festival'
       const festivals = jobs.filter(job => job.job_type === 'festival');
       setFestivalJobs(festivals);
       
-      // Fetch logos for all festival jobs
       festivals.forEach(fetchFestivalLogo);
     }
   }, [jobs]);
@@ -69,7 +66,6 @@ const Festivals = () => {
         throw new Error('Generated PDF is empty');
       }
       
-      // Create download link
       const url = URL.createObjectURL(mergedPdf);
       const a = document.createElement('a');
       a.href = url;
