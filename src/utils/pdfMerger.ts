@@ -1,4 +1,3 @@
-
 import { PDFDocument, rgb } from 'pdf-lib';
 import { exportArtistPDF, ArtistPdfData } from './artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from './artistTablePdfExport';
@@ -779,8 +778,8 @@ export const generateAndMergeFestivalPDFs = async (
               wireless: {
                 model: String(artist.wireless_model || ''),
                 providedBy: String(artist.wireless_provided_by || 'festival'),
-                handhelds: Number(a.wireless_quantity_hh || 0),
-                bodypacks: Number(a.wireless_quantity_bp || 0),
+                handhelds: Number(artist.wireless_quantity_hh || 0),
+                bodypacks: Number(artist.wireless_quantity_bp || 0),
                 band: String(artist.wireless_band || '')
               },
               iem: {
@@ -880,11 +879,3 @@ export const generateAndMergeFestivalPDFs = async (
     if (allPdfs.length <= 2) { // Only cover and TOC
       throw new Error('No valid documents were generated beyond cover and TOC');
     }
-    
-    return await mergePDFs(allPdfs);
-    
-  } catch (error) {
-    console.error('Error generating festival PDFs:', error);
-    throw error;
-  }
-};
