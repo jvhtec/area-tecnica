@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -192,18 +193,26 @@ export const ArtistManagementDialog = ({
         soundcheck_start: formData.soundcheck_start || null,
         soundcheck_end: formData.soundcheck_end || null,
         // Ensure required fields that have check constraints have valid values
-        foh_console: formData.foh_console || "", // Empty string rather than null
-        mon_console: formData.mon_console || "", // Empty string rather than null
-        wireless_model: formData.wireless_model || "", // Empty string rather than null
-        iem_model: formData.iem_model || "", // Empty string rather than null
+        foh_console: formData.foh_console || "", 
+        mon_console: formData.mon_console || "", 
+        wireless_model: formData.wireless_model || "", 
+        iem_model: formData.iem_model || "", 
+        wireless_band: formData.wireless_band || "",
+        iem_band: formData.iem_band || "",
+        extras_wired: formData.extras_wired || "",
+        other_infrastructure: formData.other_infrastructure || "",
+        notes: formData.notes || ""
       };
+
+      // Remove isAfterMidnight property if it was added during processing
+      const { isAfterMidnight, ...cleanData } = data as any;
 
       const { error } = artist?.id
         ? await supabase
             .from("festival_artists")
-            .update(data)
+            .update(cleanData)
             .eq("id", artist.id)
-        : await supabase.from("festival_artists").insert(data);
+        : await supabase.from("festival_artists").insert(cleanData);
 
       if (error) throw error;
 
