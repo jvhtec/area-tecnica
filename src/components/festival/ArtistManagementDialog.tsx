@@ -185,6 +185,7 @@ export const ArtistManagementDialog = ({
       const data = {
         ...formData,
         job_id: jobId,
+        // Only parse stage as integer if it's provided
         stage: formData.stage ? parseInt(formData.stage) : null,
         show_start: formData.show_start || null,
         show_end: formData.show_end || null,
@@ -253,7 +254,7 @@ export const ArtistManagementDialog = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="name">Artist Name</Label>
+                  <Label htmlFor="name">Artist Name*</Label>
                   <Input
                     id="name"
                     value={formData.name}
@@ -273,7 +274,6 @@ export const ArtistManagementDialog = ({
                     onChange={(e) =>
                       setFormData({ ...formData, stage: e.target.value })
                     }
-                    required
                   />
                 </div>
                 <div>
