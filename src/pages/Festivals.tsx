@@ -56,7 +56,7 @@ const Festivals = () => {
                   <JobCard 
                     job={job} 
                     onJobClick={() => handleJobClick(job.id)} 
-                    onEditClick={(e) => {
+                    onEditClick={(e: React.MouseEvent) => {
                       e.stopPropagation();
                       handleJobClick(job.id);
                     }} 
