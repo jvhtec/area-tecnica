@@ -78,7 +78,7 @@ export const TodaySchedule = ({
                 onDeleteClick={onDeleteClick} 
                 onJobClick={onJobClick} 
                 userRole={userRole} 
-                department="sound" 
+                department={job.department || jobData.department || "sound"} 
               />
             );
           })}

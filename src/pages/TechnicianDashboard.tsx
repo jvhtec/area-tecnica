@@ -131,7 +131,7 @@ const TechnicianDashboard = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           console.error("No user found");
-          return [];
+          throw new Error("User not authenticated");
         }
 
         console.log("Fetching assignments for user:", user.id);
@@ -277,7 +277,10 @@ const TechnicianDashboard = () => {
     },
     refetchOnWindowFocus: true,
     refetchOnMount: true,
-    refetchOnReconnect: true
+    refetchOnReconnect: true,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+    gcTime: 1000 * 60 * 5, // 5 minutes
+    retry: 3
   });
 
   const handleCloseMessages = () => {
