@@ -1,3 +1,4 @@
+
 import { PDFDocument } from 'pdf-lib';
 import { exportArtistPDF, ArtistPdfData } from './artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from './artistTablePdfExport';
@@ -147,6 +148,7 @@ export const generateAndMergeFestivalPDFs = async (
   const allPdfs: Blob[] = [];
   
   try {
+    // Fetch artist data
     const { data: artists, error: artistError } = await supabase
       .from("festival_artists")
       .select("*")
@@ -154,6 +156,7 @@ export const generateAndMergeFestivalPDFs = async (
     
     if (artistError) throw artistError;
     
+    // Fetch technical info
     const { data: technicalInfo, error: technicalError } = await supabase
       .from("festival_artist_technical_info")
       .select("*")
@@ -163,6 +166,7 @@ export const generateAndMergeFestivalPDFs = async (
       console.error("Error fetching technical info:", technicalError);
     }
     
+    // Fetch infrastructure info
     const { data: infrastructureInfo, error: infraError } = await supabase
       .from("festival_artist_infrastructure_info")
       .select("*")
@@ -172,6 +176,7 @@ export const generateAndMergeFestivalPDFs = async (
       console.error("Error fetching infrastructure info:", infraError);
     }
     
+    // Fetch extras info
     const { data: extrasInfo, error: extrasError } = await supabase
       .from("festival_artist_extras")
       .select("*")
@@ -181,6 +186,7 @@ export const generateAndMergeFestivalPDFs = async (
       console.error("Error fetching extras info:", extrasError);
     }
     
+    // Create maps for different types of artist info
     const techInfoMap = new Map();
     const infraInfoMap = new Map();
     const extrasInfoMap = new Map();
@@ -211,6 +217,7 @@ export const generateAndMergeFestivalPDFs = async (
 
     console.log(`Starting PDF generation for ${artists?.length || 0} artists`);
     
+    // Generate individual artist PDFs
     if (artists && artists.length > 0) {
       for (const artist of artists) {
         try {
@@ -305,8 +312,10 @@ export const generateAndMergeFestivalPDFs = async (
     
     console.log(`Generated ${allPdfs.length} artist PDFs`);
     
+    // Extract unique dates from artists
     const uniqueDates = [...new Set(artists?.map(a => a.date) || [])];
     
+    // Generate stage-specific artist table PDFs for each date
     for (const date of uniqueDates) {
       if (!date) continue;
       
@@ -395,9 +404,12 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
+    // Generate shift table PDFs for each date
+    console.log("Starting shift table PDF generation for dates:", uniqueDates);
     for (const date of uniqueDates) {
       if (!date) continue;
       
+      console.log(`Fetching shifts data for date ${date}`);
       const { data: shiftsData, error: shiftsError } = await supabase
         .from("festival_shifts")
         .select(`
@@ -414,6 +426,8 @@ export const generateAndMergeFestivalPDFs = async (
         console.error(`Error fetching shifts for date ${date}:`, shiftsError);
         continue;
       }
+      
+      console.log(`Found ${shiftsData?.length || 0} shifts for date ${date}`);
       
       if (shiftsData && shiftsData.length > 0) {
         console.log(`Generating shifts PDF for date ${date}`);
@@ -476,6 +490,7 @@ export const generateAndMergeFestivalPDFs = async (
             logoUrl
           };
           
+          console.log(`Creating shifts table PDF with ${typedShifts.length} shifts`);
           const pdf = await exportShiftsTablePDF(shiftsTableData);
           
           console.log(`Generated shifts PDF for date ${date}, size: ${pdf.size} bytes`);
@@ -487,6 +502,8 @@ export const generateAndMergeFestivalPDFs = async (
         } catch (err) {
           console.error(`Error generating shifts PDF for date ${date}:`, err);
         }
+      } else {
+        console.log(`No shifts found for date ${date}, skipping shifts PDF generation`);
       }
     }
     

@@ -5,14 +5,18 @@ import { useJobs } from "@/hooks/useJobs";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { JobCard } from "@/components/jobs/JobCard";
 import { Separator } from "@/components/ui/separator";
-import { Tent } from "lucide-react";
+import { Tent, Printer, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
+import { generateAndMergeFestivalPDFs } from "@/utils/pdfMerger";
 
 const Festivals = () => {
   const navigate = useNavigate();
   const { data: jobs, isLoading } = useJobs();
   const [festivalJobs, setFestivalJobs] = useState<any[]>([]);
   const [festivalLogos, setFestivalLogos] = useState<Record<string, string>>({});
+  const [isPrinting, setIsPrinting] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (jobs) {
@@ -54,6 +58,43 @@ const Festivals = () => {
     navigate(`/festival-management/${jobId}`);
   };
 
+  const handlePrintAllDocumentation = async (jobId: string, jobTitle: string) => {
+    setIsPrinting(prev => ({ ...prev, [jobId]: true }));
+    
+    try {
+      console.log("Starting document generation for festival:", jobTitle);
+      const mergedPdf = await generateAndMergeFestivalPDFs(jobId, jobTitle);
+      
+      if (!mergedPdf || mergedPdf.size === 0) {
+        throw new Error('Generated PDF is empty');
+      }
+      
+      // Create download link
+      const url = URL.createObjectURL(mergedPdf);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${jobTitle}_Complete_Documentation.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Success",
+        description: 'Documentation generated successfully'
+      });
+    } catch (error: any) {
+      console.error('Error generating documentation:', error);
+      toast({
+        title: "Error",
+        description: `Failed to generate documentation: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setIsPrinting(prev => ({ ...prev, [jobId]: false }));
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <Card>
@@ -81,16 +122,35 @@ const Festivals = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {festivalJobs.map((job) => (
-                <div key={job.id} onClick={() => handleJobClick(job.id)} className="cursor-pointer">
-                  <JobCard 
-                    job={job} 
-                    onJobClick={() => handleJobClick(job.id)} 
-                    onEditClick={() => {}} // Empty function as we're removing edit functionality
-                    onDeleteClick={() => {}}
-                    userRole="management"
-                    department="sound"
-                    festivalLogo={festivalLogos[job.id]}
-                  />
+                <div key={job.id} className="relative">
+                  <div onClick={() => handleJobClick(job.id)} className="cursor-pointer">
+                    <JobCard 
+                      job={job} 
+                      onJobClick={() => handleJobClick(job.id)} 
+                      onEditClick={() => {}} 
+                      onDeleteClick={() => {}}
+                      userRole="management"
+                      department="sound"
+                      festivalLogo={festivalLogos[job.id]}
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="absolute top-2 right-2 z-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePrintAllDocumentation(job.id, job.title);
+                    }}
+                    disabled={isPrinting[job.id]}
+                  >
+                    {isPrinting[job.id] ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Printer className="h-4 w-4" />
+                    )}
+                    <span className="sr-only">Print Documentation</span>
+                  </Button>
                 </div>
               ))}
             </div>
