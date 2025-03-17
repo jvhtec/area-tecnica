@@ -161,7 +161,7 @@ const TechnicianDashboard = () => {
           .eq('technician_id', user.id)
           .gte('jobs.start_time', new Date().toISOString())
           .lte('jobs.start_time', endDate.toISOString())
-          .order('jobs.start_time');  // Correct order syntax
+          .order('jobs.start_time', { ascending: true });  // Updated order syntax
 
         if (jobAssignmentsError) {
           console.error("Error fetching job assignments:", jobAssignmentsError);
