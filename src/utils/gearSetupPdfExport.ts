@@ -21,51 +21,69 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       
-      // Add logo if available
-      if (data.logoUrl) {
-        try {
-          const logo = new Image();
-          logo.crossOrigin = 'anonymous';
-          logo.src = data.logoUrl;
-          
-          logo.onload = () => {
-            const logoWidth = 40;
-            const logoHeight = logoWidth * (logo.height / logo.width);
-            doc.addImage(logo, 'PNG', (pageWidth - logoWidth) / 2, 10, logoWidth, logoHeight);
-            continueWithDocument(doc, data, pageWidth, pageHeight, logoHeight + 15);
-          };
-          
-          logo.onerror = () => {
-            console.error('Failed to load logo for gear setup PDF');
-            continueWithDocument(doc, data, pageWidth, pageHeight, 10);
-          };
-        } catch (logoError) {
-          console.error('Error with logo in gear setup PDF:', logoError);
-          continueWithDocument(doc, data, pageWidth, pageHeight, 10);
-        }
-      } else {
-        continueWithDocument(doc, data, pageWidth, pageHeight, 10);
-      }
+      // === HEADER SECTION ===
+      doc.setFillColor(125, 1, 1); // Corporate red color used in other PDFs
+      doc.rect(0, 0, pageWidth, 30, 'F');
       
-      function continueWithDocument(doc: jsPDF, data: GearSetupPdfData, pageWidth: number, pageHeight: number, startY: number) {
-        // Title
+      // Load festival logo if provided
+      const loadLogoPromise = data.logoUrl 
+        ? new Promise<void>((resolveLogoLoad) => {
+            console.log("Attempting to load logo from URL:", data.logoUrl);
+            const img = new Image();
+            img.crossOrigin = 'Anonymous';
+            img.onload = () => {
+              try {
+                console.log("Logo loaded successfully");
+                // Calculate logo dimensions (max height 20px in header)
+                const maxHeight = 20;
+                const ratio = img.width / img.height;
+                const logoHeight = Math.min(maxHeight, img.height);
+                const logoWidth = logoHeight * ratio;
+                
+                // Add logo to top right corner
+                doc.addImage(
+                  img, 
+                  'PNG', 
+                  5, // X position (left margin)
+                  5, // Y position (top margin)
+                  logoWidth,
+                  logoHeight
+                );
+                resolveLogoLoad();
+              } catch (err) {
+                console.error('Error adding logo to PDF:', err);
+                resolveLogoLoad(); // Resolve anyway to continue PDF generation
+              }
+            };
+            img.onerror = (e) => {
+              console.error('Error loading logo image:', e);
+              resolveLogoLoad(); // Resolve anyway to continue PDF generation
+            };
+            img.src = data.logoUrl;
+          })
+        : Promise.resolve();
+      
+      loadLogoPromise.then(() => {
+        // Title in header
         doc.setFontSize(18);
-        doc.setTextColor(0, 0, 0);
-        doc.text(data.jobTitle, pageWidth / 2, startY + 10, { align: 'center' });
+        doc.setTextColor(255, 255, 255); // White text for header
+        doc.text(`Stage ${data.stageNumber} Gear Setup`, pageWidth / 2, 15, { align: 'center' });
         
-        // Stage and date info
-        doc.setFontSize(14);
-        const stageName = data.stageName || `Stage ${data.stageNumber}`;
-        doc.text(stageName, pageWidth / 2, startY + 20, { align: 'center' });
-        
+        // Subtitle in header
         doc.setFontSize(12);
-        doc.text(`Date: ${format(new Date(data.date), 'MMMM d, yyyy')}`, pageWidth / 2, startY + 30, { align: 'center' });
+        doc.text(format(new Date(data.date), 'MMMM d, yyyy'), pageWidth / 2, 25, { align: 'center' });
         
-        let currentY = startY + 40;
+        let currentY = 40;
+        
+        // Job title
+        doc.setFontSize(14);
+        doc.setTextColor(0, 0, 0);
+        doc.text(data.jobTitle, pageWidth / 2, currentY, { align: 'center' });
+        currentY += 15;
         
         // FOH and MON Console Section
         doc.setFontSize(14);
-        doc.setTextColor(125, 1, 1);
+        doc.setTextColor(125, 1, 1); // Corporate red for section headers
         doc.text('Console Setup', 14, currentY);
         currentY += 10;
         
@@ -86,10 +104,15 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
             startY: currentY,
             head: [['Type', 'Model']],
             body: consoleData,
-            theme: 'striped',
+            theme: 'grid',
+            styles: {
+              fontSize: 9,
+              cellPadding: 3,
+              lineWidth: 0.1,
+            },
             headStyles: {
-              fillColor: [220, 220, 220],
-              textColor: [0, 0, 0]
+              fillColor: [125, 1, 1], // Corporate red for table headers
+              textColor: [255, 255, 255]
             }
           });
         }
@@ -137,10 +160,15 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
             startY: currentY,
             head: [['Type', 'Model', 'Quantity', 'Band']],
             body: wirelessData,
-            theme: 'striped',
+            theme: 'grid',
+            styles: {
+              fontSize: 9,
+              cellPadding: 3,
+              lineWidth: 0.1,
+            },
             headStyles: {
-              fillColor: [220, 220, 220],
-              textColor: [0, 0, 0]
+              fillColor: [125, 1, 1],
+              textColor: [255, 255, 255]
             }
           });
         }
@@ -167,10 +195,15 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
           startY: currentY,
           head: [['Type', 'Details']],
           body: monitorData,
-          theme: 'striped',
+          theme: 'grid',
+          styles: {
+            fontSize: 9,
+            cellPadding: 3,
+            lineWidth: 0.1,
+          },
           headStyles: {
-            fillColor: [220, 220, 220],
-            textColor: [0, 0, 0]
+            fillColor: [125, 1, 1],
+            textColor: [255, 255, 255]
           }
         });
         
@@ -211,10 +244,15 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
             startY: currentY,
             head: [['Type', 'Quantity/Details']],
             body: infraData,
-            theme: 'striped',
+            theme: 'grid',
+            styles: {
+              fontSize: 9,
+              cellPadding: 3,
+              lineWidth: 0.1,
+            },
             headStyles: {
-              fillColor: [220, 220, 220],
-              textColor: [0, 0, 0]
+              fillColor: [125, 1, 1],
+              textColor: [255, 255, 255]
             }
           });
         }
@@ -235,24 +273,111 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
           doc.text(splitNotes, 14, currentY);
         }
         
-        // Add page numbers
-        const totalPages = doc.getNumberOfPages();
-        for (let i = 1; i <= totalPages; i++) {
-          doc.setPage(i);
-          doc.setFontSize(10);
-          doc.setTextColor(100, 100, 100);
-          doc.text(
-            `Page ${i} of ${totalPages}`,
-            pageWidth / 2,
-            pageHeight - 10,
-            { align: 'center' }
-          );
+        // Add company logo at the bottom
+        try {
+          // Add a small company logo at the bottom right
+          const companyLogoUrl = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
+          const companyImg = new Image();
+          companyImg.onload = () => {
+            try {
+              // Logo at bottom right
+              const logoWidth = 40;
+              const ratio = companyImg.width / companyImg.height;
+              const logoHeight = logoWidth / ratio;
+              
+              doc.addImage(
+                companyImg, 
+                'PNG', 
+                pageWidth - logoWidth - 10, // X position (right aligned)
+                pageHeight - logoHeight - 10, // Y position (bottom aligned)
+                logoWidth,
+                logoHeight
+              );
+              
+              // Add page numbers
+              const totalPages = doc.getNumberOfPages();
+              for (let i = 1; i <= totalPages; i++) {
+                doc.setPage(i);
+                doc.setFontSize(10);
+                doc.setTextColor(100, 100, 100);
+                doc.text(
+                  `Page ${i} of ${totalPages}`,
+                  pageWidth / 2,
+                  pageHeight - 10,
+                  { align: 'center' }
+                );
+              }
+              
+              // Finalize PDF
+              const pdfBlob = doc.output('blob');
+              console.log(`Generated gear setup PDF of size ${pdfBlob.size} bytes`);
+              resolve(pdfBlob);
+            } catch (err) {
+              console.error('Error adding company logo to PDF:', err);
+              
+              // Add page numbers even if logo fails
+              const totalPages = doc.getNumberOfPages();
+              for (let i = 1; i <= totalPages; i++) {
+                doc.setPage(i);
+                doc.setFontSize(10);
+                doc.setTextColor(100, 100, 100);
+                doc.text(
+                  `Page ${i} of ${totalPages}`,
+                  pageWidth / 2,
+                  pageHeight - 10,
+                  { align: 'center' }
+                );
+              }
+              
+              const pdfBlob = doc.output('blob');
+              resolve(pdfBlob);
+            }
+          };
+          companyImg.onerror = () => {
+            console.error('Failed to load company logo');
+            
+            // Add page numbers even if logo fails to load
+            const totalPages = doc.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+              doc.setPage(i);
+              doc.setFontSize(10);
+              doc.setTextColor(100, 100, 100);
+              doc.text(
+                `Page ${i} of ${totalPages}`,
+                pageWidth / 2,
+                pageHeight - 10,
+                { align: 'center' }
+              );
+            }
+            
+            const pdfBlob = doc.output('blob');
+            resolve(pdfBlob);
+          };
+          companyImg.src = companyLogoUrl;
+        } catch (logoErr) {
+          console.error('Error with company logo in gear setup PDF:', logoErr);
+          
+          // Add page numbers even if there's an error with the logo
+          const totalPages = doc.getNumberOfPages();
+          for (let i = 1; i <= totalPages; i++) {
+            doc.setPage(i);
+            doc.setFontSize(10);
+            doc.setTextColor(100, 100, 100);
+            doc.text(
+              `Page ${i} of ${totalPages}`,
+              pageWidth / 2,
+              pageHeight - 10,
+              { align: 'center' }
+            );
+          }
+          
+          const pdfBlob = doc.output('blob');
+          resolve(pdfBlob);
         }
-        
-        const pdfBlob = doc.output('blob');
-        console.log(`Generated gear setup PDF of size ${pdfBlob.size} bytes`);
-        resolve(pdfBlob);
-      }
+      }).catch(err => {
+        console.error("Error in PDF generation:", err);
+        reject(err);
+      });
     } catch (error) {
       console.error('Error generating gear setup PDF:', error);
       reject(error);
