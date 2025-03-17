@@ -421,7 +421,7 @@ export const generateAndMergeFestivalPDFs = async (
             const stageObj = stages?.find(s => s.number === stageNum);
             const stageName = stageObj ? stageObj.name : `Stage ${stageNum}`;
             
-            const pdf = await generateStageGearPDF(jobId, date, stageNum, stageName, logoUrl);
+            const pdf = await generateStageGearPDF(jobId, date, stageNum, stageName);
             
             console.log(`Generated gear setup PDF for stage ${stageNum}, size: ${pdf.size} bytes`);
             if (pdf && pdf.size > 0) {
