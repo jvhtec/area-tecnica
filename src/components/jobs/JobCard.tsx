@@ -24,6 +24,11 @@ export const JobCard = ({ job, onEditClick, onDeleteClick, onJobClick, userRole,
     e.stopPropagation();
     navigate(`/festival-management/${job.id}`);
   };
+  
+  // Define who can access festival management
+  const canManageFestival = ['admin', 'management', 'logistics', 'technician'].includes(userRole || '');
+  // Define who can edit and delete jobs
+  const canEditJobs = ['admin', 'management'].includes(userRole || '');
 
   return (
     <Card 
@@ -42,15 +47,15 @@ export const JobCard = ({ job, onEditClick, onDeleteClick, onJobClick, userRole,
             )}
           </CardTitle>
           <div className="flex items-center gap-2">
-            {job.job_type === 'festival' && (
+            {job.job_type === 'festival' && canManageFestival && (
               <Button 
                 variant="outline" 
                 onClick={handleFestivalManage}
               >
-                Manage Festival
+                {userRole === 'technician' ? 'View Festival' : 'Manage Festival'}
               </Button>
             )}
-            {userRole !== "technician" && userRole !== "management" && (
+            {canEditJobs && (
               <>
                 <Button 
                   variant="outline" 

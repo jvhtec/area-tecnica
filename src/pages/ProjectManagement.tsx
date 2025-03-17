@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,7 +60,8 @@ const ProjectManagement = () => {
           console.error("ProjectManagement: Error fetching profile:", profileError);
           throw profileError;
         }
-        if (!profile || !["admin", "logistics", "management"].includes(profile.role)) {
+        // Allow technicians to view but not modify festival jobs
+        if (!profile || !["admin", "logistics", "management", "technician"].includes(profile.role)) {
           console.log("ProjectManagement: Unauthorized access attempt");
           navigate("/dashboard");
           return;
@@ -108,6 +110,9 @@ const ProjectManagement = () => {
     );
   }
 
+  // Check if user has permissions to create new items
+  const canCreateItems = ['admin', 'management', 'logistics'].includes(userRole || '');
+
   return (
     <div className="container mx-auto px-4 space-y-6">
       <Card>
@@ -129,21 +134,25 @@ const ProjectManagement = () => {
                 ))}
               </select>
             </div>
-            <Button 
-              onClick={() => navigate("/hoja-de-ruta")} 
-              className="flex items-center gap-2"
-              variant="outline"
-            >
-              <FileText className="h-4 w-4" />
-              Hoja de Ruta
-            </Button>
-            <Button 
-              onClick={() => navigate("/labor-po-form")} 
-              className="flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Create Labor PO
-            </Button>
+            {canCreateItems && (
+              <>
+                <Button 
+                  onClick={() => navigate("/hoja-de-ruta")} 
+                  className="flex items-center gap-2"
+                  variant="outline"
+                >
+                  <FileText className="h-4 w-4" />
+                  Hoja de Ruta
+                </Button>
+                <Button 
+                  onClick={() => navigate("/labor-po-form")} 
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create Labor PO
+                </Button>
+              </>
+            )}
           </div>
         </CardHeader>
         <CardContent>

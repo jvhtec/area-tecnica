@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { format, isValid, parseISO } from "date-fns";
 import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
 import { FestivalScheduling } from "@/components/festival/scheduling/FestivalScheduling";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdfMerger";
+import { useAuthSession } from "@/hooks/auth/useAuthSession";
 
 interface FestivalJob {
   id: string;
@@ -50,8 +52,13 @@ const FestivalManagement = () => {
   const [artistCount, setArtistCount] = useState(0);
   const [jobDates, setJobDates] = useState<Date[]>([]);
   const [isPrinting, setIsPrinting] = useState(false);
+  const { userRole } = useAuthSession();
 
   const isSchedulingRoute = location.pathname.includes('/scheduling');
+  
+  // Determine user permissions
+  const canEdit = ['admin', 'management', 'logistics'].includes(userRole || '');
+  const isViewOnly = userRole === 'technician'; // Technicians have view-only access
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -231,21 +238,23 @@ const FestivalManagement = () => {
               </p>
             </div>
             <div className="flex gap-2 items-center">
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="flex items-center gap-2"
-                onClick={handlePrintAllDocumentation}
-                disabled={isPrinting}
-              >
-                {isPrinting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Printer className="h-4 w-4" />
-                )}
-                {isPrinting ? 'Generating...' : 'Print All Documentation'}
-              </Button>
-              <FestivalLogoManager jobId={jobId} />
+              {canEdit && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="flex items-center gap-2"
+                  onClick={handlePrintAllDocumentation}
+                  disabled={isPrinting}
+                >
+                  {isPrinting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Printer className="h-4 w-4" />
+                  )}
+                  {isPrinting ? 'Generating...' : 'Print All Documentation'}
+                </Button>
+              )}
+              {canEdit && <FestivalLogoManager jobId={jobId} />}
             </div>
           </div>
         </CardHeader>
@@ -267,7 +276,7 @@ const FestivalManagement = () => {
                 e.stopPropagation();
                 navigate(`/festival-management/${jobId}/artists`);
               }}>
-                Manage Artists
+                {isViewOnly ? "View Artists" : "Manage Artists"}
               </Button>
             </CardContent>
           </Card>
@@ -285,7 +294,7 @@ const FestivalManagement = () => {
                 e.stopPropagation();
                 navigate(`/festival-management/${jobId}/gear`);
               }}>
-                Manage Gear
+                {isViewOnly ? "View Gear" : "Manage Gear"}
               </Button>
             </CardContent>
           </Card>
@@ -303,7 +312,7 @@ const FestivalManagement = () => {
                 e.stopPropagation();
                 navigate(`/festival-management/${jobId}/scheduling`);
               }}>
-                Manage Schedule
+                {isViewOnly ? "View Schedule" : "Manage Schedule"}
               </Button>
             </CardContent>
           </Card>
@@ -323,7 +332,7 @@ const FestivalManagement = () => {
           </div>
           
           {jobDates.length > 0 ? (
-            <FestivalScheduling jobId={jobId} jobDates={jobDates} />
+            <FestivalScheduling jobId={jobId} jobDates={jobDates} isViewOnly={isViewOnly} />
           ) : (
             <Card>
               <CardContent className="p-8 text-center">

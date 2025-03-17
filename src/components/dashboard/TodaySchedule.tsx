@@ -82,6 +82,7 @@ export const TodaySchedule = ({
                 userRole={userRole} 
                 department={job.department || jobData.department || "sound"} 
                 hideTasks={hideTasks} // Pass the hideTasks prop to JobCardNew
+                showManageArtists={job.job_type === 'festival'} // Show manage artists button for festival jobs
               />
             );
           })}

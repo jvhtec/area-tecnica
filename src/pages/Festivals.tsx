@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useJobs } from "@/hooks/useJobs";
@@ -9,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
+import { useAuthSession } from "@/hooks/auth/useAuthSession";
 
 const Festivals = () => {
   const navigate = useNavigate();
@@ -16,6 +18,7 @@ const Festivals = () => {
   const [festivalJobs, setFestivalJobs] = useState<any[]>([]);
   const [festivalLogos, setFestivalLogos] = useState<Record<string, string>>({});
   const [isPrinting, setIsPrinting] = useState<Record<string, boolean>>({});
+  const { userRole } = useAuthSession();
 
   useEffect(() => {
     if (jobs) {
@@ -91,6 +94,9 @@ const Festivals = () => {
     }
   };
 
+  // Check if user can print documentation
+  const canPrintDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <Card>
@@ -125,28 +131,30 @@ const Festivals = () => {
                       onJobClick={() => handleJobClick(job.id)} 
                       onEditClick={() => {}} 
                       onDeleteClick={() => {}}
-                      userRole="management"
+                      userRole={userRole}
                       department="sound"
                       festivalLogo={festivalLogos[job.id]}
                     />
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="absolute top-2 right-2 z-10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePrintAllDocumentation(job.id, job.title);
-                    }}
-                    disabled={isPrinting[job.id]}
-                  >
-                    {isPrinting[job.id] ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Printer className="h-4 w-4" />
-                    )}
-                    <span className="sr-only">Print Documentation</span>
-                  </Button>
+                  {canPrintDocuments && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="absolute top-2 right-2 z-10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePrintAllDocumentation(job.id, job.title);
+                      }}
+                      disabled={isPrinting[job.id]}
+                    >
+                      {isPrinting[job.id] ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Printer className="h-4 w-4" />
+                      )}
+                      <span className="sr-only">Print Documentation</span>
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
