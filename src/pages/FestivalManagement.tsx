@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -249,100 +250,107 @@ const FestivalManagement = () => {
 
       const artistPdfs: Blob[] = [];
       
-      for (const artist of artists) {
-        const technical = techInfoMap.get(artist.id) || {};
-        const infrastructure = infraInfoMap.get(artist.id) || {};
-        const extras = extrasInfoMap.get(artist.id) || {};
-        
-        const artistData: ArtistPdfData = {
-          name: artist.name,
-          stage: artist.stage,
-          date: artist.date,
-          schedule: {
-            show: { start: artist.show_start, end: artist.show_end },
-            soundcheck: artist.soundcheck_start ? {
-              start: artist.soundcheck_start,
-              end: artist.soundcheck_end || ''
-            } : undefined
-          },
-          technical: {
-            fohTech: artist.foh_tech || false,
-            monTech: artist.mon_tech || false,
-            fohConsole: { 
-              model: artist.foh_console || '', 
-              providedBy: artist.foh_console_provided_by || 'festival' 
-            },
-            monConsole: { 
-              model: artist.mon_console || '', 
-              providedBy: artist.mon_console_provided_by || 'festival' 
-            },
-            wireless: {
-              model: artist.wireless_model || '',
-              providedBy: artist.wireless_provided_by || 'festival',
-              handhelds: artist.wireless_quantity_hh || 0,
-              bodypacks: artist.wireless_quantity_bp || 0,
-              band: artist.wireless_band || ''
-            },
-            iem: {
-              model: artist.iem_model || '',
-              providedBy: artist.iem_provided_by || 'festival',
-              quantity: artist.iem_quantity || 0,
-              band: artist.iem_band || ''
-            },
-            monitors: {
-              enabled: artist.monitors_enabled || false,
-              quantity: artist.monitors_quantity || 0
+      if (artists && artists.length > 0) {
+        for (const artist of artists) {
+          try {
+            const technical = techInfoMap.get(artist.id) || {};
+            const infrastructure = infraInfoMap.get(artist.id) || {};
+            const extras = extrasInfoMap.get(artist.id) || {};
+            
+            const artistData: ArtistPdfData = {
+              name: artist.name || 'Unnamed Artist',
+              stage: artist.stage || 1,
+              date: artist.date || '',
+              schedule: {
+                show: { 
+                  start: artist.show_start || '', 
+                  end: artist.show_end || '' 
+                },
+                soundcheck: artist.soundcheck_start ? {
+                  start: artist.soundcheck_start || '',
+                  end: artist.soundcheck_end || ''
+                } : undefined
+              },
+              technical: {
+                fohTech: Boolean(artist.foh_tech || false),
+                monTech: Boolean(artist.mon_tech || false),
+                fohConsole: { 
+                  model: String(artist.foh_console || ''), 
+                  providedBy: String(artist.foh_console_provided_by || 'festival') 
+                },
+                monConsole: { 
+                  model: String(artist.mon_console || ''), 
+                  providedBy: String(artist.mon_console_provided_by || 'festival') 
+                },
+                wireless: {
+                  model: String(artist.wireless_model || ''),
+                  providedBy: String(artist.wireless_provided_by || 'festival'),
+                  handhelds: Number(artist.wireless_quantity_hh || 0),
+                  bodypacks: Number(artist.wireless_quantity_bp || 0),
+                  band: String(artist.wireless_band || '')
+                },
+                iem: {
+                  model: String(artist.iem_model || ''),
+                  providedBy: String(artist.iem_provided_by || 'festival'),
+                  quantity: Number(artist.iem_quantity || 0),
+                  band: String(artist.iem_band || '')
+                },
+                monitors: {
+                  enabled: Boolean(artist.monitors_enabled || false),
+                  quantity: Number(artist.monitors_quantity || 0)
+                }
+              },
+              infrastructure: {
+                providedBy: String(artist.infrastructure_provided_by || 'festival'),
+                cat6: { 
+                  enabled: Boolean(artist.infra_cat6 || false), 
+                  quantity: Number(artist.infra_cat6_quantity || 0) 
+                },
+                hma: { 
+                  enabled: Boolean(artist.infra_hma || false), 
+                  quantity: Number(artist.infra_hma_quantity || 0) 
+                },
+                coax: { 
+                  enabled: Boolean(artist.infra_coax || false), 
+                  quantity: Number(artist.infra_coax_quantity || 0) 
+                },
+                opticalconDuo: { 
+                  enabled: Boolean(artist.infra_opticalcon_duo || false), 
+                  quantity: Number(artist.infra_opticalcon_duo_quantity || 0) 
+                },
+                analog: Number(artist.infra_analog || 0),
+                other: String(artist.other_infrastructure || '')
+              },
+              extras: {
+                sideFill: Boolean(artist.extras_sf || false),
+                drumFill: Boolean(artist.extras_df || false),
+                djBooth: Boolean(artist.extras_djbooth || false),
+                wired: String(artist.extras_wired || '')
+              },
+              notes: artist.notes ? String(artist.notes) : undefined
+            };
+            
+            const pdf = await exportArtistPDF(artistData);
+            if (pdf && pdf.size > 0) {
+              artistPdfs.push(pdf);
+            } else {
+              console.warn(`Generated empty PDF for artist ${artist.name}, skipping`);
             }
-          },
-          infrastructure: {
-            providedBy: artist.infrastructure_provided_by || 'festival',
-            cat6: { 
-              enabled: artist.infra_cat6 || false, 
-              quantity: artist.infra_cat6_quantity || 0 
-            },
-            hma: { 
-              enabled: artist.infra_hma || false, 
-              quantity: artist.infra_hma_quantity || 0 
-            },
-            coax: { 
-              enabled: artist.infra_coax || false, 
-              quantity: artist.infra_coax_quantity || 0 
-            },
-            opticalconDuo: { 
-              enabled: artist.infra_opticalcon_duo || false, 
-              quantity: artist.infra_opticalcon_duo_quantity || 0 
-            },
-            analog: artist.infra_analog || 0,
-            other: artist.other_infrastructure || ''
-          },
-          extras: {
-            sideFill: artist.extras_sf || false,
-            drumFill: artist.extras_df || false,
-            djBooth: artist.extras_djbooth || false,
-            wired: artist.extras_wired || ''
-          },
-          notes: artist.notes
-        };
-        
-        try {
-          const pdf = await exportArtistPDF(artistData);
-          if (pdf && pdf.size > 0) {
-            artistPdfs.push(pdf);
-          } else {
-            console.warn(`Generated empty PDF for artist ${artist.name}, skipping`);
+          } catch (err) {
+            console.error(`Error generating PDF for artist ${artist.name}:`, err);
           }
-        } catch (err) {
-          console.error(`Error generating PDF for artist ${artist.name}:`, err);
         }
       }
       
-      const uniqueDates = [...new Set(artists.map(a => a.date))];
+      const uniqueDates = [...new Set(artists?.map(a => a.date) || [])];
       const artistTablePdfs: Blob[] = [];
       
       for (const date of uniqueDates) {
+        if (!date) continue;
+        
         const stageMap = new Map<number, any[]>();
         
-        artists.filter(a => a.date === date).forEach(artist => {
+        artists?.filter(a => a.date === date).forEach(artist => {
           if (!stageMap.has(artist.stage)) {
             stageMap.set(artist.stage, []);
           }
@@ -353,26 +361,27 @@ const FestivalManagement = () => {
           if (stageArtists.length === 0) continue;
           
           // Find stage name from stages array or default to "Stage X"
-          const stageName = stages?.find(s => s.number === stageNum)?.name || `Stage ${stageNum}`;
+          const stageObj = stages?.find(s => s.number === stageNum);
+          const stageName = stageObj ? stageObj.name : `Stage ${stageNum}`;
           
           const tableData: ArtistTablePdfData = {
             jobTitle: job?.title || 'Festival',
             date: date,
             stage: stageName,
             artists: stageArtists.map(a => ({
-              name: a.name,
-              stage: Number(a.stage),
+              name: String(a.name || ''),
+              stage: Number(a.stage || 1),
               showTime: { 
-                start: String(a.show_start), 
-                end: String(a.show_end) 
+                start: String(a.show_start || ''), 
+                end: String(a.show_end || '') 
               },
               soundcheck: a.soundcheck_start ? { 
-                start: String(a.soundcheck_start), 
+                start: String(a.soundcheck_start || ''), 
                 end: String(a.soundcheck_end || '') 
               } : undefined,
               technical: {
-                fohTech: Boolean(a.foh_tech),
-                monTech: Boolean(a.mon_tech),
+                fohTech: Boolean(a.foh_tech || false),
+                monTech: Boolean(a.mon_tech || false),
                 fohConsole: { 
                   model: String(a.foh_console || ''), 
                   providedBy: String(a.foh_console_provided_by || 'festival') 
@@ -382,23 +391,23 @@ const FestivalManagement = () => {
                   providedBy: String(a.mon_console_provided_by || 'festival') 
                 },
                 wireless: {
-                  hh: Number(a.wireless_quantity_hh) || 0,
-                  bp: Number(a.wireless_quantity_bp) || 0,
+                  hh: Number(a.wireless_quantity_hh || 0),
+                  bp: Number(a.wireless_quantity_bp || 0),
                   providedBy: String(a.wireless_provided_by || 'festival')
                 },
                 iem: {
-                  quantity: Number(a.iem_quantity) || 0,
+                  quantity: Number(a.iem_quantity || 0),
                   providedBy: String(a.iem_provided_by || 'festival')
                 },
                 monitors: {
-                  enabled: Boolean(a.monitors_enabled),
-                  quantity: Number(a.monitors_quantity) || 0
+                  enabled: Boolean(a.monitors_enabled || false),
+                  quantity: Number(a.monitors_quantity || 0)
                 }
               },
               extras: {
-                sideFill: Boolean(a.extras_sf),
-                drumFill: Boolean(a.extras_df),
-                djBooth: Boolean(a.extras_djbooth)
+                sideFill: Boolean(a.extras_sf || false),
+                drumFill: Boolean(a.extras_df || false),
+                djBooth: Boolean(a.extras_djbooth || false)
               },
               notes: String(a.notes || '')
             }))
@@ -420,6 +429,8 @@ const FestivalManagement = () => {
       const shiftsPdfs: Blob[] = [];
       
       for (const date of uniqueDates) {
+        if (!date) continue;
+        
         const { data: shiftsData, error: shiftsError } = await supabase
           .from("festival_shifts")
           .select(`
@@ -439,7 +450,7 @@ const FestivalManagement = () => {
         
         if (shiftsData && shiftsData.length > 0) {
           const typedShifts: ShiftWithAssignments[] = shiftsData.map(shift => {
-            const typedAssignments = shift.assignments.map(assignment => {
+            const typedAssignments = (shift.assignments || []).map(assignment => {
               let profileData = null;
               
               if (assignment.profiles) {
@@ -488,14 +499,20 @@ const FestivalManagement = () => {
             };
           });
           
-          const pdf = await exportShiftsTablePDF({
-            jobTitle: job?.title || 'Festival',
-            date: date,
-            jobId: jobId,
-            shifts: typedShifts
-          });
-          
-          shiftsPdfs.push(pdf);
+          try {
+            const pdf = await exportShiftsTablePDF({
+              jobTitle: job?.title || 'Festival',
+              date: date,
+              jobId: jobId,
+              shifts: typedShifts
+            });
+            
+            if (pdf && pdf.size > 0) {
+              shiftsPdfs.push(pdf);
+            }
+          } catch (err) {
+            console.error(`Error generating shifts PDF for date ${date}:`, err);
+          }
         }
       }
       

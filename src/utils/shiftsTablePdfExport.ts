@@ -108,34 +108,13 @@ export const exportShiftsTablePDF = (data: ShiftsTablePdfData): Promise<Blob> =>
       }
     }
 
-    // Footer with logo and date
-    const logo = new Image();
-    logo.crossOrigin = 'anonymous';
-    logo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
-    logo.onload = () => {
-      const logoWidth = 30;
-      const logoHeight = logoWidth * (logo.height / logo.width);
-      const xPosition = (pageWidth - logoWidth) / 2;
-      const yLogo = pageHeight - 15;
-      try {
-        doc.addImage(logo, 'PNG', xPosition, yLogo - logoHeight, logoWidth, logoHeight);
-      } catch (error) {
-        console.error('Error adding logo:', error);
-      }
-      doc.setFontSize(8);
-      doc.setTextColor(51, 51, 51);
-      doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
-      const blob = doc.output('blob');
-      resolve(blob);
-    };
-
-    logo.onerror = () => {
-      console.error('Failed to load logo');
-      doc.setFontSize(8);
-      doc.setTextColor(51, 51, 51);
-      doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
-      const blob = doc.output('blob');
-      resolve(blob);
-    };
+    // Footer with date
+    doc.setFontSize(8);
+    doc.setTextColor(51, 51, 51);
+    doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
+    
+    // Resolve with the PDF blob
+    const blob = doc.output('blob');
+    resolve(blob);
   });
 };

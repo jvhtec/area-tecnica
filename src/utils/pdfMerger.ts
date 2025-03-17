@@ -24,7 +24,7 @@ export const mergePDFs = async (pdfBlobs: Blob[]): Promise<Blob> => {
         console.log(`Processing PDF ${i+1}/${pdfBlobs.length}, size: ${pdfBlob.size} bytes`);
         
         // Skip empty PDFs
-        if (pdfBlob.size === 0) {
+        if (!pdfBlob || pdfBlob.size === 0) {
           console.warn(`Skipping empty PDF at index ${i}`);
           continue;
         }
@@ -36,7 +36,7 @@ export const mergePDFs = async (pdfBlobs: Blob[]): Promise<Blob> => {
         const pdfDoc = await PDFDocument.load(arrayBuffer);
         
         // Get all pages from the document
-        const pages = await pdfDoc.copyPages(pdfDoc, pdfDoc.getPageIndices());
+        const pages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
         console.log(`Copied ${pages.length} pages from PDF ${i+1}`);
         
         // Add each page to the merged document
