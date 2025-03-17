@@ -78,7 +78,7 @@ const generateCoverPage = async (
     page.drawRectangle({
       x: 0,
       y: height - 100,
-      width: width,
+      width,
       height: 100,
       color: rgb(125/255, 1/255, 1/255), // Corporate red
     });
@@ -167,7 +167,7 @@ const generateTableOfContents = async (
     page.drawRectangle({
       x: 0,
       y: height - 100,
-      width: width,
+      width,
       height: 100,
       color: rgb(125/255, 1/255, 1/255), // Corporate red
     });
