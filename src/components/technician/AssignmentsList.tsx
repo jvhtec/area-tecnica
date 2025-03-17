@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 import { ReloadButton } from "@/components/ui/reload-button";
+import { toast } from "sonner";
 
 interface JobDocument {
   id: string;
@@ -16,7 +17,7 @@ interface JobDocument {
 
 interface Assignment {
   job_id: string;
-  jobs: any;
+  jobs?: any;
   festival_jobs?: any;
 }
 
@@ -27,8 +28,9 @@ interface AssignmentsListProps {
 }
 
 export const AssignmentsList = ({ assignments, loading, onRefresh }: AssignmentsListProps) => {
-  const { toast } = useToast();
+  const { toast: uiToast } = useToast();
   const [hasError, setHasError] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     console.log("Setting up real-time subscription for job assignments");
@@ -57,6 +59,7 @@ export const AssignmentsList = ({ assignments, loading, onRefresh }: Assignments
 
   const handleDownload = async (jobDocument: JobDocument) => {
     try {
+      setDownloadingId(jobDocument.id);
       console.log("Downloading document:", jobDocument);
       
       const { data, error } = await supabase.storage
@@ -74,24 +77,30 @@ export const AssignmentsList = ({ assignments, loading, onRefresh }: Assignments
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast({
+      toast.success(`Downloading ${jobDocument.file_name}`);
+      
+      uiToast({
         title: "Download Started",
         description: `Downloading ${jobDocument.file_name}`,
       });
     } catch (error: any) {
       console.error("Download error:", error);
       setHasError(true);
-      toast({
+      toast.error(`Download failed: ${error.message}`);
+      
+      uiToast({
         title: "Download Failed",
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setDownloadingId(null);
     }
   };
 
-  // For debugging
+  // Debug logs
   useEffect(() => {
-    console.log("Current assignments data:", assignments);
+    console.log("AssignmentsList - Current assignments data:", assignments);
     if (assignments && assignments.length > 0) {
       setHasError(false);
     }
@@ -149,7 +158,7 @@ export const AssignmentsList = ({ assignments, loading, onRefresh }: Assignments
               department="sound"
               userRole="technician"
             />
-            {jobData.job_documents?.length > 0 && (
+            {jobData.job_documents && jobData.job_documents.length > 0 && (
               <div className="ml-4 space-y-2">
                 <h3 className="text-sm font-medium">Documents:</h3>
                 <div className="grid gap-2">
@@ -160,9 +169,13 @@ export const AssignmentsList = ({ assignments, loading, onRefresh }: Assignments
                       size="sm"
                       className="w-full justify-start gap-2"
                       onClick={() => handleDownload(doc)}
+                      disabled={downloadingId === doc.id}
                     >
                       <Download className="h-4 w-4" />
                       {doc.file_name}
+                      {downloadingId === doc.id && (
+                        <span className="ml-2 text-xs text-muted-foreground">Downloading...</span>
+                      )}
                     </Button>
                   ))}
                 </div>
