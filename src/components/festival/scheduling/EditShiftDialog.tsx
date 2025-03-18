@@ -61,8 +61,8 @@ export const EditShiftDialog = ({
           name: values.name,
           start_time: values.start_time,
           end_time: values.end_time,
-          stage: values.stage ? parseInt(values.stage) : null,
-          department: values.department || null,
+          stage: values.stage && values.stage !== "none" ? parseInt(values.stage) : null,
+          department: values.department && values.department !== "none" ? values.department : null,
           notes: values.notes || null,
         })
         .eq("id", shift.id);
@@ -142,7 +142,7 @@ export const EditShiftDialog = ({
             <div className="space-y-2">
               <Label htmlFor="stage">Stage (optional)</Label>
               <Select 
-                defaultValue={form.getValues("stage")}
+                defaultValue={form.getValues("stage") || "none"}
                 onValueChange={(value) => form.setValue("stage", value)}
               >
                 <SelectTrigger>
@@ -161,7 +161,7 @@ export const EditShiftDialog = ({
             <div className="space-y-2">
               <Label htmlFor="department">Department (optional)</Label>
               <Select 
-                defaultValue={form.getValues("department")}
+                defaultValue={form.getValues("department") || "none"}
                 onValueChange={(value) => form.setValue("department", value)}
               >
                 <SelectTrigger>
