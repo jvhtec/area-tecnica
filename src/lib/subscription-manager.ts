@@ -133,11 +133,11 @@ export class SubscriptionManager {
     // Create a channel with a unique name
     const channelName = `${table}-changes-${Date.now()}`;
     
-    // Fix: Create channel first, then configure it with proper syntax for Supabase's realtime API
+    // Create channel first
     const channel = supabase.channel(channelName);
     
-    // Configure the channel with postgres changes using the correct API pattern
-    const subscription = channel
+    // Configure the channel with the correct pattern for Supabase's realtime API
+    channel
       .on(
         'postgres_changes', 
         { 
