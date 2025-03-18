@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -10,6 +9,7 @@ import { Plus, FileDown, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { useFestivalShifts } from "@/hooks/festival/useFestivalShifts";
+import { supabase } from "@/lib/supabase";
 
 interface FestivalSchedulingProps {
   jobId: string;

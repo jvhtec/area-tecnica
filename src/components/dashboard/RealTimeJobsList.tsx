@@ -146,7 +146,7 @@ export function RealTimeJobsList({
                     <JobCardNew 
                       key={job.id}
                       job={job}
-                      onClick={() => onJobClick && onJobClick(job.id)}
+                      onJobClick={() => onJobClick && onJobClick(job.id)}
                       onEditClick={onEditClick ? () => onEditClick(job) : undefined}
                       onDeleteClick={onDeleteClick ? () => onDeleteClick(job.id) : undefined}
                       userRole={userRole}
