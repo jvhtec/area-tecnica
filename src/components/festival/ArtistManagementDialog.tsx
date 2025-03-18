@@ -459,7 +459,7 @@ export const ArtistManagementDialog = ({
                     </SelectContent>
                   </Select>
                   <ProviderRadioGroup
-                    value={formData.foh_console_provided_by}
+                    value={formData.foh_console_provided_by as ProviderType}
                     onChange={(value) => setFormData({ ...formData, foh_console_provided_by: value })}
                     label="FOH Console Provided By"
                   />
@@ -485,7 +485,7 @@ export const ArtistManagementDialog = ({
                     </SelectContent>
                   </Select>
                   <ProviderRadioGroup
-                    value={formData.mon_console_provided_by}
+                    value={formData.mon_console_provided_by as ProviderType}
                     onChange={(value) => setFormData({ ...formData, mon_console_provided_by: value })}
                     label="Monitor Console Provided By"
                   />
@@ -517,7 +517,7 @@ export const ArtistManagementDialog = ({
                       </SelectContent>
                     </Select>
                     <ProviderRadioGroup
-                      value={formData.wireless_provided_by}
+                      value={formData.wireless_provided_by as ProviderType}
                       onChange={(value) => setFormData({ ...formData, wireless_provided_by: value })}
                       label="Wireless System Provided By"
                     />
@@ -584,7 +584,7 @@ export const ArtistManagementDialog = ({
                       </SelectContent>
                     </Select>
                     <ProviderRadioGroup
-                      value={formData.iem_provided_by}
+                      value={formData.iem_provided_by as ProviderType}
                       onChange={(value) => setFormData({ ...formData, iem_provided_by: value })}
                       label="IEM System Provided By"
                     />
@@ -697,7 +697,7 @@ export const ArtistManagementDialog = ({
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium">Infrastructure</h3>
                 <ProviderRadioGroup
-                  value={formData.infrastructure_provided_by}
+                  value={formData.infrastructure_provided_by as ProviderType}
                   onChange={(value) => setFormData({ ...formData, infrastructure_provided_by: value })}
                   label="Infrastructure Provided By"
                 />
