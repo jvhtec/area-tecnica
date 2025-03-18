@@ -1,20 +1,30 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useJobs } from "@/hooks/useJobs";
+import { useJobsRealtime } from "@/hooks/useJobsRealtime";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { JobCard } from "@/components/jobs/JobCard";
 import { Separator } from "@/components/ui/separator";
-import { Tent, Printer, Loader2 } from "lucide-react";
+import { Tent, Printer, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { useAuthSession } from "@/hooks/auth/useAuthSession";
+import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 
 const Festivals = () => {
   const navigate = useNavigate();
-  const { data: jobs, isLoading } = useJobs();
+  const { 
+    jobs, 
+    isLoading, 
+    isError, 
+    error, 
+    isRefreshing, 
+    refetch, 
+    subscriptionStatus 
+  } = useJobsRealtime();
+  
   const [festivalJobs, setFestivalJobs] = useState<any[]>([]);
   const [festivalLogos, setFestivalLogos] = useState<Record<string, string>>({});
   const [isPrinting, setIsPrinting] = useState<Record<string, boolean>>({});
@@ -30,27 +40,31 @@ const Festivals = () => {
   }, [jobs]);
 
   const fetchFestivalLogo = async (job: any) => {
-    const { data, error } = await supabase
-      .from('festival_logos')
-      .select('file_path')
-      .eq('job_id', job.id)
-      .maybeSingle();
+    try {
+      const { data, error } = await supabase
+        .from('festival_logos')
+        .select('file_path')
+        .eq('job_id', job.id)
+        .maybeSingle();
 
-    if (error) {
-      console.error('Error fetching logo:', error);
-      return;
-    }
+      if (error) {
+        console.error('Error fetching logo:', error);
+        return;
+      }
 
-    if (data?.file_path) {
-      const { data: { publicUrl } } = supabase
-        .storage
-        .from('festival-logos')
-        .getPublicUrl(data.file_path);
-      
-      setFestivalLogos(prev => ({
-        ...prev,
-        [job.id]: publicUrl
-      }));
+      if (data?.file_path) {
+        const { data: { publicUrl } } = supabase
+          .storage
+          .from('festival-logos')
+          .getPublicUrl(data.file_path);
+        
+        setFestivalLogos(prev => ({
+          ...prev,
+          [job.id]: publicUrl
+        }));
+      }
+    } catch (err) {
+      console.error('Error in fetchFestivalLogo:', err);
     }
   };
 
@@ -78,17 +92,10 @@ const Festivals = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
-      toast({
-        title: "Success",
-        description: 'Documentation generated successfully'
-      });
+      toast.success('Documentation generated successfully');
     } catch (error: any) {
       console.error('Error generating documentation:', error);
-      toast({
-        title: "Error",
-        description: `Failed to generate documentation: ${error.message}`,
-        variant: "destructive"
-      });
+      toast.error(`Failed to generate documentation: ${error.message}`);
     } finally {
       setIsPrinting(prev => ({ ...prev, [jobId]: false }));
     }
@@ -97,15 +104,41 @@ const Festivals = () => {
   // Check if user can print documentation
   const canPrintDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
 
-  // Use empty functions for onEditClick and onDeleteClick since we don't want those buttons
+  // Empty functions for onEditClick and onDeleteClick since we don't want those buttons
   const emptyFunction = () => {};
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-2xl font-bold">Festival Management</CardTitle>
-          <Tent className="h-6 w-6 text-muted-foreground" />
+          <div className="flex items-center gap-4">
+            <CardTitle className="text-2xl font-bold">Festival Management</CardTitle>
+            <Tent className="h-6 w-6 text-muted-foreground" />
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <SubscriptionIndicator 
+              tables={['jobs', 'job_assignments', 'job_departments', 'job_date_types']} 
+              showRefreshButton 
+              onRefresh={refetch}
+              showLabel
+            />
+            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={refetch} 
+              disabled={isLoading || isRefreshing}
+              className="ml-2"
+            >
+              {isRefreshing ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-1" />
+              )}
+              Refresh
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground mb-6">
@@ -114,8 +147,25 @@ const Festivals = () => {
           <Separator className="my-6" />
           
           {isLoading ? (
-            <div className="flex justify-center items-center h-40">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white" />
+            <div className="flex flex-col justify-center items-center h-40">
+              <Loader2 className="h-8 w-8 animate-spin mb-2 text-primary" />
+              <p className="text-muted-foreground">Loading festivals...</p>
+            </div>
+          ) : isError ? (
+            <div className="flex flex-col justify-center items-center h-40 text-center">
+              <AlertTriangle className="h-8 w-8 mb-2 text-destructive" />
+              <h3 className="text-lg font-medium text-destructive">Error loading festivals</h3>
+              <p className="text-muted-foreground mt-2 max-w-md">
+                {error instanceof Error ? error.message : 'An unknown error occurred'}
+              </p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={refetch}
+                className="mt-4"
+              >
+                Try Again
+              </Button>
             </div>
           ) : festivalJobs.length === 0 ? (
             <div className="text-center py-10">

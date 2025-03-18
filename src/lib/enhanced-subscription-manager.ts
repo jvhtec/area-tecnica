@@ -1,4 +1,3 @@
-
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
@@ -16,6 +15,7 @@ export class EnhancedSubscriptionManager {
   private healthCheckInterval: number | null = null;
   private reconnectAttempts: Map<string, number> = new Map();
   private lastNetworkCheck: number = Date.now();
+  private networkCheckThrottle: number = 10000; // 10 seconds between connectivity checks
   
   private constructor(queryClient: QueryClient) {
     this.queryClient = queryClient;
@@ -96,16 +96,16 @@ export class EnhancedSubscriptionManager {
   }
   
   private async checkNetworkAndReconnect(): Promise<void> {
-    // Throttle network checks to once every 10 seconds
+    // Throttle network checks to avoid too many requests
     const now = Date.now();
-    if (now - this.lastNetworkCheck < 10000) {
+    if (now - this.lastNetworkCheck < this.networkCheckThrottle) {
       return;
     }
     this.lastNetworkCheck = now;
     
     try {
-      // Simple connectivity check using a simple endpoint that will be available
-      // with the Supabase REST API without directly accessing protected properties
+      // Simple connectivity check using the Supabase REST API endpoint
+      // We use a direct URL to avoid typescript errors with protected properties
       const response = await fetch(`https://syldobdcdsgfgjtbuwxm.supabase.co/rest/v1/`, {
         method: 'HEAD',
         headers: {
@@ -393,7 +393,6 @@ export class EnhancedSubscriptionManager {
     return statuses;
   }
   
-  // Reset all subscriptions (force reconnect)
   resetAllSubscriptions(): void {
     console.log('Resetting all subscriptions');
     
