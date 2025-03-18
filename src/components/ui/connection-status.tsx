@@ -1,8 +1,7 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
-import { Wifi, WifiOff, AlertCircle, RefreshCw } from "lucide-react";
+import { Wifi, WifiOff, AlertCircle, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "./button";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
@@ -16,24 +15,23 @@ export function ConnectionStatus() {
   } = useSubscriptionContext();
   
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
   const [hasError, setHasError] = useState(false);
   
   // Calculate stale status
   const isStale = Date.now() - lastRefreshTime > 5 * 60 * 1000; // 5 minutes
   
-  // Show connection status briefly when there's an issue
+  // Show connection status briefly when there's an issue or on initial load
   useEffect(() => {
-    if (connectionStatus !== 'connected' || isStale) {
+    if (connectionStatus === 'connecting') {
+      // Always show when connecting
+      setIsVisible(true);
+    }
+    else if (connectionStatus !== 'connected' || isStale) {
       setIsVisible(true);
       setHasError(true);
       
-      // Hide after 5 seconds
-      const timeout = setTimeout(() => {
-        setIsVisible(false);
-      }, 5000);
-      
-      return () => clearTimeout(timeout);
+      // Keep visible while issues persist
     } else if (hasError) {
       // If we've recovered from an error, show briefly then hide
       setIsVisible(true);
@@ -41,7 +39,14 @@ export function ConnectionStatus() {
       
       const timeout = setTimeout(() => {
         setIsVisible(false);
-      }, 3000);
+      }, 5000);
+      
+      return () => clearTimeout(timeout);
+    } else {
+      // If everything is good, hide after 5 seconds
+      const timeout = setTimeout(() => {
+        setIsVisible(false);
+      }, 5000);
       
       return () => clearTimeout(timeout);
     }
@@ -60,10 +65,6 @@ export function ConnectionStatus() {
     }
   };
   
-  if (!isVisible) {
-    return null;
-  }
-  
   // Format last refresh time
   let lastRefreshDisplay = "Unknown";
   try {
@@ -74,47 +75,56 @@ export function ConnectionStatus() {
   
   return (
     <div className="fixed bottom-4 right-4 z-50 max-w-md transition-all duration-300 ease-in-out">
-      <Card className={`shadow-lg ${connectionStatus === 'connected' && !isStale ? 'bg-green-50' : 'bg-red-50'}`}>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {connectionStatus === 'connected' ? (
-                isStale ? (
-                  <AlertCircle className="h-5 w-5 text-amber-500" />
+      {isVisible && (
+        <Card className={`shadow-lg ${
+          connectionStatus === 'connecting' ? 'bg-blue-50' :
+          connectionStatus === 'connected' && !isStale ? 'bg-green-50' : 'bg-red-50'
+        }`}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {connectionStatus === 'connecting' ? (
+                  <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
+                ) : connectionStatus === 'connected' ? (
+                  isStale ? (
+                    <AlertCircle className="h-5 w-5 text-amber-500" />
+                  ) : (
+                    <Wifi className="h-5 w-5 text-green-500" />
+                  )
                 ) : (
-                  <Wifi className="h-5 w-5 text-green-500" />
-                )
-              ) : (
-                <WifiOff className="h-5 w-5 text-red-500" />
-              )}
-              
-              <div>
-                <p className="text-sm font-medium">
-                  {connectionStatus === 'connected' 
-                    ? (isStale ? "Data may be stale" : "Connected") 
-                    : "Connection issue"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {connectionStatus === 'connected' 
-                    ? `Last updated: ${lastRefreshDisplay}` 
-                    : "Attempting to reconnect..."}
-                </p>
+                  <WifiOff className="h-5 w-5 text-red-500" />
+                )}
+                
+                <div>
+                  <p className="text-sm font-medium">
+                    {connectionStatus === 'connecting' ? "Connecting..." :
+                     connectionStatus === 'connected' 
+                      ? (isStale ? "Data may be stale" : "Connected") 
+                      : "Connection issue"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {connectionStatus === 'connecting' ? "Establishing connection..." :
+                     connectionStatus === 'connected' 
+                      ? `Last updated: ${lastRefreshDisplay}` 
+                      : "Attempting to reconnect..."}
+                  </p>
+                </div>
               </div>
+              
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleRefresh}
+                disabled={isRefreshing || connectionStatus === 'connecting'}
+                className="h-8 w-8 p-0"
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span className="sr-only">Refresh</span>
+              </Button>
             </div>
-            
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="h-8 w-8 p-0"
-            >
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span className="sr-only">Refresh</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

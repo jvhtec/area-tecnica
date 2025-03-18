@@ -1,5 +1,5 @@
 
-import { Wifi, WifiOff, AlertCircle, RefreshCw, Clock } from "lucide-react";
+import { Wifi, WifiOff, AlertCircle, RefreshCw, Clock, Loader2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 import { cn } from "@/lib/utils";
@@ -42,6 +42,10 @@ export function SubscriptionIndicator({
   const isCompact = variant === 'compact';
   
   const getStatusIcon = () => {
+    if (connectionStatus === 'connecting') {
+      return <Loader2 className={cn("text-blue-500 animate-spin", isCompact ? "h-3 w-3" : "h-4 w-4")} />;
+    }
+    
     if (connectionStatus !== 'connected') {
       return <WifiOff className={cn("text-red-500", isCompact ? "h-3 w-3" : "h-4 w-4")} />;
     }
@@ -58,6 +62,10 @@ export function SubscriptionIndicator({
   };
   
   const getStatusLabel = () => {
+    if (connectionStatus === 'connecting') {
+      return "Connecting...";
+    }
+    
     if (connectionStatus !== 'connected') {
       return "Disconnected";
     }
@@ -74,6 +82,15 @@ export function SubscriptionIndicator({
   };
   
   const getTooltipContent = () => {
+    if (connectionStatus === 'connecting') {
+      return (
+        <div className="text-xs max-w-xs">
+          <p className="font-semibold">Establishing connection</p>
+          <p>Setting up real-time connection...</p>
+        </div>
+      );
+    }
+    
     if (connectionStatus !== 'connected') {
       return (
         <div className="text-xs max-w-xs">

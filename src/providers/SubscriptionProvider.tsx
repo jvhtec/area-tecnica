@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { SubscriptionManager } from '@/lib/subscription-manager';
 import { useToast } from '@/hooks/use-toast';
 import { TokenManager } from '@/lib/token-manager';
+import { toast } from 'sonner';
 
 // Context for providing subscription manager state
 interface SubscriptionContextType {
@@ -18,7 +19,7 @@ interface SubscriptionContextType {
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType>({
-  connectionStatus: 'disconnected',
+  connectionStatus: 'connecting',  // Start with connecting status instead of disconnected
   activeSubscriptions: [],
   subscriptionCount: 0,
   subscriptionsByTable: {},
@@ -37,7 +38,7 @@ interface SubscriptionProviderProps {
 export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
   const queryClient = useQueryClient();
   const [state, setState] = useState<SubscriptionContextType>({
-    connectionStatus: 'disconnected',
+    connectionStatus: 'connecting',  // Start with connecting
     activeSubscriptions: [],
     subscriptionCount: 0,
     subscriptionsByTable: {},
@@ -46,11 +47,11 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     lastRefreshTime: Date.now(),
     forceRefresh: () => {}
   });
-  const { toast } = useToast();
   
   // Track last connection status to notify on changes
   const lastConnectionStatusRef = React.useRef<string>(state.connectionStatus);
   const tokenManager = TokenManager.getInstance();
+  const connectionCheckIntervalRef = React.useRef<number | null>(null);
 
   // Initialize the subscription manager
   useEffect(() => {
@@ -75,6 +76,7 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     
     // Define refresh function
     const refreshSubscriptions = () => {
+      console.log("Manually refreshing subscriptions...");
       // Recreate subscriptions by unsubscribing and resubscribing
       const tables = Object.keys(manager.getSubscriptionsByTable());
       tables.forEach(table => {
@@ -82,6 +84,9 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
         manager.subscribeToTable(table, table);
       });
       setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
+      
+      // Show toast notification
+      toast.success("Subscriptions refreshed");
     };
     
     // Define invalidate function with optional specific query key
@@ -106,20 +111,12 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
           // Invalidate related queries
           queryClient.invalidateQueries({ queryKey: [table] });
         });
-        toast({
-          title: 'Real-time subscriptions refreshed',
-          description: `${tables.join(', ')} tables refreshed`,
-          variant: 'default'
-        });
+        toast.success(`Refreshed ${tables.join(', ')} tables`);
       } else {
         // Refresh all tables
         refreshSubscriptions();
         queryClient.invalidateQueries();
-        toast({
-          title: 'All real-time subscriptions refreshed',
-          description: 'Data has been refreshed',
-          variant: 'default'
-        });
+        toast.success('All subscriptions refreshed');
       }
       setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
     };
@@ -133,23 +130,30 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
       lastRefreshTime: Date.now()
     }));
     
+    // Set initial connection status from manager
+    setState(prev => ({
+      ...prev, 
+      connectionStatus: manager.getConnectionStatus()
+    }));
+    
+    // Clear any existing interval
+    if (connectionCheckIntervalRef.current) {
+      clearInterval(connectionCheckIntervalRef.current);
+    }
+    
     // Update state periodically to reflect current subscription status
-    const intervalId = setInterval(() => {
+    connectionCheckIntervalRef.current = window.setInterval(() => {
       const connectionStatus = manager.getConnectionStatus();
       
       // Notify users of connection status changes
       if (connectionStatus !== lastConnectionStatusRef.current) {
         if (connectionStatus === 'connected' && lastConnectionStatusRef.current !== 'connected') {
-          toast({
-            title: 'Connection restored',
-            description: 'Real-time updates are now active',
-            variant: 'default'
+          toast.success('Connection restored', {
+            description: 'Real-time updates are now active'
           });
         } else if (connectionStatus === 'disconnected' && lastConnectionStatusRef.current === 'connected') {
-          toast({
-            title: 'Connection lost',
-            description: 'Attempting to reconnect...',
-            variant: 'destructive'
+          toast.error('Connection lost', {
+            description: 'Attempting to reconnect...'
           });
         }
         
@@ -163,13 +167,15 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
         subscriptionCount: manager.getSubscriptionCount(),
         subscriptionsByTable: manager.getSubscriptionsByTable(),
       }));
-    }, 5000);
+    }, 2000); // More frequent updates (every 2 seconds)
     
     return () => {
-      clearInterval(intervalId);
+      if (connectionCheckIntervalRef.current) {
+        clearInterval(connectionCheckIntervalRef.current);
+      }
       unsubscribe();
     };
-  }, [queryClient, toast]);
+  }, [queryClient]);
 
   // Setup core tables subscription
   useEffect(() => {

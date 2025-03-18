@@ -1,3 +1,4 @@
+
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel, RealtimeChannelOptions } from "@supabase/supabase-js";
@@ -6,17 +7,20 @@ export class SubscriptionManager {
   private static instance: SubscriptionManager;
   private queryClient: QueryClient;
   private subscriptions: Map<string, { unsubscribe: () => void }> = new Map();
-  private connectionStatus: 'connected' | 'disconnected' | 'connecting' = 'disconnected';
+  private connectionStatus: 'connected' | 'disconnected' | 'connecting' = 'connecting'; // Start with connecting
   private pendingSubscriptions: Map<string, { table: string, queryKey: string | string[] }> = new Map();
   private lastReconnectAttempt: number = 0;
   private reconnectTimeoutId: number | null = null;
   private batchedInvalidations: Map<string, Set<string | string[]>> = new Map();
   private batchTimeout: number | null = null;
   private debounceTimeouts: Map<string, number> = new Map();
+  private healthCheckInterval: number | null = null;
+  private pingChannel: RealtimeChannel | null = null;
   
   private constructor(queryClient: QueryClient) {
     this.queryClient = queryClient;
     this.setupConnectionMonitoring();
+    this.setupHealthCheck();
   }
   
   static getInstance(queryClient: QueryClient): SubscriptionManager {
@@ -37,10 +41,97 @@ export class SubscriptionManager {
         this.checkSubscriptionsHealth();
       }
     });
+
+    // Set up initial ping channel to detect connection status
+    this.setupPingChannel();
+  }
+
+  private setupPingChannel() {
+    // Create a dedicated channel for connection monitoring
+    try {
+      if (this.pingChannel) {
+        supabase.removeChannel(this.pingChannel);
+      }
+
+      const channelName = `ping-channel-${Date.now()}`;
+      this.pingChannel = supabase.channel(channelName);
+      
+      this.pingChannel.subscribe((status) => {
+        console.log('Ping channel status:', status);
+        if (status === 'SUBSCRIBED') {
+          // Successfully connected
+          this.connectionStatus = 'connected';
+          console.log('Supabase realtime connection established');
+        } else if (status === 'CHANNEL_ERROR') {
+          // Connection failed
+          this.connectionStatus = 'disconnected';
+          console.log('Supabase realtime connection failed');
+          
+          // Attempt reconnection after a delay
+          setTimeout(() => this.setupPingChannel(), 5000);
+        } else if (status === 'TIMED_OUT') {
+          this.connectionStatus = 'disconnected';
+          console.log('Supabase realtime connection timed out');
+          
+          // Attempt reconnection after a delay
+          setTimeout(() => this.setupPingChannel(), 5000);
+        }
+      });
+    } catch (error) {
+      console.error('Error setting up ping channel:', error);
+      this.connectionStatus = 'disconnected';
+    }
+  }
+  
+  private setupHealthCheck() {
+    // Clear any existing interval
+    if (this.healthCheckInterval !== null) {
+      window.clearInterval(this.healthCheckInterval);
+    }
+    
+    // Set up a health check interval (every 30 seconds)
+    this.healthCheckInterval = window.setInterval(() => {
+      this.performHealthCheck();
+    }, 30000);
+  }
+  
+  private performHealthCheck() {
+    console.log('Performing subscription health check');
+    
+    // Check if we need to verify the connection
+    if (this.connectionStatus !== 'connected') {
+      this.setupPingChannel();
+    }
+    
+    // Check existing subscriptions
+    const now = Date.now();
+    let hasDeadSubscriptions = false;
+    
+    this.subscriptions.forEach((_, key) => {
+      const [table, serializedKey] = key.split('::');
+      const queryKey = serializedKey ? JSON.parse(serializedKey) : table;
+      
+      // Simple check - try to get an existing channel
+      const channelExists = supabase.getChannels().some(
+        channel => channel.topic.includes(table)
+      );
+      
+      if (!channelExists) {
+        console.log(`Detected broken subscription for ${table}, will reconnect`);
+        hasDeadSubscriptions = true;
+        this.pendingSubscriptions.set(key, { table, queryKey });
+      }
+    });
+    
+    // If we found broken subscriptions, attempt to reconnect
+    if (hasDeadSubscriptions) {
+      this.reestablishSubscriptions();
+    }
   }
   
   private handleOnline() {
     console.log('Network reconnected, reestablishing Supabase subscriptions');
+    this.setupPingChannel();
     this.reestablishSubscriptions();
   }
   
@@ -55,6 +146,7 @@ export class SubscriptionManager {
     
     // If we've been offline, attempt to reconnect
     if (this.connectionStatus === 'disconnected') {
+      this.setupPingChannel();
       this.reestablishSubscriptions();
     }
   }
@@ -98,6 +190,9 @@ export class SubscriptionManager {
       this.subscribeToTable(table, queryKey);
       this.pendingSubscriptions.delete(key);
     });
+    
+    // Perform a full query invalidation to refresh data
+    this.queryClient.invalidateQueries();
     
     this.connectionStatus = 'connected';
     console.log('Supabase subscriptions reestablished');
@@ -219,7 +314,16 @@ export class SubscriptionManager {
         
         // Use the debounced batched invalidation
         this.debounce(`invalidate-${table}`, () => {
-          this.scheduleBatchedInvalidation(table, queryKey);
+          if (this.batchedInvalidations && this.scheduleBatchedInvalidation) {
+            this.scheduleBatchedInvalidation(table, queryKey);
+          } else {
+            // Direct invalidation as fallback
+            if (Array.isArray(queryKey)) {
+              this.queryClient.invalidateQueries({ queryKey });
+            } else {
+              this.queryClient.invalidateQueries({ queryKey: [queryKey] });
+            }
+          }
         }, 150);
       };
       
@@ -249,7 +353,9 @@ export class SubscriptionManager {
           console.error(`Error in subscription to ${table}`);
           // Queue for reconnection
           this.pendingSubscriptions.set(subscriptionKey, { table, queryKey });
-          this.handleOffline();
+          
+          // Don't immediately set all connections to disconnected
+          // Just mark this specific subscription for reconnection
         }
       });
       
