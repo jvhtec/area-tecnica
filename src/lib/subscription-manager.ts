@@ -130,41 +130,43 @@ export class SubscriptionManager {
     
     console.log(`Setting up subscription to ${table} for query key ${serializedKey}`);
     
-    const channel = supabase.channel(`${table}-changes-${Date.now()}`)
-      .on(
-        'postgres_changes',
-        { 
-          event: filter?.event || '*', 
-          schema: filter?.schema || 'public', 
-          table,
-          ...(filter?.filter ? { filter: filter.filter } : {})
-        },
-        async (payload) => {
-          console.log(`Received ${payload.eventType} for ${table}:`, payload);
-          
-          // Intelligently invalidate only affected queries
-          const keys = Array.isArray(queryKey) ? queryKey : [queryKey];
-          
-          // Batch invalidations to prevent UI thrashing
-          setTimeout(() => {
-            keys.forEach(key => {
-              this.queryClient.invalidateQueries({ queryKey: [key] });
-            });
-            console.log(`Invalidated queries for keys: ${keys.join(', ')}`);
-          }, 50);
-        }
-      )
-      .subscribe((status) => {
-        console.log(`Subscription to ${table} status:`, status);
-        if (status === 'SUBSCRIBED') {
-          this.connectionStatus = 'connected';
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error(`Error in subscription to ${table}`);
-          // Queue for reconnection
-          this.pendingSubscriptions.set(subscriptionKey, { table, queryKey });
-          this.handleOffline();
-        }
-      });
+    const channel = supabase.channel(`${table}-changes-${Date.now()}`);
+    
+    // Configure channel for postgres changes
+    channel.on(
+      'postgres_changes',
+      { 
+        event: filter?.event || '*', 
+        schema: filter?.schema || 'public', 
+        table,
+        ...(filter?.filter ? { filter: filter.filter } : {})
+      },
+      async (payload) => {
+        console.log(`Received ${payload.eventType} for ${table}:`, payload);
+        
+        // Intelligently invalidate only affected queries
+        const keys = Array.isArray(queryKey) ? queryKey : [queryKey];
+        
+        // Batch invalidations to prevent UI thrashing
+        setTimeout(() => {
+          keys.forEach(key => {
+            this.queryClient.invalidateQueries({ queryKey: [key] });
+          });
+          console.log(`Invalidated queries for keys: ${keys.join(', ')}`);
+        }, 50);
+      }
+    )
+    .subscribe((status) => {
+      console.log(`Subscription to ${table} status:`, status);
+      if (status === 'SUBSCRIBED') {
+        this.connectionStatus = 'connected';
+      } else if (status === 'CHANNEL_ERROR') {
+        console.error(`Error in subscription to ${table}`);
+        // Queue for reconnection
+        this.pendingSubscriptions.set(subscriptionKey, { table, queryKey });
+        this.handleOffline();
+      }
+    });
     
     // Store the subscription for later cleanup
     this.subscriptions.set(subscriptionKey, { 

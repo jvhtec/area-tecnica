@@ -1,32 +1,34 @@
 
 import { useMutation, useQueryClient, UseMutationOptions } from '@tanstack/react-query';
 
+type MutationContext = {
+  previousData: any;
+};
+
 /**
  * Generic type for optimistic mutations with real-time updates
  * @template TData The type of data returned by the mutation
  * @template TVariables The type of variables used by the mutation
- * @template TContext The type of context used for the optimistic update
  * @template TError The type of error returned by the mutation
  */
 export function useOptimisticMutation<
   TData,
   TVariables,
-  TContext = unknown,
   TError = Error
 >(
   mutationFn: (variables: TVariables) => Promise<TData>,
   options: {
     queryKey: string | string[];
     optimisticUpdate?: (variables: TVariables, oldData: any) => any;
-    onSuccess?: (data: TData, variables: TVariables, context: TContext) => void;
-    onError?: (error: TError, variables: TVariables, context: TContext) => void;
-    onSettled?: (data: TData | undefined, error: TError | null, variables: TVariables, context: TContext) => void;
+    onSuccess?: (data: TData, variables: TVariables, context: MutationContext) => void;
+    onError?: (error: TError, variables: TVariables, context: MutationContext) => void;
+    onSettled?: (data: TData | undefined, error: TError | null, variables: TVariables, context: MutationContext) => void;
   }
 ) {
   const queryClient = useQueryClient();
   const normalizedQueryKey = Array.isArray(options.queryKey) ? options.queryKey : [options.queryKey];
   
-  return useMutation({
+  return useMutation<TData, TError, TVariables, MutationContext>({
     mutationFn,
     
     onMutate: async (variables) => {

@@ -2,20 +2,23 @@
 import { QueryClient } from "@tanstack/react-query";
 import { SubscriptionManager } from "@/lib/subscription-manager";
 
-export const setupReactQuery = () => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        staleTime: 1000 * 60 * 2, // 2 minutes
-        retry: 2,
-        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
-        refetchOnWindowFocus: true,
-        refetchOnMount: true,
-        refetchOnReconnect: true,
-      },
+// Create a singleton query client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 2, // 2 minutes
+      retry: 2,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+      refetchOnWindowFocus: true,
+      refetchOnMount: true,
+      refetchOnReconnect: true,
     },
-  });
-  
+  },
+});
+
+export { queryClient };
+
+export const setupReactQuery = () => {
   // Initialize the subscription manager
   const subscriptionManager = SubscriptionManager.getInstance(queryClient);
   
