@@ -149,7 +149,7 @@ export const EditShiftDialog = ({
                   <SelectValue placeholder="Select stage" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No stage</SelectItem>
+                  <SelectItem value="">No stage</SelectItem>
                   <SelectItem value="1">Stage 1</SelectItem>
                   <SelectItem value="2">Stage 2</SelectItem>
                   <SelectItem value="3">Stage 3</SelectItem>
@@ -168,7 +168,7 @@ export const EditShiftDialog = ({
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No department</SelectItem>
+                  <SelectItem value="">No department</SelectItem>
                   <SelectItem value="sound">Sound</SelectItem>
                   <SelectItem value="lights">Lights</SelectItem>
                   <SelectItem value="video">Video</SelectItem>
