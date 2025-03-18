@@ -21,13 +21,13 @@ export const useJobsRealtime = () => {
   // Monitor subscription status
   const status = useSubscriptionStatus(['jobs', 'job_assignments', 'job_departments', 'job_date_types']);
 
-  const { data: jobs = [], isLoading, isError, error, refetch } = useQuery({
+  const { data: jobs = [], isLoading, isError, error } = useQuery({
     queryKey: ["jobs"],
     queryFn: async () => {
-      console.log("Fetching jobs...");
+      console.log("Fetching jobs with automatic retries...");
       
-      // Add retry logic
-      const fetchWithRetry = async (retries = 3) => {
+      // Add retry logic with exponential backoff
+      const fetchWithRetry = async (retries = 3, delay = 1000) => {
         try {
           const { data: jobs, error } = await supabase
             .from("jobs")
@@ -55,13 +55,13 @@ export const useJobsRealtime = () => {
             throw error;
           }
 
-          console.log("Jobs fetched successfully:", jobs);
-          return jobs;
+          console.log("Jobs fetched successfully:", jobs?.length || 0, "jobs");
+          return jobs || [];
         } catch (error) {
           if (retries > 0) {
-            console.log(`Retrying... ${retries} attempts remaining`);
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
-            return fetchWithRetry(retries - 1);
+            console.log(`Retrying fetch jobs... ${retries} attempts remaining`);
+            await new Promise(resolve => setTimeout(resolve, delay)); 
+            return fetchWithRetry(retries - 1, delay * 2); // Exponential backoff
           }
           throw error;
         }
@@ -72,13 +72,16 @@ export const useJobsRealtime = () => {
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
     staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
+    refetchInterval: status.isSubscribed ? undefined : 60000, // Poll every minute if subscription is not active
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       console.log("Manually refreshing jobs data...");
-      await refetch();
+      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
       toast.success("Jobs refreshed successfully");
     } catch (err) {
       console.error("Error refreshing jobs data:", err);

@@ -5,7 +5,7 @@ import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 import { cn } from "@/lib/utils";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { Button } from "./button";
-import { formatDistanceToNow } from "date-fns";
+import { useState } from "react";
 
 interface SubscriptionIndicatorProps {
   tables: string[];
@@ -26,9 +26,19 @@ export function SubscriptionIndicator({
   showRefreshButton = false,
   onRefresh
 }: SubscriptionIndicatorProps) {
-  const { isSubscribed, tablesSubscribed, tablesUnsubscribed, connectionStatus, lastRefreshTime, isStale } = useSubscriptionStatus(tables);
-  const { forceRefresh } = useSubscriptionContext();
-
+  const { 
+    isSubscribed, 
+    tablesSubscribed, 
+    tablesUnsubscribed, 
+    connectionStatus, 
+    lastRefreshTime,
+    lastRefreshFormatted, 
+    isStale,
+    refreshSubscription
+  } = useSubscriptionStatus(tables);
+  
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
   const isCompact = variant === 'compact';
   
   const getStatusIcon = () => {
@@ -69,6 +79,7 @@ export function SubscriptionIndicator({
         <div className="text-xs max-w-xs">
           <p className="font-semibold">Connection lost</p>
           <p>Attempting to reconnect...</p>
+          <p className="text-muted-foreground mt-1">Last data refresh: {lastRefreshFormatted}</p>
         </div>
       );
     }
@@ -77,7 +88,7 @@ export function SubscriptionIndicator({
       return (
         <div className="text-xs max-w-xs">
           <p className="font-semibold">Data may be stale</p>
-          <p>Last updated: {formatDistanceToNow(lastRefreshTime)} ago</p>
+          <p>Last updated: {lastRefreshFormatted}</p>
           <p>Click to refresh data</p>
         </div>
       );
@@ -99,16 +110,21 @@ export function SubscriptionIndicator({
       <div className="text-xs max-w-xs">
         <p className="font-semibold">Real-time updates active</p>
         <p>All tables subscribed: {tables.join(', ')}</p>
-        <p>Last updated: {formatDistanceToNow(lastRefreshTime)} ago</p>
+        <p>Last updated: {lastRefreshFormatted}</p>
       </div>
     );
   };
 
   const handleRefresh = async () => {
-    if (onRefresh) {
-      await onRefresh();
-    } else {
-      forceRefresh(tables);
+    setIsRefreshing(true);
+    try {
+      if (onRefresh) {
+        await onRefresh();
+      } else {
+        refreshSubscription();
+      }
+    } finally {
+      setIsRefreshing(false);
     }
   };
   
@@ -126,8 +142,12 @@ export function SubscriptionIndicator({
           size="icon" 
           className={cn("ml-1", isCompact ? "h-4 w-4" : "h-6 w-6")} 
           onClick={handleRefresh}
+          disabled={isRefreshing}
         >
-          <RefreshCw className={isCompact ? "h-2 w-2" : "h-3 w-3"} />
+          <RefreshCw className={cn(
+            isCompact ? "h-2 w-2" : "h-3 w-3",
+            isRefreshing ? "animate-spin" : ""
+          )} />
         </Button>
       )}
     </div>

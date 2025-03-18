@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ShiftsList } from "./ShiftsList";
@@ -10,6 +11,7 @@ import { format } from "date-fns";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { useFestivalShifts } from "@/hooks/festival/useFestivalShifts";
 import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
 interface FestivalSchedulingProps {
   jobId: string;
@@ -22,12 +24,9 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
   const [isCreateShiftOpen, setIsCreateShiftOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "table">("list");
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  console.log("FestivalScheduling component rendered with job ID:", jobId);
-  console.log("Job dates received:", jobDates);
-  console.log("Is view only mode:", isViewOnly);
+  const { toast } = useToast();
   
-  const formatDateToString = (date: Date): string => {
+  const formatDateToString = useCallback((date: Date): string => {
     try {
       return format(date, 'yyyy-MM-dd');
     } catch (error) {
@@ -35,7 +34,7 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
       console.error("Problematic date value:", date);
       return "";
     }
-  };
+  }, []);
 
   // Set initial selected date
   useEffect(() => {
@@ -56,9 +55,9 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
         setSelectedDate(formatDateToString(today));
       }
     }
-  }, [jobDates, selectedDate]);
+  }, [jobDates, selectedDate, formatDateToString]);
 
-  // Use our new custom hook to fetch shifts with real-time updates
+  // Use our enhanced hook to fetch shifts with real-time updates and auto-recovery
   const { shifts, isLoading, refetch } = useFestivalShifts({
     jobId,
     selectedDate
@@ -71,6 +70,9 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
 
   const handleDeleteShift = async (shiftId: string) => {
     try {
+      setIsRefreshing(true);
+      
+      // Delete shift assignments first to avoid foreign key constraints
       await supabase
         .from("festival_shift_assignments")
         .delete()
@@ -81,11 +83,24 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
         .delete()
         .eq("id", shiftId);
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
-      refetch();
+      await refetch();
+      toast({
+        title: "Success",
+        description: "Shift deleted successfully",
+      });
     } catch (error: any) {
       console.error("Error deleting shift:", error);
+      toast({
+        title: "Error",
+        description: `Failed to delete shift: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -93,6 +108,17 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
     setIsRefreshing(true);
     try {
       await refetch();
+      toast({
+        title: "Success",
+        description: "Shifts refreshed successfully",
+      });
+    } catch (error) {
+      console.error("Error refreshing shifts:", error);
+      toast({
+        title: "Error",
+        description: "Failed to refresh shifts",
+        variant: "destructive",
+      });
     } finally {
       setIsRefreshing(false);
     }
