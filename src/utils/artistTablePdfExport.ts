@@ -206,7 +206,7 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
             if (data.row.index === -1) return;
             const rowData = scheduleRows[data.row.index];
             if (rowData.isSoundcheck) {
-              data.cell.styles.fillColor = [0xFE/255, 0xF7/255, 0xCD/255];  // Light yellow
+              data.cell.styles.fillColor = [254, 247, 205];  // Light yellow
             }
           }
         });
