@@ -1,9 +1,10 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { DirectMessage } from "./types";
 import { DirectMessageCard } from "./DirectMessageCard";
-import { useMessagesSubscription } from "./hooks/useMessagesSubscription";
+import { useTableSubscription } from "@/hooks/useSubscription";
 import { useDirectMessageOperations } from "./hooks/useDirectMessageOperations";
 
 export const DirectMessagesList = () => {
@@ -12,6 +13,15 @@ export const DirectMessagesList = () => {
   const [currentUserId, setCurrentUserId] = useState<string>();
   const { toast } = useToast();
   const { handleDeleteMessage, handleMarkAsRead } = useDirectMessageOperations(messages, setMessages, toast);
+
+  // Set up real-time subscription using the new system
+  useTableSubscription(
+    'direct_messages',
+    'direct_messages',
+    currentUserId ? {
+      filter: `sender_id=eq.${currentUserId},recipient_id=eq.${currentUserId}`
+    } : undefined
+  );
 
   useEffect(() => {
     const getCurrentUser = async () => {
@@ -91,12 +101,22 @@ export const DirectMessagesList = () => {
     }
   };
 
-  useMessagesSubscription(currentUserId, () => {
+  // Refetch messages when the subscription triggers a refresh
+  useEffect(() => {
     if (currentUserId) {
-      console.log("Refreshing messages after subscription update");
-      fetchMessages(currentUserId);
+      // Add a query client event listener for invalidations
+      const handleInvalidate = () => {
+        console.log("Messages query invalidated, refreshing data");
+        fetchMessages(currentUserId);
+      };
+      
+      window.addEventListener('direct_messages_invalidated', handleInvalidate);
+      
+      return () => {
+        window.removeEventListener('direct_messages_invalidated', handleInvalidate);
+      };
     }
-  });
+  }, [currentUserId]);
 
   return (
     <div className="space-y-4">
@@ -117,4 +137,4 @@ export const DirectMessagesList = () => {
       )}
     </div>
   );
-};
+}

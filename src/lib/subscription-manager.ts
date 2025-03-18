@@ -10,6 +10,9 @@ export class SubscriptionManager {
   private pendingSubscriptions: Map<string, { table: string, queryKey: string | string[] }> = new Map();
   private lastReconnectAttempt: number = 0;
   private reconnectTimeoutId: number | null = null;
+  private batchedInvalidations: Map<string, Set<string | string[]>> = new Map();
+  private batchTimeout: number | null = null;
+  private debounceTimeouts: Map<string, number> = new Map();
   
   private constructor(queryClient: QueryClient) {
     this.queryClient = queryClient;
@@ -101,6 +104,79 @@ export class SubscriptionManager {
   }
   
   /**
+   * Schedule a batched query invalidation to prevent UI thrashing
+   * @param table The table that changed
+   * @param queryKey The query key to invalidate
+   */
+  private scheduleBatchedInvalidation(table: string, queryKey: string | string[]) {
+    if (!this.batchedInvalidations.has(table)) {
+      this.batchedInvalidations.set(table, new Set());
+    }
+    
+    // Add the query key to the batch
+    const keys = Array.isArray(queryKey) ? queryKey : [queryKey];
+    keys.forEach(key => {
+      this.batchedInvalidations.get(table)?.add(key);
+    });
+    
+    // If we already have a batch timeout, don't set another one
+    if (this.batchTimeout !== null) {
+      return;
+    }
+    
+    // Process batched invalidations after a short delay
+    this.batchTimeout = window.setTimeout(() => {
+      this.processBatchedInvalidations();
+      this.batchTimeout = null;
+    }, 50); // 50ms batch window
+  }
+  
+  /**
+   * Process all batched invalidations
+   */
+  private processBatchedInvalidations() {
+    console.log('Processing batched query invalidations');
+    
+    // For each table with pending invalidations
+    this.batchedInvalidations.forEach((queryKeys, table) => {
+      console.log(`Invalidating ${queryKeys.size} query keys for table ${table}`);
+      
+      // Invalidate each unique query key
+      queryKeys.forEach(key => {
+        if (typeof key === 'string') {
+          this.queryClient.invalidateQueries({ queryKey: [key] });
+        } else {
+          this.queryClient.invalidateQueries({ queryKey: key });
+        }
+      });
+    });
+    
+    // Clear all batched invalidations
+    this.batchedInvalidations.clear();
+  }
+  
+  /**
+   * Debounce a query invalidation for rapid updates
+   * @param key A unique key for this debounce operation
+   * @param callback The function to call after debounce
+   * @param delay The debounce delay in ms
+   */
+  private debounce(key: string, callback: () => void, delay: number = 300) {
+    // Clear any existing timeout for this key
+    if (this.debounceTimeouts.has(key)) {
+      window.clearTimeout(this.debounceTimeouts.get(key));
+    }
+    
+    // Set a new timeout
+    const timeoutId = window.setTimeout(() => {
+      callback();
+      this.debounceTimeouts.delete(key);
+    }, delay);
+    
+    this.debounceTimeouts.set(key, timeoutId);
+  }
+  
+  /**
    * Subscribe to changes on a specific table and invalidate the corresponding React Query cache
    * @param table The table name to subscribe to
    * @param queryKey The query key or array of keys to invalidate when the table changes
@@ -141,16 +217,10 @@ export class SubscriptionManager {
       const handleChange = (payload: any) => {
         console.log(`Received ${payload.eventType} for ${table}:`, payload);
         
-        // Intelligently invalidate only affected queries
-        const keys = Array.isArray(queryKey) ? queryKey : [queryKey];
-        
-        // Batch invalidations to prevent UI thrashing
-        setTimeout(() => {
-          keys.forEach(key => {
-            this.queryClient.invalidateQueries({ queryKey: [key] });
-          });
-          console.log(`Invalidated queries for keys: ${keys.join(', ')}`);
-        }, 50);
+        // Use the debounced batched invalidation
+        this.debounce(`invalidate-${table}`, () => {
+          this.scheduleBatchedInvalidation(table, queryKey);
+        }, 150);
       };
       
       // For Supabase JS v2.x, properly configure the channel
@@ -203,15 +273,52 @@ export class SubscriptionManager {
   }
   
   /**
-   * Subscribe to multiple tables at once
+   * Subscribe to multiple tables at once with deduplication
    * @param tables Array of table names and query keys
    * @returns An object with an unsubscribe method for all subscriptions
    */
-  subscribeToTables(tables: Array<{ table: string, queryKey: string | string[] }>) {
+  subscribeToTables(tables: Array<{ 
+    table: string, 
+    queryKey: string | string[],
+    filter?: {
+      event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*',
+      schema?: string,
+      filter?: string
+    }
+  }>) {
+    // Deduplication: check for duplicate subscriptions and only keep unique ones
+    const uniqueTables = tables.filter((tableInfo, index) => {
+      const serializedKey = Array.isArray(tableInfo.queryKey) 
+        ? JSON.stringify(tableInfo.queryKey) 
+        : tableInfo.queryKey;
+      const subscriptionKey = `${tableInfo.table}::${serializedKey}`;
+      
+      // Check if we already have this subscription
+      if (this.subscriptions.has(subscriptionKey)) {
+        console.log(`Skipping duplicate subscription to ${tableInfo.table} for ${serializedKey}`);
+        return false;
+      }
+      
+      // Check if this table+key appears earlier in the array
+      const earlierIndex = tables.findIndex((earlier, earlierIdx) => {
+        if (earlierIdx >= index) return false;
+        
+        const earlierSerializedKey = Array.isArray(earlier.queryKey) 
+          ? JSON.stringify(earlier.queryKey) 
+          : earlier.queryKey;
+        
+        return tableInfo.table === earlier.table && serializedKey === earlierSerializedKey;
+      });
+      
+      return earlierIndex === -1;
+    });
+    
+    console.log(`Setting up ${uniqueTables.length} unique subscriptions out of ${tables.length} requested`);
+    
     const unsubscribeFunctions: Array<() => void> = [];
     
-    tables.forEach(({ table, queryKey }) => {
-      const { unsubscribe } = this.subscribeToTable(table, queryKey);
+    uniqueTables.forEach(({ table, queryKey, filter }) => {
+      const { unsubscribe } = this.subscribeToTable(table, queryKey, filter);
       unsubscribeFunctions.push(unsubscribe);
     });
     
@@ -272,6 +379,26 @@ export class SubscriptionManager {
    */
   getActiveSubscriptions() {
     return Array.from(this.subscriptions.keys());
+  }
+  
+  /**
+   * Get subscriptions grouped by table for better visibility
+   * @returns Object with tables as keys and arrays of query keys as values
+   */
+  getSubscriptionsByTable() {
+    const tables: Record<string, string[]> = {};
+    
+    this.subscriptions.forEach((_, key) => {
+      const [table, serializedKey] = key.split('::');
+      
+      if (!tables[table]) {
+        tables[table] = [];
+      }
+      
+      tables[table].push(serializedKey);
+    });
+    
+    return tables;
   }
   
   // Setup visibility-based refetching that works with the subscription manager

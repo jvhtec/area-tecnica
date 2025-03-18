@@ -60,19 +60,8 @@ export function useMultiTableSubscription(
     // Get the subscription manager instance
     const manager = SubscriptionManager.getInstance(queryClient);
     
-    // Create an array of subscriptions
-    const subscriptions = tables.map(({ table, queryKey, filter }) => ({
-      table,
-      queryKey,
-      subscription: manager.subscribeToTable(table, queryKey, filter)
-    }));
-    
-    // Store unsubscribe function
-    subscriptionRef.current = {
-      unsubscribe: () => {
-        subscriptions.forEach(({ subscription }) => subscription.unsubscribe());
-      }
-    };
+    // Create subscription to multiple tables
+    subscriptionRef.current = manager.subscribeToTables(tables);
     
     // Cleanup on unmount
     return () => {
@@ -102,4 +91,42 @@ export function useRowSubscription(
       filter: `id=eq.${rowId}`
     }
   );
+}
+
+/**
+ * Hook for subscribing to related tables that should all invalidate the same query
+ * @param queryKey The query key or array of keys to invalidate when any table changes
+ * @param tables Array of table names to subscribe to
+ * @param schema Optional schema name, defaults to 'public'
+ */
+export function useRelatedTablesSubscription(
+  queryKey: string | string[],
+  tables: string[],
+  schema: string = 'public'
+) {
+  const queryClient = useQueryClient();
+  const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
+  
+  useEffect(() => {
+    // Get the subscription manager instance
+    const manager = SubscriptionManager.getInstance(queryClient);
+    
+    // Format tables array for the subscribeToTables method
+    const tableConfigs = tables.map(table => ({
+      table,
+      queryKey,
+      filter: { schema }
+    }));
+    
+    // Subscribe to all related tables
+    subscriptionRef.current = manager.subscribeToTables(tableConfigs);
+    
+    // Cleanup on unmount
+    return () => {
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+        subscriptionRef.current = null;
+      }
+    };
+  }, [queryKey, tables, schema, queryClient]);
 }
