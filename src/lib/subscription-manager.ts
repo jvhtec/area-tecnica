@@ -108,18 +108,45 @@ export class SubscriptionManager {
     let hasDeadSubscriptions = false;
     
     this.subscriptions.forEach((_, key) => {
-      const [table, serializedKey] = key.split('::');
-      const queryKey = serializedKey ? JSON.parse(serializedKey) : table;
-      
-      // Simple check - try to get an existing channel
-      const channelExists = supabase.getChannels().some(
-        channel => channel.topic.includes(table)
-      );
-      
-      if (!channelExists) {
-        console.log(`Detected broken subscription for ${table}, will reconnect`);
-        hasDeadSubscriptions = true;
-        this.pendingSubscriptions.set(key, { table, queryKey });
+      try {
+        // Split the key into table and serialized query key parts
+        const parts = key.split('::');
+        const table = parts[0];
+        const serializedKey = parts.length > 1 ? parts[1] : undefined;
+        
+        // Determine the query key - either parse the JSON or use the table name
+        let queryKey;
+        
+        if (serializedKey) {
+          try {
+            // Only attempt to parse if it looks like JSON (starts with [ or {)
+            if (serializedKey.startsWith('[') || serializedKey.startsWith('{')) {
+              queryKey = JSON.parse(serializedKey);
+            } else {
+              // For simple strings, use as-is
+              queryKey = serializedKey;
+            }
+          } catch (parseError) {
+            console.warn(`Failed to parse query key "${serializedKey}" for table ${table}:`, parseError);
+            queryKey = table; // Fallback to table name
+          }
+        } else {
+          queryKey = table;
+        }
+        
+        // Simple check - try to get an existing channel
+        const channelExists = supabase.getChannels().some(
+          channel => channel.topic.includes(table)
+        );
+        
+        if (!channelExists) {
+          console.log(`Detected broken subscription for ${table}, will reconnect`);
+          hasDeadSubscriptions = true;
+          this.pendingSubscriptions.set(key, { table, queryKey });
+        }
+      } catch (error) {
+        console.error(`Error checking subscription health for key ${key}:`, error);
+        // Don't mark as having dead subscriptions to avoid unnecessary reconnects
       }
     });
     
@@ -177,9 +204,32 @@ export class SubscriptionManager {
     
     // Copy all existing subscriptions to pending
     this.subscriptions.forEach((_, key) => {
-      const [table, serializedKey] = key.split('::');
-      const queryKey = serializedKey ? JSON.parse(serializedKey) : table;
-      this.pendingSubscriptions.set(key, { table, queryKey });
+      try {
+        const parts = key.split('::');
+        const table = parts[0];
+        const serializedKey = parts.length > 1 ? parts[1] : undefined;
+        
+        let queryKey;
+        if (serializedKey) {
+          try {
+            // Only attempt to parse if it looks like JSON
+            if (serializedKey.startsWith('[') || serializedKey.startsWith('{')) {
+              queryKey = JSON.parse(serializedKey);
+            } else {
+              queryKey = serializedKey;
+            }
+          } catch (error) {
+            console.warn(`Error parsing serialized key during reestablishment: ${serializedKey}`);
+            queryKey = table;
+          }
+        } else {
+          queryKey = table;
+        }
+        
+        this.pendingSubscriptions.set(key, { table, queryKey });
+      } catch (error) {
+        console.error(`Error processing subscription key ${key} during reestablishment:`, error);
+      }
     });
     
     // Clear existing subscriptions
@@ -288,7 +338,16 @@ export class SubscriptionManager {
     }
   ) {
     // Create a unique key for this subscription
-    const serializedKey = Array.isArray(queryKey) ? JSON.stringify(queryKey) : queryKey;
+    let serializedKey: string;
+    
+    if (Array.isArray(queryKey)) {
+      serializedKey = JSON.stringify(queryKey);
+    } else if (typeof queryKey === 'object') {
+      serializedKey = JSON.stringify(queryKey);
+    } else {
+      serializedKey = queryKey;
+    }
+    
     const subscriptionKey = `${table}::${serializedKey}`;
     
     // If we already have this subscription, don't duplicate it
@@ -501,7 +560,9 @@ export class SubscriptionManager {
         tables[table] = [];
       }
       
-      tables[table].push(serializedKey);
+      if (serializedKey) {
+        tables[table].push(serializedKey);
+      }
     });
     
     return tables;
