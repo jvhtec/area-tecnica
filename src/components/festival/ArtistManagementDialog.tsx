@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -8,21 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { Badge } from "@/components/ui/badge";
 import { Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ArtistFormData, ProviderType } from "@/types/festival";
-
-interface ArtistManagementDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  artist?: any;
-  jobId?: string;
-  selectedDate?: string;
-  dayStartTime?: string;
-}
 
 const consoleOptions = [
   'Yamaha CL5', 'Yamaha PMx', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
@@ -111,7 +101,6 @@ export const ArtistManagementDialog = ({
         date: artist.date || selectedDate || "",
       });
       
-      // Set hours for after-midnight detection
       if (artist.show_start) {
         setShowStartHour(parseInt(artist.show_start.split(':')[0]));
       }
@@ -147,7 +136,6 @@ export const ArtistManagementDialog = ({
     }
   };
 
-  // Check if a time is after midnight but before the festival day start
   const isAfterMidnight = (hour: number | null) => {
     return hour !== null && hour < dayStartHour;
   };
@@ -184,7 +172,6 @@ export const ArtistManagementDialog = ({
   
     setIsLoading(true);
     try {
-      // Ensure all string fields have a value to prevent SQL errors
       const cleanedData = {
         ...formData,
         job_id: jobId,
@@ -207,7 +194,6 @@ export const ArtistManagementDialog = ({
         infrastructure_provided_by: formData.infrastructure_provided_by as ProviderType,
         other_infrastructure: formData.other_infrastructure || "",
         notes: formData.notes || "",
-        // Use exact lowercase column name to match database
         isaftermidnight: isAfterMidnight(showStartHour),
       };
   
@@ -460,7 +446,7 @@ export const ArtistManagementDialog = ({
                     </SelectContent>
                   </Select>
                   <ProviderRadioGroup
-                    value={formData.foh_console_provided_by as ProviderType}
+                    value={formData.foh_console_provided_by}
                     onChange={(value) => setFormData({ ...formData, foh_console_provided_by: value })}
                     label="FOH Console Provided By"
                   />
@@ -486,7 +472,7 @@ export const ArtistManagementDialog = ({
                     </SelectContent>
                   </Select>
                   <ProviderRadioGroup
-                    value={formData.mon_console_provided_by as ProviderType}
+                    value={formData.mon_console_provided_by}
                     onChange={(value) => setFormData({ ...formData, mon_console_provided_by: value })}
                     label="Monitor Console Provided By"
                   />
@@ -518,7 +504,7 @@ export const ArtistManagementDialog = ({
                       </SelectContent>
                     </Select>
                     <ProviderRadioGroup
-                      value={formData.wireless_provided_by as ProviderType}
+                      value={formData.wireless_provided_by}
                       onChange={(value) => setFormData({ ...formData, wireless_provided_by: value })}
                       label="Wireless System Provided By"
                     />
@@ -585,7 +571,7 @@ export const ArtistManagementDialog = ({
                       </SelectContent>
                     </Select>
                     <ProviderRadioGroup
-                      value={formData.iem_provided_by as ProviderType}
+                      value={formData.iem_provided_by}
                       onChange={(value) => setFormData({ ...formData, iem_provided_by: value })}
                       label="IEM System Provided By"
                     />
@@ -698,7 +684,7 @@ export const ArtistManagementDialog = ({
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium">Infrastructure</h3>
                 <ProviderRadioGroup
-                  value={formData.infrastructure_provided_by as ProviderType}
+                  value={formData.infrastructure_provided_by}
                   onChange={(value) => setFormData({ ...formData, infrastructure_provided_by: value })}
                   label="Infrastructure Provided By"
                 />

@@ -1,6 +1,4 @@
 
-
-
 export interface ConsoleSetup {
   model: string;
   quantity: number;
@@ -91,4 +89,3 @@ export interface FestivalSettings {
   created_at?: string;
   updated_at?: string;
 }
-
