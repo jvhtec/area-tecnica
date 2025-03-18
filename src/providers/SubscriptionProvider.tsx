@@ -60,7 +60,7 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
       // Recreate subscriptions by unsubscribing and resubscribing
       const tables = Object.keys(manager.getSubscriptionsByTable());
       tables.forEach(table => {
-        manager.unsubscribeFromTable(table);
+        manager.unsubscribeFromTable(table, table);
         manager.subscribeToTable(table, table);
       });
       queryClient.invalidateQueries();
@@ -71,7 +71,7 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
       // Recreate subscriptions by unsubscribing and resubscribing
       const tables = Object.keys(manager.getSubscriptionsByTable());
       tables.forEach(table => {
-        manager.unsubscribeFromTable(table);
+        manager.unsubscribeFromTable(table, table);
         manager.subscribeToTable(table, table);
       });
     };
@@ -142,8 +142,8 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     manager.subscribeToTable('jobs', 'jobs');
     
     return () => {
-      manager.unsubscribeFromTable('profiles');
-      manager.unsubscribeFromTable('jobs');
+      manager.unsubscribeFromTable('profiles', 'profiles');
+      manager.unsubscribeFromTable('jobs', 'jobs');
     };
   }, [queryClient]);
 
