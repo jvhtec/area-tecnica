@@ -11,8 +11,8 @@ import {
   SidebarTrigger
 } from "@/components/ui/sidebar";
 import { LogOut } from "lucide-react";
-import { useNavigate, Outlet, Navigate } from "react-router-dom";
-import { useState } from "react";
+import { useNavigate, Outlet, Navigate, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { ThemeToggle } from "./layout/ThemeToggle";
 import { UserInfo } from "./layout/UserInfo";
 import { SidebarNavigation } from "./layout/SidebarNavigation";
@@ -26,6 +26,8 @@ import { WolfensteinDialog } from "./doom/WolfensteinDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/useAuth";
 import { HeaderStatus } from "./ui/header-status";
+import { useRouteSubscriptions } from "@/hooks/useRouteSubscriptions";
+import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -34,6 +36,7 @@ const Layout = () => {
   const queryClient = useQueryClient();
   const { triggered: doomTriggered, reset: resetDoom, handleLogoTap, tapCount } = useKonamiCode();
   const isMobile = useIsMobile();
+  const location = useLocation();
   
   const {
     session,
@@ -42,6 +45,17 @@ const Layout = () => {
     isLoading,
     logout
   } = useAuth();
+  
+  // Get route-specific subscription info
+  const { requiredTables } = useRouteSubscriptions();
+  const { forceSubscribe } = useSubscriptionContext();
+  
+  // Subscribe to route-specific tables whenever the route changes
+  useEffect(() => {
+    if (requiredTables.length > 0) {
+      forceSubscribe(requiredTables);
+    }
+  }, [location.pathname, requiredTables, forceSubscribe]);
 
   const handleSignOut = async () => {
     if (isLoggingOut) return;

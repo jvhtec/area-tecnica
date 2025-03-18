@@ -16,17 +16,19 @@ interface SubscriptionContextType {
   invalidateQueries: (queryKey?: string | string[]) => void;
   lastRefreshTime: number;
   forceRefresh: (tables?: string[]) => void;
+  forceSubscribe: (tables: string[]) => void;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType>({
-  connectionStatus: 'connecting',  // Start with connecting status instead of disconnected
+  connectionStatus: 'connecting',
   activeSubscriptions: [],
   subscriptionCount: 0,
   subscriptionsByTable: {},
   refreshSubscriptions: () => {},
   invalidateQueries: () => {},
   lastRefreshTime: 0,
-  forceRefresh: () => {}
+  forceRefresh: () => {},
+  forceSubscribe: () => {}
 });
 
 export const useSubscriptionContext = () => useContext(SubscriptionContext);
@@ -38,14 +40,15 @@ interface SubscriptionProviderProps {
 export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
   const queryClient = useQueryClient();
   const [state, setState] = useState<SubscriptionContextType>({
-    connectionStatus: 'connecting',  // Start with connecting
+    connectionStatus: 'connecting',
     activeSubscriptions: [],
     subscriptionCount: 0,
     subscriptionsByTable: {},
     refreshSubscriptions: () => {},
     invalidateQueries: () => {},
     lastRefreshTime: Date.now(),
-    forceRefresh: () => {}
+    forceRefresh: () => {},
+    forceSubscribe: () => {}
   });
   
   // Track last connection status to notify on changes
@@ -121,12 +124,35 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
       setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
     };
     
+    // Define force subscribe function for specific tables
+    const forceSubscribe = (tables: string[]) => {
+      if (!tables || tables.length === 0) return;
+      
+      console.log(`Ensuring subscriptions for tables: ${tables.join(', ')}`);
+      
+      // Subscribe to each table, ensuring they're active
+      tables.forEach(table => {
+        if (!manager.getSubscriptionsByTable()[table]?.length) {
+          manager.subscribeToTable(table, table);
+        }
+      });
+      
+      // Update state to reflect new subscriptions
+      setState(prev => ({ 
+        ...prev, 
+        subscriptionsByTable: manager.getSubscriptionsByTable(),
+        subscriptionCount: manager.getSubscriptionCount(),
+        activeSubscriptions: manager.getActiveSubscriptions()
+      }));
+    };
+    
     // Update state with functions
     setState(prev => ({
       ...prev,
       refreshSubscriptions,
       invalidateQueries,
       forceRefresh,
+      forceSubscribe,
       lastRefreshTime: Date.now()
     }));
     

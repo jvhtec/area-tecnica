@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Department } from "@/types/department";
 import { useJobs } from "@/hooks/useJobs";
@@ -17,6 +16,7 @@ import { DirectMessagesList } from "@/components/messages/DirectMessagesList";
 import { Button } from "@/components/ui/button";
 import { DirectMessageDialog } from "@/components/messages/DirectMessageDialog";
 import { DashboardContent } from "@/components/dashboard/DashboardContent";
+import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 
 const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
   if (!date || !jobs) return [];
@@ -53,6 +53,18 @@ const Dashboard = () => {
   const { data: jobs, isLoading } = useJobs();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { forceSubscribe } = useSubscriptionContext();
+  
+  useEffect(() => {
+    forceSubscribe([
+      'jobs', 
+      'job_assignments', 
+      'job_date_types', 
+      'messages', 
+      'direct_messages',
+      'tours'
+    ]);
+  }, [forceSubscribe]);
 
   useEffect(() => {
     const fetchUserRoleAndPrefs = async () => {
@@ -67,13 +79,11 @@ const Dashboard = () => {
 
         if (error) {
           console.error("Error fetching user role and preferences:", error);
-          // In case of an error, we keep the default values.
           return;
         }
 
         if (data) {
           setUserRole(data.role);
-          // If tours_expanded is null or undefined, default to true.
           setShowTours(data.tours_expanded !== null && data.tours_expanded !== undefined ? data.tours_expanded : true);
 
           const params = new URLSearchParams(window.location.search);
@@ -150,7 +160,6 @@ const Dashboard = () => {
 
   const selectedDateJobs = getSelectedDateJobs(date, jobs);
 
-  // Handle toggling the tours section and update the user preference.
   const handleToggleTours = async () => {
     const newValue = !showTours;
     setShowTours(newValue);

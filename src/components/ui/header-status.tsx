@@ -1,25 +1,36 @@
 
 import { useState, useEffect } from "react";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
-import { Wifi, WifiOff, AlertCircle, RefreshCw, Loader2 } from "lucide-react";
+import { Wifi, WifiOff, AlertCircle, RefreshCw, Loader2, Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "./button";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useRouteSubscriptions } from "@/hooks/useRouteSubscriptions";
 
 export function HeaderStatus({ className }: { className?: string }) {
-  const { 
-    connectionStatus, 
-    activeSubscriptions, 
+  const { refreshSubscriptions } = useSubscriptionContext();
+  const {
+    connectionStatus,
     lastRefreshTime,
-    refreshSubscriptions
-  } = useSubscriptionContext();
+    isFullySubscribed,
+    isStale,
+    requiredTables,
+    subscribedTables,
+    unsubscribedTables,
+    routeKey
+  } = useRouteSubscriptions();
   
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Calculate stale status
-  const isStale = Date.now() - lastRefreshTime > 5 * 60 * 1000; // 5 minutes
+  // Format last refresh time
+  let lastRefreshDisplay = "Unknown";
+  try {
+    lastRefreshDisplay = formatDistanceToNow(lastRefreshTime) + " ago";
+  } catch (error) {
+    console.error("Error formatting time:", error);
+  }
   
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -34,23 +45,31 @@ export function HeaderStatus({ className }: { className?: string }) {
     }
   };
   
-  // Format last refresh time
-  let lastRefreshDisplay = "Unknown";
-  try {
-    lastRefreshDisplay = formatDistanceToNow(lastRefreshTime) + " ago";
-  } catch (error) {
-    console.error("Error formatting time:", error);
-  }
-  
   const getStatusIcon = () => {
     if (connectionStatus === 'connecting') {
       return <Loader2 className="h-3 w-3 text-blue-500 animate-spin" />;
-    } else if (connectionStatus === 'connected') {
-      return isStale 
-        ? <AlertCircle className="h-3 w-3 text-amber-500" />
-        : <Wifi className="h-3 w-3 text-green-500" />;
-    } else {
+    } else if (connectionStatus !== 'connected') {
       return <WifiOff className="h-3 w-3 text-red-500" />;
+    } else if (isStale) {
+      return <Clock className="h-3 w-3 text-amber-500" />;
+    } else if (!isFullySubscribed) {
+      return <AlertCircle className="h-3 w-3 text-amber-500" />;
+    } else {
+      return <Wifi className="h-3 w-3 text-green-500" />;
+    }
+  };
+  
+  const getStatusText = () => {
+    if (connectionStatus === 'connecting') {
+      return "Connecting...";
+    } else if (connectionStatus !== 'connected') {
+      return "Offline";
+    } else if (isStale) {
+      return "Stale data";
+    } else if (!isFullySubscribed) {
+      return "Partial";
+    } else {
+      return "Live";
     }
   };
   
@@ -84,11 +103,27 @@ export function HeaderStatus({ className }: { className?: string }) {
       );
     }
     
+    if (!isFullySubscribed) {
+      return (
+        <div className="text-xs max-w-xs">
+          <p className="font-semibold">Partial real-time updates</p>
+          <p className="mt-1">Current page: {routeKey || 'Unknown'}</p>
+          <div className="mt-1">
+            <p>Subscribed: {subscribedTables.join(', ')}</p>
+            <p>Missing: {unsubscribedTables.join(', ')}</p>
+          </div>
+          <p className="text-muted-foreground mt-1">Last updated: {lastRefreshDisplay}</p>
+        </div>
+      );
+    }
+    
     return (
       <div className="text-xs max-w-xs">
         <p className="font-semibold">Real-time updates active</p>
-        <p>{activeSubscriptions.length} active subscriptions</p>
-        <p>Last updated: {lastRefreshDisplay}</p>
+        <p>Current page: {routeKey || 'Unknown'}</p>
+        <p>All required tables are subscribed:</p>
+        <p className="mt-1">{requiredTables.join(', ')}</p>
+        <p className="text-muted-foreground mt-1">Last updated: {lastRefreshDisplay}</p>
       </div>
     );
   };
@@ -100,7 +135,7 @@ export function HeaderStatus({ className }: { className?: string }) {
           <div 
             className={cn(
               "flex items-center gap-1.5 text-xs cursor-pointer",
-              isStale ? "text-amber-500" : (
+              isStale || !isFullySubscribed ? "text-amber-500" : (
                 connectionStatus === 'connected' ? "text-muted-foreground" : "text-red-500"
               ),
               className
@@ -109,10 +144,7 @@ export function HeaderStatus({ className }: { className?: string }) {
           >
             {getStatusIcon()}
             <span className="hidden sm:inline">
-              {connectionStatus === 'connecting' ? "Connecting..." :
-               connectionStatus === 'connected' 
-                ? (isStale ? "Stale data" : "Live") 
-                : "Offline"}
+              {getStatusText()}
             </span>
             <Button 
               variant="ghost" 
