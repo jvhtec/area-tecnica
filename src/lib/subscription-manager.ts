@@ -132,19 +132,20 @@ export class SubscriptionManager {
     
     // Create a channel with a unique name
     const channelName = `${table}-changes-${Date.now()}`;
+    
+    // Fix: Create channel first, then configure it with proper syntax for Supabase's realtime API
     const channel = supabase.channel(channelName);
     
-    // Configure the channel with postgres changes
-    channel
+    // Configure the channel with postgres changes using the correct API pattern
+    const subscription = channel
       .on(
-        'postgres_changes',
-        {
+        'postgres_changes', 
+        { 
           event: filter?.event || '*', 
           schema: filter?.schema || 'public', 
-          table,
-          ...(filter?.filter ? { filter: filter.filter } : {})
+          table 
         },
-        async (payload) => {
+        (payload) => {
           console.log(`Received ${payload.eventType} for ${table}:`, payload);
           
           // Intelligently invalidate only affected queries
