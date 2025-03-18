@@ -109,10 +109,13 @@ export const DirectMessagesList = () => {
     
     // Listen for invalidations from the subscription manager
     const unsubscribe = queryClient.getQueryCache().subscribe(event => {
-      // Check if the event has a query property and if it matches our direct_messages key
-      if (event.type === 'queryUpdated' && 
-          event.query.queryKey?.[0] === 'direct_messages') {
-        refreshData();
+      // Handle proper event types from React Query cache
+      if (event.type === 'updated' || event.type === 'added') {
+        // For updated or added events, check if it's related to direct_messages
+        const queryKey = event.query?.queryKey;
+        if (queryKey && queryKey[0] === 'direct_messages') {
+          refreshData();
+        }
       }
     });
     
