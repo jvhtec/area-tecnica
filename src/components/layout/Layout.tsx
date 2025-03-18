@@ -26,6 +26,7 @@ import { ReloadButton } from "@/components/ui/reload-button";
 import { useKonamiCode } from "@/hooks/useKonamiCode";
 import { WolfensteinDialog } from "@/components/doom/WolfensteinDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { HeaderStatus } from "@/components/ui/header-status";
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -159,6 +160,7 @@ const Layout = () => {
               <SidebarTrigger />
             </div>
             <div className="flex items-center gap-2">
+              <HeaderStatus className="mr-3" />
               <ReloadButton onReload={handleReload} />
             </div>
           </header>

@@ -12,7 +12,7 @@ interface SubscriptionIndicatorProps {
   showLabel?: boolean;
   className?: string;
   showTooltip?: boolean;
-  variant?: 'default' | 'compact';
+  variant?: 'default' | 'compact' | 'header';
   showRefreshButton?: boolean;
   onRefresh?: () => Promise<void> | void;
 }
@@ -40,25 +40,41 @@ export function SubscriptionIndicator({
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   const isCompact = variant === 'compact';
+  const isHeader = variant === 'header';
   
   const getStatusIcon = () => {
     if (connectionStatus === 'connecting') {
-      return <Loader2 className={cn("text-blue-500 animate-spin", isCompact ? "h-3 w-3" : "h-4 w-4")} />;
+      return <Loader2 className={cn(
+        "animate-spin text-blue-500", 
+        isHeader ? "h-2.5 w-2.5" : isCompact ? "h-3 w-3" : "h-4 w-4"
+      )} />;
     }
     
     if (connectionStatus !== 'connected') {
-      return <WifiOff className={cn("text-red-500", isCompact ? "h-3 w-3" : "h-4 w-4")} />;
+      return <WifiOff className={cn(
+        "text-red-500", 
+        isHeader ? "h-2.5 w-2.5" : isCompact ? "h-3 w-3" : "h-4 w-4"
+      )} />;
     }
     
     if (isStale) {
-      return <Clock className={cn("text-amber-500", isCompact ? "h-3 w-3" : "h-4 w-4")} />;
+      return <Clock className={cn(
+        "text-amber-500", 
+        isHeader ? "h-2.5 w-2.5" : isCompact ? "h-3 w-3" : "h-4 w-4"
+      )} />;
     }
     
     if (!isSubscribed) {
-      return <AlertCircle className={cn("text-amber-500", isCompact ? "h-3 w-3" : "h-4 w-4")} />;
+      return <AlertCircle className={cn(
+        "text-amber-500", 
+        isHeader ? "h-2.5 w-2.5" : isCompact ? "h-3 w-3" : "h-4 w-4"
+      )} />;
     }
     
-    return <Wifi className={cn("text-green-500", isCompact ? "h-3 w-3" : "h-4 w-4")} />;
+    return <Wifi className={cn(
+      "text-green-500", 
+      isHeader ? "h-2.5 w-2.5" : isCompact ? "h-3 w-3" : "h-4 w-4"
+    )} />;
   };
   
   const getStatusLabel = () => {
@@ -67,18 +83,18 @@ export function SubscriptionIndicator({
     }
     
     if (connectionStatus !== 'connected') {
-      return "Disconnected";
+      return isHeader ? "Offline" : "Disconnected";
     }
     
     if (isStale) {
-      return "Stale data";
+      return isHeader ? "Stale" : "Stale data";
     }
     
     if (!isSubscribed) {
-      return "Partial subscription";
+      return isHeader ? "Partial" : "Partial subscription";
     }
     
-    return "Real-time active";
+    return isHeader ? "Live" : "Real-time active";
   };
   
   const getTooltipContent = () => {
@@ -148,7 +164,7 @@ export function SubscriptionIndicator({
   const indicator = (
     <div className={cn(
       "flex items-center gap-1", 
-      isCompact ? "text-xs" : "text-sm",
+      isHeader ? "text-xs" : isCompact ? "text-xs" : "text-sm",
       className
     )}>
       {getStatusIcon()}
@@ -157,12 +173,15 @@ export function SubscriptionIndicator({
         <Button 
           variant="ghost" 
           size="icon" 
-          className={cn("ml-1", isCompact ? "h-4 w-4" : "h-6 w-6")} 
+          className={cn(
+            "ml-1", 
+            isHeader ? "h-4 w-4" : isCompact ? "h-4 w-4" : "h-6 w-6"
+          )} 
           onClick={handleRefresh}
           disabled={isRefreshing}
         >
           <RefreshCw className={cn(
-            isCompact ? "h-2 w-2" : "h-3 w-3",
+            isHeader ? "h-2 w-2" : isCompact ? "h-2 w-2" : "h-3 w-3",
             isRefreshing ? "animate-spin" : ""
           )} />
         </Button>

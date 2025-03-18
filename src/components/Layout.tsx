@@ -25,7 +25,7 @@ import { useKonamiCode } from "@/hooks/useKonamiCode";
 import { WolfensteinDialog } from "./doom/WolfensteinDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/useAuth";
-import { SubscriptionStatus } from "./ui/subscription-status";
+import { HeaderStatus } from "./ui/header-status";
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -107,7 +107,6 @@ const Layout = () => {
               <span>{isLoggingOut ? 'Signing out...' : 'Sign Out'}</span>
             </Button>
             <AboutCard />
-            <SubscriptionStatus />
             <SidebarSeparator />
             <div 
               className="px-2 py-4 cursor-pointer transition-opacity"
@@ -134,6 +133,7 @@ const Layout = () => {
               <SidebarTrigger />
             </div>
             <div className="flex items-center gap-2">
+              <HeaderStatus className="mr-3" />
               <ReloadButton onReload={handleReload} />
             </div>
           </header>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
@@ -6,7 +7,15 @@ import { Button } from "./button";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
-export function ConnectionStatus() {
+interface ConnectionStatusProps {
+  variant?: 'card' | 'inline';
+  className?: string;
+}
+
+export function ConnectionStatus({ 
+  variant = 'card',
+  className
+}: ConnectionStatusProps) {
   const { 
     connectionStatus, 
     activeSubscriptions, 
@@ -73,8 +82,45 @@ export function ConnectionStatus() {
     console.error("Error formatting time:", error);
   }
   
+  // If using inline variant, render simpler version
+  if (variant === 'inline') {
+    return (
+      <div className={`flex items-center gap-2 ${className || ''}`}>
+        {connectionStatus === 'connecting' ? (
+          <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+        ) : connectionStatus === 'connected' ? (
+          isStale ? (
+            <AlertCircle className="h-4 w-4 text-amber-500" />
+          ) : (
+            <Wifi className="h-4 w-4 text-green-500" />
+          )
+        ) : (
+          <WifiOff className="h-4 w-4 text-red-500" />
+        )}
+        
+        <span className="text-sm">
+          {connectionStatus === 'connecting' ? "Connecting..." :
+           connectionStatus === 'connected' 
+            ? (isStale ? "Data may be stale" : "Connected") 
+            : "Disconnected"}
+        </span>
+        
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={handleRefresh}
+          disabled={isRefreshing || connectionStatus === 'connecting'}
+          className="h-7 w-7 p-0"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <span className="sr-only">Refresh</span>
+        </Button>
+      </div>
+    );
+  }
+  
   return (
-    <div className="fixed bottom-4 right-4 z-50 max-w-md transition-all duration-300 ease-in-out">
+    <div className={`fixed bottom-4 right-4 z-50 max-w-md transition-all duration-300 ease-in-out ${className || ''}`}>
       {isVisible && (
         <Card className={`shadow-lg ${
           connectionStatus === 'connecting' ? 'bg-blue-50' :
