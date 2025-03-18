@@ -1,3 +1,4 @@
+
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 

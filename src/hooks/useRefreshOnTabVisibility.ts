@@ -1,30 +1,44 @@
 
 import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
-/**
- * Hook to refresh data when tab becomes visible.
- * @param callback Function to call when the tab becomes visible
- * @param dependencies Dependencies array for the effect
- */
 export const useRefreshOnTabVisibility = (
-  callback: () => void,
-  dependencies: any[] = []
+  queryKeys: string[], 
+  options?: { 
+    minTimeBetweenRefreshes?: number;
+    refreshOnMount?: boolean;
+  }
 ) => {
+  const queryClient = useQueryClient();
+  const { minTimeBetweenRefreshes = 5000, refreshOnMount = true } = options || {};
+
   useEffect(() => {
-    // Function to handle visibility change
+    let lastRefreshTime = Date.now();
+    
+    if (refreshOnMount) {
+      // Initial refresh
+      queryKeys.forEach(key => {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      });
+      lastRefreshTime = Date.now();
+    }
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        console.log('Tab is now visible, refreshing data');
-        callback();
+        const now = Date.now();
+        if (now - lastRefreshTime >= minTimeBetweenRefreshes) {
+          queryKeys.forEach(key => {
+            queryClient.invalidateQueries({ queryKey: [key] });
+          });
+          lastRefreshTime = now;
+        }
       }
     };
 
-    // Add event listener for visibility change
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // Clean up the event listener on unmount
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [...dependencies, callback]);
+  }, [queryClient, queryKeys, minTimeBetweenRefreshes, refreshOnMount]);
 };

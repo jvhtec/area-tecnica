@@ -1,31 +1,28 @@
-import { useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+
+import { useCallback } from "react";
+import { supabase } from "@/lib/supabase";
 
 export const useProfileData = () => {
-  const fetchUserProfile = useCallback(async (userId: string | undefined) => {
-    console.log('Fetching user profile for:', userId);
+  const fetchUserProfile = useCallback(async (userId: string) => {
     try {
-      if (!userId) {
-        console.error("No user ID provided to fetchUserProfile");
+      console.log("Fetching user profile for ID:", userId);
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error("Error fetching user profile:", error);
         return null;
       }
 
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('role, department')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (profileError) {
-        console.error("Error fetching user profile:", profileError);
-        throw profileError;
-      }
-
-      console.log('User profile fetched:', profileData);
-      return profileData;
+      console.log("User profile fetched successfully:", data);
+      return data;
     } catch (error) {
-      console.error("Error in fetchUserProfile:", error);
-      throw error;
+      console.error("Exception in fetchUserProfile:", error);
+      return null;
     }
   }, []);
 

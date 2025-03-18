@@ -5,7 +5,6 @@ import { useSessionRefresh } from "./session/useSessionRefresh";
 import { useProfileData } from "./session/useProfileData";
 import { useProfileChanges } from "./session/useProfileChanges";
 
-// Keep the original structure but fix critical issues
 export const useSessionManager = () => {
   const navigate = useNavigate();
   const [session, setSession] = useState<any>(null);
@@ -17,9 +16,8 @@ export const useSessionManager = () => {
   const { refreshSession } = useSessionRefresh();
   const { fetchUserProfile } = useProfileData();
 
-  // IMPORTANT FIX: Make sure session state is stable
   const handleSessionUpdate = useCallback(async (currentSession: any) => {
-    setIdleTime(0); // Reset idle time on session update
+    setIdleTime(0);
     console.log("Session update handler called with session:", !!currentSession);
 
     if (!currentSession?.user?.id) {
@@ -28,15 +26,14 @@ export const useSessionManager = () => {
       setUserRole(null);
       setUserDepartment(null);
       setIsLoading(false);
-      navigate("/auth"); // Redirect to login if session is invalid
+      navigate("/auth");
       return;
     }
 
     console.log("Session found, updating user data for ID:", currentSession.user.id);
     
-    // CRITICAL FIX: Set session first and separately from the async profile fetch
     setSession(currentSession);
-    setIsLoading(false); // Make sure we're not showing loading state during navigation
+    setIsLoading(false);
 
     try {
       const profileData = await fetchUserProfile(currentSession.user.id);
@@ -56,37 +53,32 @@ export const useSessionManager = () => {
     }
   }, [fetchUserProfile, navigate]);
 
-  // Keep idle tracking simple
   useEffect(() => {
     const idleInterval = setInterval(() => {
       setIdleTime((prevIdleTime) => prevIdleTime + 1);
-    }, 60000); // Increment idle time every minute
+    }, 60000);
 
     return () => clearInterval(idleInterval);
   }, []);
 
   useEffect(() => {
-    if (idleTime >= 15) { // 15 minutes of idle time
+    if (idleTime >= 15) {
       refreshSession();
-      setIdleTime(0); // Reset idle time after refresh
+      setIdleTime(0);
     }
   }, [idleTime, refreshSession]);
 
-  // CRITICAL FIX: Ensure clean subscription management
   useEffect(() => {
     console.log("Setting up session...");
     let subscription: { unsubscribe: () => void } | null = null;
 
     const setupSession = async () => {
       try {
-        // Get initial session
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         console.log("Initial session check:", !!initialSession);
         
-        // Handle initial session first
         await handleSessionUpdate(initialSession);
         
-        // Then set up the subscription
         const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
           async (_event, authStateSession) => {
             console.log("Auth state changed:", _event);
@@ -110,19 +102,17 @@ export const useSessionManager = () => {
     };
   }, [handleSessionUpdate]);
 
-  // SIMPLIFIED: Use a single periodic refresh that's stable
   useEffect(() => {
     const interval = setInterval(async () => {
       if (session?.user?.id) {
         console.log("Periodic session refresh");
         await refreshSession();
       }
-    }, 4 * 60 * 1000); // 4 minutes
+    }, 4 * 60 * 1000);
 
     return () => clearInterval(interval);
   }, [refreshSession, session]);
 
-  // Keep profile changes mechanism
   useProfileChanges(
     session,
     userRole,

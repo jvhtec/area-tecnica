@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+
+import { useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 export const useProfileChanges = (
   session: any,
@@ -11,6 +12,8 @@ export const useProfileChanges = (
   useEffect(() => {
     if (!session?.user?.id) return;
 
+    console.log("Setting up profile changes subscription...");
+    
     const channel = supabase
       .channel('profile-changes')
       .on(
@@ -19,32 +22,31 @@ export const useProfileChanges = (
           event: '*',
           schema: 'public',
           table: 'profiles',
-          filter: `id=eq.${session.user.id}`,
+          filter: `id=eq.${session.user.id}`
         },
         async (payload) => {
-          console.log('Profile changed:', payload);
-          try {
-            const profileData = await fetchUserProfile(session.user.id);
-            console.log('Updated profile data:', profileData);
-            
-            setUserRole(profileData.role);
-            setUserDepartment(profileData.department);
-            
-            // Only force reload if we're not on the settings page
-            const currentPath = window.location.pathname;
-            if (currentPath !== '/settings' && profileData.role !== userRole) {
-              const newPath = profileData.role === 'technician' ? '/technician-dashboard' : '/dashboard';
-              window.location.href = newPath;
+          console.log("Profile changed:", payload);
+          
+          // Fetch the updated profile
+          const profile = await fetchUserProfile(session.user.id);
+          
+          if (profile) {
+            if (profile.role !== userRole) {
+              console.log(`User role changed from ${userRole} to ${profile.role}`);
+              setUserRole(profile.role);
             }
-          } catch (error) {
-            console.error('Error updating profile data:', error);
+            
+            setUserDepartment(profile.department);
           }
         }
       )
       .subscribe();
+      
+    console.log("Profile changes subscription established");
 
     return () => {
+      console.log("Cleaning up profile changes subscription");
       supabase.removeChannel(channel);
     };
-  }, [session?.user?.id, userRole, fetchUserProfile, setUserRole, setUserDepartment]);
+  }, [session, userRole, fetchUserProfile, setUserRole, setUserDepartment]);
 };

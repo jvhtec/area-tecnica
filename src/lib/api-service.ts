@@ -1,3 +1,4 @@
+
 import { supabase } from "@/lib/supabase";
 
 // Singleton API Service class
