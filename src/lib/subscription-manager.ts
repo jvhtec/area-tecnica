@@ -1,4 +1,3 @@
-
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
@@ -135,35 +134,34 @@ export class SubscriptionManager {
     const channelName = `${table}-changes-${Date.now()}`;
     
     try {
-      // Create the channel
+      // Create and configure the channel for Supabase Realtime
       const channel = supabase.channel(channelName);
       
-      // Configure the channel for postgres_changes
-      const configuredChannel = channel.on(
-        'postgres_changes',
-        {
-          event: filter?.event || '*',
-          schema: filter?.schema || 'public',
-          table: table
-        },
-        (payload) => {
-          console.log(`Received ${payload.eventType} for ${table}:`, payload);
-          
-          // Intelligently invalidate only affected queries
-          const keys = Array.isArray(queryKey) ? queryKey : [queryKey];
-          
-          // Batch invalidations to prevent UI thrashing
-          setTimeout(() => {
-            keys.forEach(key => {
-              this.queryClient.invalidateQueries({ queryKey: [key] });
-            });
-            console.log(`Invalidated queries for keys: ${keys.join(', ')}`);
-          }, 50);
-        }
-      );
+      // Set up the callback handler
+      const handleChange = (payload: any) => {
+        console.log(`Received ${payload.eventType} for ${table}:`, payload);
+        
+        // Intelligently invalidate only affected queries
+        const keys = Array.isArray(queryKey) ? queryKey : [queryKey];
+        
+        // Batch invalidations to prevent UI thrashing
+        setTimeout(() => {
+          keys.forEach(key => {
+            this.queryClient.invalidateQueries({ queryKey: [key] });
+          });
+          console.log(`Invalidated queries for keys: ${keys.join(', ')}`);
+        }, 50);
+      };
       
-      // Now subscribe to the channel
-      configuredChannel.subscribe((status) => {
+      // Configure the channel for postgres_changes
+      channel.on('postgres_changes', {
+        event: filter?.event || '*',
+        schema: filter?.schema || 'public',
+        table: table
+      }, handleChange);
+      
+      // Subscribe to the channel
+      channel.subscribe((status: string) => {
         console.log(`Subscription to ${table} status:`, status);
         if (status === 'SUBSCRIBED') {
           this.connectionStatus = 'connected';
