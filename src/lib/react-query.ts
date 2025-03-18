@@ -31,8 +31,6 @@ const defaultQueryOptions: DefaultOptions = {
 // Create a singleton query client with optimized configuration
 export const queryClient = new QueryClient({
   defaultOptions: defaultQueryOptions,
-  queryCache: queryCacheConfig,
-  mutationCache: mutationCacheConfig,
 });
 
 // Setup function to initialize React Query and Subscriptions
@@ -55,8 +53,6 @@ export const setupReactQuery = () => {
 export const createQueryClient = () => {
   return new QueryClient({
     defaultOptions: defaultQueryOptions,
-    queryCache: queryCacheConfig,
-    mutationCache: mutationCacheConfig,
   });
 };
 

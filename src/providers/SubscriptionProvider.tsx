@@ -57,13 +57,23 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     // Subscribe to token refreshes to update subscriptions
     const unsubscribe = tokenManager.subscribe(() => {
       console.log("Token refreshed, updating subscriptions");
-      manager.reestablishSubscriptions();
+      // Recreate subscriptions by unsubscribing and resubscribing
+      const tables = Object.keys(manager.getSubscriptionsByTable());
+      tables.forEach(table => {
+        manager.unsubscribeFromTable(table);
+        manager.subscribeToTable(table, table);
+      });
       queryClient.invalidateQueries();
     });
     
     // Define refresh function
     const refreshSubscriptions = () => {
-      manager.reestablishSubscriptions();
+      // Recreate subscriptions by unsubscribing and resubscribing
+      const tables = Object.keys(manager.getSubscriptionsByTable());
+      tables.forEach(table => {
+        manager.unsubscribeFromTable(table);
+        manager.subscribeToTable(table, table);
+      });
     };
     
     // Define invalidate function with optional specific query key
