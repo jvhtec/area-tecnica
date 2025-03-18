@@ -1,3 +1,4 @@
+
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
@@ -154,17 +155,17 @@ export class SubscriptionManager {
       };
       
       // Configure the channel with the correct options and subscribe
-      channel
+      const subscription = channel
         .on(
           'postgres_changes', 
-          { 
+          {
             event: filter?.event || '*', 
             schema: filter?.schema || 'public', 
-            table: table 
-          }, 
+            table: table
+          },
           handleChange
         )
-        .subscribe((status: string) => {
+        .subscribe((status) => {
           console.log(`Subscription to ${table} status:`, status);
           if (status === 'SUBSCRIBED') {
             this.connectionStatus = 'connected';
