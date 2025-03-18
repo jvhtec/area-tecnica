@@ -14,6 +14,15 @@ import { Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ArtistFormData, ProviderType } from "@/types/festival";
 
+interface ArtistManagementDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  artist?: any;
+  jobId?: string;
+  selectedDate?: string;
+  dayStartTime?: string;
+}
+
 const consoleOptions = [
   'Yamaha CL5', 'Yamaha PMx', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
   'DiGiCo SD10', 'DiGiCo SD11', 'DiGiCo SD12', 'DiGiCo SD5Q', 'DiGiCo SD7Q',
