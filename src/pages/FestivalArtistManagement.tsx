@@ -232,6 +232,10 @@ const FestivalArtistManagement = () => {
       console.log("Fetched artists:", data);
       
       const processedArtists = data?.map(artist => {
+        if (artist.isaftermidnight !== undefined) {
+          return artist;
+        }
+        
         if (!artist.show_start) return artist;
         
         const [hours] = artist.show_start.split(':').map(Number);
@@ -239,7 +243,7 @@ const FestivalArtistManagement = () => {
         
         return {
           ...artist,
-          isAfterMidnight
+          isaftermidnight: isAfterMidnight
         };
       }) || [];
       

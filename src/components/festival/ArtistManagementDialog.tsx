@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -99,7 +100,8 @@ export const ArtistManagementDialog = ({
     infra_analog: 0,
     infrastructure_provided_by: "festival",
     other_infrastructure: "",
-    notes: ""
+    notes: "",
+    isaftermidnight: false
   });
 
   useEffect(() => {
@@ -181,6 +183,9 @@ export const ArtistManagementDialog = ({
   
     setIsLoading(true);
     try {
+      // Calculate if the start time is after midnight
+      const isAfterMidnightValue = isAfterMidnight(showStartHour);
+      
       const cleanedData = {
         ...formData,
         job_id: jobId,
@@ -203,7 +208,7 @@ export const ArtistManagementDialog = ({
         infrastructure_provided_by: formData.infrastructure_provided_by as ProviderType,
         other_infrastructure: formData.other_infrastructure || "",
         notes: formData.notes || "",
-        isaftermidnight: isAfterMidnight(showStartHour),
+        isaftermidnight: isAfterMidnightValue,
       };
   
       console.log("Saving artist with data:", cleanedData);
