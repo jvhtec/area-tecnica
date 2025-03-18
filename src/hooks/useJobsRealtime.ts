@@ -21,46 +21,57 @@ export const useJobsRealtime = () => {
   // Monitor subscription status
   const status = useSubscriptionStatus(['jobs', 'job_assignments', 'job_departments', 'job_date_types']);
 
-  const fetchJobs = useCallback(async (retries = 3, delay = 1000) => {
-    try {
-      console.log("Fetching jobs with automatic retries...");
-      
-      const { data: jobs, error } = await supabase
-        .from("jobs")
-        .select(`
-          *,
-          location:locations(name),
-          job_departments!inner(department),
-          job_assignments(
-            technician_id,
-            sound_role,
-            lights_role,
-            video_role,
-            profiles(
-              first_name,
-              last_name
-            )
-          ),
-          job_documents(*),
-          tour_date:tour_dates(*)
-        `)
-        .order("start_time", { ascending: true });
+  // Define the fetchJobs function correctly for React Query
+  const fetchJobs = useCallback(async ({ signal }) => {
+    const performFetch = async (retries = 3, delay = 1000) => {
+      try {
+        console.log("Fetching jobs with automatic retries...");
+        
+        const { data: jobs, error } = await supabase
+          .from("jobs")
+          .select(`
+            *,
+            location:locations(name),
+            job_departments!inner(department),
+            job_assignments(
+              technician_id,
+              sound_role,
+              lights_role,
+              video_role,
+              profiles(
+                first_name,
+                last_name
+              )
+            ),
+            job_documents(*),
+            tour_date:tour_dates(*)
+          `)
+          .order("start_time", { ascending: true })
+          .abortSignal(signal);
 
-      if (error) {
-        console.error("Error fetching jobs:", error);
+        if (error) {
+          console.error("Error fetching jobs:", error);
+          throw error;
+        }
+
+        console.log("Jobs fetched successfully:", jobs?.length || 0, "jobs");
+        return jobs || [];
+      } catch (error) {
+        if (signal?.aborted) {
+          console.log('Fetch aborted');
+          throw new Error('Query was cancelled');
+        }
+        
+        if (retries > 0) {
+          console.log(`Retrying fetch jobs... ${retries} attempts remaining`);
+          await new Promise(resolve => setTimeout(resolve, delay)); 
+          return performFetch(retries - 1, delay * 2); // Exponential backoff
+        }
         throw error;
       }
+    };
 
-      console.log("Jobs fetched successfully:", jobs?.length || 0, "jobs");
-      return jobs || [];
-    } catch (error) {
-      if (retries > 0) {
-        console.log(`Retrying fetch jobs... ${retries} attempts remaining`);
-        await new Promise(resolve => setTimeout(resolve, delay)); 
-        return fetchJobs(retries - 1, delay * 2); // Exponential backoff
-      }
-      throw error;
-    }
+    return performFetch();
   }, []);
 
   const { data: jobs = [], isLoading, isError, error } = useQuery({
