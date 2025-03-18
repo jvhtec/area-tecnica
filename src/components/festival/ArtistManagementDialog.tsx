@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -181,7 +182,7 @@ export const ArtistManagementDialog = ({
 
     setIsLoading(true);
     try {
-      // Ensure all required string fields have a value
+      // Ensure all string fields have a value to prevent SQL errors
       const cleanedData = {
         ...formData,
         job_id: jobId,
@@ -890,4 +891,3 @@ export const ArtistManagementDialog = ({
     </>
   );
 };
-
