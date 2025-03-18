@@ -142,8 +142,8 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     manager.subscribeToTable('jobs', 'jobs');
     
     return () => {
-      manager.unsubscribeFromTable('profiles', 'profiles');
-      manager.unsubscribeFromTable('jobs', 'jobs');
+      manager.unsubscribeFromTable('profiles');
+      manager.unsubscribeFromTable('jobs');
     };
   }, [queryClient]);
 
