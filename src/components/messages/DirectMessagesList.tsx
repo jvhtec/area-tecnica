@@ -4,24 +4,21 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { DirectMessage } from "./types";
 import { DirectMessageCard } from "./DirectMessageCard";
-import { useTableSubscription } from "@/hooks/useSubscription";
 import { useDirectMessageOperations } from "./hooks/useDirectMessageOperations";
+import { useTableSubscription } from "@/hooks/useSubscription";
+import { SubscriptionIndicator } from "../ui/subscription-indicator";
+import { useQueryClient } from "@tanstack/react-query";
 
 export const DirectMessagesList = () => {
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string>();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { handleDeleteMessage, handleMarkAsRead } = useDirectMessageOperations(messages, setMessages, toast);
 
-  // Set up real-time subscription using the new system
-  useTableSubscription(
-    'direct_messages',
-    'direct_messages',
-    currentUserId ? {
-      filter: `sender_id=eq.${currentUserId},recipient_id=eq.${currentUserId}`
-    } : undefined
-  );
+  // Set up real-time subscription using the improved hooks
+  useTableSubscription('direct_messages', 'direct_messages');
 
   useEffect(() => {
     const getCurrentUser = async () => {
@@ -101,25 +98,39 @@ export const DirectMessagesList = () => {
     }
   };
 
-  // Refetch messages when the subscription triggers a refresh
+  // Set up a listener to invalidate and refetch when messages change
   useEffect(() => {
-    if (currentUserId) {
-      // Add a query client event listener for invalidations
-      const handleInvalidate = () => {
-        console.log("Messages query invalidated, refreshing data");
-        fetchMessages(currentUserId);
-      };
-      
-      window.addEventListener('direct_messages_invalidated', handleInvalidate);
-      
-      return () => {
-        window.removeEventListener('direct_messages_invalidated', handleInvalidate);
-      };
-    }
-  }, [currentUserId]);
+    if (!currentUserId) return;
+    
+    const refreshData = () => {
+      console.log("Message subscription triggered refresh");
+      fetchMessages(currentUserId);
+    };
+    
+    // Listen for invalidations from the subscription manager
+    queryClient.getQueryCache().subscribe((event) => {
+      if (event.type === 'invalidated' && 
+          event.query.queryKey?.[0] === 'direct_messages') {
+        refreshData();
+      }
+    });
+    
+    // Set up direct invalidation event
+    const handleInvalidate = () => refreshData();
+    window.addEventListener('direct_messages_invalidated', handleInvalidate);
+    
+    return () => {
+      window.removeEventListener('direct_messages_invalidated', handleInvalidate);
+    };
+  }, [currentUserId, queryClient]);
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between pb-2">
+        <h3 className="text-lg font-medium">Direct Messages</h3>
+        <SubscriptionIndicator tables={['direct_messages']} variant="compact" />
+      </div>
+      
       {loading ? (
         <p className="text-muted-foreground">Loading messages...</p>
       ) : messages.length === 0 ? (

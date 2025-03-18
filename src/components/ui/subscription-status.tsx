@@ -2,12 +2,26 @@
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronDown, ChevronUp, Wifi, WifiOff } from "lucide-react";
+import { ChevronDown, ChevronUp, Wifi, WifiOff, RefreshCw } from "lucide-react";
 import { useState } from "react";
+import { Button } from "./button";
+import { useResetSubscriptions } from "@/hooks/useResetSubscriptions";
+import { toast } from "sonner";
 
 export function SubscriptionStatus() {
   const { connectionStatus, subscriptionCount, subscriptionsByTable } = useSubscriptionContext();
   const [expanded, setExpanded] = useState(false);
+  const { resetAllSubscriptions } = useResetSubscriptions();
+  
+  const handleReset = () => {
+    try {
+      resetAllSubscriptions();
+      toast.success("Subscriptions reset successfully");
+    } catch (error) {
+      console.error("Error resetting subscriptions:", error);
+      toast.error("Failed to reset subscriptions");
+    }
+  };
   
   return (
     <Card className="w-full max-w-md">
@@ -35,6 +49,21 @@ export function SubscriptionStatus() {
       {expanded && (
         <CardContent>
           <div className="space-y-4">
+            <div className="flex justify-end">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="flex items-center gap-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleReset();
+                }}
+              >
+                <RefreshCw className="h-3 w-3" />
+                Reset Subscriptions
+              </Button>
+            </div>
+            
             <div>
               <h3 className="text-sm font-medium mb-2">Subscriptions by Table</h3>
               <div className="space-y-2">

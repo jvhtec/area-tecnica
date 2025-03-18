@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Download, Trash2, FileText } from "lucide-react";
@@ -5,6 +6,9 @@ import { format } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Department } from "@/types/department";
+import { SubscriptionIndicator } from "../ui/subscription-indicator";
+import { useEffect, useState } from "react";
+import { useTableSubscription } from "@/hooks/useSubscription";
 
 interface JobDocument {
   id: string;
@@ -27,6 +31,15 @@ export const JobDocuments = ({
   onDeleteDocument 
 }: JobDocumentsProps) => {
   const { toast } = useToast();
+  const [localDocuments, setLocalDocuments] = useState<JobDocument[]>(documents);
+  
+  // Set up real-time subscription
+  useTableSubscription('job_documents', ['job_documents', jobId]);
+  
+  // Update local documents when the prop changes
+  useEffect(() => {
+    setLocalDocuments(documents);
+  }, [documents]);
 
   const handleDownload = async (jobDocument: JobDocument) => {
     try {
@@ -88,13 +101,24 @@ export const JobDocuments = ({
     }
   };
 
-  if (!documents?.length) return null;
+  const handleDelete = (document: JobDocument) => {
+    // Update local documents optimistically
+    setLocalDocuments(current => current.filter(doc => doc.id !== document.id));
+    
+    // Call the actual delete handler
+    onDeleteDocument(jobId, document);
+  };
+
+  if (!localDocuments?.length) return null;
 
   return (
     <div className="mt-4 space-y-2">
-      <div className="text-sm font-medium">Documents</div>
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-medium">Documents</div>
+        <SubscriptionIndicator tables={['job_documents']} variant="compact" />
+      </div>
       <div className="space-y-2">
-        {documents.map((doc) => (
+        {localDocuments.map((doc) => (
           <div 
             key={doc.id} 
             className="flex items-center justify-between p-2 rounded-md bg-accent/20"
@@ -133,7 +157,7 @@ export const JobDocuments = ({
                 size="icon"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onDeleteDocument(jobId, doc);
+                  handleDelete(doc);
                 }}
                 title="Delete"
               >

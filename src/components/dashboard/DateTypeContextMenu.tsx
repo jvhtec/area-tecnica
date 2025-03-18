@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { format, startOfDay } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTableSubscription } from "@/hooks/useSubscription";
 
 interface DateTypeContextMenuProps {
   children: React.ReactNode;
@@ -17,30 +18,10 @@ interface DateTypeContextMenuProps {
 export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: DateTypeContextMenuProps) => {
   const queryClient = useQueryClient();
 
-  // Subscribe to real-time updates for this specific job's date types
-  useEffect(() => {
-    const channel = supabase
-      .channel('job-date-types')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'job_date_types',
-          filter: `job_id=eq.${jobId}`
-        },
-        () => {
-          // Invalidate the query to trigger a refetch
-          queryClient.invalidateQueries({ queryKey: ['job-date-types', jobId] });
-          onTypeChange();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [jobId, queryClient, onTypeChange]);
+  // Use the improved subscription hook
+  useTableSubscription('job_date_types', ['job-date-types', jobId], {
+    filter: `job_id=eq.${jobId}`
+  });
 
   const handleSetDateType = async (type: 'travel' | 'setup' | 'show' | 'off' | 'rehearsal') => {
     try {

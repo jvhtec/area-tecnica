@@ -1,3 +1,4 @@
+
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Assignment } from "@/types/assignment";
@@ -5,6 +6,8 @@ import { Department } from "@/types/department";
 import { User, X } from "lucide-react";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
+import { useTableSubscription } from "@/hooks/useSubscription";
+import { SubscriptionIndicator } from "../ui/subscription-indicator";
 
 interface JobAssignmentsProps {
   jobId: string;
@@ -14,8 +17,11 @@ interface JobAssignmentsProps {
 
 export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsProps) => {
   const queryClient = useQueryClient();
+  
+  // Use our subscription hook to set up real-time updates
+  useTableSubscription("job_assignments", ["job-assignments", jobId]);
 
-  const { data: assignments } = useQuery({
+  const { data: assignments, isLoading } = useQuery({
     queryKey: ["job-assignments", jobId],
     queryFn: async () => {
       console.log("Fetching assignments for job:", jobId);
@@ -69,6 +75,14 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-2">
+        <div className="animate-pulse text-sm text-muted-foreground">Loading assignments...</div>
+      </div>
+    );
+  }
+
   if (!assignments?.length) return null;
 
   // Filter assignments based on department if specified
@@ -95,6 +109,12 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
 
   return (
     <div className="space-y-1">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs text-muted-foreground">
+          {filteredAssignments.length} assignment{filteredAssignments.length !== 1 ? 's' : ''}
+        </span>
+        <SubscriptionIndicator tables={["job_assignments"]} variant="compact" />
+      </div>
       {filteredAssignments.map((assignment) => {
         const role = getRoleForDepartment(assignment);
         if (!role) return null;
