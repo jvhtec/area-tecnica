@@ -7,7 +7,7 @@ import { Button } from "./button";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useRouteSubscriptions } from "@/hooks/useRouteSubscriptions";
+import { useRouteSubscriptions, ROUTE_SUBSCRIPTIONS } from "@/hooks/useRouteSubscriptions";
 
 export function HeaderStatus({ className }: { className?: string }) {
   const { refreshSubscriptions } = useSubscriptionContext();
@@ -115,7 +115,7 @@ export function HeaderStatus({ className }: { className?: string }) {
     }
     
     const routeName = formatRouteName(routeKey);
-    const isDefinedRoute = Object.keys(ROUTE_SUBSCRIPTIONS || {}).includes(routeKey);
+    const isDefinedRoute = Object.keys(ROUTE_SUBSCRIPTIONS).includes(routeKey);
     
     if (!isFullySubscribed) {
       return (

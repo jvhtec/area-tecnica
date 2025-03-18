@@ -1,9 +1,10 @@
+
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
 
 // Define subscription requirements for each route
-const ROUTE_SUBSCRIPTIONS: Record<string, string[]> = {
+export const ROUTE_SUBSCRIPTIONS: Record<string, string[]> = {
   // Dashboard route needs these tables for real-time updates
   '/dashboard': ['jobs', 'job_assignments', 'job_date_types', 'messages', 'direct_messages'],
   
