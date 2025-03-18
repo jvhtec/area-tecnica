@@ -1,4 +1,3 @@
-
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
@@ -154,29 +153,28 @@ export class SubscriptionManager {
         }, 50);
       };
       
-      // Configure the channel with the correct options
-      channel.on(
-        'postgres_changes', 
-        { 
-          event: filter?.event || '*', 
-          schema: filter?.schema || 'public', 
-          table: table 
-        }, 
-        handleChange
-      );
-      
-      // Subscribe to the channel
-      channel.subscribe((status: string) => {
-        console.log(`Subscription to ${table} status:`, status);
-        if (status === 'SUBSCRIBED') {
-          this.connectionStatus = 'connected';
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error(`Error in subscription to ${table}`);
-          // Queue for reconnection
-          this.pendingSubscriptions.set(subscriptionKey, { table, queryKey });
-          this.handleOffline();
-        }
-      });
+      // Configure the channel with the correct options and subscribe
+      channel
+        .on(
+          'postgres_changes', 
+          { 
+            event: filter?.event || '*', 
+            schema: filter?.schema || 'public', 
+            table: table 
+          }, 
+          handleChange
+        )
+        .subscribe((status: string) => {
+          console.log(`Subscription to ${table} status:`, status);
+          if (status === 'SUBSCRIBED') {
+            this.connectionStatus = 'connected';
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error(`Error in subscription to ${table}`);
+            // Queue for reconnection
+            this.pendingSubscriptions.set(subscriptionKey, { table, queryKey });
+            this.handleOffline();
+          }
+        });
       
       // Store the subscription for later cleanup
       this.subscriptions.set(subscriptionKey, { 
