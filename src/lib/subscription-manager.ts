@@ -1,7 +1,7 @@
 
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { RealtimeChannel, RealtimeChannelOptions, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import { RealtimeChannel, RealtimeChannelOptions } from "@supabase/supabase-js";
 
 export class SubscriptionManager {
   private static instance: SubscriptionManager;
@@ -154,23 +154,29 @@ export class SubscriptionManager {
         }, 50);
       };
       
-      // Configure the channel with the correct options
-      const postgresChanges: RealtimeChannelOptions['config'] = {
-        event: filter?.event || '*',
-        schema: filter?.schema || 'public',
-        table: table
-      };
-
+      // Set up the subscription with the correct syntax for Supabase v2
       if (filter?.filter) {
-        postgresChanges.filter = filter.filter;
+        channel.on(
+          'postgres_changes',
+          { 
+            event: filter?.event || '*', 
+            schema: filter?.schema || 'public', 
+            table: table,
+            filter: filter.filter
+          },
+          handleChange
+        );
+      } else {
+        channel.on(
+          'postgres_changes',
+          { 
+            event: filter?.event || '*', 
+            schema: filter?.schema || 'public', 
+            table: table
+          },
+          handleChange
+        );
       }
-      
-      // Set up the subscription with proper typing
-      channel.on(
-        'postgres_changes', 
-        postgresChanges,
-        handleChange
-      );
       
       // Subscribe to the channel
       channel.subscribe((status) => {
