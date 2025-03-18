@@ -108,8 +108,9 @@ export const DirectMessagesList = () => {
     };
     
     // Listen for invalidations from the subscription manager
-    queryClient.getQueryCache().subscribe((event) => {
-      if (event.type === 'invalidated' && 
+    const unsubscribe = queryClient.getQueryCache().subscribe(event => {
+      // Check if the event has a query property and if it matches our direct_messages key
+      if (event.type === 'queryUpdated' && 
           event.query.queryKey?.[0] === 'direct_messages') {
         refreshData();
       }
@@ -120,6 +121,7 @@ export const DirectMessagesList = () => {
     window.addEventListener('direct_messages_invalidated', handleInvalidate);
     
     return () => {
+      unsubscribe();
       window.removeEventListener('direct_messages_invalidated', handleInvalidate);
     };
   }, [currentUserId, queryClient]);
