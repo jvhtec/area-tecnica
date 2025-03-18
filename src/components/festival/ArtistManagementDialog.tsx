@@ -107,6 +107,7 @@ export const ArtistManagementDialog = ({
     if (artist) {
       setFormData({
         ...artist,
+        stage: typeof artist.stage === 'string' ? parseInt(artist.stage) : artist.stage,
         date: artist.date || selectedDate || "",
       });
       
