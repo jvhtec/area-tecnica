@@ -104,10 +104,13 @@ export class EnhancedSubscriptionManager {
     this.lastNetworkCheck = now;
     
     try {
-      // Simple connectivity check
-      const response = await fetch(`${supabase.supabaseUrl}/rest/v1/?apikey=${supabase.supabaseKey}`, {
+      // Simple connectivity check using a simple endpoint that will be available
+      // with the Supabase REST API without directly accessing protected properties
+      const response = await fetch(`https://syldobdcdsgfgjtbuwxm.supabase.co/rest/v1/`, {
         method: 'HEAD',
         headers: {
+          'Content-Type': 'application/json',
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN5bGRvYmRjZHNnZmdqdGJ1d3htIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU5NDE1ODcsImV4cCI6MjA1MTUxNzU4N30.iLtE6_xC0FE21JKzy77UPAvferh4l1WeLvvVCn15YJc',
           'Cache-Control': 'no-cache',
         },
       });
