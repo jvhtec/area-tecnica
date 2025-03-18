@@ -77,6 +77,8 @@ export interface ArtistFormData {
   other_infrastructure: string;
   notes: string;
   isaftermidnight?: boolean;
+  foh_tech?: boolean;
+  mon_tech?: boolean;
 }
 
 export interface FestivalSettings {

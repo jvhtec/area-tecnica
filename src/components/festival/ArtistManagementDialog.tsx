@@ -13,6 +13,7 @@ import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { Badge } from "@/components/ui/badge";
 import { Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ArtistFormData } from "@/types/festival";
 
 interface ArtistManagementDialogProps {
   open: boolean;
@@ -58,9 +59,10 @@ export const ArtistManagementDialog = ({
   const [showEndHour, setShowEndHour] = useState<number | null>(null);
   const [dayStartHour] = useState<number>(parseInt(dayStartTime.split(':')[0]) || 7);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ArtistFormData>({
     name: "",
-    stage: "",
+    stage: 1,
+    date: selectedDate || "",
     show_start: "",
     show_end: "",
     soundcheck: false,
@@ -93,13 +95,12 @@ export const ArtistManagementDialog = ({
     infra_hma_quantity: 0,
     infra_coax: false,
     infra_coax_quantity: 0,
-    infra_analog: 0,
     infra_opticalcon_duo: false,
     infra_opticalcon_duo_quantity: 0,
+    infra_analog: 0,
     infrastructure_provided_by: "festival",
     other_infrastructure: "",
-    notes: "",
-    date: selectedDate || "",
+    notes: ""
   });
 
   useEffect(() => {
@@ -186,18 +187,23 @@ export const ArtistManagementDialog = ({
       const cleanedData = {
         ...formData,
         job_id: jobId,
-        stage: formData.stage ? parseInt(formData.stage) : null,
+        stage: formData.stage ? parseInt(formData.stage.toString()) : null,
         show_start: formData.show_start || null,
         show_end: formData.show_end || null,
         soundcheck_start: formData.soundcheck_start || null,
         soundcheck_end: formData.soundcheck_end || null,
         foh_console: formData.foh_console || "",
+        foh_console_provided_by: formData.foh_console_provided_by as 'festival' | 'band',
         mon_console: formData.mon_console || "",
+        mon_console_provided_by: formData.mon_console_provided_by as 'festival' | 'band',
         wireless_model: formData.wireless_model || "",
+        wireless_provided_by: formData.wireless_provided_by as 'festival' | 'band',
         wireless_band: formData.wireless_band || "",
         iem_model: formData.iem_model || "",
+        iem_provided_by: formData.iem_provided_by as 'festival' | 'band',
         iem_band: formData.iem_band || "",
         extras_wired: formData.extras_wired || "",
+        infrastructure_provided_by: formData.infrastructure_provided_by as 'festival' | 'band',
         other_infrastructure: formData.other_infrastructure || "",
         notes: formData.notes || "",
         // Use lowercase property name to match database column name exactly
