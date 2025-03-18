@@ -13,7 +13,7 @@ import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { Badge } from "@/components/ui/badge";
 import { Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ArtistFormData } from "@/types/festival";
+import { ArtistFormData, ProviderType } from "@/types/festival";
 
 interface ArtistManagementDialogProps {
   open: boolean;
@@ -187,27 +187,27 @@ export const ArtistManagementDialog = ({
       const cleanedData = {
         ...formData,
         job_id: jobId,
-        stage: formData.stage ? parseInt(formData.stage.toString()) : null,
+        stage: typeof formData.stage === 'string' ? parseInt(formData.stage) : formData.stage,
         show_start: formData.show_start || null,
         show_end: formData.show_end || null,
         soundcheck_start: formData.soundcheck_start || null,
         soundcheck_end: formData.soundcheck_end || null,
         foh_console: formData.foh_console || "",
-        foh_console_provided_by: formData.foh_console_provided_by as 'festival' | 'band',
+        foh_console_provided_by: formData.foh_console_provided_by as ProviderType,
         mon_console: formData.mon_console || "",
-        mon_console_provided_by: formData.mon_console_provided_by as 'festival' | 'band',
+        mon_console_provided_by: formData.mon_console_provided_by as ProviderType,
         wireless_model: formData.wireless_model || "",
-        wireless_provided_by: formData.wireless_provided_by as 'festival' | 'band',
+        wireless_provided_by: formData.wireless_provided_by as ProviderType,
         wireless_band: formData.wireless_band || "",
         iem_model: formData.iem_model || "",
-        iem_provided_by: formData.iem_provided_by as 'festival' | 'band',
+        iem_provided_by: formData.iem_provided_by as ProviderType,
         iem_band: formData.iem_band || "",
         extras_wired: formData.extras_wired || "",
-        infrastructure_provided_by: formData.infrastructure_provided_by as 'festival' | 'band',
+        infrastructure_provided_by: formData.infrastructure_provided_by as ProviderType,
         other_infrastructure: formData.other_infrastructure || "",
         notes: formData.notes || "",
         // Use exact lowercase column name to match database
-        isaftermidnight: isAfterMidnight(showStartHour),  // Changed from isAfterMidnight to isaftermidnight
+        isaftermidnight: isAfterMidnight(showStartHour),
       };
   
       console.log("Saving artist with data:", cleanedData);
@@ -238,12 +238,16 @@ export const ArtistManagementDialog = ({
     }
   };
 
-  const ProviderRadioGroup = ({ value, onChange, label }: { value: string, onChange: (value: string) => void, label: string }) => (
+  const ProviderRadioGroup = ({ value, onChange, label }: { 
+    value: ProviderType, 
+    onChange: (value: ProviderType) => void, 
+    label: string 
+  }) => (
     <div className="space-y-2">
       <Label>{label}</Label>
       <RadioGroup
         value={value}
-        onValueChange={onChange}
+        onValueChange={onChange as (value: string) => void}
         className="flex space-x-4"
       >
         <div className="flex items-center space-x-2">
@@ -289,7 +293,10 @@ export const ArtistManagementDialog = ({
                     min="1"
                     value={formData.stage}
                     onChange={(e) =>
-                      setFormData({ ...formData, stage: e.target.value })
+                      setFormData({
+                        ...formData,
+                        stage: parseInt(e.target.value) || 1
+                      })
                     }
                     required
                   />

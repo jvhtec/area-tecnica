@@ -1,5 +1,6 @@
 
 
+
 export interface ConsoleSetup {
   model: string;
   quantity: number;
@@ -36,6 +37,8 @@ export interface FestivalGearSetup {
   updated_at?: string;
 }
 
+export type ProviderType = 'festival' | 'band';
+
 export interface ArtistFormData {
   readonly name: string;
   readonly stage: number;
@@ -46,16 +49,16 @@ export interface ArtistFormData {
   readonly soundcheck_start?: string;
   readonly soundcheck_end?: string;
   foh_console: string;
-  foh_console_provided_by: 'festival' | 'band';
+  foh_console_provided_by: ProviderType;
   mon_console: string;
-  mon_console_provided_by: 'festival' | 'band';
+  mon_console_provided_by: ProviderType;
   wireless_model: string;
-  wireless_provided_by: 'festival' | 'band';
+  wireless_provided_by: ProviderType;
   wireless_quantity_hh: number;
   wireless_quantity_bp: number;
   wireless_band: string;
   iem_model: string;
-  iem_provided_by: 'festival' | 'band';
+  iem_provided_by: ProviderType;
   iem_quantity: number;
   iem_band: string;
   monitors_enabled: boolean;
@@ -73,7 +76,7 @@ export interface ArtistFormData {
   infra_opticalcon_duo: boolean;
   infra_opticalcon_duo_quantity: number;
   infra_analog: number;
-  infrastructure_provided_by: 'festival' | 'band';
+  infrastructure_provided_by: ProviderType;
   other_infrastructure: string;
   notes: string;
   isaftermidnight?: boolean;
@@ -88,3 +91,4 @@ export interface FestivalSettings {
   created_at?: string;
   updated_at?: string;
 }
+
