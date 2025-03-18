@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Session } from "@supabase/supabase-js";
+import { TokenManager } from "@/lib/token-manager";
+import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 
 interface AuthContextType {
   session: Session | null;
@@ -42,13 +44,14 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { refreshSubscriptions, invalidateQueries } = useSubscriptionContext();
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<any | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [lastActivity, setLastActivity] = useState<number>(Date.now());
+  const tokenManager = TokenManager.getInstance();
 
   // Fetch user profile with proper error handling
   const fetchUserProfile = useCallback(async (userId: string) => {
@@ -71,48 +74,61 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // Session refresh logic with proper error handling
+  // Advanced and safe session refresh with proper error handling
   const refreshSession = useCallback(async (): Promise<Session | null> => {
     try {
-      setLastActivity(Date.now());
+      console.log("Starting session refresh");
       
-      const { data, error } = await supabase.auth.refreshSession();
+      // Use the token manager to handle refresh
+      const { session: refreshedSession, error } = await tokenManager.refreshToken();
       
       if (error) {
         console.error("Session refresh error:", error);
+        
         // Handle expired session
-        if (error.message.includes('expired')) {
+        if (error.message && error.message.includes('expired')) {
           setSession(null);
           setUser(null);
           setUserRole(null);
           setUserDepartment(null);
           navigate('/auth');
+          toast({
+            title: "Session expired",
+            description: "Your session has expired. Please log in again.",
+            variant: "destructive",
+          });
         }
         return null;
       }
       
-      if (data.session) {
-        setSession(data.session);
-        setUser(data.session.user);
+      if (refreshedSession) {
+        console.log("Session refreshed successfully");
+        setSession(refreshedSession);
+        setUser(refreshedSession.user);
         
         // Only fetch profile if user changed
-        if (!user || user.id !== data.session.user.id) {
-          const profile = await fetchUserProfile(data.session.user.id);
+        if (!user || user.id !== refreshedSession.user.id) {
+          const profile = await fetchUserProfile(refreshedSession.user.id);
           if (profile) {
             setUserRole(profile.role);
             setUserDepartment(profile.department);
           }
         }
         
-        return data.session;
+        // Refresh subscriptions and invalidate queries for fresh data
+        refreshSubscriptions();
+        invalidateQueries();
+        
+        return refreshedSession;
       }
       
+      console.log("No session returned from refresh");
       return null;
     } catch (error) {
       console.error("Exception in refreshSession:", error);
       return null;
     }
-  }, [fetchUserProfile, navigate, user]);
+  }, [fetchUserProfile, navigate, user, tokenManager, toast, refreshSubscriptions, invalidateQueries]);
 
   // Login function
   const login = async (email: string, password: string) => {
@@ -217,7 +233,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setIsLoading(true);
       
-      await supabase.auth.signOut();
+      await tokenManager.signOut();
       
       // Clear all state
       setSession(null);
@@ -245,6 +261,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Setup predictive token refresh
+  useEffect(() => {
+    if (!session) return;
+    
+    // Calculate optimal refresh time
+    const refreshTime = tokenManager.calculateRefreshTime(session);
+    console.log(`Scheduling token refresh in ${Math.round(refreshTime/1000)} seconds`);
+    
+    const refreshTimer = setTimeout(() => {
+      console.log("Executing scheduled token refresh");
+      refreshSession();
+    }, refreshTime);
+    
+    return () => clearTimeout(refreshTimer);
+  }, [session, refreshSession, tokenManager]);
+
   // Initial session setup and auth state subscription
   useEffect(() => {
     let subscription: { unsubscribe: () => void } | null = null;
@@ -254,7 +286,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setIsLoading(true);
         
         // Get initial session
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        const initialSession = await tokenManager.getSession();
         
         if (initialSession) {
           setSession(initialSession);
@@ -281,6 +313,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUserRole(profile.role);
                 setUserDepartment(profile.department);
               }
+              
+              // Refresh subscriptions for new user context
+              refreshSubscriptions();
             } else {
               setSession(null);
               setUser(null);
@@ -310,49 +345,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         subscription.unsubscribe();
       }
     };
-  }, [navigate, fetchUserProfile]);
-
-  // Token refresh logic
-  useEffect(() => {
-    if (!session) return;
-    
-    // Calculate time until token expiration
-    const expiresAt = session.expires_at ? session.expires_at * 1000 : Date.now() + 4 * 60 * 1000;
-    const timeUntilExpiry = expiresAt - Date.now();
-    const refreshTime = Math.max(timeUntilExpiry - 5 * 60 * 1000, 60 * 1000); // Refresh 5 minutes before expiry
-    
-    const refreshTimer = setTimeout(() => {
-      refreshSession();
-    }, refreshTime);
-    
-    return () => clearTimeout(refreshTimer);
-  }, [session, refreshSession]);
-
-  // Activity monitoring - refresh token after inactivity
-  useEffect(() => {
-    const INACTIVITY_THRESHOLD = 15 * 60 * 1000; // 15 minutes
-    
-    const activityHandler = () => {
-      const now = Date.now();
-      if (now - lastActivity > INACTIVITY_THRESHOLD) {
-        refreshSession();
-      }
-      setLastActivity(now);
-    };
-    
-    // Add event listeners for user activity
-    window.addEventListener('mousemove', activityHandler);
-    window.addEventListener('keydown', activityHandler);
-    window.addEventListener('click', activityHandler);
-    window.addEventListener('touchstart', activityHandler);
-    
-    return () => {
-      window.removeEventListener('mousemove', activityHandler);
-      window.removeEventListener('keydown', activityHandler);
-      window.removeEventListener('click', activityHandler);
-      window.removeEventListener('touchstart', activityHandler);
-    };
-  }, [lastActivity, refreshSession]);
+  }, [navigate, fetchUserProfile, tokenManager, refreshSubscriptions]);
 
   // Network status monitoring
   useEffect(() => {
@@ -365,12 +358,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
     };
     
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Only refresh if we have a session and it might be stale
+        if (session && tokenManager.checkTokenExpiration(session, 10 * 60 * 1000)) {
+          refreshSession();
+        }
+      }
+    };
+    
     window.addEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
       window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [refreshSession, toast]);
+  }, [refreshSession, session, toast, tokenManager]);
 
   const value = {
     session,
