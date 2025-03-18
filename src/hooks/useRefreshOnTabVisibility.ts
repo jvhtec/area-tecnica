@@ -2,8 +2,10 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
+type RefreshCallback = () => void;
+
 export const useRefreshOnTabVisibility = (
-  queryKeys: string[], 
+  queryKeysOrCallback: string[] | RefreshCallback, 
   options?: { 
     minTimeBetweenRefreshes?: number;
     refreshOnMount?: boolean;
@@ -17,9 +19,15 @@ export const useRefreshOnTabVisibility = (
     
     if (refreshOnMount) {
       // Initial refresh
-      queryKeys.forEach(key => {
-        queryClient.invalidateQueries({ queryKey: [key] });
-      });
+      if (typeof queryKeysOrCallback === 'function') {
+        // If it's a callback function, call it directly
+        queryKeysOrCallback();
+      } else if (Array.isArray(queryKeysOrCallback)) {
+        // If it's an array of query keys, invalidate them
+        queryKeysOrCallback.forEach(key => {
+          queryClient.invalidateQueries({ queryKey: [key] });
+        });
+      }
       lastRefreshTime = Date.now();
     }
 
@@ -27,9 +35,15 @@ export const useRefreshOnTabVisibility = (
       if (document.visibilityState === 'visible') {
         const now = Date.now();
         if (now - lastRefreshTime >= minTimeBetweenRefreshes) {
-          queryKeys.forEach(key => {
-            queryClient.invalidateQueries({ queryKey: [key] });
-          });
+          if (typeof queryKeysOrCallback === 'function') {
+            // If it's a callback function, call it directly
+            queryKeysOrCallback();
+          } else if (Array.isArray(queryKeysOrCallback)) {
+            // If it's an array of query keys, invalidate them
+            queryKeysOrCallback.forEach(key => {
+              queryClient.invalidateQueries({ queryKey: [key] });
+            });
+          }
           lastRefreshTime = now;
         }
       }
@@ -40,5 +54,5 @@ export const useRefreshOnTabVisibility = (
     return () => {
       window.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [queryClient, queryKeys, minTimeBetweenRefreshes, refreshOnMount]);
+  }, [queryClient, queryKeysOrCallback, minTimeBetweenRefreshes, refreshOnMount]);
 };

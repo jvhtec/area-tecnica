@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, RefreshCw } from "lucide-react";
@@ -199,7 +198,10 @@ const TechnicianDashboard = () => {
     retry: 3
   });
 
-  useRefreshOnTabVisibility(refetch, []);
+  useRefreshOnTabVisibility(() => {
+    console.log("Tab became visible, refreshing assignments");
+    refetch();
+  }, { minTimeBetweenRefreshes: 10000 });
 
   const handleCloseMessages = () => {
     setShowMessages(false);

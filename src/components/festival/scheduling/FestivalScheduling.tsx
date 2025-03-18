@@ -189,7 +189,7 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
       console.log("Tab became visible, refreshing shifts");
       fetchShifts();
     }
-  }, [selectedDate, jobId, fetchShifts]);
+  }, { minTimeBetweenRefreshes: 5000, refreshOnMount: false });
 
   const handleShiftCreated = async () => {
     fetchShifts();
