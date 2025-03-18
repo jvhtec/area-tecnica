@@ -76,6 +76,7 @@ export interface ArtistFormData {
   infrastructure_provided_by: 'festival' | 'band';
   other_infrastructure: string;
   notes: string;
+  isaftermidnight?: boolean;
 }
 
 export interface FestivalSettings {
@@ -85,4 +86,3 @@ export interface FestivalSettings {
   created_at?: string;
   updated_at?: string;
 }
-
