@@ -7,16 +7,34 @@ const ROUTE_SUBSCRIPTIONS: Record<string, string[]> = {
   // Dashboard route needs these tables for real-time updates
   '/dashboard': ['jobs', 'job_assignments', 'job_date_types', 'messages', 'direct_messages'],
   
+  // Department-specific routes
+  '/sound': ['jobs', 'job_assignments', 'job_departments'],
+  '/lights': ['jobs', 'job_assignments', 'job_departments'],
+  '/video': ['jobs', 'job_assignments', 'job_departments'],
+  
   // Other routes with their required tables
   '/calendar': ['jobs', 'job_departments'],
   '/technician-dashboard': ['jobs', 'job_assignments'],
   '/logistics': ['jobs', 'logistics_events'],
   '/inventory': ['equipment', 'stock_movements', 'global_stock_entries'],
   '/tours': ['tours', 'tour_dates'],
+  '/project-management': ['jobs', 'job_assignments', 'job_departments'],
+  
+  // Festival specific routes
+  '/festivals': ['festivals', 'festival_artists', 'festival_forms'],
+  '/festival-management': ['festivals', 'festival_artists', 'festival_forms'],
+  '/festival-artist-management': ['festivals', 'festival_artists', 'festival_forms'],
+  '/festival-gear-management': ['festivals', 'festival_gear'],
   
   // Add more routes as needed
   '/jobs': ['jobs'],
   '/job': ['jobs', 'job_assignments', 'job_departments'],
+  '/settings': ['profiles'],
+  '/profile': ['profiles'],
+  '/users': ['profiles'],
+  '/users-management': ['profiles'],
+  '/hoja-de-ruta': ['jobs', 'job_departments'],
+  '/labor-po-form': ['jobs', 'job_departments'],
 };
 
 // Default tables that should be monitored on all routes
@@ -47,12 +65,13 @@ export function useRouteSubscriptions() {
       .filter(route => pathname.startsWith(route))
       .sort((a, b) => b.length - a.length)[0]; // Sort by length to get most specific
     
-    // If no match, use dashboard as default
+    // If no match found, use the pathname as routeKey for display purposes
+    // but don't pull in any special subscriptions beyond globals
     if (!routeKey) {
-      routeKey = '/dashboard';
+      routeKey = pathname;
     }
     
-    // Get required tables for this route
+    // Get required tables for this route or empty array if no route match
     const routeTables = ROUTE_SUBSCRIPTIONS[routeKey] || [];
     
     // Combine with global tables

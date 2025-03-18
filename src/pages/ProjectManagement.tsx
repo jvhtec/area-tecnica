@@ -11,6 +11,7 @@ import { MonthNavigation } from "@/components/project-management/MonthNavigation
 import { DepartmentTabs } from "@/components/project-management/DepartmentTabs";
 import { useJobManagement } from "@/hooks/useJobManagement";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
+import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 
 const ProjectManagement = () => {
   const navigate = useNavigate();
@@ -20,12 +21,18 @@ const ProjectManagement = () => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [selectedJobType, setSelectedJobType] = useState("All");
   const [allJobTypes, setAllJobTypes] = useState<string[]>([]);
+  const { forceSubscribe } = useSubscriptionContext();
 
   const startDate = startOfMonth(currentDate);
   const endDate = endOfMonth(currentDate);
 
   // Use custom hook to keep the "jobs" tab active/visible.
   useTabVisibility(["jobs"]);
+  
+  // Force subscription to required tables
+  useEffect(() => {
+    forceSubscribe(['jobs', 'job_assignments', 'job_departments']);
+  }, [forceSubscribe]);
 
   // Retrieve jobs using the custom hook. The hook already applies department and date filters.
   const { jobs: unfilteredJobs = [], jobsLoading, handleDeleteDocument } = useJobManagement(

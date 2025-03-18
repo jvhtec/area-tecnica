@@ -73,6 +73,17 @@ export function HeaderStatus({ className }: { className?: string }) {
     }
   };
   
+  const formatRouteName = (route: string) => {
+    // Remove leading slash
+    const withoutSlash = route.startsWith('/') ? route.substring(1) : route;
+    
+    // Replace hyphens with spaces and capitalize each word
+    return withoutSlash
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+  
   const getTooltipContent = () => {
     if (connectionStatus === 'connecting') {
       return (
@@ -103,14 +114,24 @@ export function HeaderStatus({ className }: { className?: string }) {
       );
     }
     
+    const routeName = formatRouteName(routeKey);
+    const isDefinedRoute = Object.keys(ROUTE_SUBSCRIPTIONS || {}).includes(routeKey);
+    
     if (!isFullySubscribed) {
       return (
         <div className="text-xs max-w-xs">
           <p className="font-semibold">Partial real-time updates</p>
-          <p className="mt-1">Current page: {routeKey || 'Unknown'}</p>
+          <p className="mt-1">Current page: {routeName}</p>
           <div className="mt-1">
-            <p>Subscribed: {subscribedTables.join(', ')}</p>
-            <p>Missing: {unsubscribedTables.join(', ')}</p>
+            {subscribedTables.length > 0 && (
+              <p>Subscribed: {subscribedTables.join(', ')}</p>
+            )}
+            {unsubscribedTables.length > 0 && (
+              <p>Missing: {unsubscribedTables.join(', ')}</p>
+            )}
+            {!isDefinedRoute && (
+              <p className="text-amber-500 mt-1">This route has no specific subscriptions defined</p>
+            )}
           </div>
           <p className="text-muted-foreground mt-1">Last updated: {lastRefreshDisplay}</p>
         </div>
@@ -120,9 +141,15 @@ export function HeaderStatus({ className }: { className?: string }) {
     return (
       <div className="text-xs max-w-xs">
         <p className="font-semibold">Real-time updates active</p>
-        <p>Current page: {routeKey || 'Unknown'}</p>
-        <p>All required tables are subscribed:</p>
-        <p className="mt-1">{requiredTables.join(', ')}</p>
+        <p>Current page: {routeName}</p>
+        {requiredTables.length > 0 ? (
+          <>
+            <p>All required tables are subscribed:</p>
+            <p className="mt-1">{requiredTables.join(', ')}</p>
+          </>
+        ) : (
+          <p>No specific tables required for this route</p>
+        )}
         <p className="text-muted-foreground mt-1">Last updated: {lastRefreshDisplay}</p>
       </div>
     );
