@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, RefreshCw } from "lucide-react";
@@ -8,11 +9,12 @@ import { MessageManagementDialog } from "@/components/technician/MessageManageme
 import { AssignmentsList } from "@/components/technician/AssignmentsList";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
-import { useRefreshOnTabVisibility } from "@/hooks/useRefreshOnTabVisibility";
+import { useTableSubscription } from "@/hooks/useSubscription";
+import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
 
 const TechnicianDashboard = () => {
   const [timeSpan, setTimeSpan] = useState<string>("1week");
@@ -65,30 +67,8 @@ const TechnicianDashboard = () => {
     fetchUserDepartment();
   }, []);
 
-  useEffect(() => {
-    console.log("Setting up real-time subscription for assignments");
-    
-    const channel = supabase
-      .channel('assignments_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'job_assignments'
-        },
-        (payload) => {
-          console.log("Received real-time update:", payload);
-          queryClient.invalidateQueries({ queryKey: ['assignments'] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      console.log("Cleaning up real-time subscription");
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
+  // Set up real-time subscription for job assignments
+  useTableSubscription('job_assignments', 'assignments');
 
   const getTimeSpanEndDate = () => {
     const today = new Date();
@@ -106,9 +86,10 @@ const TechnicianDashboard = () => {
     }
   };
 
-  const { data: assignments = [], isLoading, refetch } = useQuery({
-    queryKey: ['assignments', timeSpan],
-    queryFn: async () => {
+  // Use our new real-time query hook for fetching assignments
+  const { data: assignments = [], isLoading, refetch } = useRealtimeQuery(
+    ['assignments', timeSpan],
+    async () => {
       try {
         console.log("Fetching assignments with timeSpan:", timeSpan);
         
@@ -190,18 +171,16 @@ const TechnicianDashboard = () => {
         return [];
       }
     },
-    refetchOnWindowFocus: true,
-    refetchOnMount: true,
-    refetchOnReconnect: true,
-    staleTime: 1000 * 60 * 2,
-    gcTime: 1000 * 60 * 5,
-    retry: 3
-  });
-
-  useRefreshOnTabVisibility(() => {
-    console.log("Tab became visible, refreshing assignments");
-    refetch();
-  }, { minTimeBetweenRefreshes: 10000 });
+    'job_assignments',
+    {
+      refetchOnWindowFocus: true,
+      refetchOnMount: true,
+      refetchOnReconnect: true,
+      staleTime: 1000 * 60 * 2,
+      gcTime: 1000 * 60 * 5,
+      retry: 3
+    }
+  );
 
   const handleCloseMessages = () => {
     setShowMessages(false);

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -8,10 +9,10 @@ import { CreateShiftDialog } from "./CreateShiftDialog";
 import { ShiftsTable } from "./ShiftsTable";
 import { Button } from "@/components/ui/button";
 import { Plus, FileDown } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
 import { FestivalShift, ShiftWithAssignments } from "@/types/festival-scheduling";
 import { format } from "date-fns";
-import { useRefreshOnTabVisibility } from "@/hooks/useRefreshOnTabVisibility";
+import { useTableSubscription } from "@/hooks/useSubscription";
+import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
 
 interface FestivalSchedulingProps {
   jobId: string;
@@ -26,11 +27,14 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
   const [isCreateShiftOpen, setIsCreateShiftOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "table">("list");
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   console.log("FestivalScheduling component rendered with job ID:", jobId);
   console.log("Job dates received:", jobDates);
   console.log("Is view only mode:", isViewOnly);
+  
+  // Set up real-time subscriptions for festival shifts and assignments
+  useTableSubscription('festival_shifts', ['festival_shifts', jobId, selectedDate]);
+  useTableSubscription('festival_shift_assignments', ['festival_shift_assignments', jobId, selectedDate]);
   
   const formatDateToString = (date: Date): string => {
     try {
@@ -183,13 +187,6 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
       console.log("Not fetching shifts - missing selectedDate or jobId", { selectedDate, jobId });
     }
   }, [selectedDate, jobId, fetchShifts]);
-
-  useRefreshOnTabVisibility(() => {
-    if (selectedDate && jobId) {
-      console.log("Tab became visible, refreshing shifts");
-      fetchShifts();
-    }
-  }, { minTimeBetweenRefreshes: 5000, refreshOnMount: false });
 
   const handleShiftCreated = async () => {
     fetchShifts();
