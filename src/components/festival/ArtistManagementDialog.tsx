@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { Badge } from "@/components/ui/badge";
 import { Clock } from "lucide-react";
@@ -200,7 +200,7 @@ export const ArtistManagementDialog = ({
         extras_wired: formData.extras_wired || "",
         other_infrastructure: formData.other_infrastructure || "",
         notes: formData.notes || "",
-        // Use lowercase property name to match database column
+        // Use lowercase property name to match database column name exactly
         isaftermidnight: isAfterMidnight(showStartHour),
       };
 
