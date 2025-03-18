@@ -162,7 +162,7 @@ export const ArtistManagementDialog = ({
       });
       return;
     }
-
+  
     if (!formData.date) {
       toast({
         title: "Error",
@@ -171,7 +171,7 @@ export const ArtistManagementDialog = ({
       });
       return;
     }
-
+  
     if (!formData.name.trim()) {
       toast({
         title: "Error",
@@ -180,7 +180,7 @@ export const ArtistManagementDialog = ({
       });
       return;
     }
-
+  
     setIsLoading(true);
     try {
       // Ensure all string fields have a value to prevent SQL errors
@@ -206,21 +206,21 @@ export const ArtistManagementDialog = ({
         infrastructure_provided_by: formData.infrastructure_provided_by as 'festival' | 'band',
         other_infrastructure: formData.other_infrastructure || "",
         notes: formData.notes || "",
-        // Use lowercase property name to match database column name exactly
-        isaftermidnight: isAfterMidnight(showStartHour),
+        // Use exact lowercase column name to match database
+        isaftermidnight: isAfterMidnight(showStartHour),  // Changed from isAfterMidnight to isaftermidnight
       };
-
+  
       console.log("Saving artist with data:", cleanedData);
-
+  
       const { error } = artist?.id
         ? await supabase
             .from("festival_artists")
             .update(cleanedData)
             .eq("id", artist.id)
         : await supabase.from("festival_artists").insert(cleanedData);
-
+  
       if (error) throw error;
-
+  
       toast({
         title: "Success",
         description: `Artist ${artist?.id ? "updated" : "added"} successfully`,
