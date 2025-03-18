@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { 
   SidebarProvider, 
@@ -12,19 +13,19 @@ import {
 import { LogOut } from "lucide-react";
 import { useNavigate, Outlet, Navigate } from "react-router-dom";
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { ThemeToggle } from "./layout/ThemeToggle";
 import { UserInfo } from "./layout/UserInfo";
 import { SidebarNavigation } from "./layout/SidebarNavigation";
 import { AboutCard } from "./layout/AboutCard";
 import { NotificationBadge } from "./layout/NotificationBadge";
 import { useToast } from "@/hooks/use-toast";
-import { useSessionManager } from "@/hooks/useSessionManager";
 import { ReloadButton } from "./ui/reload-button";
 import { useQueryClient } from "@tanstack/react-query";
 import { useKonamiCode } from "@/hooks/useKonamiCode";
 import { WolfensteinDialog } from "./doom/WolfensteinDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/hooks/useAuth";
+import { SubscriptionStatus } from "./ui/subscription-status";
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -39,10 +40,8 @@ const Layout = () => {
     userRole,
     userDepartment,
     isLoading,
-    setSession,
-    setUserRole,
-    setUserDepartment
-  } = useSessionManager();
+    logout
+  } = useAuth();
 
   const handleSignOut = async () => {
     if (isLoggingOut) return;
@@ -51,31 +50,9 @@ const Layout = () => {
     console.log("Starting sign out process");
 
     try {
-      // Clear all state first
-      setSession(null);
-      setUserRole(null);
-      setUserDepartment(null);
-      localStorage.clear();
-      
-      // Sign out from Supabase
-      await supabase.auth.signOut();
-      console.log("Sign out successful");
-      
-      // Navigate to auth page after everything is cleared
-      navigate('/auth', { replace: true });
-      
-      toast({
-        title: "Success",
-        description: "You have been logged out successfully",
-      });
+      await logout();
     } catch (error) {
       console.error("Error during sign out:", error);
-      toast({
-        title: "Notice",
-        description: "You have been logged out",
-      });
-      // Still navigate to auth page even if there's an error
-      navigate('/auth', { replace: true });
     } finally {
       setIsLoggingOut(false);
     }
@@ -130,6 +107,7 @@ const Layout = () => {
               <span>{isLoggingOut ? 'Signing out...' : 'Sign Out'}</span>
             </Button>
             <AboutCard />
+            <SubscriptionStatus />
             <SidebarSeparator />
             <div 
               className="px-2 py-4 cursor-pointer transition-opacity"

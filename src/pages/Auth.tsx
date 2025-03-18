@@ -1,18 +1,18 @@
+
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { SignUpForm } from "@/components/auth/SignUpForm";
-import { supabase } from "@/lib/supabase";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useAuth } from "@/hooks/useAuth";
 
 const Auth = () => {
-  const navigate = useNavigate();
-  const [session, setSession] = useState<any>(null);
+  const { session, isLoading, error } = useAuth();
   const [showSignUp, setShowSignUp] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
+    // Remove dark mode for better authentication UI visibility
     const originalTheme = document.documentElement.classList.contains("dark");
     document.documentElement.classList.remove("dark");
 
@@ -23,40 +23,17 @@ const Auth = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) throw sessionError;
-        
-        console.log("Auth: Current session status:", !!session);
-        setSession(session);
-        
-        if (session) {
-          navigate("/dashboard");
-        }
-      } catch (error: any) {
-        console.error("Auth: Session check error:", error);
-        setError(error.message);
-      }
-    };
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white" />
+      </div>
+    );
+  }
 
-    checkSession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log("Auth: Auth state changed:", _event);
-      setSession(session);
-      if (session) {
-        navigate("/dashboard");
-      } else {
-        setError("Session expired. Please log in again."); // Better user feedback
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+  if (session) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col px-4 py-8 md:py-12">
