@@ -1,8 +1,11 @@
 
-import { Wifi, WifiOff, AlertCircle } from "lucide-react";
+import { Wifi, WifiOff, AlertCircle, RefreshCw, Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 import { cn } from "@/lib/utils";
+import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
+import { Button } from "./button";
+import { formatDistanceToNow } from "date-fns";
 
 interface SubscriptionIndicatorProps {
   tables: string[];
@@ -10,6 +13,8 @@ interface SubscriptionIndicatorProps {
   className?: string;
   showTooltip?: boolean;
   variant?: 'default' | 'compact';
+  showRefreshButton?: boolean;
+  onRefresh?: () => Promise<void> | void;
 }
 
 export function SubscriptionIndicator({
@@ -17,15 +22,22 @@ export function SubscriptionIndicator({
   showLabel = false,
   className,
   showTooltip = true,
-  variant = 'default'
+  variant = 'default',
+  showRefreshButton = false,
+  onRefresh
 }: SubscriptionIndicatorProps) {
-  const { isSubscribed, tablesSubscribed, tablesUnsubscribed, connectionStatus } = useSubscriptionStatus(tables);
+  const { isSubscribed, tablesSubscribed, tablesUnsubscribed, connectionStatus, lastRefreshTime, isStale } = useSubscriptionStatus(tables);
+  const { forceRefresh } = useSubscriptionContext();
 
   const isCompact = variant === 'compact';
   
   const getStatusIcon = () => {
     if (connectionStatus !== 'connected') {
       return <WifiOff className={cn("text-red-500", isCompact ? "h-3 w-3" : "h-4 w-4")} />;
+    }
+    
+    if (isStale) {
+      return <Clock className={cn("text-amber-500", isCompact ? "h-3 w-3" : "h-4 w-4")} />;
     }
     
     if (!isSubscribed) {
@@ -38,6 +50,10 @@ export function SubscriptionIndicator({
   const getStatusLabel = () => {
     if (connectionStatus !== 'connected') {
       return "Disconnected";
+    }
+    
+    if (isStale) {
+      return "Stale data";
     }
     
     if (!isSubscribed) {
@@ -53,6 +69,16 @@ export function SubscriptionIndicator({
         <div className="text-xs max-w-xs">
           <p className="font-semibold">Connection lost</p>
           <p>Attempting to reconnect...</p>
+        </div>
+      );
+    }
+    
+    if (isStale) {
+      return (
+        <div className="text-xs max-w-xs">
+          <p className="font-semibold">Data may be stale</p>
+          <p>Last updated: {formatDistanceToNow(lastRefreshTime)} ago</p>
+          <p>Click to refresh data</p>
         </div>
       );
     }
@@ -73,8 +99,17 @@ export function SubscriptionIndicator({
       <div className="text-xs max-w-xs">
         <p className="font-semibold">Real-time updates active</p>
         <p>All tables subscribed: {tables.join(', ')}</p>
+        <p>Last updated: {formatDistanceToNow(lastRefreshTime)} ago</p>
       </div>
     );
+  };
+
+  const handleRefresh = async () => {
+    if (onRefresh) {
+      await onRefresh();
+    } else {
+      forceRefresh(tables);
+    }
   };
   
   const indicator = (
@@ -85,6 +120,16 @@ export function SubscriptionIndicator({
     )}>
       {getStatusIcon()}
       {showLabel && <span>{getStatusLabel()}</span>}
+      {showRefreshButton && (
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className={cn("ml-1", isCompact ? "h-4 w-4" : "h-6 w-6")} 
+          onClick={handleRefresh}
+        >
+          <RefreshCw className={isCompact ? "h-2 w-2" : "h-3 w-3"} />
+        </Button>
+      )}
     </div>
   );
   
@@ -96,7 +141,9 @@ export function SubscriptionIndicator({
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          {indicator}
+          <div onClick={isStale ? handleRefresh : undefined} className={isStale ? "cursor-pointer" : undefined}>
+            {indicator}
+          </div>
         </TooltipTrigger>
         <TooltipContent>
           {getTooltipContent()}

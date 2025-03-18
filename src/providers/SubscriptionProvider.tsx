@@ -13,6 +13,8 @@ interface SubscriptionContextType {
   subscriptionsByTable: Record<string, string[]>;
   refreshSubscriptions: () => void;
   invalidateQueries: (queryKey?: string | string[]) => void;
+  lastRefreshTime: number;
+  forceRefresh: (tables?: string[]) => void;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType>({
@@ -21,7 +23,9 @@ const SubscriptionContext = createContext<SubscriptionContextType>({
   subscriptionCount: 0,
   subscriptionsByTable: {},
   refreshSubscriptions: () => {},
-  invalidateQueries: () => {}
+  invalidateQueries: () => {},
+  lastRefreshTime: 0,
+  forceRefresh: () => {}
 });
 
 export const useSubscriptionContext = () => useContext(SubscriptionContext);
@@ -38,7 +42,9 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     subscriptionCount: 0,
     subscriptionsByTable: {},
     refreshSubscriptions: () => {},
-    invalidateQueries: () => {}
+    invalidateQueries: () => {},
+    lastRefreshTime: Date.now(),
+    forceRefresh: () => {}
   });
   const { toast } = useToast();
   
@@ -64,6 +70,7 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
         manager.subscribeToTable(table, table);
       });
       queryClient.invalidateQueries();
+      setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
     });
     
     // Define refresh function
@@ -74,6 +81,7 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
         manager.unsubscribeFromTable(table, table);
         manager.subscribeToTable(table, table);
       });
+      setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
     };
     
     // Define invalidate function with optional specific query key
@@ -84,13 +92,45 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
       } else {
         queryClient.invalidateQueries();
       }
+      setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
+    };
+    
+    // Define force refresh function for specific tables
+    const forceRefresh = (tables?: string[]) => {
+      if (tables && tables.length > 0) {
+        // Refresh specific tables
+        tables.forEach(table => {
+          // Unsubscribe and resubscribe
+          manager.unsubscribeFromTable(table, table);
+          manager.subscribeToTable(table, table);
+          // Invalidate related queries
+          queryClient.invalidateQueries({ queryKey: [table] });
+        });
+        toast({
+          title: 'Real-time subscriptions refreshed',
+          description: `${tables.join(', ')} tables refreshed`,
+          variant: 'default'
+        });
+      } else {
+        // Refresh all tables
+        refreshSubscriptions();
+        queryClient.invalidateQueries();
+        toast({
+          title: 'All real-time subscriptions refreshed',
+          description: 'Data has been refreshed',
+          variant: 'default'
+        });
+      }
+      setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
     };
     
     // Update state with functions
     setState(prev => ({
       ...prev,
       refreshSubscriptions,
-      invalidateQueries
+      invalidateQueries,
+      forceRefresh,
+      lastRefreshTime: Date.now()
     }));
     
     // Update state periodically to reflect current subscription status
@@ -122,8 +162,6 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
         activeSubscriptions: manager.getActiveSubscriptions(),
         subscriptionCount: manager.getSubscriptionCount(),
         subscriptionsByTable: manager.getSubscriptionsByTable(),
-        refreshSubscriptions,
-        invalidateQueries
       }));
     }, 5000);
     

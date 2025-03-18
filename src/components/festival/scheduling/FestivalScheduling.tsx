@@ -1,18 +1,15 @@
 
-import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ShiftsList } from "./ShiftsList";
 import { CreateShiftDialog } from "./CreateShiftDialog";
 import { ShiftsTable } from "./ShiftsTable";
 import { Button } from "@/components/ui/button";
-import { Plus, FileDown } from "lucide-react";
-import { FestivalShift, ShiftWithAssignments } from "@/types/festival-scheduling";
+import { Plus, FileDown, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
-import { useTableSubscription } from "@/hooks/useSubscription";
-import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
+import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
+import { useFestivalShifts } from "@/hooks/festival/useFestivalShifts";
 
 interface FestivalSchedulingProps {
   jobId: string;
@@ -21,20 +18,14 @@ interface FestivalSchedulingProps {
 }
 
 export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: FestivalSchedulingProps) => {
-  const [isLoading, setIsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string>("");
-  const [shifts, setShifts] = useState<ShiftWithAssignments[]>([]);
   const [isCreateShiftOpen, setIsCreateShiftOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "table">("list");
-  const { toast } = useToast();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   console.log("FestivalScheduling component rendered with job ID:", jobId);
   console.log("Job dates received:", jobDates);
   console.log("Is view only mode:", isViewOnly);
-  
-  // Set up real-time subscriptions for festival shifts and assignments
-  useTableSubscription('festival_shifts', ['festival_shifts', jobId, selectedDate]);
-  useTableSubscription('festival_shift_assignments', ['festival_shift_assignments', jobId, selectedDate]);
   
   const formatDateToString = (date: Date): string => {
     try {
@@ -46,119 +37,7 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
     }
   };
 
-  const fetchShifts = useCallback(async () => {
-    if (!selectedDate || !jobId) {
-      console.error("Cannot fetch shifts: missing date or job ID");
-      return;
-    }
-    
-    setIsLoading(true);
-    console.log("Starting to fetch shifts");
-    
-    try {
-      console.log(`Executing fetch for job: ${jobId}, date: ${selectedDate}`);
-      
-      const { data: shiftsData, error: shiftsError } = await supabase
-        .from("festival_shifts")
-        .select("*")
-        .eq("job_id", jobId)
-        .eq("date", selectedDate)
-        .order("start_time");
-
-      if (shiftsError) {
-        console.error("Error fetching shifts:", shiftsError);
-        throw shiftsError;
-      }
-      
-      console.log("Shifts data retrieved:", shiftsData);
-
-      if (!shiftsData || shiftsData.length === 0) {
-        console.log("No shifts found for this date");
-        setShifts([]);
-        setIsLoading(false);
-        return;
-      }
-
-      const shiftIds = shiftsData.map(shift => shift.id);
-      
-      try {
-        const { data: assignmentsData, error: assignmentsError } = await supabase
-          .from("festival_shift_assignments")
-          .select(`
-            id,
-            shift_id,
-            technician_id,
-            role
-          `)
-          .in("shift_id", shiftIds);
-
-        if (assignmentsError) {
-          console.error("Error fetching shift assignments:", assignmentsError);
-          // Don't throw here, we'll continue with empty assignments
-        }
-
-        let technicianProfiles: Record<string, any> = {};
-        
-        if (assignmentsData && assignmentsData.length > 0) {
-          const technicianIds = [...new Set(assignmentsData.map(a => a.technician_id))];
-          
-          const { data: profilesData, error: profilesError } = await supabase
-            .from("profiles")
-            .select("id, first_name, last_name, email, department, role")
-            .in("id", technicianIds);
-            
-          if (profilesError) {
-            console.error("Error fetching technician profiles:", profilesError);
-          } else if (profilesData) {
-            technicianProfiles = profilesData.reduce((acc, profile) => {
-              acc[profile.id] = profile;
-              return acc;
-            }, {} as Record<string, any>);
-          }
-        }
-        
-        const shiftsWithAssignments = shiftsData.map((shift: FestivalShift) => {
-          const shiftAssignments = assignmentsData 
-            ? assignmentsData
-                .filter(assignment => assignment.shift_id === shift.id)
-                .map(assignment => ({
-                  ...assignment,
-                  profiles: technicianProfiles[assignment.technician_id] || null
-                }))
-            : [];
-            
-          return {
-            ...shift,
-            assignments: shiftAssignments
-          };
-        });
-
-        console.log("Shifts with assignments:", shiftsWithAssignments);
-        setShifts(shiftsWithAssignments);
-      } catch (error: any) {
-        console.error("Error processing assignments:", error);
-        const shiftsWithEmptyAssignments = shiftsData.map((shift: FestivalShift) => ({
-          ...shift,
-          assignments: []
-        }));
-        
-        console.log("Shifts without assignments due to error:", shiftsWithEmptyAssignments);
-        setShifts(shiftsWithEmptyAssignments);
-      }
-    } catch (error: any) {
-      console.error("Error fetching shifts:", error);
-      toast({
-        title: "Error",
-        description: "Could not load shifts: " + error.message,
-        variant: "destructive",
-      });
-      
-      setShifts([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [selectedDate, jobId, toast]);
-
+  // Set initial selected date
   useEffect(() => {
     if (jobDates && jobDates.length > 0 && !selectedDate) {
       try {
@@ -179,22 +58,15 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
     }
   }, [jobDates, selectedDate]);
 
-  useEffect(() => {
-    if (selectedDate && jobId) {
-      console.log(`Fetching shifts for date: ${selectedDate} and job: ${jobId}`);
-      fetchShifts();
-    } else {
-      console.log("Not fetching shifts - missing selectedDate or jobId", { selectedDate, jobId });
-    }
-  }, [selectedDate, jobId, fetchShifts]);
+  // Use our new custom hook to fetch shifts with real-time updates
+  const { shifts, isLoading, refetch } = useFestivalShifts({
+    jobId,
+    selectedDate
+  });
 
   const handleShiftCreated = async () => {
-    fetchShifts();
+    await refetch();
     setIsCreateShiftOpen(false);
-    toast({
-      title: "Success",
-      description: "Shift created successfully",
-    });
   };
 
   const handleDeleteShift = async (shiftId: string) => {
@@ -211,18 +83,18 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
 
       if (error) throw error;
 
-      fetchShifts();
-      toast({
-        title: "Success",
-        description: "Shift deleted successfully",
-      });
+      refetch();
     } catch (error: any) {
       console.error("Error deleting shift:", error);
-      toast({
-        title: "Error",
-        description: "Could not delete shift",
-        variant: "destructive",
-      });
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -253,9 +125,19 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
                 Create Shift
               </Button>
             )}
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="flex items-center gap-1"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
           </div>
         </div>
-        <div className="mt-4">
+        <div className="mt-2 flex justify-between items-center">
           <Tabs 
             value={selectedDate} 
             onValueChange={setSelectedDate} 
@@ -285,16 +167,22 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
               })}
             </TabsList>
           </Tabs>
-          <div className="mt-2 flex justify-end">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setViewMode(viewMode === "list" ? "table" : "list")}
-              className="text-xs"
-            >
-              {viewMode === "list" ? "Table View" : "List View"}
-            </Button>
-          </div>
+          <SubscriptionIndicator 
+            tables={['festival_shifts', 'festival_shift_assignments']} 
+            variant="compact"
+            showRefreshButton
+            onRefresh={handleRefresh}
+          />
+        </div>
+        <div className="mt-2 flex justify-end">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setViewMode(viewMode === "list" ? "table" : "list")}
+            className="text-xs"
+          >
+            {viewMode === "list" ? "Table View" : "List View"}
+          </Button>
         </div>
       </CardHeader>
       <CardContent>
@@ -308,7 +196,7 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
           <ShiftsList 
             shifts={shifts} 
             onDeleteShift={handleDeleteShift} 
-            onShiftUpdated={fetchShifts}
+            onShiftUpdated={refetch}
             jobId={jobId}
             isViewOnly={isViewOnly}
           />

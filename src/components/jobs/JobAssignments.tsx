@@ -1,13 +1,13 @@
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Assignment } from "@/types/assignment";
 import { Department } from "@/types/department";
-import { User, X } from "lucide-react";
+import { User, X, RefreshCw } from "lucide-react";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
-import { useTableSubscription } from "@/hooks/useSubscription";
 import { SubscriptionIndicator } from "../ui/subscription-indicator";
+import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 
 interface JobAssignmentsProps {
   jobId: string;
@@ -17,38 +17,7 @@ interface JobAssignmentsProps {
 
 export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsProps) => {
   const queryClient = useQueryClient();
-  
-  // Use our subscription hook to set up real-time updates
-  useTableSubscription("job_assignments", ["job-assignments", jobId]);
-
-  const { data: assignments, isLoading } = useQuery({
-    queryKey: ["job-assignments", jobId],
-    queryFn: async () => {
-      console.log("Fetching assignments for job:", jobId);
-      const { data, error } = await supabase
-        .from("job_assignments")
-        .select(`
-          *,
-          profiles (
-            first_name,
-            last_name,
-            email,
-            department
-          )
-        `)
-        .eq("job_id", jobId);
-
-      if (error) {
-        console.error("Error fetching assignments:", error);
-        throw error;
-      }
-
-      if (!data) return [];
-
-      console.log("Assignments data:", data);
-      return data as unknown as Assignment[];
-    },
-  });
+  const { assignments, isLoading, isRefreshing, refetch } = useJobAssignmentsRealtime(jobId);
 
   const handleDelete = async (technicianId: string) => {
     if (userRole === 'logistics') return;
@@ -113,7 +82,18 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
         <span className="text-xs text-muted-foreground">
           {filteredAssignments.length} assignment{filteredAssignments.length !== 1 ? 's' : ''}
         </span>
-        <SubscriptionIndicator tables={["job_assignments"]} variant="compact" />
+        <div className="flex items-center gap-1">
+          <SubscriptionIndicator tables={["job_assignments"]} variant="compact" showRefreshButton onRefresh={refetch} />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5"
+            disabled={isRefreshing}
+            onClick={() => refetch()}
+          >
+            <RefreshCw className={`h-3 w-3 ${isRefreshing ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
       </div>
       {filteredAssignments.map((assignment) => {
         const role = getRoleForDepartment(assignment);

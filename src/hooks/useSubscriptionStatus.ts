@@ -8,12 +8,14 @@ import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
  * @returns Object containing subscription status information
  */
 export function useSubscriptionStatus(tables: string[]) {
-  const { subscriptionsByTable, connectionStatus } = useSubscriptionContext();
+  const { subscriptionsByTable, connectionStatus, lastRefreshTime } = useSubscriptionContext();
   const [status, setStatus] = useState({
     isSubscribed: false,
     tablesSubscribed: [] as string[],
     tablesUnsubscribed: [] as string[],
-    connectionStatus
+    connectionStatus,
+    lastRefreshTime: lastRefreshTime || 0,
+    isStale: false
   });
 
   useEffect(() => {
@@ -28,13 +30,18 @@ export function useSubscriptionStatus(tables: string[]) {
       }
     });
 
+    // Calculate staleness - if last refresh was more than 5 minutes ago
+    const isStale = Date.now() - lastRefreshTime > 5 * 60 * 1000;
+
     setStatus({
       isSubscribed: tablesSubscribed.length === tables.length,
       tablesSubscribed,
       tablesUnsubscribed,
-      connectionStatus
+      connectionStatus,
+      lastRefreshTime,
+      isStale
     });
-  }, [tables, subscriptionsByTable, connectionStatus]);
+  }, [tables, subscriptionsByTable, connectionStatus, lastRefreshTime]);
 
   return status;
 }
