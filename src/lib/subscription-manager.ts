@@ -1,3 +1,4 @@
+
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
@@ -134,10 +135,10 @@ export class SubscriptionManager {
     const channelName = `${table}-changes-${Date.now()}`;
     
     try {
-      // Create and configure the channel for Supabase Realtime
+      // Create the channel
       const channel = supabase.channel(channelName);
       
-      // Set up the callback handler
+      // Set up the callback handler for real-time changes
       const handleChange = (payload: any) => {
         console.log(`Received ${payload.eventType} for ${table}:`, payload);
         
@@ -153,12 +154,16 @@ export class SubscriptionManager {
         }, 50);
       };
       
-      // Configure the channel for postgres_changes
-      channel.on('postgres_changes', {
-        event: filter?.event || '*',
-        schema: filter?.schema || 'public',
-        table: table
-      }, handleChange);
+      // Configure the channel with the correct options
+      channel.on(
+        'postgres_changes', 
+        { 
+          event: filter?.event || '*', 
+          schema: filter?.schema || 'public', 
+          table: table 
+        }, 
+        handleChange
+      );
       
       // Subscribe to the channel
       channel.subscribe((status: string) => {
