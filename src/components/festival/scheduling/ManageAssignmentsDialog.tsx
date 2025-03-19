@@ -81,6 +81,26 @@ export const ManageAssignmentsDialog = ({
     }
   };
 
+  // Function to sort technicians - house techs first
+  const getSortedTechnicians = () => {
+    if (!technicians) return [];
+    
+    return [...technicians].sort((a, b) => {
+      // Sort house_tech before technician
+      if (a.role === 'house_tech' && b.role !== 'house_tech') return -1;
+      if (a.role !== 'house_tech' && b.role === 'house_tech') return 1;
+      
+      // Then sort by name
+      return (a.first_name + a.last_name).localeCompare(b.first_name + b.last_name);
+    });
+  };
+
+  // Format technician display name
+  const formatTechnicianName = (technician: any) => {
+    const isHouseTech = technician.role === 'house_tech';
+    return `${technician.first_name} ${technician.last_name}${isHouseTech ? ' (House Tech)' : ''}`;
+  };
+
   const addAssignmentMutation = useMutation({
     mutationFn: async () => {
       if (!technicianId || !shift?.id) {
@@ -200,9 +220,9 @@ export const ManageAssignmentsDialog = ({
                     <SelectValue placeholder="Select a technician" />
                   </SelectTrigger>
                   <SelectContent>
-                    {technicians?.map((technician) => (
+                    {getSortedTechnicians().map((technician) => (
                       <SelectItem key={technician.id} value={technician.id}>
-                        {technician.first_name} {technician.last_name} ({technician.email})
+                        {formatTechnicianName(technician)}
                       </SelectItem>
                     ))}
                   </SelectContent>
