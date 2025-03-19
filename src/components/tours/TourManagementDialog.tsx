@@ -31,12 +31,15 @@ export const TourManagementDialog = ({
             <TourLogoManager tourId={tour.id} />
           </div>
           
-          <TourColorSection 
-            color={tour.color} 
-            tourName={tour.name}
-            onColorChange={handleColorChange}
-            onNameChange={handleNameChange}
-          />
+          <div className="border-b pb-4">
+            <TourColorSection 
+              color={tour.color} 
+              tourName={tour.name}
+              onColorChange={handleColorChange}
+              onNameChange={handleNameChange}
+            />
+          </div>
+          
           <TourDeleteSection onDelete={handleDelete} />
         </div>
       </DialogContent>
