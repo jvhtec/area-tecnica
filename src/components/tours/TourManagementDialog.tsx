@@ -1,7 +1,9 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TourColorSection } from "./TourColorSection";
 import { TourDeleteSection } from "./TourDeleteSection";
 import { useTourManagement } from "./hooks/useTourManagement";
+import { TourLogoManager } from "./TourLogoManager";
 
 interface TourManagementDialogProps {
   open: boolean;
@@ -24,6 +26,8 @@ export const TourManagementDialog = ({
         </DialogHeader>
         
         <div className="space-y-6">
+          <TourLogoManager tourId={tour.id} />
+          
           <TourColorSection 
             color={tour.color} 
             tourName={tour.name}
