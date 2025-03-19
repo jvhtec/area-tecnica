@@ -1,11 +1,8 @@
-
 import { useState } from "react";
 import { Department } from "@/types/department";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
-import { useTourDates } from "@/components/tours/hooks/useTourDates";
-import { useTourDepartments } from "@/components/tours/hooks/useTourDepartments";
-import { useTourCreationMutation } from "@/components/tours/hooks/useTourCreationMutation";
 
 export const useTourCreation = (
   currentDepartment: Department,
@@ -13,23 +10,155 @@ export const useTourCreation = (
 ) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [dates, setDates] = useState<{ date: string; location: string }[]>([
+    { date: "", location: "" },
+  ]);
   const [color, setColor] = useState("#7E69AB");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  
-  const { dates, handleAddDate, handleRemoveDate, handleDateChange } = useTourDates();
-  const { departments, handleDepartmentChange } = useTourDepartments(currentDepartment);
-  const { createTourWithDates } = useTourCreationMutation();
-  
+  const [departments, setDepartments] = useState<Department[]>([currentDepartment]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const handleStartDateChange = (date: string) => {
-    setStartDate(date);
+  const handleAddDate = () => {
+    setDates([...dates, { date: "", location: "" }]);
   };
 
-  const handleEndDateChange = (date: string) => {
-    setEndDate(date);
+  const handleRemoveDate = (index: number) => {
+    if (dates.length > 1) {
+      const newDates = dates.filter((_, i) => i !== index);
+      setDates(newDates);
+    }
+  };
+
+  const handleDateChange = (
+    index: number,
+    field: "date" | "location",
+    value: string
+  ) => {
+    const newDates = [...dates];
+    newDates[index] = { ...newDates[index], [field]: value };
+    setDates(newDates);
+  };
+
+  const handleDepartmentChange = (dept: Department, checked: boolean) => {
+    if (checked) {
+      setDepartments([...departments, dept]);
+    } else {
+      setDepartments(departments.filter(d => d !== dept));
+    }
+  };
+
+  const createTourWithDates = async () => {
+    const validDates = dates.filter(date => date.date);
+    
+    if (validDates.length === 0) {
+      throw new Error("At least one valid date is required");
+    }
+
+    // Sort dates chronologically
+    validDates.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Create the tour
+    const { data: tour, error: tourError } = await supabase
+      .from("tours")
+      .insert({
+        name: title,
+        description
+      })
+      .select()
+      .single();
+
+    if (tourError) throw tourError;
+
+    // Create the main tour job
+    const { data: mainTourJob, error: mainJobError } = await supabase
+      .from("jobs")
+      .insert({
+        title,
+        description,
+        start_time: `${validDates[0].date}T00:00:00`,
+        end_time: `${validDates[validDates.length - 1].date}T23:59:59`,
+        job_type: "tour",
+        color,
+      })
+      .select()
+      .single();
+
+    if (mainJobError) throw mainJobError;
+
+    // Create department associations for main tour job
+    const mainJobDepartments = departments.map(department => ({
+      job_id: mainTourJob.id,
+      department
+    }));
+
+    const { error: mainDeptError } = await supabase
+      .from("job_departments")
+      .insert(mainJobDepartments);
+
+    if (mainDeptError) throw mainDeptError;
+
+    // Process each tour date
+    for (const dateInfo of validDates) {
+      // First get or create location
+      let locationId = null;
+      
+      if (dateInfo.location) {
+        const { data: locationData } = await supabase
+          .from("locations")
+          .insert({ name: dateInfo.location })
+          .select()
+          .single();
+
+        if (locationData) {
+          locationId = locationData.id;
+        }
+      }
+      
+      // Create tour date entry
+      const { data: tourDate, error: tourDateError } = await supabase
+        .from("tour_dates")
+        .insert({
+          tour_id: tour.id,
+          date: dateInfo.date,
+          location_id: locationId
+        })
+        .select()
+        .single();
+
+      if (tourDateError) throw tourDateError;
+
+      // Create job for this tour date
+      const { data: dateJob, error: dateJobError } = await supabase
+        .from("jobs")
+        .insert({
+          title: `${title} (Tour Date)`,
+          description,
+          start_time: `${dateInfo.date}T00:00:00`,
+          end_time: `${dateInfo.date}T23:59:59`,
+          location_id: locationId,
+          job_type: "single",
+          tour_date_id: tourDate.id,
+          color,
+        })
+        .select()
+        .single();
+
+      if (dateJobError) throw dateJobError;
+
+      // Create department associations for this date's job
+      const dateDepartments = departments.map(department => ({
+        job_id: dateJob.id,
+        department
+      }));
+
+      const { error: dateDeptError } = await supabase
+        .from("job_departments")
+        .insert(dateDepartments);
+
+      if (dateDeptError) throw dateDeptError;
+    }
+
+    return tour;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -55,15 +184,7 @@ export const useTourCreation = (
 
     try {
       console.log("Creating tour...");
-      await createTourWithDates({
-        title,
-        description,
-        dates,
-        color,
-        departments,
-        startDate,
-        endDate,
-      });
+      await createTourWithDates();
       console.log("Tour created successfully");
 
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
@@ -79,9 +200,9 @@ export const useTourCreation = (
       // Reset form
       setTitle("");
       setDescription("");
+      setDates([{ date: "", location: "" }]);
       setColor("#7E69AB");
-      setStartDate("");
-      setEndDate("");
+      setDepartments([currentDepartment]);
     } catch (error: any) {
       console.error("Error creating tour:", error);
       toast({
@@ -106,9 +227,5 @@ export const useTourCreation = (
     handleDateChange,
     handleDepartmentChange,
     handleSubmit,
-    startDate,
-    endDate,
-    handleStartDateChange,
-    handleEndDateChange,
   };
 };

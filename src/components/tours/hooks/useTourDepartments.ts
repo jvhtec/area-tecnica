@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Department } from "@/types/department";
 
@@ -15,7 +14,6 @@ export const useTourDepartments = (currentDepartment: Department) => {
 
   return {
     departments,
-    setDepartments,
     handleDepartmentChange,
   };
 };

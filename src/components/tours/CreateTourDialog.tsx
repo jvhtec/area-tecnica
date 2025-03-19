@@ -1,10 +1,9 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Department } from "@/types/department";
 import { useLocations } from "@/hooks/useLocations";
 import { TourFormFields } from "./TourFormFields";
-import { useTourCreation } from "./useTourCreation";
+import { useTourCreation } from "./hooks/useTourCreation";
 
 interface CreateTourDialogProps {
   open: boolean;
@@ -14,7 +13,7 @@ interface CreateTourDialogProps {
 
 const CreateTourDialog = ({ open, onOpenChange, currentDepartment }: CreateTourDialogProps) => {
   const { data: locations } = useLocations();
-  const availableDepartments: Department[] = ["sound", "lights", "video", "production", "personnel", "comercial"];
+  const availableDepartments: Department[] = ["sound", "lights", "video"];
 
   const {
     title,
