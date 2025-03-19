@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FestivalShift, ShiftWithAssignments } from "@/types/festival-scheduling";
+import { Department } from "@/types/department";
 
 interface ManageAssignmentsDialogProps {
   open: boolean;
@@ -33,18 +34,30 @@ export const ManageAssignmentsDialog = ({
   isViewOnly = false
 }: ManageAssignmentsDialogProps) => {
   const [technicianId, setTechnicianId] = useState("");
-  const [role, setRole] = useState("technician");
+  const [role, setRole] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Set a default role when dialog opens based on department
+  useEffect(() => {
+    if (open && shift.department) {
+      const roleOptions = getRoleOptions(shift.department as Department);
+      if (roleOptions.length > 0) {
+        setRole(roleOptions[0]);
+      }
+    }
+  }, [open, shift.department]);
 
   const { data: technicians, isLoading: isLoadingTechnicians, error: techniciansError } = useQuery({
     queryKey: ["technicians"],
     queryFn: async () => {
+      const departmentFilter = shift.department || "sound";
+      
       const { data, error } = await supabase
         .from("profiles")
         .select("id, first_name, last_name, email, department, role")
-        .eq("department", "sound")
-        .eq("role", "technician");
+        .eq("department", departmentFilter)
+        .in("role", ["technician", "house_tech"]);
 
       if (error) {
         console.error("Error fetching technicians:", error);
@@ -53,6 +66,20 @@ export const ManageAssignmentsDialog = ({
       return data;
     },
   });
+
+  // Function to get department-specific role options
+  const getRoleOptions = (department: Department) => {
+    switch (department) {
+      case "sound":
+        return ["FOH Engineer", "Monitor Engineer", "PA Tech", "RF Tech"];
+      case "lights":
+        return ["Lighting Designer", "Lighting Tech", "Follow Spot"];
+      case "video":
+        return ["Video Director", "Camera Operator", "Video Tech"];
+      default:
+        return ["Technician", "Stagehand", "Other"];
+    }
+  };
 
   const addAssignmentMutation = useMutation({
     mutationFn: async () => {
@@ -183,14 +210,19 @@ export const ManageAssignmentsDialog = ({
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="role">Role</Label>
-                <Select onValueChange={setRole}>
+                <Select 
+                  value={role} 
+                  onValueChange={setRole}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="technician">Technician</SelectItem>
-                    <SelectItem value="stagehand">Stagehand</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    {getRoleOptions(shift.department as Department || "sound").map((roleOption) => (
+                      <SelectItem key={roleOption} value={roleOption}>
+                        {roleOption}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
