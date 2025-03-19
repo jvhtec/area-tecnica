@@ -26,7 +26,10 @@ export const TourManagementDialog = ({
         </DialogHeader>
         
         <div className="space-y-6">
-          <TourLogoManager tourId={tour.id} />
+          <div className="border-b pb-4">
+            <h3 className="text-sm font-medium mb-3">Tour Logo</h3>
+            <TourLogoManager tourId={tour.id} />
+          </div>
           
           <TourColorSection 
             color={tour.color} 

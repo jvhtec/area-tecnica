@@ -22,17 +22,25 @@ export const TourCard = ({
 }: TourCardProps) => {
   const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [dialogKey, setDialogKey] = useState(0); // Used to force re-render of dialog
   
-  useEffect(() => {
-    const fetchLogo = async () => {
+  // Function to fetch the tour logo
+  const fetchLogo = async () => {
+    try {
       const { data, error } = await supabase
         .from('tour_logos')
         .select('file_path')
         .eq('tour_id', tour.id)
         .maybeSingle();
       
-      if (error || !data) {
+      if (error) {
+        console.error("Error fetching tour logo:", error);
+        return;
+      }
+      
+      if (!data) {
         console.log("No logo found for tour:", tour.id);
+        setLogoUrl(null);
         return;
       }
       
@@ -42,10 +50,26 @@ export const TourCard = ({
         .getPublicUrl(data.file_path);
         
       setLogoUrl(urlData.publicUrl);
-    };
-    
+    } catch (error) {
+      console.error("Unexpected error fetching logo:", error);
+    }
+  };
+  
+  // Effect to fetch logo when component mounts or tour changes
+  useEffect(() => {
     fetchLogo();
   }, [tour.id]);
+  
+  // Handle dialog close with refresh
+  const handleDialogOpenChange = (open: boolean) => {
+    setIsManageDialogOpen(open);
+    
+    // When the dialog closes, refresh logo and increment key to force re-render
+    if (!open) {
+      fetchLogo();
+      setDialogKey(prevKey => prevKey + 1);
+    }
+  };
   
   return (
     <Card 
@@ -90,7 +114,7 @@ export const TourCard = ({
             size="sm" 
             onClick={e => {
               e.stopPropagation();
-              setIsManageDialogOpen(true);
+              handleDialogOpenChange(true);
             }} 
             title="Edit Tour"
           >
@@ -111,7 +135,14 @@ export const TourCard = ({
         {tour.description && <p className="text-muted-foreground mt-2">{tour.description}</p>}
       </CardContent>
 
-      {isManageDialogOpen && <TourManagementDialog open={isManageDialogOpen} onOpenChange={setIsManageDialogOpen} tour={tour} />}
+      {isManageDialogOpen && (
+        <TourManagementDialog 
+          key={dialogKey}
+          open={isManageDialogOpen} 
+          onOpenChange={handleDialogOpenChange} 
+          tour={tour} 
+        />
+      )}
     </Card>
   );
 };

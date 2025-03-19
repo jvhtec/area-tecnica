@@ -13,37 +13,48 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   const fetchExistingLogo = async () => {
-    const { data, error } = await supabase
-      .from('tour_logos')
-      .select('file_path')
-      .eq('tour_id', tourId)
-      .maybeSingle();
+    try {
+      console.log("Fetching logo for tour:", tourId);
+      
+      const { data, error } = await supabase
+        .from('tour_logos')
+        .select('file_path')
+        .eq('tour_id', tourId)
+        .maybeSingle();
 
-    if (error) {
-      console.error('Error fetching logo:', error);
-      return;
-    }
-
-    if (data?.file_path) {
-      try {
-        const { data: publicUrlData } = supabase
-          .storage
-          .from('tour-logos')
-          .getPublicUrl(data.file_path);
-          
-        if (publicUrlData?.publicUrl) {
-          console.log("Found existing tour logo:", publicUrlData.publicUrl);
-          setLogoUrl(publicUrlData.publicUrl);
-        }
-      } catch (e) {
-        console.error('Error getting logo public URL:', e);
+      if (error) {
+        console.error('Error fetching logo:', error);
+        setErrorDetails(`Failed to fetch logo: ${error.message}`);
+        return;
       }
+
+      if (data?.file_path) {
+        try {
+          const { data: publicUrlData } = supabase
+            .storage
+            .from('tour-logos')
+            .getPublicUrl(data.file_path);
+            
+          if (publicUrlData?.publicUrl) {
+            console.log("Found existing tour logo:", publicUrlData.publicUrl);
+            setLogoUrl(publicUrlData.publicUrl);
+          }
+        } catch (e: any) {
+          console.error('Error getting logo public URL:', e);
+          setErrorDetails(`Failed to get logo URL: ${e.message}`);
+        }
+      }
+    } catch (error: any) {
+      console.error('Unexpected error in fetchExistingLogo:', error);
+      setErrorDetails(`Unexpected error: ${error.message}`);
     }
   };
 
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    setErrorDetails(null);
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -58,20 +69,32 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
 
     setIsUploading(true);
     try {
+      console.log("Uploading logo for tour:", tourId);
+      
       const fileExt = file.name.split('.').pop();
       const filePath = `${tourId}.${fileExt}`;
 
       // First, delete any existing logo
-      const { data: existingLogo } = await supabase
+      const { data: existingLogo, error: fetchError } = await supabase
         .from('tour_logos')
         .select('file_path')
         .eq('tour_id', tourId)
         .maybeSingle();
 
+      if (fetchError) {
+        console.error('Error fetching existing logo:', fetchError);
+        throw new Error(`Error fetching existing logo: ${fetchError.message}`);
+      }
+
       if (existingLogo?.file_path) {
-        await supabase.storage
+        const { error: removeError } = await supabase.storage
           .from('tour-logos')
           .remove([existingLogo.file_path]);
+          
+        if (removeError) {
+          console.error('Error removing existing logo:', removeError);
+          // Continue with upload even if delete fails
+        }
       }
 
       // Upload new logo
@@ -79,9 +102,19 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
         .from('tour-logos')
         .upload(filePath, file, {
           upsert: true,
+          cacheControl: '3600',
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw new Error(`Error uploading logo: ${uploadError.message}`);
+      }
+
+      // Get auth user for the uploaded_by field
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
 
       // Update or insert logo record
       const { error: dbError } = await supabase
@@ -92,10 +125,13 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
           file_name: file.name,
           content_type: file.type,
           file_size: file.size,
-          uploaded_by: (await supabase.auth.getUser()).data.user?.id,
+          uploaded_by: user.id,
         });
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error('Database error:', dbError);
+        throw new Error(`Error saving logo information: ${dbError.message}`);
+      }
 
       // Get public URL
       const { data: { publicUrl } } = supabase
@@ -112,9 +148,11 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       });
     } catch (error: any) {
       console.error('Error uploading logo:', error);
+      const errorMessage = error.message || "Could not upload logo";
+      setErrorDetails(errorMessage);
       toast({
         title: "Error",
-        description: "Could not upload logo",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -123,6 +161,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
   };
 
   const handleDeleteLogo = async () => {
+    setErrorDetails(null);
     try {
       const { data, error: fetchError } = await supabase
         .from('tour_logos')
@@ -130,17 +169,30 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
         .eq('tour_id', tourId)
         .maybeSingle();
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        console.error('Error fetching logo:', fetchError);
+        throw new Error(`Error fetching logo: ${fetchError.message}`);
+      }
 
       if (data?.file_path) {
-        await supabase.storage
+        const { error: storageError } = await supabase.storage
           .from('tour-logos')
           .remove([data.file_path]);
 
-        await supabase
+        if (storageError) {
+          console.error('Error removing from storage:', storageError);
+          throw new Error(`Error removing logo: ${storageError.message}`);
+        }
+
+        const { error: dbError } = await supabase
           .from('tour_logos')
           .delete()
           .eq('tour_id', tourId);
+
+        if (dbError) {
+          console.error('Error deleting from database:', dbError);
+          throw new Error(`Error deleting logo record: ${dbError.message}`);
+        }
 
         setLogoUrl(null);
 
@@ -151,16 +203,20 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       }
     } catch (error: any) {
       console.error('Error deleting logo:', error);
+      const errorMessage = error.message || "Could not delete logo";
+      setErrorDetails(errorMessage);
       toast({
         title: "Error",
-        description: "Could not delete logo",
+        description: errorMessage,
         variant: "destructive",
       });
     }
   };
 
   useEffect(() => {
-    fetchExistingLogo();
+    if (tourId) {
+      fetchExistingLogo();
+    }
   }, [tourId]); 
 
   return (
@@ -184,6 +240,12 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       ) : (
         <div className="w-36 h-36 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
           <Image className="h-12 w-12 text-gray-400" />
+        </div>
+      )}
+      
+      {errorDetails && (
+        <div className="text-sm text-red-500 mt-1">
+          Error: {errorDetails}
         </div>
       )}
       
