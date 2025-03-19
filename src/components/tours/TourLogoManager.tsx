@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Image, Upload, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 interface TourLogoManagerProps {
   tourId: string;
@@ -11,6 +12,7 @@ interface TourLogoManagerProps {
 
 export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
@@ -19,9 +21,12 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
     try {
       console.log("Fetching logo for tour:", tourId);
       
-      // First get the current user to log for debugging
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log("Current user:", user?.id);
+      if (!user) {
+        console.log("No authenticated user found");
+        return;
+      }
+      
+      console.log("Current user:", user.id);
       
       const { data, error } = await supabase
         .from('tour_logos')
@@ -73,15 +78,18 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       return;
     }
 
+    if (!user) {
+      toast({
+        title: "Authentication error",
+        description: "You must be logged in to upload logos",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsUploading(true);
     try {
       console.log("Uploading logo for tour:", tourId);
-      
-      // Get auth user for debugging
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
       console.log("Authenticated user:", user.id);
       
       const fileExt = file.name.split('.').pop();
@@ -174,10 +182,18 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
 
   const handleDeleteLogo = async () => {
     setErrorDetails(null);
+    
+    if (!user) {
+      toast({
+        title: "Authentication error",
+        description: "You must be logged in to delete logos",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
-      // Get current user for debugging
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log("Deleting logo as user:", user?.id);
+      console.log("Deleting logo as user:", user.id);
       
       const { data, error: fetchError } = await supabase
         .from('tour_logos')
@@ -234,10 +250,10 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
   };
 
   useEffect(() => {
-    if (tourId) {
+    if (tourId && user) {
       fetchExistingLogo();
     }
-  }, [tourId]); 
+  }, [tourId, user]); 
 
   return (
     <div className="space-y-4">
