@@ -11,7 +11,7 @@ interface VideoCalendarProps {
 export const VideoCalendar = ({ date, onSelect, jobs = [] }: VideoCalendarProps) => {
   return (
     <Card className="h-full flex flex-col">
-      <CardContent className="flex-grow p-2">
+      <CardContent className="flex-grow p-2 overflow-x-auto">
         <CalendarSection 
           date={date} 
           onDateSelect={onSelect}

@@ -153,10 +153,11 @@
     scrollbar-width: none;
   }
   
-  /* Added calendar cell styling improvements */
+  /* Calendar styling improvements */
   .calendar-cell {
     min-height: 200px;
     overflow-y: auto;
+    min-width: 140px; /* Make cells wider */
   }
   
   .calendar-job-list {
