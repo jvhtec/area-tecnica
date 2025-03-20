@@ -3,7 +3,6 @@ import React from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Edit, Trash2, FolderPlus } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface JobOptionsContextMenuProps {
@@ -57,7 +56,7 @@ export const JobOptionsContextMenu = ({
 
   return (
     <ContextMenu>
-      <ContextMenuTrigger>{children}</ContextMenuTrigger>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent className="w-48">
         {canEditJobs && (
           <ContextMenuItem onClick={handleEditClick} className="flex items-center gap-2">
