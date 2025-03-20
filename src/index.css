@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -150,5 +151,17 @@
   .no-scrollbar {
     -ms-overflow-x: hidden;
     scrollbar-width: none;
+  }
+  
+  /* Added calendar cell styling improvements */
+  .calendar-cell {
+    min-height: 200px;
+    overflow-y: auto;
+  }
+  
+  .calendar-job-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
   }
 }

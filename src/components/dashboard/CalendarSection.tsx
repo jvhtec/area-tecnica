@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -685,12 +686,12 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
         {allDays.map((day, i) => {
           const dayJobs = getJobsForDate(day);
           const isCurrentMonth = isSameMonth(day, currentMonth);
-          const maxVisibleJobs = 3;
+          const maxVisibleJobs = 7; // Increased from 3 to 7
           return (
             <div
               key={i}
               className={cn(
-                "bg-background p-2 min-h-[120px] border-t relative cursor-pointer hover:bg-accent/50 transition-colors",
+                "bg-background p-2 min-h-[200px] border-t relative cursor-pointer hover:bg-accent/50 transition-colors",
                 !isCurrentMonth && "text-muted-foreground/50"
               )}
               onClick={() => onDateSelect(day)}
@@ -699,7 +700,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
               <div className="space-y-1 mt-1">
                 {dayJobs.slice(0, maxVisibleJobs).map((job: any) => renderJobCard(job, day))}
                 {dayJobs.length > maxVisibleJobs && (
-                  <div className="text-xs text-muted-foreground mt-1">
+                  <div className="text-xs text-muted-foreground mt-1 bg-accent/30 p-1 rounded text-center">
                     + {dayJobs.length - maxVisibleJobs} more
                   </div>
                 )}
