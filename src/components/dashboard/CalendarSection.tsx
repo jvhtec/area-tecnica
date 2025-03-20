@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -676,6 +675,12 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
             getJobsForDate={getJobsForDate}
             JobCard={JobCard}
             onDateSelect={onDateSelect}
+            dateTypes={dateTypes}
+            setDateTypes={setDateTypes}
+            handleEditJob={handleEditJob}
+            handleDeleteJob={handleDeleteJob}
+            createFlexFolders={createFlexFolders}
+            userRole={userRole}
           />
         )}
         
@@ -861,6 +866,12 @@ interface CalendarGridProps {
   getJobsForDate: (date: Date) => any[];
   JobCard: (props: any) => JSX.Element;
   onDateSelect: (date: Date) => void;
+  dateTypes: Record<string, any>;
+  setDateTypes: React.Dispatch<React.SetStateAction<Record<string, any>>>;
+  handleEditJob: (job: any) => void;
+  handleDeleteJob: (jobId: string) => void;
+  createFlexFolders: (job: any) => Promise<void>;
+  userRole?: string | null;
 }
 
 const CalendarGrid: React.FC<CalendarGridProps> = ({
@@ -869,6 +880,12 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   getJobsForDate,
   JobCard,
   onDateSelect,
+  dateTypes,
+  setDateTypes,
+  handleEditJob,
+  handleDeleteJob,
+  createFlexFolders,
+  userRole
 }) => {
   return (
     <div className="border rounded-lg overflow-x-auto">
