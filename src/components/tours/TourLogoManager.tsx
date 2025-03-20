@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Image, Upload, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 
 interface TourLogoManagerProps {
@@ -92,6 +92,12 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
     try {
       console.log("Uploading logo for tour:", tourId);
       console.log("Authenticated user:", userId);
+      
+      // Check auth status before proceeding
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
+        throw new Error("Authentication error: " + (sessionError?.message || "Session not found"));
+      }
       
       const fileExt = file.name.split('.').pop();
       const filePath = `${tourId}.${fileExt}`;
@@ -197,6 +203,12 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
     
     try {
       console.log("Deleting logo as user:", userId);
+      
+      // Check auth status before proceeding
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
+        throw new Error("Authentication error: " + (sessionError?.message || "Session not found"));
+      }
       
       const { data, error: fetchError } = await supabase
         .from('tour_logos')

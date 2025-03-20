@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, Edit2, FileText } from "lucide-react";
 import { useState, useEffect } from "react";
 import { TourManagementDialog } from "./TourManagementDialog";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 
 interface TourCardProps {
   tour: any;
@@ -27,6 +27,8 @@ export const TourCard = ({
   // Function to fetch the tour logo
   const fetchLogo = async () => {
     try {
+      console.log("Fetching tour logo for:", tour.id);
+      
       const { data, error } = await supabase
         .from('tour_logos')
         .select('file_path')
@@ -35,6 +37,7 @@ export const TourCard = ({
       
       if (error) {
         console.error("Error fetching tour logo:", error);
+        setLogoUrl(null);
         return;
       }
       
@@ -53,6 +56,7 @@ export const TourCard = ({
       setLogoUrl(urlData.publicUrl);
     } catch (error) {
       console.error("Unexpected error fetching logo:", error);
+      setLogoUrl(null);
     }
   };
   
