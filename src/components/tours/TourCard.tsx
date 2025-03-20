@@ -90,7 +90,7 @@ export const TourCard = ({
   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
     {/* Logo on the Left */}
     {logoUrl && (
-      <div className="h-14 w-14 flex-shrink-0 overflow-hidden">
+      <div className="h-20 w-20 flex-shrink-0 overflow-hidden">
         <img
           src={logoUrl}
           alt={`${tour.name} logo`}
