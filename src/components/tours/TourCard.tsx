@@ -79,7 +79,7 @@ export const TourCard = ({
   };
   
   return (
-  <Card
+ <Card
   className="relative hover:shadow-md transition-shadow cursor-pointer"
   onClick={() => onTourClick(tour.id)}
   style={{
@@ -87,34 +87,27 @@ export const TourCard = ({
     backgroundColor: `${tour.color}05` || '#7E69AB05',
   }}
 >
-  {/* Logo in Top-Left Corner */}
-  {logoUrl && (
-    <div className="absolute top-2 left-2 h-14 w-14 flex-shrink-0 overflow-hidden">
-      <img
-        src={logoUrl}
-        alt={`${tour.name} logo`}
-        className="h-full w-full object-contain"
-        onError={(e) => {
-          console.error('Image failed to load:', logoUrl);
-          const target = e.target as HTMLImageElement;
-          target.onerror = null;
-          target.src =
-            'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTAgMTRIMTRWMTZIMTBWMTRaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48cGF0aCBkPSJNMTIgMUMxNC4yMDkxIDEgMTYgMi43OTA4NiAxNiA1QzE2IDcuMjA9MTQgMTQuMjA5MSA5IDEyIDlDOS43OTA4NiA5IDggNy4yMDkxNCA4IDVDOCAyLjc5MDg2IDkuNzkwODYgMSAxMiAxWiIgZmlsbD0iY3VycmVudENvbG9yIi8+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xIDEzQzEgMTAuNzkwOSAyLjc5MDg2IDkgNSA5SDE5QzIxLjIwOTEgOSAyMyAxMC43OTA5IDIzIDEzVjE5QzIzIDIwLjEwNDYgMjIuMTA0NiAyMSAyMSAyMUgzQzEuODk1NDMgMjEgMSAyMC4xMDQ2IDEgMTlWMTNaTTE5IDExSDVDMy44OTU0MyAxMSAzIDExLjg5NTQgMyAxM0MzIDE1LjIwOTEgNC43OTA5MSAxNyA3IDE3SDE3QzE5LjIwOTEgMTcgMjEgMTUuMjA5MSAyMSAxM0MyMSAxMS44OTU0IDIwLjEwNDYgMTEgMTkgMTFaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48L3N2Zz4=';
-        }}
-      />
-    </div>
-  )}
+  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    {/* Logo on the Left */}
+    {logoUrl && (
+      <div className="h-14 w-14 flex-shrink-0 overflow-hidden">
+        <img
+          src={logoUrl}
+          alt={`${tour.name} logo`}
+          className="h-full w-full object-contain"
+          onError={(e) => {
+            console.error('Image failed to load:', logoUrl);
+            const target = e.target as HTMLImageElement;
+            target.onerror = null;
+            target.src =
+              'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTAgMTRIMTRWMTZIMTBWMTRaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48cGF0aCBkPSJNMTIgMUMxNC4yMDkxIDEgMTYgMi43OTA4NiAxNiA1QzE2IDcuMjA5MTQgMTQuMjA5MSA5IDEyIDlDOS43OTA4NiA9IDggNy4yMDkxNCA4IDVDOCAyLjc5MDg2IDkuNzkwODYgMSAxMiAxWiIgZmlsbD0iY3VycmVudENvbG9yIi8+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xIDEzQzEgMTAuNzkwOSAyLjc5MDg2IDkgMSA5SDE5QzIxLjIwOTEgOSAyMyAxMC43OTA5IDIzIDEzVjE5QzIzIDIwLjEwNDYgMjIuMTA0NiAyMSAyMSAyMUgzQzEuODk1NDMgMjEgMSAyMC4xMDQ2IDEgMTlWMTNaTTE5IDExSDVDMy44OTU0MyAxMSAzIDExLjg5NTQgMyAxM0MzIDE1LjIwOTEgNC43OTA5MSAxNyA3IDE3SDE3QzE5LjIwOTEgMTcgMjEgMTUuMjA9MSAyMSAxM0MyMSAxMS44OTU0IDIwLjEwNDYgMTEgMTkgMTFaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48L3N2Zz4=';
+          }}
+        />
+      </div>
+    )}
 
-  <CardHeader className="flex flex-row items-center justify-center space-y-0 pb-2 px-16">
-    <CardTitle className="text-xl font-semibold flex items-center gap-2">
-      {tour.name}
-      {tour.flex_main_folder_id && <Badge variant="secondary">Flex Folders Created</Badge>}
-    </CardTitle>
-  </CardHeader>
-
-  <CardContent className="pt-10">
-    {/* Buttons in Top-Right Corner */}
-    <div className="absolute top-2 right-2 flex gap-1">
+    {/* Buttons on the Right */}
+    <div className="flex gap-1">
       <Button
         variant="secondary"
         size="sm"
@@ -149,7 +142,19 @@ export const TourCard = ({
         <FileText className="h-4 w-4" />
       </Button>
     </div>
-    {tour.description && <p className="text-muted-foreground mt-2">{tour.description}</p>}
+  </CardHeader>
+
+  <CardContent>
+    {/* Tour Name Centered Below Logo and Buttons */}
+    <div className="flex justify-center mb-2">
+      <CardTitle className="text-xl font-semibold flex items-center gap-2">
+        {tour.name}
+        {tour.flex_main_folder_id && <Badge variant="secondary">Flex Folders Created</Badge>}
+      </CardTitle>
+    </div>
+
+    {/* Description Below Tour Name */}
+    {tour.description && <p className="text-muted-foreground">{tour.description}</p>}
   </CardContent>
 
   {isManageDialogOpen && (
