@@ -79,85 +79,83 @@ export const TourCard = ({
   };
   
   return (
-  <Card
-  className="relative hover:shadow-md transition-shadow cursor-pointer"
-  onClick={() => onTourClick(tour.id)}
-  style={{
-    borderColor: `${tour.color}30` || '#7E69AB30',
-    backgroundColor: `${tour.color}05` || '#7E69AB05',
-  }}
->
-  {/* Logo in Top-Left Corner */}
-  {logoUrl && (
-    <div className="absolute top-2 left-2 h-14 w-14 flex-shrink-0 overflow-hidden">
-      <img
-        src={logoUrl}
-        alt={`${tour.name} logo`}
-        className="h-full w-full object-contain"
-        onError={(e) => {
-          console.error('Image failed to load:', logoUrl);
-          const target = e.target as HTMLImageElement;
-          target.onerror = null;
-          target.src =
-            'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTAgMTRIMTRWMTZIMTBWMTRaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48cGF0aCBkPSJNMTIgMUMxNC4yMDkxIDEgMTYgMi43OTA4NiAxNiA1QzE2IDcuMjA5MTQgMTQuMjA5MSA5IDEyIDlDOS43OTA4NiA5IDggNy4yMDkxNCA4IDVDOCAyLjc5MDg2IDkuNzkwODYgMSAxMiAxWiIgZmlsbD0iY3VycmVudENvbG9yIi8+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xIDEzQzEgMTAuNzkwOSAyLjc5MDg2IDkgNSA5SDE5QzIxLjIwOTEgOSAyMyAxMC43OTA5IDIzIDEzVjE5QzIzIDIwLjEwNDYgMjIuMTA0NiAyMSAyMSAyMUgzQzEuODk1NDMgMjEgMSAyMC4xMDQ2IDEgMTlWMTNaTTE5IDExSDVDMy44OTU0MyAxMSAzIDExLjg5NTQgMyAxM0MzIDE1LjIwOTEgNC43OTA5MSAxNyA3IDE3SDE3QzE5LjIwOTEgMTcgMjEgMTUuMjA5MSAyMSAxM0MyMSAxMS44OTU0IDIwLjEwNDYgMTEgMTkgMTFaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48L3N2Zz4=';
-        }}
-      />
-    </div>
-  )}
+    <Card 
+      className="relative hover:shadow-md transition-shadow cursor-pointer" 
+      onClick={() => onTourClick(tour.id)} 
+      style={{
+        borderColor: `${tour.color}30` || '#7E69AB30',
+        backgroundColor: `${tour.color}05` || '#7E69AB05'
+      }}
+    >
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-xl font-semibold flex items-center gap-2 my-[30px] py-0">
+          {logoUrl && (
+            <div className="h-14 w-14 mr-2 flex-shrink-0 overflow-hidden">
+              <img 
+                src={logoUrl} 
+                alt={`${tour.name} logo`} 
+                className="h-full w-full object-contain"
+                onError={(e) => {
+                  console.error('Image failed to load:', logoUrl);
+                  const target = e.target as HTMLImageElement;
+                  target.onerror = null;
+                  target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTAgMTRIMTRWMTZIMTBWMTRaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48cGF0aCBkPSJNMTIgMUMxNC4yMDkxIDEgMTYgMi43OTA4NiAxNiA1QzE2IDcuMjA5MTQgMTQuMjA5MSA5IDEyIDlDOS43OTA4NiA5IDggNy4yMDkxNCA4IDVDOCAyLjc5MDg2IDkuNzkwODYgMSAxMiAxWiIgZmlsbD0iY3VycmVudENvbG9yIi8+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xIDEzQzEgMTAuNzkwOSAyLjc5MDg2IDkgNSA5SDE5QzIxLjIwOTEgOSAyMyAxMC43OTA5IDIzIDEzVjE5QzIzIDIwLjEwNDYgMjIuMTA0NiAyMSAyMSAyMUgzQzEuODk1NDMgMjEgMSAyMC4xMDQ2IDEgMTlWMTNaTTE5IDExSDVDMy44OTU0MyAxMSAzIDExLjg5NTQgMyAxM0MzIDE1LjIwOTEgNC43OTA5MSAxNyA3IDE3SDE3QzE5LjIwOTEgMTcgMjEgMTUuMjA5MSAyMSAxM0MyMSAxMS44OTU0IDIwLjEwNDYgMTEgMTkgMTFaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48L3N2Zz4=';
+                }}
+              />
+            </div>
+          )}
+          {tour.name}
+          {tour.flex_main_folder_id && <Badge variant="secondary">Flex Folders Created</Badge>}
+        </CardTitle>
+      </CardHeader>
+      
+      <CardContent>
+        <div className="absolute top-2 right-2 flex gap-1">
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            onClick={e => {
+              e.stopPropagation();
+              onManageDates(tour.id);
+            }} 
+            title="Manage Dates"
+          >
+            <Calendar className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            onClick={e => {
+              e.stopPropagation();
+              handleDialogOpenChange(true);
+            }} 
+            title="Edit Tour"
+          >
+            <Edit2 className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            onClick={e => {
+              e.stopPropagation();
+              onPrint(tour);
+            }} 
+            title="Print Tour"
+          >
+            <FileText className="h-4 w-4" />
+          </Button>
+        </div>
+        {tour.description && <p className="text-muted-foreground mt-2">{tour.description}</p>}
+      </CardContent>
 
-  <CardHeader className="flex flex-row items-center justify-center space-y-0 pb-2 px-16">
-    <CardTitle className="text-xl font-semibold flex items-center gap-2">
-      {tour.name}
-      {tour.flex_main_folder_id && <Badge variant="secondary">Flex Folders Created</Badge>}
-    </CardTitle>
-  </CardHeader>
-
-  <CardContent>
-    {/* Buttons in Top-Right Corner */}
-    <div className="absolute top-2 right-2 flex gap-1">
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={(e) => {
-          e.stopPropagation();
-          onManageDates(tour.id);
-        }}
-        title="Manage Dates"
-      >
-        <Calendar className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={(e) => {
-          e.stopPropagation();
-          handleDialogOpenChange(true);
-        }}
-        title="Edit Tour"
-      >
-        <Edit2 className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={(e) => {
-          e.stopPropagation();
-          onPrint(tour);
-        }}
-        title="Print Tour"
-      >
-        <FileText className="h-4 w-4" />
-      </Button>
-    </div>
-    {tour.description && <p className="text-muted-foreground mt-2">{tour.description}</p>}
-  </CardContent>
-
-  {isManageDialogOpen && (
-    <TourManagementDialog
-      key={dialogKey}
-      open={isManageDialogOpen}
-      onOpenChange={handleDialogOpenChange}
-      tour={tour}
-    />
-  )}
-</Card>
+      {isManageDialogOpen && (
+        <TourManagementDialog 
+          key={dialogKey}
+          open={isManageDialogOpen} 
+          onOpenChange={handleDialogOpenChange} 
+          tour={tour} 
+        />
+      )}
+    </Card>
+  );
+};
