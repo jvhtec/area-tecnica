@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -673,7 +674,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
             allDays={allDays}
             currentMonth={currentMonth}
             getJobsForDate={getJobsForDate}
-            renderJobCard={renderJobCard}
+            JobCard={JobCard}
             onDateSelect={onDateSelect}
           />
         )}
@@ -858,7 +859,7 @@ interface CalendarGridProps {
   allDays: Date[];
   currentMonth: Date;
   getJobsForDate: (date: Date) => any[];
-  renderJobCard: (job: any, date: Date) => JSX.Element;
+  JobCard: (props: any) => JSX.Element;
   onDateSelect: (date: Date) => void;
 }
 
@@ -866,7 +867,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   allDays,
   currentMonth,
   getJobsForDate,
-  renderJobCard,
+  JobCard,
   onDateSelect,
 }) => {
   return (
@@ -892,7 +893,19 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
             >
               <span className="text-sm">{format(day, "d")}</span>
               <div className="space-y-1 mt-1 calendar-job-list">
-                {dayJobs.slice(0, maxVisibleJobs).map((job: any) => renderJobCard(job, day))}
+                {dayJobs.slice(0, maxVisibleJobs).map((job: any) => (
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    date={day}
+                    dateTypes={dateTypes}
+                    setDateTypes={setDateTypes}
+                    onEditJob={() => handleEditJob(job)}
+                    onDeleteJob={() => handleDeleteJob(job.id)}
+                    onCreateFlexFolders={() => createFlexFolders(job)}
+                    userRole={userRole}
+                  />
+                ))}
                 {dayJobs.length > maxVisibleJobs && (
                   <div className="text-xs text-muted-foreground mt-1 bg-accent/30 p-1 rounded">
                     +{dayJobs.length - maxVisibleJobs} more
