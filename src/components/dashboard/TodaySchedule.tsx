@@ -32,7 +32,7 @@ export const TodaySchedule = ({
           <CardTitle>Agenda del Dia</CardTitle>
         </CardHeader>
         <CardContent className="p-1">
-          <div className="flex items-center justify-center p-2">
+          <div className="flex items-center justify-center p-4">
             <p className="text-muted-foreground">Cargando asignaciones...</p>
           </div>
         </CardContent>
@@ -61,7 +61,7 @@ export const TodaySchedule = ({
         <CardTitle>Agenda del Dia</CardTitle>
       </CardHeader>
       <CardContent className="p-1">
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {jobs.map(job => {
             console.log("Rendering job in TodaySchedule:", job);
             const jobData = job.jobs || job;
