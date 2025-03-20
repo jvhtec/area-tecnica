@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { DateTypeContextMenu } from "./DateTypeContextMenu";
+import { JobOptionsContextMenu } from "./JobOptionsContextMenu";
 import { supabase } from "@/lib/supabase";
 import jsPDF from "jspdf";
 import {
@@ -51,6 +51,9 @@ import {
   Printer,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { EditJobDialog } from "@/components/jobs/EditJobDialog";
+import { useQueryClient } from "@tanstack/react-query";
+import { createAllFoldersForJob } from "@/utils/flex-folders";
 
 interface CalendarSectionProps {
   date: Date | undefined;
@@ -58,6 +61,7 @@ interface CalendarSectionProps {
   jobs?: any[];
   department?: string;
   onDateTypeChange: () => void;
+  userRole?: string | null;
 }
 
 interface PrintSettings {
@@ -77,6 +81,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   jobs = [],
   department,
   onDateTypeChange,
+  userRole,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [dateTypes, setDateTypes] = useState<Record<string, any>>({});
@@ -93,7 +98,9 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       festival: true,
     },
   });
+  const [editingJob, setEditingJob] = useState<any | null>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const currentMonth = date || new Date();
   const firstDayOfMonth = startOfMonth(currentMonth);
@@ -289,11 +296,10 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     const logoHeight = logo ? logoWidth * (logo.height / logo.width) : 0;
     const pageWidth = doc.internal.pageSize.getWidth();
     
-    // Define standard vertical spacing values
     const logoTopY = 10;
     const monthTitleY = logo ? logoTopY + logoHeight + 5 : 20;
     const calendarStartY = monthTitleY + 10;
-    const footerSpace = 40; // Space reserved for logo and created date
+    const footerSpace = 40;
 
     switch (range) {
       case "month":
@@ -329,18 +335,15 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     for (const [pageIndex, monthStart] of months.entries()) {
       if (pageIndex > 0) doc.addPage("landscape");
 
-      // Add logo if available
       const logoX = logo ? (pageWidth - logoWidth) / 2 : 0;
       if (logo) {
         doc.addImage(logo, "PNG", logoX, logoTopY, logoWidth, logoHeight);
       }
 
-      // Month title - set consistent styling and positioning
       doc.setFontSize(16);
-      doc.setTextColor(51, 51, 51); // Reset to standard text color
+      doc.setTextColor(51, 51, 51);
       doc.text(format(monthStart, "MMMM yyyy"), pageWidth / 2, monthTitleY, { align: "center" });
 
-      // Days of week header
       daysOfWeek.forEach((day, index) => {
         doc.setFillColor(41, 128, 185);
         doc.rect(startX + index * cellWidth, calendarStartY, cellWidth, 10, "F");
@@ -446,12 +449,163 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     onDateSelect(new Date());
   };
 
+  const handleEditJob = (job: any) => {
+    setEditingJob(job);
+  };
+
+  const handleDeleteJob = async (jobId: string) => {
+    if (!window.confirm("Are you sure you want to delete this job?")) {
+      return;
+    }
+
+    try {
+      console.log("Starting job deletion process for job:", jobId);
+
+      const { error: taskDocsError } = await supabase
+        .from("task_documents")
+        .delete()
+        .or(
+          `sound_task_id.in.(select id from sound_job_tasks where job_id='${jobId}'),lights_task_id.in.(select id from lights_job_tasks where job_id='${jobId}'),video_task_id.in.(select id from video_job_tasks where job_id='${jobId}')`
+        );
+
+      if (taskDocsError) {
+        console.error("Error deleting task documents:", taskDocsError);
+        throw taskDocsError;
+      }
+
+      await Promise.all([
+        supabase.from("sound_job_tasks").delete().eq("job_id", jobId),
+        supabase.from("lights_job_tasks").delete().eq("job_id", jobId),
+        supabase.from("video_job_tasks").delete().eq("job_id", jobId)
+      ]);
+
+      await Promise.all([
+        supabase.from("sound_job_personnel").delete().eq("job_id", jobId),
+        supabase.from("lights_job_personnel").delete().eq("job_id", jobId),
+        supabase.from("video_job_personnel").delete().eq("job_id", jobId)
+      ]);
+
+      const { error: jobDocsError } = await supabase
+        .from("job_documents")
+        .delete()
+        .eq("job_id", jobId);
+
+      if (jobDocsError) {
+        console.error("Error deleting job documents:", jobDocsError);
+        throw jobDocsError;
+      }
+
+      const { error: assignmentsError } = await supabase
+        .from("job_assignments")
+        .delete()
+        .eq("job_id", jobId);
+
+      if (assignmentsError) {
+        console.error("Error deleting job assignments:", assignmentsError);
+        throw assignmentsError;
+      }
+
+      const { error: departmentsError } = await supabase
+        .from("job_departments")
+        .delete()
+        .eq("job_id", jobId);
+
+      if (departmentsError) {
+        console.error("Error deleting job departments:", departmentsError);
+        throw departmentsError;
+      }
+
+      const { error: jobError } = await supabase
+        .from("jobs")
+        .delete()
+        .eq("id", jobId);
+
+      if (jobError) {
+        console.error("Error deleting job:", jobError);
+        throw jobError;
+      }
+
+      toast({
+        title: "Job deleted successfully",
+        description: "The job and all related records have been removed."
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    } catch (error: any) {
+      console.error("Error in deletion process:", error);
+      toast({
+        title: "Error deleting job",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const createFlexFolders = async (job: any) => {
+    try {
+      console.log("Starting folder creation for job:", job.id);
+
+      const { data: existingFolders } = await supabase
+        .from("flex_folders")
+        .select("id")
+        .eq("job_id", job.id)
+        .limit(1);
+
+      if (existingFolders && existingFolders.length > 0) {
+        console.log("Found existing folders in final check:", existingFolders);
+        toast({
+          title: "Folders already exist",
+          description: "Flex folders have already been created for this job.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const startDate = new Date(job.start_time);
+      const documentNumber = startDate
+        .toISOString()
+        .slice(2, 10)
+        .replace(/-/g, "");
+
+      const formattedStartDate = new Date(job.start_time).toISOString().split(".")[0] + ".000Z";
+      const formattedEndDate = new Date(job.end_time).toISOString().split(".")[0] + ".000Z";
+
+      await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber);
+      
+      const { error } = await supabase
+        .from("jobs")
+        .update({ flex_folders_created: true })
+        .eq("id", job.id);
+      
+      if (error) throw error;
+
+      console.log("Successfully created folders for job:", job.id);
+      toast({
+        title: "Success",
+        description: "Flex folders have been created successfully."
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    } catch (error: any) {
+      console.error("Error creating Flex folders:", error);
+      toast({
+        title: "Error creating folders",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
   const renderJobCard = (job: any, day: Date) => (
     <JobCard
       job={job}
       date={day}
       dateTypes={dateTypes}
       setDateTypes={setDateTypes}
+      onEditJob={() => handleEditJob(job)}
+      onDeleteJob={() => handleDeleteJob(job.id)}
+      onCreateFlexFolders={() => createFlexFolders(job)}
+      userRole={userRole}
     />
   );
 
@@ -489,6 +643,14 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
             getJobsForDate={getJobsForDate}
             renderJobCard={renderJobCard}
             onDateSelect={onDateSelect}
+          />
+        )}
+        
+        {editingJob && (
+          <EditJobDialog
+            open={!!editingJob}
+            onOpenChange={() => setEditingJob(null)}
+            job={editingJob}
           />
         )}
       </CardContent>
@@ -686,7 +848,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
         {allDays.map((day, i) => {
           const dayJobs = getJobsForDate(day);
           const isCurrentMonth = isSameMonth(day, currentMonth);
-          const maxVisibleJobs = 7; // Increased from 3 to 7
+          const maxVisibleJobs = 7;
           return (
             <div
               key={i}
@@ -718,6 +880,10 @@ interface JobCardProps {
   date: Date;
   dateTypes: Record<string, any>;
   setDateTypes: React.Dispatch<React.SetStateAction<Record<string, any>>>;
+  onEditJob: () => void;
+  onDeleteJob: () => void;
+  onCreateFlexFolders: () => void;
+  userRole?: string | null;
 }
 
 const JobCard: React.FC<JobCardProps> = ({
@@ -725,6 +891,10 @@ const JobCard: React.FC<JobCardProps> = ({
   date,
   dateTypes,
   setDateTypes,
+  onEditJob,
+  onDeleteJob,
+  onCreateFlexFolders,
+  userRole
 }) => {
   const getDateTypeIcon = (jobId: string, date: Date) => {
     const key = `${jobId}-${format(date, "yyyy-MM-dd")}`;
@@ -787,75 +957,85 @@ const JobCard: React.FC<JobCardProps> = ({
   const totalRequired = getTotalRequiredPersonnel(job);
   const currentlyAssigned = job.job_assignments?.length || 0;
   const dateTypeIcon = getDateTypeIcon(job.id, date);
+  const flexFoldersExist = job.flex_folders_created || (job.flex_folders && job.flex_folders.length > 0);
 
   return (
-    <DateTypeContextMenu
-      key={job.id}
+    <JobOptionsContextMenu
       jobId={job.id}
-      date={date}
-      onTypeChange={async () => {
-        const { data } = await supabase.from("job_date_types").select("*").eq("job_id", job.id);
-        setDateTypes((prev) => ({
-          ...prev,
-          ...data?.reduce((acc: Record<string, any>, curr) => ({
-            ...acc,
-            [`${curr.job_id}-${curr.date}`]: curr,
-          }), {}),
-        }));
-      }}
+      onEditJob={onEditJob}
+      onDeleteJob={onDeleteJob}
+      onCreateFlexFolders={onCreateFlexFolders}
+      flexFoldersExist={flexFoldersExist}
+      userRole={userRole}
     >
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div
-              className="px-1.5 py-0.5 rounded text-xs truncate hover:bg-accent/50 transition-colors flex items-center gap-1 cursor-pointer"
-              style={{
-                backgroundColor: `${job.color}20`,
-                color: job.color,
-              }}
-            >
-              {dateTypeIcon}
-              <span>{job.title}</span>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent className="w-64 p-2">
-            <div className="space-y-2">
-              <h4 className="font-semibold">{job.title}</h4>
-              {job.description && <p className="text-sm text-muted-foreground">{job.description}</p>}
-              <div className="flex items-center gap-2 text-sm">
-                <Clock className="h-4 w-4" />
-                <span>
-                  {format(new Date(job.start_time), "MMM d, HH:mm")} -{" "}
-                  {format(new Date(job.end_time), "MMM d, HH:mm")}
-                </span>
+      <DateTypeContextMenu
+        key={job.id}
+        jobId={job.id}
+        date={date}
+        onTypeChange={async () => {
+          const { data } = await supabase.from("job_date_types").select("*").eq("job_id", job.id);
+          setDateTypes((prev) => ({
+            ...prev,
+            ...data?.reduce((acc: Record<string, any>, curr) => ({
+              ...acc,
+              [`${curr.job_id}-${curr.date}`]: curr,
+            }), {}),
+          }));
+        }}
+      >
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                className="px-1.5 py-0.5 rounded text-xs truncate hover:bg-accent/50 transition-colors flex items-center gap-1 cursor-pointer"
+                style={{
+                  backgroundColor: `${job.color}20`,
+                  color: job.color,
+                }}
+              >
+                {dateTypeIcon}
+                <span>{job.title}</span>
               </div>
-              {job.location?.name && (
+            </TooltipTrigger>
+            <TooltipContent className="w-64 p-2">
+              <div className="space-y-2">
+                <h4 className="font-semibold">{job.title}</h4>
+                {job.description && <p className="text-sm text-muted-foreground">{job.description}</p>}
                 <div className="flex items-center gap-2 text-sm">
-                  <MapPin className="h-4 w-4" />
-                  <span>{job.location.name}</span>
+                  <Clock className="h-4 w-4" />
+                  <span>
+                    {format(new Date(job.start_time), "MMM d, HH:mm")} -{" "}
+                    {format(new Date(job.end_time), "MMM d, HH:mm")}
+                  </span>
                 </div>
-              )}
-              <div className="space-y-1">
-                <div className="text-sm font-medium">Departments:</div>
-                <div className="flex flex-wrap gap-1">
-                  {job.job_departments.map((dept: any) => (
-                    <Badge key={dept.department} variant="secondary" className="flex items-center gap-1">
-                      {getDepartmentIcon(dept.department)}
-                      <span className="capitalize">{dept.department}</span>
-                    </Badge>
-                  ))}
+                {job.location?.name && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <MapPin className="h-4 w-4" />
+                    <span>{job.location.name}</span>
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <div className="text-sm font-medium">Departments:</div>
+                  <div className="flex flex-wrap gap-1">
+                    {job.job_departments.map((dept: any) => (
+                      <Badge key={dept.department} variant="secondary" className="flex items-center gap-1">
+                        {getDepartmentIcon(dept.department)}
+                        <span className="capitalize">{dept.department}</span>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Users className="h-4 w-4" />
+                  <span>
+                    {currentlyAssigned}/{totalRequired} assigned
+                  </span>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Users className="h-4 w-4" />
-                <span>
-                  {currentlyAssigned}/{totalRequired} assigned
-                </span>
-              </div>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    </DateTypeContextMenu>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </DateTypeContextMenu>
+    </JobOptionsContextMenu>
   );
 };
