@@ -37,30 +37,26 @@ export const DashboardContent = ({
 
   return (
     <div className="space-y-8">
-      {/* Calendar and Today's Schedule section - stacks on mobile */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-       <div className="space-y-8">
-  {/* Full-width Calendar section */}
-  <div>
-    <CalendarSection 
-      date={date} 
-      onDateSelect={setDate} 
-      jobs={jobs} 
-      onDateTypeChange={onDateTypeChange}
-    />
-  </div>
-  
-  {/* Today's Schedule below the calendar */}
-  <div>
-    <TodaySchedule
-      jobs={selectedDateJobs}
-      onEditClick={onEditClick}
-      onDeleteClick={onDeleteClick}
-      onJobClick={onJobClick}
-      userRole={userRole}
-      selectedDate={date}
-    />
-  </div>
+      {/* Calendar section - full width */}
+      <div className="w-full">
+        <CalendarSection 
+          date={date} 
+          onDateSelect={setDate} 
+          jobs={jobs} 
+          onDateTypeChange={onDateTypeChange}
+        />
+      </div>
+      
+      {/* Today's Schedule below the calendar */}
+      <div className="w-full">
+        <TodaySchedule
+          jobs={selectedDateJobs}
+          onEditClick={onEditClick}
+          onDeleteClick={onDeleteClick}
+          onJobClick={onJobClick}
+          userRole={userRole}
+          selectedDate={date}
+        />
       </div>
 
       {/* Department schedules section */}
