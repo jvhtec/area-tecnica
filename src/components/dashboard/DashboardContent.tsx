@@ -39,7 +39,7 @@ export const DashboardContent = ({
     <div className="space-y-8">
       {/* Calendar and Today's Schedule section - stacks on mobile */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-10">
+        <div className="lg:col-span-8">
           <CalendarSection 
             date={date} 
             onDateSelect={setDate} 
@@ -47,7 +47,7 @@ export const DashboardContent = ({
             onDateTypeChange={onDateTypeChange}
           />
         </div>
-        <div className="lg:col-span-4">
+        <div className="lg:col-span-2">
           <TodaySchedule
             jobs={selectedDateJobs}
             onEditClick={onEditClick}
