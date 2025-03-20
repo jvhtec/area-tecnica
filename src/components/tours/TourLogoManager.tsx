@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Image, Upload, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
 interface TourLogoManagerProps {
@@ -55,6 +55,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
         }
       } else {
         console.log("No logo found for tour", tourId);
+        setLogoUrl(null);
       }
     } catch (error: any) {
       console.error('Unexpected error in fetchExistingLogo:', error);
@@ -76,8 +77,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       return;
     }
 
-    const userData = await supabase.auth.getUser();
-    if (!userData.data.user) {
+    if (!user) {
       toast({
         title: "Authentication required",
         description: "You must be logged in to upload logos",
@@ -86,7 +86,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       return;
     }
     
-    const userId = userData.data.user.id;
+    const userId = user.id;
 
     setIsUploading(true);
     try {
@@ -184,8 +184,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
   const handleDeleteLogo = async () => {
     setErrorDetails(null);
     
-    const userData = await supabase.auth.getUser();
-    if (!userData.data.user) {
+    if (!user) {
       toast({
         title: "Authentication required",
         description: "You must be logged in to delete logos",
@@ -194,7 +193,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       return;
     }
     
-    const userId = userData.data.user.id;
+    const userId = user.id;
     
     try {
       console.log("Deleting logo as user:", userId);
@@ -267,6 +266,12 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
             src={logoUrl}
             alt="Tour logo"
             className="w-full h-full object-contain"
+            onError={(e) => {
+              console.error('Image failed to load:', logoUrl);
+              const target = e.target as HTMLImageElement;
+              target.onerror = null;
+              target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTAgMTRIMTRWMTZIMTBWMTRaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48cGF0aCBkPSJNMTIgMUMxNC4yMDkxIDEgMTYgMi43OTA4NiAxNiA1QzE2IDcuMjA5MTQgMTQuMjA5MSA5IDEyIDlDOS43OTA4NiA5IDggNy4yMDkxNCA4IDVDOCAyLjc5MDg2IDkuNzkwODYgMSAxMiAxWiIgZmlsbD0iY3VycmVudENvbG9yIi8+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xIDEzQzEgMTAuNzkwOSAyLjc5MDg2IDkgNSA5SDE5QzIxLjIwOTEgOSAyMyAxMC43OTA5IDIzIDEzVjE5QzIzIDIwLjEwNDYgMjIuMTA0NiAyMSAyMSAyMUgzQzEuODk1NDMgMjEgMSAyMC4xMDQ2IDEgMTlWMTNaTTE5IDExSDVDMy44OTU0MyAxMSAzIDExLjg5NTQgMyAxM0MzIDE1LjIwOTEgNC43OTA5MSAxNyA3IDE3SDE3QzE5LjIwOTEgMTcgMjEgMTUuMjA5MSAyMSAxM0MyMSAxMS44OTU0IDIwLjEwNDYgMTEgMTkgMTFaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48L3N2Zz4=';
+            }}
           />
           <Button
             variant="destructive"

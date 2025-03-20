@@ -49,6 +49,7 @@ export const TourCard = ({
         .from('tour-logos')
         .getPublicUrl(data.file_path);
         
+      console.log("Tour card logo URL:", urlData.publicUrl);
       setLogoUrl(urlData.publicUrl);
     } catch (error) {
       console.error("Unexpected error fetching logo:", error);
@@ -57,7 +58,9 @@ export const TourCard = ({
   
   // Effect to fetch logo when component mounts or tour changes
   useEffect(() => {
-    fetchLogo();
+    if (tour && tour.id) {
+      fetchLogo();
+    }
   }, [tour.id]);
   
   // Handle dialog close with refresh
@@ -83,11 +86,17 @@ export const TourCard = ({
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-xl font-semibold flex items-center gap-2 my-[30px] py-0">
           {logoUrl && (
-            <div className="h-8 w-8 mr-2 flex-shrink-0">
+            <div className="h-8 w-8 mr-2 flex-shrink-0 overflow-hidden">
               <img 
                 src={logoUrl} 
                 alt={`${tour.name} logo`} 
                 className="h-full w-full object-contain"
+                onError={(e) => {
+                  console.error('Image failed to load:', logoUrl);
+                  const target = e.target as HTMLImageElement;
+                  target.onerror = null;
+                  target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTAgMTRIMTRWMTZIMTBWMTRaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48cGF0aCBkPSJNMTIgMUMxNC4yMDkxIDEgMTYgMi43OTA4NiAxNiA1QzE2IDcuMjA5MTQgMTQuMjA5MSA5IDEyIDlDOS43OTA4NiA5IDggNy4yMDkxNCA4IDVDOCAyLjc5MDg2IDkuNzkwODYgMSAxMiAxWiIgZmlsbD0iY3VycmVudENvbG9yIi8+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xIDEzQzEgMTAuNzkwOSAyLjc5MDg2IDkgNSA5SDE5QzIxLjIwOTEgOSAyMyAxMC43OTA5IDIzIDEzVjE5QzIzIDIwLjEwNDYgMjIuMTA0NiAyMSAyMSAyMUgzQzEuODk1NDMgMjEgMSAyMC4xMDQ2IDEgMTlWMTNaTTE5IDExSDVDMy44OTU0MyAxMSAzIDExLjg5NTQgMyAxM0MzIDE1LjIwOTEgNC43OTA5MSAxNyA3IDE3SDE3QzE5LjIwOTEgMTcgMjEgMTUuMjA5MSAyMSAxM0MyMSAxMS44OTU0IDIwLjEwNDYgMTEgMTkgMTFaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48L3N2Zz4=';
+                }}
               />
             </div>
           )}
