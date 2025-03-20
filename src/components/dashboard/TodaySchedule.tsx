@@ -32,7 +32,7 @@ export const TodaySchedule = ({
           <CardTitle>Agenda del Dia</CardTitle>
         </CardHeader>
         <CardContent className="p-1">
-          <div className="flex items-center justify-center p-4">
+          <div className="flex items-center justify-center p-2">
             <p className="text-muted-foreground">Cargando asignaciones...</p>
           </div>
         </CardContent>
