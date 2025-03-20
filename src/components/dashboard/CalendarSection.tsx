@@ -596,18 +596,50 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     }
   };
 
-  const renderJobCard = (job: any, day: Date) => (
-    <JobCard
-      job={job}
-      date={day}
-      dateTypes={dateTypes}
-      setDateTypes={setDateTypes}
-      onEditJob={() => handleEditJob(job)}
-      onDeleteJob={() => handleDeleteJob(job.id)}
-      onCreateFlexFolders={() => createFlexFolders(job)}
-      userRole={userRole}
-    />
-  );
+  const JobCard = ({ job, date, dateTypes, setDateTypes, onEditJob, onDeleteJob, onCreateFlexFolders, userRole }) => {
+    const hasDateType = dateTypes && dateTypes[`${job.id}-${format(date, "yyyy-MM-dd")}`]?.type;
+    const dateType = hasDateType || null;
+    
+    return (
+      <div className="job-card-wrapper relative">
+        <JobOptionsContextMenu
+          jobId={job.id}
+          onEditJob={onEditJob}
+          onDeleteJob={onDeleteJob}
+          onCreateFlexFolders={onCreateFlexFolders}
+          flexFoldersExist={job.flex_folders_created || false}
+          userRole={userRole}
+        >
+          <div className="relative z-10 bg-white dark:bg-gray-800 rounded border p-1 text-xs hover:shadow-md transition-shadow cursor-pointer"
+              style={{
+                backgroundColor: job.color || "#cccccc",
+                color: job.color ? getContrastColor(job.color) : "#000000",
+                borderColor: "rgba(0,0,0,0.1)",
+              }}
+          >
+            <div className="flex items-center gap-1">
+              {dateType && (
+                <Badge variant="outline" className="bg-white/25 text-[0.65rem] px-1 h-4">
+                  {dateType}
+                </Badge>
+              )}
+              <span className="truncate">{job.title}</span>
+            </div>
+          </div>
+        </JobOptionsContextMenu>
+        
+        <div className="absolute inset-0 z-20">
+          <DateTypeContextMenu
+            jobId={job.id}
+            date={date}
+            onTypeChange={onDateTypeChange}
+          >
+            <div className="w-full h-full date-type-context-trigger"></div>
+          </DateTypeContextMenu>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <Card className="h-full flex flex-col">
@@ -862,4 +894,15 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
               <div className="space-y-1 mt-1 calendar-job-list">
                 {dayJobs.slice(0, maxVisibleJobs).map((job: any) => renderJobCard(job, day))}
                 {dayJobs.length > maxVisibleJobs && (
-                  <div className="text-xs text-muted-foreground mt-1 bg-accent/30 p-1
+                  <div className="text-xs text-muted-foreground mt-1 bg-accent/30 p-1 rounded">
+                    +{dayJobs.length - maxVisibleJobs} more
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
