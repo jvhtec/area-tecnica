@@ -16,7 +16,8 @@ export const WirelessSetupSection = ({ formData, onChange, gearSetup }: SectionP
           <EquipmentSelect
             value={formData.wireless_model}
             onChange={(value) => onChange({ wireless_model: value })}
-            options={gearSetup?.wireless_systems || WIRELESS_SYSTEMS}
+            options={gearSetup?.wireless_systems || []}
+            fallbackOptions={WIRELESS_SYSTEMS}
             placeholder="Select wireless system"
           />
           <div className="grid grid-cols-2 gap-4">
@@ -62,7 +63,8 @@ export const WirelessSetupSection = ({ formData, onChange, gearSetup }: SectionP
           <EquipmentSelect
             value={formData.iem_model}
             onChange={(value) => onChange({ iem_model: value })}
-            options={gearSetup?.iem_systems || IEM_SYSTEMS}
+            options={gearSetup?.iem_systems || []}
+            fallbackOptions={IEM_SYSTEMS}
             placeholder="Select IEM system"
           />
           <div>

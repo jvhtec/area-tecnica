@@ -21,7 +21,8 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup }: SectionPr
           <EquipmentSelect
             value={formData.foh_console}
             onChange={(value) => onChange({ foh_console: value })}
-            options={gearSetup?.foh_consoles || consoleOptions}
+            options={gearSetup?.foh_consoles || []}
+            fallbackOptions={consoleOptions}
             placeholder="Select console"
           />
         </div>
@@ -32,7 +33,8 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup }: SectionPr
           <EquipmentSelect
             value={formData.mon_console}
             onChange={(value) => onChange({ mon_console: value })}
-            options={gearSetup?.mon_consoles || consoleOptions}
+            options={gearSetup?.mon_consoles || []}
+            fallbackOptions={consoleOptions}
             placeholder="Select console"
           />
         </div>
