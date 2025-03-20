@@ -1,9 +1,9 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Image, Upload, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 
 interface TourLogoManagerProps {
@@ -17,16 +17,14 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
-  const fetchExistingLogo = async () => {
+  const fetchExistingLogo = useCallback(async () => {
     try {
       console.log("Fetching logo for tour:", tourId);
       
-      if (!user) {
-        console.log("No authenticated user found");
+      if (!tourId) {
+        console.log("No tour ID provided");
         return;
       }
-      
-      console.log("Current user:", user.id);
       
       const { data, error } = await supabase
         .from('tour_logos')
@@ -62,7 +60,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       console.error('Unexpected error in fetchExistingLogo:', error);
       setErrorDetails(`Unexpected error: ${error.message}`);
     }
-  };
+  }, [tourId]);
 
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     setErrorDetails(null);
@@ -78,19 +76,22 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       return;
     }
 
-    if (!user) {
+    const userData = await supabase.auth.getUser();
+    if (!userData.data.user) {
       toast({
-        title: "Authentication error",
+        title: "Authentication required",
         description: "You must be logged in to upload logos",
         variant: "destructive",
       });
       return;
     }
+    
+    const userId = userData.data.user.id;
 
     setIsUploading(true);
     try {
       console.log("Uploading logo for tour:", tourId);
-      console.log("Authenticated user:", user.id);
+      console.log("Authenticated user:", userId);
       
       const fileExt = file.name.split('.').pop();
       const filePath = `${tourId}.${fileExt}`;
@@ -145,7 +146,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
           file_name: file.name,
           content_type: file.type,
           file_size: file.size,
-          uploaded_by: user.id,
+          uploaded_by: userId,
         });
 
       if (dbError) {
@@ -183,17 +184,20 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
   const handleDeleteLogo = async () => {
     setErrorDetails(null);
     
-    if (!user) {
+    const userData = await supabase.auth.getUser();
+    if (!userData.data.user) {
       toast({
-        title: "Authentication error",
+        title: "Authentication required",
         description: "You must be logged in to delete logos",
         variant: "destructive",
       });
       return;
     }
     
+    const userId = userData.data.user.id;
+    
     try {
-      console.log("Deleting logo as user:", user.id);
+      console.log("Deleting logo as user:", userId);
       
       const { data, error: fetchError } = await supabase
         .from('tour_logos')
@@ -250,10 +254,10 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
   };
 
   useEffect(() => {
-    if (tourId && user) {
+    if (tourId) {
       fetchExistingLogo();
     }
-  }, [tourId, user]); 
+  }, [tourId, fetchExistingLogo]); 
 
   return (
     <div className="space-y-4">
