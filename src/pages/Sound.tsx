@@ -138,7 +138,7 @@ const Sound = () => {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-12">
+        <div className="lg:col-span-8">
           <CalendarSection 
             date={date} 
             onDateSelect={setDate}
@@ -147,7 +147,7 @@ const Sound = () => {
             onDateTypeChange={() => {}}
           />
         </div>
-        <div className="lg:col-span-4">
+        <div className="lg:col-span-12">
           <TodaySchedule
             jobs={getSelectedDateJobs()}
             onEditClick={handleEditClick}

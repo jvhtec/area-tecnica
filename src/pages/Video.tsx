@@ -135,7 +135,7 @@ const Video = () => {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-8">
+        <div className="lg:col-span-12">
           <CalendarSection 
             date={date} 
             onDateSelect={setDate}
@@ -144,7 +144,7 @@ const Video = () => {
             onDateTypeChange={() => {}} // Add empty handler as it's required
           />
         </div>
-        <div className="lg:col-span-4">
+        <div className="lg:col-span-12">
           <TodaySchedule
             jobs={getSelectedDateJobs()}
             onEditClick={handleEditClick}
