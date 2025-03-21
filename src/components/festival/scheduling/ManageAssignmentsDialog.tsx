@@ -26,6 +26,16 @@ interface ManageAssignmentsDialogProps {
   isViewOnly?: boolean;
 }
 
+// Define a type for the technician object
+interface Technician {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  department: string;
+  role: string;
+}
+
 export const ManageAssignmentsDialog = ({ 
   open, 
   onOpenChange, 
@@ -74,11 +84,11 @@ export const ManageAssignmentsDialog = ({
         throw error;
       }
 
-      // Filter by department
+      // Filter by department and map to get just the profiles
       const filteredTechnicians = data
         .filter(assignment => assignment.profiles && 
                 assignment.profiles.department === departmentFilter)
-        .map(assignment => assignment.profiles);
+        .map(assignment => assignment.profiles) as Technician[];
 
       console.log(`Found ${filteredTechnicians.length} technicians assigned to job ${shift.job_id} for department ${departmentFilter}`);
       return filteredTechnicians;
@@ -114,7 +124,7 @@ export const ManageAssignmentsDialog = ({
   };
 
   // Format technician display name
-  const formatTechnicianName = (technician: any) => {
+  const formatTechnicianName = (technician: Technician) => {
     const isHouseTech = technician.role === 'house_tech';
     return `${technician.first_name} ${technician.last_name}${isHouseTech ? ' (House Tech)' : ''}`;
   };
