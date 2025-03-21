@@ -36,10 +36,10 @@ interface Technician {
   role: string;
 }
 
-// Define the structure of the assignment response from Supabase
-interface TechnicianAssignmentResponse {
+// Define the structure for the job_assignments response from Supabase
+interface JobAssignmentResponse {
   technician_id: string;
-  profiles: Technician | null;
+  profiles: Technician;
 }
 
 export const ManageAssignmentsDialog = ({ 
@@ -92,15 +92,14 @@ export const ManageAssignmentsDialog = ({
 
       // Filter by department and map to get just the profiles
       const filteredTechnicians = data
-        .filter((assignment: TechnicianAssignmentResponse) => 
+        .filter((assignment: any) => 
           assignment.profiles && 
           assignment.profiles.department === departmentFilter
         )
-        .map((assignment: TechnicianAssignmentResponse) => assignment.profiles)
-        .filter((profile): profile is Technician => profile !== null);
+        .map((assignment: any) => assignment.profiles);
 
       console.log(`Found ${filteredTechnicians.length} technicians assigned to job ${shift.job_id} for department ${departmentFilter}`);
-      return filteredTechnicians;
+      return filteredTechnicians as Technician[];
     },
   });
 
