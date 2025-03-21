@@ -49,21 +49,39 @@ export const ManageAssignmentsDialog = ({
   }, [open, shift.department]);
 
   const { data: technicians, isLoading: isLoadingTechnicians, error: techniciansError } = useQuery({
-    queryKey: ["technicians"],
+    queryKey: ["job-technicians", shift.job_id, shift.department],
     queryFn: async () => {
       const departmentFilter = shift.department || "sound";
       
+      // First, get assigned technicians for this job and department
       const { data, error } = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name, email, department, role")
-        .eq("department", departmentFilter)
-        .in("role", ["technician", "house_tech"]);
+        .from("job_assignments")
+        .select(`
+          technician_id,
+          profiles (
+            id, 
+            first_name, 
+            last_name, 
+            email, 
+            department, 
+            role
+          )
+        `)
+        .eq("job_id", shift.job_id);
 
       if (error) {
-        console.error("Error fetching technicians:", error);
+        console.error("Error fetching job assignments:", error);
         throw error;
       }
-      return data;
+
+      // Filter by department
+      const filteredTechnicians = data
+        .filter(assignment => assignment.profiles && 
+                assignment.profiles.department === departmentFilter)
+        .map(assignment => assignment.profiles);
+
+      console.log(`Found ${filteredTechnicians.length} technicians assigned to job ${shift.job_id} for department ${departmentFilter}`);
+      return filteredTechnicians;
     },
   });
 
@@ -255,22 +273,26 @@ export const ManageAssignmentsDialog = ({
         
         <div className="space-y-4">
           <h3 className="text-sm font-medium">Assigned Staff</h3>
-          {shift.assignments.map(assignment => (
-            <div key={assignment.id} className="flex items-center justify-between p-2 bg-accent/20 rounded-md">
-              <div>
-                {assignment.profiles?.first_name} {assignment.profiles?.last_name} - {assignment.role}
+          {shift.assignments.length > 0 ? (
+            shift.assignments.map(assignment => (
+              <div key={assignment.id} className="flex items-center justify-between p-2 bg-accent/20 rounded-md">
+                <div>
+                  {assignment.profiles?.first_name} {assignment.profiles?.last_name} - {assignment.role}
+                </div>
+                {!isViewOnly && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleRemoveAssignment(assignment.id)}
+                  >
+                    Remove
+                  </Button>
+                )}
               </div>
-              {!isViewOnly && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => handleRemoveAssignment(assignment.id)}
-                >
-                  Remove
-                </Button>
-              )}
-            </div>
-          ))}
+            ))
+          ) : (
+            <div className="text-sm text-muted-foreground">No staff assigned to this shift yet.</div>
+          )}
         </div>
         
         <DialogFooter>
