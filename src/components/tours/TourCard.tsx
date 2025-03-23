@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Edit2, FileText } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { TourManagementDialog } from "./TourManagementDialog";
 import { useTourLogo } from "@/hooks/useTourLogo";
 
@@ -23,7 +23,7 @@ export const TourCard = ({
   const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
   const [dialogKey, setDialogKey] = useState(0); // Used to force re-render of dialog
   
-  // Use the tour logo hook instead of custom fetching logic
+  // Use the tour logo hook to fetch the logo
   const { logoUrl } = useTourLogo(undefined, tour.id);
   
   // Handle dialog close with refresh
