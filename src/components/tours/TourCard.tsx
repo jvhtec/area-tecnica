@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Edit2, FileText } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TourManagementDialog } from "./TourManagementDialog";
-import { useTourLogo } from "@/hooks/useTourLogo";
+import { supabase } from "@/lib/supabase";
 
 interface TourCardProps {
   tour: any;
@@ -21,17 +21,59 @@ export const TourCard = ({
   onPrint
 }: TourCardProps) => {
   const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [dialogKey, setDialogKey] = useState(0); // Used to force re-render of dialog
   
-  // Use the tour logo hook to fetch the logo
-  const { logoUrl } = useTourLogo(undefined, tour.id);
+  // Function to fetch the tour logo
+  const fetchLogo = async () => {
+    try {
+      console.log("Fetching tour logo for:", tour.id);
+      
+      const { data, error } = await supabase
+        .from('tour_logos')
+        .select('file_path')
+        .eq('tour_id', tour.id)
+        .maybeSingle();
+      
+      if (error) {
+        console.error("Error fetching tour logo:", error);
+        setLogoUrl(null);
+        return;
+      }
+      
+      if (!data) {
+        console.log("No logo found for tour:", tour.id);
+        setLogoUrl(null);
+        return;
+      }
+      
+      const { data: urlData } = supabase
+        .storage
+        .from('tour-logos')
+        .getPublicUrl(data.file_path);
+        
+      console.log("Tour card logo URL:", urlData.publicUrl);
+      setLogoUrl(urlData.publicUrl);
+    } catch (error) {
+      console.error("Unexpected error fetching logo:", error);
+      setLogoUrl(null);
+    }
+  };
+  
+  // Effect to fetch logo when component mounts or tour changes
+  useEffect(() => {
+    if (tour && tour.id) {
+      fetchLogo();
+    }
+  }, [tour.id]);
   
   // Handle dialog close with refresh
   const handleDialogOpenChange = (open: boolean) => {
     setIsManageDialogOpen(open);
     
-    // When the dialog closes, increment key to force re-render
+    // When the dialog closes, refresh logo and increment key to force re-render
     if (!open) {
+      fetchLogo();
       setDialogKey(prevKey => prevKey + 1);
     }
   };
@@ -58,7 +100,7 @@ export const TourCard = ({
             const target = e.target as HTMLImageElement;
             target.onerror = null;
             target.src =
-              'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTAgMTRIMTRWMTZIMTBWMTRaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48cGF0aCBkPSJNMTIgMUMxNC4yMDkxIDEgMTYgMi43OTA4NiAxNiA1QzE2IDcuMjA5MTQgMTQuMjA5MSA5IDEyIDlDOS43OTA4NiA5IDggNy4yMDkxNCA4IDVDOCAyLjc5MDg2IDkuNzkwODYgMSAxMiAxWiIgZmlsbD0iY3VycmVudENvbG9yIi8+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xIDEzQzEgMTAuNzkwOSAyLjc5MDg2IDkgNSA5SDE5QzIxLjIwOTEgOSAyMyAxMC43OTA5IDIzIDEzVjE5QzIzIDIwLjEwNDYgMjIuMTA0NiAyMSAyMSAyMUgzQzEuODk1NDMgMjEgMSAyMC4xMDQ2IDEgMTlWMTNaTTE5IDExSDVDMy44OTU0MyAxMSAzIDExLjg5NTQgMyAxM0MzIDE1LjIwOTEgNC43OTA5MSAxNyA3IDE3SDE3QzE5LjIwOTEgMTcgMjEgMTUuMjA5MSAyMSAxM0MyMSAxMS44OTU0IDIwLjEwNDYgMTEgMTkgMTFaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48L3N2Zz4=';
+              'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTAgMTRIMTRWMTZIMTBWMTRaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48cGF0aCBkPSJNMTIgMUMxNC4yMDkxIDEgMTYgMi43OTA4NiAxNiA1QzE2IDcuMjA5MTQgMTQuMjA5MSA5IDEyIDlDOS43OTA4NiA9IDggNy4yMDkxNCA4IDVDOCAyLjc5MDg2IDkuNzkwODYgMSAxMiAxWiIgZmlsbD0iY3VycmVudENvbG9yIi8+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xIDEzQzEgMTAuNzkwOSAyLjc5MDg2IDkgMSA5SDE5QzIxLjIwOTEgOSAyMyAxMC43OTA5IDIzIDEzVjE5QzIzIDIwLjEwNDYgMjIuMTA0NiAyMSAyMSAyMUgzQzEuODk1NDMgMjEgMSAyMC4xMDQ2IDEgMTlWMTNaTTE5IDExSDVDMy44OTU0MyAxMSAzIDExLjg5NTQgMyAxM0MzIDE1LjIwOTEgNC43OTA5MSAxNyA3IDE3SDE3QzE5LjIwOTEgMTcgMjEgMTUuMjA9MSAyMSAxM0MyMSAxMS44OTU0IDIwLjEwNDYgMTEgMTkgMTFaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48L3N2Zz4=';
           }}
         />
       </div>
