@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -8,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Department } from "@/types/department";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { useNavigate } from "react-router-dom";
+import { useTourLogo } from "@/hooks/useTourLogo";
 
 import { 
   createAllFoldersForJob
@@ -98,6 +100,13 @@ export function JobCardNew({
   const [videoTaskDialogOpen, setVideoTaskDialogOpen] = useState(false);
   const [editJobDialogOpen, setEditJobDialogOpen] = useState(false);
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
+
+  // Use the tour logo hook to get the logo for this job
+  const { logoUrl } = useTourLogo(
+    job.id,
+    job.tour_id,
+    job.tour_date_id
+  );
 
   const getDateTypeIcon = (jobId: string, date: Date, dateTypes: Record<string, any>) => {
     const key = `${jobId}-${format(date, "yyyy-MM-dd")}`;
@@ -618,7 +627,8 @@ export function JobCardNew({
     showManageArtists,
     userRole,
     canManageArtists,
-    isProjectManagementPage
+    isProjectManagementPage,
+    tourLogo: logoUrl
   });
 
   return (
@@ -749,6 +759,26 @@ export function JobCardNew({
         </div>
 
         <div className="px-6 pb-6">
+          {/* Add tour logo here if available */}
+          {logoUrl && (
+            <div className="flex justify-center mb-4">
+              <div className="h-16 w-16 flex-shrink-0 overflow-hidden">
+                <img
+                  src={logoUrl}
+                  alt={`${job.title} logo`}
+                  className="h-full w-full object-contain"
+                  onError={(e) => {
+                    console.error('Image failed to load:', logoUrl);
+                    const target = e.target as HTMLImageElement;
+                    target.onerror = null;
+                    target.src =
+                      'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTAgMTRIMTRWMTZIMTBWMTRaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48cGF0aCBkPSJNMTIgMUMxNC4yMDkxIDEgMTYgMi43OTA4NiAxNiA1QzE2IDcuMjA5MTQgMTQuMjA5MSA5IDEyIDlDOS43OTA4NiA5IDggNy4yMDkxNCA4IDVDOCAyLjc5MDg2IDkuNzkwODYgMSAxMiAxWiIgZmlsbD0iY3VycmVudENvbG9yIi8+PHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xIDEzQzEgMTAuNzkwOSAyLjc5MDg2IDkgNSA5SDE5QzIxLjIwOTEgOSAyMyAxMC43OTA5IDIzIDEzVjE5QzIzIDIwLjEwNDYgMjIuMTA0NiAyMSAyMSAyMUgzQzEuODk1NDMgMjEgMSAyMC4xMDQ2IDEgMTlWMTNaTTE5IDExSDVDMy44OTU0MyAxMSAzIDExLjg5NTQgMyAxM0MzIDE1LjIwOTEgNC43OTA5MSAxNyA3IDE3SDE3QzE5LjIwOTEgMTcgMjEgMTUuMjA5MSAyMSAxM0MyMSAxMS44OTU0IDIwLjEwNDYgMTEgMTkgMTFaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48L3N2Zz4=';
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          
           <div className="space-y-2 text-sm">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
