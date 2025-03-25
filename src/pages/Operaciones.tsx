@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
@@ -62,6 +63,7 @@ const Operaciones = () => {
     fetchUserRole();
   }, []);
 
+  // Add the missing getDepartmentJobs function
   const getDepartmentJobs = () => {
     if (!jobs) {
       console.log("Video page: No jobs data available");

@@ -2897,7 +2897,7 @@ export type Database = {
       form_status: "pending" | "submitted" | "expired"
       global_preset_status: "available" | "unavailable" | "tentative"
       job_date_type: "travel" | "setup" | "show" | "off" | "rehearsal"
-      job_status: "Tentativa" | "Confirmado" | "Completado" | "Cancelado"
+      job_status: "pending" | "in_progress" | "completed" | "cancelled"
       job_type: "single" | "tour" | "festival" | "dryhire" | "tourdate"
       logistics_event_type: "load" | "unload"
       message_status: "unread" | "read"
