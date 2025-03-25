@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 import { Department } from "@/types/department";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { useNavigate } from "react-router-dom";
-import { JobStatusBadge } from "@/components/jobs/JobStatusBadge";
 
 import { 
   createAllFoldersForJob
@@ -642,7 +641,6 @@ export function JobCardNew({
                 {getDateTypeIcon(job.id, new Date(job.start_time), dateTypes)}
                 <span className="font-medium text-lg truncate">{job.title}</span>
                 {getBadgeForJobType(job.job_type)}
-                <JobStatusBadge jobId={job.id} status={job.status} />
               </div>
               <Button
                 variant="ghost"

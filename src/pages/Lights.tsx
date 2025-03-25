@@ -128,7 +128,7 @@ const Lights = () => {
             onDateSelect={setDate}
             jobs={getDepartmentJobs()}
             department={currentDepartment}
-            onDateTypeChange={() => {}} // Add empty handler as required
+            onDateTypeChange={() => {}} // Add empty handler as it's required
           />
         </div>
         <div className="lg:col-span-12">

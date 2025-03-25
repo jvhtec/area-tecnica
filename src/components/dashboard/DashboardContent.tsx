@@ -13,7 +13,7 @@ interface DashboardContentProps {
   onDeleteClick: (jobId: string) => void;
   onJobClick: (jobId: string) => void;
   userRole: string | null;
-  onDateTypeChange: () => void;
+  onDateTypeChange: () => void;  // Added this prop to the interface
 }
 
 export const DashboardContent = ({
@@ -43,7 +43,6 @@ export const DashboardContent = ({
           date={date} 
           onDateSelect={setDate} 
           jobs={jobs} 
-          department="all" 
           onDateTypeChange={onDateTypeChange}
         />
       </div>

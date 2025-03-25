@@ -512,7 +512,7 @@ const FestivalArtistManagement = () => {
                       <DateTypeContextMenu 
                         key={formattedDateValue}
                         jobId={jobId || ''}
-                        date={formattedDateValue}
+                        date={date}
                         onTypeChange={() => refetchDateTypes()}
                       >
                         <TooltipProvider>
@@ -536,7 +536,6 @@ const FestivalArtistManagement = () => {
                     );
                   })}
                 </TabsList>
-                
                 {jobDates.map((date) => (
                   <TabsContent
                     key={format(date, 'yyyy-MM-dd')}
