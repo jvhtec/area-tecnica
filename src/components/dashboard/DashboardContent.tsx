@@ -44,6 +44,7 @@ export const DashboardContent = ({
           onDateSelect={setDate} 
           jobs={jobs} 
           onDateTypeChange={onDateTypeChange}
+          department="" // Pass empty string to show all departments
         />
       </div>
       
