@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { format, isWithinInterval, parseISO } from 'date-fns';
 import { Calendar as CalendarIcon } from "lucide-react";
@@ -42,7 +43,7 @@ export function CalendarSection({
     console.log("Job clicked:", jobId);
   };
 
-  const renderContent = (date: Date, jobs: any[]) => {
+  const renderContent = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const jobsForDate = jobs.filter(job => {
       const startDate = format(new Date(job.start_time), 'yyyy-MM-dd');
@@ -113,7 +114,14 @@ export function CalendarSection({
             selected={date}
             onSelect={onDateSelect}
             initialFocus
-            renderDay={(date) => renderContent(date, jobs)}
+            components={{
+              Day: (props) => (
+                <div>
+                  {props.children}
+                  {renderContent(props.date)}
+                </div>
+              )
+            }}
           />
         </PopoverContent>
       </Popover>

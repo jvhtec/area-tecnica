@@ -17,7 +17,7 @@ export const LightsCalendar = ({ date, onSelect, jobs = [] }: LightsCalendarProp
           onDateSelect={onSelect}
           jobs={jobs}
           department="lights"
-          onDateTypeChange={() => {}} // Add empty handler as it's required
+          onDateTypeChange={() => {}} // Empty handler as required
         />
       </CardContent>
     </Card>

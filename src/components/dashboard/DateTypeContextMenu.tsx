@@ -4,7 +4,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, Con
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
-import { Check, X, AlertCircle, Clock, Calendar } from 'lucide-react';
+import { Check, X, AlertCircle, Clock, Calendar, Star, Plane, Wrench, Moon, Mic } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { JobStatusBadge } from '@/components/jobs/JobStatusBadge';
 

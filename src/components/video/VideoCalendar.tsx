@@ -17,7 +17,7 @@ export const VideoCalendar = ({ date, onSelect, jobs = [] }: VideoCalendarProps)
           onDateSelect={onSelect}
           jobs={jobs}
           department="video"
-          onDateTypeChange={() => {}} // Add empty handler as it's required
+          onDateTypeChange={() => {}} // Empty handler as required
         />
       </CardContent>
     </Card>

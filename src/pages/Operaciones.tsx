@@ -141,7 +141,7 @@ const Operaciones = () => {
             onDateSelect={setDate}
             jobs={getDepartmentJobs()}
             department={currentDepartment}
-            onDateTypeChange={() => {}} // Add empty handler as it's required
+            onDateTypeChange={() => {}} // Add empty handler as required
           />
         </div>
         <div className="lg:col-span-4">
