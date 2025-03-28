@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -637,10 +636,10 @@ export function JobCardNew({
       >
         <div className="p-6 pb-3">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
               <div className="flex items-center gap-1">
                 {getDateTypeIcon(job.id, new Date(job.start_time), dateTypes)}
-                <span className="font-medium text-lg break-words whitespace-normal">{job.title}</span>
+                <span className="font-medium text-lg truncate">{job.title}</span>
                 {getBadgeForJobType(job.job_type)}
               </div>
               <Button
