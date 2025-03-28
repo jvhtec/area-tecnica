@@ -640,7 +640,7 @@ export function JobCardNew({
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <div className="flex items-center gap-1">
                 {getDateTypeIcon(job.id, new Date(job.start_time), dateTypes)}
-                <span className="font-medium text-lg break-words line-clamp-2">{job.title}</span>
+                <span className="font-medium text-lg break-words whitespace-normal">{job.title}</span>
                 {getBadgeForJobType(job.job_type)}
               </div>
               <Button
