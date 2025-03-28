@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -720,135 +721,138 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto md:max-h-none md:h-auto md:overflow-visible">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Manage Tour Dates</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          {tourDates.length > 0 && (
-            <Button
-              onClick={createAllFolders}
-              className="w-full"
-              variant="outline"
-              disabled={isCreatingFolders}
-            >
-              <FolderPlus className="h-4 w-4 mr-2" />
-              Create Folders for All Dates
-            </Button>
-          )}
+        
+        <ScrollArea className="h-[60vh] pr-4">
           <div className="space-y-4">
-            {tourDates?.map((dateObj) => {
-              const foldersExist = foldersExistenceMap?.[dateObj.id] || false;
+            {tourDates.length > 0 && (
+              <Button
+                onClick={createAllFolders}
+                className="w-full"
+                variant="outline"
+                disabled={isCreatingFolders}
+              >
+                <FolderPlus className="h-4 w-4 mr-2" />
+                Create Folders for All Dates
+              </Button>
+            )}
+            <div className="space-y-4">
+              {tourDates?.map((dateObj) => {
+                const foldersExist = foldersExistenceMap?.[dateObj.id] || false;
 
-              return (
-                <div key={dateObj.id} className="p-3 border rounded-lg">
-                  {editingTourDate && editingTourDate.id === dateObj.id ? (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        <Input
-                          type="date"
-                          value={editDateValue}
-                          onChange={(e) => setEditDateValue(e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4" />
-                        <Input
-                          type="text"
-                          value={editLocationValue}
-                          onChange={(e) => setEditLocationValue(e.target.value)}
-                          placeholder="Location"
-                          required
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <Button onClick={() => submitEditing(dateObj.id)}>
-                          Save
-                        </Button>
-                        <Button variant="outline" onClick={cancelEditing}>
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-sm">
+                return (
+                  <div key={dateObj.id} className="p-3 border rounded-lg">
+                    {editingTourDate && editingTourDate.id === dateObj.id ? (
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4" />
-                          <span>{format(new Date(dateObj.date), "MMM d, yyyy")}</span>
+                          <Input
+                            type="date"
+                            value={editDateValue}
+                            onChange={(e) => setEditDateValue(e.target.value)}
+                            required
+                          />
                         </div>
-                        {dateObj.location?.name && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <MapPin className="h-4 w-4" />
-                            <span>{dateObj.location.name}</span>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          <Input
+                            type="text"
+                            value={editLocationValue}
+                            onChange={(e) => setEditLocationValue(e.target.value)}
+                            placeholder="Location"
+                            required
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button onClick={() => submitEditing(dateObj.id)}>
+                            Save
+                          </Button>
+                          <Button variant="outline" onClick={cancelEditing}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="h-4 w-4" />
+                            <span>{format(new Date(dateObj.date), "MMM d, yyyy")}</span>
                           </div>
-                        )}
+                          {dateObj.location?.name && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <MapPin className="h-4 w-4" />
+                              <span>{dateObj.location.name}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleCreateFoldersForDate(dateObj)}
+                            title="Create Flex folders"
+                            disabled={dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id) || foldersExist}
+                            className={(dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id) || foldersExist) ? "opacity-50 cursor-not-allowed" : ""}
+                          >
+                            <FolderPlus className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => startEditing(dateObj)}
+                            title="Edit Date"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteDate(dateObj.id)}
+                            title="Delete Date"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleCreateFoldersForDate(dateObj)}
-                          title="Create Flex folders"
-                          disabled={dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id) || foldersExist}
-                          className={(dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id) || foldersExist) ? "opacity-50 cursor-not-allowed" : ""}
-                        >
-                          <FolderPlus className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => startEditing(dateObj)}
-                          title="Edit Date"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteDate(dateObj.id)}
-                          title="Delete Date"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              const date = formData.get("date") as string;
-              const location = formData.get("location") as string;
-              if (!date || !location) {
-                toast({
-                  title: "Error",
-                  description: "Please fill in all fields",
-                  variant: "destructive",
-                });
-                return;
-              }
-              handleAddDate(date, location);
-              e.currentTarget.reset();
-            }}
-            className="space-y-4"
-          >
-            <div className="grid grid-cols-2 gap-4">
-              <Input type="date" name="date" required />
-              <Input type="text" name="location" placeholder="Location" required />
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <Button type="submit" className="w-full">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Date
-            </Button>
-          </form>
-        </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                const date = formData.get("date") as string;
+                const location = formData.get("location") as string;
+                if (!date || !location) {
+                  toast({
+                    title: "Error",
+                    description: "Please fill in all fields",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                handleAddDate(date, location);
+                e.currentTarget.reset();
+              }}
+              className="space-y-4"
+            >
+              <div className="grid grid-cols-2 gap-4">
+                <Input type="date" name="date" required />
+                <Input type="text" name="location" placeholder="Location" required />
+              </div>
+              <Button type="submit" className="w-full">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Date
+              </Button>
+            </form>
+          </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
