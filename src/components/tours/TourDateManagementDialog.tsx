@@ -719,7 +719,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible">
+      <DialogContent className="max-h-[90vh] overflow-y-auto md:max-h-none md:h-auto md:overflow-visible" />
         <DialogHeader>
           <DialogTitle>Manage Tour Dates</DialogTitle>
         </DialogHeader>
