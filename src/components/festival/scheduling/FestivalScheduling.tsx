@@ -6,12 +6,12 @@ import { ShiftsList } from "./ShiftsList";
 import { CreateShiftDialog } from "./CreateShiftDialog";
 import { ShiftsTable } from "./ShiftsTable";
 import { Button } from "@/components/ui/button";
-import { Plus, FileDown, RefreshCw } from "lucide-react";
+import { Plus, FileDown, RefreshCw, Wifi, WifiOff, Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
-import { useFestivalShifts } from "@/hooks/festival/useFestivalShifts";
+import { useEnhancedFestivalShifts } from "@/hooks/festival/useEnhancedFestivalShifts";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface FestivalSchedulingProps {
   jobId: string;
@@ -23,7 +23,6 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [isCreateShiftOpen, setIsCreateShiftOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "table">("list");
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
   
   const formatDateToString = useCallback((date: Date): string => {
@@ -58,7 +57,13 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
   }, [jobDates, selectedDate, formatDateToString]);
 
   // Use our enhanced hook to fetch shifts with real-time updates and auto-recovery
-  const { shifts, isLoading, refetch } = useFestivalShifts({
+  const { 
+    shifts, 
+    isLoading, 
+    refetch, 
+    isRefreshing, 
+    connectionStatus 
+  } = useEnhancedFestivalShifts({
     jobId,
     selectedDate
   });
@@ -70,8 +75,6 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
 
   const handleDeleteShift = async (shiftId: string) => {
     try {
-      setIsRefreshing(true);
-      
       // Delete shift assignments first to avoid foreign key constraints
       await supabase
         .from("festival_shift_assignments")
@@ -99,28 +102,16 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
         description: `Failed to delete shift: ${error.message}`,
         variant: "destructive",
       });
-    } finally {
-      setIsRefreshing(false);
     }
   };
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      await refetch();
-      toast({
-        title: "Success",
-        description: "Shifts refreshed successfully",
-      });
-    } catch (error) {
-      console.error("Error refreshing shifts:", error);
-      toast({
-        title: "Error",
-        description: "Failed to refresh shifts",
-        variant: "destructive",
-      });
-    } finally {
-      setIsRefreshing(false);
+  const getConnectionStatusIcon = () => {
+    if (connectionStatus === 'connecting') {
+      return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
+    } else if (connectionStatus === 'connected') {
+      return <Wifi className="h-4 w-4 text-green-500" />;
+    } else {
+      return <WifiOff className="h-4 w-4 text-red-500" />;
     }
   };
 
@@ -155,7 +146,7 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
               size="sm" 
               variant="outline" 
               className="flex items-center gap-1"
-              onClick={handleRefresh}
+              onClick={refetch}
               disabled={isRefreshing}
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
@@ -193,12 +184,28 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
               })}
             </TabsList>
           </Tabs>
-          <SubscriptionIndicator 
-            tables={['festival_shifts', 'festival_shift_assignments']} 
-            variant="compact"
-            showRefreshButton
-            onRefresh={handleRefresh}
-          />
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center space-x-1 text-xs">
+                  {getConnectionStatusIcon()}
+                  <span>
+                    {connectionStatus === 'connected' ? 'Live' : 
+                     connectionStatus === 'connecting' ? 'Connecting' : 'Offline'}
+                  </span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">
+                  {connectionStatus === 'connected' 
+                    ? 'Real-time updates active' 
+                    : connectionStatus === 'connecting'
+                    ? 'Establishing connection...'
+                    : 'Real-time updates offline - click refresh for latest data'}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
         <div className="mt-2 flex justify-end">
           <Button 
@@ -213,7 +220,10 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="flex justify-center p-8">Loading...</div>
+          <div className="flex justify-center p-8">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <span className="ml-2">Loading...</span>
+          </div>
         ) : shifts.length === 0 ? (
           <div className="text-center p-8 text-muted-foreground">
             No shifts scheduled for this date. {!isViewOnly && "Click \"Create Shift\" to add one."}

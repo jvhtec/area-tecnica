@@ -1,79 +1,100 @@
 
-import { useState, useEffect, useCallback } from 'react';
-import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
-import { formatDistanceToNow } from 'date-fns';
+import { useState, useEffect } from 'react';
+import { format, formatDistanceToNow } from 'date-fns';
+import { useQueryClient } from '@tanstack/react-query';
+import { EnhancedSubscriptionManager } from '@/lib/enhanced-subscription-manager';
 
 /**
- * Hook to monitor subscription status for specific tables with enhanced staleness detection
- * @param tables Array of table names to monitor
- * @returns Object containing detailed subscription status information
+ * Hook to check the status of Supabase subscriptions and connection
  */
-export function useSubscriptionStatus(tables: string[]) {
-  const { 
-    subscriptionsByTable, 
-    connectionStatus, 
-    lastRefreshTime,
-    forceRefresh 
-  } = useSubscriptionContext();
+export function useSubscriptionStatus(tables: string[] = []) {
+  const queryClient = useQueryClient();
+  const manager = EnhancedSubscriptionManager.getInstance(queryClient);
   
-  const [status, setStatus] = useState({
-    isSubscribed: false,
-    tablesSubscribed: [] as string[],
-    tablesUnsubscribed: [] as string[],
-    connectionStatus,
-    lastRefreshTime: lastRefreshTime || 0,
-    isStale: false,
-    lastRefreshFormatted: '',
-    refreshSubscription: () => {}
-  });
-
-  // Create a refresh function that's specific to these tables
-  const refreshSubscription = useCallback(() => {
-    forceRefresh(tables);
-  }, [tables, forceRefresh]);
-
-  // Update status whenever relevant state changes
+  const [statuses, setStatuses] = useState<Record<string, any>>({});
+  const [lastRefreshTime, setLastRefreshTime] = useState(Date.now());
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>(
+    manager.getConnectionStatus()
+  );
+  
+  // Initialize subscriptions if they don't exist
   useEffect(() => {
-    const tablesSubscribed: string[] = [];
-    const tablesUnsubscribed: string[] = [];
-
+    const ensureSubscriptions = () => {
+      tables.forEach(table => {
+        const subscriptionStatus = manager.getSubscriptionStatus(table, table);
+        if (!subscriptionStatus.isConnected) {
+          manager.subscribeToTable(table, table);
+        }
+      });
+    };
+    
+    ensureSubscriptions();
+    const checkInterval = setInterval(ensureSubscriptions, 30000);
+    
+    return () => clearInterval(checkInterval);
+  }, [tables, manager]);
+  
+  // Set up status monitoring interval
+  useEffect(() => {
+    const statusInterval = setInterval(() => {
+      const newStatuses: Record<string, any> = {};
+      tables.forEach(table => {
+        newStatuses[table] = manager.getSubscriptionStatus(table, table);
+      });
+      
+      setStatuses(newStatuses);
+      setConnectionStatus(manager.getConnectionStatus());
+    }, 2000);
+    
+    return () => clearInterval(statusInterval);
+  }, [tables, manager]);
+  
+  // Get subscription status summary
+  const tablesSubscribed = tables.filter(table => 
+    statuses[table]?.isConnected
+  );
+  
+  const tablesUnsubscribed = tables.filter(table => 
+    !statuses[table]?.isConnected
+  );
+  
+  const isSubscribed = tables.length > 0 && tablesSubscribed.length === tables.length;
+  
+  // Check for stale data
+  const isStale = Object.values(statuses).some(status => {
+    const now = Date.now();
+    const staleDuration = 5 * 60 * 1000; // 5 minutes
+    return now - (status?.lastActivity || 0) > staleDuration;
+  });
+  
+  // Format the last refresh time
+  const lastRefreshFormatted = formatDistanceToNow(new Date(lastRefreshTime), {
+    addSuffix: true
+  });
+  
+  // Function to refresh subscriptions
+  const refreshSubscription = () => {
     tables.forEach(table => {
-      if (subscriptionsByTable[table]?.length > 0) {
-        tablesSubscribed.push(table);
-      } else {
-        tablesUnsubscribed.push(table);
-      }
+      // Refresh by recreating the subscription
+      manager.unsubscribeFromTable(`${table}::${table}`);
+      manager.subscribeToTable(table, table);
+      
+      // Invalidate the related query
+      queryClient.invalidateQueries({ queryKey: [table] });
     });
-
-    // Calculate staleness with dynamic thresholds based on connection status
-    let staleThreshold = 5 * 60 * 1000; // 5 minutes default
     
-    // If we're disconnected, reduce threshold to mark as stale sooner
-    if (connectionStatus !== 'connected') {
-      staleThreshold = 60 * 1000; // 1 minute when disconnected
-    }
-    
-    const isStale = Date.now() - lastRefreshTime > staleThreshold;
-    
-    // Format the last refresh time in a human-readable format
-    let lastRefreshFormatted = 'unknown';
-    try {
-      lastRefreshFormatted = formatDistanceToNow(lastRefreshTime) + ' ago';
-    } catch (error) {
-      console.error('Error formatting last refresh time:', error);
-    }
-
-    setStatus({
-      isSubscribed: tablesSubscribed.length === tables.length,
-      tablesSubscribed,
-      tablesUnsubscribed,
-      connectionStatus,
-      lastRefreshTime,
-      isStale,
-      lastRefreshFormatted,
-      refreshSubscription
-    });
-  }, [tables, subscriptionsByTable, connectionStatus, lastRefreshTime, refreshSubscription]);
-
-  return status;
+    setLastRefreshTime(Date.now());
+  };
+  
+  return {
+    isSubscribed,
+    tablesSubscribed,
+    tablesUnsubscribed,
+    lastRefreshTime,
+    lastRefreshFormatted,
+    connectionStatus,
+    isStale,
+    refreshSubscription,
+    status: connectionStatus
+  };
 }

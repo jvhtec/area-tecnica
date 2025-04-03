@@ -1,29 +1,29 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useJobsRealtime } from "@/hooks/useJobsRealtime";
+import { useFestivalsData } from "@/hooks/festival/useFestivalsData";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { JobCard } from "@/components/jobs/JobCard";
 import { Separator } from "@/components/ui/separator";
-import { Tent, Printer, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
+import { Tent, Printer, Loader2, RefreshCw, AlertTriangle, Wifi, WifiOff } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { useAuthSession } from "@/hooks/auth/useAuthSession";
-import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const Festivals = () => {
   const navigate = useNavigate();
   const { 
-    jobs, 
+    festivals, 
     isLoading, 
     isError, 
     error, 
     isRefreshing, 
     refetch, 
-    subscriptionStatus 
-  } = useJobsRealtime();
+    connectionStatus 
+  } = useFestivalsData();
   
   const [festivalJobs, setFestivalJobs] = useState<any[]>([]);
   const [festivalLogos, setFestivalLogos] = useState<Record<string, string>>({});
@@ -31,13 +31,11 @@ const Festivals = () => {
   const { userRole } = useAuthSession();
 
   useEffect(() => {
-    if (jobs) {
-      const festivals = jobs.filter(job => job.job_type === 'festival');
+    if (festivals) {
       setFestivalJobs(festivals);
-      
       festivals.forEach(fetchFestivalLogo);
     }
-  }, [jobs]);
+  }, [festivals]);
 
   const fetchFestivalLogo = async (job: any) => {
     try {
@@ -107,6 +105,16 @@ const Festivals = () => {
   // Empty functions for onEditClick and onDeleteClick since we don't want those buttons
   const emptyFunction = () => {};
 
+  const getConnectionStatusIcon = () => {
+    if (connectionStatus === 'connecting') {
+      return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
+    } else if (connectionStatus === 'connected') {
+      return <Wifi className="h-4 w-4 text-green-500" />;
+    } else {
+      return <WifiOff className="h-4 w-4 text-red-500" />;
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <Card>
@@ -117,12 +125,28 @@ const Festivals = () => {
           </div>
           
           <div className="flex items-center gap-2">
-            <SubscriptionIndicator 
-              tables={['jobs', 'job_assignments', 'job_departments', 'job_date_types']} 
-              showRefreshButton 
-              onRefresh={refetch}
-              showLabel
-            />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center mr-2">
+                    {getConnectionStatusIcon()}
+                    <span className="ml-1 text-xs">
+                      {connectionStatus === 'connected' ? 'Live' : 
+                       connectionStatus === 'connecting' ? 'Connecting...' : 'Offline'}
+                    </span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">
+                    {connectionStatus === 'connected' 
+                      ? 'Real-time updates active' 
+                      : connectionStatus === 'connecting'
+                      ? 'Establishing connection...'
+                      : 'Real-time updates offline - click refresh for latest data'}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             
             <Button 
               variant="outline" 
