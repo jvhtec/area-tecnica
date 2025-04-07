@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import {
   Dialog,
@@ -20,8 +19,10 @@ import {
   Trash2,
   FolderPlus,
   Edit,
+  Battery,
 } from "lucide-react";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
+import { BatterySalesDialog } from "./BatterySalesDialog";
 
 import {
   FLEX_FOLDER_IDS,
@@ -196,9 +197,8 @@ async function createFoldersForDate(
         }
       }
 
-      // Create department-specific hojaInfo elements for sound, lights, and video
       if (["sound", "lights", "video"].includes(dept)) {
-        const job = { title: 'Default Job Title' }; // Define the job variable
+        const job = { title: 'Default Job Title' };
         const hojaInfoType = dept === "sound"
           ? FLEX_FOLDER_IDS.hojaInfoSx
           : dept === "lights"
@@ -351,6 +351,9 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
 
   const [createdTourDateIds, setCreatedTourDateIds] = useState<string[]>([]);
   const [isCreatingFolders, setIsCreatingFolders] = useState(false);
+  
+  const [batterySalesOpen, setBatterySalesOpen] = useState(false);
+  const [selectedTourDateId, setSelectedTourDateId] = useState<string | null>(null);
 
   const { data: foldersExistenceMap } = useQuery({
     queryKey: ["flex-folders-existence", tourDates.map(d => d.id)],
@@ -719,6 +722,11 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
     cancelEditing();
   };
 
+  const startBatterySales = (dateId: string) => {
+    setSelectedTourDateId(dateId);
+    setBatterySalesOpen(true);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
@@ -803,6 +811,14 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => startBatterySales(dateObj.id)}
+                            title="Battery Sales"
+                          >
+                            <Battery className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => startEditing(dateObj)}
                             title="Edit Date"
                           >
@@ -854,6 +870,12 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
           </div>
         </ScrollArea>
       </DialogContent>
+      
+      <BatterySalesDialog 
+        open={batterySalesOpen}
+        onOpenChange={setBatterySalesOpen}
+        tourDateId={selectedTourDateId}
+      />
     </Dialog>
   );
 };
