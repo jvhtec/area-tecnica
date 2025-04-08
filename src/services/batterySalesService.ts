@@ -37,6 +37,18 @@ interface FlexLineItemResponse {
   [key: string]: any;
 }
 
+interface TourDateResponse {
+  id: string;
+  date: string;
+  tour_id: string;
+  location: {
+    name: string;
+  } | null;
+  tours: {
+    name: string;
+  } | null;
+}
+
 /**
  * Creates a new battery sales quote in the Flex system
  */
