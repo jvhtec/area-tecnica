@@ -1,7 +1,6 @@
-
 import { ApiService } from "@/lib/api-service";
 import { FLEX_API_BASE_URL } from "@/lib/api-config";
-import { FLEX_BATTERY_IDS } from "@/utils/flex-folders/battery-constants";
+import { FLEX_BATTERY_IDS, BATTERY_TYPE_NAMES } from "@/utils/flex-folders/battery-constants";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
@@ -46,7 +45,6 @@ interface TourDateResponse {
     name: string;
   } | null;
   tours: {
-    id?: string;
     name: string;
   } | null;
 }
