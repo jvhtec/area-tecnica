@@ -26,6 +26,17 @@ export interface BatterySalesQuote {
   }[];
 }
 
+interface FlexElementResponse {
+  elementId: string;
+  documentNumber?: string;
+  [key: string]: any;
+}
+
+interface FlexLineItemResponse {
+  addedResourceLineIds: string[];
+  [key: string]: any;
+}
+
 /**
  * Creates a new battery sales quote in the Flex system
  */
@@ -61,7 +72,7 @@ export async function createBatterySalesQuote(tourDateId: string): Promise<Batte
       
     if (tourDateError) throw tourDateError;
     
-    const tourName = tourDate.tours.name;
+    const tourName = tourDate.tours?.name || "Unknown Tour";
     const locationName = tourDate.location?.name || "No Location";
     const dateString = new Date(tourDate.date).toISOString().split('T')[0];
     
@@ -79,7 +90,7 @@ export async function createBatterySalesQuote(tourDateId: string): Promise<Batte
     
     console.log("Creating battery sales quote with payload:", quotePayload);
     
-    const quoteResponse = await apiService.post(
+    const quoteResponse = await apiService.post<FlexElementResponse>(
       `${FLEX_API_BASE_URL}/element`,
       quotePayload
     );
@@ -142,7 +153,7 @@ export async function addBatteryLineItem(
     const url = `${FLEX_API_BASE_URL}/financial-document-line-item/${quote.element_id}/add-resource/${resourceId}?quantity=${quantity}`;
     console.log(`Adding battery line item: ${url}`);
     
-    const lineItemResponse = await apiService.post(url, {});
+    const lineItemResponse = await apiService.post<FlexLineItemResponse>(url, {});
     console.log("Added battery line item:", lineItemResponse);
     
     // Update the batteries array in our database
