@@ -42,9 +42,11 @@ interface TourDateResponse {
   date: string;
   tour_id: string;
   location: {
+    id: string;
     name: string;
   } | null;
   tours: {
+    id?: string;
     name: string;
   } | null;
 }
@@ -84,8 +86,8 @@ export async function createBatterySalesQuote(tourDateId: string): Promise<Batte
       
     if (tourDateError) throw tourDateError;
     
-    const tourName = tourDate.tours?.name || "Unknown Tour";
-    const locationName = tourDate.location?.name || "No Location";
+    const tourName = tourDate?.tours?.name || "Unknown Tour";
+    const locationName = tourDate?.location?.name || "No Location";
     const dateString = new Date(tourDate.date).toISOString().split('T')[0];
     
     // Create quote in Flex
