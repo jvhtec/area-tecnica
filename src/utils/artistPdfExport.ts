@@ -137,7 +137,7 @@ export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
       ];
 
       autoTable(doc, {
-        head: [['Position', 'Required']],
+        head: [['Position', 'Artist Provided']],
         body: technicalStaffRows,
         startY: yPosition,
         theme: 'grid',
