@@ -287,13 +287,35 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
-    // Process individual artist PDFs
+    // Process individual artist PDFs - sort by date, stage, and show time
     console.log(`Starting PDF generation for ${artists?.length || 0} artists`);
     
     if (artists && artists.length > 0) {
-      for (const artist of artists) {
+      // Sort artists by date, stage, and show_start time
+      const sortedArtists = [...artists].sort((a, b) => {
+        // First sort by date
+        if (a.date < b.date) return -1;
+        if (a.date > b.date) return 1;
+        
+        // If same date, sort by stage
+        if (a.stage < b.stage) return -1;
+        if (a.stage > b.stage) return 1;
+        
+        // If same stage, sort by show_start time
+        const aTime = a.show_start || '';
+        const bTime = b.show_start || '';
+        if (aTime < bTime) return -1;
+        if (aTime > bTime) return 1;
+        
+        // If everything is the same, sort by name
+        return (a.name || '').localeCompare(b.name || '');
+      });
+      
+      console.log(`Sorted ${sortedArtists.length} artists for PDF generation`);
+      
+      for (const artist of sortedArtists) {
         try {
-          console.log(`Generating PDF for artist: ${artist.name}`);
+          console.log(`Generating PDF for artist: ${artist.name}, Stage: ${artist.stage}, Time: ${artist.show_start}`);
           
           const artistData: ArtistPdfData = {
             name: artist.name || 'Unnamed Artist',
