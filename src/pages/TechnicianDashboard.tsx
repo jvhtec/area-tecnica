@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Clock, RefreshCw } from "lucide-react";
+import { Calendar, RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { addWeeks, addMonths } from "date-fns";
 import { TimeSpanSelector } from "@/components/technician/TimeSpanSelector";
@@ -15,20 +15,12 @@ import { toast } from "sonner";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { useTableSubscription } from "@/hooks/useSubscription";
 import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
-import { WorkHoursDialog } from "@/components/technician/WorkHoursDialog";
-import { TechnicianWorkRecords } from "@/components/technician/TechnicianWorkRecords";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const TechnicianDashboard = () => {
   const [timeSpan, setTimeSpan] = useState<string>("1week");
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
   const [showMessages, setShowMessages] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [selectedJobTitle, setSelectedJobTitle] = useState<string>("");
-  const [selectedJobDate, setSelectedJobDate] = useState<Date>(new Date());
-  const [workHoursDialogOpen, setWorkHoursDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("assignments");
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -77,7 +69,6 @@ const TechnicianDashboard = () => {
 
   // Set up real-time subscription for job assignments
   useTableSubscription('job_assignments', 'assignments');
-  useTableSubscription('technician_work_records', 'work_records');
 
   const getTimeSpanEndDate = () => {
     const today = new Date();
@@ -248,13 +239,6 @@ const TechnicianDashboard = () => {
     console.log("Delete job clicked:", jobId);
   };
 
-  const handleAddWorkHours = (jobId: string, jobTitle: string, jobDate: Date) => {
-    setSelectedJobId(jobId);
-    setSelectedJobTitle(jobTitle);
-    setSelectedJobDate(jobDate);
-    setWorkHoursDialogOpen(true);
-  };
-
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
@@ -280,47 +264,33 @@ const TechnicianDashboard = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="assignments" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-4">
-          <TabsTrigger value="assignments">Assignments</TabsTrigger>
-          <TabsTrigger value="work-records">Work Records</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="assignments">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                My Upcoming Assignments
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {assignments && assignments.length > 0 ? (
-                <TodaySchedule 
-                  jobs={assignments} 
-                  onEditClick={handleEditClick} 
-                  onDeleteClick={handleDeleteClick} 
-                  onJobClick={handleJobClick} 
-                  userRole="technician"
-                  isLoading={isLoading}
-                  hideTasks={true}
-                  onAddWorkHours={handleAddWorkHours}
-                />
-              ) : (
-                <AssignmentsList 
-                  assignments={assignments} 
-                  loading={isLoading} 
-                  onRefresh={handleRefresh}
-                />
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="work-records">
-          <TechnicianWorkRecords />
-        </TabsContent>
-      </Tabs>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            My Upcoming Assignments
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {assignments && assignments.length > 0 ? (
+            <TodaySchedule 
+              jobs={assignments} 
+              onEditClick={handleEditClick} 
+              onDeleteClick={handleDeleteClick} 
+              onJobClick={handleJobClick} 
+              userRole="technician"
+              isLoading={isLoading}
+              hideTasks={true}
+            />
+          ) : (
+            <AssignmentsList 
+              assignments={assignments} 
+              loading={isLoading} 
+              onRefresh={handleRefresh}
+            />
+          )}
+        </CardContent>
+      </Card>
 
       {showMessages && (
         <Dialog open={showMessages} onOpenChange={handleCloseMessages}>
@@ -328,19 +298,6 @@ const TechnicianDashboard = () => {
             <MessageManagementDialog department={userDepartment} trigger={false} />
           </DialogContent>
         </Dialog>
-      )}
-
-      {selectedJobId && (
-        <WorkHoursDialog 
-          open={workHoursDialogOpen}
-          onOpenChange={setWorkHoursDialogOpen}
-          jobId={selectedJobId}
-          jobTitle={selectedJobTitle}
-          jobDate={selectedJobDate}
-          onSubmitSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ['work_records'] });
-          }}
-        />
       )}
     </div>
   );

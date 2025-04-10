@@ -34,7 +34,6 @@ import { ArtistRequirementsForm } from '@/components/festival/ArtistRequirements
 import { FormSubmitted } from '@/components/festival/FormSubmitted';
 import FestivalGearManagement from '@/pages/FestivalGearManagement';
 import Festivals from '@/pages/Festivals';
-import WorkHoursManagement from '@/pages/WorkHoursManagement';
 import { AuthProvider } from "@/hooks/useAuth";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
@@ -69,7 +68,6 @@ export default function App() {
                     <Route path="/equipment-management" element={<EquipmentManagement />} />
                     <Route path="/festivals" element={<Festivals />} />
                     <Route path="/technician-dashboard" element={<TechnicianDashboard />} />
-                    <Route path="/work-hours-management" element={<WorkHoursManagement />} />
                     
                     {/* Tools Routes */}
                     <Route path="/pesos-tool" element={<PesosTool />} />
