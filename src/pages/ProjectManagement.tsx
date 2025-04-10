@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -208,6 +207,10 @@ export default function ProjectManagement() {
   
   const isEditable = userRole === "admin" || userRole === "management";
   
+  const handleDepartmentChange = (value: string[]) => {
+    setSelectedDepartments(value);
+  };
+  
   return (
     <div className="container mx-auto py-10">
       <div className="mb-4 flex justify-between items-center">
@@ -229,7 +232,7 @@ export default function ProjectManagement() {
           <Select
             id="departments"
             multiple
-            onValueChange={(value) => setSelectedDepartments(value)}
+            onValueChange={handleDepartmentChange}
             defaultValue={selectedDepartments}
           >
             <SelectTrigger className="w-[180px]">
@@ -328,7 +331,7 @@ export default function ProjectManagement() {
         <div className="text-center py-8 text-muted-foreground">No projects found.</div>
       )}
       
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => setIsDialogOpen(open)}>
         <DialogTrigger asChild>
           <Button>Add Project</Button>
         </DialogTrigger>
