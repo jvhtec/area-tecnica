@@ -10,7 +10,8 @@ import {
   Truck,
   UserCircle,
   ClipboardList,
-  Tent
+  Tent,
+  Clock
 } from "lucide-react";
 
 interface SidebarNavigationProps {
@@ -172,6 +173,21 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
             >
               <ClipboardList className="h-4 w-4" />
               <span>Project Management</span>
+            </Button>
+          </Link>
+        )}
+
+        {/* Work Hours Management - Available to management and admin */}
+        {(['admin', 'management'].includes(userRole)) && (
+          <Link to="/work-hours-management">
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-2 ${
+                location.pathname === "/work-hours-management" ? "bg-accent" : ""
+              }`}
+            >
+              <Clock className="h-4 w-4" />
+              <span>Work Hours</span>
             </Button>
           </Link>
         )}

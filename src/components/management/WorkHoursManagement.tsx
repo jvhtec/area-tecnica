@@ -8,6 +8,7 @@ import { ManageWorkRecordsDialog } from "./ManageWorkRecordsDialog";
 import { FileSpreadsheet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { useSearchParams } from "react-router-dom";
 
 interface Job {
   id: string;
@@ -22,6 +23,7 @@ export function WorkHoursManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [searchParams] = useSearchParams();
   
   useEffect(() => {
     const fetchJobs = async () => {
@@ -43,6 +45,16 @@ export function WorkHoursManagement() {
         }
         
         setJobs(data || []);
+        
+        // Check if jobId is provided in URL
+        const jobIdFromUrl = searchParams.get('jobId');
+        if (jobIdFromUrl) {
+          const jobFromUrl = data?.find(job => job.id === jobIdFromUrl);
+          if (jobFromUrl) {
+            setSelectedJob(jobFromUrl);
+            setDialogOpen(true);
+          }
+        }
       } catch (error) {
         console.error("Error fetching jobs:", error);
       } finally {
@@ -51,7 +63,7 @@ export function WorkHoursManagement() {
     };
     
     fetchJobs();
-  }, []);
+  }, [searchParams]);
   
   const filteredJobs = jobs.filter(job => 
     job.title.toLowerCase().includes(searchTerm.toLowerCase())

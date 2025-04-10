@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -622,6 +621,13 @@ export function JobCardNew({
     isProjectManagementPage
   });
 
+  const canManageWorkRecords = ['admin', 'management'].includes(userRole || '');
+
+  const handleManageWorkRecordsClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/work-hours-management?jobId=${job.id}`);
+  };
+
   return (
     <div className="p-4 bg-gray-50 dark:bg-gray-900">
       <Card
@@ -666,6 +672,17 @@ export function JobCardNew({
                   className="hover:bg-accent/50"
                 >
                   {userRole === 'technician' || userRole === 'house_tech' ? 'View Festival' : 'Manage Festival'}
+                </Button>
+              )}
+              {canManageWorkRecords && isProjectManagementPage && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleManageWorkRecordsClick}
+                  className="hover:bg-accent/50"
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Work Hours
                 </Button>
               )}
               {!isHouseTech && job.job_type !== "dryhire" && isProjectManagementPage && (
@@ -913,57 +930,3 @@ export function JobCardNew({
               open={videoTaskDialogOpen}
               onOpenChange={setVideoTaskDialogOpen}
               jobId={job.id}
-            />
-          )}
-          {editJobDialogOpen && (
-            <EditJobDialog
-              open={editJobDialogOpen}
-              onOpenChange={setEditJobDialogOpen}
-              job={job}
-            />
-          )}
-          {assignmentDialogOpen && job.job_type !== "dryhire" && (
-            <JobAssignmentDialog
-              open={assignmentDialogOpen}
-              onOpenChange={setAssignmentDialogOpen}
-              jobId={job.id}
-              department={department as Department}
-            />
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-const handleDownload = async (doc: JobDocument) => {
-  try {
-    console.log('Starting download for document:', doc.file_name);
-    
-    const { data, error } = await supabase.storage
-      .from('job_documents')
-      .createSignedUrl(doc.file_path, 60);
-    
-    if (error) {
-      console.error('Error creating signed URL for download:', error);
-      throw error;
-    }
-    
-    if (!data?.signedUrl) {
-      throw new Error('Failed to generate download URL');
-    }
-    
-    console.log('Download URL created:', data.signedUrl);
-    
-    const link = document.createElement('a');
-    link.href = data.signedUrl;
-    link.download = doc.file_name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-  } catch (err: any) {
-    console.error('Error in handleDownload:', err);
-    alert(`Error downloading document: ${err.message}`);
-  }
-};
