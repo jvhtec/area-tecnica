@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -14,7 +15,7 @@ interface JobAssignmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   jobId: string;
-  department?: string;
+  department?: Department;
   onAssignmentsChanged?: (newAssignments: any) => void;
 }
 
@@ -131,6 +132,15 @@ export const JobAssignmentDialog = ({
       setSelectedTechnician("");
       setSelectedRole("");
       handleDialogChange(false);
+      
+      if (onAssignmentsChanged) {
+        const { data: assignments } = await supabase
+          .from("job_assignments")
+          .select("*")
+          .eq("job_id", jobId);
+        
+        onAssignmentsChanged(assignments);
+      }
       
     } catch (error: any) {
       console.error("Failed to assign technician:", error);

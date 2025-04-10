@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -226,9 +227,9 @@ export const ManageWorkRecordsDialog = ({
               onClick={() => {
                 approveRecordMutation.mutate();
               }}
-              disabled={approveRecordMutation.isLoading}
+              disabled={approveRecordMutation.isPending}
             >
-              {approveRecordMutation.isLoading ? "Approving..." : "Approve Record"}
+              {approveRecordMutation.isPending ? "Approving..." : "Approve Record"}
             </Button>
           )}
         </div>

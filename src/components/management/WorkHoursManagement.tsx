@@ -23,6 +23,7 @@ export function WorkHoursManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
   
   useEffect(() => {
@@ -52,7 +53,18 @@ export function WorkHoursManagement() {
           const jobFromUrl = data?.find(job => job.id === jobIdFromUrl);
           if (jobFromUrl) {
             setSelectedJob(jobFromUrl);
-            setDialogOpen(true);
+            
+            // Fetch the first work record for this job to get its ID
+            const { data: records } = await supabase
+              .from('technician_work_records')
+              .select('id')
+              .eq('job_id', jobIdFromUrl)
+              .limit(1);
+              
+            if (records && records.length > 0) {
+              setSelectedRecordId(records[0].id);
+              setDialogOpen(true);
+            }
           }
         }
       } catch (error) {
@@ -69,9 +81,23 @@ export function WorkHoursManagement() {
     job.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
-  const handleOpenDialog = (job: Job) => {
+  const handleOpenDialog = async (job: Job) => {
     setSelectedJob(job);
-    setDialogOpen(true);
+    
+    // Fetch the first work record for this job to get its ID
+    const { data: records } = await supabase
+      .from('technician_work_records')
+      .select('id')
+      .eq('job_id', job.id)
+      .limit(1);
+      
+    if (records && records.length > 0) {
+      setSelectedRecordId(records[0].id);
+      setDialogOpen(true);
+    } else {
+      console.log("No work records found for this job");
+      // Handle case where no records exist
+    }
   };
 
   return (
@@ -131,12 +157,11 @@ export function WorkHoursManagement() {
         </CardContent>
       </Card>
       
-      {selectedJob && (
+      {selectedRecordId && (
         <ManageWorkRecordsDialog 
           open={dialogOpen}
           onOpenChange={setDialogOpen}
-          jobId={selectedJob.id}
-          jobTitle={selectedJob.title}
+          recordId={selectedRecordId}
         />
       )}
     </div>
