@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -503,6 +504,29 @@ export function JobCardNew({
     }
   };
 
+  const handleDownload = async (doc: JobDocument) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from("job_documents")
+        .createSignedUrl(doc.file_path, 60);
+
+      if (error) throw error;
+      
+      const link = document.createElement('a');
+      link.href = data.signedUrl;
+      link.download = doc.file_name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err: any) {
+      toast({
+        title: "Error downloading document",
+        description: err.message,
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleDeleteDocument = async (doc: JobDocument) => {
     if (!window.confirm("Are you sure you want to delete this document?")) return;
     try {
@@ -930,3 +954,31 @@ export function JobCardNew({
               open={videoTaskDialogOpen}
               onOpenChange={setVideoTaskDialogOpen}
               jobId={job.id}
+            />
+          )}
+          {editJobDialogOpen && (
+            <EditJobDialog
+              open={editJobDialogOpen}
+              onOpenChange={setEditJobDialogOpen}
+              job={job}
+              onJobUpdated={() => {
+                queryClient.invalidateQueries({ queryKey: ["jobs"] });
+              }}
+            />
+          )}
+          {assignmentDialogOpen && (
+            <JobAssignmentDialog
+              open={assignmentDialogOpen}
+              onOpenChange={setAssignmentDialogOpen}
+              jobId={job.id}
+              onAssignmentsChanged={(newAssignments) => {
+                setAssignments(newAssignments);
+                queryClient.invalidateQueries({ queryKey: ["jobs"] });
+              }}
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
+}
