@@ -207,8 +207,8 @@ export default function ProjectManagement() {
   
   const isEditable = userRole === "admin" || userRole === "management";
   
-  const handleDepartmentChange = (value: string[]) => {
-    setSelectedDepartments(value);
+  const handleDepartmentChange = (value: string) => {
+    setSelectedDepartments([value]);
   };
   
   return (
@@ -231,9 +231,8 @@ export default function ProjectManagement() {
           <Label htmlFor="departments">Departments</Label>
           <Select
             id="departments"
-            multiple
             onValueChange={handleDepartmentChange}
-            defaultValue={selectedDepartments}
+            defaultValue={selectedDepartments.length > 0 ? selectedDepartments[0] : undefined}
           >
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select departments" />

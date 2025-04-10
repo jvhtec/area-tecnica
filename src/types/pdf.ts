@@ -2,19 +2,19 @@
 import { jsPDF } from "jspdf";
 
 // Define the AutoTableJsPDF interface that combines jsPDF with autotable features
-export interface AutoTableJsPDF extends jsPDF {
+export interface AutoTableJsPDF extends Omit<jsPDF, "output"> {
   lastAutoTable?: {
     finalY: number;
   };
   internal: any;
-  setFillColor: (r: number, g: number, b: number) => void;
-  rect: (x: number, y: number, w: number, h: number, style: string) => void;
-  setFontSize: (size: number) => void;
-  setTextColor: (r: number, g: number, b: number) => void;
-  text: (text: string, x: number, y: number, options?: any) => jsPDF;
-  addPage: () => jsPDF;
-  addImage: (imageData: string | HTMLImageElement, format: string, x: number, y: number, width: number, height: number) => jsPDF;
-  setPage: (pageNumber: number) => jsPDF;
+  setFillColor: (r: number, g: number, b: number) => AutoTableJsPDF;
+  rect: (x: number, y: number, w: number, h: number, style: string) => AutoTableJsPDF;
+  setFontSize: (size: number) => AutoTableJsPDF;
+  setTextColor: (r: number, g: number, b: number) => AutoTableJsPDF;
+  text: (text: string, x: number, y: number, options?: any) => AutoTableJsPDF;
+  addPage: () => AutoTableJsPDF;
+  addImage: (imageData: string | HTMLImageElement, format: string, x: number, y: number, width: number, height: number) => AutoTableJsPDF;
+  setPage: (pageNumber: number) => AutoTableJsPDF;
   splitTextToSize: (text: string, maxWidth: number) => string[];
   getNumberOfPages: () => number;
   output: (type: string, options?: any) => any;
