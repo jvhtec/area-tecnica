@@ -2,7 +2,7 @@
 import { jsPDF } from "jspdf";
 
 // Define the AutoTableJsPDF interface that combines jsPDF with autotable features
-export interface AutoTableJsPDF extends jsPDF {
+export interface AutoTableJsPDF extends Omit<jsPDF, 'output'> {
   lastAutoTable?: {
     finalY: number;
   };

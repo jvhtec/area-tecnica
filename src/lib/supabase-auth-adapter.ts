@@ -1,12 +1,12 @@
 
 import { supabase } from "@/lib/supabase";
-import { User } from "@supabase/supabase-js";
+import { User, AuthChangeEvent } from "@supabase/supabase-js";
 
 // Define the Session type from Supabase
 export interface Session {
   access_token: string;
   refresh_token: string;
-  expires_at: number;
+  expires_at?: number; // Make expires_at optional to match Supabase's type
   user: User;
 }
 
@@ -32,27 +32,51 @@ export interface RealtimeChannelOptions {
 const supabaseAuthAdapter = {
   // Session methods
   async getSession(): Promise<{ data: { session: Session | null }, error: Error | null }> {
-    return await supabase.auth.getSession();
+    const response = await supabase.auth.getSession();
+    return {
+      data: { session: response.data.session as Session | null },
+      error: response.error
+    };
   },
   
   async getUser(): Promise<{ data: { user: User | null }, error: Error | null }> {
-    return await supabase.auth.getUser();
+    const response = await supabase.auth.getUser();
+    return {
+      data: { user: response.data.user },
+      error: response.error
+    };
   },
   
   async refreshSession(refresh_token?: string): Promise<{ data: { session: Session | null }, error: Error | null }> {
-    if (refresh_token) {
-      return await supabase.auth.refreshSession({ refresh_token });
-    }
-    return await supabase.auth.refreshSession();
+    const options = refresh_token ? { refresh_token } : undefined;
+    const response = await supabase.auth.refreshSession(options);
+    return {
+      data: { session: response.data.session as Session | null },
+      error: response.error
+    };
   },
   
   // Authentication methods
   async signInWithPassword(credentials: { email: string, password: string }): Promise<{ data: { user: User | null, session: Session | null }, error: Error | null }> {
-    return await supabase.auth.signInWithPassword(credentials);
+    const response = await supabase.auth.signInWithPassword(credentials);
+    return {
+      data: { 
+        user: response.data.user,
+        session: response.data.session as Session | null
+      },
+      error: response.error
+    };
   },
   
   async signUp(credentials: { email: string, password: string, options?: any }): Promise<{ data: { user: User | null, session: Session | null }, error: Error | null }> {
-    return await supabase.auth.signUp(credentials);
+    const response = await supabase.auth.signUp(credentials);
+    return {
+      data: { 
+        user: response.data.user,
+        session: response.data.session as Session | null
+      },
+      error: response.error
+    };
   },
   
   async signOut(): Promise<{ error: Error | null }> {
@@ -64,8 +88,10 @@ const supabaseAuthAdapter = {
   },
   
   // Listeners
-  onAuthStateChange(callback: (event: string, session: Session | null) => void): { data: { subscription: { unsubscribe: () => void } } } {
-    const { data } = supabase.auth.onAuthStateChange(callback);
+  onAuthStateChange(callback: (event: AuthChangeEvent, session: Session | null) => void): { data: { subscription: { unsubscribe: () => void } } } {
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      callback(event, session as Session | null);
+    });
     return { data };
   }
 };

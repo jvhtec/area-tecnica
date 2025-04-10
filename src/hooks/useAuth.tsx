@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useContext, createContext, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
@@ -98,7 +99,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (refreshedSession) {
         console.log("Session refreshed successfully");
-        setSession(refreshedSession);
+        // Convert the session to our own Session type before setting state
+        setSession(refreshedSession as unknown as Session);
         setUser(refreshedSession.user);
         
         if (!user || user.id !== refreshedSession.user.id) {
@@ -112,7 +114,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         refreshSubscriptions();
         invalidateQueries();
         
-        return refreshedSession;
+        return refreshedSession as unknown as Session;
       }
       
       console.log("No session returned from refresh");
@@ -273,7 +275,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const initialSession = await tokenManager.getSession();
         
         if (initialSession) {
-          setSession(initialSession);
+          // Convert to our Session type
+          setSession(initialSession as unknown as Session);
           setUser(initialSession.user);
           
           const profile = await fetchUserProfile(initialSession.user.id);
@@ -288,7 +291,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             console.log("Auth state changed:", event);
             
             if (authStateSession) {
-              setSession(authStateSession);
+              // Convert to our Session type
+              setSession(authStateSession as unknown as Session);
               setUser(authStateSession.user);
               
               const profile = await fetchUserProfile(authStateSession.user.id);

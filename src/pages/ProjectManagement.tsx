@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -45,6 +47,7 @@ import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Project {
   id: string;
@@ -185,7 +188,9 @@ export default function ProjectManagement() {
     if (departmentParam) {
       try {
         const data = JSON.parse(departmentParam);
-        setSelectedDepartments(data as string[]);
+        if (Array.isArray(data)) {
+          setSelectedDepartments(data);
+        }
       } catch (error) {
         console.error("Error parsing departments from URL:", error);
       }
@@ -474,7 +479,7 @@ export default function ProjectManagement() {
       </Dialog>
       
       {deleteProjectId && (
-        <AlertDialog open={!!deleteProjectId} onOpenChange={setDeleteProjectId}>
+        <AlertDialog open={!!deleteProjectId} onOpenChange={(open) => !open && setDeleteProjectId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
