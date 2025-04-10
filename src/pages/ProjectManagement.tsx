@@ -1,509 +1,185 @@
+
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Plus, Edit, Trash } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Loader2, Plus, FileText, Filter } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Department } from "@/types/department";
+import { startOfMonth, endOfMonth, addMonths } from "date-fns";
+import { MonthNavigation } from "@/components/project-management/MonthNavigation";
+import { DepartmentTabs } from "@/components/project-management/DepartmentTabs";
+import { useJobManagement } from "@/hooks/useJobManagement";
+import { useTabVisibility } from "@/hooks/useTabVisibility";
+import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 
-interface Project {
-  id: string;
-  title: string;
-  description: string;
-  start_date: string;
-  end_date: string;
-  status: string;
-  departments: string[];
-  color: string;
-}
+const ProjectManagement = () => {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [selectedDepartment, setSelectedDepartment] = useState<Department>("sound");
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [selectedJobType, setSelectedJobType] = useState("All");
+  const [allJobTypes, setAllJobTypes] = useState<string[]>([]);
+  const { forceSubscribe } = useSubscriptionContext();
 
-export default function ProjectManagement() {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editProject, setEditProject] = useState<Project | null>(null);
-  const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
-  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
-  const [searchParams] = useSearchParams();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const { userRole } = useAuth();
+  const startDate = startOfMonth(currentDate);
+  const endDate = endOfMonth(currentDate);
+
+  // Use custom hook to keep the "jobs" tab active/visible.
+  useTabVisibility(["jobs"]);
   
-  const { data: projects, isLoading } = useQuery({
-    queryKey: ["projects"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("projects")
-        .select("*")
-        .order("created_at", { ascending: false });
-      
-      if (error) {
-        console.error("Error fetching projects:", error);
-        throw error;
-      }
-      
-      return data as Project[];
-    },
-  });
-  
-  const addProjectMutation = useMutation({
-    mutationFn: async (newProject: Omit<Project, 'id'>) => {
-      const { data, error } = await supabase
-        .from("projects")
-        .insert([newProject])
-        .select()
-        .single();
-      
-      if (error) {
-        console.error("Error adding project:", error);
-        throw error;
-      }
-      
-      return data as Project;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      toast({
-        title: "Success",
-        description: "Project added successfully",
-      });
-      setIsDialogOpen(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-  
-  const updateProjectMutation = useMutation({
-    mutationFn: async (updatedProject: Project) => {
-      const { data, error } = await supabase
-        .from("projects")
-        .update(updatedProject)
-        .eq("id", updatedProject.id)
-        .select()
-        .single();
-      
-      if (error) {
-        console.error("Error updating project:", error);
-        throw error;
-      }
-      
-      return data as Project;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      toast({
-        title: "Success",
-        description: "Project updated successfully",
-      });
-      setIsDialogOpen(false);
-      setEditProject(null);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-  
-  const deleteProjectMutation = useMutation({
-    mutationFn: async (projectId: string) => {
-      const { error } = await supabase
-        .from("projects")
-        .delete()
-        .eq("id", projectId);
-      
-      if (error) {
-        console.error("Error deleting project:", error);
-        throw error;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      toast({
-        title: "Success",
-        description: "Project deleted successfully",
-      });
-      setDeleteProjectId(null);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-  
+  // Force subscription to required tables
   useEffect(() => {
-    const departmentParam = searchParams.get("departments");
-    if (departmentParam) {
-      try {
-        const data = JSON.parse(departmentParam);
-        if (Array.isArray(data)) {
-          setSelectedDepartments(data);
-        }
-      } catch (error) {
-        console.error("Error parsing departments from URL:", error);
-      }
-    }
-  }, [searchParams]);
-  
-  const filteredProjects = projects?.filter((project) => {
-    if (selectedDepartments.length === 0) {
-      return true;
-    }
-    return project.departments.some((department) =>
-      selectedDepartments.includes(department)
-    );
+    forceSubscribe(['jobs', 'job_assignments', 'job_departments']);
+  }, [forceSubscribe]);
+
+  // Retrieve jobs using the custom hook. The hook already applies department and date filters.
+  const { jobs: unfilteredJobs = [], jobsLoading, handleDeleteDocument } = useJobManagement(
+    selectedDepartment,
+    startDate,
+    endDate,
+    true
+  );
+
+  // Filter jobs by selected job type using a case-insensitive comparison.
+  const jobs = (unfilteredJobs || []).filter((job: any) => {
+    if (selectedJobType === "All") return true;
+    return job.job_type?.toLowerCase() === selectedJobType.toLowerCase();
   });
-  
-  const isEditable = userRole === "admin" || userRole === "management";
-  
-  const handleDepartmentChange = (value: string) => {
-    setSelectedDepartments([value]);
-  };
-  
-  return (
-    <div className="container mx-auto py-10">
-      <div className="mb-4 flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Project Management</h1>
-        {isEditable && (
-          <Button onClick={() => setIsDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Project
-          </Button>
-        )}
+
+  // Check user access and fetch profile role.
+  useEffect(() => {
+    const checkAccess = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.log("ProjectManagement: No session found, redirecting to auth");
+          navigate("/auth");
+          return;
+        }
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", session.user.id)
+          .single();
+        if (profileError) {
+          console.error("ProjectManagement: Error fetching profile:", profileError);
+          throw profileError;
+        }
+        // Allow technicians to view but not modify festival jobs
+        if (!profile || !["admin", "logistics", "management", "technician"].includes(profile.role)) {
+          console.log("ProjectManagement: Unauthorized access attempt");
+          navigate("/dashboard");
+          return;
+        }
+        setUserRole(profile.role);
+        setLoading(false);
+      } catch (error) {
+        console.error("ProjectManagement: Error in access check:", error);
+        navigate("/dashboard");
+      }
+    };
+
+    checkAccess();
+  }, [navigate]);
+
+  // Fetch all distinct job types (ignoring current filters) for the dropdown.
+  useEffect(() => {
+    const fetchJobTypes = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("jobs")
+          .select("job_type");
+        if (error) {
+          console.error("Error fetching job types:", error);
+          return;
+        }
+        const types = Array.from(
+          new Set((data || [])
+            .map((job: any) => job.job_type)
+            .filter(Boolean))
+        );
+        setAllJobTypes(types);
+      } catch (error) {
+        console.error("Error in fetchJobTypes:", error);
+      }
+    };
+
+    fetchJobTypes();
+  }, []);
+
+  if (loading || jobsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
-      
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle>Filter Projects</CardTitle>
+    );
+  }
+
+  // Check if user has permissions to create new items
+  const canCreateItems = ['admin', 'management', 'logistics'].includes(userRole || '');
+
+  return (
+    <div className="container mx-auto px-4 space-y-6">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardTitle>Project Management</CardTitle>
+          <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <select
+                value={selectedJobType}
+                onChange={(e) => setSelectedJobType(e.target.value)}
+                className="border border-gray-300 rounded-md py-1 px-2 text-sm"
+              >
+                <option value="All">All Types</option>
+                {allJobTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {canCreateItems && (
+              <>
+                <Button 
+                  onClick={() => navigate("/hoja-de-ruta")} 
+                  className="flex items-center gap-2"
+                  variant="outline"
+                >
+                  <FileText className="h-4 w-4" />
+                  Hoja de Ruta
+                </Button>
+                <Button 
+                  onClick={() => navigate("/labor-po-form")} 
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create Labor PO
+                </Button>
+              </>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
-          <Label htmlFor="departments">Departments</Label>
-          <Select
-            onValueChange={handleDepartmentChange}
-            defaultValue={selectedDepartments.length > 0 ? selectedDepartments[0] : undefined}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select departments" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="lights">Lights</SelectItem>
-              <SelectItem value="sound">Sound</SelectItem>
-              <SelectItem value="video">Video</SelectItem>
-              <SelectItem value="rigging">Rigging</SelectItem>
-              <SelectItem value="staging">Staging</SelectItem>
-              <SelectItem value="power">Power</SelectItem>
-            </SelectContent>
-          </Select>
+          <MonthNavigation
+            currentDate={currentDate}
+            onPreviousMonth={() => setCurrentDate(prev => addMonths(prev, -1))}
+            onNextMonth={() => setCurrentDate(prev => addMonths(prev, 1))}
+          />
+          <DepartmentTabs
+            selectedDepartment={selectedDepartment}
+            onDepartmentChange={(value) => setSelectedDepartment(value as Department)}
+            jobs={jobs}
+            jobsLoading={jobsLoading}
+            onDeleteDocument={handleDeleteDocument}
+            userRole={userRole}
+          />
         </CardContent>
       </Card>
-      
-      {isLoading ? (
-        <div className="animate-pulse space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-muted rounded-md p-4 h-32" />
-          ))}
-        </div>
-      ) : filteredProjects && filteredProjects.length > 0 ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Title</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Start Date</TableHead>
-              <TableHead>End Date</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredProjects.map((project) => (
-              <TableRow key={project.id}>
-                <TableCell>{project.title}</TableCell>
-                <TableCell>{project.description}</TableCell>
-                <TableCell>{format(new Date(project.start_date), "PPP")}</TableCell>
-                <TableCell>{format(new Date(project.end_date), "PPP")}</TableCell>
-                <TableCell>{project.status}</TableCell>
-                <TableCell className="text-right">
-                  {isEditable && (
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setEditProject(project);
-                          setIsDialogOpen(true);
-                        }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <Trash className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This action cannot be undone. This will permanently delete
-                              the project from our servers.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => setDeleteProjectId(project.id)}
-                            >
-                              Continue
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-          <TableFooter>
-            <TableRow>
-              <TableCell colSpan={6} className="text-center">
-                {projects?.length} total projects
-              </TableCell>
-            </TableRow>
-          </TableFooter>
-        </Table>
-      ) : (
-        <div className="text-center py-8 text-muted-foreground">No projects found.</div>
-      )}
-      
-      <Dialog open={isDialogOpen} onOpenChange={(open) => setIsDialogOpen(open)}>
-        <DialogTrigger asChild>
-          <Button>Add Project</Button>
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{editProject ? "Edit Project" : "Add Project"}</DialogTitle>
-            <DialogDescription>
-              {editProject
-                ? "Make changes to your project here. Click save when you're done."
-                : "Create a new project here. Click save when you're done."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="title" className="text-right">
-                Title
-              </Label>
-              <Input
-                type="text"
-                id="title"
-                defaultValue={editProject?.title}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="description" className="text-right">
-                Description
-              </Label>
-              <Textarea
-                id="description"
-                defaultValue={editProject?.description}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="departments" className="text-right mt-2">
-                Departments
-              </Label>
-              <div className="col-span-3 space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="lights" />
-                  <Label htmlFor="lights">Lights</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="sound" />
-                  <Label htmlFor="sound">Sound</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="video" />
-                  <Label htmlFor="video">Video</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="rigging" />
-                  <Label htmlFor="rigging">Rigging</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="staging" />
-                  <Label htmlFor="staging">Staging</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="power" />
-                  <Label htmlFor="power">Power</Label>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="start_date" className="text-right">
-                Start Date
-              </Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-[240px] justify-start text-left font-normal",
-                      !selectedDate && "text-muted-foreground"
-                    )}
-                  >
-                    {selectedDate ? (
-                      format(selectedDate, "PPP")
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={setSelectedDate}
-                    disabled={(date) =>
-                      date > new Date()
-                    }
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="end_date" className="text-right">
-                End Date
-              </Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-[240px] justify-start text-left font-normal",
-                      !selectedDate && "text-muted-foreground"
-                    )}
-                  >
-                    {selectedDate ? (
-                      format(selectedDate, "PPP")
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={setSelectedDate}
-                    disabled={(date) =>
-                      date > new Date()
-                    }
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="status" className="text-right">
-                Status
-              </Label>
-              <Input
-                type="text"
-                id="status"
-                defaultValue={editProject?.status}
-                className="col-span-3"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="submit">Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {deleteProjectId && (
-        <AlertDialog open={!!deleteProjectId} onOpenChange={(open) => !open && setDeleteProjectId(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the
-                project from our servers.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setDeleteProjectId(null)}>
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => {
-                  deleteProjectMutation.mutate(deleteProjectId);
-                }}
-              >
-                Continue
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
     </div>
   );
-}
+};
+
+export default ProjectManagement;

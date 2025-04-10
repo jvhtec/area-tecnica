@@ -1,32 +1,36 @@
-
-import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { SimplifiedJobColorPicker } from "./SimplifiedJobColorPicker";
-import { JobType } from "@/types/job";
+import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Department } from "@/types/department";
+import { SimplifiedJobColorPicker } from "./SimplifiedJobColorPicker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { JobType } from "@/types/job";
 
 interface EditJobDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   job: any;
-  onJobUpdated?: () => void;
 }
 
-export const EditJobDialog = ({
-  open,
-  onOpenChange,
-  job,
-  onJobUpdated
-}: EditJobDialogProps) => {
+export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) => {
   const [title, setTitle] = useState(job.title);
   const [description, setDescription] = useState(job.description || "");
   const [startTime, setStartTime] = useState(job.start_time?.slice(0, 16) || "");
@@ -38,6 +42,7 @@ export const EditJobDialog = ({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Reset form when job changes
   useEffect(() => {
     if (job) {
       setTitle(job.title);
@@ -49,6 +54,7 @@ export const EditJobDialog = ({
     }
   }, [job]);
 
+  // Fetch current departments when dialog opens
   useEffect(() => {
     const fetchDepartments = async () => {
       const { data, error } = await supabase
@@ -97,6 +103,7 @@ export const EditJobDialog = ({
 
       if (jobError) throw jobError;
 
+      // Update departments
       const { data: currentDepts } = await supabase
         .from("job_departments")
         .select("department")
@@ -104,6 +111,7 @@ export const EditJobDialog = ({
 
       const currentDepartments = currentDepts?.map(d => d.department) || [];
       
+      // Remove deselected departments
       const toRemove = currentDepartments.filter(dept => !selectedDepartments.includes(dept as Department));
       if (toRemove.length > 0) {
         await supabase
@@ -113,6 +121,7 @@ export const EditJobDialog = ({
           .in("department", toRemove);
       }
 
+      // Add new departments
       const toAdd = selectedDepartments.filter(dept => !currentDepartments.includes(dept));
       if (toAdd.length > 0) {
         await supabase
@@ -127,7 +136,6 @@ export const EditJobDialog = ({
       
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       onOpenChange(false);
-      onJobUpdated?.();
     } catch (error: any) {
       console.error("Error updating job:", error);
       toast({

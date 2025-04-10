@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useContext, createContext, ReactNode 
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import supabaseAuthAdapter, { Session } from "@/lib/supabase-auth-adapter";
+import { Session } from "@supabase/supabase-js";
 import { TokenManager } from "@/lib/token-manager";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 
@@ -53,6 +53,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
   const tokenManager = TokenManager.getInstance();
 
+  // Fetch user profile with proper error handling
   const fetchUserProfile = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -73,15 +74,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  // Advanced and safe session refresh with proper error handling
   const refreshSession = useCallback(async (): Promise<Session | null> => {
     try {
       console.log("Starting session refresh");
       
+      // Use the token manager to handle refresh
       const { session: refreshedSession, error } = await tokenManager.refreshToken();
       
       if (error) {
         console.error("Session refresh error:", error);
         
+        // Handle expired session
         if (error.message && error.message.includes('expired')) {
           setSession(null);
           setUser(null);
@@ -99,10 +103,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (refreshedSession) {
         console.log("Session refreshed successfully");
-        // Convert the session to our own Session type before setting state
-        setSession(refreshedSession as unknown as Session);
+        setSession(refreshedSession);
         setUser(refreshedSession.user);
         
+        // Only fetch profile if user changed
         if (!user || user.id !== refreshedSession.user.id) {
           const profile = await fetchUserProfile(refreshedSession.user.id);
           if (profile) {
@@ -111,10 +115,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         }
         
+        // Refresh subscriptions and invalidate queries for fresh data
         refreshSubscriptions();
         invalidateQueries();
         
-        return refreshedSession as unknown as Session;
+        return refreshedSession;
       }
       
       console.log("No session returned from refresh");
@@ -125,12 +130,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [fetchUserProfile, navigate, user, tokenManager, toast, refreshSubscriptions, invalidateQueries]);
 
+  // Login function
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
       setError(null);
       
-      const { data, error } = await supabaseAuthAdapter.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase(),
         password,
       });
@@ -171,12 +177,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Sign Up function
   const signUp = async (userData: SignUpData) => {
     try {
       setIsLoading(true);
       setError(null);
       
-      const { data, error } = await supabaseAuthAdapter.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: userData.email.toLowerCase(),
         password: userData.password,
         options: {
@@ -221,12 +228,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Logout function
   const logout = async () => {
     try {
       setIsLoading(true);
       
       await tokenManager.signOut();
       
+      // Clear all state
       setSession(null);
       setUser(null);
       setUserRole(null);
@@ -245,15 +254,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: error.message,
         variant: "destructive",
       });
+      // Still navigate to auth page even if there's an error
       navigate('/auth');
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Setup predictive token refresh
   useEffect(() => {
     if (!session) return;
     
+    // Calculate optimal refresh time
     const refreshTime = tokenManager.calculateRefreshTime(session);
     console.log(`Scheduling token refresh in ${Math.round(refreshTime/1000)} seconds`);
     
@@ -265,6 +277,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => clearTimeout(refreshTimer);
   }, [session, refreshSession, tokenManager]);
 
+  // Initial session setup and auth state subscription
   useEffect(() => {
     let subscription: { unsubscribe: () => void } | null = null;
     
@@ -272,11 +285,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         setIsLoading(true);
         
+        // Get initial session
         const initialSession = await tokenManager.getSession();
         
         if (initialSession) {
-          // Convert to our Session type
-          setSession(initialSession as unknown as Session);
+          setSession(initialSession);
           setUser(initialSession.user);
           
           const profile = await fetchUserProfile(initialSession.user.id);
@@ -286,13 +299,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         }
         
+        // Set up the auth state change listener
         const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
           async (event, authStateSession) => {
             console.log("Auth state changed:", event);
             
             if (authStateSession) {
-              // Convert to our Session type
-              setSession(authStateSession as unknown as Session);
+              setSession(authStateSession);
               setUser(authStateSession.user);
               
               const profile = await fetchUserProfile(authStateSession.user.id);
@@ -301,6 +314,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUserDepartment(profile.department);
               }
               
+              // Refresh subscriptions for new user context
               refreshSubscriptions();
             } else {
               setSession(null);
@@ -333,6 +347,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [navigate, fetchUserProfile, tokenManager, refreshSubscriptions]);
 
+  // Network status monitoring
   useEffect(() => {
     const handleOnline = () => {
       refreshSession();
@@ -345,6 +360,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
+        // Only refresh if we have a session and it might be stale
         if (session && tokenManager.checkTokenExpiration(session, 10 * 60 * 1000)) {
           refreshSession();
         }

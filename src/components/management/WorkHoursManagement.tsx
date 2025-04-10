@@ -8,7 +8,6 @@ import { ManageWorkRecordsDialog } from "./ManageWorkRecordsDialog";
 import { FileSpreadsheet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import { useSearchParams } from "react-router-dom";
 
 interface Job {
   id: string;
@@ -23,13 +22,12 @@ export function WorkHoursManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
-  const [searchParams] = useSearchParams();
   
   useEffect(() => {
     const fetchJobs = async () => {
       setLoading(true);
       try {
+        // Fetch jobs from the last 3 months
         const threeMonthsAgo = new Date();
         threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
         
@@ -45,25 +43,6 @@ export function WorkHoursManagement() {
         }
         
         setJobs(data || []);
-        
-        const jobIdFromUrl = searchParams.get('jobId');
-        if (jobIdFromUrl) {
-          const jobFromUrl = data?.find(job => job.id === jobIdFromUrl);
-          if (jobFromUrl) {
-            setSelectedJob(jobFromUrl);
-            
-            const { data: records } = await supabase
-              .from('technician_work_records')
-              .select('id')
-              .eq('job_id', jobIdFromUrl)
-              .limit(1);
-              
-            if (records && records.length > 0) {
-              setSelectedRecordId(records[0].id);
-              setDialogOpen(true);
-            }
-          }
-        }
       } catch (error) {
         console.error("Error fetching jobs:", error);
       } finally {
@@ -72,27 +51,15 @@ export function WorkHoursManagement() {
     };
     
     fetchJobs();
-  }, [searchParams]);
+  }, []);
   
   const filteredJobs = jobs.filter(job => 
     job.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
-  const handleOpenDialog = async (job: Job) => {
+  const handleOpenDialog = (job: Job) => {
     setSelectedJob(job);
-    
-    const { data: records } = await supabase
-      .from('technician_work_records')
-      .select('id')
-      .eq('job_id', job.id)
-      .limit(1);
-      
-    if (records && records.length > 0) {
-      setSelectedRecordId(records[0].id);
-      setDialogOpen(true);
-    } else {
-      console.log("No work records found for this job");
-    }
+    setDialogOpen(true);
   };
 
   return (
@@ -152,11 +119,12 @@ export function WorkHoursManagement() {
         </CardContent>
       </Card>
       
-      {selectedRecordId && (
+      {selectedJob && (
         <ManageWorkRecordsDialog 
           open={dialogOpen}
           onOpenChange={setDialogOpen}
-          recordId={selectedRecordId}
+          jobId={selectedJob.id}
+          jobTitle={selectedJob.title}
         />
       )}
     </div>

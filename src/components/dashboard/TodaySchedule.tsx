@@ -27,7 +27,6 @@ interface TodayScheduleProps {
   isLoading?: boolean;
   hideTasks?: boolean;
   onAddWorkHours?: (jobId: string, jobTitle: string, jobDate: Date) => void;
-  selectedDate?: Date; // Added this prop
 }
 
 export function TodaySchedule({
@@ -39,8 +38,7 @@ export function TodaySchedule({
   userRole = "admin",
   isLoading = false,
   hideTasks = false,
-  onAddWorkHours,
-  selectedDate
+  onAddWorkHours
 }: TodayScheduleProps) {
   const [groupedJobs, setGroupedJobs] = useState<any>({});
   const [sortedDates, setSortedDates] = useState<string[]>([]);
