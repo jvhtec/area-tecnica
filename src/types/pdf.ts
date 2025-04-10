@@ -17,7 +17,7 @@ export interface AutoTableJsPDF extends Omit<jsPDF, "output"> {
   setPage: (pageNumber: number) => AutoTableJsPDF;
   splitTextToSize: (text: string, maxWidth: number) => string[];
   getNumberOfPages: () => number;
-  output: (type: string, options?: any) => any;
+  output(type: string, options?: any): any;
 }
 
 export interface RealtimePostgresChangesPayload<T = any> {

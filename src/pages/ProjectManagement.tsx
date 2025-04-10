@@ -230,7 +230,6 @@ export default function ProjectManagement() {
         <CardContent>
           <Label htmlFor="departments">Departments</Label>
           <Select
-            id="departments"
             onValueChange={handleDepartmentChange}
             defaultValue={selectedDepartments.length > 0 ? selectedDepartments[0] : undefined}
           >
