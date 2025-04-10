@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,7 +29,6 @@ export function WorkHoursManagement() {
     const fetchJobs = async () => {
       setLoading(true);
       try {
-        // Fetch jobs from the last 3 months
         const threeMonthsAgo = new Date();
         threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
         
@@ -47,14 +45,12 @@ export function WorkHoursManagement() {
         
         setJobs(data || []);
         
-        // Check if jobId is provided in URL
         const jobIdFromUrl = searchParams.get('jobId');
         if (jobIdFromUrl) {
           const jobFromUrl = data?.find(job => job.id === jobIdFromUrl);
           if (jobFromUrl) {
             setSelectedJob(jobFromUrl);
             
-            // Fetch the first work record for this job to get its ID
             const { data: records } = await supabase
               .from('technician_work_records')
               .select('id')
@@ -84,7 +80,6 @@ export function WorkHoursManagement() {
   const handleOpenDialog = async (job: Job) => {
     setSelectedJob(job);
     
-    // Fetch the first work record for this job to get its ID
     const { data: records } = await supabase
       .from('technician_work_records')
       .select('id')
@@ -96,7 +91,6 @@ export function WorkHoursManagement() {
       setDialogOpen(true);
     } else {
       console.log("No work records found for this job");
-      // Handle case where no records exist
     }
   };
 

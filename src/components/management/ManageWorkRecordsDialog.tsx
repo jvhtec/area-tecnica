@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -14,7 +13,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { SignaturePad } from "@/components/technician/SignaturePad";
 import { Separator } from "@/components/ui/separator";
-import { FileText } from "lucide-react"; // Changed from FilePdf to FileText
+import { FileText } from "lucide-react";
+import supabaseAuthAdapter from "@/lib/supabase-auth-adapter";
 
 interface ManageWorkRecordsDialogProps {
   open: boolean;
@@ -22,7 +22,6 @@ interface ManageWorkRecordsDialogProps {
   recordId: string;
 }
 
-// Define the WorkRecord type to handle possible error cases
 interface WorkRecord {
   id: string;
   job_id: string;
@@ -40,7 +39,7 @@ interface WorkRecord {
   technician: { 
     first_name: string; 
     last_name: string; 
-  } | { error: true } & string;
+  };
   status: string;
   total_hours: number;
 }
@@ -74,8 +73,8 @@ export const ManageWorkRecordsDialog = ({
 
   const approveRecordMutation = useMutation({
     mutationFn: async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const currentUserId = userData.user?.id;
+      const { data: userData } = await supabaseAuthAdapter.getUser();
+      const currentUserId = userData?.user?.id;
 
       const { error } = await supabase
         .from("technician_work_records")
@@ -108,9 +107,8 @@ export const ManageWorkRecordsDialog = ({
   const renderTechnicianName = () => {
     if (!workRecord) return "Unknown";
     
-    // Handle the case where technician might be an error object
     const technician = workRecord.technician;
-    if (typeof technician === 'string' || 'error' in technician) {
+    if (!technician || typeof technician === 'string' || 'error' in technician) {
       return "Unknown Technician";
     }
     
@@ -118,8 +116,9 @@ export const ManageWorkRecordsDialog = ({
   };
 
   const getWorkRecordWithSafeTypes = (record: any): WorkRecord => {
-    // Handle potential error cases in technician property
-    if (record && typeof record.technician === 'string' || (record.technician && 'error' in record.technician)) {
+    if (!record) return {} as WorkRecord;
+    
+    if (record && (typeof record.technician === 'string' || (record.technician && 'error' in record.technician))) {
       return {
         ...record,
         technician: {
@@ -128,6 +127,7 @@ export const ManageWorkRecordsDialog = ({
         }
       } as WorkRecord;
     }
+    
     return record as WorkRecord;
   };
 
