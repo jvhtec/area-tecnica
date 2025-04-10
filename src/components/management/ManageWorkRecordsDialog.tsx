@@ -1,362 +1,238 @@
-
 import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
-import { toast } from "sonner";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { WorkRecordsTable } from "@/components/technician/WorkRecordsTable";
-import { WorkRecordDetailsDialog } from "@/components/technician/WorkRecordDetailsDialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { FilePdf, Printer } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-
-interface WorkRecord {
-  id: string;
-  job_id: string;
-  technician_id: string;
-  work_date: string;
-  start_time: string;
-  end_time: string;
-  break_duration: number;
-  total_hours: number;
-  signature_url: string;
-  signature_date: string;
-  notes: string;
-  status: string;
-  reviewed_by: string | null;
-  reviewed_at: string | null;
-  created_at: string;
-  job: {
-    title: string;
-  };
-  technician?: {
-    first_name: string;
-    last_name: string;
-  };
-}
+import { useToast } from "@/hooks/use-toast";
+import { SignaturePad } from "@/components/technician/SignaturePad";
+import { Separator } from "@/components/ui/separator";
+import { FileText } from "lucide-react"; // Changed from FilePdf to FileText
 
 interface ManageWorkRecordsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  jobId: string;
-  jobTitle: string;
+  recordId: string;
 }
 
-export function ManageWorkRecordsDialog({
+// Define the WorkRecord type to handle possible error cases
+interface WorkRecord {
+  id: string;
+  job_id: string;
+  technician_id: string;
+  start_time: string;
+  end_time: string;
+  break_duration: number;
+  notes: string;
+  signature_url: string | null;
+  signature_date: string | null;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  created_at: string;
+  updated_at: string;
+  technician: { 
+    first_name: string; 
+    last_name: string; 
+  } | { error: true } & string;
+  status: string;
+  total_hours: number;
+}
+
+export const ManageWorkRecordsDialog = ({
   open,
   onOpenChange,
-  jobId,
-  jobTitle
-}: ManageWorkRecordsDialogProps) {
-  const [activeTab, setActiveTab] = useState("pending");
-  const [selectedRecord, setSelectedRecord] = useState<WorkRecord | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-  
-  // Set default date range to current month
-  useEffect(() => {
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    
-    setStartDate(format(firstDay, 'yyyy-MM-dd'));
-    setEndDate(format(lastDay, 'yyyy-MM-dd'));
-  }, []);
-  
-  const handleViewRecord = (record: WorkRecord) => {
-    setSelectedRecord(record);
-    setDetailsOpen(true);
-  };
-  
-  const handleStatusUpdate = () => {
-    setDetailsOpen(false);
-    // Force a re-render of the table
-    setActiveTab(prev => prev);
-  };
-  
-  const generateWorkHoursReport = async () => {
-    if (!startDate || !endDate) {
-      toast.error("Please select a date range");
-      return;
-    }
-    
-    setIsGeneratingReport(true);
-    
-    try {
-      // Fetch all approved records for the job within the date range
+  recordId,
+}: ManageWorkRecordsDialogProps) => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [signatureData, setSignatureData] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("details");
+
+  const { data: workRecord, isLoading } = useQuery({
+    queryKey: ["work-record", recordId],
+    queryFn: async () => {
       const { data, error } = await supabase
-        .from('technician_work_records')
-        .select(`
-          *,
-          job:jobs(title),
-          technician:profiles(first_name, last_name)
-        `)
-        .eq('job_id', jobId)
-        .eq('status', 'approved')
-        .gte('work_date', startDate)
-        .lte('work_date', endDate)
-        .order('work_date', { ascending: true });
-      
-      if (error) {
-        throw error;
-      }
-      
-      if (!data || data.length === 0) {
-        toast.error("No approved work records found in this date range");
-        return;
-      }
-      
-      // Create PDF document
-      const doc = new jsPDF();
-      
-      // Add title
-      doc.setFontSize(20);
-      doc.text(`Work Hours Report: ${jobTitle}`, 14, 22);
-      
-      // Add date range
-      doc.setFontSize(12);
-      doc.text(`Date Range: ${format(new Date(startDate), 'PP')} to ${format(new Date(endDate), 'PP')}`, 14, 32);
-      doc.text(`Generated on: ${format(new Date(), 'PPP p')}`, 14, 38);
-      
-      // Group records by technician
-      const recordsByTechnician: Record<string, WorkRecord[]> = {};
-      data.forEach(record => {
-        const technicianName = `${record.technician?.first_name} ${record.technician?.last_name}`;
-        if (!recordsByTechnician[technicianName]) {
-          recordsByTechnician[technicianName] = [];
-        }
-        recordsByTechnician[technicianName].push(record as WorkRecord);
+        .from("technician_work_records")
+        .select(
+          "*, technician:technician_id(first_name, last_name), job:job_id(title)"
+        )
+        .eq("id", recordId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!recordId && open,
+  });
+
+  const approveRecordMutation = useMutation({
+    mutationFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const currentUserId = userData.user?.id;
+
+      const { error } = await supabase
+        .from("technician_work_records")
+        .update({
+          status: "approved",
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: currentUserId,
+        })
+        .eq("id", recordId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Record approved",
+        description: "The work record has been approved successfully.",
       });
-      
-      // Add summary table
-      const summaryTableBody = Object.entries(recordsByTechnician).map(([technicianName, records]) => {
-        const totalHours = records.reduce((sum, record) => sum + record.total_hours, 0);
-        return [technicianName, totalHours.toFixed(2)];
+      queryClient.invalidateQueries({ queryKey: ["work-record", recordId] });
+      queryClient.invalidateQueries({ queryKey: ["work-records"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error approving record",
+        description: error.message,
+        variant: "destructive",
       });
-      
-      autoTable(doc, {
-        startY: 45,
-        head: [['Technician', 'Total Hours']],
-        body: summaryTableBody,
-        headStyles: {
-          fillColor: [66, 66, 66],
-          textColor: [255, 255, 255],
-          fontStyle: 'bold'
-        },
-      });
-      
-      // Add detailed tables for each technician
-      let yPosition = (doc as any).lastAutoTable.finalY + 15;
-      
-      for (const [technicianName, records] of Object.entries(recordsByTechnician)) {
-        // Check if we need a new page
-        if (yPosition > 240) {
-          doc.addPage();
-          yPosition = 20;
-        }
-        
-        doc.setFontSize(14);
-        doc.text(`${technicianName} - Detailed Hours`, 14, yPosition);
-        yPosition += 10;
-        
-        const detailedTableBody = records.map(record => [
-          format(new Date(record.work_date), 'PP'),
-          record.start_time,
-          record.end_time,
-          record.break_duration.toString(),
-          record.total_hours.toFixed(2),
-          record.notes || ''
-        ]);
-        
-        autoTable(doc, {
-          startY: yPosition,
-          head: [['Date', 'Start', 'End', 'Break (min)', 'Hours', 'Notes']],
-          body: detailedTableBody,
-          headStyles: {
-            fillColor: [100, 100, 100],
-            textColor: [255, 255, 255]
-          },
-        });
-        
-        yPosition = (doc as any).lastAutoTable.finalY + 15;
-        
-        // Add signature for the technician
-        const lastRecord = records[records.length - 1];
-        if (lastRecord.signature_url) {
-          // Check if we need a new page
-          if (yPosition > 220) {
-            doc.addPage();
-            yPosition = 20;
-          }
-          
-          doc.setFontSize(12);
-          doc.text(`Signature:`, 14, yPosition);
-          yPosition += 5;
-          
-          // Add signature image
-          try {
-            // Create an image element to load the signature
-            const img = new Image();
-            img.crossOrigin = "Anonymous";
-            img.src = lastRecord.signature_url;
-            
-            // Wait for image to load
-            await new Promise((resolve, reject) => {
-              img.onload = resolve;
-              img.onerror = reject;
-            });
-            
-            // Calculate appropriate dimensions (max width 100px)
-            const imgWidth = Math.min(100, img.width);
-            const imgHeight = (img.height * imgWidth) / img.width;
-            
-            // Add image to PDF
-            doc.addImage(img, 'PNG', 14, yPosition, imgWidth, imgHeight);
-            yPosition += imgHeight + 10;
-            
-            // Add signature date
-            doc.setFontSize(10);
-            doc.text(`Signed on: ${format(new Date(lastRecord.signature_date), 'PPP p')}`, 14, yPosition);
-            yPosition += 15;
-          } catch (error) {
-            console.error("Error adding signature:", error);
-            doc.text("Signature could not be loaded", 14, yPosition);
-            yPosition += 10;
-          }
-        }
-        
-        // Add page break for next technician
-        if (yPosition > 200) {
-          doc.addPage();
-          yPosition = 20;
-        } else {
-          yPosition += 10;
-        }
-      }
-      
-      // Save the PDF
-      doc.save(`${jobTitle}_work_hours_report.pdf`);
-      toast.success("Work hours report generated successfully");
-    } catch (error) {
-      console.error("Error generating report:", error);
-      toast.error("Failed to generate work hours report");
-    } finally {
-      setIsGeneratingReport(false);
+    },
+  });
+
+  const renderTechnicianName = () => {
+    if (!workRecord) return "Unknown";
+    
+    // Handle the case where technician might be an error object
+    const technician = workRecord.technician;
+    if (typeof technician === 'string' || 'error' in technician) {
+      return "Unknown Technician";
     }
+    
+    return `${technician.first_name} ${technician.last_name}`;
+  };
+
+  const getWorkRecordWithSafeTypes = (record: any): WorkRecord => {
+    // Handle potential error cases in technician property
+    if (record && typeof record.technician === 'string' || (record.technician && 'error' in record.technician)) {
+      return {
+        ...record,
+        technician: {
+          first_name: "Unknown",
+          last_name: "Technician"
+        }
+      } as WorkRecord;
+    }
+    return record as WorkRecord;
   };
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[800px]">
-          <DialogHeader>
-            <DialogTitle>Manage Work Records - {jobTitle}</DialogTitle>
-          </DialogHeader>
-          
-          <div className="mt-4 space-y-4">
-            <Tabs defaultValue="pending" value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid grid-cols-3">
-                <TabsTrigger value="pending">Pending</TabsTrigger>
-                <TabsTrigger value="approved">Approved</TabsTrigger>
-                <TabsTrigger value="rejected">Rejected</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="pending">
-                <div className="mb-4">
-                  <h3 className="text-sm font-medium mb-2">Pending Work Records</h3>
-                  <WorkRecordsTable 
-                    jobId={jobId} 
-                    onViewRecord={handleViewRecord} 
-                    userRole="management" 
-                  />
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Manage Work Record</DialogTitle>
+        </DialogHeader>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="signature">Signature</TabsTrigger>
+          </TabsList>
+          <TabsContent value="details" className="space-y-4">
+            {isLoading ? (
+              <p>Loading work record...</p>
+            ) : workRecord ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <strong>Job:</strong> {workRecord.job?.title || "N/A"}
+                  </div>
+                  <div>
+                    <strong>Technician:</strong> {renderTechnicianName()}
+                  </div>
+                  <div>
+                    <strong>Start Time:</strong>{" "}
+                    {format(new Date(workRecord.start_time), "Pp")}
+                  </div>
+                  <div>
+                    <strong>End Time:</strong>{" "}
+                    {format(new Date(workRecord.end_time), "Pp")}
+                  </div>
+                  <div>
+                    <strong>Break Duration:</strong> {workRecord.break_duration} minutes
+                  </div>
+                  <div>
+                    <strong>Total Hours:</strong> {workRecord.total_hours}
+                  </div>
+                  <div>
+                    <strong>Status:</strong> {workRecord.status}
+                  </div>
+                  <div>
+                    <strong>Created At:</strong>{" "}
+                    {format(new Date(workRecord.created_at), "Pp")}
+                  </div>
                 </div>
-              </TabsContent>
-              
-              <TabsContent value="approved">
-                <div className="mb-4">
-                  <h3 className="text-sm font-medium mb-2">Approved Work Records</h3>
-                  <WorkRecordsTable 
-                    jobId={jobId} 
-                    onViewRecord={handleViewRecord} 
-                    userRole="management" 
-                  />
+                <div>
+                  <strong>Notes:</strong>
+                  <Separator className="my-2" />
+                  <p>{workRecord.notes}</p>
                 </div>
-              </TabsContent>
-              
-              <TabsContent value="rejected">
-                <div className="mb-4">
-                  <h3 className="text-sm font-medium mb-2">Rejected Work Records</h3>
-                  <WorkRecordsTable 
-                    jobId={jobId} 
-                    onViewRecord={handleViewRecord} 
-                    userRole="management" 
+                <Button
+                  variant="outline"
+                  onClick={() => window.open(workRecord.signature_url, "_blank")}
+                  disabled={!workRecord.signature_url}
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  View Signature
+                </Button>
+              </>
+            ) : (
+              <p>No work record found.</p>
+            )}
+          </TabsContent>
+          <TabsContent value="signature">
+            <div className="space-y-4">
+              {workRecord?.signature_url ? (
+                <>
+                  <img
+                    src={workRecord.signature_url}
+                    alt="Technician Signature"
+                    className="border rounded-md"
                   />
-                </div>
-              </TabsContent>
-            </Tabs>
-            
-            <div className="mt-8">
-              <h3 className="text-sm font-medium mb-4">Generate Work Hours Report</h3>
-              
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="space-y-2">
-                  <Label htmlFor="startDate">Start Date</Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="endDate">End Date</Label>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                  />
-                </div>
-              </div>
-              
-              <Button 
-                onClick={generateWorkHoursReport} 
-                disabled={isGeneratingReport} 
-                className="gap-2"
-              >
-                {isGeneratingReport ? (
-                  <>Generating...</>
-                ) : (
-                  <>
-                    <FilePdf className="h-4 w-4" />
-                    Generate PDF Report
-                  </>
-                )}
-              </Button>
+                  <p className="text-sm text-muted-foreground">
+                    Signature captured on{" "}
+                    {format(new Date(workRecord.signature_date || ""), "PPP")}
+                  </p>
+                </>
+              ) : (
+                <p>No signature captured for this work record.</p>
+              )}
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-      
-      <WorkRecordDetailsDialog
-        open={detailsOpen}
-        onOpenChange={setDetailsOpen}
-        record={selectedRecord}
-        userRole="management"
-        onStatusUpdate={handleStatusUpdate}
-      />
-    </>
+          </TabsContent>
+        </Tabs>
+
+        <Separator className="my-4" />
+
+        <div className="flex justify-end space-x-2">
+          <Button variant="secondary" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          {workRecord?.status === "pending" && (
+            <Button
+              onClick={() => {
+                approveRecordMutation.mutate();
+              }}
+              disabled={approveRecordMutation.isLoading}
+            >
+              {approveRecordMutation.isLoading ? "Approving..." : "Approve Record"}
+            </Button>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
-}
+};

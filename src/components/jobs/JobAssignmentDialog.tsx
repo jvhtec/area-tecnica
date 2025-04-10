@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -15,7 +14,8 @@ interface JobAssignmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   jobId: string;
-  department: Department;
+  department?: string;
+  onAssignmentsChanged?: (newAssignments: any) => void;
 }
 
 interface Technician {
@@ -27,18 +27,22 @@ interface Technician {
   department: Department;
 }
 
-export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: JobAssignmentDialogProps) => {
+export const JobAssignmentDialog = ({
+  open,
+  onOpenChange,
+  jobId,
+  department = "lights",
+  onAssignmentsChanged
+}: JobAssignmentDialogProps) => {
   const [selectedTechnician, setSelectedTechnician] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<string>("");
   const queryClient = useQueryClient();
 
-  // Reset selections when department changes
   useEffect(() => {
     setSelectedTechnician("");
     setSelectedRole("");
   }, [department]);
 
-  // Set up tab visibility tracking to refresh data when tab becomes visible
   useTabVisibility(['technicians']);
 
   const { data: technicians, isLoading: isLoadingTechnicians } = useQuery({
@@ -49,7 +53,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
         .from("profiles")
         .select("id, first_name, last_name, email, role, department")
         .eq("department", department)
-        .in("role", ["technician", "house_tech"]); // Modified to include both technician and house_tech roles
+        .in("role", ["technician", "house_tech"]);
 
       if (error) {
         console.error("Error fetching technicians:", error);
@@ -59,7 +63,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
       console.log("Fetched technicians:", data);
       return data as Technician[];
     },
-    staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
+    staleTime: 1000 * 60 * 5,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
@@ -67,7 +71,6 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
 
   const handleDialogChange = async (isOpen: boolean) => {
     if (!isOpen) {
-      // Reset form and refresh jobs data when dialog closes
       setSelectedTechnician("");
       setSelectedRole("");
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
@@ -75,7 +78,6 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
     onOpenChange(isOpen);
   };
 
-  // Validate assignment before submitting
   const validateAssignment = (techId: string, role: string, techs: Technician[]) => {
     const technician = techs.find(t => t.id === techId);
     if (!technician) {
@@ -103,14 +105,11 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
     try {
       console.log("Assigning technician:", selectedTechnician, "with role:", selectedRole);
       
-      // Validate assignment
       if (!technicians) {
         throw new Error("Technician data not available");
       }
       
       validateAssignment(selectedTechnician, selectedRole, technicians);
-
-      // REMOVED: Check for existing assignment with same role - allowing duplicate role assignments
 
       const roleField = `${department}_role` as const;
       const { error } = await supabase
@@ -129,7 +128,6 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
       console.log("Technician assigned successfully");
       toast.success("Technician assigned successfully");
       
-      // Reset form and close dialog
       setSelectedTechnician("");
       setSelectedRole("");
       handleDialogChange(false);
