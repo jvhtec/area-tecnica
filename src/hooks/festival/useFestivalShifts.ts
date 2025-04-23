@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useTableSubscription } from "@/hooks/useSubscription";
@@ -53,33 +52,22 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
           id,
           shift_id,
           technician_id,
-          role
+          external_technician_name,
+          role,
+          profiles:technician_id (
+            id,
+            first_name,
+            last_name,
+            email,
+            department,
+            role
+          )
         `)
         .in("shift_id", shiftIds);
 
       if (assignmentsError) {
         console.error("Error fetching shift assignments:", assignmentsError);
         // Continue with empty assignments
-      }
-
-      let technicianProfiles: Record<string, any> = {};
-      
-      if (assignmentsData && assignmentsData.length > 0) {
-        const technicianIds = [...new Set(assignmentsData.map(a => a.technician_id))];
-        
-        const { data: profilesData, error: profilesError } = await supabase
-          .from("profiles")
-          .select("id, first_name, last_name, email, department, role")
-          .in("id", technicianIds);
-          
-        if (profilesError) {
-          console.error("Error fetching technician profiles:", profilesError);
-        } else if (profilesData) {
-          technicianProfiles = profilesData.reduce((acc, profile) => {
-            acc[profile.id] = profile;
-            return acc;
-          }, {} as Record<string, any>);
-        }
       }
       
       const shiftsWithAssignments = shiftsData.map((shift: any) => {
@@ -88,7 +76,8 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
               .filter(assignment => assignment.shift_id === shift.id)
               .map(assignment => ({
                 ...assignment,
-                profiles: technicianProfiles[assignment.technician_id] || null
+                // Keep profiles data if it exists (internal technician)
+                profiles: assignment.technician_id ? assignment.profiles : null
               }))
           : [];
           
