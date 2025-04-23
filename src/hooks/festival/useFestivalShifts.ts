@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useTableSubscription } from "@/hooks/useSubscription";
@@ -35,6 +34,7 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
     try {
       console.log(`Fetching shifts for job: ${jobId}, date: ${selectedDate}`);
       
+      // First fetch all shifts for the given job and date
       const { data: shiftsData, error: shiftsError } = await supabase
         .from("festival_shifts")
         .select("*")
@@ -53,9 +53,10 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
         return [];
       }
 
+      // Get all shift IDs to fetch assignments
       const shiftIds = shiftsData.map(shift => shift.id);
       
-      // Fetch all assignments for the shifts
+      // Fetch assignments with explicit column selection and profile data in a single query
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from("festival_shift_assignments")
         .select(`
@@ -81,13 +82,17 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
       }
       
       console.log("Assignments data retrieved:", assignmentsData);
-      
+
+      // Map shifts with their assignments
       const shiftsWithAssignments = shiftsData.map((shift: any) => {
-        const shiftAssignments = assignmentsData 
+        // Filter and map assignments for this shift
+        const shiftAssignments = assignmentsData
           ? assignmentsData
               .filter(assignment => assignment.shift_id === shift.id)
               .map(assignment => ({
                 ...assignment,
+                // If there's a technician_id, include the profiles data
+                // Otherwise this is an external technician and profiles will be null
                 profiles: assignment.technician_id ? assignment.profiles : null
               }))
           : [];
@@ -98,7 +103,9 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
         };
       });
 
+      console.log("Processed shifts with assignments:", shiftsWithAssignments);
       return shiftsWithAssignments;
+      
     } catch (error: any) {
       console.error("Error in fetchShifts:", error);
       toast({
