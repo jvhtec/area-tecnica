@@ -273,8 +273,13 @@ export const generateAndMergeFestivalPDFs = async (
     
     // Process individual artist PDFs
     if (options.includeArtistRequirements && artists && artists.length > 0) {
-      // Sort artists by stage, date, show_start time, and name
-      const sortedArtists = [...artists].sort((a, b) => {
+      // Filter artists by selected stages first
+      const filteredArtists = artists.filter(artist => 
+        options.artistRequirementStages.includes(Number(artist.stage))
+      );
+      
+      // Sort the filtered artists
+      const sortedArtists = [...filteredArtists].sort((a, b) => {
         // First sort by stage
         if (a.stage < b.stage) return -1;
         if (a.stage > b.stage) return 1;

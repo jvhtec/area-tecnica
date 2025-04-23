@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -13,6 +12,7 @@ export interface PrintOptions {
   includeArtistTables: boolean;
   artistTableStages: number[];
   includeArtistRequirements: boolean;
+  artistRequirementStages: number[];
 }
 
 interface PrintOptionsDialogProps {
@@ -35,11 +35,12 @@ export const PrintOptionsDialog = ({
     shiftScheduleStages: Array.from({ length: maxStages }, (_, i) => i + 1),
     includeArtistTables: true,
     artistTableStages: Array.from({ length: maxStages }, (_, i) => i + 1),
-    includeArtistRequirements: true
+    includeArtistRequirements: true,
+    artistRequirementStages: Array.from({ length: maxStages }, (_, i) => i + 1)
   });
 
   const handleStageChange = (section: keyof PrintOptions, stageNumber: number, checked: boolean) => {
-    if (section === 'gearSetupStages' || section === 'shiftScheduleStages' || section === 'artistTableStages') {
+    if (section === 'gearSetupStages' || section === 'shiftScheduleStages' || section === 'artistTableStages' || section === 'artistRequirementStages') {
       setOptions(prev => ({
         ...prev,
         [section]: checked 
@@ -49,7 +50,7 @@ export const PrintOptionsDialog = ({
     }
   };
 
-  const renderStageSelections = (section: 'gearSetupStages' | 'shiftScheduleStages' | 'artistTableStages') => {
+  const renderStageSelections = (section: 'gearSetupStages' | 'shiftScheduleStages' | 'artistTableStages' | 'artistRequirementStages') => {
     return (
       <div className="pl-6 space-y-2">
         <p className="text-sm text-muted-foreground">Select stages:</p>
@@ -126,15 +127,18 @@ export const PrintOptionsDialog = ({
               {options.includeArtistTables && maxStages > 1 && renderStageSelections('artistTableStages')}
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="artist-requirements"
-                checked={options.includeArtistRequirements}
-                onCheckedChange={(checked) => 
-                  setOptions(prev => ({ ...prev, includeArtistRequirements: checked as boolean }))
-                }
-              />
-              <Label htmlFor="artist-requirements">Individual Artist Requirements</Label>
+            <div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="artist-requirements"
+                  checked={options.includeArtistRequirements}
+                  onCheckedChange={(checked) => 
+                    setOptions(prev => ({ ...prev, includeArtistRequirements: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="artist-requirements">Individual Artist Requirements</Label>
+              </div>
+              {options.includeArtistRequirements && maxStages > 1 && renderStageSelections('artistRequirementStages')}
             </div>
           </div>
         </div>
@@ -142,7 +146,7 @@ export const PrintOptionsDialog = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleConfirm}>
+          <Button onClick={() => onConfirm(options)}>
             Generate PDF
           </Button>
         </DialogFooter>
