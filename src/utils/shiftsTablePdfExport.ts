@@ -101,10 +101,21 @@ export const exportShiftsTablePDF = (data: ShiftsTablePdfData): Promise<Blob> =>
           const tableRows = shifts.map(shift => {
             const assignments = shift.assignments || [];
             const technicians = assignments.map(a => {
-              // Handle both external and internal technicians
-              const technicianName = a.external_technician_name || 
-                (a.profiles && `${a.profiles.first_name} ${a.profiles.last_name}`) ||
-                'Unnamed Technician';
+              let technicianName;
+              
+              // First check for external technician name
+              if (a.external_technician_name) {
+                technicianName = a.external_technician_name;
+              }
+              // Then fall back to profile data if available
+              else if (a.profiles?.first_name && a.profiles?.last_name) {
+                technicianName = `${a.profiles.first_name} ${a.profiles.last_name}`;
+              }
+              // Last resort fallback
+              else {
+                technicianName = 'Unnamed Technician';
+                console.warn('Missing technician name data for assignment:', a);
+              }
               
               return `${technicianName} (${a.role || 'N/A'})`;
             }).join('\n');
