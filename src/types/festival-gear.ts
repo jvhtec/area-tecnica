@@ -71,4 +71,5 @@ export interface WirelessConfigProps {
   onChange: (systems: WirelessSetup[]) => void;
   label: string;
   includeQuantityTypes?: boolean;
+  isIEM?: boolean;
 }

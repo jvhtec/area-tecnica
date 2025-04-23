@@ -148,9 +148,15 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
         if (data.gearSetup.iem_systems && data.gearSetup.iem_systems.length > 0) {
           const iem = data.gearSetup.iem_systems[0];
           wirelessData.push([
-            'IEM Systems', 
+            'IEM Channels', 
             iem.model || 'N/A', 
-            `${iem.quantity || 0}`,
+            `${iem.quantity_hh || 0}`,
+            iem.band || 'N/A'
+          ]);
+          wirelessData.push([
+            'IEM Bodypacks', 
+            iem.model || 'N/A', 
+            `${iem.quantity_bp || 0}`,
             iem.band || 'N/A'
           ]);
         }

@@ -12,7 +12,8 @@ export const WirelessConfig = ({
   systems, 
   onChange, 
   label, 
-  includeQuantityTypes = false 
+  includeQuantityTypes = false,
+  isIEM = false
 }: WirelessConfigProps) => {
   const addSystem = () => {
     const newSystem: WirelessSetup = {
@@ -93,17 +94,17 @@ export const WirelessConfig = ({
           {includeQuantityTypes && (
             <div className="flex gap-4">
               <div className="flex-1">
-                <Label>Handheld</Label>
+                <Label>{isIEM ? "Channels" : "Handheld"}</Label>
                 <Input
                   type="number"
                   min="0"
                   value={system.quantity_hh}
                   onChange={(e) => updateSystem(index, 'quantity_hh', parseInt(e.target.value) || 0)}
-                  placeholder="HH Qty"
+                  placeholder={isIEM ? "CH Qty" : "HH Qty"}
                 />
               </div>
               <div className="flex-1">
-                <Label>Bodypack</Label>
+                <Label>Bodypacks</Label>
                 <Input
                   type="number"
                   min="0"
