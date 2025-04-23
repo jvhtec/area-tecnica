@@ -225,6 +225,8 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
             onShiftUpdated={refetch}
             jobId={jobId}
             isViewOnly={isViewOnly}
+            jobDates={jobDates}
+            selectedDate={selectedDate}
           />
         ) : (
           <ShiftsTable 
