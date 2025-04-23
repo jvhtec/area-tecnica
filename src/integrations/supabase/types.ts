@@ -830,6 +830,7 @@ export type Database = {
       festival_shift_assignments: {
         Row: {
           created_at: string | null
+          external_technician_name: string | null
           id: string
           role: string
           shift_id: string | null
@@ -837,6 +838,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          external_technician_name?: string | null
           id?: string
           role: string
           shift_id?: string | null
@@ -844,6 +846,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          external_technician_name?: string | null
           id?: string
           role?: string
           shift_id?: string | null
@@ -2545,6 +2548,71 @@ export type Database = {
             columns: ["technician_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technician_work_records: {
+        Row: {
+          break_duration: number | null
+          created_at: string | null
+          end_time: string
+          id: string
+          job_id: string
+          notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          signature_date: string | null
+          signature_url: string | null
+          start_time: string
+          status: string | null
+          technician_id: string
+          total_hours: number
+          updated_at: string | null
+          work_date: string
+        }
+        Insert: {
+          break_duration?: number | null
+          created_at?: string | null
+          end_time: string
+          id?: string
+          job_id: string
+          notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          signature_date?: string | null
+          signature_url?: string | null
+          start_time: string
+          status?: string | null
+          technician_id: string
+          total_hours: number
+          updated_at?: string | null
+          work_date: string
+        }
+        Update: {
+          break_duration?: number | null
+          created_at?: string | null
+          end_time?: string
+          id?: string
+          job_id?: string
+          notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          signature_date?: string | null
+          signature_url?: string | null
+          start_time?: string
+          status?: string | null
+          technician_id?: string
+          total_hours?: number
+          updated_at?: string | null
+          work_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_work_records_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
         ]

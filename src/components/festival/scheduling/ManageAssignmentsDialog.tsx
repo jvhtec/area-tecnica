@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +16,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FestivalShift, ShiftWithAssignments } from "@/types/festival-scheduling";
 import { Department } from "@/types/department";
+import { Switch } from "@/components/ui/switch";
 
 interface ManageAssignmentsDialogProps {
   open: boolean;
@@ -50,6 +50,8 @@ export const ManageAssignmentsDialog = ({
   isViewOnly = false
 }: ManageAssignmentsDialogProps) => {
   const [technicianId, setTechnicianId] = useState("");
+  const [externalTechnicianName, setExternalTechnicianName] = useState("");
+  const [isExternalTechnician, setIsExternalTechnician] = useState(false);
   const [role, setRole] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -138,14 +140,14 @@ export const ManageAssignmentsDialog = ({
   };
 
   const addAssignmentMutation = useMutation({
-    mutationFn: async () => {
-      if (!technicianId || !shift?.id) {
-        throw new Error("Technician and shift ID are required");
+    mutationFn: async (assignment: { shift_id: string; technician_id?: string; external_technician_name?: string; role: string }) => {
+      if (!shift?.id) {
+        throw new Error("Shift ID is required");
       }
 
       const { data, error } = await supabase
         .from("festival_shift_assignments")
-        .insert([{ shift_id: shift.id, technician_id: technicianId, role: role }]);
+        .insert([assignment]);
 
       if (error) {
         console.error("Error adding assignment:", error);
@@ -203,8 +205,31 @@ export const ManageAssignmentsDialog = ({
   });
 
   const handleAddAssignment = async () => {
+    if ((!technicianId && !externalTechnicianName) || !role) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      await addAssignmentMutation.mutateAsync();
+      const assignment = {
+        shift_id: shift.id,
+        role: role,
+        ...(isExternalTechnician 
+          ? { external_technician_name: externalTechnicianName }
+          : { technician_id: technicianId }
+        )
+      };
+
+      await addAssignmentMutation.mutateAsync(assignment);
+      
+      // Reset form
+      setTechnicianId("");
+      setExternalTechnicianName("");
+      setRole("");
     } catch (error: any) {
       console.error("Error adding assignment:", error);
       toast({
@@ -242,13 +267,27 @@ export const ManageAssignmentsDialog = ({
           </DialogDescription>
         </DialogHeader>
         
-        {isLoadingTechnicians ? (
-          <div className="flex justify-center p-4">Loading technicians...</div>
-        ) : techniciansError ? (
-          <div className="text-red-500">Error loading technicians.</div>
-        ) : (
-          !isViewOnly && (
-            <div className="space-y-4">
+        {!isViewOnly && (
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Switch
+                checked={isExternalTechnician}
+                onCheckedChange={setIsExternalTechnician}
+              />
+              <Label>External Technician</Label>
+            </div>
+
+            {isExternalTechnician ? (
+              <div className="grid gap-2">
+                <Label htmlFor="externalTechnician">External Technician Name</Label>
+                <Input
+                  id="externalTechnician"
+                  value={externalTechnicianName}
+                  onChange={(e) => setExternalTechnicianName(e.target.value)}
+                  placeholder="Enter technician name"
+                />
+              </div>
+            ) : (
               <div className="grid gap-2">
                 <Label htmlFor="technician">Technician</Label>
                 <Select onValueChange={setTechnicianId}>
@@ -264,29 +303,30 @@ export const ManageAssignmentsDialog = ({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="role">Role</Label>
-                <Select 
-                  value={role} 
-                  onValueChange={setRole}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getRoleOptions(shift.department as Department || "sound").map((roleOption) => (
-                      <SelectItem key={roleOption} value={roleOption}>
-                        {roleOption}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={handleAddAssignment} disabled={addAssignmentMutation.isPending}>
-                {addAssignmentMutation.isPending ? "Assigning..." : "Assign Technician"}
-              </Button>
+            )}
+
+            <div className="grid gap-2">
+              <Label htmlFor="role">Role</Label>
+              <Select 
+                value={role} 
+                onValueChange={setRole}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {getRoleOptions(shift.department as Department || "sound").map((roleOption) => (
+                    <SelectItem key={roleOption} value={roleOption}>
+                      {roleOption}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          )
+            <Button onClick={handleAddAssignment} disabled={addAssignmentMutation.isPending}>
+              {addAssignmentMutation.isPending ? "Assigning..." : "Assign Technician"}
+            </Button>
+          </div>
         )}
         
         <div className="space-y-4">
@@ -295,7 +335,9 @@ export const ManageAssignmentsDialog = ({
             shift.assignments.map(assignment => (
               <div key={assignment.id} className="flex items-center justify-between p-2 bg-accent/20 rounded-md">
                 <div>
-                  {assignment.profiles?.first_name} {assignment.profiles?.last_name} - {assignment.role}
+                  {assignment.external_technician_name || 
+                    `${assignment.profiles?.first_name} ${assignment.profiles?.last_name}`} 
+                  - {assignment.role}
                 </div>
                 {!isViewOnly && (
                   <Button 
