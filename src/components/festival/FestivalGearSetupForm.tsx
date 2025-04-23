@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -30,13 +31,8 @@ export const FestivalGearSetupForm = ({
     max_stages: 1,
     foh_consoles: [],
     mon_consoles: [],
-    wireless_model: "",
-    wireless_quantity_hh: 0,
-    wireless_quantity_bp: 0,
-    wireless_band: "",
-    iem_model: "",
-    iem_quantity: 0,
-    iem_band: "",
+    wireless_systems: [],
+    iem_systems: [],
     monitors_enabled: false,
     monitors_quantity: 0,
     extras_sf: false,
@@ -94,13 +90,8 @@ export const FestivalGearSetupForm = ({
             max_stages: setupData.max_stages || 1,
             foh_consoles: setupData.foh_consoles || [],
             mon_consoles: setupData.mon_consoles || [],
-            wireless_model: setupData.wireless_systems?.[0]?.model || "",
-            wireless_band: setupData.wireless_systems?.[0]?.band || "",
-            iem_model: setupData.iem_systems?.[0]?.model || "",
-            iem_band: setupData.iem_systems?.[0]?.band || "",
-            wireless_quantity_hh: setupData.wireless_systems?.[0]?.quantity_hh || 0,
-            wireless_quantity_bp: setupData.wireless_systems?.[0]?.quantity_bp || 0,
-            iem_quantity: setupData.iem_systems?.[0]?.quantity || 0,
+            wireless_systems: setupData.wireless_systems || [],
+            iem_systems: setupData.iem_systems || [],
             monitors_enabled: setupData.available_monitors > 0,
             monitors_quantity: setupData.available_monitors || 0,
             extras_sf: setupData.has_side_fills || false,
@@ -151,9 +142,6 @@ export const FestivalGearSetupForm = ({
       
       if (!jobId) throw new Error('No job ID provided');
 
-      // Create wireless and IEM quantities with proper split between HH and BP
-      const totalWirelessQuantity = setup.wireless_quantity_hh + setup.wireless_quantity_bp;
-
       // Prepare payload for upsert
       const setupPayload = {
         job_id: jobId,
@@ -173,18 +161,8 @@ export const FestivalGearSetupForm = ({
         // Add console and wireless info as JSON arrays
         foh_consoles: setup.foh_consoles,
         mon_consoles: setup.mon_consoles,
-        wireless_systems: [{ 
-          model: setup.wireless_model, 
-          quantity: totalWirelessQuantity,
-          quantity_hh: setup.wireless_quantity_hh,
-          quantity_bp: setup.wireless_quantity_bp,
-          band: setup.wireless_band 
-        }],
-        iem_systems: [{ 
-          model: setup.iem_model, 
-          quantity: setup.iem_quantity, 
-          band: setup.iem_band 
-        }],
+        wireless_systems: setup.wireless_systems,
+        iem_systems: setup.iem_systems,
         notes: setup.notes
       };
 
