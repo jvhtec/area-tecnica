@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,6 +55,7 @@ const FestivalManagement = () => {
   const [isPrinting, setIsPrinting] = useState(false);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const { userRole } = useAuthSession();
+  const [maxStages, setMaxStages] = useState(1);
 
   const isSchedulingRoute = location.pathname.includes('/scheduling');
   
@@ -91,6 +93,20 @@ const FestivalManagement = () => {
         if (artistError) {
           console.error("Error fetching artist count:", artistError);
           throw artistError;
+        }
+
+        // Fetch maximum stages from festival_gear_setups
+        const { data: gearSetups, error: gearError } = await supabase
+          .from("festival_gear_setups")
+          .select("max_stages")
+          .eq("job_id", jobId)
+          .order("created_at", { ascending: false })
+          .limit(1);
+          
+        if (gearError) {
+          console.error("Error fetching gear setup:", gearError);
+        } else if (gearSetups && gearSetups.length > 0) {
+          setMaxStages(gearSetups[0].max_stages || 1);
         }
 
         setJob(jobData);
@@ -355,7 +371,7 @@ const FestivalManagement = () => {
           open={isPrintDialogOpen}
           onOpenChange={setIsPrintDialogOpen}
           onConfirm={handlePrintAllDocumentation}
-          maxStages={job?.max_stages || 1}
+          maxStages={maxStages}
         />
       )}
     </div>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useJobsRealtime } from "@/hooks/useJobsRealtime";
@@ -77,7 +76,15 @@ const Festivals = () => {
     
     try {
       console.log("Starting document generation for festival:", jobTitle);
-      const mergedPdf = await generateAndMergeFestivalPDFs(jobId, jobTitle);
+      const defaultOptions = {
+        includeGearSetup: true,
+        selectedStages: [1], // Default to stage 1
+        includeShiftSchedules: true,
+        includeArtistTables: true,
+        includeArtistRequirements: true
+      };
+      
+      const mergedPdf = await generateAndMergeFestivalPDFs(jobId, jobTitle, defaultOptions);
       
       if (!mergedPdf || mergedPdf.size === 0) {
         throw new Error('Generated PDF is empty');
@@ -101,10 +108,8 @@ const Festivals = () => {
     }
   };
 
-  // Check if user can print documentation
   const canPrintDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
 
-  // Empty functions for onEditClick and onDeleteClick since we don't want those buttons
   const emptyFunction = () => {};
 
   return (
