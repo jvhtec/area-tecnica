@@ -1,17 +1,11 @@
-
 import { ConsoleSetup, WirelessSetup } from "./festival";
 
 export interface GearSetupFormData {
   max_stages: number;
   foh_consoles: ConsoleSetup[];
   mon_consoles: ConsoleSetup[];
-  wireless_model: string;
-  wireless_quantity_hh: number;
-  wireless_quantity_bp: number;
-  wireless_band: string;
-  iem_model: string;
-  iem_quantity: number;
-  iem_band: string;
+  wireless_systems: WirelessSetup[];
+  iem_systems: WirelessSetup[];
   monitors_enabled: boolean;
   monitors_quantity: number;
   extras_sf: boolean;
@@ -70,4 +64,11 @@ export interface StageSetup {
   name: string;
   description?: string;
   gear_setup_id: string;
+}
+
+export interface WirelessConfigProps {
+  systems: WirelessSetup[];
+  onChange: (systems: WirelessSetup[]) => void;
+  label: string;
+  includeQuantityTypes?: boolean;
 }

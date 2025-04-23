@@ -8,6 +8,8 @@ export interface ConsoleSetup {
 export interface WirelessSetup {
   model: string;
   quantity: number;
+  quantity_hh?: number;
+  quantity_bp?: number;
   band?: string;
   notes?: string;
 }
