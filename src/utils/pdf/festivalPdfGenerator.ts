@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabase';
 import { exportArtistPDF, ArtistPdfData } from '../artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from '../artistTablePdfExport';
@@ -92,7 +93,7 @@ export const generateAndMergeFestivalPDFs = async (
                 const { data: assignmentsData, error: assignmentsError } = await supabase
                   .from("festival_shift_assignments")
                   .select(`
-                    id, shift_id, technician_id, role
+                    id, shift_id, technician_id, external_technician_name, role
                   `)
                   .eq("shift_id", shift.id);
                 
@@ -102,8 +103,17 @@ export const generateAndMergeFestivalPDFs = async (
                 }
                 
                 const assignmentsWithProfiles = await Promise.all((assignmentsData || []).map(async (assignment) => {
-                  if (!assignment.technician_id) {
+                  if (!assignment.technician_id && !assignment.external_technician_name) {
                     return { ...assignment, profiles: null };
+                  }
+                  
+                  if (assignment.external_technician_name) {
+                    // For external technicians, we already have the name
+                    return { 
+                      ...assignment, 
+                      profiles: null,
+                      external_technician_name: assignment.external_technician_name
+                    };
                   }
                   
                   try {
@@ -142,7 +152,10 @@ export const generateAndMergeFestivalPDFs = async (
                 name: shift.name,
                 department: shift.department || undefined,
                 stage: shift.stage ? Number(shift.stage) : undefined,
-                assignments: shift.assignments || []
+                assignments: shift.assignments.map(assignment => ({
+                  ...assignment,
+                  external_technician_name: assignment.external_technician_name || undefined
+                }))
               };
             });
           
