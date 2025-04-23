@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { useAuthSession } from "@/hooks/auth/useAuthSession";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
+import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 
 const Festivals = () => {
   const navigate = useNavigate();
@@ -76,11 +77,14 @@ const Festivals = () => {
     
     try {
       console.log("Starting document generation for festival:", jobTitle);
-      const defaultOptions = {
+      
+      const defaultOptions: PrintOptions = {
         includeGearSetup: true,
-        selectedStages: [1], // Default to stage 1
+        gearSetupStages: [1], // Default to stage 1
         includeShiftSchedules: true,
+        shiftScheduleStages: [1], // Default to stage 1
         includeArtistTables: true,
+        artistTableStages: [1], // Default to stage 1
         includeArtistRequirements: true
       };
       
