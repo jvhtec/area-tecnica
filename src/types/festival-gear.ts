@@ -3,8 +3,8 @@ import { ConsoleSetup, WirelessSetup } from "./festival";
 
 export interface GearSetupFormData {
   max_stages: number;
-  foh_console: string;
-  mon_console: string;
+  foh_consoles: ConsoleSetup[];
+  mon_consoles: ConsoleSetup[];
   wireless_model: string;
   wireless_quantity_hh: number;
   wireless_quantity_bp: number;

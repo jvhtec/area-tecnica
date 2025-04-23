@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -29,8 +28,8 @@ export const FestivalGearSetupForm = ({
   const [isLoading, setIsLoading] = useState(false);
   const [setup, setSetup] = useState<GearSetupFormData>({
     max_stages: 1,
-    foh_console: "",
-    mon_console: "",
+    foh_consoles: [],
+    mon_consoles: [],
     wireless_model: "",
     wireless_quantity_hh: 0,
     wireless_quantity_bp: 0,
@@ -93,8 +92,8 @@ export const FestivalGearSetupForm = ({
           // Update form values with existing data
           setSetup({
             max_stages: setupData.max_stages || 1,
-            foh_console: setupData.foh_consoles?.[0]?.model || "",
-            mon_console: setupData.mon_consoles?.[0]?.model || "",
+            foh_consoles: setupData.foh_consoles || [],
+            mon_consoles: setupData.mon_consoles || [],
             wireless_model: setupData.wireless_systems?.[0]?.model || "",
             wireless_band: setupData.wireless_systems?.[0]?.band || "",
             iem_model: setupData.iem_systems?.[0]?.model || "",
@@ -172,8 +171,8 @@ export const FestivalGearSetupForm = ({
         available_analog_runs: setup.infra_analog,
         other_infrastructure: setup.other_infrastructure,
         // Add console and wireless info as JSON arrays
-        foh_consoles: [{ model: setup.foh_console, quantity: 1 }],
-        mon_consoles: [{ model: setup.mon_console, quantity: 1 }],
+        foh_consoles: setup.foh_consoles,
+        mon_consoles: setup.mon_consoles,
         wireless_systems: [{ 
           model: setup.wireless_model, 
           quantity: totalWirelessQuantity,
