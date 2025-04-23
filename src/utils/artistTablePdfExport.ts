@@ -153,7 +153,7 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
             `Stage ${row.stage}`,
             `${row.time.start}-${row.time.end}`,
             `FOH: ${row.technical!.fohConsole.model}\n(${row.technical!.fohConsole.providedBy})\n\nMON: ${row.technical!.monConsole.model}\n(${row.technical!.monConsole.providedBy})`,
-            `FOH Tech: ${row.technical!.fohTech ? '✓' : '✗'}\n\nMON Tech: ${row.technical!.monTech ? '✓' : '✗'}`,
+            `FOH: ${row.technical!.fohTech ? 'Y' : 'N'}\nMON: ${row.technical!.monTech ? 'Y' : 'N'}`,
             `HH: ${row.technical!.wireless.hh} (${row.technical!.wireless.providedBy})\nBP: ${row.technical!.wireless.bp}\n\nIEM: ${row.technical!.iem.quantity} (${row.technical!.iem.providedBy})`,
             row.technical!.monitors.enabled ? `Monitors: ${row.technical!.monitors.quantity}` : '-',
             [
@@ -190,7 +190,7 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
             1: { cellWidth: 15 },
             2: { cellWidth: 25 },
             3: { cellWidth: 35, cellPadding: 4 },
-            4: { cellWidth: 30, cellPadding: 4 },
+            4: { cellWidth: 20, cellPadding: 4 },
             5: { cellWidth: 30, cellPadding: 4 },
             6: { cellWidth: 20 },
             7: { cellWidth: 20 },
