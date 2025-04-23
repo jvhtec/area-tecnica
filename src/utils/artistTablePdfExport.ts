@@ -173,7 +173,6 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
           styles: {
             fontSize: 8,
             cellPadding: 3,
-            lineHeight: 1.2,
             overflow: 'linebreak',
             lineWidth: 0.1,
             valign: 'middle'
