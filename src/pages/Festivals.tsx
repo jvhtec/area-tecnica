@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { useAuthSession } from "@/hooks/auth/useAuthSession";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
-import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
+import { PrintOptions, PrintOptionsDialog } from "@/components/festival/pdf/PrintOptionsDialog";
 
 const Festivals = () => {
   const navigate = useNavigate();
@@ -85,7 +85,8 @@ const Festivals = () => {
         shiftScheduleStages: [1], // Default to stage 1
         includeArtistTables: true,
         artistTableStages: [1], // Default to stage 1
-        includeArtistRequirements: true
+        includeArtistRequirements: true,
+        artistRequirementStages: [1] // Add the missing property, default to stage 1
       };
       
       const mergedPdf = await generateAndMergeFestivalPDFs(jobId, jobTitle, defaultOptions);
