@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -9,6 +10,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -266,96 +268,102 @@ export const ManageAssignmentsDialog = ({
               : "Add or remove staff from this shift"}
           </DialogDescription>
         </DialogHeader>
-        
-        {!isViewOnly && (
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Switch
-                checked={isExternalTechnician}
-                onCheckedChange={setIsExternalTechnician}
-              />
-              <Label>External Technician</Label>
-            </div>
 
-            {isExternalTechnician ? (
-              <div className="grid gap-2">
-                <Label htmlFor="externalTechnician">External Technician Name</Label>
-                <Input
-                  id="externalTechnician"
-                  value={externalTechnicianName}
-                  onChange={(e) => setExternalTechnicianName(e.target.value)}
-                  placeholder="Enter technician name"
-                />
-              </div>
-            ) : (
-              <div className="grid gap-2">
-                <Label htmlFor="technician">Technician</Label>
-                <Select onValueChange={setTechnicianId}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a technician" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getSortedTechnicians().map((technician) => (
-                      <SelectItem key={technician.id} value={technician.id}>
-                        {formatTechnicianName(technician)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+        <ScrollArea className="max-h-[60vh] px-1">
+          <div className="space-y-6">
+            {!isViewOnly && (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={isExternalTechnician}
+                    onCheckedChange={setIsExternalTechnician}
+                  />
+                  <Label>External Technician</Label>
+                </div>
+
+                {isExternalTechnician ? (
+                  <div className="grid gap-2">
+                    <Label htmlFor="externalTechnician">External Technician Name</Label>
+                    <Input
+                      id="externalTechnician"
+                      value={externalTechnicianName}
+                      onChange={(e) => setExternalTechnicianName(e.target.value)}
+                      placeholder="Enter technician name"
+                    />
+                  </div>
+                ) : (
+                  <div className="grid gap-2">
+                    <Label htmlFor="technician">Technician</Label>
+                    <Select onValueChange={setTechnicianId}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select a technician" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getSortedTechnicians().map((technician) => (
+                          <SelectItem key={technician.id} value={technician.id}>
+                            {formatTechnicianName(technician)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <div className="grid gap-2">
+                  <Label htmlFor="role">Role</Label>
+                  <Select 
+                    value={role} 
+                    onValueChange={setRole}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getRoleOptions(shift.department as Department || "sound").map((roleOption) => (
+                        <SelectItem key={roleOption} value={roleOption}>
+                          {roleOption}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={handleAddAssignment} disabled={addAssignmentMutation.isPending}>
+                  {addAssignmentMutation.isPending ? "Assigning..." : "Assign Technician"}
+                </Button>
               </div>
             )}
-
-            <div className="grid gap-2">
-              <Label htmlFor="role">Role</Label>
-              <Select 
-                value={role} 
-                onValueChange={setRole}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {getRoleOptions(shift.department as Department || "sound").map((roleOption) => (
-                    <SelectItem key={roleOption} value={roleOption}>
-                      {roleOption}
-                    </SelectItem>
+            
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium">Assigned Staff</h3>
+              {shift.assignments.length > 0 ? (
+                <div className="space-y-2">
+                  {shift.assignments.map(assignment => (
+                    <div key={assignment.id} className="flex items-center justify-between p-2 bg-accent/20 rounded-md">
+                      <div>
+                        {assignment.external_technician_name || 
+                          `${assignment.profiles?.first_name} ${assignment.profiles?.last_name}`} 
+                        - {assignment.role}
+                      </div>
+                      {!isViewOnly && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleRemoveAssignment(assignment.id)}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={handleAddAssignment} disabled={addAssignmentMutation.isPending}>
-              {addAssignmentMutation.isPending ? "Assigning..." : "Assign Technician"}
-            </Button>
-          </div>
-        )}
-        
-        <div className="space-y-4">
-          <h3 className="text-sm font-medium">Assigned Staff</h3>
-          {shift.assignments.length > 0 ? (
-            shift.assignments.map(assignment => (
-              <div key={assignment.id} className="flex items-center justify-between p-2 bg-accent/20 rounded-md">
-                <div>
-                  {assignment.external_technician_name || 
-                    `${assignment.profiles?.first_name} ${assignment.profiles?.last_name}`} 
-                  - {assignment.role}
                 </div>
-                {!isViewOnly && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleRemoveAssignment(assignment.id)}
-                  >
-                    Remove
-                  </Button>
-                )}
-              </div>
-            ))
-          ) : (
-            <div className="text-sm text-muted-foreground">No staff assigned to this shift yet.</div>
-          )}
-        </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">No staff assigned to this shift yet.</div>
+              )}
+            </div>
+          </div>
+        </ScrollArea>
         
-        <DialogFooter>
+        <DialogFooter className="mt-6">
           <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
             Close
           </Button>
