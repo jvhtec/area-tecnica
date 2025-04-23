@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -28,7 +27,7 @@ export interface ArtistTablePdfData {
     };
     notes?: string;
   }[];
-  logoUrl?: string; // Add logo URL option
+  logoUrl?: string;
 }
 
 interface ScheduleRow {
@@ -56,17 +55,14 @@ interface ScheduleRow {
 export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     try {
-      // Create PDF in landscape
       const doc = new jsPDF({ orientation: 'landscape' });
       const pageWidth = doc.internal.pageSize.width;
       const pageHeight = doc.internal.pageSize.height;
       const createdDate = format(new Date(), 'dd/MM/yyyy');
 
-      // Header with correct corporate red color (125, 1, 1)
-      doc.setFillColor(125, 1, 1);  // Corporate red
+      doc.setFillColor(125, 1, 1);
       doc.rect(0, 0, pageWidth, 20, 'F');
-      
-      // Logo loading promise
+
       const loadLogoPromise = data.logoUrl 
         ? new Promise<void>((resolveLogoLoad) => {
             console.log("Attempting to load logo from URL:", data.logoUrl);
@@ -75,30 +71,28 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
             img.onload = () => {
               try {
                 console.log("Logo loaded successfully, dimensions:", img.width, "x", img.height);
-                // Calculate logo dimensions (max height 18px in header)
                 const maxHeight = 18;
                 const ratio = img.width / img.height;
                 const logoHeight = Math.min(maxHeight, img.height);
                 const logoWidth = logoHeight * ratio;
                 
-                // Add logo to top left corner
                 doc.addImage(
                   img, 
                   'JPEG', 
-                  5, // X position (left margin)
-                  1, // Y position (top margin)
+                  5, 
+                  1,
                   logoWidth,
                   logoHeight
                 );
                 resolveLogoLoad();
               } catch (err) {
                 console.error('Error adding logo to PDF:', err);
-                resolveLogoLoad(); // Resolve anyway to continue PDF generation
+                resolveLogoLoad();
               }
             };
             img.onerror = (e) => {
               console.error('Error loading logo image:', e);
-              resolveLogoLoad(); // Resolve anyway to continue PDF generation
+              resolveLogoLoad();
             };
             img.src = data.logoUrl;
           })
@@ -106,7 +100,7 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
 
       loadLogoPromise.then(() => {
         doc.setFontSize(14);
-        doc.setTextColor(255, 255, 255);  // White
+        doc.setTextColor(255, 255, 255);
         doc.text(`${data.jobTitle} - Artist Schedule`, pageWidth / 2, 12, { align: 'center' });
         
         if (data.stage) {
@@ -115,7 +109,6 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
           doc.text(format(new Date(data.date), 'dd/MM/yyyy'), pageWidth / 2, 18, { align: 'center' });
         }
 
-        // Process artists into schedule rows with soundchecks
         const scheduleRows: ScheduleRow[] = [];
         
         data.artists.forEach(artist => {
@@ -159,9 +152,9 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
             row.name,
             `Stage ${row.stage}`,
             `${row.time.start}-${row.time.end}`,
-            `FOH: ${row.technical!.fohConsole.model} (${row.technical!.fohConsole.providedBy})\nMON: ${row.technical!.monConsole.model} (${row.technical!.monConsole.providedBy})`,
-            `FOH Tech: ${row.technical!.fohTech ? '✓' : '-'}\nMON Tech: ${row.technical!.monTech ? '✓' : '-'}`,
-            `HH: ${row.technical!.wireless.hh} (${row.technical!.wireless.providedBy})\nBP: ${row.technical!.wireless.bp}\nIEM: ${row.technical!.iem.quantity} (${row.technical!.iem.providedBy})`,
+            `FOH: ${row.technical!.fohConsole.model}\n(${row.technical!.fohConsole.providedBy})\n\nMON: ${row.technical!.monConsole.model}\n(${row.technical!.monConsole.providedBy})`,
+            `FOH Tech: ${row.technical!.fohTech ? '✓' : '✗'}\n\nMON Tech: ${row.technical!.monTech ? '✓' : '✗'}`,
+            `HH: ${row.technical!.wireless.hh} (${row.technical!.wireless.providedBy})\nBP: ${row.technical!.wireless.bp}\n\nIEM: ${row.technical!.iem.quantity} (${row.technical!.iem.providedBy})`,
             row.technical!.monitors.enabled ? `Monitors: ${row.technical!.monitors.quantity}` : '-',
             [
               row.extras!.sideFill ? 'SF' : '',
@@ -179,48 +172,47 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
           theme: 'grid',
           styles: {
             fontSize: 8,
-            cellPadding: 2,
+            cellPadding: 3,
+            lineHeight: 1.2,
             overflow: 'linebreak',
             lineWidth: 0.1,
+            valign: 'middle'
           },
           headStyles: {
-            fillColor: [125, 1, 1],  // Corporate red
-            textColor: [0, 0, 0],
+            fillColor: [125, 1, 1],
+            textColor: [255, 255, 255],
             fontSize: 8,
             fontStyle: 'bold',
             halign: 'left',
             cellPadding: 4
           },
           columnStyles: {
-            0: { cellWidth: 35 },
+            0: { cellWidth: 30 },
             1: { cellWidth: 15 },
             2: { cellWidth: 25 },
-            3: { cellWidth: 40 },
-            4: { cellWidth: 20 },
-            5: { cellWidth: 35 },
+            3: { cellWidth: 35, cellPadding: 4 },
+            4: { cellWidth: 30, cellPadding: 4 },
+            5: { cellWidth: 30, cellPadding: 4 },
             6: { cellWidth: 20 },
             7: { cellWidth: 20 },
-            8: { cellWidth: 'auto' },
+            8: { cellWidth: 'auto' }
           },
           didParseCell: function(data) {
             if (data.row.index === -1) return;
             const rowData = scheduleRows[data.row.index];
             if (rowData.isSoundcheck) {
-              data.cell.styles.fillColor = [254, 247, 205];  // Light yellow
+              data.cell.styles.fillColor = [254, 247, 205];
             }
           }
         });
 
-        // Try to add sector pro logo at the bottom
         try {
-          // Add a small company logo at the bottom right
           const sectorLogoPath = '/sector pro logo.png';
           console.log("Attempting to add Sector Pro logo from:", sectorLogoPath);
           
           const sectorImg = new Image();
           sectorImg.onload = () => {
             try {
-              // Logo at bottom center
               const logoWidth = 30;
               const ratio = sectorImg.width / sectorImg.height;
               const logoHeight = logoWidth / ratio;
@@ -228,23 +220,20 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
               doc.addImage(
                 sectorImg, 
                 'PNG', 
-                pageWidth/2 - logoWidth/2, // Center horizontally
-                pageHeight - logoHeight - 10, // Position at the bottom
+                pageWidth/2 - logoWidth/2,
+                pageHeight - logoHeight - 10,
                 logoWidth,
                 logoHeight
               );
               
-              // Add footer with date
               doc.setFontSize(8);
               doc.setTextColor(51, 51, 51);
               doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
               
-              // Resolve with the PDF blob
               const blob = doc.output('blob');
               resolve(blob);
             } catch (err) {
               console.error('Error adding Sector Pro logo to PDF:', err);
-              // Add just the footer text
               doc.setFontSize(8);
               doc.setTextColor(51, 51, 51);
               doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
@@ -255,7 +244,6 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
           
           sectorImg.onerror = () => {
             console.error('Failed to load Sector Pro logo');
-            // Add just the footer text
             doc.setFontSize(8);
             doc.setTextColor(51, 51, 51);
             doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
@@ -266,7 +254,6 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
           sectorImg.src = sectorLogoPath;
         } catch (logoErr) {
           console.error('Error trying to add Sector Pro logo:', logoErr);
-          // Add just the footer text
           doc.setFontSize(8);
           doc.setTextColor(51, 51, 51);
           doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
