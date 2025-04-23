@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,9 +8,9 @@ import { useToast } from "@/hooks/use-toast";
 import { format, isValid, parseISO } from "date-fns";
 import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
 import { FestivalScheduling } from "@/components/festival/scheduling/FestivalScheduling";
-import { generateAndMergeFestivalPDFs } from "@/utils/pdfMerger";
 import { PrintOptionsDialog, PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { useAuthSession } from "@/hooks/auth/useAuthSession";
+import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 
 interface FestivalJob {
   id: string;

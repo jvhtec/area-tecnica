@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -13,7 +14,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { generateStageGearPDF, generateAndMergeFestivalPDFs } from "@/utils/gearSetupPdfExport";
+import { generateStageGearPDF } from "@/utils/gearSetupPdfExport";
+import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
+import { PrintOptions, PrintOptionsDialog } from "@/components/festival/pdf/PrintOptionsDialog";
 
 const FestivalGearManagement = () => {
   const { jobId } = useParams();
@@ -30,6 +33,7 @@ const FestivalGearManagement = () => {
   const [isCreateStageDialogOpen, setIsCreateStageDialogOpen] = useState(false);
   const [newStageName, setNewStageName] = useState("");
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isPrintOptionsDialogOpen, setIsPrintOptionsDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!jobId) return;
@@ -205,7 +209,7 @@ const FestivalGearManagement = () => {
     try {
       console.log("Starting documentation print process with options:", options);
       
-      const mergedPdf = await generateAndMergeFestivalPDFs(jobId, job?.title || 'Festival', options);
+      const mergedPdf = await generateAndMergeFestivalPDFs(jobId, jobTitle || 'Festival', options);
       
       console.log(`Merged PDF created, size: ${mergedPdf.size} bytes`);
       if (!mergedPdf || mergedPdf.size === 0) {
@@ -215,7 +219,7 @@ const FestivalGearManagement = () => {
       const url = URL.createObjectURL(mergedPdf);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${job?.title || 'Festival'}_Documentation.pdf`;
+      a.download = `${jobTitle || 'Festival'}_Documentation.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -387,6 +391,15 @@ const FestivalGearManagement = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {isPrintOptionsDialogOpen && (
+        <PrintOptionsDialog
+          open={isPrintOptionsDialogOpen}
+          onOpenChange={setIsPrintOptionsDialogOpen}
+          onConfirm={handlePrintAllDocumentation}
+          maxStages={maxStages}
+        />
+      )}
     </div>
   );
 };

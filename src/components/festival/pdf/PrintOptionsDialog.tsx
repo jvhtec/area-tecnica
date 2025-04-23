@@ -39,7 +39,7 @@ export const PrintOptionsDialog = ({
   });
 
   const handleStageChange = (section: keyof PrintOptions, stageNumber: number, checked: boolean) => {
-    if (section.endsWith('Stages')) {
+    if (section === 'gearSetupStages' || section === 'shiftScheduleStages' || section === 'artistTableStages') {
       setOptions(prev => ({
         ...prev,
         [section]: checked 
@@ -150,4 +150,3 @@ export const PrintOptionsDialog = ({
     </Dialog>
   );
 };
-
