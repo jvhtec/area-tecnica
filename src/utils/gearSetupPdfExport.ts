@@ -74,12 +74,6 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
         
         let currentY = 40;
         
-        // Job title
-        doc.setFontSize(14);
-        doc.setTextColor(0, 0, 0);
-        doc.text(data.jobTitle, pageWidth / 2, currentY, { align: 'center' });
-        currentY += 15;
-        
         // FOH and MON Console Section
         doc.setFontSize(14);
         doc.setTextColor(125, 1, 1); // Corporate red for section headers
@@ -90,18 +84,25 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
         doc.setFontSize(10);
         
         const consoleData = [];
+        
+        // Add all FOH consoles
         if (data.gearSetup.foh_consoles && data.gearSetup.foh_consoles.length > 0) {
-          consoleData.push(['FOH Console', data.gearSetup.foh_consoles[0].model || 'N/A']);
+          data.gearSetup.foh_consoles.forEach(console => {
+            consoleData.push(['FOH Console', `${console.model} (${console.quantity})`]);
+          });
         }
         
+        // Add all MON consoles
         if (data.gearSetup.mon_consoles && data.gearSetup.mon_consoles.length > 0) {
-          consoleData.push(['MON Console', data.gearSetup.mon_consoles[0].model || 'N/A']);
+          data.gearSetup.mon_consoles.forEach(console => {
+            consoleData.push(['MON Console', `${console.model} (${console.quantity})`]);
+          });
         }
         
         if (consoleData.length > 0) {
           autoTable(doc, {
             startY: currentY,
-            head: [['Type', 'Model']],
+            head: [['Type', 'Model (Quantity)']],
             body: consoleData,
             theme: 'grid',
             styles: {
@@ -110,7 +111,7 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
               lineWidth: 0.1,
             },
             headStyles: {
-              fillColor: [125, 1, 1], // Corporate red for table headers
+              fillColor: [125, 1, 1],
               textColor: [255, 255, 255]
             }
           });

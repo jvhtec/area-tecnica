@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -101,9 +100,14 @@ export const exportShiftsTablePDF = (data: ShiftsTablePdfData): Promise<Blob> =>
           // Create table rows for shifts
           const tableRows = shifts.map(shift => {
             const assignments = shift.assignments || [];
-            const technicians = assignments.map(a => 
-              `${a.profiles?.first_name || ''} ${a.profiles?.last_name || ''} (${a.role || 'N/A'})`
-            ).join('\n');
+            const technicians = assignments.map(a => {
+              // Handle both external and internal technicians
+              const technicianName = a.external_technician_name || 
+                (a.profiles && `${a.profiles.first_name} ${a.profiles.last_name}`) ||
+                'Unnamed Technician';
+              
+              return `${technicianName} (${a.role || 'N/A'})`;
+            }).join('\n');
 
             return [
               shift.name,
