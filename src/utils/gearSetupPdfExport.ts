@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -387,12 +386,11 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
 
 export const generateStageGearPDF = async (
   jobId: string,
-  selectedDate: string,
   stageNumber: number,
   stageName?: string
-): Promise<Blob> => {
+): Promise<Blob | null> => {
   try {
-    console.log(`Generating gear setup PDF for stage ${stageNumber} on ${selectedDate}`);
+    console.log(`Generating gear setup PDF for stage ${stageNumber}`);
     
     // Fetch job details
     const { data: jobData, error: jobError } = await supabase
@@ -403,15 +401,20 @@ export const generateStageGearPDF = async (
     
     if (jobError) throw jobError;
     
-    // Fetch gear setup
+    // Fetch gear setup - note the removal of date filter
     const { data: gearSetup, error: gearError } = await supabase
       .from("festival_gear_setups")
       .select("*")
       .eq("job_id", jobId)
-      .eq("date", selectedDate)
-      .single();
+      .order('created_at', { ascending: false })
+      .limit(1);
     
     if (gearError) throw gearError;
+    
+    if (!gearSetup || gearSetup.length === 0) {
+      console.log('No gear setup found for this festival');
+      return null;
+    }
     
     // Fetch logo URL
     const { data: logoData } = await supabase
@@ -435,8 +438,8 @@ export const generateStageGearPDF = async (
       jobTitle: jobData.title,
       stageNumber,
       stageName,
-      date: selectedDate,
-      gearSetup,
+      date: new Date().toISOString().split('T')[0], // Current date as fallback
+      gearSetup: gearSetup[0],
       logoUrl
     };
     
