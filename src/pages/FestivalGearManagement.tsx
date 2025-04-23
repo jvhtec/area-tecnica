@@ -163,7 +163,11 @@ const FestivalGearManagement = () => {
     setIsPrinting(true);
     try {
       console.log(`Generating PDF for Stage ${selectedStage} on ${selectedDate}`);
-      const pdf = await generateStageGearPDF(jobId, selectedStage, selectedStage);
+      const pdf = await generateStageGearPDF(
+        jobId, 
+        selectedStage, 
+        `Stage ${selectedStage}`
+      );
       
       if (!pdf || pdf.size === 0) {
         throw new Error('Generated PDF is empty');
