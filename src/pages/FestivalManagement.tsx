@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +9,7 @@ import { format, isValid, parseISO } from "date-fns";
 import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
 import { FestivalScheduling } from "@/components/festival/scheduling/FestivalScheduling";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdfMerger";
+import { PrintOptionsDialog, PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { useAuthSession } from "@/hooks/auth/useAuthSession";
 
 interface FestivalJob {
@@ -52,13 +52,13 @@ const FestivalManagement = () => {
   const [artistCount, setArtistCount] = useState(0);
   const [jobDates, setJobDates] = useState<Date[]>([]);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const { userRole } = useAuthSession();
 
   const isSchedulingRoute = location.pathname.includes('/scheduling');
   
-  // Determine user permissions
   const canEdit = ['admin', 'management', 'logistics'].includes(userRole || '');
-  const isViewOnly = userRole === 'technician'; // Technicians have view-only access
+  const isViewOnly = userRole === 'technician';
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -172,14 +172,14 @@ const FestivalManagement = () => {
     fetchJobDetails();
   }, [jobId]);
 
-  const handlePrintAllDocumentation = async () => {
+  const handlePrintAllDocumentation = async (options: PrintOptions) => {
     if (!jobId) return;
     
     setIsPrinting(true);
     try {
-      console.log("Starting all documentation print process");
+      console.log("Starting documentation print process with options:", options);
       
-      const mergedPdf = await generateAndMergeFestivalPDFs(jobId, job?.title || 'Festival');
+      const mergedPdf = await generateAndMergeFestivalPDFs(jobId, job?.title || 'Festival', options);
       
       console.log(`Merged PDF created, size: ${mergedPdf.size} bytes`);
       if (!mergedPdf || mergedPdf.size === 0) {
@@ -189,7 +189,7 @@ const FestivalManagement = () => {
       const url = URL.createObjectURL(mergedPdf);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${job?.title || 'Festival'}_Complete_Documentation.pdf`;
+      a.download = `${job?.title || 'Festival'}_Documentation.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -197,7 +197,7 @@ const FestivalManagement = () => {
       
       toast({
         title: "Success",
-        description: 'All documentation generated successfully'
+        description: 'Documentation generated successfully'
       });
     } catch (error: any) {
       console.error('Error generating documentation:', error);
@@ -209,6 +209,10 @@ const FestivalManagement = () => {
     } finally {
       setIsPrinting(false);
     }
+  };
+
+  const handlePrintButtonClick = () => {
+    setIsPrintDialogOpen(true);
   };
 
   if (!jobId) {
@@ -243,7 +247,7 @@ const FestivalManagement = () => {
                   variant="outline" 
                   size="sm"
                   className="flex items-center gap-2"
-                  onClick={handlePrintAllDocumentation}
+                  onClick={handlePrintButtonClick}
                   disabled={isPrinting}
                 >
                   {isPrinting ? (
@@ -251,7 +255,7 @@ const FestivalManagement = () => {
                   ) : (
                     <Printer className="h-4 w-4" />
                   )}
-                  {isPrinting ? 'Generating...' : 'Print All Documentation'}
+                  {isPrinting ? 'Generating...' : 'Print Documentation'}
                 </Button>
               )}
               {canEdit && <FestivalLogoManager jobId={jobId} />}
@@ -344,6 +348,15 @@ const FestivalManagement = () => {
             </Card>
           )}
         </div>
+      )}
+      
+      {isPrintDialogOpen && (
+        <PrintOptionsDialog
+          open={isPrintDialogOpen}
+          onOpenChange={setIsPrintDialogOpen}
+          onConfirm={handlePrintAllDocumentation}
+          maxStages={job?.max_stages || 1}
+        />
       )}
     </div>
   );
