@@ -7,9 +7,11 @@ import { useState } from "react";
 
 export interface PrintOptions {
   includeGearSetup: boolean;
-  selectedStages: number[];
+  gearSetupStages: number[];
   includeShiftSchedules: boolean;
+  shiftScheduleStages: number[];
   includeArtistTables: boolean;
+  artistTableStages: number[];
   includeArtistRequirements: boolean;
 }
 
@@ -28,19 +30,45 @@ export const PrintOptionsDialog = ({
 }: PrintOptionsDialogProps) => {
   const [options, setOptions] = useState<PrintOptions>({
     includeGearSetup: true,
-    selectedStages: Array.from({ length: maxStages }, (_, i) => i + 1),
+    gearSetupStages: Array.from({ length: maxStages }, (_, i) => i + 1),
     includeShiftSchedules: true,
+    shiftScheduleStages: Array.from({ length: maxStages }, (_, i) => i + 1),
     includeArtistTables: true,
+    artistTableStages: Array.from({ length: maxStages }, (_, i) => i + 1),
     includeArtistRequirements: true
   });
 
-  const handleStageChange = (stageNumber: number, checked: boolean) => {
-    setOptions(prev => ({
-      ...prev,
-      selectedStages: checked 
-        ? [...prev.selectedStages, stageNumber].sort((a, b) => a - b)
-        : prev.selectedStages.filter(s => s !== stageNumber)
-    }));
+  const handleStageChange = (section: keyof PrintOptions, stageNumber: number, checked: boolean) => {
+    if (section.endsWith('Stages')) {
+      setOptions(prev => ({
+        ...prev,
+        [section]: checked 
+          ? [...prev[section], stageNumber].sort((a, b) => a - b)
+          : prev[section].filter(s => s !== stageNumber)
+      }));
+    }
+  };
+
+  const renderStageSelections = (section: 'gearSetupStages' | 'shiftScheduleStages' | 'artistTableStages') => {
+    return (
+      <div className="pl-6 space-y-2">
+        <p className="text-sm text-muted-foreground">Select stages:</p>
+        <div className="grid grid-cols-2 gap-2">
+          {Array.from({ length: maxStages }, (_, i) => i + 1).map((stageNum) => (
+            <div key={stageNum} className="flex items-center space-x-2">
+              <Checkbox
+                id={`${section}-${stageNum}`}
+                checked={options[section].includes(stageNum)}
+                onCheckedChange={(checked) => 
+                  handleStageChange(section, stageNum, checked as boolean)
+                }
+              />
+              <Label htmlFor={`${section}-${stageNum}`}>Stage {stageNum}</Label>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   const handleConfirm = () => {
@@ -56,57 +84,46 @@ export const PrintOptionsDialog = ({
         </DialogHeader>
         <div className="space-y-6 py-4">
           <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="gear-setup"
-                checked={options.includeGearSetup}
-                onCheckedChange={(checked) => 
-                  setOptions(prev => ({ ...prev, includeGearSetup: checked as boolean }))
-                }
-              />
-              <Label htmlFor="gear-setup">Stage Equipment Setup</Label>
-            </div>
-            
-            {options.includeGearSetup && maxStages > 1 && (
-              <div className="pl-6 space-y-2">
-                <p className="text-sm text-muted-foreground">Select stages:</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {Array.from({ length: maxStages }, (_, i) => i + 1).map((stageNum) => (
-                    <div key={stageNum} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`stage-${stageNum}`}
-                        checked={options.selectedStages.includes(stageNum)}
-                        onCheckedChange={(checked) => 
-                          handleStageChange(stageNum, checked as boolean)
-                        }
-                      />
-                      <Label htmlFor={`stage-${stageNum}`}>Stage {stageNum}</Label>
-                    </div>
-                  ))}
-                </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="gear-setup"
+                  checked={options.includeGearSetup}
+                  onCheckedChange={(checked) => 
+                    setOptions(prev => ({ ...prev, includeGearSetup: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="gear-setup">Stage Equipment Setup</Label>
               </div>
-            )}
-
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="shift-schedules"
-                checked={options.includeShiftSchedules}
-                onCheckedChange={(checked) => 
-                  setOptions(prev => ({ ...prev, includeShiftSchedules: checked as boolean }))
-                }
-              />
-              <Label htmlFor="shift-schedules">Staff Shift Schedules</Label>
+              {options.includeGearSetup && maxStages > 1 && renderStageSelections('gearSetupStages')}
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="artist-tables"
-                checked={options.includeArtistTables}
-                onCheckedChange={(checked) => 
-                  setOptions(prev => ({ ...prev, includeArtistTables: checked as boolean }))
-                }
-              />
-              <Label htmlFor="artist-tables">Artist Schedule Tables</Label>
+            <div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="shift-schedules"
+                  checked={options.includeShiftSchedules}
+                  onCheckedChange={(checked) => 
+                    setOptions(prev => ({ ...prev, includeShiftSchedules: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="shift-schedules">Staff Shift Schedules</Label>
+              </div>
+              {options.includeShiftSchedules && maxStages > 1 && renderStageSelections('shiftScheduleStages')}
+            </div>
+
+            <div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="artist-tables"
+                  checked={options.includeArtistTables}
+                  onCheckedChange={(checked) => 
+                    setOptions(prev => ({ ...prev, includeArtistTables: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="artist-tables">Artist Schedule Tables</Label>
+              </div>
+              {options.includeArtistTables && maxStages > 1 && renderStageSelections('artistTableStages')}
             </div>
 
             <div className="flex items-center space-x-2">
@@ -133,3 +150,4 @@ export const PrintOptionsDialog = ({
     </Dialog>
   );
 };
+

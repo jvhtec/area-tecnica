@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { generateStageGearPDF } from "@/utils/gearSetupPdfExport";
+import { generateStageGearPDF, generateAndMergeFestivalPDFs } from "@/utils/gearSetupPdfExport";
 
 const FestivalGearManagement = () => {
   const { jobId } = useParams();
@@ -188,6 +188,45 @@ const FestivalGearManagement = () => {
       });
     } catch (error: any) {
       console.error('Error generating gear setup PDF:', error);
+      toast({
+        title: "Error",
+        description: `Failed to generate documentation: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  const handlePrintAllDocumentation = async (options: PrintOptions) => {
+    if (!jobId) return;
+    
+    setIsPrinting(true);
+    try {
+      console.log("Starting documentation print process with options:", options);
+      
+      const mergedPdf = await generateAndMergeFestivalPDFs(jobId, job?.title || 'Festival', options);
+      
+      console.log(`Merged PDF created, size: ${mergedPdf.size} bytes`);
+      if (!mergedPdf || mergedPdf.size === 0) {
+        throw new Error('Generated PDF is empty');
+      }
+      
+      const url = URL.createObjectURL(mergedPdf);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${job?.title || 'Festival'}_Documentation.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Success",
+        description: 'Documentation generated successfully'
+      });
+    } catch (error: any) {
+      console.error('Error generating documentation:', error);
       toast({
         title: "Error",
         description: `Failed to generate documentation: ${error.message}`,
