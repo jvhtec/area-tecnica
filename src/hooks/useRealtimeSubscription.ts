@@ -36,7 +36,7 @@ export function useRealtimeSubscription(
 
       // Add the postgres changes listener
       channel
-        .on('postgres_changes' as Channel.REALTIME_LISTEN_TYPES, {
+        .on('postgres_changes', {
           event: options.event || '*',
           schema: options.schema || 'public',
           table: table,
