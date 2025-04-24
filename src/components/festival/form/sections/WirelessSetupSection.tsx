@@ -2,13 +2,19 @@
 import { WirelessConfig } from "../../gear-setup/WirelessConfig";
 import { SectionProps } from "@/types/festival-form";
 
-export const WirelessSetupSection = ({ formData, onChange, gearSetup }: SectionProps) => {
+export const WirelessSetupSection = ({ formData, onChange }: SectionProps) => {
   const handleWirelessChange = (systems: any[]) => {
-    onChange({ wireless_systems: systems });
+    onChange({ 
+      wireless_systems: systems,
+      wireless_provided_by: formData.wireless_provided_by 
+    });
   };
 
   const handleIEMChange = (systems: any[]) => {
-    onChange({ iem_systems: systems });
+    onChange({ 
+      iem_systems: systems,
+      iem_provided_by: formData.iem_provided_by 
+    });
   };
 
   return (
@@ -25,7 +31,7 @@ export const WirelessSetupSection = ({ formData, onChange, gearSetup }: SectionP
           systems={formData.iem_systems || []}
           onChange={handleIEMChange}
           label="IEM Systems"
-          includeQuantityTypes={true}
+          includeQuantityTypes={false}
           isIEM={true}
         />
       </div>

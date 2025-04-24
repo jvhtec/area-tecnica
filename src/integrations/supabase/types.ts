@@ -486,10 +486,8 @@ export type Database = {
             | null
           foh_tech: boolean | null
           id: string
-          iem_band: string | null
-          iem_model: string | null
           iem_provided_by: Database["public"]["Enums"]["provider_type"] | null
-          iem_quantity: number | null
+          iem_systems: Json | null
           infra_analog: number | null
           infra_cat6: boolean | null
           infra_cat6_quantity: number | null
@@ -526,14 +524,11 @@ export type Database = {
           stage: number | null
           timezone: string | null
           updated_at: string | null
-          wireless_band: string | null
-          wireless_model: string | null
           wireless_provided_by:
             | Database["public"]["Enums"]["provider_type"]
             | null
           wireless_quantity: number | null
-          wireless_quantity_bp: number | null
-          wireless_quantity_hh: number | null
+          wireless_systems: Json | null
         }
         Insert: {
           created_at?: string | null
@@ -549,10 +544,8 @@ export type Database = {
             | null
           foh_tech?: boolean | null
           id?: string
-          iem_band?: string | null
-          iem_model?: string | null
           iem_provided_by?: Database["public"]["Enums"]["provider_type"] | null
-          iem_quantity?: number | null
+          iem_systems?: Json | null
           infra_analog?: number | null
           infra_cat6?: boolean | null
           infra_cat6_quantity?: number | null
@@ -589,14 +582,11 @@ export type Database = {
           stage?: number | null
           timezone?: string | null
           updated_at?: string | null
-          wireless_band?: string | null
-          wireless_model?: string | null
           wireless_provided_by?:
             | Database["public"]["Enums"]["provider_type"]
             | null
           wireless_quantity?: number | null
-          wireless_quantity_bp?: number | null
-          wireless_quantity_hh?: number | null
+          wireless_systems?: Json | null
         }
         Update: {
           created_at?: string | null
@@ -612,10 +602,8 @@ export type Database = {
             | null
           foh_tech?: boolean | null
           id?: string
-          iem_band?: string | null
-          iem_model?: string | null
           iem_provided_by?: Database["public"]["Enums"]["provider_type"] | null
-          iem_quantity?: number | null
+          iem_systems?: Json | null
           infra_analog?: number | null
           infra_cat6?: boolean | null
           infra_cat6_quantity?: number | null
@@ -652,14 +640,11 @@ export type Database = {
           stage?: number | null
           timezone?: string | null
           updated_at?: string | null
-          wireless_band?: string | null
-          wireless_model?: string | null
           wireless_provided_by?:
             | Database["public"]["Enums"]["provider_type"]
             | null
           wireless_quantity?: number | null
-          wireless_quantity_bp?: number | null
-          wireless_quantity_hh?: number | null
+          wireless_systems?: Json | null
         }
         Relationships: [
           {
