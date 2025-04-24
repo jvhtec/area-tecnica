@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -12,6 +11,7 @@ import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { useFestivalShifts } from "@/hooks/festival/useFestivalShifts";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { useAuthSession } from "@/hooks/use-auth-session";
 
 interface FestivalSchedulingProps {
   jobId: string;
@@ -25,7 +25,10 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
   const [viewMode, setViewMode] = useState<"list" | "table">("list");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
-  
+  const { userRole } = useAuthSession();
+  const canManageSchedule = ['admin', 'management'].includes(userRole || '');
+  const canViewSchedule = ['admin', 'management', 'technician', 'house_tech'].includes(userRole || '');
+
   const formatDateToString = useCallback((date: Date): string => {
     try {
       return format(date, 'yyyy-MM-dd');
@@ -36,7 +39,6 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
     }
   }, []);
 
-  // Set initial selected date
   useEffect(() => {
     if (jobDates && jobDates.length > 0 && !selectedDate) {
       try {
@@ -57,7 +59,6 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
     }
   }, [jobDates, selectedDate, formatDateToString]);
 
-  // Use our enhanced hook to fetch shifts with real-time updates and auto-recovery
   const { shifts, isLoading, refetch } = useFestivalShifts({
     jobId,
     selectedDate
@@ -72,7 +73,6 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
     try {
       setIsRefreshing(true);
       
-      // Delete shift assignments first to avoid foreign key constraints
       await supabase
         .from("festival_shift_assignments")
         .delete()
@@ -135,13 +135,23 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
     );
   }
 
+  if (!canViewSchedule) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <p className="text-muted-foreground">You don't have permission to view the schedule.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="mt-6">
       <CardHeader>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <CardTitle>Festival Schedule</CardTitle>
           <div className="flex gap-2">
-            {!isViewOnly && (
+            {canManageSchedule && !isViewOnly && (
               <Button 
                 size="sm" 
                 onClick={() => setIsCreateShiftOpen(true)}
@@ -216,7 +226,7 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
           <div className="flex justify-center p-8">Loading...</div>
         ) : shifts.length === 0 ? (
           <div className="text-center p-8 text-muted-foreground">
-            No shifts scheduled for this date. {!isViewOnly && "Click \"Create Shift\" to add one."}
+            No shifts scheduled for this date. {canManageSchedule && !isViewOnly && "Click \"Create Shift\" to add one."}
           </div>
         ) : viewMode === "list" ? (
           <ShiftsList 
@@ -224,7 +234,7 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
             onDeleteShift={handleDeleteShift} 
             onShiftUpdated={refetch}
             jobId={jobId}
-            isViewOnly={isViewOnly}
+            isViewOnly={!canManageSchedule || isViewOnly}
             jobDates={jobDates}
             selectedDate={selectedDate}
           />
@@ -234,12 +244,12 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
             onDeleteShift={handleDeleteShift} 
             date={selectedDate}
             jobId={jobId}
-            isViewOnly={isViewOnly}
+            isViewOnly={!canManageSchedule || isViewOnly}
           />
         )}
       </CardContent>
 
-      {!isViewOnly && (
+      {canManageSchedule && !isViewOnly && (
         <CreateShiftDialog
           open={isCreateShiftOpen}
           onOpenChange={setIsCreateShiftOpen}

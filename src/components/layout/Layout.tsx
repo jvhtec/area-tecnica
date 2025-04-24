@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { 
   SidebarProvider, 
@@ -45,7 +44,9 @@ const Layout = () => {
     logout
   } = useSessionManager();
 
-  // Redirect technicians to technician dashboard if they somehow get to the regular dashboard
+  const canManageSchedule = ['admin', 'management'].includes(userRole || '');
+  const canViewSchedule = ['admin', 'management', 'technician', 'house_tech'].includes(userRole || '');
+
   useEffect(() => {
     if (!isLoading && userRole === 'technician' && location.pathname === '/dashboard') {
       console.log('Technician on dashboard, redirecting to technician dashboard');
