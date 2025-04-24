@@ -40,7 +40,7 @@ export const WirelessConfig = ({
         // Handle numeric fields
         if (field === 'quantity_hh' || field === 'quantity_bp') {
           const numericValue = typeof value === 'string' ? parseInt(value) || 0 : value;
-          updatedSystem[field] = numericValue;
+          updatedSystem[field as 'quantity_hh' | 'quantity_bp'] = numericValue;
           
           if (isIEM) {
             // For IEM systems, quantity equals channels (quantity_hh)
@@ -53,7 +53,7 @@ export const WirelessConfig = ({
           }
         } else {
           // Handle non-numeric fields (model, band)
-          updatedSystem[field] = value;
+          updatedSystem[field as 'model' | 'band'] = value as string;
         }
         
         return updatedSystem;
