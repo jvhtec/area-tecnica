@@ -1,4 +1,3 @@
-
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel, RealtimeChannelOptions } from "@supabase/supabase-js";
@@ -319,6 +318,66 @@ export class SubscriptionManager {
     }, delay);
     
     this.debounceTimeouts.set(key, timeoutId);
+  }
+  
+  private createChannel(table: string, queryKey: string): RealtimeChannel {
+    const channelName = `${table}-changes-${Date.now()}`;
+    
+    try {
+      const channel = supabase.channel(channelName);
+      
+      const handleChange = (payload: any) => {
+        console.log(`Received ${payload.eventType} for ${table}:`, payload);
+        
+        const subscription = this.subscriptions.get(`${table}::${queryKey}`);
+        if (subscription) {
+          this.subscriptions.set(`${table}::${queryKey}`, {
+            ...subscription,
+            lastActivity: Date.now(),
+            status: 'connected',
+            errorCount: 0
+          });
+        }
+        
+        this.reconnectAttempts.delete(`${table}::${queryKey}`);
+        this.queryClient.invalidateQueries({ queryKey: [queryKey] });
+      };
+      
+      channel.on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: table
+        },
+        handleChange
+      ).subscribe((status: 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR') => {
+        console.log(`Subscription to ${table} status:`, status);
+        
+        const subscription = this.subscriptions.get(`${table}::${queryKey}`);
+        if (!subscription) return;
+        
+        if (status === 'SUBSCRIBED') {
+          this.subscriptions.set(`${table}::${queryKey}`, {
+            ...subscription,
+            status: 'connected',
+            lastActivity: Date.now()
+          });
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error(`Error in subscription to ${table}`);
+          this.subscriptions.set(`${table}::${queryKey}`, {
+            ...subscription,
+            status: 'error',
+            errorCount: subscription.errorCount + 1
+          });
+        }
+      });
+      
+      return channel;
+    } catch (error) {
+      console.error(`Error creating channel for ${table}:`, error);
+      throw error;
+    }
   }
   
   /**
