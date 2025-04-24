@@ -27,30 +27,27 @@ export function useRealtimeSubscription(
     // Create the channel
     const channel = supabase.channel(channelName);
     
-    // The error is here - the API expects an object with a config for postgres_changes
-    channel
-      .on(
-        'postgres_changes',
-        {
-          event: options.event,
-          schema: options.schema,
-          table: table,
-          filter: options.filter,
-        },
-        (payload) => {
-          console.log(`Received realtime update for ${table}:`, payload);
-          
-          // Invalidate queries
-          if (Array.isArray(queryKey)) {
-            queryClient.invalidateQueries({ queryKey });
-          } else {
-            queryClient.invalidateQueries({ queryKey: [queryKey] });
-          }
+    // Fix: The correct way to subscribe to postgres_changes
+    channel.on('postgres_changes', 
+      {
+        event: options.event,
+        schema: options.schema,
+        table: table,
+        filter: options.filter
+      },
+      (payload) => {
+        console.log(`Received realtime update for ${table}:`, payload);
+        
+        // Invalidate queries
+        if (Array.isArray(queryKey)) {
+          queryClient.invalidateQueries({ queryKey });
+        } else {
+          queryClient.invalidateQueries({ queryKey: [queryKey] });
         }
-      )
-      .subscribe((status) => {
-        console.log(`Subscription status for ${table}:`, status);
-      });
+      }
+    ).subscribe((status) => {
+      console.log(`Subscription status for ${table}:`, status);
+    });
 
     // Store the channel reference
     channelRef.current = channel;
