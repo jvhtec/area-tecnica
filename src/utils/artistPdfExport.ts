@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -8,22 +7,30 @@ export interface ArtistTechnicalInfo {
   fohConsole: { model: string; providedBy: string };
   monConsole: { model: string; providedBy: string };
   wireless: {
-    model: string;
+    systems: WirelessSystem[];
     providedBy: string;
-    handhelds: number;
-    bodypacks: number;
-    band: string;
   };
   iem: {
-    model: string;
+    systems: IEMSystem[];
     providedBy: string;
-    quantity: number;
-    band: string;
   };
   monitors: {
     enabled: boolean;
     quantity: number;
   };
+}
+
+interface WirelessSystem {
+  quantity_hh?: number;
+  quantity_bp?: number;
+  model: string;
+  band?: string;
+}
+
+interface IEMSystem {
+  quantity: number;
+  model: string;
+  band?: string;
 }
 
 export interface ArtistInfrastructure {
@@ -53,8 +60,18 @@ export interface ArtistPdfData {
     wired: string;
   };
   notes?: string;
-  logoUrl?: string; // Add the missing logoUrl property as optional
+  logoUrl?: string;
 }
+
+const getWirelessSummary = (systems: WirelessSystem[] = []) => {
+  const totalHH = systems.reduce((sum, system) => sum + (system.quantity_hh || 0), 0);
+  const totalBP = systems.reduce((sum, system) => sum + (system.quantity_bp || 0), 0);
+  return { hh: totalHH, bp: totalBP };
+};
+
+const getIEMSummary = (systems: IEMSystem[] = []) => {
+  return systems.reduce((sum, system) => sum + (system.quantity || 0), 0);
+};
 
 export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
   return new Promise((resolve) => {
@@ -181,11 +198,23 @@ export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
       yPosition = (doc as any).lastAutoTable.finalY + 8;
 
       // === RF & WIRELESS ===
+      const wirelessSummary = getWirelessSummary(data.technical.wireless.systems);
+      const iemSummary = getIEMSummary(data.technical.iem.systems);
+      
       const wirelessRows = [
-        ['Handheld', data.technical.wireless.handhelds, data.technical.wireless.model, data.technical.wireless.band, data.technical.wireless.providedBy],
-        ['Bodypack', data.technical.wireless.bodypacks, data.technical.wireless.model, data.technical.wireless.band, data.technical.wireless.providedBy],
-        ['IEM', data.technical.iem.quantity, data.technical.iem.model, data.technical.iem.band, data.technical.iem.providedBy]
-      ].filter(row => Number(row[1]) > 0);
+        ...(wirelessSummary.hh > 0 ? [['Handheld', wirelessSummary.hh, 
+          data.technical.wireless.systems[0]?.model || '-', 
+          data.technical.wireless.systems[0]?.band || '-',
+          data.technical.wireless.providedBy]] : []),
+        ...(wirelessSummary.bp > 0 ? [['Bodypack', wirelessSummary.bp,
+          data.technical.wireless.systems[0]?.model || '-',
+          data.technical.wireless.systems[0]?.band || '-',
+          data.technical.wireless.providedBy]] : []),
+        ...(iemSummary > 0 ? [['IEM', iemSummary,
+          data.technical.iem.systems[0]?.model || '-',
+          data.technical.iem.systems[0]?.band || '-',
+          data.technical.iem.providedBy]] : [])
+      ];
 
       if (wirelessRows.length > 0) {
         autoTable(doc, {

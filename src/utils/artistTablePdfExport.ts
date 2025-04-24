@@ -2,6 +2,19 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 
+const getWirelessSummary = (systems: any[] = []) => {
+  const totalHH = systems.reduce((sum: number, system: any) => 
+    sum + (system.quantity_hh || 0), 0);
+  const totalBP = systems.reduce((sum: number, system: any) => 
+    sum + (system.quantity_bp || 0), 0);
+  return { hh: totalHH, bp: totalBP };
+};
+
+const getIEMSummary = (systems: any[] = []) => {
+  return systems.reduce((sum: number, system: any) => 
+    sum + (system.quantity || 0), 0);
+};
+
 export interface ArtistTablePdfData {
   jobTitle: string;
   date: string;
@@ -16,8 +29,14 @@ export interface ArtistTablePdfData {
       monTech: boolean;
       fohConsole: { model: string; providedBy: string };
       monConsole: { model: string; providedBy: string };
-      wireless: { hh: number; bp: number; providedBy: string };
-      iem: { quantity: number; providedBy: string };
+      wireless: { 
+        systems: any[];
+        providedBy: string;
+      };
+      iem: {
+        systems: any[];
+        providedBy: string;
+      };
       monitors: { enabled: boolean; quantity: number };
     };
     extras: {
@@ -40,8 +59,14 @@ interface ScheduleRow {
     monTech: boolean;
     fohConsole: { model: string; providedBy: string };
     monConsole: { model: string; providedBy: string };
-    wireless: { hh: number; bp: number; providedBy: string };
-    iem: { quantity: number; providedBy: string };
+    wireless: { 
+      systems: any[];
+      providedBy: string;
+    };
+    iem: {
+      systems: any[];
+      providedBy: string;
+    };
     monitors: { enabled: boolean; quantity: number };
   };
   extras?: {
@@ -148,13 +173,16 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
             ];
           }
           
+          const wirelessSummary = getWirelessSummary(row.technical?.wireless.systems);
+          const iemSummary = getIEMSummary(row.technical?.iem.systems);
+          
           return [
             row.name,
             `Stage ${row.stage}`,
             `${row.time.start}-${row.time.end}`,
             `FOH: ${row.technical!.fohConsole.model}\n(${row.technical!.fohConsole.providedBy})\n\nMON: ${row.technical!.monConsole.model}\n(${row.technical!.monConsole.providedBy})`,
             `FOH: ${row.technical!.fohTech ? 'Y' : 'N'}\nMON: ${row.technical!.monTech ? 'Y' : 'N'}`,
-            `HH: ${row.technical!.wireless.hh} (${row.technical!.wireless.providedBy})\nBP: ${row.technical!.wireless.bp}\n\nIEM: ${row.technical!.iem.quantity} (${row.technical!.iem.providedBy})`,
+            `HH: ${wirelessSummary.hh} (${row.technical!.wireless.providedBy})\nBP: ${wirelessSummary.bp}\n\nIEM: ${iemSummary} (${row.technical!.iem.providedBy})`,
             row.technical!.monitors.enabled ? `Monitors: ${row.technical!.monitors.quantity}` : '-',
             [
               row.extras!.sideFill ? 'SF' : '',
