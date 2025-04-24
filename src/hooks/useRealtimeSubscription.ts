@@ -28,7 +28,7 @@ export function useRealtimeSubscription(
     const channel = supabase.channel(channelName);
     
     // Set up the subscription with proper typing
-    channel.on(
+    const subscription = channel.on(
       'postgres_changes',
       {
         event: options.event,
@@ -46,7 +46,10 @@ export function useRealtimeSubscription(
           queryClient.invalidateQueries({ queryKey: [queryKey] });
         }
       }
-    ).subscribe((status) => {
+    );
+
+    // Subscribe to the channel
+    subscription.subscribe((status) => {
       console.log(`Subscription status for ${table}:`, status);
     });
 
