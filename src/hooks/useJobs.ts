@@ -1,18 +1,15 @@
-
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { useMultiTableSubscription } from "@/hooks/useSubscription";
+import { useTableSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 
 export const useJobs = () => {
   const queryClient = useQueryClient();
 
-  // Set up multi-table subscriptions using our enhanced hooks
-  useMultiTableSubscription([
-    { table: 'jobs', queryKey: 'jobs' },
-    { table: 'job_date_types', queryKey: 'jobs' },
-    { table: 'job_assignments', queryKey: 'jobs' }
-  ]);
+  // Set up individual table subscriptions instead of using multi-table
+  useTableSubscription('jobs', 'jobs');
+  useTableSubscription('job_date_types', 'jobs');
+  useTableSubscription('job_assignments', 'jobs');
 
   return useQuery({
     queryKey: ["jobs"],

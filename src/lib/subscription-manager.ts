@@ -339,7 +339,6 @@ export class SubscriptionManager {
           });
         }
         
-        this.reconnectAttempts.delete(`${table}::${queryKey}`);
         this.queryClient.invalidateQueries({ queryKey: [queryKey] });
       };
       

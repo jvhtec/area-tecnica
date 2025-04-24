@@ -22,3 +22,31 @@ export function useTableSubscription(
     };
   }, [table, queryKey, queryClient]);
 }
+
+// Add the missing function that's being imported in other files
+export function useMultiTableSubscription(
+  tables: Array<{ table: string, queryKey?: string }>
+) {
+  const queryClient = useQueryClient();
+  const subscriptionRefs = useRef<Array<{ unsubscribe: () => void }>>([]);
+  
+  useEffect(() => {
+    const manager = SubscriptionManager.getInstance(queryClient);
+    
+    // Clear any existing subscriptions
+    subscriptionRefs.current.forEach(sub => sub.unsubscribe());
+    subscriptionRefs.current = [];
+    
+    // Create new subscriptions for each table
+    tables.forEach(({ table, queryKey }) => {
+      const subscription = manager.subscribeToTable(table, queryKey || table);
+      subscriptionRefs.current.push(subscription);
+    });
+    
+    // Clean up on unmount
+    return () => {
+      subscriptionRefs.current.forEach(sub => sub.unsubscribe());
+      subscriptionRefs.current = [];
+    };
+  }, [tables, queryClient]);
+}
