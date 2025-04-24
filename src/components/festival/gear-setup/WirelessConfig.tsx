@@ -35,17 +35,25 @@ export const WirelessConfig = ({
       systems.map((system, i) => {
         if (i !== index) return system;
         
-        const updatedSystem = { ...system, [field]: value };
+        const updatedSystem = { ...system };
         
+        // Handle numeric fields
         if (field === 'quantity_hh' || field === 'quantity_bp') {
-          // For IEM systems, quantity_hh represents channels
-          if (isIEM && field === 'quantity_hh') {
-            updatedSystem.quantity = value as number;
-          }
-          // For wireless systems, quantity is the sum of handhelds and bodypacks
-          if (!isIEM) {
+          const numericValue = typeof value === 'string' ? parseInt(value) || 0 : value;
+          updatedSystem[field] = numericValue;
+          
+          if (isIEM) {
+            // For IEM systems, quantity equals channels (quantity_hh)
+            if (field === 'quantity_hh') {
+              updatedSystem.quantity = numericValue;
+            }
+          } else {
+            // For wireless systems, quantity is the sum of handhelds and bodypacks
             updatedSystem.quantity = (updatedSystem.quantity_hh || 0) + (updatedSystem.quantity_bp || 0);
           }
+        } else {
+          // Handle non-numeric fields (model, band)
+          updatedSystem[field] = value;
         }
         
         return updatedSystem;
@@ -110,12 +118,7 @@ export const WirelessConfig = ({
                 min="0"
                 value={system.quantity_hh || 0}
                 onChange={(e) => {
-                  const value = parseInt(e.target.value) || 0;
-                  updateSystem(index, 'quantity_hh', value);
-                  // Also update the legacy quantity field for backward compatibility
-                  if (isIEM) {
-                    updateSystem(index, 'quantity', value);
-                  }
+                  updateSystem(index, 'quantity_hh', e.target.value);
                 }}
                 placeholder={`${quantityTypeLabels.hh} Qty`}
               />
@@ -127,13 +130,7 @@ export const WirelessConfig = ({
                 min="0"
                 value={system.quantity_bp || 0}
                 onChange={(e) => {
-                  const value = parseInt(e.target.value) || 0;
-                  updateSystem(index, 'quantity_bp', value);
-                  // For wireless systems, update quantity with the sum
-                  if (!isIEM) {
-                    const totalQuantity = (system.quantity_hh || 0) + value;
-                    updateSystem(index, 'quantity', totalQuantity);
-                  }
+                  updateSystem(index, 'quantity_bp', e.target.value);
                 }}
                 placeholder={`${quantityTypeLabels.bp} Qty`}
               />
