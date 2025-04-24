@@ -58,8 +58,9 @@ const FestivalManagement = () => {
 
   const isSchedulingRoute = location.pathname.includes('/scheduling');
   
-  const canEdit = ['admin', 'management', 'logistics'].includes(userRole || '');
-  const isViewOnly = userRole === 'technician';
+  const canEdit = ['admin', 'management'].includes(userRole || '');
+  const canView = ['admin', 'management', 'technician', 'house_tech'].includes(userRole || '');
+  const isViewOnly = !canEdit;
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -94,7 +95,6 @@ const FestivalManagement = () => {
           throw artistError;
         }
 
-        // Fetch maximum stages from festival_gear_setups
         const { data: gearSetups, error: gearError } = await supabase
           .from("festival_gear_setups")
           .select("max_stages")
@@ -242,6 +242,18 @@ const FestivalManagement = () => {
     return <div>Festival not found</div>;
   }
 
+  if (!canView) {
+    return (
+      <div className="container mx-auto px-4 py-6">
+        <Card>
+          <CardContent className="p-8 text-center">
+            <p className="text-muted-foreground">You don't have permission to view festival management.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
       <Card>
@@ -258,22 +270,24 @@ const FestivalManagement = () => {
             </div>
             <div className="flex gap-2 items-center">
               {canEdit && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="flex items-center gap-2"
-                  onClick={handlePrintButtonClick}
-                  disabled={isPrinting}
-                >
-                  {isPrinting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Printer className="h-4 w-4" />
-                  )}
-                  {isPrinting ? 'Generating...' : 'Print Documentation'}
-                </Button>
+                <>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="flex items-center gap-2"
+                    onClick={handlePrintButtonClick}
+                    disabled={isPrinting}
+                  >
+                    {isPrinting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Printer className="h-4 w-4" />
+                    )}
+                    {isPrinting ? 'Generating...' : 'Print Documentation'}
+                  </Button>
+                  <FestivalLogoManager jobId={jobId} />
+                </>
               )}
-              {canEdit && <FestivalLogoManager jobId={jobId} />}
             </div>
           </div>
         </CardHeader>
@@ -365,7 +379,7 @@ const FestivalManagement = () => {
         </div>
       )}
       
-      {isPrintDialogOpen && (
+      {canEdit && isPrintDialogOpen && (
         <PrintOptionsDialog
           open={isPrintDialogOpen}
           onOpenChange={setIsPrintDialogOpen}
