@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabase';
 import { exportArtistPDF, ArtistPdfData } from '../artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from '../artistTablePdfExport';
@@ -225,7 +226,9 @@ export const generateAndMergeFestivalPDFs = async (
                 
                 const iemSystems = (artist.iem_systems || []).map((system: any) => ({
                   model: system.model || '',
-                  quantity: system.quantity || 0,
+                  quantity_hh: system.quantity_hh || 0, // Ensure we explicitly map channels
+                  quantity_bp: system.quantity_bp || 0, // Ensure we explicitly map bodypacks
+                  quantity: system.quantity || 0, // Keep the legacy field for backward compatibility
                   band: system.band || ''
                 }));
                 
