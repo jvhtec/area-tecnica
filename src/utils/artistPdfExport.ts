@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { WirelessSystem, IEMSystem } from '@/types/festival-equipment';
@@ -31,7 +30,7 @@ export interface ArtistTechnicalInfo {
   };
 }
 
-// Rename these interfaces to avoid conflicts with imported types
+// Local interfaces for internal PDF generation use
 interface WirelessSystemDetail {
   quantity_hh?: number;
   quantity_bp?: number;
@@ -75,6 +74,7 @@ export interface ArtistPdfData {
   logoUrl?: string;
 }
 
+// Helper functions to process wireless and IEM data
 const getWirelessSummary = (systems: WirelessSystem[] = []) => {
   const totalHH = systems.reduce((sum, system) => sum + (system.quantity_hh || 0), 0);
   const totalBP = systems.reduce((sum, system) => sum + (system.quantity_bp || 0), 0);
@@ -220,6 +220,11 @@ export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
         wirelessSummary = {
           hh: data.technical.wireless.handhelds || 0,
           bp: data.technical.wireless.bodypacks || 0
+        };
+      } else if (data.technical.wireless.hh !== undefined || data.technical.wireless.bp !== undefined) {
+        wirelessSummary = {
+          hh: data.technical.wireless.hh || 0,
+          bp: data.technical.wireless.bp || 0
         };
       }
       

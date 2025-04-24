@@ -1,16 +1,17 @@
 
 import { WirelessConfig } from "../../gear-setup/WirelessConfig";
 import { SectionProps } from "@/types/festival-form";
+import { WirelessSystem, IEMSystem } from "@/types/festival-equipment";
 
 export const WirelessSetupSection = ({ formData, onChange }: SectionProps) => {
-  const handleWirelessChange = (systems: any[]) => {
+  const handleWirelessChange = (systems: WirelessSystem[]) => {
     onChange({ 
       wireless_systems: systems,
       wireless_provided_by: formData.wireless_provided_by 
     });
   };
 
-  const handleIEMChange = (systems: any[]) => {
+  const handleIEMChange = (systems: IEMSystem[]) => {
     onChange({ 
       iem_systems: systems,
       iem_provided_by: formData.iem_provided_by 
