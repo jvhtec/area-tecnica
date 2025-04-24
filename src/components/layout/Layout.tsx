@@ -42,9 +42,7 @@ const Layout = () => {
     userRole,
     userDepartment,
     isLoading,
-    setSession,
-    setUserRole,
-    setUserDepartment
+    logout
   } = useSessionManager();
 
   // Redirect technicians to technician dashboard if they somehow get to the regular dashboard
@@ -62,11 +60,7 @@ const Layout = () => {
     console.log("Starting sign out process");
 
     try {
-      setSession(null);
-      setUserRole(null);
-      setUserDepartment(null);
-      localStorage.clear();
-      await supabase.auth.signOut();
+      await logout();
       console.log("Sign out successful");
       navigate('/auth');
       toast({
