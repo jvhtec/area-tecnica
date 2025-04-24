@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -14,15 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ArtistFormData, ProviderType } from "@/types/festival";
-
-interface ArtistManagementDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  artist?: any;
-  jobId?: string;
-  selectedDate?: string;
-  dayStartTime?: string;
-}
+import { WirelessSetupSection } from "./form/sections/WirelessSetupSection";
 
 const consoleOptions = [
   'Yamaha CL5', 'Yamaha PMx', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
@@ -74,15 +65,10 @@ export const ArtistManagementDialog = ({
     mon_console: "",
     mon_console_provided_by: "festival",
     mon_tech: false,
-    wireless_model: "",
+    wireless_systems: [],
+    iem_systems: [],
     wireless_provided_by: "festival",
-    wireless_quantity_hh: 0,
-    wireless_quantity_bp: 0,
-    wireless_band: "",
-    iem_model: "",
     iem_provided_by: "festival",
-    iem_quantity: 0,
-    iem_band: "",
     monitors_enabled: false,
     monitors_quantity: 0,
     extras_sf: false,
@@ -183,7 +169,6 @@ export const ArtistManagementDialog = ({
   
     setIsLoading(true);
     try {
-      // Calculate if the start time is after midnight
       const isAfterMidnightValue = isAfterMidnight(showStartHour);
       
       const cleanedData = {
@@ -198,12 +183,10 @@ export const ArtistManagementDialog = ({
         foh_console_provided_by: formData.foh_console_provided_by as ProviderType,
         mon_console: formData.mon_console || "",
         mon_console_provided_by: formData.mon_console_provided_by as ProviderType,
-        wireless_model: formData.wireless_model || "",
+        wireless_systems: formData.wireless_systems,
+        iem_systems: formData.iem_systems,
         wireless_provided_by: formData.wireless_provided_by as ProviderType,
-        wireless_band: formData.wireless_band || "",
-        iem_model: formData.iem_model || "",
         iem_provided_by: formData.iem_provided_by as ProviderType,
-        iem_band: formData.iem_band || "",
         extras_wired: formData.extras_wired || "",
         infrastructure_provided_by: formData.infrastructure_provided_by as ProviderType,
         other_infrastructure: formData.other_infrastructure || "",
@@ -494,130 +477,10 @@ export const ArtistManagementDialog = ({
               </div>
             </div>
 
-            <div className="border rounded-lg p-4 space-y-4">
-              <h3 className="text-lg font-medium">RF & Wireless Setup</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="wireless_model">Wireless Microphone Model</Label>
-                    <Select
-                      value={formData.wireless_model}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, wireless_model: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select wireless model" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {wirelessOptions.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <ProviderRadioGroup
-                      value={formData.wireless_provided_by}
-                      onChange={(value) => setFormData({ ...formData, wireless_provided_by: value })}
-                      label="Wireless System Provided By"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="wireless_quantity_hh">Handheld Quantity</Label>
-                    <Input
-                      id="wireless_quantity_hh"
-                      type="number"
-                      min="0"
-                      value={formData.wireless_quantity_hh}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          wireless_quantity_hh: parseInt(e.target.value) || 0,
-                        })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="wireless_quantity_bp">Bodypack Quantity</Label>
-                    <Input
-                      id="wireless_quantity_bp"
-                      type="number"
-                      min="0"
-                      value={formData.wireless_quantity_bp}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          wireless_quantity_bp: parseInt(e.target.value) || 0,
-                        })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="wireless_band">Frequency Band</Label>
-                    <Input
-                      id="wireless_band"
-                      value={formData.wireless_band}
-                      onChange={(e) =>
-                        setFormData({ ...formData, wireless_band: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="iem_model">IEM Model</Label>
-                    <Select
-                      value={formData.iem_model}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, iem_model: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select IEM model" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {iemOptions.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <ProviderRadioGroup
-                      value={formData.iem_provided_by}
-                      onChange={(value) => setFormData({ ...formData, iem_provided_by: value })}
-                      label="IEM System Provided By"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="iem_quantity">IEM Quantity</Label>
-                    <Input
-                      id="iem_quantity"
-                      type="number"
-                      min="0"
-                      value={formData.iem_quantity}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          iem_quantity: parseInt(e.target.value) || 0,
-                        })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="iem_band">IEM Band</Label>
-                    <Input
-                      id="iem_band"
-                      value={formData.iem_band}
-                      onChange={(e) =>
-                        setFormData({ ...formData, iem_band: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
+            <WirelessSetupSection
+              formData={formData}
+              onChange={(changes) => setFormData(prev => ({ ...prev, ...changes }))}
+            />
 
             <div className="border rounded-lg p-4 space-y-4">
               <div className="flex items-center justify-between">
