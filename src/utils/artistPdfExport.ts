@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { WirelessSystem, IEMSystem } from '@/types/festival-equipment';
@@ -30,14 +31,15 @@ export interface ArtistTechnicalInfo {
   };
 }
 
-interface WirelessSystem {
+// Rename these interfaces to avoid conflicts with imported types
+interface WirelessSystemDetail {
   quantity_hh?: number;
   quantity_bp?: number;
   model: string;
   band?: string;
 }
 
-interface IEMSystem {
+interface IEMSystemDetail {
   quantity: number;
   model: string;
   band?: string;
