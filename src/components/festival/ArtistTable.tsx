@@ -591,7 +591,7 @@ export const ArtistTable = ({
                           {renderProviderBadge(artist.wireless_provided_by)}
                         </div>
                       )}
-                      {getIEMSummary(artist).channels > 0 || getIEMSummary(artist).bodypacks > 0 && (
+                      {(getIEMSummary(artist).channels > 0 || getIEMSummary(artist).bodypacks > 0) && (
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1" title="IEM Systems">
                             <Headphones className="h-4 w-4" />
