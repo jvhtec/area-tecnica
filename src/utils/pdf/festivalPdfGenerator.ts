@@ -214,48 +214,64 @@ export const generateAndMergeFestivalPDFs = async (
               jobTitle: jobTitle,
               date: date,
               stage: stageName,
-              artists: filteredArtists.map(artist => ({
-                name: String(artist.name || ''),
-                stage: Number(artist.stage || 1),
-                showTime: { 
-                  start: String(artist.show_start || ''), 
-                  end: String(artist.show_end || '') 
-                },
-                soundcheck: artist.soundcheck_start ? { 
-                  start: String(artist.soundcheck_start || ''), 
-                  end: String(artist.soundcheck_end || '') 
-                } : undefined,
-                technical: {
-                  fohTech: Boolean(artist.foh_tech || false),
-                  monTech: Boolean(artist.mon_tech || false),
-                  fohConsole: { 
-                    model: String(artist.foh_console || ''), 
-                    providedBy: String(artist.foh_console_provided_by || 'festival') 
+              artists: filteredArtists.map(artist => {
+                // Convert the database wireless_systems and iem_systems to the correct format
+                const wirelessSystems = (artist.wireless_systems || []).map((system: any) => ({
+                  model: system.model || '',
+                  quantity_hh: system.quantity_hh || 0,
+                  quantity_bp: system.quantity_bp || 0,
+                  band: system.band || ''
+                }));
+                
+                const iemSystems = (artist.iem_systems || []).map((system: any) => ({
+                  model: system.model || '',
+                  quantity: system.quantity || 0,
+                  band: system.band || ''
+                }));
+                
+                return {
+                  name: String(artist.name || ''),
+                  stage: Number(artist.stage || 1),
+                  showTime: { 
+                    start: String(artist.show_start || ''), 
+                    end: String(artist.show_end || '') 
                   },
-                  monConsole: { 
-                    model: String(artist.mon_console || ''), 
-                    providedBy: String(artist.mon_console_provided_by || 'festival') 
+                  soundcheck: artist.soundcheck_start ? { 
+                    start: String(artist.soundcheck_start || ''), 
+                    end: String(artist.soundcheck_end || '') 
+                  } : undefined,
+                  technical: {
+                    fohTech: Boolean(artist.foh_tech || false),
+                    monTech: Boolean(artist.mon_tech || false),
+                    fohConsole: { 
+                      model: String(artist.foh_console || ''), 
+                      providedBy: String(artist.foh_console_provided_by || 'festival') 
+                    },
+                    monConsole: { 
+                      model: String(artist.mon_console || ''), 
+                      providedBy: String(artist.mon_console_provided_by || 'festival') 
+                    },
+                    wireless: {
+                      systems: wirelessSystems,
+                      providedBy: String(artist.wireless_provided_by || 'festival')
+                    },
+                    iem: {
+                      systems: iemSystems,
+                      providedBy: String(artist.iem_provided_by || 'festival')
+                    },
+                    monitors: {
+                      enabled: Boolean(artist.monitors_enabled || false),
+                      quantity: Number(artist.monitors_quantity || 0)
+                    }
                   },
-                  wireless: {
-                    systems: artist.wireless_systems || [],
-                    providedBy: String(artist.wireless_provided_by || 'festival')
+                  extras: {
+                    sideFill: Boolean(artist.extras_sf || false),
+                    drumFill: Boolean(artist.extras_df || false),
+                    djBooth: Boolean(artist.extras_djbooth || false)
                   },
-                  iem: {
-                    systems: artist.iem_systems || [],
-                    providedBy: String(artist.iem_provided_by || 'festival')
-                  },
-                  monitors: {
-                    enabled: Boolean(artist.monitors_enabled || false),
-                    quantity: Number(artist.monitors_quantity || 0)
-                  }
-                },
-                extras: {
-                  sideFill: Boolean(artist.extras_sf || false),
-                  drumFill: Boolean(artist.extras_df || false),
-                  djBooth: Boolean(artist.extras_djbooth || false)
-                },
-                notes: String(artist.notes || '')
-              })),
+                  notes: String(artist.notes || '')
+                };
+              }),
               logoUrl
             };
             

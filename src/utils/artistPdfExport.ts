@@ -1,6 +1,6 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { WirelessSystem, IEMSystem } from '@/types/festival-equipment';
 
 export interface ArtistTechnicalInfo {
   fohTech: boolean;

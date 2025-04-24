@@ -1,17 +1,31 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
-import { WirelessSystem, IEMSystem } from '@/types/festival-equipment';
+
+// Define proper interfaces for the wireless and IEM systems
+interface WirelessSystemItem {
+  model: string;
+  quantity_hh?: number;
+  quantity_bp?: number;
+  band?: string;
+}
+
+interface IEMSystemItem {
+  model: string;
+  quantity: number;
+  band?: string;
+}
 
 // Helper functions for wireless and IEM quantity calculations
 export const getWirelessSummary = (data: { 
-  systems?: WirelessSystem[]; 
+  systems?: WirelessSystemItem[]; 
 }) => {
   if (data.systems && data.systems.length > 0) {
     return {
-      hh: data.systems.reduce((sum: number, system: WirelessSystem) => 
+      hh: data.systems.reduce((sum: number, system: WirelessSystemItem) => 
         sum + (system.quantity_hh || 0), 0),
-      bp: data.systems.reduce((sum: number, system: WirelessSystem) => 
+      bp: data.systems.reduce((sum: number, system: WirelessSystemItem) => 
         sum + (system.quantity_bp || 0), 0)
     };
   }
@@ -19,10 +33,10 @@ export const getWirelessSummary = (data: {
 };
 
 export const getIEMSummary = (data: {
-  systems?: IEMSystem[];
+  systems?: IEMSystemItem[];
 }) => {
   if (data.systems && data.systems.length > 0) {
-    return data.systems.reduce((sum: number, system: IEMSystem) => 
+    return data.systems.reduce((sum: number, system: IEMSystemItem) => 
       sum + (system.quantity || 0), 0);
   }
   return 0;
@@ -43,11 +57,11 @@ export interface ArtistTablePdfData {
       fohConsole: { model: string; providedBy: string };
       monConsole: { model: string; providedBy: string };
       wireless: { 
-        systems: WirelessSystem[];
+        systems: WirelessSystemItem[];
         providedBy: string;
       };
       iem: {
-        systems: IEMSystem[];
+        systems: IEMSystemItem[];
         providedBy: string;
       };
       monitors: { enabled: boolean; quantity: number };
@@ -73,11 +87,11 @@ interface ScheduleRow {
     fohConsole: { model: string; providedBy: string };
     monConsole: { model: string; providedBy: string };
     wireless: { 
-      systems: WirelessSystem[];
+      systems: WirelessSystemItem[];
       providedBy: string;
     };
     iem: {
-      systems: IEMSystem[];
+      systems: IEMSystemItem[];
       providedBy: string;
     };
     monitors: { enabled: boolean; quantity: number };

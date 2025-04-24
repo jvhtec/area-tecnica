@@ -24,5 +24,19 @@ export const IEM_SYSTEMS = [
   'Other'
 ] as const;
 
-export type WirelessSystem = typeof WIRELESS_SYSTEMS[number];
-export type IEMSystem = typeof IEM_SYSTEMS[number];
+export type WirelessSystemModel = typeof WIRELESS_SYSTEMS[number];
+export type IEMSystemModel = typeof IEM_SYSTEMS[number];
+
+// For compatibility with the existing code
+export type WirelessSystem = {
+  model: WirelessSystemModel | string;
+  quantity_hh?: number;
+  quantity_bp?: number;
+  band?: string;
+};
+
+export type IEMSystem = {
+  model: IEMSystemModel | string;
+  quantity: number;
+  band?: string;
+};
