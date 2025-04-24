@@ -1,4 +1,3 @@
-
 export interface ConsoleSetup {
   model: string;
   quantity: number;
@@ -52,15 +51,10 @@ export interface ArtistFormData {
   foh_console_provided_by: ProviderType;
   mon_console: string;
   mon_console_provided_by: ProviderType;
-  wireless_model: string;
+  wireless_systems: WirelessSetup[];
+  iem_systems: WirelessSetup[];
   wireless_provided_by: ProviderType;
-  wireless_quantity_hh: number;
-  wireless_quantity_bp: number;
-  wireless_band: string;
-  iem_model: string;
   iem_provided_by: ProviderType;
-  iem_quantity: number;
-  iem_band: string;
   monitors_enabled: boolean;
   monitors_quantity: number;
   extras_sf: boolean;

@@ -23,17 +23,14 @@ const consoleOptions = [
   'Waves LV1 (homemade)', 'Waves LV1 Classic', 'SSL', 'Other'
 ];
 
-const wirelessOptions = [
-  'Shure AD Series', 'Shure AXT Series', 'Shure UR Series', 'Shure ULX Series',
-  'Shure QLX Series', 'Sennheiser 2000 Series', 'Sennheiser EW500 Series',
-  'Sennheiser EW300 Series', 'Sennheiser EW100 Series', 'Other'
-];
-
-const iemOptions = [
-  'Shure Digital PSM Series', 'Shure PSM1000 Series', 'Shure PSM900 Series',
-  'Shure PSM300 Series', 'Sennheiser 2000 series', 'Sennheiser 300 G4 Series',
-  'Sennheiser 300 G3 Series', 'Wysicom MTK', 'Other'
-];
+interface ArtistManagementDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  artist?: ArtistFormData & { id?: string };
+  jobId?: string;
+  selectedDate?: string;
+  dayStartTime?: string;
+}
 
 export const ArtistManagementDialog = ({
   open,
