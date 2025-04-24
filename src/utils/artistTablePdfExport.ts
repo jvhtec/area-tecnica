@@ -22,10 +22,14 @@ export const getIEMSummary = (data: {
   systems?: IEMSystem[];
 }) => {
   if (data.systems && data.systems.length > 0) {
-    return data.systems.reduce((sum: number, system: IEMSystem) => 
-      sum + (system.quantity || 0), 0);
+    return {
+      channels: data.systems.reduce((sum: number, system: IEMSystem) => 
+        sum + (system.quantity_hh || 0), 0),
+      bodypacks: data.systems.reduce((sum: number, system: IEMSystem) => 
+        sum + (system.quantity_bp || 0), 0)
+    };
   }
-  return 0;
+  return { channels: 0, bodypacks: 0 };
 };
 
 export interface ArtistTablePdfData {
@@ -197,7 +201,7 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
             `${row.time.start}-${row.time.end}`,
             `FOH: ${row.technical.fohConsole.model}\n(${row.technical.fohConsole.providedBy})\n\nMON: ${row.technical.monConsole.model}\n(${row.technical.monConsole.providedBy})`,
             `FOH: ${row.technical.fohTech ? 'Y' : 'N'}\nMON: ${row.technical.monTech ? 'Y' : 'N'}`,
-            `HH: ${wirelessSummary.hh} (${row.technical.wireless.providedBy})\nBP: ${wirelessSummary.bp}\n\nIEM: ${iemSummary} (${row.technical.iem.providedBy})`,
+            `HH: ${wirelessSummary.hh} (${row.technical.wireless.providedBy})\nBP: ${wirelessSummary.bp}\n\nIEM: ${iemSummary.channels} channels (${row.technical.iem.providedBy})\n${iemSummary.bodypacks} bodypacks`,
             row.technical.monitors.enabled ? `Monitors: ${row.technical.monitors.quantity}` : '-',
             [
               row.extras.sideFill ? 'SF' : '',

@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +18,6 @@ export const WirelessConfig = ({
   const addSystem = () => {
     const newSystem: WirelessSetup = {
       model: '',
-      quantity: 0,
       quantity_hh: 0,
       quantity_bp: 0,
       band: ''
@@ -76,17 +76,6 @@ export const WirelessConfig = ({
                 placeholder="Select system"
               />
             </div>
-            {!includeQuantityTypes && (
-              <div className="w-24">
-                <Input
-                  type="number"
-                  min="0"
-                  value={system.quantity}
-                  onChange={(e) => updateSystem(index, 'quantity', parseInt(e.target.value) || 0)}
-                  placeholder="Qty"
-                />
-              </div>
-            )}
             <Button
               type="button"
               variant="ghost"
@@ -97,30 +86,28 @@ export const WirelessConfig = ({
             </Button>
           </div>
 
-          {includeQuantityTypes && (
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <Label>{quantityTypeLabels.hh}</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={system.quantity_hh}
-                  onChange={(e) => updateSystem(index, 'quantity_hh', parseInt(e.target.value) || 0)}
-                  placeholder={`${quantityTypeLabels.hh} Qty`}
-                />
-              </div>
-              <div className="flex-1">
-                <Label>{quantityTypeLabels.bp}</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={system.quantity_bp}
-                  onChange={(e) => updateSystem(index, 'quantity_bp', parseInt(e.target.value) || 0)}
-                  placeholder={`${quantityTypeLabels.bp} Qty`}
-                />
-              </div>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <Label>{quantityTypeLabels.hh}</Label>
+              <Input
+                type="number"
+                min="0"
+                value={system.quantity_hh || 0}
+                onChange={(e) => updateSystem(index, 'quantity_hh', parseInt(e.target.value) || 0)}
+                placeholder={`${quantityTypeLabels.hh} Qty`}
+              />
             </div>
-          )}
+            <div className="flex-1">
+              <Label>{quantityTypeLabels.bp}</Label>
+              <Input
+                type="number"
+                min="0"
+                value={system.quantity_bp || 0}
+                onChange={(e) => updateSystem(index, 'quantity_bp', parseInt(e.target.value) || 0)}
+                placeholder={`${quantityTypeLabels.bp} Qty`}
+              />
+            </div>
+          </div>
 
           <div>
             <Label>Frequency Band</Label>

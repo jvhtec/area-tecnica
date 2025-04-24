@@ -112,7 +112,10 @@ export const ArtistTable = ({
 
   const getIEMSummary = (artist: any) => {
     const iemSystems = artist.iem_systems || [];
-    return iemSystems.reduce((sum: number, system: any) => sum + (system.quantity || 0), 0);
+    return {
+      channels: iemSystems.reduce((sum: number, system: any) => sum + (system.quantity_hh || 0), 0),
+      bodypacks: iemSystems.reduce((sum: number, system: any) => sum + (system.quantity_bp || 0), 0)
+    };
   };
 
   useEffect(() => {
@@ -428,7 +431,7 @@ export const ArtistTable = ({
     const matchesStage = !stageFilter || artist.stage?.toString() === stageFilter;
     const matchesEquipment = !equipmentFilter || (
       (equipmentFilter === 'wireless' && getWirelessSummary(artist).hh + getWirelessSummary(artist).bp > 0) ||
-      (equipmentFilter === 'iem' && getIEMSummary(artist) > 0) ||
+      (equipmentFilter === 'iem' && getIEMSummary(artist).channels + getIEMSummary(artist).bodypacks > 0) ||
       (equipmentFilter === 'monitors' && artist.monitors_enabled)
     );
     return matchesSearch && matchesStage && matchesEquipment;
@@ -588,11 +591,13 @@ export const ArtistTable = ({
                           {renderProviderBadge(artist.wireless_provided_by)}
                         </div>
                       )}
-                      {getIEMSummary(artist) > 0 && (
+                      {getIEMSummary(artist).channels > 0 || getIEMSummary(artist).bodypacks > 0 && (
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1" title="IEM Systems">
                             <Headphones className="h-4 w-4" />
-                            <span className="text-xs">{getIEMSummary(artist)}</span>
+                            <span className="text-xs">
+                              CH: {getIEMSummary(artist).channels} / BP: {getIEMSummary(artist).bodypacks}
+                            </span>
                           </div>
                           {renderProviderBadge(artist.iem_provided_by)}
                         </div>
