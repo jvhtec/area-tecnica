@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -9,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, FileDown, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
-import { useRealtimeFestivalShifts } from "@/hooks/festival/useRealtimeFestivalShifts";
+import { useFestivalShifts } from "@/hooks/festival/useFestivalShifts";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthSession } from "@/hooks/useAuthSession";
@@ -24,6 +23,7 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [isCreateShiftOpen, setIsCreateShiftOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "table">("list");
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
   const { userRole } = useAuthSession();
   const canManageSchedule = ['admin', 'management'].includes(userRole || '');
@@ -59,7 +59,7 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
     }
   }, [jobDates, selectedDate, formatDateToString]);
 
-  const { shifts, isLoading, isRefreshing, refetch } = useRealtimeFestivalShifts({
+  const { shifts, isLoading, refetch } = useFestivalShifts({
     jobId,
     selectedDate
   });
@@ -71,7 +71,7 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
 
   const handleDeleteShift = async (shiftId: string) => {
     try {
-      // No need to set isRefreshing as it comes from the hook now
+      setIsRefreshing(true);
       
       await supabase
         .from("festival_shift_assignments")
@@ -99,10 +99,13 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
         description: `Failed to delete shift: ${error.message}`,
         variant: "destructive",
       });
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
   const handleRefresh = async () => {
+    setIsRefreshing(true);
     try {
       await refetch();
       toast({
@@ -116,6 +119,8 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
         description: "Failed to refresh shifts",
         variant: "destructive",
       });
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
