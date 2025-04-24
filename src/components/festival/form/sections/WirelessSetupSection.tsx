@@ -31,7 +31,7 @@ export const WirelessSetupSection = ({ formData, onChange }: SectionProps) => {
           systems={formData.iem_systems || []}
           onChange={handleIEMChange}
           label="IEM Systems"
-          includeQuantityTypes={false}
+          includeQuantityTypes={true}
           isIEM={true}
         />
       </div>

@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,7 +37,14 @@ export const WirelessConfig = ({
     );
   };
 
-  const options = label.toLowerCase().includes('iem') ? IEM_SYSTEMS : WIRELESS_SYSTEMS;
+  const options = isIEM ? IEM_SYSTEMS : WIRELESS_SYSTEMS;
+  const quantityTypeLabels = isIEM ? {
+    hh: "Channels",
+    bp: "Bodypacks"
+  } : {
+    hh: "Handheld",
+    bp: "Bodypacks"
+  };
 
   return (
     <div className="space-y-4">
@@ -94,23 +100,23 @@ export const WirelessConfig = ({
           {includeQuantityTypes && (
             <div className="flex gap-4">
               <div className="flex-1">
-                <Label>{isIEM ? "Channels" : "Handheld"}</Label>
+                <Label>{quantityTypeLabels.hh}</Label>
                 <Input
                   type="number"
                   min="0"
                   value={system.quantity_hh}
                   onChange={(e) => updateSystem(index, 'quantity_hh', parseInt(e.target.value) || 0)}
-                  placeholder={isIEM ? "CH Qty" : "HH Qty"}
+                  placeholder={`${quantityTypeLabels.hh} Qty`}
                 />
               </div>
               <div className="flex-1">
-                <Label>Bodypacks</Label>
+                <Label>{quantityTypeLabels.bp}</Label>
                 <Input
                   type="number"
                   min="0"
                   value={system.quantity_bp}
                   onChange={(e) => updateSystem(index, 'quantity_bp', parseInt(e.target.value) || 0)}
-                  placeholder="BP Qty"
+                  placeholder={`${quantityTypeLabels.bp} Qty`}
                 />
               </div>
             </div>
