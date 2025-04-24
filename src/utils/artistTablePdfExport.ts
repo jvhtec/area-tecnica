@@ -1,36 +1,31 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
+import { WirelessSystem, IEMSystem } from '@/types/festival-equipment';
 
 // Helper functions for wireless and IEM quantity calculations
 export const getWirelessSummary = (data: { 
-  systems?: any[]; 
-  hh?: number; 
-  bp?: number;
+  systems?: WirelessSystem[]; 
 }) => {
   if (data.systems && data.systems.length > 0) {
     return {
-      hh: data.systems.reduce((sum: number, system: any) => 
+      hh: data.systems.reduce((sum: number, system: WirelessSystem) => 
         sum + (system.quantity_hh || 0), 0),
-      bp: data.systems.reduce((sum: number, system: any) => 
+      bp: data.systems.reduce((sum: number, system: WirelessSystem) => 
         sum + (system.quantity_bp || 0), 0)
     };
   }
-  return {
-    hh: data.hh || 0,
-    bp: data.bp || 0
-  };
+  return { hh: 0, bp: 0 };
 };
 
 export const getIEMSummary = (data: {
-  systems?: any[];
-  quantity?: number;
+  systems?: IEMSystem[];
 }) => {
   if (data.systems && data.systems.length > 0) {
-    return data.systems.reduce((sum: number, system: any) => 
+    return data.systems.reduce((sum: number, system: IEMSystem) => 
       sum + (system.quantity || 0), 0);
   }
-  return data.quantity || 0;
+  return 0;
 };
 
 export interface ArtistTablePdfData {
@@ -48,14 +43,11 @@ export interface ArtistTablePdfData {
       fohConsole: { model: string; providedBy: string };
       monConsole: { model: string; providedBy: string };
       wireless: { 
-        systems?: any[];
-        hh?: number;
-        bp?: number;
+        systems: WirelessSystem[];
         providedBy: string;
       };
       iem: {
-        systems?: any[];
-        quantity?: number;
+        systems: IEMSystem[];
         providedBy: string;
       };
       monitors: { enabled: boolean; quantity: number };
@@ -81,14 +73,11 @@ interface ScheduleRow {
     fohConsole: { model: string; providedBy: string };
     monConsole: { model: string; providedBy: string };
     wireless: { 
-      systems?: any[];
-      hh?: number;
-      bp?: number;
+      systems: WirelessSystem[];
       providedBy: string;
     };
     iem: {
-      systems?: any[];
-      quantity?: number;
+      systems: IEMSystem[];
       providedBy: string;
     };
     monitors: { enabled: boolean; quantity: number };

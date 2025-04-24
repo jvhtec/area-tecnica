@@ -32,7 +32,6 @@ export const generateAndMergeFestivalPDFs = async (
     
     if (artistError) throw artistError;
     
-    // Generate gear setup PDFs if selected
     if (options.includeGearSetup && options.gearSetupStages.length > 0) {
       console.log("Starting gear setup PDF generation for stages:", options.gearSetupStages);
       
@@ -62,7 +61,6 @@ export const generateAndMergeFestivalPDFs = async (
     
     const uniqueDates = [...new Set(artists?.map(a => a.date) || [])];
     
-    // Generate shift PDFs if selected
     if (options.includeShiftSchedules) {
       console.log("Starting shift table PDF generation for dates:", uniqueDates);
       for (const date of uniqueDates) {
@@ -78,7 +76,6 @@ export const generateAndMergeFestivalPDFs = async (
         
         if (shiftsError) continue;
         
-        // Filter shifts by selected stages
         const filteredShifts = shiftsData?.filter(shift => 
           !shift.stage || options.shiftScheduleStages.includes(Number(shift.stage))
         );
@@ -107,7 +104,6 @@ export const generateAndMergeFestivalPDFs = async (
                   }
                   
                   if (assignment.external_technician_name) {
-                    // For external technicians, we already have the name
                     return { 
                       ...assignment, 
                       profiles: null,
@@ -185,12 +181,10 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
-    // Process artist tables by stage and selected stages
     if (options.includeArtistTables) {
       for (const date of uniqueDates) {
         if (!date) continue;
         
-        // Filter artists by selected stages
         const stageArtists = artists?.filter(a => 
           a.date === date && options.artistTableStages.includes(Number(a.stage))
         );
@@ -217,53 +211,50 @@ export const generateAndMergeFestivalPDFs = async (
             const stageName = stageObj ? stageObj.name : `Stage ${stageNum}`;
             
             const tableData: ArtistTablePdfData = {
-              jobTitle: jobTitle || 'Festival',
+              jobTitle: jobTitle,
               date: date,
               stage: stageName,
-              artists: filteredArtists.map(a => ({
-                name: String(a.name || ''),
-                stage: Number(a.stage || 1),
+              artists: filteredArtists.map(artist => ({
+                name: String(artist.name || ''),
+                stage: Number(artist.stage || 1),
                 showTime: { 
-                  start: String(a.show_start || ''), 
-                  end: String(a.show_end || '') 
+                  start: String(artist.show_start || ''), 
+                  end: String(artist.show_end || '') 
                 },
-                soundcheck: a.soundcheck_start ? { 
-                  start: String(a.soundcheck_start || ''), 
-                  end: String(a.soundcheck_end || '') 
+                soundcheck: artist.soundcheck_start ? { 
+                  start: String(artist.soundcheck_start || ''), 
+                  end: String(artist.soundcheck_end || '') 
                 } : undefined,
                 technical: {
-                  fohTech: Boolean(a.foh_tech || false),
-                  monTech: Boolean(a.mon_tech || false),
+                  fohTech: Boolean(artist.foh_tech || false),
+                  monTech: Boolean(artist.mon_tech || false),
                   fohConsole: { 
-                    model: String(a.foh_console || ''), 
-                    providedBy: String(a.foh_console_provided_by || 'festival') 
+                    model: String(artist.foh_console || ''), 
+                    providedBy: String(artist.foh_console_provided_by || 'festival') 
                   },
                   monConsole: { 
-                    model: String(a.mon_console || ''), 
-                    providedBy: String(a.mon_console_provided_by || 'festival') 
+                    model: String(artist.mon_console || ''), 
+                    providedBy: String(artist.mon_console_provided_by || 'festival') 
                   },
                   wireless: {
-                    systems: a.wireless_systems || undefined,
-                    hh: a.wireless_quantity_hh,
-                    bp: a.wireless_quantity_bp,
-                    providedBy: String(a.wireless_provided_by || 'festival')
+                    systems: artist.wireless_systems || [],
+                    providedBy: String(artist.wireless_provided_by || 'festival')
                   },
                   iem: {
-                    systems: a.iem_systems || undefined,
-                    quantity: a.iem_quantity,
-                    providedBy: String(a.iem_provided_by || 'festival')
+                    systems: artist.iem_systems || [],
+                    providedBy: String(artist.iem_provided_by || 'festival')
                   },
                   monitors: {
-                    enabled: Boolean(a.monitors_enabled || false),
-                    quantity: Number(a.monitors_quantity || 0)
+                    enabled: Boolean(artist.monitors_enabled || false),
+                    quantity: Number(artist.monitors_quantity || 0)
                   }
                 },
                 extras: {
-                  sideFill: Boolean(a.extras_sf || false),
-                  drumFill: Boolean(a.extras_df || false),
-                  djBooth: Boolean(a.extras_djbooth || false)
+                  sideFill: Boolean(artist.extras_sf || false),
+                  drumFill: Boolean(artist.extras_df || false),
+                  djBooth: Boolean(artist.extras_djbooth || false)
                 },
-                notes: String(a.notes || '')
+                notes: String(artist.notes || '')
               })),
               logoUrl
             };
@@ -285,41 +276,30 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
-    // Process individual artist PDFs
     if (options.includeArtistRequirements && artists && artists.length > 0) {
-      // Filter artists by selected stages first
       const filteredArtists = artists.filter(artist => 
         options.artistRequirementStages.includes(Number(artist.stage))
       );
       
-      // Sort the filtered artists
       const sortedArtists = [...filteredArtists].sort((a, b) => {
-        // First sort by stage
         if (a.stage < b.stage) return -1;
         if (a.stage > b.stage) return 1;
         
-        // If same stage, sort by date
         if (a.date < b.date) return -1;
         if (a.date > b.date) return 1;
         
-        // If same date, sort by show_start time with festival day offset
         const aTime = a.show_start || '';
         const bTime = b.show_start || '';
         
-        // Handle festival day offset (7:00 am to 7:00 am)
-        // Extract hours from show_start times
         const aHour = aTime ? parseInt(aTime.split(':')[0], 10) : 0;
         const bHour = bTime ? parseInt(bTime.split(':')[0], 10) : 0;
         
-        // Adjust times for festival day logic - times from 00:00 to 06:59 are considered 
-        // part of the previous festival day, so add 24 hours for sorting
         const adjustedATime = aHour >= 0 && aHour < 7 ? `${aHour + 24}${aTime.substring(aTime.indexOf(':'))}` : aTime;
         const adjustedBTime = bHour >= 0 && bHour < 7 ? `${bHour + 24}${bTime.substring(bTime.indexOf(':'))}` : bTime;
         
         if (adjustedATime < adjustedBTime) return -1;
         if (adjustedATime > adjustedBTime) return 1;
         
-        // If everything is the same, sort by name
         return (a.name || '').localeCompare(b.name || '');
       });
       
@@ -355,7 +335,7 @@ export const generateAndMergeFestivalPDFs = async (
                 providedBy: String(artist.mon_console_provided_by || 'festival') 
               },
               wireless: {
-                systems: artist.wireless_systems || undefined,
+                systems: artist.wireless_systems || [],
                 providedBy: String(artist.wireless_provided_by || 'festival'),
                 model: String(artist.wireless_model || ''),
                 handhelds: Number(artist.wireless_quantity_hh || 0),
@@ -363,7 +343,7 @@ export const generateAndMergeFestivalPDFs = async (
                 band: String(artist.wireless_band || '')
               },
               iem: {
-                systems: artist.iem_systems || undefined,
+                systems: artist.iem_systems || [],
                 providedBy: String(artist.iem_provided_by || 'festival'),
                 model: String(artist.iem_model || ''),
                 quantity: Number(artist.iem_quantity || 0),
@@ -418,7 +398,6 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
-    // Build TOC with only selected sections
     const tocSections = [];
     
     if (options.includeGearSetup && gearPdfs.length > 0) {
@@ -439,7 +418,6 @@ export const generateAndMergeFestivalPDFs = async (
     const coverPage = await generateCoverPage(jobId, jobTitle, logoUrl);
     const tableOfContents = await generateTableOfContents(tocSections, logoUrl);
     
-    // Collect only selected PDFs
     const selectedPdfs = [
       coverPage,
       tableOfContents,

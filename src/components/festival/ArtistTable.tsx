@@ -104,18 +104,15 @@ export const ArtistTable = ({
 
   const getWirelessSummary = (artist: any) => {
     const wirelessSystems = artist.wireless_systems || [];
-    const totalHH = wirelessSystems.reduce((sum: number, system: any) => 
-      sum + (system.quantity_hh || 0), 0);
-    const totalBP = wirelessSystems.reduce((sum: number, system: any) => 
-      sum + (system.quantity_bp || 0), 0);
-    return { hh: totalHH, bp: totalBP };
+    return {
+      hh: wirelessSystems.reduce((sum: number, system: any) => sum + (system.quantity_hh || 0), 0),
+      bp: wirelessSystems.reduce((sum: number, system: any) => sum + (system.quantity_bp || 0), 0)
+    };
   };
 
   const getIEMSummary = (artist: any) => {
     const iemSystems = artist.iem_systems || [];
-    const total = iemSystems.reduce((sum: number, system: any) => 
-      sum + (system.quantity || 0), 0);
-    return total;
+    return iemSystems.reduce((sum: number, system: any) => sum + (system.quantity || 0), 0);
   };
 
   useEffect(() => {
