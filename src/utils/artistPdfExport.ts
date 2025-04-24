@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -7,12 +8,19 @@ export interface ArtistTechnicalInfo {
   fohConsole: { model: string; providedBy: string };
   monConsole: { model: string; providedBy: string };
   wireless: {
-    systems: WirelessSystem[];
+    systems?: WirelessSystem[];
+    model?: string;
     providedBy: string;
+    handhelds?: number;
+    bodypacks?: number;
+    band?: string;
   };
   iem: {
-    systems: IEMSystem[];
+    systems?: IEMSystem[];
+    model?: string;
     providedBy: string;
+    quantity?: number;
+    band?: string;
   };
   monitors: {
     enabled: boolean;
@@ -198,21 +206,43 @@ export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
       yPosition = (doc as any).lastAutoTable.finalY + 8;
 
       // === RF & WIRELESS ===
-      const wirelessSummary = getWirelessSummary(data.technical.wireless.systems);
-      const iemSummary = getIEMSummary(data.technical.iem.systems);
+      let wirelessSummary = { hh: 0, bp: 0 };
+      let iemSummary = 0;
+      
+      // Handle both formats for wireless data
+      if (data.technical.wireless.systems) {
+        wirelessSummary = getWirelessSummary(data.technical.wireless.systems);
+      } else if (data.technical.wireless.handhelds !== undefined || data.technical.wireless.bodypacks !== undefined) {
+        wirelessSummary = {
+          hh: data.technical.wireless.handhelds || 0,
+          bp: data.technical.wireless.bodypacks || 0
+        };
+      }
+      
+      // Handle both formats for IEM data
+      if (data.technical.iem.systems) {
+        iemSummary = getIEMSummary(data.technical.iem.systems);
+      } else if (data.technical.iem.quantity !== undefined) {
+        iemSummary = data.technical.iem.quantity;
+      }
+      
+      const wirelessModel = data.technical.wireless.systems?.[0]?.model || data.technical.wireless.model || '-';
+      const wirelessBand = data.technical.wireless.systems?.[0]?.band || data.technical.wireless.band || '-';
+      const iemModel = data.technical.iem.systems?.[0]?.model || data.technical.iem.model || '-';
+      const iemBand = data.technical.iem.systems?.[0]?.band || data.technical.iem.band || '-';
       
       const wirelessRows = [
         ...(wirelessSummary.hh > 0 ? [['Handheld', wirelessSummary.hh, 
-          data.technical.wireless.systems[0]?.model || '-', 
-          data.technical.wireless.systems[0]?.band || '-',
+          wirelessModel, 
+          wirelessBand,
           data.technical.wireless.providedBy]] : []),
         ...(wirelessSummary.bp > 0 ? [['Bodypack', wirelessSummary.bp,
-          data.technical.wireless.systems[0]?.model || '-',
-          data.technical.wireless.systems[0]?.band || '-',
+          wirelessModel,
+          wirelessBand,
           data.technical.wireless.providedBy]] : []),
         ...(iemSummary > 0 ? [['IEM', iemSummary,
-          data.technical.iem.systems[0]?.model || '-',
-          data.technical.iem.systems[0]?.band || '-',
+          iemModel,
+          iemBand,
           data.technical.iem.providedBy]] : [])
       ];
 

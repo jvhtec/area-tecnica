@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase';
 import { exportArtistPDF, ArtistPdfData } from '../artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from '../artistTablePdfExport';
@@ -244,11 +243,13 @@ export const generateAndMergeFestivalPDFs = async (
                     providedBy: String(a.mon_console_provided_by || 'festival') 
                   },
                   wireless: {
+                    systems: a.wireless_systems || [],
                     hh: Number(a.wireless_quantity_hh || 0),
                     bp: Number(a.wireless_quantity_bp || 0),
                     providedBy: String(a.wireless_provided_by || 'festival')
                   },
                   iem: {
+                    systems: a.iem_systems || [],
                     quantity: Number(a.iem_quantity || 0),
                     providedBy: String(a.iem_provided_by || 'festival')
                   },
@@ -354,15 +355,17 @@ export const generateAndMergeFestivalPDFs = async (
                 providedBy: String(artist.mon_console_provided_by || 'festival') 
               },
               wireless: {
-                model: String(artist.wireless_model || ''),
+                systems: artist.wireless_systems || [],
                 providedBy: String(artist.wireless_provided_by || 'festival'),
+                model: String(artist.wireless_model || ''),
                 handhelds: Number(artist.wireless_quantity_hh || 0),
                 bodypacks: Number(artist.wireless_quantity_bp || 0),
                 band: String(artist.wireless_band || '')
               },
               iem: {
-                model: String(artist.iem_model || ''),
+                systems: artist.iem_systems || [],
                 providedBy: String(artist.iem_provided_by || 'festival'),
+                model: String(artist.iem_model || ''),
                 quantity: Number(artist.iem_quantity || 0),
                 band: String(artist.iem_band || '')
               },

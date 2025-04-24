@@ -314,15 +314,17 @@ export const ArtistTable = ({
             providedBy: artist.mon_console_provided_by
           },
           wireless: {
-            model: artist.wireless_model,
+            systems: artist.wireless_systems,
             providedBy: artist.wireless_provided_by,
+            model: artist.wireless_model,
             handhelds: artist.wireless_quantity_hh,
             bodypacks: artist.wireless_quantity_bp,
             band: artist.wireless_band
           },
           iem: {
-            model: artist.iem_model,
+            systems: artist.iem_systems,
             providedBy: artist.iem_provided_by,
+            model: artist.iem_model,
             quantity: artist.iem_quantity,
             band: artist.iem_band
           },

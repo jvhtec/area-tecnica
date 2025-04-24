@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -30,11 +31,14 @@ export interface ArtistTablePdfData {
       fohConsole: { model: string; providedBy: string };
       monConsole: { model: string; providedBy: string };
       wireless: { 
-        systems: any[];
+        systems?: any[];
+        hh?: number;
+        bp?: number;
         providedBy: string;
       };
       iem: {
-        systems: any[];
+        systems?: any[];
+        quantity?: number;
         providedBy: string;
       };
       monitors: { enabled: boolean; quantity: number };
@@ -173,8 +177,25 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
             ];
           }
           
-          const wirelessSummary = getWirelessSummary(row.technical?.wireless.systems);
-          const iemSummary = getIEMSummary(row.technical?.iem.systems);
+          let wirelessSummary = { hh: 0, bp: 0 };
+          
+          // Handle both formats for wireless data
+          if (row.technical?.wireless.systems) {
+            wirelessSummary = getWirelessSummary(row.technical.wireless.systems);
+          } else if (row.technical?.wireless.hh !== undefined || row.technical?.wireless.bp !== undefined) {
+            wirelessSummary = {
+              hh: row.technical?.wireless.hh || 0,
+              bp: row.technical?.wireless.bp || 0
+            };
+          }
+          
+          // Handle both formats for IEM data
+          let iemSummary = 0;
+          if (row.technical?.iem.systems) {
+            iemSummary = getIEMSummary(row.technical.iem.systems);
+          } else if (row.technical?.iem.quantity !== undefined) {
+            iemSummary = row.technical.iem.quantity;
+          }
           
           return [
             row.name,

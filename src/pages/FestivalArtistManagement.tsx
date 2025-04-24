@@ -50,6 +50,7 @@ const FestivalArtistManagement = () => {
   const [printStage, setPrintStage] = useState("");
   const [dateTypes, setDateTypes] = useState<Record<string, string>>({});
   const [dayStartTime, setDayStartTime] = useState<string>("07:00");
+  const [logoUrl, setLogoUrl] = useState("");
 
   const { data: festivalSettings } = useQuery({
     queryKey: ['festival-settings', jobId],
@@ -356,49 +357,57 @@ const FestivalArtistManagement = () => {
         jobTitle: jobTitle,
         date: printDate,
         stage: printStage,
-        artists: filteredArtists.map(artist => ({
-          name: artist.name,
-          stage: artist.stage,
-          showTime: {
-            start: artist.show_start,
-            end: artist.show_end
-          },
-          soundcheck: artist.soundcheck ? {
-            start: artist.soundcheck_start,
-            end: artist.soundcheck_end
-          } : undefined,
-          technical: {
-            fohTech: artist.foh_tech,
-            monTech: artist.mon_tech,
-            fohConsole: {
-              model: artist.foh_console,
-              providedBy: artist.foh_console_provided_by
+        artists: filteredArtists.map(artist => {
+          const wirelessSystems = artist.wireless_systems || [];
+          const iemSystems = artist.iem_systems || [];
+          
+          return {
+            name: artist.name,
+            stage: artist.stage,
+            showTime: {
+              start: artist.show_start,
+              end: artist.show_end
             },
-            monConsole: {
-              model: artist.mon_console,
-              providedBy: artist.mon_console_provided_by
+            soundcheck: artist.soundcheck ? {
+              start: artist.soundcheck_start,
+              end: artist.soundcheck_end
+            } : undefined,
+            technical: {
+              fohTech: artist.foh_tech,
+              monTech: artist.mon_tech,
+              fohConsole: {
+                model: artist.foh_console,
+                providedBy: artist.foh_console_provided_by
+              },
+              monConsole: {
+                model: artist.mon_console,
+                providedBy: artist.mon_console_provided_by
+              },
+              wireless: {
+                systems: wirelessSystems,
+                hh: artist.wireless_quantity_hh,
+                bp: artist.wireless_quantity_bp,
+                providedBy: artist.wireless_provided_by
+              },
+              iem: {
+                systems: iemSystems,
+                quantity: artist.iem_quantity,
+                providedBy: artist.iem_provided_by
+              },
+              monitors: {
+                enabled: artist.monitors_enabled,
+                quantity: artist.monitors_quantity
+              }
             },
-            wireless: {
-              hh: artist.wireless_quantity_hh,
-              bp: artist.wireless_quantity_bp,
-              providedBy: artist.wireless_provided_by
+            extras: {
+              sideFill: artist.extras_sf,
+              drumFill: artist.extras_df,
+              djBooth: artist.extras_djbooth
             },
-            iem: {
-              quantity: artist.iem_quantity,
-              providedBy: artist.iem_provided_by
-            },
-            monitors: {
-              enabled: artist.monitors_enabled,
-              quantity: artist.monitors_quantity
-            }
-          },
-          extras: {
-            sideFill: artist.extras_sf,
-            drumFill: artist.extras_df,
-            djBooth: artist.extras_djbooth
-          },
-          notes: artist.notes
-        }))
+            notes: artist.notes
+          };
+        }),
+        logoUrl
       };
 
       const blob = await exportArtistTablePDF(data);
