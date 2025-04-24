@@ -31,7 +31,8 @@ export function useRealtimeSubscription(
       const channel = supabase.channel(channelName);
 
       // Setup subscription with proper configuration
-      const subscription = channel.on(
+      // First create the channel
+      channel.on(
         'postgres_changes',
         {
           event: options.event || '*',
@@ -51,8 +52,8 @@ export function useRealtimeSubscription(
         }
       );
 
-      // Subscribe to the channel
-      subscription.subscribe((status) => {
+      // Then subscribe to the channel
+      channel.subscribe((status) => {
         console.log(`Subscription status for ${table}:`, status);
         if (status === 'SUBSCRIBED') {
           console.log(`Successfully subscribed to ${table}`);
