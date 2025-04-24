@@ -27,31 +27,30 @@ export function useRealtimeSubscription(
     // Create the channel
     const channel = supabase.channel(channelName);
     
-    // Set up the subscription with proper typing
-    const subscription = channel.on(
-      'postgres_changes',
-      {
-        event: options.event,
-        schema: options.schema,
-        table: table,
-        filter: options.filter
-      },
-      (payload: RealtimePostgresChangesPayload<any>) => {
-        console.log(`Received realtime update for ${table}:`, payload);
-        
-        // Invalidate queries
-        if (Array.isArray(queryKey)) {
-          queryClient.invalidateQueries({ queryKey });
-        } else {
-          queryClient.invalidateQueries({ queryKey: [queryKey] });
+    // Set up the subscription with proper typing for postgres_changes
+    channel
+      .on(
+        'postgres_changes',
+        {
+          event: options.event,
+          schema: options.schema,
+          table: table,
+          filter: options.filter
+        },
+        (payload: RealtimePostgresChangesPayload<any>) => {
+          console.log(`Received realtime update for ${table}:`, payload);
+          
+          // Invalidate queries
+          if (Array.isArray(queryKey)) {
+            queryClient.invalidateQueries({ queryKey });
+          } else {
+            queryClient.invalidateQueries({ queryKey: [queryKey] });
+          }
         }
-      }
-    );
-
-    // Subscribe to the channel
-    subscription.subscribe((status) => {
-      console.log(`Subscription status for ${table}:`, status);
-    });
+      )
+      .subscribe((status) => {
+        console.log(`Subscription status for ${table}:`, status);
+      });
 
     // Store the channel reference
     channelRef.current = channel;
