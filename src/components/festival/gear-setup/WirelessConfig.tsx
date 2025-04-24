@@ -18,7 +18,7 @@ export const WirelessConfig = ({
   const addSystem = () => {
     const newSystem: WirelessSetup = {
       model: '',
-      quantity: 0, // Keep the quantity field for backward compatibility
+      quantity: 0,
       quantity_hh: 0,
       quantity_bp: 0,
       band: ''
@@ -32,9 +32,24 @@ export const WirelessConfig = ({
 
   const updateSystem = (index: number, field: keyof WirelessSetup, value: string | number) => {
     onChange(
-      systems.map((system, i) => 
-        i === index ? { ...system, [field]: value } : system
-      )
+      systems.map((system, i) => {
+        if (i !== index) return system;
+        
+        const updatedSystem = { ...system, [field]: value };
+        
+        if (field === 'quantity_hh' || field === 'quantity_bp') {
+          // For IEM systems, quantity_hh represents channels
+          if (isIEM && field === 'quantity_hh') {
+            updatedSystem.quantity = value as number;
+          }
+          // For wireless systems, quantity is the sum of handhelds and bodypacks
+          if (!isIEM) {
+            updatedSystem.quantity = (updatedSystem.quantity_hh || 0) + (updatedSystem.quantity_bp || 0);
+          }
+        }
+        
+        return updatedSystem;
+      })
     );
   };
 
