@@ -24,6 +24,7 @@ import { useKonamiCode } from "@/hooks/useKonamiCode";
 import { WolfensteinDialog } from "./doom/WolfensteinDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuthSession } from "@/hooks/useAuthSession";
+import { HeaderStatus } from "./ui/header-status";
 
 const Layout = () => {
   const navigate = useNavigate();
