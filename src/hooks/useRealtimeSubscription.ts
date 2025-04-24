@@ -24,32 +24,45 @@ export function useRealtimeSubscription(
     
     console.log(`Setting up realtime subscription for ${table}`);
     
-    // Create the channel
-    const channel = supabase.channel(channelName);
-    
-    // Configure channel for postgres changes
-    channel.on(
-      'postgres_changes', 
-      { 
-        event: options.event,
-        schema: options.schema,
-        table: table,
-        filter: options.filter 
-      },
-      (payload: RealtimePostgresChangesPayload<any>) => {
-        console.log(`Received realtime update for ${table}:`, payload);
-        
-        // Invalidate queries
-        if (Array.isArray(queryKey)) {
-          queryClient.invalidateQueries({ queryKey });
-        } else {
-          queryClient.invalidateQueries({ queryKey: [queryKey] });
+    // Create and configure the channel using .from()
+    const channel = supabase.channel(channelName)
+      .from(table)
+      .on<any>(
+        'INSERT',
+        (payload) => {
+          console.log(`Received realtime INSERT for ${table}:`, payload);
+          if (Array.isArray(queryKey)) {
+            queryClient.invalidateQueries({ queryKey });
+          } else {
+            queryClient.invalidateQueries({ queryKey: [queryKey] });
+          }
         }
-      }
-    )
-    .subscribe((status) => {
-      console.log(`Subscription status for ${table}:`, status);
-    });
+      )
+      .on<any>(
+        'UPDATE',
+        (payload) => {
+          console.log(`Received realtime UPDATE for ${table}:`, payload);
+          if (Array.isArray(queryKey)) {
+            queryClient.invalidateQueries({ queryKey });
+          } else {
+            queryClient.invalidateQueries({ queryKey: [queryKey] });
+          }
+        }
+      )
+      .on<any>(
+        'DELETE',
+        (payload) => {
+          console.log(`Received realtime DELETE for ${table}:`, payload);
+          if (Array.isArray(queryKey)) {
+            queryClient.invalidateQueries({ queryKey });
+          } else {
+            queryClient.invalidateQueries({ queryKey: [queryKey] });
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log(`Subscription status for ${table}:`, status);
+      });
 
     // Store the channel reference
     channelRef.current = channel;
