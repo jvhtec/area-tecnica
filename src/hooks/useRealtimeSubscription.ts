@@ -29,8 +29,7 @@ export function useRealtimeSubscription(
     
     // Set up the subscription with proper typing for postgres_changes
     channel
-      .on(
-        'postgres_changes',
+      .on('postgres_changes', 
         { 
           event: options.event,
           schema: options.schema,
