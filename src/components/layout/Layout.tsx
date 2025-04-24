@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { 
   SidebarProvider, 
@@ -41,12 +42,12 @@ const Layout = () => {
     userRole,
     userDepartment,
     isLoading,
-    logout
+    setSession,
+    setUserRole,
+    setUserDepartment
   } = useSessionManager();
 
-  const canManageSchedule = ['admin', 'management'].includes(userRole || '');
-  const canViewSchedule = ['admin', 'management', 'technician', 'house_tech'].includes(userRole || '');
-
+  // Redirect technicians to technician dashboard if they somehow get to the regular dashboard
   useEffect(() => {
     if (!isLoading && userRole === 'technician' && location.pathname === '/dashboard') {
       console.log('Technician on dashboard, redirecting to technician dashboard');
@@ -61,7 +62,11 @@ const Layout = () => {
     console.log("Starting sign out process");
 
     try {
-      await logout();
+      setSession(null);
+      setUserRole(null);
+      setUserDepartment(null);
+      localStorage.clear();
+      await supabase.auth.signOut();
       console.log("Sign out successful");
       navigate('/auth');
       toast({
