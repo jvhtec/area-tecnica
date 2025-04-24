@@ -243,14 +243,14 @@ export const generateAndMergeFestivalPDFs = async (
                     providedBy: String(a.mon_console_provided_by || 'festival') 
                   },
                   wireless: {
-                    systems: a.wireless_systems || [],
-                    hh: Number(a.wireless_quantity_hh || 0),
-                    bp: Number(a.wireless_quantity_bp || 0),
+                    systems: a.wireless_systems || undefined,
+                    hh: a.wireless_quantity_hh,
+                    bp: a.wireless_quantity_bp,
                     providedBy: String(a.wireless_provided_by || 'festival')
                   },
                   iem: {
-                    systems: a.iem_systems || [],
-                    quantity: Number(a.iem_quantity || 0),
+                    systems: a.iem_systems || undefined,
+                    quantity: a.iem_quantity,
                     providedBy: String(a.iem_provided_by || 'festival')
                   },
                   monitors: {
@@ -355,7 +355,7 @@ export const generateAndMergeFestivalPDFs = async (
                 providedBy: String(artist.mon_console_provided_by || 'festival') 
               },
               wireless: {
-                systems: artist.wireless_systems || [],
+                systems: artist.wireless_systems || undefined,
                 providedBy: String(artist.wireless_provided_by || 'festival'),
                 model: String(artist.wireless_model || ''),
                 handhelds: Number(artist.wireless_quantity_hh || 0),
@@ -363,7 +363,7 @@ export const generateAndMergeFestivalPDFs = async (
                 band: String(artist.wireless_band || '')
               },
               iem: {
-                systems: artist.iem_systems || [],
+                systems: artist.iem_systems || undefined,
                 providedBy: String(artist.iem_provided_by || 'festival'),
                 model: String(artist.iem_model || ''),
                 quantity: Number(artist.iem_quantity || 0),

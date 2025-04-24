@@ -1,19 +1,36 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 
-const getWirelessSummary = (systems: any[] = []) => {
-  const totalHH = systems.reduce((sum: number, system: any) => 
-    sum + (system.quantity_hh || 0), 0);
-  const totalBP = systems.reduce((sum: number, system: any) => 
-    sum + (system.quantity_bp || 0), 0);
-  return { hh: totalHH, bp: totalBP };
+// Helper functions for wireless and IEM quantity calculations
+export const getWirelessSummary = (data: { 
+  systems?: any[]; 
+  hh?: number; 
+  bp?: number;
+}) => {
+  if (data.systems && data.systems.length > 0) {
+    return {
+      hh: data.systems.reduce((sum: number, system: any) => 
+        sum + (system.quantity_hh || 0), 0),
+      bp: data.systems.reduce((sum: number, system: any) => 
+        sum + (system.quantity_bp || 0), 0)
+    };
+  }
+  return {
+    hh: data.hh || 0,
+    bp: data.bp || 0
+  };
 };
 
-const getIEMSummary = (systems: any[] = []) => {
-  return systems.reduce((sum: number, system: any) => 
-    sum + (system.quantity || 0), 0);
+export const getIEMSummary = (data: {
+  systems?: any[];
+  quantity?: number;
+}) => {
+  if (data.systems && data.systems.length > 0) {
+    return data.systems.reduce((sum: number, system: any) => 
+      sum + (system.quantity || 0), 0);
+  }
+  return data.quantity || 0;
 };
 
 export interface ArtistTablePdfData {
@@ -180,38 +197,23 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
             ];
           }
           
-          let wirelessSummary = { hh: 0, bp: 0 };
+          if (!row.technical) return ['', '', '', '', '', '', '', '', ''];
           
-          // Handle both formats for wireless data
-          if (row.technical?.wireless.systems) {
-            wirelessSummary = getWirelessSummary(row.technical.wireless.systems);
-          } else if (row.technical?.wireless.hh !== undefined || row.technical?.wireless.bp !== undefined) {
-            wirelessSummary = {
-              hh: row.technical?.wireless.hh || 0,
-              bp: row.technical?.wireless.bp || 0
-            };
-          }
-          
-          // Handle both formats for IEM data
-          let iemSummary = 0;
-          if (row.technical?.iem.systems) {
-            iemSummary = getIEMSummary(row.technical.iem.systems);
-          } else if (row.technical?.iem.quantity !== undefined) {
-            iemSummary = row.technical.iem.quantity;
-          }
+          const wirelessSummary = getWirelessSummary(row.technical.wireless);
+          const iemSummary = getIEMSummary(row.technical.iem);
           
           return [
             row.name,
             `Stage ${row.stage}`,
             `${row.time.start}-${row.time.end}`,
-            `FOH: ${row.technical!.fohConsole.model}\n(${row.technical!.fohConsole.providedBy})\n\nMON: ${row.technical!.monConsole.model}\n(${row.technical!.monConsole.providedBy})`,
-            `FOH: ${row.technical!.fohTech ? 'Y' : 'N'}\nMON: ${row.technical!.monTech ? 'Y' : 'N'}`,
-            `HH: ${wirelessSummary.hh} (${row.technical!.wireless.providedBy})\nBP: ${wirelessSummary.bp}\n\nIEM: ${iemSummary} (${row.technical!.iem.providedBy})`,
-            row.technical!.monitors.enabled ? `Monitors: ${row.technical!.monitors.quantity}` : '-',
+            `FOH: ${row.technical.fohConsole.model}\n(${row.technical.fohConsole.providedBy})\n\nMON: ${row.technical.monConsole.model}\n(${row.technical.monConsole.providedBy})`,
+            `FOH: ${row.technical.fohTech ? 'Y' : 'N'}\nMON: ${row.technical.monTech ? 'Y' : 'N'}`,
+            `HH: ${wirelessSummary.hh} (${row.technical.wireless.providedBy})\nBP: ${wirelessSummary.bp}\n\nIEM: ${iemSummary} (${row.technical.iem.providedBy})`,
+            row.technical.monitors.enabled ? `Monitors: ${row.technical.monitors.quantity}` : '-',
             [
-              row.extras!.sideFill ? 'SF' : '',
-              row.extras!.drumFill ? 'DF' : '',
-              row.extras!.djBooth ? 'DJ' : ''
+              row.extras.sideFill ? 'SF' : '',
+              row.extras.drumFill ? 'DF' : '',
+              row.extras.djBooth ? 'DJ' : ''
             ].filter(Boolean).join(', ') || '-',
             row.notes || '-'
           ];
