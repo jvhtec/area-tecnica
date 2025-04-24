@@ -1,6 +1,6 @@
 
 import { useEffect, useRef } from 'react';
-import { RealtimeChannel, RealtimePostgresChangesPayload, RealtimeChannelConfig } from '@supabase/supabase-js';
+import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
@@ -27,20 +27,18 @@ export function useRealtimeSubscription(
     console.log(`Setting up realtime subscription for ${table}`);
     
     try {
-      const channelConfig: RealtimeChannelConfig = {
+      // Create the channel with proper configuration
+      const channel = supabase.channel(channelName, {
         schemas: [options.schema || 'public'],
         config: {
           broadcast: { ack: true }
         }
-      };
-
-      // Create the channel with proper configuration
-      const channel = supabase.channel(channelName, channelConfig);
+      });
 
       // Setup subscription with typed configuration
       channel
         .on(
-          'postgres_changes' as const,
+          'postgres_changes',
           {
             event: options.event || '*',
             schema: options.schema || 'public',
