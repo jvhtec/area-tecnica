@@ -31,32 +31,33 @@ export function useRealtimeSubscription(
       const channel = supabase.channel(channelName);
 
       // Setup subscription with proper configuration
-      channel
-        .on(
-          'postgres_changes', 
-          { 
-            event: options.event || '*', 
-            schema: options.schema || 'public',
-            table: table,
-            filter: options.filter
-          },
-          (payload: RealtimePostgresChangesPayload<any>) => {
-            console.log(`Received realtime update for ${table}:`, payload);
-              
-            // Invalidate queries
-            if (Array.isArray(queryKey)) {
-              queryClient.invalidateQueries({ queryKey });
-            } else {
-              queryClient.invalidateQueries({ queryKey: [queryKey] });
-            }
+      const subscription = channel.on(
+        'postgres_changes',
+        {
+          event: options.event || '*',
+          schema: options.schema || 'public',
+          table: table,
+          filter: options.filter
+        },
+        (payload: RealtimePostgresChangesPayload<any>) => {
+          console.log(`Received realtime update for ${table}:`, payload);
+            
+          // Invalidate queries
+          if (Array.isArray(queryKey)) {
+            queryClient.invalidateQueries({ queryKey });
+          } else {
+            queryClient.invalidateQueries({ queryKey: [queryKey] });
           }
-        )
-        .subscribe((status) => {
-          console.log(`Subscription status for ${table}:`, status);
-          if (status === 'SUBSCRIBED') {
-            console.log(`Successfully subscribed to ${table}`);
-          }
-        });
+        }
+      );
+
+      // Subscribe to the channel
+      subscription.subscribe((status) => {
+        console.log(`Subscription status for ${table}:`, status);
+        if (status === 'SUBSCRIBED') {
+          console.log(`Successfully subscribed to ${table}`);
+        }
+      });
 
       // Store the channel reference
       channelRef.current = channel;
