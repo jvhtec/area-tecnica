@@ -60,6 +60,7 @@ const FestivalManagement = () => {
   
   const canEdit = ['admin', 'management'].includes(userRole || '');
   const canView = ['admin', 'management', 'technician', 'house_tech'].includes(userRole || '');
+  const isViewOnly = !canEdit;
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -94,7 +95,6 @@ const FestivalManagement = () => {
           throw artistError;
         }
 
-        // Fetch maximum stages from festival_gear_setups
         const { data: gearSetups, error: gearError } = await supabase
           .from("festival_gear_setups")
           .select("max_stages")

@@ -11,7 +11,7 @@ import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { useFestivalShifts } from "@/hooks/festival/useFestivalShifts";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import { useAuthSession } from "@/hooks/use-auth-session";
+import { useAuthSession } from "@/hooks/useAuthSession";
 
 interface FestivalSchedulingProps {
   jobId: string;
