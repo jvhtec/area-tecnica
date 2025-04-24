@@ -29,17 +29,20 @@ export function useRealtimeSubscription(
     try {
       // Create the channel with proper configuration
       const channel = supabase.channel(channelName);
+
+      // The configuration object for postgres_changes
+      const postgresConfig = {
+        event: options.event || '*',
+        schema: options.schema || 'public',
+        table: table,
+        filter: options.filter,
+      };
       
       // Add the subscription to postgres changes with correct typing
       channel
         .on(
           'postgres_changes',
-          {
-            event: options.event,
-            schema: options.schema,
-            table: table,
-            filter: options.filter,
-          },
+          postgresConfig,
           (payload: RealtimePostgresChangesPayload<any>) => {
             console.log(`Received realtime update for ${table}:`, payload);
             
