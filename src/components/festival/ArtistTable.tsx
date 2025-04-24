@@ -102,6 +102,22 @@ export const ArtistTable = ({
     }
   };
 
+  const getWirelessSummary = (artist: any) => {
+    const wirelessSystems = artist.wireless_systems || [];
+    const totalHH = wirelessSystems.reduce((sum: number, system: any) => 
+      sum + (system.quantity_hh || 0), 0);
+    const totalBP = wirelessSystems.reduce((sum: number, system: any) => 
+      sum + (system.quantity_bp || 0), 0);
+    return { hh: totalHH, bp: totalBP };
+  };
+
+  const getIEMSummary = (artist: any) => {
+    const iemSystems = artist.iem_systems || [];
+    const total = iemSystems.reduce((sum: number, system: any) => 
+      sum + (system.quantity || 0), 0);
+    return total;
+  };
+
   useEffect(() => {
     const fetchGearSetup = async () => {
       if (artists.length > 0) {
@@ -412,8 +428,8 @@ export const ArtistTable = ({
     const matchesSearch = artist.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStage = !stageFilter || artist.stage?.toString() === stageFilter;
     const matchesEquipment = !equipmentFilter || (
-      (equipmentFilter === 'wireless' && (artist.wireless_quantity_hh > 0 || artist.wireless_quantity_bp > 0)) ||
-      (equipmentFilter === 'iem' && artist.iem_quantity > 0) ||
+      (equipmentFilter === 'wireless' && getWirelessSummary(artist).hh + getWirelessSummary(artist).bp > 0) ||
+      (equipmentFilter === 'iem' && getIEMSummary(artist) > 0) ||
       (equipmentFilter === 'monitors' && artist.monitors_enabled)
     );
     return matchesSearch && matchesStage && matchesEquipment;
@@ -562,22 +578,22 @@ export const ArtistTable = ({
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-2">
-                      {(artist.wireless_quantity_hh > 0 || artist.wireless_quantity_bp > 0) && (
+                      {(getWirelessSummary(artist).hh > 0 || getWirelessSummary(artist).bp > 0) && (
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1" title="Wireless Mics">
                             <Mic className="h-4 w-4" />
                             <span className="text-xs">
-                              HH: {artist.wireless_quantity_hh} / BP: {artist.wireless_quantity_bp}
+                              HH: {getWirelessSummary(artist).hh} / BP: {getWirelessSummary(artist).bp}
                             </span>
                           </div>
                           {renderProviderBadge(artist.wireless_provided_by)}
                         </div>
                       )}
-                      {artist.iem_quantity > 0 && (
+                      {getIEMSummary(artist) > 0 && (
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1" title="IEM Systems">
                             <Headphones className="h-4 w-4" />
-                            <span className="text-xs">{artist.iem_quantity}</span>
+                            <span className="text-xs">{getIEMSummary(artist)}</span>
                           </div>
                           {renderProviderBadge(artist.iem_provided_by)}
                         </div>
