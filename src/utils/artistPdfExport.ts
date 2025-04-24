@@ -14,6 +14,8 @@ export interface ArtistTechnicalInfo {
     handhelds?: number;
     bodypacks?: number;
     band?: string;
+    hh?: number;
+    bp?: number;
   };
   iem: {
     systems?: IEMSystem[];

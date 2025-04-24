@@ -64,11 +64,14 @@ interface ScheduleRow {
     fohConsole: { model: string; providedBy: string };
     monConsole: { model: string; providedBy: string };
     wireless: { 
-      systems: any[];
+      systems?: any[];
+      hh?: number;
+      bp?: number;
       providedBy: string;
     };
     iem: {
-      systems: any[];
+      systems?: any[];
+      quantity?: number;
       providedBy: string;
     };
     monitors: { enabled: boolean; quantity: number };
