@@ -201,7 +201,7 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
             `${row.time.start}-${row.time.end}`,
             `FOH: ${row.technical.fohConsole.model}\n(${row.technical.fohConsole.providedBy})\n\nMON: ${row.technical.monConsole.model}\n(${row.technical.monConsole.providedBy})`,
             `FOH: ${row.technical.fohTech ? 'Y' : 'N'}\nMON: ${row.technical.monTech ? 'Y' : 'N'}`,
-            `HH: ${wirelessSummary.hh} (${row.technical.wireless.providedBy})\nBP: ${wirelessSummary.bp}\n\nIEM: ${iemSummary.channels} channels (${row.technical.iem.providedBy})\n${iemSummary.bodypacks} bodypacks`,
+            `Wireless:\nHH: ${wirelessSummary.hh} (${row.technical.wireless.providedBy})\nBP: ${wirelessSummary.bp}\n\nIEM:\nCH: ${iemSummary.channels}\nBP: ${iemSummary.bodypacks} (${row.technical.iem.providedBy})`,
             row.technical.monitors.enabled ? `Monitors: ${row.technical.monitors.quantity}` : '-',
             [
               row.extras.sideFill ? 'SF' : '',
@@ -238,7 +238,7 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
             2: { cellWidth: 25 },
             3: { cellWidth: 35, cellPadding: 4 },
             4: { cellWidth: 20, cellPadding: 4 },
-            5: { cellWidth: 30, cellPadding: 4 },
+            5: { cellWidth: 35, cellPadding: 4 },
             6: { cellWidth: 20 },
             7: { cellWidth: 20 },
             8: { cellWidth: 'auto' }
