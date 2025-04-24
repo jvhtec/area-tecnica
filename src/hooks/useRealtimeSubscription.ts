@@ -27,30 +27,30 @@ export function useRealtimeSubscription(
     console.log(`Setting up realtime subscription for ${table}`);
     
     try {
-      // Create the channel
-      const channel = supabase.channel(channelName);
+      // Create the channel with specific configuration
+      const channel = supabase.channel(channelName, {
+        config: {
+          broadcast: { self: true }
+        }
+      });
 
-      // Setup subscription with proper configuration
+      // Add the postgres changes listener
       channel
-        .on(
-          'postgres_changes',
-          {
-            event: options.event || '*',
-            schema: options.schema || 'public',
-            table: table,
-            filter: options.filter
-          },
-          (payload: RealtimePostgresChangesPayload<any>) => {
-            console.log(`Received realtime update for ${table}:`, payload);
-              
-            // Invalidate queries
-            if (Array.isArray(queryKey)) {
-              queryClient.invalidateQueries({ queryKey });
-            } else {
-              queryClient.invalidateQueries({ queryKey: [queryKey] });
-            }
+        .on('postgres_changes' as Channel.REALTIME_LISTEN_TYPES, {
+          event: options.event || '*',
+          schema: options.schema || 'public',
+          table: table,
+          filter: options.filter
+        }, (payload: RealtimePostgresChangesPayload<any>) => {
+          console.log(`Received realtime update for ${table}:`, payload);
+            
+          // Invalidate queries
+          if (Array.isArray(queryKey)) {
+            queryClient.invalidateQueries({ queryKey });
+          } else {
+            queryClient.invalidateQueries({ queryKey: [queryKey] });
           }
-        )
+        })
         .subscribe((status) => {
           console.log(`Subscription status for ${table}:`, status);
           if (status === 'SUBSCRIBED') {
