@@ -1,7 +1,7 @@
-
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel, RealtimeChannelOptions } from "@supabase/supabase-js";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/api-config";
 
 // Define interfaces for our subscription tracking
 interface SubscriptionObject {
@@ -62,7 +62,13 @@ export class SubscriptionManager {
       }
 
       const channelName = `ping-channel-${Date.now()}`;
-      this.pingChannel = supabase.channel(channelName);
+      
+      // Use the direct Supabase URL from config to ensure proper connection
+      this.pingChannel = supabase.channel(channelName, {
+        config: {
+          broadcast: { self: true }
+        }
+      });
       
       this.pingChannel.subscribe((status) => {
         console.log('Ping channel status:', status);
@@ -115,46 +121,45 @@ export class SubscriptionManager {
     const now = Date.now();
     let hasDeadSubscriptions = false;
     
-    this.subscriptions.forEach((_, key) => {
+    this.subscriptions.forEach((subscription, key) => {
       try {
         // Split the key into table and serialized query key parts
         const parts = key.split('::');
         const table = parts[0];
         const serializedKey = parts.length > 1 ? parts[1] : undefined;
         
-        // Determine the query key - either parse the JSON or use the table name
-        let queryKey;
+        // Check if subscription is stale
+        const lastActivity = subscription.lastActivity || 0;
+        const isStale = now - lastActivity > 5 * 60 * 1000; // 5 minutes
         
-        if (serializedKey) {
-          try {
-            // Only attempt to parse if it looks like JSON (starts with [ or {)
-            if (serializedKey.startsWith('[') || serializedKey.startsWith('{')) {
-              queryKey = JSON.parse(serializedKey);
-            } else {
-              // For simple strings, use as-is
-              queryKey = serializedKey;
-            }
-          } catch (parseError) {
-            console.warn(`Failed to parse query key "${serializedKey}" for table ${table}:`, parseError);
-            queryKey = table; // Fallback to table name
-          }
-        } else {
-          queryKey = table;
-        }
-        
-        // Simple check - try to get an existing channel
-        const channelExists = supabase.getChannels().some(
-          channel => channel.topic.includes(table)
-        );
-        
-        if (!channelExists) {
-          console.log(`Detected broken subscription for ${table}, will reconnect`);
+        // If subscription is stale or has error status, mark for reconnection
+        if (isStale || subscription.status === 'error' || subscription.status === 'disconnected') {
+          console.log(`Detected stale or broken subscription for ${table}, will reconnect`);
           hasDeadSubscriptions = true;
+          
+          // Determine the query key
+          let queryKey;
+          if (serializedKey) {
+            try {
+              // Only attempt to parse if it looks like JSON
+              if (serializedKey.startsWith('[') || serializedKey.startsWith('{')) {
+                queryKey = JSON.parse(serializedKey);
+              } else {
+                // For simple strings, use as-is
+                queryKey = serializedKey;
+              }
+            } catch (parseError) {
+              console.warn(`Failed to parse query key "${serializedKey}" for table ${table}:`, parseError);
+              queryKey = table; // Fallback to table name
+            }
+          } else {
+            queryKey = table;
+          }
+          
           this.pendingSubscriptions.set(key, { table, queryKey });
         }
       } catch (error) {
         console.error(`Error checking subscription health for key ${key}:`, error);
-        // Don't mark as having dead subscriptions to avoid unnecessary reconnects
       }
     });
     
@@ -211,7 +216,7 @@ export class SubscriptionManager {
     this.connectionStatus = 'connecting';
     
     // Copy all existing subscriptions to pending
-    this.subscriptions.forEach((_, key) => {
+    this.subscriptions.forEach((subscription, key) => {
       try {
         const parts = key.split('::');
         const table = parts[0];
@@ -267,10 +272,13 @@ export class SubscriptionManager {
     }
     
     // Add the query key to the batch
-    const keys = Array.isArray(queryKey) ? queryKey : [queryKey];
-    keys.forEach(key => {
-      this.batchedInvalidations.get(table)?.add(key);
-    });
+    if (Array.isArray(queryKey)) {
+      queryKey.forEach(key => {
+        this.batchedInvalidations.get(table)?.add(key);
+      });
+    } else {
+      this.batchedInvalidations.get(table)?.add(queryKey);
+    }
     
     // If we already have a batch timeout, don't set another one
     if (this.batchTimeout !== null) {
@@ -329,28 +337,46 @@ export class SubscriptionManager {
     this.debounceTimeouts.set(key, timeoutId);
   }
   
-  private createChannel(table: string, queryKey: string): RealtimeChannel {
-    const channelName = `${table}-changes-${Date.now()}`;
+  private createChannel(table: string, queryKey: string | string[]): RealtimeChannel {
+    // Generate a truly unique channel name with timestamp and random ID
+    const channelId = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+    const channelName = `${table}-changes-${channelId}`;
     
     try {
-      const channel = supabase.channel(channelName);
+      // Ensure we're using the proper configuration when creating the channel
+      const channel = supabase.channel(channelName, {
+        config: {
+          broadcast: { self: true }
+        }
+      });
+      
+      // Create a serialized query key for lookups
+      const serializedKey = typeof queryKey === 'string' ? 
+        queryKey : JSON.stringify(queryKey);
       
       const handleChange = (payload: any) => {
         console.log(`Received ${payload.eventType} for ${table}:`, payload);
         
-        const subscription = this.subscriptions.get(`${table}::${queryKey}`);
+        const subscription = this.subscriptions.get(`${table}::${serializedKey}`);
         if (subscription) {
-          // Update the subscription metadata without changing the interface
+          // Update the subscription metadata 
           const updatedSubscription: SubscriptionObject = {
             ...subscription,
             lastActivity: Date.now(),
             status: 'connected',
             errorCount: 0
           };
-          this.subscriptions.set(`${table}::${queryKey}`, updatedSubscription);
+          this.subscriptions.set(`${table}::${serializedKey}`, updatedSubscription);
         }
         
-        this.queryClient.invalidateQueries({ queryKey: [queryKey] });
+        // Use the debounced batched invalidation to prevent thrashing
+        this.debounce(`invalidate-${table}`, () => {
+          if (typeof queryKey === 'string') {
+            this.queryClient.invalidateQueries({ queryKey: [queryKey] });
+          } else {
+            this.queryClient.invalidateQueries({ queryKey });
+          }
+        }, 150);
       };
       
       channel.on(
@@ -364,17 +390,17 @@ export class SubscriptionManager {
       ).subscribe((status: 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR') => {
         console.log(`Subscription to ${table} status:`, status);
         
-        const subscription = this.subscriptions.get(`${table}::${queryKey}`);
+        const subscription = this.subscriptions.get(`${table}::${serializedKey}`);
         if (!subscription) return;
         
         if (status === 'SUBSCRIBED') {
-          // Update the subscription with new status metadata
+          // Update the subscription with status metadata
           const updatedSubscription: SubscriptionObject = {
             ...subscription,
             status: 'connected',
             lastActivity: Date.now()
           };
-          this.subscriptions.set(`${table}::${queryKey}`, updatedSubscription);
+          this.subscriptions.set(`${table}::${serializedKey}`, updatedSubscription);
         } else if (status === 'CHANNEL_ERROR') {
           console.error(`Error in subscription to ${table}`);
           // Update the subscription with error status and increment error count
@@ -384,7 +410,7 @@ export class SubscriptionManager {
             status: 'error',
             errorCount: errorCount + 1
           };
-          this.subscriptions.set(`${table}::${queryKey}`, updatedSubscription);
+          this.subscriptions.set(`${table}::${serializedKey}`, updatedSubscription);
         }
       });
       
@@ -427,6 +453,17 @@ export class SubscriptionManager {
     // If we already have this subscription, don't duplicate it
     if (this.subscriptions.has(subscriptionKey)) {
       console.log(`Subscription to ${table} for ${serializedKey} already exists`);
+      
+      // Update the lastActivity timestamp to keep it fresh
+      const subscription = this.subscriptions.get(subscriptionKey);
+      if (subscription) {
+        const updatedSubscription: SubscriptionObject = {
+          ...subscription,
+          lastActivity: Date.now()
+        };
+        this.subscriptions.set(subscriptionKey, updatedSubscription);
+      }
+      
       return {
         unsubscribe: () => this.unsubscribeFromTable(table, queryKey)
       };
@@ -434,62 +471,11 @@ export class SubscriptionManager {
     
     console.log(`Setting up subscription to ${table} for query key ${serializedKey}`);
     
-    // Create a channel with a unique name
-    const channelName = `${table}-changes-${Date.now()}`;
-    
     try {
-      // Create the channel
-      const channel = supabase.channel(channelName);
+      // Create the channel with a unique name
+      const channel = this.createChannel(table, queryKey);
       
-      // Set up the callback handler for real-time changes
-      const handleChange = (payload: any) => {
-        console.log(`Received ${payload.eventType} for ${table}:`, payload);
-        
-        // Use the debounced batched invalidation
-        this.debounce(`invalidate-${table}`, () => {
-          if (this.batchedInvalidations && this.scheduleBatchedInvalidation) {
-            this.scheduleBatchedInvalidation(table, queryKey);
-          } else {
-            // Direct invalidation as fallback
-            if (Array.isArray(queryKey)) {
-              this.queryClient.invalidateQueries({ queryKey });
-            } else {
-              this.queryClient.invalidateQueries({ queryKey: [queryKey] });
-            }
-          }
-        }, 150);
-      };
-      
-      // For Supabase JS v2.x, properly configure the channel
-      const channelConfig = {
-        event: filter?.event || '*',
-        schema: filter?.schema || 'public',
-        table: table
-      };
-      
-      // Add filter if provided
-      if (filter?.filter) {
-        // @ts-ignore - The Supabase types are incorrect for v2.x, but this works
-        channelConfig.filter = filter.filter;
-      }
-      
-      // Subscribe to postgres changes
-      // @ts-ignore - We need to ignore TS errors here because the types don't match the actual API
-      channel.on('postgres_changes', channelConfig, handleChange);
-      
-      // Subscribe to the channel
-      channel.subscribe((status) => {
-        console.log(`Subscription to ${table} status:`, status);
-        if (status === 'SUBSCRIBED') {
-          this.connectionStatus = 'connected';
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error(`Error in subscription to ${table}`);
-          // Queue for reconnection
-          this.pendingSubscriptions.set(subscriptionKey, { table, queryKey });
-        }
-      });
-      
-      // Store the subscription for later cleanup
+      // Store the subscription for later cleanup with metadata
       const subscriptionObject: SubscriptionObject = { 
         unsubscribe: () => {
           console.log(`Removing subscription to ${table} for ${serializedKey}`);

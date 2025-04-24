@@ -1,52 +1,106 @@
 
-import { useEffect, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
 import { SubscriptionManager } from '@/lib/subscription-manager';
+import { useQueryClient } from '@tanstack/react-query';
 
-export function useTableSubscription(
-  table: string,
-  queryKey: string | string[]
-) {
-  const queryClient = useQueryClient();
-  const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
-  
-  useEffect(() => {
-    const manager = SubscriptionManager.getInstance(queryClient);
-    subscriptionRef.current = manager.subscribeToTable(table, queryKey);
-    
-    return () => {
-      if (subscriptionRef.current) {
-        subscriptionRef.current.unsubscribe();
-        subscriptionRef.current = null;
-      }
-    };
-  }, [table, queryKey, queryClient]);
+/**
+ * Hook for accessing subscription context information
+ */
+export function useSubscription() {
+  return useSubscriptionContext();
 }
 
-// Add the missing function that's being imported in other files
-export function useMultiTableSubscription(
-  tables: Array<{ table: string, queryKey?: string }>
-) {
+// Create individual hooks for different subscription types
+export function useTableSubscription(tableName: string, queryKey?: string | string[]) {
   const queryClient = useQueryClient();
-  const subscriptionRefs = useRef<Array<{ unsubscribe: () => void }>>([]);
+  const manager = SubscriptionManager.getInstance(queryClient);
+  const { subscriptionsByTable } = useSubscriptionContext();
   
   useEffect(() => {
-    const manager = SubscriptionManager.getInstance(queryClient);
+    const subscription = manager.subscribeToTable(tableName, queryKey || tableName);
     
-    // Clear any existing subscriptions
-    subscriptionRefs.current.forEach(sub => sub.unsubscribe());
-    subscriptionRefs.current = [];
-    
-    // Create new subscriptions for each table
-    tables.forEach(({ table, queryKey }) => {
-      const subscription = manager.subscribeToTable(table, queryKey || table);
-      subscriptionRefs.current.push(subscription);
-    });
-    
-    // Clean up on unmount
     return () => {
-      subscriptionRefs.current.forEach(sub => sub.unsubscribe());
-      subscriptionRefs.current = [];
+      subscription.unsubscribe();
     };
-  }, [tables, queryClient]);
+  }, [tableName, queryKey, manager, queryClient]);
+  
+  return {
+    isSubscribed: subscriptionsByTable[tableName]?.length > 0
+  };
+}
+
+export function useMultiTableSubscription(tables: Array<{table: string, queryKey?: string | string[]}>) {
+  const queryClient = useQueryClient();
+  const manager = SubscriptionManager.getInstance(queryClient);
+  const { subscriptionsByTable } = useSubscriptionContext();
+  
+  useEffect(() => {
+    const subscription = manager.subscribeToTables(
+      tables.map(t => ({ 
+        table: t.table, 
+        queryKey: t.queryKey || t.table 
+      }))
+    );
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [tables, manager, queryClient]);
+  
+  return {
+    isSubscribed: tables.every(t => subscriptionsByTable[t.table]?.length > 0)
+  };
+}
+
+// Add other subscription hooks we now use
+export function useRowSubscription(tableName: string, rowId: string) {
+  const queryClient = useQueryClient();
+  const manager = SubscriptionManager.getInstance(queryClient);
+  const { subscriptionsByTable } = useSubscriptionContext();
+  
+  useEffect(() => {
+    const filter = `id=eq.${rowId}`;
+    const subscription = manager.subscribeToTable(
+      tableName, 
+      [tableName, rowId],
+      { filter }
+    );
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [tableName, rowId, manager, queryClient]);
+  
+  return {
+    isSubscribed: subscriptionsByTable[tableName]?.some(key => key.includes(rowId))
+  };
+}
+
+export function useRelatedTablesSubscription(
+  primaryTable: string, 
+  relatedTables: string[]
+) {
+  const queryClient = useQueryClient();
+  const manager = SubscriptionManager.getInstance(queryClient);
+  const { subscriptionsByTable } = useSubscriptionContext();
+  
+  useEffect(() => {
+    const tables = [
+      { table: primaryTable, queryKey: primaryTable },
+      ...relatedTables.map(table => ({ table, queryKey: [primaryTable, table] }))
+    ];
+    
+    const subscription = manager.subscribeToTables(tables);
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [primaryTable, relatedTables, manager, queryClient]);
+  
+  return {
+    isSubscribed: [primaryTable, ...relatedTables].every(
+      table => subscriptionsByTable[table]?.length > 0
+    )
+  };
 }
