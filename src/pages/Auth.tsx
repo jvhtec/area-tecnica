@@ -1,14 +1,13 @@
-
 import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { SignUpForm } from "@/components/auth/SignUpForm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuthSession } from "@/hooks/useAuthSession";
 
 const Auth = () => {
-  const { session, isLoading, error } = useAuth();
+  const { session, isLoading, error } = useAuthSession();
   const [showSignUp, setShowSignUp] = useState(false);
   
   useEffect(() => {
