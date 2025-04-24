@@ -226,7 +226,7 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
           },
           headStyles: {
             fillColor: [125, 1, 1],
-            textColor: [255, 255, 255],
+            textColor: [0, 0, 0],
             fontSize: 8,
             fontStyle: 'bold',
             halign: 'left',
