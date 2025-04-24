@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, FileDown, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
-import { useFestivalShifts } from "@/hooks/festival/useFestivalShifts";
+import { useRealtimeFestivalShifts } from "@/hooks/festival/useRealtimeFestivalShifts";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthSession } from "@/hooks/useAuthSession";
@@ -59,7 +59,7 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
     }
   }, [jobDates, selectedDate, formatDateToString]);
 
-  const { shifts, isLoading, refetch } = useFestivalShifts({
+  const { shifts, isLoading, isRefreshing, refetch } = useRealtimeFestivalShifts({
     jobId,
     selectedDate
   });
