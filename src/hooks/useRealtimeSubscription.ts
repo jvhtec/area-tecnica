@@ -27,23 +27,18 @@ export function useRealtimeSubscription(
     console.log(`Setting up realtime subscription for ${table}`);
     
     try {
-      // Create the channel with proper configuration
-      const channel = supabase.channel(channelName, {
-        schemas: [options.schema || 'public'],
-        config: {
-          broadcast: { ack: true }
-        }
-      });
+      // Create the channel
+      const channel = supabase.channel(channelName);
 
-      // Setup subscription with typed configuration
+      // Setup subscription with proper configuration
       channel
         .on(
-          'postgres_changes',
-          {
-            event: options.event || '*',
+          'postgres_changes', 
+          { 
+            event: options.event || '*', 
             schema: options.schema || 'public',
             table: table,
-            filter: options.filter,
+            filter: options.filter
           },
           (payload: RealtimePostgresChangesPayload<any>) => {
             console.log(`Received realtime update for ${table}:`, payload);
