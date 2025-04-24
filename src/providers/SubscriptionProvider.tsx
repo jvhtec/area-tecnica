@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { SubscriptionManager } from '@/lib/subscription-manager';
+import { useToast } from '@/hooks/use-toast';
 import { TokenManager } from '@/lib/token-manager';
 import { toast } from 'sonner';
 
@@ -68,21 +69,12 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
       console.log("Token refreshed, updating subscriptions");
       // Recreate subscriptions by unsubscribing and resubscribing
       const tables = Object.keys(manager.getSubscriptionsByTable());
-      
-      // Only attempt to recreate subscriptions if we have active subscriptions
-      if (tables.length > 0) {
-        console.log(`Recreating ${tables.length} subscriptions after token refresh`);
-        
-        tables.forEach(table => {
-          manager.unsubscribeFromTable(table, table);
-          manager.subscribeToTable(table, table);
-        });
-        
-        queryClient.invalidateQueries();
-        setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
-        
-        toast.success('Connection refreshed after token update');
-      }
+      tables.forEach(table => {
+        manager.unsubscribeFromTable(table, table);
+        manager.subscribeToTable(table, table);
+      });
+      queryClient.invalidateQueries();
+      setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
     });
     
     // Define refresh function
@@ -90,19 +82,11 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
       console.log("Manually refreshing subscriptions...");
       // Recreate subscriptions by unsubscribing and resubscribing
       const tables = Object.keys(manager.getSubscriptionsByTable());
-      
-      if (tables.length === 0) {
-        toast.info('No active subscriptions to refresh');
-        return;
-      }
-      
       tables.forEach(table => {
         manager.unsubscribeFromTable(table, table);
         manager.subscribeToTable(table, table);
       });
-      
       setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
-      queryClient.invalidateQueries();
       
       // Show toast notification
       toast.success("Subscriptions refreshed");

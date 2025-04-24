@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useTableSubscription } from "@/hooks/useSubscription";
@@ -14,11 +15,17 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   
-  // Fix: remove the third parameter to match expected arguments
-  useTableSubscription('festival_shifts', ['festival_shifts', jobId, selectedDate]);
+  // Set up real-time subscriptions for both tables with all change events
+  useTableSubscription('festival_shifts', ['festival_shifts', jobId, selectedDate], {
+    event: '*',
+    schema: 'public',
+    filter: `job_id=eq.${jobId}`
+  });
   
-  // Fix: remove the third parameter to match expected arguments
-  useTableSubscription('festival_shift_assignments', ['festival_shift_assignments', jobId, selectedDate]);
+  useTableSubscription('festival_shift_assignments', ['festival_shift_assignments', jobId, selectedDate], {
+    event: '*',
+    schema: 'public'
+  });
 
   const fetchShifts = useCallback(async () => {
     if (!selectedDate || !jobId) {

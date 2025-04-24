@@ -1,7 +1,8 @@
+
 import { useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { useTableSubscription } from "@/hooks/useSubscription";
+import { useMultiTableSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 import { useSubscriptionStatus } from "./useSubscriptionStatus";
 
@@ -9,11 +10,13 @@ export const useJobsRealtime = () => {
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Set up individual table subscriptions instead of using multi-table
-  useTableSubscription('jobs', 'jobs');
-  useTableSubscription('job_date_types', 'jobs');
-  useTableSubscription('job_assignments', 'jobs');
-  useTableSubscription('job_departments', 'jobs');
+  // Set up multi-table subscriptions using our enhanced hooks
+  useMultiTableSubscription([
+    { table: 'jobs', queryKey: 'jobs' },
+    { table: 'job_date_types', queryKey: 'jobs' },
+    { table: 'job_assignments', queryKey: 'jobs' },
+    { table: 'job_departments', queryKey: 'jobs' }
+  ]);
 
   // Monitor subscription status
   const status = useSubscriptionStatus(['jobs', 'job_assignments', 'job_departments', 'job_date_types']);

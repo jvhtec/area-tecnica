@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Plane, Wrench, Star, Moon, Mic } from "lucide-react";
@@ -17,8 +18,10 @@ interface DateTypeContextMenuProps {
 export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: DateTypeContextMenuProps) => {
   const queryClient = useQueryClient();
 
-  // Fix: remove the third parameter to match expected arguments
-  useTableSubscription('job_date_types', ['job-date-types', jobId]);
+  // Use the improved subscription hook
+  useTableSubscription('job_date_types', ['job-date-types', jobId], {
+    filter: `job_id=eq.${jobId}`
+  });
 
   const handleSetDateType = async (type: 'travel' | 'setup' | 'show' | 'off' | 'rehearsal') => {
     try {
