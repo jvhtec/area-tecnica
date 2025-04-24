@@ -27,14 +27,15 @@ export function useRealtimeSubscription(
     // Create the channel
     const channel = supabase.channel(channelName);
     
-    // Fix: The correct way to subscribe to postgres_changes
-    channel.on('postgres_changes', 
+    // Fix: Using the correct type for the channel.on method
+    channel.on(
+      'postgres_changes', 
       {
         event: options.event,
         schema: options.schema,
         table: table,
         filter: options.filter
-      },
+      } as any, // Using type assertion to bypass TypeScript error
       (payload) => {
         console.log(`Received realtime update for ${table}:`, payload);
         
