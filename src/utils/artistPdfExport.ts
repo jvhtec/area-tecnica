@@ -82,7 +82,13 @@ const getWirelessSummary = (systems: WirelessSystem[] = []) => {
 };
 
 const getIEMSummary = (systems: IEMSystem[] = []) => {
-  return systems.reduce((sum, system) => sum + (system.quantity || 0), 0);
+  const totalChannels = systems.reduce((sum, system) => sum + (system.quantity_hh || 0), 0);
+  const totalBodpacks = systems.reduce((sum, system) => sum + (system.quantity_bp || 0), 0);
+  return { 
+    channels: totalChannels, 
+    bodypacks: totalBodpacks,
+    total: totalChannels // For backward compatibility
+  };
 };
 
 export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
@@ -211,7 +217,7 @@ export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
 
       // === RF & WIRELESS ===
       let wirelessSummary = { hh: 0, bp: 0 };
-      let iemSummary = 0;
+      let iemSummary = { channels: 0, bodypacks: 0, total: 0 };
       
       // Handle both formats for wireless data
       if (data.technical.wireless.systems) {
@@ -232,7 +238,11 @@ export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
       if (data.technical.iem.systems) {
         iemSummary = getIEMSummary(data.technical.iem.systems);
       } else if (data.technical.iem.quantity !== undefined) {
-        iemSummary = data.technical.iem.quantity;
+        iemSummary = { 
+          channels: data.technical.iem.quantity,
+          bodypacks: data.technical.iem.quantity, 
+          total: data.technical.iem.quantity 
+        };
       }
       
       const wirelessModel = data.technical.wireless.systems?.[0]?.model || data.technical.wireless.model || '-';
@@ -249,7 +259,11 @@ export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
           wirelessModel,
           wirelessBand,
           data.technical.wireless.providedBy]] : []),
-        ...(iemSummary > 0 ? [['IEM', iemSummary,
+        ...(iemSummary.channels > 0 ? [['IEM Channels', iemSummary.channels,
+          iemModel,
+          iemBand,
+          data.technical.iem.providedBy]] : []),
+        ...(iemSummary.bodypacks > 0 ? [['IEM Bodypacks', iemSummary.bodypacks,
           iemModel,
           iemBand,
           data.technical.iem.providedBy]] : [])

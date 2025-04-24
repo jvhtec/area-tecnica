@@ -18,6 +18,7 @@ export const WirelessConfig = ({
   const addSystem = () => {
     const newSystem: WirelessSetup = {
       model: '',
+      quantity: 0, // Keep the quantity field for backward compatibility
       quantity_hh: 0,
       quantity_bp: 0,
       band: ''
@@ -93,7 +94,14 @@ export const WirelessConfig = ({
                 type="number"
                 min="0"
                 value={system.quantity_hh || 0}
-                onChange={(e) => updateSystem(index, 'quantity_hh', parseInt(e.target.value) || 0)}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value) || 0;
+                  updateSystem(index, 'quantity_hh', value);
+                  // Also update the legacy quantity field for backward compatibility
+                  if (isIEM) {
+                    updateSystem(index, 'quantity', value);
+                  }
+                }}
                 placeholder={`${quantityTypeLabels.hh} Qty`}
               />
             </div>
@@ -103,7 +111,15 @@ export const WirelessConfig = ({
                 type="number"
                 min="0"
                 value={system.quantity_bp || 0}
-                onChange={(e) => updateSystem(index, 'quantity_bp', parseInt(e.target.value) || 0)}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value) || 0;
+                  updateSystem(index, 'quantity_bp', value);
+                  // For wireless systems, update quantity with the sum
+                  if (!isIEM) {
+                    const totalQuantity = (system.quantity_hh || 0) + value;
+                    updateSystem(index, 'quantity', totalQuantity);
+                  }
+                }}
                 placeholder={`${quantityTypeLabels.bp} Qty`}
               />
             </div>

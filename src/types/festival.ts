@@ -1,3 +1,4 @@
+
 export interface ConsoleSetup {
   model: string;
   quantity: number;
@@ -6,7 +7,7 @@ export interface ConsoleSetup {
 
 export interface WirelessSetup {
   model: string;
-  quantity: number;
+  quantity?: number; // Make quantity optional since we're using quantity_hh/quantity_bp instead
   quantity_hh?: number;
   quantity_bp?: number;
   band?: string;

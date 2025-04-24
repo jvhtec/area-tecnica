@@ -38,8 +38,8 @@ export interface WirelessSystem {
 // Base interface for IEM system
 export interface IEMSystem {
   model: IEMSystemModel | string;
-  quantity_hh?: number;  // Changed from quantity to quantity_hh for channels
-  quantity_bp?: number;  // Added quantity_bp for bodypacks
+  quantity?: number;  // Keep for backward compatibility
+  quantity_hh?: number;  // Channels
+  quantity_bp?: number;  // Bodypacks
   band?: string;
 }
-
