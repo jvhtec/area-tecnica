@@ -1,11 +1,20 @@
+
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel, RealtimeChannelOptions } from "@supabase/supabase-js";
 
+// Define interfaces for our subscription tracking
+interface SubscriptionObject {
+  unsubscribe: () => void;
+  lastActivity?: number;
+  status?: 'connected' | 'error' | 'disconnected';
+  errorCount?: number;
+}
+
 export class SubscriptionManager {
   private static instance: SubscriptionManager;
   private queryClient: QueryClient;
-  private subscriptions: Map<string, { unsubscribe: () => void }> = new Map();
+  private subscriptions: Map<string, SubscriptionObject> = new Map();
   private connectionStatus: 'connected' | 'disconnected' | 'connecting' = 'connecting'; // Start with connecting
   private pendingSubscriptions: Map<string, { table: string, queryKey: string | string[] }> = new Map();
   private lastReconnectAttempt: number = 0;
@@ -331,12 +340,14 @@ export class SubscriptionManager {
         
         const subscription = this.subscriptions.get(`${table}::${queryKey}`);
         if (subscription) {
-          this.subscriptions.set(`${table}::${queryKey}`, {
+          // Update the subscription metadata without changing the interface
+          const updatedSubscription: SubscriptionObject = {
             ...subscription,
             lastActivity: Date.now(),
             status: 'connected',
             errorCount: 0
-          });
+          };
+          this.subscriptions.set(`${table}::${queryKey}`, updatedSubscription);
         }
         
         this.queryClient.invalidateQueries({ queryKey: [queryKey] });
@@ -357,18 +368,23 @@ export class SubscriptionManager {
         if (!subscription) return;
         
         if (status === 'SUBSCRIBED') {
-          this.subscriptions.set(`${table}::${queryKey}`, {
+          // Update the subscription with new status metadata
+          const updatedSubscription: SubscriptionObject = {
             ...subscription,
             status: 'connected',
             lastActivity: Date.now()
-          });
+          };
+          this.subscriptions.set(`${table}::${queryKey}`, updatedSubscription);
         } else if (status === 'CHANNEL_ERROR') {
           console.error(`Error in subscription to ${table}`);
-          this.subscriptions.set(`${table}::${queryKey}`, {
+          // Update the subscription with error status and increment error count
+          const errorCount = subscription.errorCount || 0;
+          const updatedSubscription: SubscriptionObject = {
             ...subscription,
             status: 'error',
-            errorCount: subscription.errorCount + 1
-          });
+            errorCount: errorCount + 1
+          };
+          this.subscriptions.set(`${table}::${queryKey}`, updatedSubscription);
         }
       });
       
@@ -470,19 +486,21 @@ export class SubscriptionManager {
           console.error(`Error in subscription to ${table}`);
           // Queue for reconnection
           this.pendingSubscriptions.set(subscriptionKey, { table, queryKey });
-          
-          // Don't immediately set all connections to disconnected
-          // Just mark this specific subscription for reconnection
         }
       });
       
       // Store the subscription for later cleanup
-      this.subscriptions.set(subscriptionKey, { 
+      const subscriptionObject: SubscriptionObject = { 
         unsubscribe: () => {
           console.log(`Removing subscription to ${table} for ${serializedKey}`);
           supabase.removeChannel(channel);
-        }
-      });
+        },
+        status: 'connected',
+        lastActivity: Date.now(),
+        errorCount: 0
+      };
+      
+      this.subscriptions.set(subscriptionKey, subscriptionObject);
       
       return {
         unsubscribe: () => this.unsubscribeFromTable(table, queryKey)
