@@ -27,7 +27,7 @@ export function useRealtimeSubscription(
     // Create the channel
     const channel = supabase.channel(channelName);
     
-    // Subscribe to changes
+    // Subscribe to changes - fixed the API usage here
     channel
       .on(
         'postgres_changes',
