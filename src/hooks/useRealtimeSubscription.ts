@@ -1,6 +1,6 @@
 
 import { useEffect, useRef } from 'react';
-import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import { RealtimeChannel, RealtimePostgresChangesPayload, RealtimeChannelConfig } from '@supabase/supabase-js';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
@@ -27,28 +27,42 @@ export function useRealtimeSubscription(
     console.log(`Setting up realtime subscription for ${table}`);
     
     try {
+      const channelConfig: RealtimeChannelConfig = {
+        schemas: [options.schema || 'public'],
+        config: {
+          broadcast: { ack: true }
+        }
+      };
+
       // Create the channel with proper configuration
-      const channel = supabase.channel(channelName);
-      
-      // Setup subscription using the correct API pattern
+      const channel = supabase.channel(channelName, channelConfig);
+
+      // Setup subscription with typed configuration
       channel
-        .on('postgres_changes', {
-          event: options.event || '*',
-          schema: options.schema || 'public',
-          table: table,
-          filter: options.filter,
-        }, (payload: RealtimePostgresChangesPayload<any>) => {
-          console.log(`Received realtime update for ${table}:`, payload);
-            
-          // Invalidate queries
-          if (Array.isArray(queryKey)) {
-            queryClient.invalidateQueries({ queryKey });
-          } else {
-            queryClient.invalidateQueries({ queryKey: [queryKey] });
+        .on(
+          'postgres_changes' as const,
+          {
+            event: options.event || '*',
+            schema: options.schema || 'public',
+            table: table,
+            filter: options.filter,
+          },
+          (payload: RealtimePostgresChangesPayload<any>) => {
+            console.log(`Received realtime update for ${table}:`, payload);
+              
+            // Invalidate queries
+            if (Array.isArray(queryKey)) {
+              queryClient.invalidateQueries({ queryKey });
+            } else {
+              queryClient.invalidateQueries({ queryKey: [queryKey] });
+            }
           }
-        })
+        )
         .subscribe((status) => {
           console.log(`Subscription status for ${table}:`, status);
+          if (status === 'SUBSCRIBED') {
+            console.log(`Successfully subscribed to ${table}`);
+          }
         });
 
       // Store the channel reference
