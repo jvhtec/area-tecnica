@@ -1,6 +1,6 @@
 
 import { useEffect, useRef } from 'react';
-import { RealtimeChannel } from '@supabase/supabase-js';
+import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
@@ -27,16 +27,16 @@ export function useRealtimeSubscription(
     // Create the channel
     const channel = supabase.channel(channelName);
     
-    // Fix: Using the correct type for the channel.on method
+    // Set up the subscription with proper typing
     channel.on(
-      'postgres_changes', 
+      'postgres_changes',
       {
         event: options.event,
         schema: options.schema,
         table: table,
         filter: options.filter
-      } as any, // Using type assertion to bypass TypeScript error
-      (payload) => {
+      },
+      (payload: RealtimePostgresChangesPayload<any>) => {
         console.log(`Received realtime update for ${table}:`, payload);
         
         // Invalidate queries
