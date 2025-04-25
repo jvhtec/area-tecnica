@@ -216,58 +216,84 @@ export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
       yPosition = (doc as any).lastAutoTable.finalY + 8;
 
       // === RF & WIRELESS ===
-      let wirelessSummary = { hh: 0, bp: 0 };
-      let iemSummary = { channels: 0, bodypacks: 0, total: 0 };
+      const wirelessRows: any[] = [];
       
-      // Handle both formats for wireless data
-      if (data.technical.wireless.systems) {
-        wirelessSummary = getWirelessSummary(data.technical.wireless.systems);
-      } else if (data.technical.wireless.handhelds !== undefined || data.technical.wireless.bodypacks !== undefined) {
-        wirelessSummary = {
-          hh: data.technical.wireless.handhelds || 0,
-          bp: data.technical.wireless.bodypacks || 0
-        };
-      } else if (data.technical.wireless.hh !== undefined || data.technical.wireless.bp !== undefined) {
-        wirelessSummary = {
-          hh: data.technical.wireless.hh || 0,
-          bp: data.technical.wireless.bp || 0
-        };
+      // Process wireless systems
+      if (data.technical.wireless.systems && data.technical.wireless.systems.length > 0) {
+        data.technical.wireless.systems.forEach(system => {
+          if (system.quantity_hh && system.quantity_hh > 0) {
+            wirelessRows.push([
+              'Handheld',
+              system.quantity_hh,
+              system.model,
+              system.band || '-',
+              data.technical.wireless.providedBy
+            ]);
+          }
+          if (system.quantity_bp && system.quantity_bp > 0) {
+            wirelessRows.push([
+              'Bodypack',
+              system.quantity_bp,
+              system.model,
+              system.band || '-',
+              data.technical.wireless.providedBy
+            ]);
+          }
+        });
+      } else if (data.technical.wireless.handhelds || data.technical.wireless.bodypacks) {
+        // Handle legacy format
+        if (data.technical.wireless.handhelds) {
+          wirelessRows.push([
+            'Handheld',
+            data.technical.wireless.handhelds,
+            data.technical.wireless.model || '-',
+            data.technical.wireless.band || '-',
+            data.technical.wireless.providedBy
+          ]);
+        }
+        if (data.technical.wireless.bodypacks) {
+          wirelessRows.push([
+            'Bodypack',
+            data.technical.wireless.bodypacks,
+            data.technical.wireless.model || '-',
+            data.technical.wireless.band || '-',
+            data.technical.wireless.providedBy
+          ]);
+        }
       }
-      
-      // Handle both formats for IEM data
-      if (data.technical.iem.systems) {
-        iemSummary = getIEMSummary(data.technical.iem.systems);
-      } else if (data.technical.iem.quantity !== undefined) {
-        iemSummary = { 
-          channels: data.technical.iem.quantity,
-          bodypacks: data.technical.iem.quantity, 
-          total: data.technical.iem.quantity 
-        };
+
+      // Process IEM systems
+      if (data.technical.iem.systems && data.technical.iem.systems.length > 0) {
+        data.technical.iem.systems.forEach(system => {
+          if (system.quantity_hh && system.quantity_hh > 0) {
+            wirelessRows.push([
+              'IEM Channels',
+              system.quantity_hh,
+              system.model,
+              system.band || '-',
+              data.technical.iem.providedBy
+            ]);
+          }
+          if (system.quantity_bp && system.quantity_bp > 0) {
+            wirelessRows.push([
+              'IEM Bodypacks',
+              system.quantity_bp,
+              system.model,
+              system.band || '-',
+              data.technical.iem.providedBy
+            ]);
+          }
+        });
+      } else if (data.technical.iem.quantity) {
+        // Handle legacy format
+        wirelessRows.push([
+          'IEM System',
+          data.technical.iem.quantity,
+          data.technical.iem.model || '-',
+          data.technical.iem.band || '-',
+          data.technical.iem.providedBy
+        ]);
       }
-      
-      const wirelessModel = data.technical.wireless.systems?.[0]?.model || data.technical.wireless.model || '-';
-      const wirelessBand = data.technical.wireless.systems?.[0]?.band || data.technical.wireless.band || '-';
-      const iemModel = data.technical.iem.systems?.[0]?.model || data.technical.iem.model || '-';
-      const iemBand = data.technical.iem.systems?.[0]?.band || data.technical.iem.band || '-';
-      
-      const wirelessRows = [
-        ...(wirelessSummary.hh > 0 ? [['Handheld', wirelessSummary.hh, 
-          wirelessModel, 
-          wirelessBand,
-          data.technical.wireless.providedBy]] : []),
-        ...(wirelessSummary.bp > 0 ? [['Bodypack', wirelessSummary.bp,
-          wirelessModel,
-          wirelessBand,
-          data.technical.wireless.providedBy]] : []),
-        ...(iemSummary.channels > 0 ? [['IEM Channels', iemSummary.channels,
-          iemModel,
-          iemBand,
-          data.technical.iem.providedBy]] : []),
-        ...(iemSummary.bodypacks > 0 ? [['IEM Bodypacks', iemSummary.bodypacks,
-          iemModel,
-          iemBand,
-          data.technical.iem.providedBy]] : [])
-      ];
 
       if (wirelessRows.length > 0) {
         autoTable(doc, {
