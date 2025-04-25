@@ -194,17 +194,17 @@ export async function createAllFoldersForJob(
         const subfolders = [
           {
             definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
-            name: `Documentación Técnica - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+            name: `${tourData.name} - ${locationName} - ${formattedDate} - Documentación Técnica - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
             suffix: "DT",
           },
           {
             definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos,
-            name: `Presupuestos Recibidos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+            name: `${tourData.name} - ${locationName} - ${formattedDate} - Presupuestos Recibidos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
             suffix: "PR",
           },
           {
             definitionId: FLEX_FOLDER_IDS.hojaGastos,
-            name: `Hoja de Gastos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+            name: `${tourData.name} - ${locationName} - ${formattedDate} - Hoja de Gastos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
             suffix: "HG",
           },
         ];
@@ -399,17 +399,17 @@ export async function createAllFoldersForJob(
       const subfolders = [
         {
           definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
-          name: `Documentación Técnica - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+          name: `${job.title} - Documentación Técnica - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
           suffix: "DT",
         },
         {
           definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos,
-          name: `Presupuestos Recibidos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+          name: `${job.title} - Presupuestos Recibidos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
           suffix: "PR",
         },
         {
           definitionId: FLEX_FOLDER_IDS.hojaGastos,
-          name: `Hoja de Gastos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+          name: `${job.title} - Hoja de Gastos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
           suffix: "HG",
         },
       ];
