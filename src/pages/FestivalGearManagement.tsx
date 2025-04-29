@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -126,6 +125,8 @@ const FestivalGearManagement = () => {
           job_id: jobId,
           date: selectedDate,
           max_stages: newMaxStages
+        }, {
+          onConflict: 'job_id,date'
         });
 
       if (error) throw error;
