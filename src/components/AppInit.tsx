@@ -1,6 +1,6 @@
 
 import { useEffect } from "react";
-import { ConnectionRecoveryService } from "@/lib/connection-recovery-service";
+import { connectionRecovery } from "@/lib/connection-recovery-service";
 
 /**
  * Component that initializes app-wide services when the application starts
@@ -9,7 +9,7 @@ import { ConnectionRecoveryService } from "@/lib/connection-recovery-service";
 export function AppInit() {
   useEffect(() => {
     // Initialize the connection recovery service
-    ConnectionRecoveryService.getInstance();
+    connectionRecovery.startRecovery();
     
     console.log('Application services initialized');
   }, []);

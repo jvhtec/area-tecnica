@@ -3,7 +3,6 @@ import { supabase, checkNetworkConnection } from './enhanced-supabase-client';
 import { toast } from "sonner";
 
 class ConnectionRecoveryService {
-  private static instance: ConnectionRecoveryService;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
   private baseReconnectDelay = 2000; // 2 seconds
@@ -13,15 +12,8 @@ class ConnectionRecoveryService {
   private lastNotificationTime = 0;
   private notificationCooldown = 15000; // 15 seconds between notifications
   
-  private constructor() {
+  constructor() {
     this.setupNetworkListeners();
-  }
-  
-  static getInstance(): ConnectionRecoveryService {
-    if (!ConnectionRecoveryService.instance) {
-      ConnectionRecoveryService.instance = new ConnectionRecoveryService();
-    }
-    return ConnectionRecoveryService.instance;
   }
   
   private setupNetworkListeners() {
@@ -83,9 +75,7 @@ class ConnectionRecoveryService {
       // Check if any realtime channels are disconnected
       const channels = supabase.getChannels();
       const hasDisconnectedChannels = channels.some(channel => 
-        channel.state !== 'joined' && 
-        channel.state !== 'subscribed' &&
-        channel.state !== 'SUBSCRIBED'
+        channel.state !== 'joined'
       );
       
       if (hasDisconnectedChannels) {
@@ -211,7 +201,7 @@ class ConnectionRecoveryService {
 }
 
 // Export singleton instance
-export const connectionRecovery = ConnectionRecoveryService.getInstance();
+export const connectionRecovery = new ConnectionRecoveryService();
 
 // Export a hook for components to use
 export function useConnectionRecovery() {

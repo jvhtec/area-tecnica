@@ -17,7 +17,6 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     },
     timeout: 30000, // Increase timeout to 30 seconds (from default 10s)
     heartbeatIntervalMs: 15000, // Send heartbeat every 15 seconds
-    disconnectAfterInactivity: 60000, // Disconnect after 1 minute of inactivity (conserve resources)
   },
 });
 
@@ -50,8 +49,7 @@ export const getRealtimeConnectionStatus = (): 'CONNECTED' | 'CONNECTING' | 'DIS
   // Check if any channel is connected
   const hasConnected = channels.some(channel => 
     channel.state === 'joined' || 
-    channel.state === 'subscribed' ||
-    channel.state === 'SUBSCRIBED'
+    channel.state === 'joined'
   );
   
   if (hasConnected) {
