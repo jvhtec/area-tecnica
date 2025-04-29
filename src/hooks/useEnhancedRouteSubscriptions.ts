@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
@@ -164,7 +165,9 @@ export function useEnhancedRouteSubscriptions() {
     
     // Subscribe to all tables
     allTables.forEach(({ table, priority }) => {
-      manager.subscribeToTable(table, table, undefined, priority);
+      // Ensure priority is handled safely for the manager's type expectations
+      const safePriority = priority as 'high' | 'medium' | 'low';
+      manager.subscribeToTable(table, table, undefined, safePriority);
       manager.registerRouteSubscription(pathname, `${table}::${table}`);
     });
     

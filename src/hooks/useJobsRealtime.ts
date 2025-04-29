@@ -19,8 +19,9 @@ export function useJobsRealtime() {
     isLoading,
     isError,
     error,
-    refetch,
-    isRefreshing
+    refetch: reactQueryRefetch,
+    isRefreshing,
+    manualRefresh
   } = useRealtimeQuery(
     ['jobs'],
     async () => {
@@ -39,6 +40,11 @@ export function useJobsRealtime() {
     },
     'jobs' // Primary table to subscribe to
   );
+  
+  // Wrap the refetch function to match expected void return type
+  const refetch = async () => {
+    await manualRefresh();
+  };
   
   return {
     jobs,

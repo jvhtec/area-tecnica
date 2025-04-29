@@ -1,9 +1,7 @@
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Assignment } from "@/types/assignment";
-import { useTableSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 import { useRealtimeQuery } from "./useRealtimeQuery";
 

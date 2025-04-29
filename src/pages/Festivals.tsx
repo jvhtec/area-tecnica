@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useJobsRealtime } from "@/hooks/useJobsRealtime";
@@ -120,6 +119,12 @@ const Festivals = () => {
     }
   };
 
+  // Handle refresh button click
+  const handleRefreshClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    refetch();
+  };
+
   const canPrintDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
   const emptyFunction = () => {};
 
@@ -162,7 +167,7 @@ const Festivals = () => {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={refetch}
+                onClick={handleRefreshClick}
                 className="mt-4"
               >
                 Try Again
