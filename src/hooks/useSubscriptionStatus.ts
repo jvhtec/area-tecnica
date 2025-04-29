@@ -1,79 +1,75 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
 import { formatDistanceToNow } from 'date-fns';
 
 /**
- * Hook to monitor subscription status for specific tables with enhanced staleness detection
- * @param tables Array of table names to monitor
- * @returns Object containing detailed subscription status information
+ * Hook to monitor the subscription status for specific tables
+ * @param tables Array of table names to check subscription status
+ * @returns Status information about the subscriptions
  */
 export function useSubscriptionStatus(tables: string[]) {
   const { 
     subscriptionsByTable, 
     connectionStatus, 
-    lastRefreshTime,
-    forceRefresh 
+    refreshSubscriptions,
+    lastRefreshTime
   } = useSubscriptionContext();
   
   const [status, setStatus] = useState({
     isSubscribed: false,
     tablesSubscribed: [] as string[],
     tablesUnsubscribed: [] as string[],
-    connectionStatus,
-    lastRefreshTime: lastRefreshTime || 0,
-    isStale: false,
+    connectionStatus: connectionStatus,
+    lastRefreshTime,
     lastRefreshFormatted: '',
-    refreshSubscription: () => {}
+    isStale: false
   });
-
-  // Create a refresh function that's specific to these tables
-  const refreshSubscription = useCallback(() => {
-    forceRefresh(tables);
-  }, [tables, forceRefresh]);
-
-  // Update status whenever relevant state changes
+  
+  // Update status when context changes
   useEffect(() => {
-    const tablesSubscribed: string[] = [];
-    const tablesUnsubscribed: string[] = [];
-
-    tables.forEach(table => {
-      if (subscriptionsByTable[table]?.length > 0) {
-        tablesSubscribed.push(table);
-      } else {
-        tablesUnsubscribed.push(table);
-      }
-    });
-
-    // Calculate staleness with dynamic thresholds based on connection status
-    let staleThreshold = 5 * 60 * 1000; // 5 minutes default
+    // Determine which tables are subscribed vs unsubscribed
+    const tablesSubscribed = tables.filter(
+      table => subscriptionsByTable[table]?.length > 0
+    );
     
-    // If we're disconnected, reduce threshold to mark as stale sooner
-    if (connectionStatus !== 'connected') {
-      staleThreshold = 60 * 1000; // 1 minute when disconnected
-    }
+    const tablesUnsubscribed = tables.filter(
+      table => !subscriptionsByTable[table] || subscriptionsByTable[table].length === 0
+    );
     
-    const isStale = Date.now() - lastRefreshTime > staleThreshold;
-    
-    // Format the last refresh time in a human-readable format
-    let lastRefreshFormatted = 'unknown';
+    // Format the last refresh time
+    let lastRefreshFormatted = "Unknown";
     try {
-      lastRefreshFormatted = formatDistanceToNow(lastRefreshTime) + ' ago';
+      lastRefreshFormatted = formatDistanceToNow(lastRefreshTime, { addSuffix: true });
     } catch (error) {
-      console.error('Error formatting last refresh time:', error);
+      console.error("Error formatting refresh time:", error);
     }
-
+    
+    // Check if all required tables are subscribed
+    const isSubscribed = tablesUnsubscribed.length === 0 && tables.length > 0;
+    
+    // Check if data is stale (older than 5 minutes)
+    const isStale = Date.now() - lastRefreshTime > 5 * 60 * 1000;
+    
     setStatus({
-      isSubscribed: tablesSubscribed.length === tables.length,
+      isSubscribed,
       tablesSubscribed,
       tablesUnsubscribed,
       connectionStatus,
       lastRefreshTime,
-      isStale,
       lastRefreshFormatted,
-      refreshSubscription
+      isStale
     });
-  }, [tables, subscriptionsByTable, connectionStatus, lastRefreshTime, refreshSubscription]);
-
-  return status;
+  }, [tables, subscriptionsByTable, connectionStatus, lastRefreshTime]);
+  
+  // Function to manually refresh a subscription
+  const refreshSubscription = () => {
+    refreshSubscriptions();
+    console.log('Manually refreshed subscriptions for tables:', tables);
+  };
+  
+  return {
+    ...status,
+    refreshSubscription
+  };
 }
