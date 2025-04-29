@@ -106,6 +106,20 @@ export const ROUTE_SUBSCRIPTIONS: Record<string, Array<{
     { table: 'festival_gear', priority: 'high' }
   ],
   
+  // Tool specific routes
+  '/pesos-tool': [
+    { table: 'jobs', priority: 'high' },
+    { table: 'video_memoria_tecnica_documents', priority: 'high' }
+  ],
+  '/consumos-tool': [
+    { table: 'jobs', priority: 'high' },
+    { table: 'power_requirement_tables', priority: 'high' }
+  ],
+  '/memoria-tecnica-tool': [
+    { table: 'jobs', priority: 'high' },
+    { table: 'memoria_tecnica_documents', priority: 'high' }
+  ],
+  
   // Add more routes as needed
   '/jobs': [{ table: 'jobs', priority: 'high' }],
   '/job': [
@@ -178,6 +192,17 @@ export function useEnhancedRouteSubscriptions() {
       } else {
         return '/festival-management'; // Default festival management route
       }
+    }
+    
+    // Handle dynamic routes for tool pages
+    if (pathname.includes('/pesos-tool')) {
+      return '/pesos-tool';
+    }
+    if (pathname.includes('/consumos-tool')) {
+      return '/consumos-tool';
+    }
+    if (pathname.includes('/memoria-tecnica-tool')) {
+      return '/memoria-tecnica-tool';
     }
     
     // If no exact match, find the most specific parent route
