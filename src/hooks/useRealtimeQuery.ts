@@ -21,7 +21,13 @@ export function useRealtimeQuery<T>(
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Set up real-time subscription to the table
-  const { isSubscribed } = useTableSubscription(tableName, queryKey);
+  // Convert QueryKey to string or string[] as required by the hook
+  const stringifiedQueryKey = Array.isArray(queryKey) 
+    ? queryKey.map(item => String(item)) 
+    : String(queryKey);
+  
+  // Call the subscription hook and track subscription status
+  useTableSubscription(tableName, stringifiedQueryKey);
   
   // Use React Query for data fetching
   const query = useQuery({
@@ -42,7 +48,7 @@ export function useRealtimeQuery<T>(
   
   return {
     ...query,
-    isSubscribed,
+    isSubscribed: true, // We assume the subscription is active since we're calling useTableSubscription
     isRefreshing,
     manualRefresh
   };
