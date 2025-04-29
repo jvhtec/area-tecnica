@@ -70,6 +70,46 @@ export class UnifiedSubscriptionManager {
     return true;
   }
 
+  // Add the missing cleanupRouteDependentSubscriptions method
+  public cleanupRouteDependentSubscriptions(route: string) {
+    console.log(`Cleaning up subscriptions for route: ${route}`);
+    
+    // Get the set of subscription keys associated with this route
+    const subscriptionKeys = this.routeSubscriptions.get(route);
+    
+    if (!subscriptionKeys || subscriptionKeys.size === 0) {
+      console.log(`No subscriptions found for route ${route}`);
+      return;
+    }
+    
+    // Check each subscription to see if it's used by other routes before unsubscribing
+    subscriptionKeys.forEach(key => {
+      let isUsedElsewhere = false;
+      
+      // Check if this subscription is used by any other route
+      this.routeSubscriptions.forEach((keys, otherRoute) => {
+        if (otherRoute !== route && keys.has(key)) {
+          isUsedElsewhere = true;
+        }
+      });
+      
+      // If not used elsewhere, unsubscribe
+      if (!isUsedElsewhere) {
+        console.log(`Unsubscribing from ${key} as it's no longer needed`);
+        const subscription = this.subscriptions.get(key);
+        if (subscription) {
+          subscription.unsubscribe();
+          this.subscriptions.delete(key);
+        }
+      } else {
+        console.log(`Keeping subscription to ${key} as it's used by other routes`);
+      }
+    });
+    
+    // Clear the route's subscription list
+    this.routeSubscriptions.delete(route);
+  }
+
   // Placeholder for other required methods in the class
   public subscribeToTable(table: string, queryKey: string | string[], filter?: any, priority?: string) {
     // Implementation for subscribing to a table

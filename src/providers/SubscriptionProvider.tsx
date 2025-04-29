@@ -153,7 +153,6 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
       refreshSubscriptions,
       invalidateQueries,
       forceRefresh,
-      forceRefresh,
       forceSubscribe,
       lastRefreshTime: Date.now()
     }));
