@@ -4,6 +4,7 @@ import { connectionRecovery } from "@/lib/connection-recovery-service";
 import { useQueryClient } from "@tanstack/react-query";
 import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
 import { useLocation } from "react-router-dom";
+import { useEnhancedRouteSubscriptions } from "@/hooks/useEnhancedRouteSubscriptions";
 
 /**
  * Component that initializes app-wide services when the application starts
@@ -28,14 +29,23 @@ export function AppInit() {
     console.log('Unified subscription manager initialized');
   }, [queryClient]);
   
-  // Set up route-based subscription cleaning
+  // Use the enhanced route subscriptions hook to manage subscriptions based on the current route
+  const subscriptionStatus = useEnhancedRouteSubscriptions();
+  
+  // Handle subscription staleness
   useEffect(() => {
-    const manager = UnifiedSubscriptionManager.getInstance(queryClient);
-    
-    // Clean up unused subscriptions when route changes
-    manager.cleanupRouteDependentSubscriptions(location.pathname);
-    
-  }, [location.pathname, queryClient]);
+    if (subscriptionStatus.isStale) {
+      console.log('Subscriptions are stale, refreshing...');
+      subscriptionStatus.forceRefresh();
+    }
+  }, [subscriptionStatus.isStale]);
+  
+  // Handle subscription refresh when coming back after inactivity
+  useEffect(() => {
+    if (subscriptionStatus.wasInactive) {
+      console.log('Page was inactive, refreshing subscriptions');
+    }
+  }, [subscriptionStatus.wasInactive]);
   
   // This component doesn't render anything
   return null;

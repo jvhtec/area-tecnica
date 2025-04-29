@@ -1,3 +1,4 @@
+
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/enhanced-supabase-client";
 import { RealtimeChannel } from "@supabase/supabase-js";
@@ -197,6 +198,44 @@ export class UnifiedSubscriptionManager {
       this.setupPingChannel();
       this.reestablishSubscriptions();
     }
+  }
+  
+  /**
+   * Force refresh specific table subscriptions
+   */
+  forceRefreshSubscriptions(tables: string[]) {
+    console.log(`Forcing refresh of subscriptions for tables: ${tables.join(', ')}`);
+    
+    // For each specified table
+    tables.forEach(table => {
+      // Find all subscriptions for this table
+      const subscriptionKeys = this.subscriptionsByTable.get(table) || new Set();
+      
+      // Recreate each subscription
+      subscriptionKeys.forEach(key => {
+        const subscription = this.subscriptions.get(key);
+        if (subscription) {
+          console.log(`Recreating subscription for ${table} with key ${key}`);
+          
+          // Save the subscription options
+          const options = { ...subscription.options };
+          
+          // Unsubscribe from the current subscription
+          subscription.unsubscribe();
+          
+          // Create a new subscription with the same options
+          this.subscribeToTable(
+            options.table, 
+            options.queryKey, 
+            options.filter, 
+            options.priority
+          );
+        }
+      });
+    });
+    
+    // Invalidate related queries to force data refresh
+    this.queryClient.invalidateQueries();
   }
   
   /**
