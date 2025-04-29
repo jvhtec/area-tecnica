@@ -107,9 +107,6 @@ export const ROUTE_SUBSCRIPTIONS: Record<string, Array<{
   ],
 };
 
-// Default tables that should be monitored on all routes
-const GLOBAL_TABLES = [{ table: 'profiles', priority: 'medium' as const }];
-
 /**
  * Enhanced hook to determine required subscriptions based on current route
  * and monitor their status with intelligent cleanup
@@ -209,3 +206,7 @@ export function useEnhancedRouteSubscriptions() {
     lastRefreshTime,
   };
 }
+
+// Default tables that should be monitored on all routes
+const GLOBAL_TABLES = [{ table: 'profiles', priority: 'medium' as const }];
+
