@@ -74,9 +74,9 @@ class ConnectionRecoveryService {
       
       // Check if any realtime channels are disconnected
       const channels = supabase.getChannels();
-      const hasDisconnectedChannels = channels.some(channel => 
-        channel.state !== 'joined'
-      );
+      const hasDisconnectedChannels = channels.some(channel => {
+        return channel.state !== 'joined';
+      });
       
       if (hasDisconnectedChannels) {
         console.log("Detected disconnected channels, starting recovery");

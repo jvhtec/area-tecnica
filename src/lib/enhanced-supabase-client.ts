@@ -46,11 +46,10 @@ export const getRealtimeConnectionStatus = (): 'CONNECTED' | 'CONNECTING' | 'DIS
     return 'DISCONNECTED';
   }
   
-  // Check if any channel is connected
-  const hasConnected = channels.some(channel => 
-    channel.state === 'joined' || 
-    channel.state === 'joined'
-  );
+  // Check if any channel is connected - using the correct enum value
+  const hasConnected = channels.some(channel => {
+    return channel.state === 'joined';
+  });
   
   if (hasConnected) {
     return 'CONNECTED';
