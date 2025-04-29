@@ -1,4 +1,3 @@
-
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/enhanced-supabase-client";
 import { RealtimeChannel } from "@supabase/supabase-js";
