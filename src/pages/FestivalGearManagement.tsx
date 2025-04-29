@@ -6,7 +6,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArrowLeft, Plus, Copy, Save, Wrench, Printer, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/enhanced-supabase-client";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
+import { ConnectionIndicator } from "@/components/ui/connection-indicator";
 import { FestivalGearSetupForm } from "@/components/festival/FestivalGearSetupForm";
 import { FestivalGearSetup } from "@/types/festival";
 import { Input } from "@/components/ui/input";
@@ -33,6 +35,20 @@ const FestivalGearManagement = () => {
   const [newStageName, setNewStageName] = useState("");
   const [isPrinting, setIsPrinting] = useState(false);
   const [isPrintOptionsDialogOpen, setIsPrintOptionsDialogOpen] = useState(false);
+
+  // Use our new realtime subscription hook
+  useRealtimeSubscription([
+    {
+      table: "jobs",
+      filter: `id=eq.${jobId}`,
+      queryKey: ["job", jobId]
+    },
+    {
+      table: "festival_gear_setups",
+      filter: `job_id=eq.${jobId}`,
+      queryKey: ["festival-gear", jobId, selectedDate]
+    }
+  ]);
 
   useEffect(() => {
     if (!jobId) return;
@@ -253,9 +269,12 @@ const FestivalGearManagement = () => {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Festival Management
         </Button>
-        <div className="text-right">
+        <div className="text-right flex flex-col items-end">
           <h1 className="text-2xl font-bold">{jobTitle}</h1>
-          <p className="text-muted-foreground">Gear Management</p>
+          <div className="flex items-center gap-2">
+            <p className="text-muted-foreground">Gear Management</p>
+            <ConnectionIndicator variant="icon" />
+          </div>
         </div>
       </div>
 

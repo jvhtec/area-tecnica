@@ -7,7 +7,9 @@ import { ArtistTable } from "@/components/festival/ArtistTable";
 import { ArtistManagementDialog } from "@/components/festival/ArtistManagementDialog";
 import { ArtistTableFilters } from "@/components/festival/ArtistTableFilters";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/enhanced-supabase-client"; // Updated import
+import { ConnectionIndicator } from "@/components/ui/connection-indicator"; // Import the new component
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription"; // Import the new hook
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { 
   format, 
@@ -181,30 +183,13 @@ const FestivalArtistManagement = () => {
     fetchJobDetails();
   }, [jobId]);
 
-  useEffect(() => {
-    if (!jobId || !selectedDate) return;
-
-    const channel = supabase
-      .channel('festival-artists-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'festival_artists',
-          filter: `job_id=eq.${jobId}`
-        },
-        () => {
-          fetchArtists();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [jobId, selectedDate]);
-
+  // Use our new realtime subscription hook instead of manual subscription
+  useRealtimeSubscription({
+    table: "festival_artists",
+    filter: `job_id=eq.${jobId}`,
+    queryKey: ["festival-artists", jobId, selectedDate]
+  });
+  
   const fetchArtists = async () => {
     try {
       if (!jobId || !selectedDate) {
@@ -451,7 +436,10 @@ const FestivalArtistManagement = () => {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Festival Management
         </Button>
-        <h1 className="text-2xl font-bold">{jobTitle}</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">{jobTitle}</h1>
+          <ConnectionIndicator /> {/* Add the connection indicator */}
+        </div>
       </div>
 
       <Card>
