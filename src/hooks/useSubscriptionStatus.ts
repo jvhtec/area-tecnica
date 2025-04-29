@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
 import { formatDistanceToNow } from 'date-fns';
+import { useQueryClient } from '@tanstack/react-query';
+import { UnifiedSubscriptionManager } from '@/lib/unified-subscription-manager';
 
 /**
  * Hook to monitor the subscription status for specific tables
@@ -9,11 +11,13 @@ import { formatDistanceToNow } from 'date-fns';
  * @returns Status information about the subscriptions
  */
 export function useSubscriptionStatus(tables: string[]) {
+  const queryClient = useQueryClient();
+  const manager = UnifiedSubscriptionManager.getInstance(queryClient);
+  
   const { 
-    subscriptionsByTable, 
     connectionStatus, 
-    refreshSubscriptions,
-    lastRefreshTime
+    lastRefreshTime,
+    refreshSubscriptions
   } = useSubscriptionContext();
   
   const [status, setStatus] = useState({
@@ -28,6 +32,9 @@ export function useSubscriptionStatus(tables: string[]) {
   
   // Update status when context changes
   useEffect(() => {
+    // Get current subscription status
+    const subscriptionsByTable = manager.getSubscriptionsByTable();
+    
     // Determine which tables are subscribed vs unsubscribed
     const tablesSubscribed = tables.filter(
       table => subscriptionsByTable[table]?.length > 0
@@ -60,12 +67,17 @@ export function useSubscriptionStatus(tables: string[]) {
       lastRefreshFormatted,
       isStale
     });
-  }, [tables, subscriptionsByTable, connectionStatus, lastRefreshTime]);
+  }, [tables, connectionStatus, lastRefreshTime, manager]);
   
-  // Function to manually refresh a subscription
+  // Function to manually refresh subscriptions
   const refreshSubscription = () => {
     refreshSubscriptions();
     console.log('Manually refreshed subscriptions for tables:', tables);
+    
+    // Also invalidate related queries
+    tables.forEach(table => {
+      queryClient.invalidateQueries({ queryKey: [table] });
+    });
   };
   
   return {

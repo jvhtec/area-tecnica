@@ -1,102 +1,77 @@
 
-import { Wifi, WifiOff, AlertCircle, RefreshCw, Clock, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Wifi, WifiOff, AlertTriangle, RefreshCw, Loader2 } from "lucide-react";
+import { Button } from "./button";
 import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 import { cn } from "@/lib/utils";
-import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
-import { Button } from "./button";
-import { useState } from "react";
 
 interface SubscriptionIndicatorProps {
   tables: string[];
-  showLabel?: boolean;
-  className?: string;
-  showTooltip?: boolean;
-  variant?: 'default' | 'compact' | 'header';
+  variant?: 'default' | 'compact' | 'icon-only';
   showRefreshButton?: boolean;
+  showLabel?: boolean;
   onRefresh?: () => Promise<void> | void;
+  className?: string;
 }
 
-export function SubscriptionIndicator({
+export function SubscriptionIndicator({ 
   tables,
-  showLabel = false,
-  className,
-  showTooltip = true,
   variant = 'default',
   showRefreshButton = false,
-  onRefresh
+  showLabel = false,
+  onRefresh,
+  className 
 }: SubscriptionIndicatorProps) {
-  const { 
-    isSubscribed, 
-    tablesSubscribed, 
-    tablesUnsubscribed, 
-    connectionStatus, 
-    lastRefreshTime,
-    lastRefreshFormatted, 
+  const {
+    isSubscribed,
+    tablesSubscribed,
+    tablesUnsubscribed,
+    connectionStatus,
+    lastRefreshFormatted,
     isStale,
     refreshSubscription
   } = useSubscriptionStatus(tables);
-  
+
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
-  const isCompact = variant === 'compact';
-  const isHeader = variant === 'header';
-  
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      if (onRefresh) {
+        await onRefresh();
+      } else {
+        refreshSubscription();
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const getStatusIcon = () => {
     if (connectionStatus === 'connecting') {
-      return <Loader2 className={cn(
-        "animate-spin text-blue-500", 
-        isHeader ? "h-2.5 w-2.5" : isCompact ? "h-3 w-3" : "h-4 w-4"
+      return <Loader2 className={cn("animate-spin", 
+        variant === 'icon-only' ? "h-5 w-5" : "h-4 w-4"
+      )} />;
+    } else if (connectionStatus !== 'connected') {
+      return <WifiOff className={cn("text-red-500", 
+        variant === 'icon-only' ? "h-5 w-5" : "h-4 w-4"
+      )} />;
+    } else if (isStale) {
+      return <AlertTriangle className={cn("text-amber-500", 
+        variant === 'icon-only' ? "h-5 w-5" : "h-4 w-4"
+      )} />;
+    } else if (!isSubscribed) {
+      return <AlertTriangle className={cn("text-amber-500", 
+        variant === 'icon-only' ? "h-5 w-5" : "h-4 w-4"
+      )} />;
+    } else {
+      return <Wifi className={cn("text-green-500", 
+        variant === 'icon-only' ? "h-5 w-5" : "h-4 w-4"
       )} />;
     }
-    
-    if (connectionStatus !== 'connected') {
-      return <WifiOff className={cn(
-        "text-red-500", 
-        isHeader ? "h-2.5 w-2.5" : isCompact ? "h-3 w-3" : "h-4 w-4"
-      )} />;
-    }
-    
-    if (isStale) {
-      return <Clock className={cn(
-        "text-amber-500", 
-        isHeader ? "h-2.5 w-2.5" : isCompact ? "h-3 w-3" : "h-4 w-4"
-      )} />;
-    }
-    
-    if (!isSubscribed) {
-      return <AlertCircle className={cn(
-        "text-amber-500", 
-        isHeader ? "h-2.5 w-2.5" : isCompact ? "h-3 w-3" : "h-4 w-4"
-      )} />;
-    }
-    
-    return <Wifi className={cn(
-      "text-green-500", 
-      isHeader ? "h-2.5 w-2.5" : isCompact ? "h-3 w-3" : "h-4 w-4"
-    )} />;
   };
-  
-  const getStatusLabel = () => {
-    if (connectionStatus === 'connecting') {
-      return "Connecting...";
-    }
-    
-    if (connectionStatus !== 'connected') {
-      return isHeader ? "Offline" : "Disconnected";
-    }
-    
-    if (isStale) {
-      return isHeader ? "Stale" : "Stale data";
-    }
-    
-    if (!isSubscribed) {
-      return isHeader ? "Partial" : "Partial subscription";
-    }
-    
-    return isHeader ? "Live" : "Real-time active";
-  };
-  
+
   const getTooltipContent = () => {
     if (connectionStatus === 'connecting') {
       return (
@@ -130,11 +105,14 @@ export function SubscriptionIndicator({
     if (!isSubscribed) {
       return (
         <div className="text-xs max-w-xs">
-          <p className="font-semibold">Partial real-time subscription</p>
-          <div className="mt-1">
-            <p>Subscribed tables: {tablesSubscribed.join(', ') || 'none'}</p>
-            <p>Unsubscribed tables: {tablesUnsubscribed.join(', ')}</p>
-          </div>
+          <p className="font-semibold">Partial real-time updates</p>
+          {tablesSubscribed.length > 0 && (
+            <p>Subscribed: {tablesSubscribed.join(', ')}</p>
+          )}
+          {tablesUnsubscribed.length > 0 && (
+            <p>Missing: {tablesUnsubscribed.join(', ')}</p>
+          )}
+          <p className="text-muted-foreground mt-1">Last updated: {lastRefreshFormatted}</p>
         </div>
       );
     }
@@ -142,63 +120,93 @@ export function SubscriptionIndicator({
     return (
       <div className="text-xs max-w-xs">
         <p className="font-semibold">Real-time updates active</p>
-        <p>All tables subscribed: {tables.join(', ')}</p>
-        <p>Last updated: {lastRefreshFormatted}</p>
+        <p>Subscribed tables: {tables.join(', ')}</p>
+        <p className="text-muted-foreground mt-1">Last updated: {lastRefreshFormatted}</p>
       </div>
     );
   };
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      if (onRefresh) {
-        await onRefresh();
-      } else {
-        refreshSubscription();
-      }
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
   
-  const indicator = (
-    <div className={cn(
-      "flex items-center gap-1", 
-      isHeader ? "text-xs" : isCompact ? "text-xs" : "text-sm",
-      className
-    )}>
-      {getStatusIcon()}
-      {showLabel && <span>{getStatusLabel()}</span>}
-      {showRefreshButton && (
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className={cn(
-            "ml-1", 
-            isHeader ? "h-4 w-4" : isCompact ? "h-4 w-4" : "h-6 w-6"
-          )} 
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-        >
-          <RefreshCw className={cn(
-            isHeader ? "h-2 w-2" : isCompact ? "h-2 w-2" : "h-3 w-3",
-            isRefreshing ? "animate-spin" : ""
-          )} />
-        </Button>
-      )}
-    </div>
-  );
-  
-  if (!showTooltip) {
-    return indicator;
+  // For icon-only variant
+  if (variant === 'icon-only') {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className={cn("cursor-help", className)}>
+              {getStatusIcon()}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            {getTooltipContent()}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
   }
   
+  // For compact variant
+  if (variant === 'compact') {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className={cn("flex items-center gap-1.5", className)}>
+              {getStatusIcon()}
+              {showRefreshButton && (
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleRefresh();
+                  }}
+                  disabled={isRefreshing || connectionStatus === 'connecting'}
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
+                  <span className="sr-only">Refresh</span>
+                </Button>
+              )}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            {getTooltipContent()}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+  
+  // Default variant
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div onClick={isStale ? handleRefresh : undefined} className={isStale ? "cursor-pointer" : undefined}>
-            {indicator}
+          <div className={cn("flex items-center gap-2", className)}>
+            <div className="flex items-center gap-1.5">
+              {getStatusIcon()}
+              {showLabel && (
+                <span className="text-sm font-medium">
+                  {connectionStatus === 'connecting' ? "Connecting..." :
+                   !isSubscribed ? "Partial" :
+                   isStale ? "Stale" :
+                   "Live"}
+                </span>
+              )}
+            </div>
+            {showRefreshButton && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-7 px-2 py-1"
+                onClick={handleRefresh}
+                disabled={isRefreshing || connectionStatus === 'connecting'}
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5 mr-1", isRefreshing && "animate-spin")} />
+                Refresh
+              </Button>
+            )}
           </div>
         </TooltipTrigger>
         <TooltipContent>

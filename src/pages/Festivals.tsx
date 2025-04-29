@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useJobsRealtime } from "@/hooks/useJobsRealtime";
@@ -5,14 +6,17 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { JobCard } from "@/components/jobs/JobCard";
 import { Separator } from "@/components/ui/separator";
 import { Tent, Printer, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/enhanced-supabase-client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { useAuthSession } from "@/hooks/auth/useAuthSession";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
-import { PrintOptions, PrintOptionsDialog } from "@/components/festival/pdf/PrintOptionsDialog";
+import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 
+/**
+ * Festivals page component showing all festival events
+ */
 const Festivals = () => {
   const navigate = useNavigate();
   const { 
@@ -21,8 +25,7 @@ const Festivals = () => {
     isError, 
     error, 
     isRefreshing, 
-    refetch, 
-    subscriptionStatus 
+    refetch
   } = useJobsRealtime();
   
   const [festivalJobs, setFestivalJobs] = useState<any[]>([]);
@@ -30,6 +33,7 @@ const Festivals = () => {
   const [isPrinting, setIsPrinting] = useState<Record<string, boolean>>({});
   const { userRole } = useAuthSession();
 
+  // Filter jobs to only show festivals
   useEffect(() => {
     if (jobs) {
       const festivals = jobs.filter(job => job.job_type === 'festival');
@@ -39,6 +43,7 @@ const Festivals = () => {
     }
   }, [jobs]);
 
+  // Fetch festival logo for each festival job
   const fetchFestivalLogo = async (job: any) => {
     try {
       const { data, error } = await supabase
@@ -68,10 +73,12 @@ const Festivals = () => {
     }
   };
 
+  // Navigate to festival management page when clicking on a job
   const handleJobClick = (jobId: string) => {
     navigate(`/festival-management/${jobId}`);
   };
 
+  // Handle printing all documentation for a festival
   const handlePrintAllDocumentation = async (jobId: string, jobTitle: string) => {
     setIsPrinting(prev => ({ ...prev, [jobId]: true }));
     
@@ -86,7 +93,7 @@ const Festivals = () => {
         includeArtistTables: true,
         artistTableStages: [1], // Default to stage 1
         includeArtistRequirements: true,
-        artistRequirementStages: [1] // Add the missing property, default to stage 1
+        artistRequirementStages: [1] // Default to stage 1
       };
       
       const mergedPdf = await generateAndMergeFestivalPDFs(jobId, jobTitle, defaultOptions);
@@ -114,7 +121,6 @@ const Festivals = () => {
   };
 
   const canPrintDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
-
   const emptyFunction = () => {};
 
   return (
@@ -128,26 +134,11 @@ const Festivals = () => {
           
           <div className="flex items-center gap-2">
             <SubscriptionIndicator 
-              tables={['jobs', 'job_assignments', 'job_departments', 'job_date_types']} 
+              tables={['jobs', 'job_assignments', 'job_departments', 'festival_logos']} 
               showRefreshButton 
               onRefresh={refetch}
               showLabel
             />
-            
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={refetch} 
-              disabled={isLoading || isRefreshing}
-              className="ml-2"
-            >
-              {isRefreshing ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-1" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-1" />
-              )}
-              Refresh
-            </Button>
           </div>
         </CardHeader>
         <CardContent>
