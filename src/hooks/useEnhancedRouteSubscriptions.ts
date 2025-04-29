@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
@@ -164,7 +165,6 @@ export function useEnhancedRouteSubscriptions() {
     
     // Subscribe to all tables
     allTables.forEach(({ table, priority }) => {
-      // Use the manager's method with the priority as is - the manager should handle type compatibility
       manager.subscribeToTable(table, table, undefined, priority);
       manager.registerRouteSubscription(pathname, `${table}::${table}`);
     });

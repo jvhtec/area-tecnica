@@ -8,6 +8,7 @@ import { useLocation } from "react-router-dom";
 /**
  * Component that initializes app-wide services when the application starts
  * Doesn't render anything to the UI
+ * IMPORTANT: Must be used inside QueryClientProvider
  */
 export function AppInit() {
   const queryClient = useQueryClient();
