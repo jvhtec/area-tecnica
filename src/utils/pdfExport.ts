@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -70,11 +69,11 @@ export const exportToPDF = (
 
       doc.setFontSize(24);
       doc.setTextColor(255, 255, 255);
-      const title =
+      const titleText =
         type === 'weight'
           ? "Informe de Distribución de Peso"
           : "Informe de Distribución de Potencia";
-      doc.text(title, pageWidth / 2, 20, { align: 'center' });
+      doc.text(titleText, pageWidth / 2, 20, { align: 'center' });
 
       doc.setFontSize(16);
       // Use "Trabajo sin título" if jobName is empty.
@@ -241,7 +240,7 @@ export const exportToPDF = (
 
       doc.setFontSize(24);
       doc.setTextColor(255, 255, 255);
-      doc.text(title, pageWidth / 2, 20, { align: 'center' });
+      doc.text(titleText, pageWidth / 2, 20, { align: 'center' });
 
       doc.setFontSize(16);
       doc.text(jobName || 'Trabajo sin título', pageWidth / 2, 30, { align: 'center' });
