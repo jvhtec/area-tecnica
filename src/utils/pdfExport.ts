@@ -95,6 +95,11 @@ export const exportToPDF = (
       processTables();
     };
 
+    // Store the titleText variable outside the function so it's accessible everywhere
+    const titleText = type === 'weight'
+      ? "Informe de Distribución de Peso"
+      : "Informe de Distribución de Potencia";
+
     const processTables = () => {
       let yPosition = 70;
 
