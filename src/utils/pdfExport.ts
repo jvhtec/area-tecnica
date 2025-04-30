@@ -54,11 +54,16 @@ export const exportToPDF = (
     doc.setFillColor(125, 1, 1);
     doc.rect(0, 0, pageWidth, 40, 'F');
 
+    // Store the titleText variable outside the function so it's accessible everywhere
+    const titleText = type === 'weight'
+      ? "Informe de Distribución de Peso"
+      : "Informe de Distribución de Potencia";
+
     // If we have a custom logo, load it for the header
     const loadHeaderContent = (customLogo?: HTMLImageElement) => {
       // If we have a custom logo, add it to the left side of the header
       if (customLogo) {
-        const logoHeight = 30; // Fixed height for the logo in the header
+        const logoHeight = 7.5; // Reduced to 1/4th of the original size (was 30)
         const logoWidth = logoHeight * (customLogo.width / customLogo.height);
         try {
           doc.addImage(customLogo, 'PNG', 10, 5, logoWidth, logoHeight);
@@ -69,10 +74,6 @@ export const exportToPDF = (
 
       doc.setFontSize(24);
       doc.setTextColor(255, 255, 255);
-      const titleText =
-        type === 'weight'
-          ? "Informe de Distribución de Peso"
-          : "Informe de Distribución de Potencia";
       doc.text(titleText, pageWidth / 2, 20, { align: 'center' });
 
       doc.setFontSize(16);
@@ -94,11 +95,6 @@ export const exportToPDF = (
 
       processTables();
     };
-
-    // Store the titleText variable outside the function so it's accessible everywhere
-    const titleText = type === 'weight'
-      ? "Informe de Distribución de Peso"
-      : "Informe de Distribución de Potencia";
 
     const processTables = () => {
       let yPosition = 70;
@@ -234,7 +230,7 @@ export const exportToPDF = (
 
       // If we have a custom logo, add it to the header of the summary page
       if (headerLogo) {
-        const logoHeight = 30; // Fixed height for the logo in the header
+        const logoHeight = 7.5; // Reduced to 1/4th of the original size (was 30)
         const logoWidth = logoHeight * (headerLogo.width / headerLogo.height);
         try {
           doc.addImage(headerLogo, 'PNG', 10, 5, logoWidth, logoHeight);
