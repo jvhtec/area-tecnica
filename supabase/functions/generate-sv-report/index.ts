@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
@@ -11,10 +12,10 @@ serve(async (req) => {
   }
 
   try {
-    const { eventName, date, venue, details } = await req.json()
+    const { eventName, date, venue, details, logoUrl } = await req.json()
 
     // Here you would implement the actual report generation logic
-    // For now, we'll just return a success message
+    // For now, we'll just return a success message with the included data
     const result = {
       success: true,
       message: "Report generated successfully",
@@ -23,6 +24,7 @@ serve(async (req) => {
         date,
         venue,
         details,
+        logoUrl
       }
     }
 

@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { useJobSelection } from "@/hooks/useJobSelection";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
+import { useLogoList, LogoOption } from "@/hooks/useLogoList";
 
 const reportSections = [
   {
@@ -38,10 +40,13 @@ const reportSections = [
 export const ReportGenerator = () => {
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
+  const { logos, isLoading: logosLoading } = useLogoList();
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [equipamiento, setEquipamiento] = useState("");
   const [images, setImages] = useState<{ [key: string]: File | null }>({});
   const [isoViewEnabled, setIsoViewEnabled] = useState<{ [key: string]: boolean }>({});
+  const [useCustomLogo, setUseCustomLogo] = useState(false);
+  const [selectedLogo, setSelectedLogo] = useState<string>("");
 
   const handleImageChange = (section: string, view: string, file: File | null) => {
     const key = `${section}-${view}`;
@@ -55,10 +60,11 @@ export const ReportGenerator = () => {
     }));
   };
 
-  const addPageHeader = async (pdf: jsPDF, pageNumber: number, jobTitle: string, jobDate: string) => {
+  const addPageHeader = async (pdf: jsPDF, pageNumber: number, jobTitle: string, jobDate: string, customLogoUrl?: string) => {
     return new Promise<void>((resolve) => {
       const pageWidth = pdf.internal.pageSize.getWidth();
-      const logoPath = '/lovable-uploads/a2246e0e-373b-4091-9471-1a7c00fe82ed.png';
+      const defaultLogoPath = '/lovable-uploads/a2246e0e-373b-4091-9471-1a7c00fe82ed.png';
+      const logoPath = customLogoUrl || defaultLogoPath;
       
       // Purple header background
       pdf.setFillColor(125, 1, 1);
@@ -84,9 +90,10 @@ export const ReportGenerator = () => {
       logo.src = logoPath;
 
       logo.onload = () => {
-        const logoWidth = 30;
-        const logoHeight = logoWidth * (logo.height / logo.width);
-        const logoX = pageWidth - logoWidth - 10;
+        // Make logo 1/4 the size and left-aligned
+        const logoHeight = 7.5;
+        const logoWidth = logoHeight * (logo.width / logo.height);
+        const logoX = 10; // Left-aligned position
         const logoY = 5;
 
         try {
@@ -120,6 +127,8 @@ export const ReportGenerator = () => {
       ? format(new Date(selectedJob.start_time), "MMMM dd, yyyy")
       : format(new Date(), "MMMM dd, yyyy");
 
+    const customLogoUrl = useCustomLogo && selectedLogo ? selectedLogo : undefined;
+    
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",
@@ -132,7 +141,7 @@ export const ReportGenerator = () => {
     const contentWidth = pageWidth - (2 * margin);
 
     // Page 1: Equipment
-    await addPageHeader(pdf, 1, jobTitle, jobDate);
+    await addPageHeader(pdf, 1, jobTitle, jobDate, customLogoUrl);
     pdf.setFontSize(14);
     pdf.setTextColor(51, 51, 51);
     pdf.setFont(undefined, 'bold');
@@ -156,7 +165,7 @@ export const ReportGenerator = () => {
     for (let i = 1; i < reportSections.length; i++) {
       const section = reportSections[i];
       pdf.addPage();
-      await addPageHeader(pdf, section.pageNumber, jobTitle, jobDate);
+      await addPageHeader(pdf, section.pageNumber, jobTitle, jobDate, customLogoUrl);
       
       // Bold section title
       pdf.setFontSize(14);
@@ -257,6 +266,43 @@ export const ReportGenerator = () => {
               </SelectContent>
             </Select>
           </div>
+
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="use-custom-logo" 
+              checked={useCustomLogo} 
+              onCheckedChange={(checked) => setUseCustomLogo(!!checked)}
+            />
+            <Label htmlFor="use-custom-logo" className="text-sm">
+              Use Custom Logo
+            </Label>
+          </div>
+
+          {useCustomLogo && (
+            <div>
+              <Label htmlFor="logoSelect">Select Logo</Label>
+              <Select 
+                value={selectedLogo} 
+                onValueChange={setSelectedLogo} 
+                disabled={logosLoading || logos.length === 0}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={
+                    logosLoading ? "Loading logos..." : 
+                    logos.length === 0 ? "No logos available" : 
+                    "Select a logo"
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {logos.map((logo) => (
+                    <SelectItem key={logo.id} value={logo.url}>
+                      {logo.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div>
             <Label htmlFor="equipamiento">Equipment List</Label>
