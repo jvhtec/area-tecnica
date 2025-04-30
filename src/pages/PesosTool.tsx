@@ -276,6 +276,17 @@ const PesosTool: React.FC = () => {
     }
 
     try {
+      // Fetch the job logo (festival or tour)
+      let logoUrl: string | undefined = undefined;
+      try {
+        const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
+        logoUrl = await fetchJobLogo(selectedJobId);
+        console.log("Logo URL for PDF:", logoUrl);
+      } catch (logoError) {
+        console.error("Error fetching logo:", logoError);
+        // Continue without the logo if there's an error
+      }
+
       const jobDateStr = new Date().toLocaleDateString('en-GB');
       const pdfBlob = await exportToPDF(
         selectedJob.title,
@@ -283,7 +294,10 @@ const PesosTool: React.FC = () => {
         'weight',
         selectedJob.title,
         jobDateStr,
-        summaryRows
+        summaryRows,
+        undefined,
+        undefined,
+        logoUrl // Pass the logo URL to the PDF generator
       );
 
       const fileName = `Pesos Report - ${selectedJob.title}.pdf`;

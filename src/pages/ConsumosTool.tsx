@@ -232,6 +232,17 @@ const ConsumosTool: React.FC = () => {
     }
 
     try {
+      // Fetch the job logo (festival or tour)
+      let logoUrl: string | undefined = undefined;
+      try {
+        const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
+        logoUrl = await fetchJobLogo(selectedJobId);
+        console.log("Logo URL for PDF:", logoUrl);
+      } catch (logoError) {
+        console.error("Error fetching logo:", logoError);
+        // Continue without the logo if there's an error
+      }
+
       // Convert the job date into a proper string (if available)
       let jobDate: string;
       if (selectedJob && (selectedJob as any).date) {
@@ -248,7 +259,8 @@ const ConsumosTool: React.FC = () => {
         jobDate,
         undefined,
         undefined,
-        safetyMargin
+        safetyMargin,
+        logoUrl  // Pass the logo URL to the PDF generator
       );
 
       const fileName = `Power Report - ${selectedJob.title}.pdf`;
