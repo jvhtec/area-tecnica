@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const reportSections = [
   {
@@ -41,6 +42,7 @@ export const ReportGenerator = () => {
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
   const [selectedJobId, setSelectedJobId] = useState<string>("");
+  const [reportSystem, setReportSystem] = useState<"LA" | "Turbo">("LA");
   const [equipamiento, setEquipamiento] = useState("");
   const [images, setImages] = useState<{ [key: string]: File | null }>({});
   const [isoViewEnabled, setIsoViewEnabled] = useState<{ [key: string]: boolean }>({});
@@ -80,7 +82,11 @@ export const ReportGenerator = () => {
   const addPageHeader = async (pdf: jsPDF, pageNumber: number, jobTitle: string, jobDate: string) => {
     return new Promise<void>((resolve) => {
       const pageWidth = pdf.internal.pageSize.getWidth();
-      const logoPath = '/lovable-uploads/a2246e0e-373b-4091-9471-1a7c00fe82ed.png';
+      
+      // Select the appropriate logo based on the report system
+      const logoPath = reportSystem === "LA" 
+        ? '/lovable-uploads/a2246e0e-373b-4091-9471-1a7c00fe82ed.png'
+        : '/lovable-uploads/e78ab52e-aa81-4770-a6bb-f802a5ff651e.png';
       
       // Purple header background
       pdf.setFillColor(125, 1, 1);
@@ -89,7 +95,10 @@ export const ReportGenerator = () => {
       // White text for header
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(24);
-      pdf.text("SOUNDVISION REPORT", pageWidth / 2, 15, { align: 'center' });
+      
+      // Use different header text based on selection
+      const headerText = reportSystem === "LA" ? "SOUNDVISION REPORT" : "EASE FOCUS REPORT";
+      pdf.text(headerText, pageWidth / 2, 15, { align: 'center' });
 
       // Job title and date
       pdf.setFontSize(14);
@@ -253,7 +262,7 @@ export const ReportGenerator = () => {
       try {
         pdf.addImage(footerLogo, 'PNG', xPosition, yPosition - logoHeight, logoWidth, logoHeight);
         const blob = pdf.output('blob');
-        const filename = `SoundVision_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
+        const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
         pdf.save(filename);
         toast({
           title: "Success",
@@ -262,7 +271,7 @@ export const ReportGenerator = () => {
       } catch (error) {
         console.error('Error adding footer logo:', error);
         const blob = pdf.output('blob');
-        const filename = `SoundVision_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
+        const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
         pdf.save(filename);
         toast({
           title: "Success",
@@ -273,7 +282,7 @@ export const ReportGenerator = () => {
 
     footerLogo.onerror = () => {
       console.error('Failed to load footer logo');
-      const filename = `SoundVision_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
+      const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
       pdf.save(filename);
       toast({
         title: "Success",
@@ -316,6 +325,24 @@ export const ReportGenerator = () => {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div>
+            <Label className="mb-2">Report System</Label>
+            <RadioGroup 
+              value={reportSystem}
+              onValueChange={(value) => setReportSystem(value as "LA" | "Turbo")}
+              className="flex items-center space-x-6"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="LA" id="r-la" />
+                <Label htmlFor="r-la" className="cursor-pointer">L'Acoustics</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="Turbo" id="r-turbo" />
+                <Label htmlFor="r-turbo" className="cursor-pointer">Turbosound</Label>
+              </div>
+            </RadioGroup>
           </div>
 
           <div>
