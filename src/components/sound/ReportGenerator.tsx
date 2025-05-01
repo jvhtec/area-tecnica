@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+
+import React, { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { useJobSelection } from "@/hooks/useJobSelection";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
+import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 
 const reportSections = [
   {
@@ -42,6 +44,26 @@ export const ReportGenerator = () => {
   const [equipamiento, setEquipamiento] = useState("");
   const [images, setImages] = useState<{ [key: string]: File | null }>({});
   const [isoViewEnabled, setIsoViewEnabled] = useState<{ [key: string]: boolean }>({});
+  const [jobLogo, setJobLogo] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    const loadJobLogo = async () => {
+      if (selectedJobId) {
+        try {
+          const logoUrl = await fetchJobLogo(selectedJobId);
+          setJobLogo(logoUrl);
+          console.log("Job logo loaded:", logoUrl);
+        } catch (error) {
+          console.error("Error loading job logo:", error);
+          setJobLogo(undefined);
+        }
+      } else {
+        setJobLogo(undefined);
+      }
+    };
+
+    loadJobLogo();
+  }, [selectedJobId]);
 
   const handleImageChange = (section: string, view: string, file: File | null) => {
     const key = `${section}-${view}`;
@@ -78,29 +100,67 @@ export const ReportGenerator = () => {
       pdf.setFontSize(12);
       pdf.text(pageNumber.toString(), pageWidth - 10, 15, { align: 'right' });
 
-      // Add the logo
-      const logo = new Image();
-      logo.crossOrigin = 'anonymous';
-      logo.src = logoPath;
+      const promises = [];
+      
+      // Add the job logo if available (left-aligned, smaller)
+      if (jobLogo) {
+        promises.push(
+          new Promise<void>((resolveLogo) => {
+            const jobLogoImg = new Image();
+            jobLogoImg.crossOrigin = 'anonymous';
+            jobLogoImg.src = jobLogo;
+            
+            jobLogoImg.onload = () => {
+              const logoHeight = 7.5; // 1/4 of original size
+              const logoWidth = logoHeight * (jobLogoImg.width / jobLogoImg.height);
+              const logoX = 10; // Left position
+              const logoY = 5;
+              
+              try {
+                pdf.addImage(jobLogoImg, 'PNG', logoX, logoY, logoWidth, logoHeight);
+              } catch (error) {
+                console.error('Error adding job logo:', error);
+              }
+              resolveLogo();
+            };
+            
+            jobLogoImg.onerror = () => {
+              console.error('Failed to load job logo');
+              resolveLogo();
+            };
+          })
+        );
+      }
 
-      logo.onload = () => {
-        const logoWidth = 30;
-        const logoHeight = logoWidth * (logo.height / logo.width);
-        const logoX = pageWidth - logoWidth - 10;
-        const logoY = 5;
+      // Add the standard logo (right-aligned)
+      promises.push(
+        new Promise<void>((resolveLogo) => {
+          const logo = new Image();
+          logo.crossOrigin = 'anonymous';
+          logo.src = logoPath;
 
-        try {
-          pdf.addImage(logo, 'PNG', logoX, logoY, logoWidth, logoHeight);
-        } catch (error) {
-          console.error('Error adding header logo:', error);
-        }
-        resolve();
-      };
+          logo.onload = () => {
+            const logoWidth = 30;
+            const logoHeight = logoWidth * (logo.height / logo.width);
+            const logoX = pageWidth - logoWidth - 10;
+            const logoY = 5;
 
-      logo.onerror = () => {
-        console.error('Failed to load header logo');
-        resolve();
-      };
+            try {
+              pdf.addImage(logo, 'PNG', logoX, logoY, logoWidth, logoHeight);
+            } catch (error) {
+              console.error('Error adding header logo:', error);
+            }
+            resolveLogo();
+          };
+
+          logo.onerror = () => {
+            console.error('Failed to load header logo');
+            resolveLogo();
+          };
+        })
+      );
+
+      Promise.all(promises).then(() => resolve());
     });
   };
 
@@ -321,3 +381,4 @@ export const ReportGenerator = () => {
     </Card>
   );
 };
+
