@@ -66,7 +66,7 @@ export const useLogoOptions = (jobId?: string) => {
         if (tourLogoError) throw tourLogoError;
 
         // Format festival logos for dropdown
-        const festivalOptions: LogoOption[] = (festivalLogos as FestivalLogoResult[] || [])
+        const festivalOptions: LogoOption[] = (festivalLogos || [])
           .filter(logo => logo.jobs !== null)
           .map(logo => {
             const jobTitle = logo.jobs?.title || 'Unknown Job';
@@ -79,7 +79,7 @@ export const useLogoOptions = (jobId?: string) => {
           });
 
         // Format tour logos for dropdown
-        const tourOptions: LogoOption[] = (tourLogos as TourLogoResult[] || [])
+        const tourOptions: LogoOption[] = (tourLogos || [])
           .filter(logo => logo.tours !== null)
           .map(logo => {
             const tourName = logo.tours?.name || 'Unknown Tour';
