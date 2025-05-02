@@ -9,6 +9,25 @@ export interface LogoOption {
   type: "job" | "tour";
 }
 
+// Define interfaces for the Supabase query results
+interface FestivalLogoResult {
+  id: string;
+  file_path: string;
+  job_id: string | null;
+  jobs: {
+    title: string;
+  } | null;
+}
+
+interface TourLogoResult {
+  id: string;
+  file_path: string;
+  tour_id: string | null;
+  tours: {
+    name: string;
+  } | null;
+}
+
 export const useLogoOptions = (jobId?: string) => {
   const [isLoading, setIsLoading] = useState(true);
   const [logoOptions, setLogoOptions] = useState<LogoOption[]>([]);
@@ -47,8 +66,8 @@ export const useLogoOptions = (jobId?: string) => {
         if (tourLogoError) throw tourLogoError;
 
         // Format festival logos for dropdown
-        const festivalOptions: LogoOption[] = (festivalLogos || [])
-          .filter(logo => logo.jobs && logo.jobs.title)
+        const festivalOptions: LogoOption[] = (festivalLogos as FestivalLogoResult[] || [])
+          .filter(logo => logo.jobs !== null)
           .map(logo => {
             const jobTitle = logo.jobs?.title || 'Unknown Job';
             return {
@@ -60,8 +79,8 @@ export const useLogoOptions = (jobId?: string) => {
           });
 
         // Format tour logos for dropdown
-        const tourOptions: LogoOption[] = (tourLogos || [])
-          .filter(logo => logo.tours && logo.tours.name)
+        const tourOptions: LogoOption[] = (tourLogos as TourLogoResult[] || [])
+          .filter(logo => logo.tours !== null)
           .map(logo => {
             const tourName = logo.tours?.name || 'Unknown Tour';
             return {
