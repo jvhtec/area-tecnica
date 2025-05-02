@@ -68,14 +68,21 @@ export const useLogoOptions = (jobId?: string) => {
         // Format festival logos for dropdown
         const festivalOptions: LogoOption[] = (festivalLogos || [])
           .filter(logo => logo.jobs !== null)
-          .map(logo => {
-            // The jobs object is returned differently than expected
-            // We need to safely access the title property
-            const jobTitle = typeof logo.jobs === 'object' && logo.jobs !== null 
-              ? (Array.isArray(logo.jobs) 
-                ? (logo.jobs[0]?.title || 'Unknown Job')  // If it's an array, get the first item's title
-                : logo.jobs.title || 'Unknown Job')       // If it's an object, get the title directly
-              : 'Unknown Job';
+          .map((logo: any) => {
+            // Handle different possible shapes of the jobs object
+            let jobTitle = 'Unknown Job';
+            
+            if (logo.jobs) {
+              if (Array.isArray(logo.jobs)) {
+                // If it's an array with contents, get the first item's title
+                jobTitle = logo.jobs.length > 0 && logo.jobs[0] && typeof logo.jobs[0].title === 'string' 
+                  ? logo.jobs[0].title 
+                  : 'Unknown Job';
+              } else if (typeof logo.jobs === 'object') {
+                // If it's an object, get the title directly
+                jobTitle = logo.jobs.title || 'Unknown Job';
+              }
+            }
               
             return {
               value: `job-${logo.id}`,
@@ -88,14 +95,21 @@ export const useLogoOptions = (jobId?: string) => {
         // Format tour logos for dropdown
         const tourOptions: LogoOption[] = (tourLogos || [])
           .filter(logo => logo.tours !== null)
-          .map(logo => {
-            // The tours object is returned differently than expected
-            // We need to safely access the name property
-            const tourName = typeof logo.tours === 'object' && logo.tours !== null
-              ? (Array.isArray(logo.tours) 
-                ? (logo.tours[0]?.name || 'Unknown Tour')  // If it's an array, get the first item's name
-                : logo.tours.name || 'Unknown Tour')       // If it's an object, get the name directly
-              : 'Unknown Tour';
+          .map((logo: any) => {
+            // Handle different possible shapes of the tours object
+            let tourName = 'Unknown Tour';
+            
+            if (logo.tours) {
+              if (Array.isArray(logo.tours)) {
+                // If it's an array with contents, get the first item's name
+                tourName = logo.tours.length > 0 && logo.tours[0] && typeof logo.tours[0].name === 'string' 
+                  ? logo.tours[0].name 
+                  : 'Unknown Tour';
+              } else if (typeof logo.tours === 'object') {
+                // If it's an object, get the name directly
+                tourName = logo.tours.name || 'Unknown Tour';
+              }
+            }
               
             return {
               value: `tour-${logo.id}`,
