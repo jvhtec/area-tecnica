@@ -69,6 +69,7 @@ export const useLogoOptions = (jobId?: string) => {
         const festivalOptions: LogoOption[] = (festivalLogos || [])
           .filter(logo => logo.jobs !== null)
           .map(logo => {
+            // Access title as a property of jobs object, not as an array
             const jobTitle = logo.jobs?.title || 'Unknown Job';
             return {
               value: `job-${logo.id}`,
@@ -82,6 +83,7 @@ export const useLogoOptions = (jobId?: string) => {
         const tourOptions: LogoOption[] = (tourLogos || [])
           .filter(logo => logo.tours !== null)
           .map(logo => {
+            // Access name as a property of tours object, not as an array
             const tourName = logo.tours?.name || 'Unknown Tour';
             return {
               value: `tour-${logo.id}`,
