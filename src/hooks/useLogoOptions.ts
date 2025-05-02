@@ -69,8 +69,12 @@ export const useLogoOptions = (jobId?: string) => {
         const festivalOptions: LogoOption[] = (festivalLogos || [])
           .filter(logo => logo.jobs !== null)
           .map(logo => {
-            // Access title as a property of jobs object, not as an array
-            const jobTitle = logo.jobs?.title || 'Unknown Job';
+            // The jobs object is returned differently than expected
+            // We need to safely access the title property
+            const jobTitle = typeof logo.jobs === 'object' && logo.jobs !== null 
+              ? logo.jobs.title || 'Unknown Job'
+              : 'Unknown Job';
+              
             return {
               value: `job-${logo.id}`,
               label: `Job: ${jobTitle}`,
@@ -83,8 +87,12 @@ export const useLogoOptions = (jobId?: string) => {
         const tourOptions: LogoOption[] = (tourLogos || [])
           .filter(logo => logo.tours !== null)
           .map(logo => {
-            // Access name as a property of tours object, not as an array
-            const tourName = logo.tours?.name || 'Unknown Tour';
+            // The tours object is returned differently than expected
+            // We need to safely access the name property
+            const tourName = typeof logo.tours === 'object' && logo.tours !== null
+              ? logo.tours.name || 'Unknown Tour'
+              : 'Unknown Tour';
+              
             return {
               value: `tour-${logo.id}`,
               label: `Tour: ${tourName}`,
