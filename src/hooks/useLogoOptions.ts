@@ -72,7 +72,9 @@ export const useLogoOptions = (jobId?: string) => {
             // The jobs object is returned differently than expected
             // We need to safely access the title property
             const jobTitle = typeof logo.jobs === 'object' && logo.jobs !== null 
-              ? logo.jobs.title || 'Unknown Job'
+              ? (Array.isArray(logo.jobs) 
+                ? (logo.jobs[0]?.title || 'Unknown Job')  // If it's an array, get the first item's title
+                : logo.jobs.title || 'Unknown Job')       // If it's an object, get the title directly
               : 'Unknown Job';
               
             return {
@@ -90,7 +92,9 @@ export const useLogoOptions = (jobId?: string) => {
             // The tours object is returned differently than expected
             // We need to safely access the name property
             const tourName = typeof logo.tours === 'object' && logo.tours !== null
-              ? logo.tours.name || 'Unknown Tour'
+              ? (Array.isArray(logo.tours) 
+                ? (logo.tours[0]?.name || 'Unknown Tour')  // If it's an array, get the first item's name
+                : logo.tours.name || 'Unknown Tour')       // If it's an object, get the name directly
               : 'Unknown Tour';
               
             return {
