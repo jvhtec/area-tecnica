@@ -897,6 +897,101 @@ export type Database = {
           },
         ]
       }
+      festival_stage_gear_setups: {
+        Row: {
+          created_at: string | null
+          extras_df: boolean | null
+          extras_djbooth: boolean | null
+          extras_sf: boolean | null
+          extras_wired: string | null
+          foh_consoles: Json | null
+          gear_setup_id: string
+          id: string
+          iem_systems: Json | null
+          infra_analog: number | null
+          infra_cat6: boolean | null
+          infra_cat6_quantity: number | null
+          infra_coax: boolean | null
+          infra_coax_quantity: number | null
+          infra_hma: boolean | null
+          infra_hma_quantity: number | null
+          infra_opticalcon_duo: boolean | null
+          infra_opticalcon_duo_quantity: number | null
+          mon_consoles: Json | null
+          monitors_enabled: boolean | null
+          monitors_quantity: number | null
+          notes: string | null
+          other_infrastructure: string | null
+          stage_number: number
+          updated_at: string | null
+          wireless_systems: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          extras_df?: boolean | null
+          extras_djbooth?: boolean | null
+          extras_sf?: boolean | null
+          extras_wired?: string | null
+          foh_consoles?: Json | null
+          gear_setup_id: string
+          id?: string
+          iem_systems?: Json | null
+          infra_analog?: number | null
+          infra_cat6?: boolean | null
+          infra_cat6_quantity?: number | null
+          infra_coax?: boolean | null
+          infra_coax_quantity?: number | null
+          infra_hma?: boolean | null
+          infra_hma_quantity?: number | null
+          infra_opticalcon_duo?: boolean | null
+          infra_opticalcon_duo_quantity?: number | null
+          mon_consoles?: Json | null
+          monitors_enabled?: boolean | null
+          monitors_quantity?: number | null
+          notes?: string | null
+          other_infrastructure?: string | null
+          stage_number: number
+          updated_at?: string | null
+          wireless_systems?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          extras_df?: boolean | null
+          extras_djbooth?: boolean | null
+          extras_sf?: boolean | null
+          extras_wired?: string | null
+          foh_consoles?: Json | null
+          gear_setup_id?: string
+          id?: string
+          iem_systems?: Json | null
+          infra_analog?: number | null
+          infra_cat6?: boolean | null
+          infra_cat6_quantity?: number | null
+          infra_coax?: boolean | null
+          infra_coax_quantity?: number | null
+          infra_hma?: boolean | null
+          infra_hma_quantity?: number | null
+          infra_opticalcon_duo?: boolean | null
+          infra_opticalcon_duo_quantity?: number | null
+          mon_consoles?: Json | null
+          monitors_enabled?: boolean | null
+          monitors_quantity?: number | null
+          notes?: string | null
+          other_infrastructure?: string | null
+          stage_number?: number
+          updated_at?: string | null
+          wireless_systems?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "festival_stage_gear_setups_gear_setup_id_fkey"
+            columns: ["gear_setup_id"]
+            isOneToOne: false
+            referencedRelation: "festival_gear_setups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       festival_stages: {
         Row: {
           created_at: string | null

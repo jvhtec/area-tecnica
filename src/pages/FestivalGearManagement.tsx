@@ -18,6 +18,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { generateStageGearPDF } from "@/utils/gearSetupPdfExport";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { PrintOptions, PrintOptionsDialog } from "@/components/festival/pdf/PrintOptionsDialog";
+import { Badge } from "@/components/ui/badge";
 
 const FestivalGearManagement = () => {
   const { jobId } = useParams();
@@ -35,6 +36,7 @@ const FestivalGearManagement = () => {
   const [newStageName, setNewStageName] = useState("");
   const [isPrinting, setIsPrinting] = useState(false);
   const [isPrintOptionsDialogOpen, setIsPrintOptionsDialogOpen] = useState(false);
+  const [stageSetups, setStageSetups] = useState<Record<number, boolean>>({});
 
   // Use our new realtime subscription hook
   useRealtimeSubscription([
@@ -130,6 +132,52 @@ const FestivalGearManagement = () => {
       fetchFestivalGearSetup();
     }
   }, [jobId, selectedDate, toast]);
+
+  const fetchStageSetups = async () => {
+    if (!selectedDate || !jobId) return;
+    
+    try {
+      // First get the gear setup ID for the selected date
+      const { data: gearSetup, error: gearError } = await supabase
+        .from("festival_gear_setups")
+        .select("id")
+        .eq("job_id", jobId)
+        .eq("date", selectedDate)
+        .maybeSingle();
+        
+      if (gearError) {
+        console.error("Error fetching gear setup ID:", gearError);
+        return;
+      }
+      
+      if (!gearSetup) return;
+      
+      // Then fetch all stage setups for this gear setup
+      const { data: stageSetupData, error: stageError } = await supabase
+        .from("festival_stage_gear_setups")
+        .select("stage_number")
+        .eq("gear_setup_id", gearSetup.id);
+        
+      if (stageError) {
+        console.error("Error fetching stage setups:", stageError);
+        return;
+      }
+      
+      // Create a map of stage numbers to true (has custom setup)
+      const setupMap = stageSetupData.reduce((acc, item) => {
+        acc[item.stage_number] = true;
+        return acc;
+      }, {});
+      
+      setStageSetups(setupMap);
+    } catch (error) {
+      console.error("Error checking stage setups:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchStageSetups();
+  }, [selectedDate, jobId]);
 
   const handleUpdateMaxStages = async (newMaxStages: number) => {
     try {
@@ -326,14 +374,20 @@ const FestivalGearManagement = () => {
           <CardContent>
             <div className="flex flex-wrap gap-4">
               {stages.map((stage) => (
-                <Button
-                  key={stage}
-                  variant={selectedStage === stage ? "default" : "outline"}
-                  onClick={() => setSelectedStage(stage)}
-                  className="px-6"
-                >
-                  Stage {stage}
-                </Button>
+                <div key={stage} className="relative">
+                  <Button
+                    variant={selectedStage === stage ? "default" : "outline"}
+                    onClick={() => setSelectedStage(stage)}
+                    className="px-6"
+                  >
+                    Stage {stage}
+                    {stageSetups[stage] && (
+                      <Badge variant="outline" className="ml-2 bg-blue-100">
+                        Custom
+                      </Badge>
+                    )}
+                  </Button>
+                </div>
               ))}
             </div>
           </CardContent>

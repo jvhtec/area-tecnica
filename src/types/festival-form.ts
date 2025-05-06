@@ -16,6 +16,7 @@ export interface SectionProps {
   formData: any;
   onChange: (changes: Partial<any>) => void;
   gearSetup?: FestivalGearSetup;
+  stageNumber?: number;
 }
 
 export interface ProviderSelectorProps {

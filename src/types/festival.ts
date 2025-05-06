@@ -1,4 +1,3 @@
-
 export interface ConsoleSetup {
   model: string;
   quantity: number;
@@ -85,4 +84,38 @@ export interface FestivalSettings {
   day_start_time: string; // Format: "07:00"
   created_at?: string;
   updated_at?: string;
+}
+
+export interface StageGearSetup {
+  id: string;
+  gear_setup_id: string;
+  stage_number: number;
+  foh_consoles: ConsoleSetup[];
+  mon_consoles: ConsoleSetup[];
+  wireless_systems: WirelessSetup[];
+  iem_systems: WirelessSetup[];
+  monitors_enabled: boolean;
+  monitors_quantity: number;
+  extras_sf: boolean;
+  extras_df: boolean;
+  extras_djbooth: boolean;
+  extras_wired: string | null;
+  infra_cat6: boolean;
+  infra_cat6_quantity: number;
+  infra_hma: boolean;
+  infra_hma_quantity: number;
+  infra_coax: boolean;
+  infra_coax_quantity: number;
+  infra_opticalcon_duo: boolean;
+  infra_opticalcon_duo_quantity: number;
+  infra_analog: number;
+  other_infrastructure: string | null;
+  notes: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CombinedGearSetup {
+  globalSetup: FestivalGearSetup | null;
+  stageSetup: StageGearSetup | null;
 }
