@@ -1,7 +1,9 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
+import { CombinedGearSetup } from '@/types/festival';
 
 export interface GearSetupPdfData {
   jobTitle: string;
@@ -191,10 +193,10 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
         doc.setFontSize(10);
         
         const monitorData = [];
-        monitorData.push(['Wedge Monitors', `${data.gearSetup.available_monitors || 0}`]);
-        monitorData.push(['Side Fills', data.gearSetup.has_side_fills ? 'Yes' : 'No']);
-        monitorData.push(['Drum Fills', data.gearSetup.has_drum_fills ? 'Yes' : 'No']);
-        monitorData.push(['DJ Booths', data.gearSetup.has_dj_booths ? 'Yes' : 'No']);
+        monitorData.push(['Wedge Monitors', `${data.gearSetup.monitors_quantity || 0}`]);
+        monitorData.push(['Side Fills', data.gearSetup.extras_sf ? 'Yes' : 'No']);
+        monitorData.push(['Drum Fills', data.gearSetup.extras_df ? 'Yes' : 'No']);
+        monitorData.push(['DJ Booths', data.gearSetup.extras_djbooth ? 'Yes' : 'No']);
         monitorData.push(['Other', data.gearSetup.extras_wired || 'N/A']);
         
         autoTable(doc, {
@@ -225,20 +227,20 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
         doc.setFontSize(10);
         
         const infraData = [];
-        if (data.gearSetup.available_cat6_runs > 0) {
-          infraData.push(['CAT6', `${data.gearSetup.available_cat6_runs}`]);
+        if (data.gearSetup.infra_cat6) {
+          infraData.push(['CAT6', `${data.gearSetup.infra_cat6_quantity || 0}`]);
         }
-        if (data.gearSetup.available_hma_runs > 0) {
-          infraData.push(['HMA', `${data.gearSetup.available_hma_runs}`]);
+        if (data.gearSetup.infra_hma) {
+          infraData.push(['HMA', `${data.gearSetup.infra_hma_quantity || 0}`]);
         }
-        if (data.gearSetup.available_coax_runs > 0) {
-          infraData.push(['Coax', `${data.gearSetup.available_coax_runs}`]);
+        if (data.gearSetup.infra_coax) {
+          infraData.push(['Coax', `${data.gearSetup.infra_coax_quantity || 0}`]);
         }
-        if (data.gearSetup.available_opticalcon_duo_runs > 0) {
-          infraData.push(['Opticalcon Duo', `${data.gearSetup.available_opticalcon_duo_runs}`]);
+        if (data.gearSetup.infra_opticalcon_duo) {
+          infraData.push(['Opticalcon Duo', `${data.gearSetup.infra_opticalcon_duo_quantity || 0}`]);
         }
-        if (data.gearSetup.available_analog_runs > 0) {
-          infraData.push(['Analog', `${data.gearSetup.available_analog_runs}`]);
+        if (data.gearSetup.infra_analog > 0) {
+          infraData.push(['Analog', `${data.gearSetup.infra_analog || 0}`]);
         }
         
         if (data.gearSetup.other_infrastructure) {
@@ -408,19 +410,73 @@ export const generateStageGearPDF = async (
     
     if (jobError) throw jobError;
     
-    // Fetch gear setup - note the removal of date filter
-    const { data: gearSetup, error: gearError } = await supabase
+    // Fetch global gear setup
+    const { data: globalSetupData, error: globalError } = await supabase
       .from("festival_gear_setups")
       .select("*")
       .eq("job_id", jobId)
       .order('created_at', { ascending: false })
       .limit(1);
     
-    if (gearError) throw gearError;
+    if (globalError) throw globalError;
     
-    if (!gearSetup || gearSetup.length === 0) {
-      console.log('No gear setup found for this festival');
+    if (!globalSetupData || globalSetupData.length === 0) {
+      console.log('No global gear setup found for this festival');
       return null;
+    }
+    
+    const globalSetup = globalSetupData[0];
+    
+    // Fetch stage-specific gear setup if it exists
+    const { data: stageSetup, error: stageError } = await supabase
+      .from("festival_stage_gear_setups")
+      .select("*")
+      .eq("gear_setup_id", globalSetup.id)
+      .eq("stage_number", stageNumber)
+      .maybeSingle();
+    
+    if (stageError) {
+      console.error('Error fetching stage-specific setup:', stageError);
+    }
+
+    // Combine global and stage-specific data
+    // Start with global setup data
+    let combinedSetup = { ...globalSetup };
+    
+    // Override with stage-specific data where available
+    if (stageSetup) {
+      console.log('Using stage-specific gear setup for PDF generation');
+      
+      // Override fields that can be customized at the stage level
+      combinedSetup = {
+        ...globalSetup,
+        foh_consoles: stageSetup.foh_consoles || globalSetup.foh_consoles,
+        mon_consoles: stageSetup.mon_consoles || globalSetup.mon_consoles,
+        wireless_systems: stageSetup.wireless_systems || globalSetup.wireless_systems,
+        iem_systems: stageSetup.iem_systems || globalSetup.iem_systems,
+        
+        // Monitor setup
+        monitors_quantity: stageSetup.monitors_quantity,
+        extras_sf: stageSetup.extras_sf,
+        extras_df: stageSetup.extras_df,
+        extras_djbooth: stageSetup.extras_djbooth,
+        extras_wired: stageSetup.extras_wired || globalSetup.extras_wired,
+        
+        // Infrastructure
+        infra_cat6: stageSetup.infra_cat6,
+        infra_cat6_quantity: stageSetup.infra_cat6_quantity,
+        infra_hma: stageSetup.infra_hma,
+        infra_hma_quantity: stageSetup.infra_hma_quantity,
+        infra_coax: stageSetup.infra_coax,
+        infra_coax_quantity: stageSetup.infra_coax_quantity,
+        infra_opticalcon_duo: stageSetup.infra_opticalcon_duo,
+        infra_opticalcon_duo_quantity: stageSetup.infra_opticalcon_duo_quantity,
+        infra_analog: stageSetup.infra_analog,
+        other_infrastructure: stageSetup.other_infrastructure || globalSetup.other_infrastructure,
+        
+        // Notes
+        notes: stageSetup.notes || globalSetup.notes
+      };
     }
     
     // Fetch logo URL
@@ -446,7 +502,7 @@ export const generateStageGearPDF = async (
       stageNumber,
       stageName,
       date: new Date().toISOString().split('T')[0], // Current date as fallback
-      gearSetup: gearSetup[0],
+      gearSetup: combinedSetup,
       logoUrl
     };
     
