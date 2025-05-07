@@ -1,211 +1,189 @@
 
-import { supabase, checkNetworkConnection } from './enhanced-supabase-client';
+import { SessionCheckService } from "./session-check-service";
 import { toast } from "sonner";
 
+// Enhanced connection recovery service
 class ConnectionRecoveryService {
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 10;
-  private baseReconnectDelay = 2000; // 2 seconds
-  private maxReconnectDelay = 60000; // 1 minute
-  private reconnectTimeoutId: number | null = null;
-  private isRecovering = false;
-  private lastNotificationTime = 0;
-  private notificationCooldown = 15000; // 15 seconds between notifications
-  
+  private sessionCheckService: SessionCheckService;
+  private isRecoveryActive = false;
+  private recoveryAttempts = 0;
+  private maxRecoveryAttempts = 5;
+  private lastRecoveryTime = 0;
+  private recoveryInterval: NodeJS.Timeout | null = null;
+  private healthCheckInterval: NodeJS.Timeout | null = null;
+
   constructor() {
-    this.setupNetworkListeners();
+    this.sessionCheckService = new SessionCheckService();
   }
-  
-  private setupNetworkListeners() {
-    // Listen for online/offline events
-    window.addEventListener('online', () => {
-      this.handleNetworkRecovery();
-    });
-    
-    window.addEventListener('offline', () => {
-      this.handleNetworkDisconnection();
-    });
-    
-    // Listen for visibility changes (tab focus)
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        this.checkConnection();
-      }
-    });
-  }
-  
-  private handleNetworkRecovery() {
-    console.log("Network connection recovered, checking WebSockets");
-    
-    // Reset reconnect attempts when network recovers
-    this.reconnectAttempts = 0;
-    
-    // Show notification with cooldown
-    this.showConnectionNotification('Network connection restored, reconnecting...', 'success');
-    
-    // Start recovery process
-    this.startRecovery();
-  }
-  
-  private handleNetworkDisconnection() {
-    console.log("Network connection lost");
-    
-    // Show notification
-    this.showConnectionNotification('Network connection lost', 'error');
-    
-    // Clear any pending reconnect attempts
-    if (this.reconnectTimeoutId) {
-      window.clearTimeout(this.reconnectTimeoutId);
-      this.reconnectTimeoutId = null;
-    }
-  }
-  
-  private async checkConnection() {
-    console.log("Checking connection status");
-    
-    try {
-      // Check if we have a network connection
-      const hasNetwork = await checkNetworkConnection();
-      
-      if (!hasNetwork) {
-        console.log("No network connection detected");
-        return;
-      }
-      
-      // Check if any realtime channels are disconnected
-      const channels = supabase.getChannels();
-      const hasDisconnectedChannels = channels.some(channel => {
-        return channel.state !== 'joined';
-      });
-      
-      if (hasDisconnectedChannels) {
-        console.log("Detected disconnected channels, starting recovery");
-        this.startRecovery();
-      }
-    } catch (error) {
-      console.error("Error checking connection:", error);
-    }
-  }
-  
-  private showConnectionNotification(message: string, type: 'success' | 'error' | 'info') {
-    const now = Date.now();
-    
-    // Limit notification frequency
-    if (now - this.lastNotificationTime < this.notificationCooldown) {
-      return;
-    }
-    
-    this.lastNotificationTime = now;
-    
-    if (type === 'success') {
-      toast.success(message);
-    } else if (type === 'error') {
-      toast.error(message);
-    } else {
-      toast.info(message);
-    }
-  }
-  
+
+  // Start the recovery service
   startRecovery() {
-    // Don't start multiple recovery processes
-    if (this.isRecovering) {
+    if (this.isRecoveryActive) {
+      return;
+    }
+
+    console.log("Starting connection recovery service");
+    this.isRecoveryActive = true;
+    this.recoveryAttempts = 0;
+
+    // Set up network status monitoring
+    window.addEventListener('online', () => this.handleOnline());
+    window.addEventListener('offline', () => this.handleOffline());
+
+    // Set up visibility change monitoring
+    document.addEventListener('visibilitychange', () => this.handleVisibilityChange());
+
+    // Set up periodic health checks
+    this.healthCheckInterval = setInterval(() => this.performHealthCheck(), 60000); // Every minute
+  }
+
+  // Stop the recovery service
+  stopRecovery() {
+    if (!this.isRecoveryActive) {
+      return;
+    }
+
+    console.log("Stopping connection recovery service");
+    this.isRecoveryActive = false;
+
+    // Clear any pending intervals
+    if (this.recoveryInterval) {
+      clearInterval(this.recoveryInterval);
+      this.recoveryInterval = null;
+    }
+
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
+
+    // Remove event listeners
+    window.removeEventListener('online', () => this.handleOnline());
+    window.removeEventListener('offline', () => this.handleOffline());
+    document.removeEventListener('visibilitychange', () => this.handleVisibilityChange());
+  }
+
+  // Handle browser coming online
+  private handleOnline() {
+    console.log("Network connection detected");
+    
+    // Dispatch a custom event that subscription managers can listen for
+    const event = new CustomEvent('supabase-reconnect', {
+      detail: { reason: 'online' }
+    });
+    window.dispatchEvent(event);
+    
+    // Trigger recovery
+    this.performRecovery('network-reconnect');
+  }
+
+  // Handle browser going offline
+  private handleOffline() {
+    console.log("Network connection lost");
+    toast.error("Network connection lost", {
+      description: "Trying to reconnect...",
+      duration: 3000
+    });
+  }
+
+  // Handle tab visibility changes
+  private handleVisibilityChange() {
+    if (document.visibilityState === 'visible') {
+      console.log("Tab became visible");
+      
+      // Calculate time since last visibility
+      const timeSinceLastActivity = Date.now() - this.lastRecoveryTime;
+      
+      // If we've been away for a while, perform recovery
+      if (timeSinceLastActivity > 5 * 60 * 1000) { // 5 minutes
+        console.log(`Tab was inactive for ${Math.round(timeSinceLastActivity/1000)}s, performing recovery`);
+        this.performRecovery('visibility-change');
+      }
+    }
+  }
+
+  // Perform connection recovery
+  async performRecovery(reason: string) {
+    // Avoid too frequent recovery attempts
+    const now = Date.now();
+    if (now - this.lastRecoveryTime < 10000) { // 10 seconds
+      console.log("Skipping recovery, too soon since last attempt");
       return;
     }
     
-    this.isRecovering = true;
+    this.lastRecoveryTime = now;
+    this.recoveryAttempts += 1;
     
-    this.attemptReconnect();
+    console.log(`Performing connection recovery (Attempt ${this.recoveryAttempts}, reason: ${reason})`);
+    
+    try {
+      // Check session first
+      const isSessionValid = await this.sessionCheckService.checkSession();
+      
+      if (!isSessionValid) {
+        console.log("Session is invalid, directing to login");
+        toast.error("Session expired", {
+          description: "Please log in again",
+          duration: 5000
+        });
+        
+        // Redirect to auth page
+        window.location.href = "/auth";
+        return;
+      }
+      
+      // Session is valid, trigger reconnect events
+      const reconnectEvent = new CustomEvent('force-data-refresh', {
+        detail: { reason }
+      });
+      window.dispatchEvent(reconnectEvent);
+      
+      // Reset recovery attempts on success
+      this.recoveryAttempts = 0;
+      
+      // Show success toast only if recovering from a known issue
+      if (reason === 'network-reconnect' || reason === 'health-check-failed') {
+        toast.success("Connection restored", {
+          description: "Your data has been refreshed",
+          duration: 3000
+        });
+      }
+    } catch (error) {
+      console.error("Error during connection recovery:", error);
+      
+      // If we've reached max attempts, suggest more drastic measures
+      if (this.recoveryAttempts >= this.maxRecoveryAttempts) {
+        toast.error("Connection issues persist", {
+          description: "Consider refreshing the page",
+          duration: 8000
+        });
+      }
+    }
   }
-  
-  private async attemptReconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log("Max reconnection attempts reached");
-      this.showConnectionNotification(
-        'Unable to restore connection after multiple attempts', 
-        'error'
-      );
-      this.isRecovering = false;
+
+  // Perform periodic health check
+  private async performHealthCheck() {
+    if (!this.isRecoveryActive) {
       return;
     }
     
     try {
-      console.log(`Reconnection attempt ${this.reconnectAttempts + 1}`);
-      
-      // Check network before attempting reconnect
-      const hasNetwork = await checkNetworkConnection();
-      
-      if (!hasNetwork) {
-        console.log("No network connection, delaying reconnect");
-        this.scheduleNextReconnect();
-        return;
-      }
-      
-      // Get all active channels
-      const channels = supabase.getChannels();
-      
-      if (channels.length === 0) {
-        console.log("No channels to reconnect");
-        this.isRecovering = false;
-        return;
-      }
-      
-      // Remove all channels and recreate them
-      channels.forEach(channel => {
-        try {
-          console.log(`Removing channel: ${channel.topic}`);
-          supabase.removeChannel(channel);
-        } catch (error) {
-          console.error(`Error removing channel ${channel.topic}:`, error);
-        }
+      // Simple check to Supabase health endpoint
+      const response = await fetch(`${process.env.VITE_SUPABASE_URL}/health`, {
+        method: 'HEAD',
+        cache: 'no-cache'
       });
       
-      // Signal success
-      this.reconnectAttempts = 0;
-      this.isRecovering = false;
-      
-      // Show success notification if this was a recovery (not initial connection)
-      if (this.reconnectAttempts > 0) {
-        this.showConnectionNotification('Connection restored', 'success');
+      if (!response.ok) {
+        console.log(`Health check failed: ${response.status} ${response.statusText}`);
+        this.performRecovery('health-check-failed');
       }
-      
-      // Broadcast a custom event so components can refresh their subscriptions
-      window.dispatchEvent(new CustomEvent('supabase-reconnect'));
-      
     } catch (error) {
-      console.error("Error during reconnection:", error);
-      this.scheduleNextReconnect();
+      console.error("Health check error:", error);
+      this.performRecovery('health-check-failed');
     }
-  }
-  
-  private scheduleNextReconnect() {
-    // Clear any existing timeout
-    if (this.reconnectTimeoutId) {
-      window.clearTimeout(this.reconnectTimeoutId);
-    }
-    
-    // Calculate delay with exponential backoff and jitter
-    const delay = Math.min(
-      this.baseReconnectDelay * Math.pow(1.5, this.reconnectAttempts) * (0.9 + Math.random() * 0.2),
-      this.maxReconnectDelay
-    );
-    
-    console.log(`Scheduling next reconnect attempt in ${Math.round(delay / 1000)}s`);
-    
-    this.reconnectAttempts++;
-    
-    // Schedule next attempt
-    this.reconnectTimeoutId = window.setTimeout(() => {
-      this.attemptReconnect();
-    }, delay);
   }
 }
 
-// Export singleton instance
+// Export as singleton
 export const connectionRecovery = new ConnectionRecoveryService();
-
-// Export a hook for components to use
-export function useConnectionRecovery() {
-  return {
-    startRecovery: () => connectionRecovery.startRecovery(),
-  };
-}

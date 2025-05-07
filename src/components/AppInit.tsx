@@ -18,13 +18,19 @@ export function AppInit() {
   
   // Initialize the connection recovery service
   useEffect(() => {
+    console.log('Initializing connection recovery service');
     connectionRecovery.startRecovery();
-    console.log('Connection recovery service initialized');
+    
+    return () => {
+      connectionRecovery.stopRecovery();
+    };
   }, []);
   
   // Initialize the unified subscription manager
   useEffect(() => {
     const manager = UnifiedSubscriptionManager.getInstance(queryClient);
+    
+    // Setup core functionality
     manager.setupVisibilityBasedRefetching();
     manager.setupNetworkStatusRefetching();
     console.log('Unified subscription manager initialized');
@@ -32,9 +38,13 @@ export function AppInit() {
     // Set up a periodic health check for subscriptions
     const healthCheckInterval = setInterval(() => {
       const connectionStatus = manager.getConnectionStatus();
+      
       if (connectionStatus !== 'connected') {
         console.log(`Connection status is ${connectionStatus}, attempting to reconnect`);
         manager.reestablishSubscriptions();
+        
+        // Also trigger a connection recovery
+        connectionRecovery.performRecovery('subscription-manager-health-check');
       }
     }, 60000); // Check every minute
     
@@ -92,6 +102,20 @@ export function AppInit() {
       return () => clearTimeout(delayTimeout);
     }
   }, [location.pathname, subscriptionStatus]);
+  
+  // Update React Query default options for better performance
+  useEffect(() => {
+    queryClient.setDefaultOptions({
+      queries: {
+        staleTime: 2 * 60 * 1000, // 2 minutes - increased from default
+        retry: 3, // More retries for resilience
+        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+        refetchOnWindowFocus: true,
+        refetchOnMount: true,
+        refetchOnReconnect: true,
+      },
+    });
+  }, [queryClient]);
   
   // This component doesn't render anything
   return null;
