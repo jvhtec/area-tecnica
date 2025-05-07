@@ -1,4 +1,3 @@
-
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
@@ -289,7 +288,7 @@ export class EnhancedSubscriptionManager {
   
   // Reestablish all subscriptions
   reestablishAllSubscriptions() {
-    console.log(`Reestablishing ${this.subscriptions.size} subscriptions`);
+    console.log(`Reestablishing all ${this.subscriptions.size} subscriptions`);
     
     // Create a copy of the subscriptions to avoid issues with iteration
     const subscriptionsCopy = new Map(this.subscriptions);

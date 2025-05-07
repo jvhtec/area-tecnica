@@ -12,7 +12,7 @@ export function useResetSubscriptions() {
     try {
       console.log('Resetting all subscriptions...');
       const manager = EnhancedSubscriptionManager.getInstance(queryClient);
-      manager.resetAllSubscriptions();
+      manager.reestablishAllSubscriptions(); // Changed from resetAllSubscriptions to reestablishAllSubscriptions
       
       // Invalidate all queries to refresh data after resetting subscriptions
       await queryClient.invalidateQueries();

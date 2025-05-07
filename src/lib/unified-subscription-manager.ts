@@ -1,4 +1,3 @@
-
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
@@ -69,7 +68,9 @@ export class UnifiedSubscriptionManager {
     setInterval(async () => {
       try {
         // Try a simple HEAD request to check connection
-        const response = await fetch(`${supabase.realtimeUrl}/health`, {
+        // Use the API URL instead of the realtime URL directly
+        const url = new URL(supabase.supabaseUrl);
+        const response = await fetch(`${url.origin}/rest/v1/health`, {
           method: 'HEAD',
           cache: 'no-cache'
         });

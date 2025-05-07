@@ -187,3 +187,12 @@ class ConnectionRecoveryService {
 
 // Export as singleton
 export const connectionRecovery = new ConnectionRecoveryService();
+
+// Hook for component use (conveniently export the same methods)
+export const useConnectionRecovery = () => {
+  return {
+    startRecovery: () => connectionRecovery.startRecovery(),
+    stopRecovery: () => connectionRecovery.stopRecovery(),
+    performRecovery: (reason: string) => connectionRecovery.performRecovery(reason)
+  };
+};
