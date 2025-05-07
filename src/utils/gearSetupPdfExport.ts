@@ -428,41 +428,77 @@ export const generateStageGearPDF = async (
     const globalSetup = globalSetupData[0];
     
     // Fetch stage-specific gear setup if it exists
-    const { data: stageSetup, error: stageError } = await supabase
-      .from("festival_stage_gear_setups")
-      .select("*")
-      .eq("gear_setup_id", globalSetup.id)
-      .eq("stage_number", stageNumber)
-      .maybeSingle();
-    
-    if (stageError) {
-      console.error('Error fetching stage-specific setup:', stageError);
+    let stageSetup = null;
+    if (stageNumber !== 1) { // Only fetch stage-specific setup if not stage 1
+      const { data: stageSetupData, error: stageError } = await supabase
+        .from("festival_stage_gear_setups")
+        .select("*")
+        .eq("gear_setup_id", globalSetup.id)
+        .eq("stage_number", stageNumber)
+        .maybeSingle();
+      
+      if (stageError) {
+        console.error('Error fetching stage-specific setup:', stageError);
+      } else {
+        stageSetup = stageSetupData;
+      }
+
+      console.log('Stage-specific setup:', stageSetup);
     }
 
-    // Combine global and stage-specific data
-    // Start with global setup data
-    let combinedSetup = { ...globalSetup };
+    // For stage 1, just use the global setup as is
+    // For other stages, combine global and stage-specific data, with stage-specific taking precedence
+    let combinedSetup: any;
     
-    // Override with stage-specific data where available
-    if (stageSetup) {
-      console.log('Using stage-specific gear setup for PDF generation');
-      
-      // Override fields that can be customized at the stage level
+    if (stageNumber === 1 || !stageSetup) {
+      // For stage 1 or if no stage-specific setup exists, use global setup
       combinedSetup = {
-        ...globalSetup,
-        foh_consoles: stageSetup.foh_consoles || globalSetup.foh_consoles,
-        mon_consoles: stageSetup.mon_consoles || globalSetup.mon_consoles,
-        wireless_systems: stageSetup.wireless_systems || globalSetup.wireless_systems,
-        iem_systems: stageSetup.iem_systems || globalSetup.iem_systems,
+        // Direct mappings
+        foh_consoles: globalSetup.foh_consoles || [],
+        mon_consoles: globalSetup.mon_consoles || [],
+        wireless_systems: globalSetup.wireless_systems || [],
+        iem_systems: globalSetup.iem_systems || [],
         
-        // Monitor setup
+        // Convert properties with different names
+        monitors_quantity: globalSetup.available_monitors || 0,
+        monitors_enabled: globalSetup.available_monitors > 0,
+        extras_sf: globalSetup.has_side_fills || false,
+        extras_df: globalSetup.has_drum_fills || false,
+        extras_djbooth: globalSetup.has_dj_booths || false,
+        extras_wired: globalSetup.extras_wired || '',
+        
+        // Infrastructure
+        infra_cat6: globalSetup.available_cat6_runs > 0,
+        infra_cat6_quantity: globalSetup.available_cat6_runs || 0,
+        infra_hma: globalSetup.available_hma_runs > 0,
+        infra_hma_quantity: globalSetup.available_hma_runs || 0,
+        infra_coax: globalSetup.available_coax_runs > 0,
+        infra_coax_quantity: globalSetup.available_coax_runs || 0,
+        infra_opticalcon_duo: globalSetup.available_opticalcon_duo_runs > 0,
+        infra_opticalcon_duo_quantity: globalSetup.available_opticalcon_duo_runs || 0,
+        infra_analog: globalSetup.available_analog_runs || 0,
+        other_infrastructure: globalSetup.other_infrastructure || '',
+        
+        // Notes
+        notes: globalSetup.notes || ''
+      };
+      
+      console.log('Using global setup for PDF generation (Stage 1):', combinedSetup);
+    } else {
+      // For other stages with stage-specific setup, merge with stage-specific taking precedence
+      combinedSetup = {
+        foh_consoles: stageSetup.foh_consoles || globalSetup.foh_consoles || [],
+        mon_consoles: stageSetup.mon_consoles || globalSetup.mon_consoles || [],
+        wireless_systems: stageSetup.wireless_systems || globalSetup.wireless_systems || [],
+        iem_systems: stageSetup.iem_systems || globalSetup.iem_systems || [],
+        
         monitors_quantity: stageSetup.monitors_quantity,
+        monitors_enabled: stageSetup.monitors_enabled,
         extras_sf: stageSetup.extras_sf,
         extras_df: stageSetup.extras_df,
         extras_djbooth: stageSetup.extras_djbooth,
-        extras_wired: stageSetup.extras_wired || globalSetup.extras_wired,
+        extras_wired: stageSetup.extras_wired || globalSetup.extras_wired || '',
         
-        // Infrastructure
         infra_cat6: stageSetup.infra_cat6,
         infra_cat6_quantity: stageSetup.infra_cat6_quantity,
         infra_hma: stageSetup.infra_hma,
@@ -472,11 +508,12 @@ export const generateStageGearPDF = async (
         infra_opticalcon_duo: stageSetup.infra_opticalcon_duo,
         infra_opticalcon_duo_quantity: stageSetup.infra_opticalcon_duo_quantity,
         infra_analog: stageSetup.infra_analog,
-        other_infrastructure: stageSetup.other_infrastructure || globalSetup.other_infrastructure,
+        other_infrastructure: stageSetup.other_infrastructure || globalSetup.other_infrastructure || '',
         
-        // Notes
-        notes: stageSetup.notes || globalSetup.notes
+        notes: stageSetup.notes || globalSetup.notes || ''
       };
+      
+      console.log('Using merged setup for PDF generation (Stage ' + stageNumber + '):', combinedSetup);
     }
     
     // Fetch logo URL
