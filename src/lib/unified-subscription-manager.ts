@@ -1,6 +1,8 @@
+
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { RealtimeChannel } from "@supabase/supabase-js";
+import { SUPABASE_URL } from "@/lib/api-config"; // Import the URL from config
 
 // This class unifies and improves upon all subscription patterns in the app
 export class UnifiedSubscriptionManager {
@@ -68,9 +70,8 @@ export class UnifiedSubscriptionManager {
     setInterval(async () => {
       try {
         // Try a simple HEAD request to check connection
-        // Use the API URL instead of the realtime URL directly
-        const url = new URL(supabase.supabaseUrl);
-        const response = await fetch(`${url.origin}/rest/v1/health`, {
+        // Use the API URL from config instead of trying to access the protected supabaseUrl property
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/health`, {
           method: 'HEAD',
           cache: 'no-cache'
         });
