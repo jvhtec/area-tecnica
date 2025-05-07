@@ -1,4 +1,3 @@
-
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
@@ -14,8 +13,6 @@ export const alertVariants = cva(
           "border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive",
         // Add the info variant
         info: "border-blue-200 bg-blue-50 text-blue-800 [&>svg]:text-blue-500",
-        // Add success variant for connection notifications
-        success: "border-green-200 bg-green-50 text-green-800 [&>svg]:text-green-500",
       },
     },
     defaultVariants: {
