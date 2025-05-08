@@ -1,12 +1,11 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Wifi, WifiOff, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { getRealtimeConnectionStatus } from "@/lib/enhanced-supabase-client";
-import { useConnectionRecovery } from "@/lib/connection-recovery-service";
-import { toast } from "sonner";
+import { useConnectionStatus } from "@/hooks/useConnectionStatus";
+import { connectionManager } from "@/lib/connection-manager";
 
 interface ConnectionIndicatorProps {
   className?: string;
@@ -17,42 +16,13 @@ export function ConnectionIndicator({
   className = "", 
   variant = "badge" 
 }: ConnectionIndicatorProps) {
-  const [status, setStatus] = useState<'CONNECTED' | 'CONNECTING' | 'DISCONNECTED'>(
-    getRealtimeConnectionStatus()
-  );
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const { startRecovery } = useConnectionRecovery();
-  
-  // Update status periodically
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setStatus(getRealtimeConnectionStatus());
-    }, 5000);
-    
-    // Update immediately on mount
-    setStatus(getRealtimeConnectionStatus());
-    
-    return () => clearInterval(interval);
-  }, []);
-  
-  // Handle reconnection
-  const handleReconnect = async () => {
-    setIsRefreshing(true);
-    
-    try {
-      startRecovery();
-      toast.info("Attempting to restore connection...");
-      
-      // Set a timeout to reset the refreshing state
-      setTimeout(() => {
-        setIsRefreshing(false);
-      }, 3000);
-    } catch (error) {
-      setIsRefreshing(false);
-      toast.error("Failed to restore connection");
-      console.error("Error during reconnection:", error);
-    }
-  };
+  const { 
+    connectionState, 
+    isStale, 
+    formattedLastRefresh, 
+    isRefreshing, 
+    refreshConnections 
+  } = useConnectionStatus();
   
   // Simple icon-only variant
   if (variant === "icon") {
@@ -61,22 +31,25 @@ export function ConnectionIndicator({
         <Tooltip>
           <TooltipTrigger asChild>
             <div className={`cursor-help ${className}`}>
-              {status === "CONNECTED" && <Wifi className="h-4 w-4 text-green-500" />}
-              {status === "CONNECTING" && <Loader2 className="h-4 w-4 text-amber-500 animate-spin" />}
-              {status === "DISCONNECTED" && <WifiOff className="h-4 w-4 text-red-500" />}
+              {connectionState === "connecting" && <Loader2 className="h-4 w-4 text-amber-500 animate-spin" />}
+              {connectionState === "connected" && !isStale && <Wifi className="h-4 w-4 text-green-500" />}
+              {connectionState === "connected" && isStale && <Wifi className="h-4 w-4 text-amber-500" />}
+              {connectionState === "disconnected" && <WifiOff className="h-4 w-4 text-red-500" />}
             </div>
           </TooltipTrigger>
           <TooltipContent>
             <p>
-              {status === "CONNECTED" ? "Connected to real-time updates" :
-               status === "CONNECTING" ? "Connecting..." :
+              {connectionState === "connecting" ? "Connecting..." :
+               connectionState === "connected" && !isStale ? "Connected to real-time updates" :
+               connectionState === "connected" && isStale ? "Data may be stale" :
                "Disconnected from real-time updates"}
             </p>
-            {status !== "CONNECTED" && (
+            <p className="text-xs text-muted-foreground">Last updated: {formattedLastRefresh}</p>
+            {(connectionState !== "connected" || isStale) && (
               <Button 
                 variant="link" 
                 className="p-0 h-auto text-xs" 
-                onClick={handleReconnect}
+                onClick={refreshConnections}
               >
                 Click to reconnect
               </Button>
@@ -93,15 +66,17 @@ export function ConnectionIndicator({
       <Badge 
         variant="outline" 
         className={`flex items-center gap-1 cursor-pointer ${className}`}
-        onClick={handleReconnect}
+        onClick={refreshConnections}
       >
-        {status === "CONNECTED" && <Wifi className="h-3 w-3 text-green-500" />}
-        {status === "CONNECTING" && <Loader2 className="h-3 w-3 text-amber-500 animate-spin" />}
-        {status === "DISCONNECTED" && <WifiOff className="h-3 w-3 text-red-500" />}
+        {connectionState === "connecting" && <Loader2 className="h-3 w-3 text-amber-500 animate-spin" />}
+        {connectionState === "connected" && !isStale && <Wifi className="h-3 w-3 text-green-500" />}
+        {connectionState === "connected" && isStale && <Wifi className="h-3 w-3 text-amber-500" />}
+        {connectionState === "disconnected" && <WifiOff className="h-3 w-3 text-red-500" />}
         
         <span className="text-xs">
-          {status === "CONNECTED" ? "Connected" :
-           status === "CONNECTING" ? "Connecting..." :
+          {connectionState === "connecting" ? "Connecting..." :
+           connectionState === "connected" && !isStale ? "Connected" :
+           connectionState === "connected" && isStale ? "Stale" :
            "Disconnected"}
         </span>
         
@@ -117,20 +92,22 @@ export function ConnectionIndicator({
   // Full variant with more details
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      {status === "CONNECTED" && <Wifi className="h-4 w-4 text-green-500" />}
-      {status === "CONNECTING" && <Loader2 className="h-4 w-4 text-amber-500 animate-spin" />}
-      {status === "DISCONNECTED" && <WifiOff className="h-4 w-4 text-red-500" />}
+      {connectionState === "connecting" && <Loader2 className="h-4 w-4 text-amber-500 animate-spin" />}
+      {connectionState === "connected" && !isStale && <Wifi className="h-4 w-4 text-green-500" />}
+      {connectionState === "connected" && isStale && <Wifi className="h-4 w-4 text-amber-500" />}
+      {connectionState === "disconnected" && <WifiOff className="h-4 w-4 text-red-500" />}
       
       <span>
-        {status === "CONNECTED" ? "Connected to real-time updates" :
-         status === "CONNECTING" ? "Connecting to real-time updates..." :
+        {connectionState === "connecting" ? "Connecting to real-time updates..." :
+         connectionState === "connected" && !isStale ? "Connected to real-time updates" :
+         connectionState === "connected" && isStale ? "Data may be stale" :
          "Disconnected from real-time updates"}
       </span>
       
       <Button 
         variant="outline" 
         size="sm" 
-        onClick={handleReconnect}
+        onClick={refreshConnections}
         disabled={isRefreshing}
         className="ml-2"
       >
