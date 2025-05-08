@@ -3,6 +3,8 @@ import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { TokenManager } from "@/lib/token-manager";
 import { toast } from "sonner";
+import { connectionConfig, ConnectionConfig } from "@/lib/connection-config";
+import { throttle, debounce } from "lodash";
 
 /**
  * ConnectionManager orchestrates network connectivity, subscriptions and authentication
@@ -21,23 +23,22 @@ export class ConnectionManager {
   private tokenManager: TokenManager;
   private listeners: Array<(status: ConnectionStatus) => void> = [];
   private consecutiveFailedHeartbeats = 0;
+  private reconnectAttempts = 0;
+  private connectionEventThrottled: (state: 'connected' | 'connecting' | 'disconnected') => void;
+  private lastConnectionEvent = Date.now();
+  private isRefreshing = false;
   
-  // Adjustable settings with sensible defaults
-  private settings = {
-    heartbeatIntervalMs: 30000, // 30 seconds between heartbeats
-    healthCheckIntervalMs: 10000, // 10 seconds between health checks
-    connectionTimeoutMs: 60000, // 1 minute to consider connection dead
-    maxConsecutiveFailedHeartbeats: 3, // After this many failed heartbeats, force reconnect
-    inactivityThresholdMs: 3 * 60 * 1000, // 3 minutes of inactivity before refreshing
-    backgroundRefreshIntervalMs: 4 * 60 * 1000, // 4 minutes between background refreshes
-    staleDataThresholdMs: 5 * 60 * 1000, // 5 minutes before considering data stale
-    reconnectBackoffBaseMs: 2000, // Start with 2 seconds for reconnect attempts
-    reconnectBackoffMaxMs: 60000, // Max 1 minute between reconnect attempts
-    reconnectJitterFactor: 0.2 // 20% random jitter to avoid thundering herd problem
-  };
-  
+  // Constructor is now private - use getInstance() to access
   private constructor() {
     this.tokenManager = TokenManager.getInstance();
+    
+    // Create throttled version of setConnectionState
+    this.connectionEventThrottled = throttle(
+      (state: 'connected' | 'connecting' | 'disconnected') => {
+        this.setConnectionStateInternal(state);
+      }, 
+      connectionConfig.get().throttleConnectionEventsMs
+    );
   }
   
   /**
@@ -55,6 +56,7 @@ export class ConnectionManager {
    */
   public initialize(queryClient: QueryClient): void {
     this.queryClient = queryClient;
+    const config = connectionConfig.get();
     
     // Start heartbeat system
     this.startHeartbeat();
@@ -70,12 +72,22 @@ export class ConnectionManager {
     
     // Subscribe to token refresh events to handle auth-related reconnects
     this.tokenManager.subscribe(() => {
-      console.log("[ConnectionManager] Token refreshed, validating connections");
+      this.logDebug("[ConnectionManager] Token refreshed, validating connections");
       this.validateConnections();
     });
     
-    // Log initialization
-    console.log("[ConnectionManager] Initialized");
+    // Log initialization with current config
+    this.logDebug("[ConnectionManager] Initialized with config:", config);
+  }
+  
+  /**
+   * Enhanced logging with debug mode support
+   */
+  private logDebug(...args: any[]): void {
+    const config = connectionConfig.get();
+    if (config.debugMode) {
+      console.log(...args);
+    }
   }
   
   /**
@@ -86,29 +98,32 @@ export class ConnectionManager {
     this.visibilityDetectionEnabled = true;
     
     document.addEventListener('visibilitychange', this.handleVisibilityChange);
-    console.log("[ConnectionManager] Visibility detection enabled");
+    this.logDebug("[ConnectionManager] Visibility detection enabled");
   }
   
   /**
-   * Handle visibility change events
+   * Handle visibility change events with debouncing
    */
-  private handleVisibilityChange = (): void => {
+  private handleVisibilityChange = debounce((): void => {
     if (document.visibilityState === 'visible') {
-      console.log("[ConnectionManager] Document became visible");
+      this.logDebug("[ConnectionManager] Document became visible");
       
       // Calculate time since last activity
       const inactivityDuration = Date.now() - this.lastActiveTimestamp;
+      const config = connectionConfig.get();
       
-      if (inactivityDuration > this.settings.inactivityThresholdMs) {
-        console.log(`[ConnectionManager] Page was inactive for ${Math.round(inactivityDuration / 1000)}s, refreshing connections`);
+      if (inactivityDuration > config.inactivityThresholdMs) {
+        this.logDebug(`[ConnectionManager] Page was inactive for ${Math.round(inactivityDuration / 1000)}s, refreshing connections`);
         
         // Force a complete connection validation
         this.validateConnections(true);
         
-        // Show a toast notification
-        toast.info("Refreshing data after inactivity", {
-          description: "Reconnecting to real-time updates..."
-        });
+        // Show a toast notification if not in quiet mode
+        if (config.showReconnectNotifications && !config.quietMode) {
+          toast.info("Refreshing data after inactivity", {
+            description: "Reconnecting to real-time updates..."
+          });
+        }
         
         // Invalidate all queries to refresh data
         this.queryClient?.invalidateQueries();
@@ -117,7 +132,7 @@ export class ConnectionManager {
       // Update last active timestamp
       this.lastActiveTimestamp = Date.now();
     }
-  };
+  }, 500);
   
   /**
    * Set up network status detection
@@ -128,23 +143,31 @@ export class ConnectionManager {
     
     // Handle online event
     window.addEventListener('online', () => {
-      console.log("[ConnectionManager] Network came online");
+      this.logDebug("[ConnectionManager] Network came online");
       this.validateConnections(true);
-      toast.success("Network connection restored", {
-        description: "Reconnecting to real-time updates..."
-      });
+      
+      const config = connectionConfig.get();
+      if (config.showReconnectNotifications && !config.quietMode) {
+        toast.success("Network connection restored", {
+          description: "Reconnecting to real-time updates..."
+        });
+      }
     });
     
     // Handle offline event
     window.addEventListener('offline', () => {
-      console.log("[ConnectionManager] Network went offline");
+      this.logDebug("[ConnectionManager] Network went offline");
       this.setConnectionState('disconnected');
-      toast.error("Network connection lost", {
-        description: "Waiting for reconnection..."
-      });
+      
+      const config = connectionConfig.get();
+      if (config.showReconnectNotifications) {
+        toast.error("Network connection lost", {
+          description: "Waiting for reconnection..."
+        });
+      }
     });
     
-    console.log("[ConnectionManager] Network detection enabled");
+    this.logDebug("[ConnectionManager] Network detection enabled");
   }
   
   /**
@@ -155,28 +178,32 @@ export class ConnectionManager {
       window.clearInterval(this.heartbeatInterval);
     }
     
+    const config = connectionConfig.get();
+    
     // Set up interval for sending heartbeats
     this.heartbeatInterval = window.setInterval(() => {
       this.sendHeartbeat();
-    }, this.settings.heartbeatIntervalMs);
+    }, config.heartbeatIntervalMs);
     
     // Send an initial heartbeat
     this.sendHeartbeat();
     
-    console.log("[ConnectionManager] Heartbeat system started");
+    this.logDebug("[ConnectionManager] Heartbeat system started with interval:", config.heartbeatIntervalMs);
   }
   
   /**
-   * Send a heartbeat to check connection status
+   * Send a heartbeat to check connection status with exponential backoff
    */
   private async sendHeartbeat(): Promise<void> {
+    const config = connectionConfig.get();
+    
     try {
       // Only send heartbeat if the document is visible or we've exceeded background refresh interval
       const timeSinceLastHeartbeat = Date.now() - this.lastHeartbeatResponse;
       if (document.visibilityState === 'visible' || 
-          timeSinceLastHeartbeat > this.settings.backgroundRefreshIntervalMs) {
+          timeSinceLastHeartbeat > config.inactivityThresholdMs) {
         
-        console.log("[ConnectionManager] Sending heartbeat");
+        this.logDebug("[ConnectionManager] Sending heartbeat");
         
         // Use Supabase REST API for heartbeat
         const response = await fetch('https://syldobdcdsgfgjtbuwxm.supabase.co/rest/v1/', {
@@ -192,17 +219,20 @@ export class ConnectionManager {
         if (response.ok) {
           this.lastHeartbeatResponse = Date.now();
           this.consecutiveFailedHeartbeats = 0;
+          this.reconnectAttempts = 0;
           
           // If we were previously disconnected, reconnect
           if (this.connectionState !== 'connected') {
             this.setConnectionState('connected');
           }
         } else {
-          console.warn("[ConnectionManager] Failed heartbeat:", response.status);
+          if (config.verboseLogging) {
+            console.warn("[ConnectionManager] Failed heartbeat:", response.status);
+          }
           this.consecutiveFailedHeartbeats++;
           
           // If we've had too many consecutive failed heartbeats, force reconnect
-          if (this.consecutiveFailedHeartbeats >= this.settings.maxConsecutiveFailedHeartbeats) {
+          if (this.consecutiveFailedHeartbeats >= config.maxConsecutiveFailedHeartbeats) {
             console.error("[ConnectionManager] Too many failed heartbeats, forcing reconnection");
             this.validateConnections(true);
             this.consecutiveFailedHeartbeats = 0;
@@ -214,9 +244,22 @@ export class ConnectionManager {
       this.consecutiveFailedHeartbeats++;
       
       // If we've had too many consecutive failures, set to disconnected
-      if (this.consecutiveFailedHeartbeats >= this.settings.maxConsecutiveFailedHeartbeats) {
+      if (this.consecutiveFailedHeartbeats >= config.maxConsecutiveFailedHeartbeats) {
         this.setConnectionState('disconnected');
       }
+      
+      // Apply exponential backoff for reconnect attempts
+      this.reconnectAttempts++;
+      const backoffTime = Math.min(
+        config.reconnectBackoffBaseMs * Math.pow(2, this.reconnectAttempts - 1),
+        config.reconnectBackoffMaxMs
+      );
+      
+      // Add jitter to avoid thundering herd
+      const jitter = config.reconnectJitterFactor * backoffTime * (Math.random() * 2 - 1);
+      const nextBackoff = backoffTime + jitter;
+      
+      this.logDebug(`[ConnectionManager] Backoff for ${Math.round(nextBackoff / 1000)}s before next reconnect attempt`);
     }
   }
   
@@ -228,12 +271,14 @@ export class ConnectionManager {
       window.clearInterval(this.healthCheckInterval);
     }
     
+    const config = connectionConfig.get();
+    
     // Set up interval for health checks
     this.healthCheckInterval = window.setInterval(() => {
       this.checkConnectionHealth();
-    }, this.settings.healthCheckIntervalMs);
+    }, config.healthCheckIntervalMs);
     
-    console.log("[ConnectionManager] Health check system started");
+    this.logDebug("[ConnectionManager] Health check system started with interval:", config.healthCheckIntervalMs);
   }
   
   /**
@@ -243,23 +288,36 @@ export class ConnectionManager {
     // Skip checks if document isn't visible
     if (document.visibilityState !== 'visible') return;
     
+    const config = connectionConfig.get();
+    
     // Check if heartbeat is stale
     const timeSinceLastHeartbeat = Date.now() - this.lastHeartbeatResponse;
-    if (timeSinceLastHeartbeat > this.settings.connectionTimeoutMs) {
+    if (timeSinceLastHeartbeat > config.connectionTimeoutMs) {
       console.warn(`[ConnectionManager] No heartbeat response for ${Math.round(timeSinceLastHeartbeat / 1000)}s, connection may be dead`);
       
-      // Try to reconnect
-      this.setConnectionState('connecting');
-      this.validateConnections(true);
+      // Try to reconnect if not already refreshing
+      if (!this.isRefreshing) {
+        this.setConnectionState('connecting');
+        this.validateConnections(true);
+      }
     }
     
     // Check if we should refresh session
     const timeSinceLastActive = Date.now() - this.lastActiveTimestamp;
-    if (timeSinceLastActive > this.settings.staleDataThresholdMs) {
-      console.log(`[ConnectionManager] Session may be stale after ${Math.round(timeSinceLastActive / 1000)}s of inactivity`);
+    if (timeSinceLastActive > config.staleDataThresholdMs) {
+      this.logDebug(`[ConnectionManager] Session may be stale after ${Math.round(timeSinceLastActive / 1000)}s of inactivity`);
       
-      // Refresh session
-      this.tokenManager.refreshToken();
+      // Refresh session using token manager
+      if (!this.isRefreshing) {
+        this.isRefreshing = true;
+        this.tokenManager.refreshToken()
+          .catch(error => {
+            console.error("[ConnectionManager] Failed to refresh token:", error);
+          })
+          .finally(() => {
+            this.isRefreshing = false;
+          });
+      }
     }
     
     // Update the last active timestamp if the document is visible
@@ -269,19 +327,28 @@ export class ConnectionManager {
   }
   
   /**
-   * Set the connection state and notify listeners
+   * Internal method to set connection state without throttling
    */
-  private setConnectionState(state: 'connected' | 'connecting' | 'disconnected'): void {
+  private setConnectionStateInternal(state: 'connected' | 'connecting' | 'disconnected'): void {
     // Skip if state hasn't changed
     if (this.connectionState === state) return;
     
-    console.log(`[ConnectionManager] Connection state changed: ${this.connectionState} -> ${state}`);
+    this.logDebug(`[ConnectionManager] Connection state changed: ${this.connectionState} -> ${state}`);
     
     // Update state
     this.connectionState = state;
+    this.lastConnectionEvent = Date.now();
     
     // Notify all listeners
     this.notifyListeners();
+  }
+  
+  /**
+   * Set the connection state and notify listeners with throttling
+   */
+  private setConnectionState(state: 'connected' | 'connecting' | 'disconnected'): void {
+    // Use the throttled version of setConnectionState
+    this.connectionEventThrottled(state);
   }
   
   /**
@@ -293,7 +360,15 @@ export class ConnectionManager {
       return;
     }
     
-    console.log(`[ConnectionManager] Validating connections${force ? ' (forced)' : ''}`);
+    this.logDebug(`[ConnectionManager] Validating connections${force ? ' (forced)' : ''}`);
+    
+    // Avoid concurrent refreshes
+    if (this.isRefreshing) {
+      this.logDebug("[ConnectionManager] Already refreshing, skipping validation");
+      return;
+    }
+    
+    this.isRefreshing = true;
     
     // Check session first
     if (force) {
@@ -306,10 +381,14 @@ export class ConnectionManager {
         .catch(error => {
           console.error("[ConnectionManager] Failed to refresh session:", error);
           this.validateChannelConnections(force);
+        })
+        .finally(() => {
+          this.isRefreshing = false;
         });
     } else {
       // Just validate the channels without refreshing the session
       this.validateChannelConnections(force);
+      this.isRefreshing = false;
     }
   }
   
@@ -322,18 +401,18 @@ export class ConnectionManager {
       const channels = supabase.getChannels();
       
       if (channels.length === 0) {
-        console.log("[ConnectionManager] No channels to validate");
+        this.logDebug("[ConnectionManager] No channels to validate");
         return;
       }
       
-      console.log(`[ConnectionManager] Validating ${channels.length} channels`);
+      this.logDebug(`[ConnectionManager] Validating ${channels.length} channels`);
       
       // If force is true, remove all channels and re-subscribe
       if (force) {
         // Remove all channels
         channels.forEach(channel => {
           try {
-            console.log(`[ConnectionManager] Removing channel ${channel.topic}`);
+            this.logDebug(`[ConnectionManager] Removing channel ${channel.topic}`);
             supabase.removeChannel(channel);
           } catch (error) {
             console.error(`[ConnectionManager] Error removing channel ${channel.topic}:`, error);
@@ -358,7 +437,7 @@ export class ConnectionManager {
           // Remove broken channels
           brokenChannels.forEach(channel => {
             try {
-              console.log(`[ConnectionManager] Removing broken channel ${channel.topic}`);
+              this.logDebug(`[ConnectionManager] Removing broken channel ${channel.topic}`);
               supabase.removeChannel(channel);
             } catch (error) {
               console.error(`[ConnectionManager] Error removing broken channel ${channel.topic}:`, error);
@@ -371,7 +450,7 @@ export class ConnectionManager {
           // Invalidate queries
           this.queryClient?.invalidateQueries();
         } else {
-          console.log("[ConnectionManager] All channels are connected");
+          this.logDebug("[ConnectionManager] All channels are connected");
           this.setConnectionState('connected');
         }
       }
@@ -413,11 +492,14 @@ export class ConnectionManager {
    * Get current connection status
    */
   public getConnectionStatus(): ConnectionStatus {
+    const config = connectionConfig.get();
+    
     return {
       state: this.connectionState,
       lastActiveTimestamp: this.lastActiveTimestamp,
       lastHeartbeatResponse: this.lastHeartbeatResponse,
-      isStale: (Date.now() - this.lastHeartbeatResponse) > this.settings.staleDataThresholdMs
+      isStale: (Date.now() - this.lastHeartbeatResponse) > config.staleDataThresholdMs,
+      timeSinceLastEvent: Date.now() - this.lastConnectionEvent
     };
   }
   
@@ -425,12 +507,16 @@ export class ConnectionManager {
    * Force a manual refresh of all connections and data
    */
   public forceRefresh(): void {
-    console.log("[ConnectionManager] Forcing refresh of all connections and data");
+    this.logDebug("[ConnectionManager] Forcing refresh of all connections and data");
     
-    // Show toast notification
-    toast.info("Refreshing all connections", {
-      description: "Reconnecting to real-time updates..."
-    });
+    const config = connectionConfig.get();
+    
+    // Show toast notification if not in quiet mode
+    if (config.showReconnectNotifications && !config.quietMode) {
+      toast.info("Refreshing all connections", {
+        description: "Reconnecting to real-time updates..."
+      });
+    }
     
     // Refresh connections
     this.validateConnections(true);
@@ -457,15 +543,22 @@ export class ConnectionManager {
     // Remove event listeners
     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
     
-    console.log("[ConnectionManager] Cleaned up resources");
+    this.logDebug("[ConnectionManager] Cleaned up resources");
   }
   
   /**
    * Update connection manager settings
    */
-  public updateSettings(settings: Partial<typeof this.settings>): void {
-    this.settings = { ...this.settings, ...settings };
-    console.log("[ConnectionManager] Settings updated:", this.settings);
+  public updateSettings(settings: Partial<ConnectionConfig>): ConnectionConfig {
+    const updatedConfig = connectionConfig.update(settings);
+    
+    this.logDebug("[ConnectionManager] Settings updated:", updatedConfig);
+    
+    // Restart systems with new configurations
+    this.startHeartbeat();
+    this.startHealthCheck();
+    
+    return updatedConfig;
   }
 }
 
@@ -477,6 +570,7 @@ export interface ConnectionStatus {
   lastActiveTimestamp: number;
   lastHeartbeatResponse: number;
   isStale: boolean;
+  timeSinceLastEvent: number;
 }
 
 // Export singleton instance
