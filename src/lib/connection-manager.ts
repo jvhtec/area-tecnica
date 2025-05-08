@@ -259,7 +259,7 @@ export class ConnectionManager {
       console.log(`[ConnectionManager] Session may be stale after ${Math.round(timeSinceLastActive / 1000)}s of inactivity`);
       
       // Refresh session
-      this.tokenManager.refreshSession();
+      this.tokenManager.refreshToken();
     }
     
     // Update the last active timestamp if the document is visible
