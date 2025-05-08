@@ -298,7 +298,7 @@ export class ConnectionManager {
     // Check session first
     if (force) {
       // Force refresh the auth session
-      this.tokenManager.refreshSession()
+      this.tokenManager.refreshToken()
         .then(() => {
           // Check channel connections
           this.validateChannelConnections(force);
