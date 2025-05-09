@@ -5,5 +5,5 @@ import ConnectionSettings from "@/pages/ConnectionSettings";
 // In your routes array, add the new route:
 {
   path: "/connection-settings",
-  element: <ConnectionSettings />,
-},
+  element: <ConnectionSettings />
+}

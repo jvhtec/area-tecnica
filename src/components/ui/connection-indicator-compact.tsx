@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Wifi, WifiOff, AlertCircle, RefreshCw, Loader2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
@@ -141,6 +142,7 @@ export function ConnectionIndicatorCompact({
             Click to reset connection
           </p>
         </TooltipContent>
-      </TooltipProvider>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
