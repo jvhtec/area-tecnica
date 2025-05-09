@@ -11,11 +11,11 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
+import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { Link } from "react-router-dom";
 import { Scale, Zap, File } from "lucide-react";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
-import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 
 const Video = () => {
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
@@ -30,16 +30,8 @@ const Video = () => {
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { forceSubscribe } = useSubscriptionContext();
   
-  // Use the subscription context instead of the tab visibility hook
-  useEffect(() => {
-    // Ensure we're subscribed to the necessary tables for this component
-    forceSubscribe(['jobs', 'job_departments']);
-    
-    // Return empty cleanup to satisfy the linter
-    return () => {};
-  }, [forceSubscribe]);
+  useTabVisibility(['jobs']);
 
   const { data: jobs, isLoading } = useJobs();
 
@@ -177,13 +169,15 @@ const Video = () => {
             Power Calculator
           </Button>
         </Link>
-        <Link to="/video-memoria-tecnica">
-          <Button variant="outline" className="gap-2">
-            <File className="h-4 w-4" />
-            Memoria Técnica
-          </Button>
-        </Link>
+<Link to="/video-memoria-tecnica">
+  <Button variant="outline" className="gap-2">
+    <File className="h-4 w-4" />
+    Memoria Técnica
+  </Button>
+</Link>
+
       </div>
+
 
       <CreateJobDialog
         open={isJobDialogOpen}

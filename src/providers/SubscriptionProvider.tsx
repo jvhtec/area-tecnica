@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { UnifiedSubscriptionManager } from '@/lib/unified-subscription-manager';
-import { connectionManager } from '@/lib/connection-manager';
+import { toast } from 'sonner';
 import { TokenManager } from '@/lib/token-manager';
 
 // Context for providing subscription manager state
@@ -50,31 +50,45 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     forceSubscribe: () => {}
   });
   
-  // Initialize managers
+  // Track last connection status to notify on changes
+  const lastConnectionStatusRef = React.useRef<string>(state.connectionStatus);
+  const tokenManager = TokenManager.getInstance();
+  const connectionCheckIntervalRef = React.useRef<number | null>(null);
+
+  // Initialize the subscription manager
   useEffect(() => {
-    // Initialize connection manager
-    connectionManager.initialize(queryClient);
-    
-    // Get subscription manager instance
     const manager = UnifiedSubscriptionManager.getInstance(queryClient);
     
-    // Setup subscription monitoring
-    const connectionCheckIntervalRef = window.setInterval(() => {
-      const connectionStatus = connectionManager.getConnectionStatus().state;
+    // Setup network status and visibility monitoring
+    manager.setupNetworkStatusRefetching();
+    manager.setupVisibilityBasedRefetching();
+    
+    // Subscribe to token refreshes to update subscriptions
+    const unsubscribe = tokenManager.subscribe(() => {
+      console.log("Token refreshed, updating subscriptions");
       
-      setState(prev => ({
-        ...prev,
-        connectionStatus,
-        activeSubscriptions: manager.getActiveSubscriptions(),
-        subscriptionCount: manager.getSubscriptionCount(),
-        subscriptionsByTable: manager.getSubscriptionsByTable(),
-        lastRefreshTime: connectionManager.getConnectionStatus().lastHeartbeatResponse
-      }));
-    }, 2000);
+      // Get current subscriptions by table
+      const tables = Object.keys(manager.getSubscriptionsByTable());
+      
+      // Force refresh all subscriptions
+      manager.forceRefreshSubscriptions(tables);
+      queryClient.invalidateQueries();
+      setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
+    });
     
     // Define refresh function
     const refreshSubscriptions = () => {
-      connectionManager.forceRefresh();
+      console.log("Manually refreshing subscriptions...");
+      
+      // Get current subscriptions by table
+      const tables = Object.keys(manager.getSubscriptionsByTable());
+      
+      // Force refresh all subscriptions
+      manager.forceRefreshSubscriptions(tables);
+      setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
+      
+      // Show toast notification
+      toast.success("Subscriptions refreshed");
     };
     
     // Define invalidate function with optional specific query key
@@ -90,9 +104,6 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     
     // Define force refresh function for specific tables
     const forceRefresh = (tables?: string[]) => {
-      // Get subscription manager
-      const manager = UnifiedSubscriptionManager.getInstance(queryClient);
-      
       if (tables && tables.length > 0) {
         // Refresh specific tables
         manager.forceRefreshSubscriptions(tables);
@@ -101,9 +112,14 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
         tables.forEach(table => {
           queryClient.invalidateQueries({ queryKey: [table] });
         });
+        
+        toast.success(`Refreshed ${tables.join(', ')} tables`);
       } else {
-        // Refresh all tables by forcing connection validation
-        connectionManager.validateConnections(true);
+        // Refresh all tables
+        const allTables = Object.keys(manager.getSubscriptionsByTable());
+        manager.forceRefreshSubscriptions(allTables);
+        queryClient.invalidateQueries();
+        toast.success('All subscriptions refreshed');
       }
       
       setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
@@ -137,16 +153,54 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
       refreshSubscriptions,
       invalidateQueries,
       forceRefresh,
-      forceSubscribe
+      forceSubscribe,
+      lastRefreshTime: Date.now()
     }));
     
-    // Clean up interval
-    return () => {
-      if (connectionCheckIntervalRef) {
-        clearInterval(connectionCheckIntervalRef);
+    // Set initial connection status from manager
+    setState(prev => ({
+      ...prev, 
+      connectionStatus: manager.getConnectionStatus()
+    }));
+    
+    // Clear any existing interval
+    if (connectionCheckIntervalRef.current) {
+      clearInterval(connectionCheckIntervalRef.current);
+    }
+    
+    // Update state periodically to reflect current subscription status
+    connectionCheckIntervalRef.current = window.setInterval(() => {
+      const connectionStatus = manager.getConnectionStatus();
+      
+      // Notify users of connection status changes
+      if (connectionStatus !== lastConnectionStatusRef.current) {
+        if (connectionStatus === 'connected' && lastConnectionStatusRef.current !== 'connected') {
+          toast.success('Connection restored', {
+            description: 'Real-time updates are now active'
+          });
+        } else if (connectionStatus === 'disconnected' && lastConnectionStatusRef.current === 'connected') {
+          toast.error('Connection lost', {
+            description: 'Attempting to reconnect...'
+          });
+        }
+        
+        lastConnectionStatusRef.current = connectionStatus;
       }
-      // Clean up connection manager
-      connectionManager.cleanup();
+      
+      setState(prev => ({
+        ...prev,
+        connectionStatus: manager.getConnectionStatus(),
+        activeSubscriptions: manager.getActiveSubscriptions(),
+        subscriptionCount: manager.getSubscriptionCount(),
+        subscriptionsByTable: manager.getSubscriptionsByTable(),
+      }));
+    }, 2000); // More frequent updates (every 2 seconds)
+    
+    return () => {
+      if (connectionCheckIntervalRef.current) {
+        clearInterval(connectionCheckIntervalRef.current);
+      }
+      unsubscribe();
     };
   }, [queryClient]);
 

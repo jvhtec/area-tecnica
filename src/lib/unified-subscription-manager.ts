@@ -69,58 +69,6 @@ export class UnifiedSubscriptionManager {
     
     return true;
   }
-  
-  // New method to match what's used in useResetSubscriptions
-  public reestablishAllSubscriptions() {
-    return this.reestablishSubscriptions();
-  }
-  
-  // New method to forcefully refresh subscriptions by table
-  public forceRefreshSubscriptions(tables: string[]) {
-    console.log(`Forcing refresh of subscriptions for tables: ${tables.join(', ')}`);
-    
-    // Get subscription keys for the specified tables
-    const keysToRefresh: string[] = [];
-    
-    this.subscriptions.forEach((sub, key) => {
-      const [table] = key.split('::');
-      if (tables.includes(table)) {
-        keysToRefresh.push(key);
-      }
-    });
-    
-    if (keysToRefresh.length === 0) {
-      console.log('No subscriptions found for the specified tables');
-      return false;
-    }
-    
-    console.log(`Refreshing ${keysToRefresh.length} subscriptions`);
-    
-    // Save options for resubscribing
-    keysToRefresh.forEach(key => {
-      const subscription = this.subscriptions.get(key);
-      if (subscription) {
-        this.pendingSubscriptions.set(key, subscription.options);
-        
-        // Unsubscribe
-        subscription.unsubscribe();
-        this.subscriptions.delete(key);
-      }
-    });
-    
-    // Resubscribe
-    this.pendingSubscriptions.forEach((options, key) => {
-      this.subscribeToTable(options.table, options.queryKey, options.filter, options.priority);
-      this.pendingSubscriptions.delete(key);
-    });
-    
-    // Invalidate relevant queries
-    tables.forEach(table => {
-      this.queryClient.invalidateQueries({ queryKey: [table] });
-    });
-    
-    return true;
-  }
 
   // Add the missing cleanupRouteDependentSubscriptions method
   public cleanupRouteDependentSubscriptions(route: string) {
@@ -223,5 +171,10 @@ export class UnifiedSubscriptionManager {
     // Implementation for getting subscription status
     // ...
     return { isConnected: false, lastActivity: 0 };
+  }
+
+  public forceRefreshSubscriptions(tables: string[]) {
+    // Implementation for forcing refresh of subscriptions
+    // ...
   }
 }
