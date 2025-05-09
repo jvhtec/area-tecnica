@@ -1,18 +1,14 @@
-
 import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Outlet, useRouteError, isRouteErrorResponse, useNavigate } from "react-router-dom";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Layout } from "@/components/layout/Layout";
+import Layout from "@/components/layout/Layout";
 import { Toaster } from "@/components/ui/toaster";
-import { ThemeProvider } from "@/components/theme/theme-provider";
-import { AuthProvider } from "@/providers/AuthProvider";
-import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
-import { supabase } from "@/lib/supabase";
-import { Sonner } from 'sonner';
+import { ThemeProvider } from "@/components/ui/theme-provider";
 import { connectionManager } from "@/lib/connection-manager";
 import { ConnectionIndicatorCompact } from "@/components/ui/connection-indicator-compact";
 import { connectionConfig } from "@/lib/connection-config";
+import { Toaster as Sonner } from "sonner";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -34,16 +30,12 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ThemeProvider>
-          <AuthProvider>
-            <SubscriptionProvider>
-              <Layout>
-                <Outlet />
-                <Toaster />
-                <Sonner position="bottom-right" />
-                <ConnectionIndicatorCompact />
-              </Layout>
-            </SubscriptionProvider>
-          </AuthProvider>
+          <Layout>
+            <Outlet />
+            <Toaster />
+            <Sonner position="bottom-right" />
+            <ConnectionIndicatorCompact />
+          </Layout>
         </ThemeProvider>
       </TooltipProvider>
     </QueryClientProvider>
