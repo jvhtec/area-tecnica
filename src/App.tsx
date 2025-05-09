@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Outlet, useRouteError, isRouteErrorResponse, useNavigate } from "react-router-dom";
@@ -30,12 +31,14 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ThemeProvider>
-          <Layout>
-            <Outlet />
-            <Toaster />
-            <Sonner position="bottom-right" />
-            <ConnectionIndicatorCompact />
-          </Layout>
+          <div className="app-container">
+            <Layout>
+              <Outlet />
+              <Toaster />
+              <Sonner position="bottom-right" />
+              <ConnectionIndicatorCompact />
+            </Layout>
+          </div>
         </ThemeProvider>
       </TooltipProvider>
     </QueryClientProvider>

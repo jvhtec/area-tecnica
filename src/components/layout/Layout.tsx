@@ -11,8 +11,8 @@ import {
   SidebarTrigger
 } from "@/components/ui/sidebar";
 import { LogOut } from "lucide-react";
-import { useNavigate, useLocation, Outlet } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { UserInfo } from "@/components/layout/UserInfo";
@@ -28,7 +28,11 @@ import { WolfensteinDialog } from "@/components/doom/WolfensteinDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { HeaderStatus } from "@/components/ui/header-status";
 
-const Layout = () => {
+interface LayoutProps {
+  children: ReactNode;
+}
+
+const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -165,7 +169,7 @@ const Layout = () => {
             </div>
           </header>
           <main className="p-6">
-            <Outlet />
+            {children}
           </main>
         </div>
       </div>
