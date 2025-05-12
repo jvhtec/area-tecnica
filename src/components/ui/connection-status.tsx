@@ -1,5 +1,5 @@
 
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useState, useMemo } from 'react';
 import { WifiIcon, WifiOffIcon, SignalIcon } from 'lucide-react';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
 import { cn } from '@/lib/utils';
@@ -34,8 +34,8 @@ export const ConnectionStatus = memo(function ConnectionStatus({
     };
   }, []);
 
-  // Render different variants based on props, not conditional hook usage
-  const renderInlineVariant = () => (
+  // Memoize all variant renderings to prevent conditional hook calls
+  const inlineVariant = useMemo(() => (
     <div className={cn('flex items-center gap-1', className)}>
       {connectionStatus === 'connected' ? (
         <>
@@ -54,9 +54,9 @@ export const ConnectionStatus = memo(function ConnectionStatus({
         </>
       )}
     </div>
-  );
+  ), [connectionStatus, className]);
   
-  const renderCompactVariant = () => (
+  const compactVariant = useMemo(() => (
     <div className={cn('relative', className)}>
       {connectionStatus === 'connected' ? (
         <WifiIcon className="h-4 w-4 text-green-500" />
@@ -66,9 +66,9 @@ export const ConnectionStatus = memo(function ConnectionStatus({
         <WifiOffIcon className="h-4 w-4 text-red-500" />
       )}
     </div>
-  );
+  ), [connectionStatus, className]);
   
-  const renderDefaultVariant = () => (
+  const defaultVariant = useMemo(() => (
     <div className={cn('flex items-center gap-2', className)}>
       {connectionStatus === 'connected' ? (
         <>
@@ -89,15 +89,15 @@ export const ConnectionStatus = memo(function ConnectionStatus({
         </>
       )}
     </div>
-  );
+  ), [connectionStatus, isOnline, className]);
 
-  // Use a switch statement instead of conditional rendering
+  // Use a switch statement instead of conditional rendering to ensure consistent hook calls
   switch (variant) {
     case 'inline':
-      return renderInlineVariant();
+      return inlineVariant;
     case 'compact':
-      return renderCompactVariant();
+      return compactVariant;
     default:
-      return renderDefaultVariant();
+      return defaultVariant;
   }
 });

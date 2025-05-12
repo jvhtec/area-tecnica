@@ -58,7 +58,7 @@ export function SessionStatusIndicator({
     }
   };
   
-  // Get the right status icon - memoized
+  // Memoize all status icons and content to prevent conditional renders
   const statusIcon = useMemo(() => {
     switch (combinedStatus) {
       case "connected":
@@ -131,8 +131,8 @@ export function SessionStatusIndicator({
     }
   }, [combinedStatus]);
   
-  // Render based on variant - using functions to avoid conditional hook calls
-  const renderIconVariant = () => (
+  // Pre-render all variant components to avoid conditional hook calls
+  const iconVariantComponent = useMemo(() => (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
@@ -154,9 +154,9 @@ export function SessionStatusIndicator({
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
-  );
+  ), [statusIcon, tooltipMessage, combinedStatus, className, handleReconnect]);
   
-  const renderBadgeVariant = () => (
+  const badgeVariantComponent = useMemo(() => (
     <Badge 
       variant="outline" 
       className={`flex items-center gap-1 cursor-pointer ${className}`}
@@ -176,9 +176,9 @@ export function SessionStatusIndicator({
         <RefreshCw className="h-3 w-3" />
       )}
     </Badge>
-  );
+  ), [statusIcon, statusText, isRefreshing, className, handleReconnect]);
   
-  const renderFullVariant = () => (
+  const fullVariantComponent = useMemo(() => (
     <div className={`flex items-center gap-2 ${className}`}>
       <div className="flex items-center">
         {statusIcon}
@@ -208,17 +208,11 @@ export function SessionStatusIndicator({
         )}
       </Button>
     </div>
-  );
+  ), [statusIcon, tooltipMessage, isRefreshing, className, handleReconnect]);
 
   // Use a switch instead of conditionals to ensure consistent hook calls
-  switch (variant) {
-    case "icon":
-      return renderIconVariant();
-    case "badge":
-      return renderBadgeVariant();
-    case "full":
-      return renderFullVariant();
-    default:
-      return renderBadgeVariant();
-  }
+  // All variants are pre-rendered with useMemo, so we're just returning the pre-rendered components
+  if (variant === "icon") return iconVariantComponent;
+  if (variant === "badge") return badgeVariantComponent;
+  return fullVariantComponent;
 }

@@ -88,7 +88,9 @@ export function useEnhancedRouteSubscriptions() {
       console.log(`Subscribing to ${table} with priority medium`);
       if (typeof manager.subscribeToTable === 'function') {
         manager.subscribeToTable(table, [table], undefined, "medium");
-        manager.registerRouteSubscription(routeKeyForSubs, table);
+        if (typeof manager.registerRouteSubscription === 'function') {
+          manager.registerRouteSubscription(routeKeyForSubs, table);
+        }
       }
     });
   }, [location.pathname, manager, routeKey, findMatchingRoute]);
@@ -141,10 +143,16 @@ export function useEnhancedRouteSubscriptions() {
   // Create a checkSubscriptionStatus function and memoize it
   const checkSubscriptionStatus = useCallback(() => {
     try {
-      const activeSubscriptions = manager.getActiveSubscriptions?.() || [];
+      // Ensure consistent object structure with optional chaining
+      const activeSubscriptions = typeof manager.getActiveSubscriptions === 'function' 
+        ? manager.getActiveSubscriptions() 
+        : [];
       
       // Get list of tables that are currently subscribed
-      const currentlySubscribedTables = Object.keys(manager.getSubscriptionsByTable() || {});
+      const currentlySubscribedTables = typeof manager.getSubscriptionsByTable === 'function'
+        ? Object.keys(manager.getSubscriptionsByTable() || {})
+        : [];
+        
       setSubscribedTables(currentlySubscribedTables);
       
       // Find tables that should be subscribed but aren't
@@ -165,7 +173,9 @@ export function useEnhancedRouteSubscriptions() {
         unsubscribedTables: missingTables,
       }));
       
-      setConnectionStatus(manager.getConnectionStatus());
+      if (typeof manager.getConnectionStatus === 'function') {
+        setConnectionStatus(manager.getConnectionStatus());
+      }
     } catch (error) {
       console.error("Error checking subscription status:", error);
     }
@@ -188,7 +198,9 @@ export function useEnhancedRouteSubscriptions() {
       console.log("Still missing subscriptions, attempting to resubscribe");
       const timeout = setTimeout(() => {
         console.log("Manually forcing refresh of all subscriptions");
-        manager.reestablishSubscriptions();
+        if (typeof manager.reestablishSubscriptions === 'function') {
+          manager.reestablishSubscriptions();
+        }
       }, 2000);
       
       return () => clearTimeout(timeout);
@@ -210,7 +222,9 @@ export function useEnhancedRouteSubscriptions() {
     }));
     
     // Reestablish all subscriptions
-    manager.reestablishSubscriptions();
+    if (typeof manager.reestablishSubscriptions === 'function') {
+      manager.reestablishSubscriptions();
+    }
     
     // After a short delay, invalidate all queries to fetch fresh data
     setTimeout(() => {
