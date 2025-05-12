@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
@@ -19,7 +20,8 @@ export function ConnectionStatus({
     connectionStatus, 
     refreshSubscriptions,
     lastRefreshTime,
-    subscriptionCount
+    subscriptionCount,
+    activeSubscriptions
   } = useSubscriptionContext();
   
   const [isRefreshing, setIsRefreshing] = useState(false);

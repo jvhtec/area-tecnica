@@ -145,9 +145,6 @@ export function useEnhancedRouteSubscriptions() {
       );
       setUnsubscribedTables(missingTables);
       
-      console.log("Not fully subscribed to required tables, checking what is missing");
-      console.log("Missing tables:", missingTables);
-      
       // Check how long since last activity
       const staleDuration = 5 * 60 * 1000; // 5 minutes
       const timeSinceLastActivity = Date.now() - state.lastActiveTime;
@@ -158,7 +155,6 @@ export function useEnhancedRouteSubscriptions() {
         isFullySubscribed: missingTables.length === 0,
         isStale: isStale,
         unsubscribedTables: missingTables,
-        connectionStatus: manager.getConnectionStatus(),
       }));
       
       setConnectionStatus(manager.getConnectionStatus());
@@ -197,6 +193,7 @@ export function useEnhancedRouteSubscriptions() {
       ...prev,
       isStale: false,
       lastActiveTime: Date.now(),
+      lastRefreshTime: Date.now(),
     }));
     
     // Reestablish all subscriptions
@@ -215,7 +212,7 @@ export function useEnhancedRouteSubscriptions() {
     wasInactive: state.wasInactive,
     lastActiveTime: state.lastActiveTime,
     unsubscribedTables: state.unsubscribedTables,
-    lastRefreshTime: state.lastActiveTime,
+    lastRefreshTime: state.lastRefreshTime,
     requiredTables,
     subscribedTables,
     connectionStatus,
