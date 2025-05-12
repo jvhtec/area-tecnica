@@ -1,101 +1,116 @@
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
+import { useQueryClient } from "@tanstack/react-query";
+import { debounce } from "@/lib/utils";
 
-interface SubscriptionContextType {
-  connectionStatus: 'connected' | 'disconnected' | 'connecting';
+export type SubscriptionContextType = {
+  activeSubscriptions: string[];
   subscriptionCount: number;
-  subscriptionsByTable: Record<string, string[]>;
-  lastRefreshTime: number;
-  activeSubscriptions: Array<any>;
   refreshSubscriptions: () => void;
+  forceSubscribe: (table: string) => void;
   invalidateQueries: () => void;
-  forceSubscribe: (tables: string[]) => void;
-}
+  connectionStatus: 'connected' | 'disconnected' | 'connecting';
+  lastRefreshTime: number;
+};
 
-const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
+const SubscriptionContext = createContext<SubscriptionContextType>({
+  activeSubscriptions: [],
+  subscriptionCount: 0,
+  refreshSubscriptions: () => {},
+  forceSubscribe: () => {},
+  invalidateQueries: () => {},
+  connectionStatus: 'disconnected',
+  lastRefreshTime: Date.now(),
+});
 
-/**
- * Provider component for subscription management
- */
-export function SubscriptionProvider({ children }: { children: ReactNode }) {
+export const useSubscriptionContext = () => useContext(SubscriptionContext);
+
+export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const queryClient = useQueryClient();
-  const [manager] = useState(() => UnifiedSubscriptionManager.getInstance(queryClient));
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>(
-    manager.getConnectionStatus()
-  );
-  const [subscriptionCount, setSubscriptionCount] = useState(manager.getSubscriptionCount());
-  const [subscriptionsByTable, setSubscriptionsByTable] = useState<Record<string, string[]>>(
-    manager.getSubscriptionsByTable() || {}
-  );
-  const [lastRefreshTime, setLastRefreshTime] = useState(Date.now());
-  const [activeSubscriptions, setActiveSubscriptions] = useState<Array<any>>(
-    manager.getActiveSubscriptions?.() || []
-  );
+  const [activeSubscriptions, setActiveSubscriptions] = useState<string[]>([]);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
+  const [lastRefreshTime, setLastRefreshTime] = useState<number>(Date.now());
   
-  // Update context values periodically
+  // Use a memoized instance of the manager to prevent unnecessary re-renders
+  const manager = useMemo(() => {
+    const instance = UnifiedSubscriptionManager.getInstance(queryClient);
+    return instance;
+  }, [queryClient]);
+  
+  // Update state with the current subscriptions
   useEffect(() => {
-    const updateStatus = () => {
+    // Initial state update
+    const updateSubscriptionState = () => {
+      const subs = manager.getActiveSubscriptions();
+      setActiveSubscriptions(subs);
       setConnectionStatus(manager.getConnectionStatus());
-      setSubscriptionCount(manager.getSubscriptionCount());
-      setSubscriptionsByTable(manager.getSubscriptionsByTable() || {});
-      setActiveSubscriptions(manager.getActiveSubscriptions?.() || []);
+      setLastRefreshTime(manager.getLastRefreshTime());
     };
     
-    // Update immediately and then every 5 seconds
-    updateStatus();
-    const interval = setInterval(updateStatus, 5000);
+    // Set up interval to periodically update the state
+    updateSubscriptionState();
     
-    return () => clearInterval(interval);
+    // Create debounced version to prevent excessive updates
+    const debouncedUpdate = debounce(updateSubscriptionState, 1000);
+    
+    // Subscribe to subscription changes
+    const unsubscribe = manager.onSubscriptionChange(() => {
+      debouncedUpdate();
+    });
+    
+    // Set up interval for periodic updates (prevents stale UI)
+    const intervalId = setInterval(debouncedUpdate, 10000);
+    
+    return () => {
+      unsubscribe();
+      clearInterval(intervalId);
+    };
   }, [manager]);
   
-  // Helper function to refresh all subscriptions
-  const refreshSubscriptions = () => {
-    manager.reestablishSubscriptions();
-    setLastRefreshTime(Date.now());
-  };
+  // Memorize callback functions to prevent unnecessary re-renders
+  const refreshSubscriptions = useMemo(() => {
+    return () => {
+      console.log("Manually reestablishing subscriptions");
+      manager.reestablishSubscriptions();
+      setLastRefreshTime(Date.now());
+    };
+  }, [manager]);
   
-  // Helper function to invalidate all queries
-  const invalidateQueries = () => {
-    queryClient.invalidateQueries();
-  };
-  
-  // Helper function to force subscribe to specific tables
-  const forceSubscribe = (tables: string[]) => {
-    console.log(`Force subscribing to tables: ${tables.join(', ')}`);
-    tables.forEach(table => {
-      // Basic implementation - in a real app, you might want more sophisticated logic
+  const forceSubscribe = useMemo(() => {
+    return (table: string) => {
+      console.log(`Manually subscribing to table: ${table}`);
       manager.subscribeToTable(table, [table]);
-    });
-    setLastRefreshTime(Date.now());
-  };
+    };
+  }, [manager]);
   
-  const contextValue: SubscriptionContextType = {
-    connectionStatus,
-    subscriptionCount,
-    subscriptionsByTable,
-    lastRefreshTime,
+  const invalidateQueries = useMemo(() => {
+    return () => {
+      console.log("Invalidating all queries");
+      queryClient.invalidateQueries();
+    };
+  }, [queryClient]);
+  
+  const contextValue = useMemo(() => ({
     activeSubscriptions,
+    subscriptionCount: activeSubscriptions.length,
     refreshSubscriptions,
-    invalidateQueries,
     forceSubscribe,
-  };
+    invalidateQueries,
+    connectionStatus,
+    lastRefreshTime
+  }), [
+    activeSubscriptions, 
+    refreshSubscriptions, 
+    forceSubscribe, 
+    invalidateQueries, 
+    connectionStatus,
+    lastRefreshTime
+  ]);
   
   return (
     <SubscriptionContext.Provider value={contextValue}>
       {children}
     </SubscriptionContext.Provider>
   );
-}
-
-/**
- * Hook to access subscription context
- */
-export function useSubscriptionContext(): SubscriptionContextType {
-  const context = useContext(SubscriptionContext);
-  if (!context) {
-    throw new Error("useSubscriptionContext must be used within a SubscriptionProvider");
-  }
-  return context;
-}
+};

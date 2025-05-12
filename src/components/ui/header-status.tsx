@@ -2,6 +2,7 @@
 import { SessionStatusIndicator } from "./session-status-indicator";
 import { ConnectionStatus } from "./connection-status";
 import { useRouteSubscriptions } from "@/hooks/useRouteSubscriptions";
+import { memo } from "react";
 
 interface HeaderStatusProps {
   className?: string;
@@ -9,8 +10,9 @@ interface HeaderStatusProps {
 
 /**
  * Combined header status component showing both session and connection status
+ * Memoized to prevent excessive re-renders
  */
-export function HeaderStatus({ className = "" }: HeaderStatusProps) {
+export const HeaderStatus = memo(function HeaderStatus({ className = "" }: HeaderStatusProps) {
   const routeStatus = useRouteSubscriptions();
   
   return (
@@ -19,4 +21,4 @@ export function HeaderStatus({ className = "" }: HeaderStatusProps) {
       <ConnectionStatus variant="inline" className="text-xs" />
     </div>
   );
-}
+});

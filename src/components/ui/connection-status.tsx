@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { Wifi, WifiOff, AlertCircle, RefreshCw, Loader2 } from "lucide-react";
@@ -12,7 +11,8 @@ interface ConnectionStatusProps {
   className?: string;
 }
 
-export function ConnectionStatus({ 
+// Memoize to prevent excessive re-renders
+export const ConnectionStatus = memo(function ConnectionStatus({ 
   variant = 'card',
   className
 }: ConnectionStatusProps) {
@@ -27,42 +27,73 @@ export function ConnectionStatus({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const lastRefreshRef = useRef(lastRefreshTime);
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Calculate stale status
-  const isStale = Date.now() - lastRefreshTime > 5 * 60 * 1000; // 5 minutes
+  // Update the ref when lastRefreshTime changes to avoid stale closures
+  useEffect(() => {
+    lastRefreshRef.current = lastRefreshTime;
+  }, [lastRefreshTime]);
+  
+  // Calculate stale status - use a debounced approach with refs to minimize renders
+  const isStale = Date.now() - (lastRefreshRef.current || Date.now()) > 5 * 60 * 1000; // 5 minutes
   
   // Show connection status briefly when there's an issue or on initial load
   useEffect(() => {
-    if (connectionStatus === 'connecting') {
-      // Always show when connecting
-      setIsVisible(true);
-    }
-    else if (connectionStatus !== 'connected' || isStale) {
-      setIsVisible(true);
-      setHasError(true);
-      
-      // Keep visible while issues persist
-    } else if (hasError) {
-      // If we've recovered from an error, show briefly then hide
-      setIsVisible(true);
-      setHasError(false);
-      
-      const timeout = setTimeout(() => {
-        setIsVisible(false);
-      }, 5000);
-      
-      return () => clearTimeout(timeout);
-    } else {
-      // If everything is good, hide after 5 seconds
-      const timeout = setTimeout(() => {
-        setIsVisible(false);
-      }, 5000);
-      
-      return () => clearTimeout(timeout);
-    }
+    const handleStatusChange = () => {
+      if (connectionStatus === 'connecting') {
+        // Always show when connecting
+        setIsVisible(true);
+      }
+      else if (connectionStatus !== 'connected' || isStale) {
+        setIsVisible(true);
+        setHasError(true);
+        
+        // Keep visible while issues persist
+      } else if (hasError) {
+        // If we've recovered from an error, show briefly then hide
+        setIsVisible(true);
+        setHasError(false);
+        
+        // Clear any existing timeout
+        if (refreshTimeoutRef.current) {
+          clearTimeout(refreshTimeoutRef.current);
+        }
+        
+        // Set new timeout
+        refreshTimeoutRef.current = setTimeout(() => {
+          setIsVisible(false);
+          refreshTimeoutRef.current = null;
+        }, 5000);
+      } else {
+        // If everything is good, hide after 5 seconds
+        // Clear any existing timeout
+        if (refreshTimeoutRef.current) {
+          clearTimeout(refreshTimeoutRef.current);
+        }
+        
+        // Set new timeout
+        refreshTimeoutRef.current = setTimeout(() => {
+          setIsVisible(false);
+          refreshTimeoutRef.current = null;
+        }, 5000);
+      }
+    };
+    
+    handleStatusChange();
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+    };
   }, [connectionStatus, isStale, hasError]);
   
   const handleRefresh = async () => {
+    // Prevent multiple rapid refreshes
+    if (isRefreshing) return;
+    
     setIsRefreshing(true);
     try {
       refreshSubscriptions();
@@ -71,7 +102,10 @@ export function ConnectionStatus({
       console.error("Error refreshing subscriptions:", error);
       toast.error("Failed to refresh connections");
     } finally {
-      setIsRefreshing(false);
+      // Add a slight delay before allowing another refresh to prevent double-clicks
+      setTimeout(() => {
+        setIsRefreshing(false);
+      }, 500);
     }
   };
   
@@ -174,4 +208,4 @@ export function ConnectionStatus({
       )}
     </div>
   );
-}
+});
