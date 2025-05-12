@@ -7,8 +7,11 @@ interface SubscriptionContextType {
   connectionStatus: 'connected' | 'disconnected' | 'connecting';
   subscriptionCount: number;
   subscriptionsByTable: Record<string, string[]>;
+  lastRefreshTime: number;
+  activeSubscriptions: Array<any>;
   refreshSubscriptions: () => void;
   invalidateQueries: () => void;
+  forceSubscribe: (tables: string[]) => void;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
@@ -26,6 +29,10 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [subscriptionsByTable, setSubscriptionsByTable] = useState<Record<string, string[]>>(
     manager.getSubscriptionsByTable() || {}
   );
+  const [lastRefreshTime, setLastRefreshTime] = useState(Date.now());
+  const [activeSubscriptions, setActiveSubscriptions] = useState<Array<any>>(
+    manager.getActiveSubscriptions?.() || []
+  );
   
   // Update context values periodically
   useEffect(() => {
@@ -33,6 +40,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       setConnectionStatus(manager.getConnectionStatus());
       setSubscriptionCount(manager.getSubscriptionCount());
       setSubscriptionsByTable(manager.getSubscriptionsByTable() || {});
+      setActiveSubscriptions(manager.getActiveSubscriptions?.() || []);
     };
     
     // Update immediately and then every 5 seconds
@@ -45,6 +53,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   // Helper function to refresh all subscriptions
   const refreshSubscriptions = () => {
     manager.reestablishSubscriptions();
+    setLastRefreshTime(Date.now());
   };
   
   // Helper function to invalidate all queries
@@ -52,12 +61,25 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     queryClient.invalidateQueries();
   };
   
+  // Helper function to force subscribe to specific tables
+  const forceSubscribe = (tables: string[]) => {
+    console.log(`Force subscribing to tables: ${tables.join(', ')}`);
+    tables.forEach(table => {
+      // Basic implementation - in a real app, you might want more sophisticated logic
+      manager.subscribeToTable(table, [table]);
+    });
+    setLastRefreshTime(Date.now());
+  };
+  
   const contextValue: SubscriptionContextType = {
     connectionStatus,
     subscriptionCount,
     subscriptionsByTable,
+    lastRefreshTime,
+    activeSubscriptions,
     refreshSubscriptions,
     invalidateQueries,
+    forceSubscribe,
   };
   
   return (

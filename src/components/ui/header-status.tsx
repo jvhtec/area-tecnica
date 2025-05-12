@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { Wifi, WifiOff, AlertCircle, RefreshCw, Loader2, Clock } from "lucide-react";
@@ -7,27 +6,18 @@ import { Button } from "./button";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useRouteSubscriptions, ROUTE_SUBSCRIPTIONS } from "@/hooks/useRouteSubscriptions";
+import { useEnhancedRouteSubscriptions, ROUTE_SUBSCRIPTIONS } from "@/hooks/useEnhancedRouteSubscriptions";
 
 export function HeaderStatus({ className }: { className?: string }) {
   const { refreshSubscriptions } = useSubscriptionContext();
-  const {
-    connectionStatus,
-    lastRefreshTime,
-    isFullySubscribed,
-    isStale,
-    requiredTables,
-    subscribedTables,
-    unsubscribedTables,
-    routeKey
-  } = useRouteSubscriptions();
+  const routeSubscriptions = useEnhancedRouteSubscriptions();
   
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Format last refresh time
   let lastRefreshDisplay = "Unknown";
   try {
-    lastRefreshDisplay = formatDistanceToNow(lastRefreshTime) + " ago";
+    lastRefreshDisplay = formatDistanceToNow(routeSubscriptions.lastRefreshTime) + " ago";
   } catch (error) {
     console.error("Error formatting time:", error);
   }
@@ -46,13 +36,13 @@ export function HeaderStatus({ className }: { className?: string }) {
   };
   
   const getStatusIcon = () => {
-    if (connectionStatus === 'connecting') {
+    if (routeSubscriptions.connectionStatus === 'connecting') {
       return <Loader2 className="h-3 w-3 text-blue-500 animate-spin" />;
-    } else if (connectionStatus !== 'connected') {
+    } else if (routeSubscriptions.connectionStatus !== 'connected') {
       return <WifiOff className="h-3 w-3 text-red-500" />;
-    } else if (isStale) {
+    } else if (routeSubscriptions.isStale) {
       return <Clock className="h-3 w-3 text-amber-500" />;
-    } else if (!isFullySubscribed) {
+    } else if (!routeSubscriptions.isFullySubscribed) {
       return <AlertCircle className="h-3 w-3 text-amber-500" />;
     } else {
       return <Wifi className="h-3 w-3 text-green-500" />;
@@ -60,13 +50,13 @@ export function HeaderStatus({ className }: { className?: string }) {
   };
   
   const getStatusText = () => {
-    if (connectionStatus === 'connecting') {
+    if (routeSubscriptions.connectionStatus === 'connecting') {
       return "Connecting...";
-    } else if (connectionStatus !== 'connected') {
+    } else if (routeSubscriptions.connectionStatus !== 'connected') {
       return "Offline";
-    } else if (isStale) {
+    } else if (routeSubscriptions.isStale) {
       return "Stale data";
-    } else if (!isFullySubscribed) {
+    } else if (!routeSubscriptions.isFullySubscribed) {
       return "Partial";
     } else {
       return "Live";
@@ -85,7 +75,7 @@ export function HeaderStatus({ className }: { className?: string }) {
   };
   
   const getTooltipContent = () => {
-    if (connectionStatus === 'connecting') {
+    if (routeSubscriptions.connectionStatus === 'connecting') {
       return (
         <div className="text-xs max-w-xs">
           <p className="font-semibold">Establishing connection</p>
@@ -94,7 +84,7 @@ export function HeaderStatus({ className }: { className?: string }) {
       );
     }
     
-    if (connectionStatus !== 'connected') {
+    if (routeSubscriptions.connectionStatus !== 'connected') {
       return (
         <div className="text-xs max-w-xs">
           <p className="font-semibold">Connection lost</p>
@@ -104,7 +94,7 @@ export function HeaderStatus({ className }: { className?: string }) {
       );
     }
     
-    if (isStale) {
+    if (routeSubscriptions.isStale) {
       return (
         <div className="text-xs max-w-xs">
           <p className="font-semibold">Data may be stale</p>
@@ -114,20 +104,20 @@ export function HeaderStatus({ className }: { className?: string }) {
       );
     }
     
-    const routeName = formatRouteName(routeKey);
-    const isDefinedRoute = Object.keys(ROUTE_SUBSCRIPTIONS).includes(routeKey);
+    const routeName = formatRouteName(routeSubscriptions.routeKey);
+    const isDefinedRoute = Object.keys(ROUTE_SUBSCRIPTIONS).includes(routeSubscriptions.routeKey);
     
-    if (!isFullySubscribed) {
+    if (!routeSubscriptions.isFullySubscribed) {
       return (
         <div className="text-xs max-w-xs">
           <p className="font-semibold">Partial real-time updates</p>
           <p className="mt-1">Current page: {routeName}</p>
           <div className="mt-1">
-            {subscribedTables.length > 0 && (
-              <p>Subscribed: {subscribedTables.join(', ')}</p>
+            {routeSubscriptions.subscribedTables.length > 0 && (
+              <p>Subscribed: {routeSubscriptions.subscribedTables.join(', ')}</p>
             )}
-            {unsubscribedTables.length > 0 && (
-              <p>Missing: {unsubscribedTables.join(', ')}</p>
+            {routeSubscriptions.unsubscribedTables.length > 0 && (
+              <p>Missing: {routeSubscriptions.unsubscribedTables.join(', ')}</p>
             )}
             {!isDefinedRoute && (
               <p className="text-amber-500 mt-1">This route has no specific subscriptions defined</p>
@@ -142,10 +132,10 @@ export function HeaderStatus({ className }: { className?: string }) {
       <div className="text-xs max-w-xs">
         <p className="font-semibold">Real-time updates active</p>
         <p>Current page: {routeName}</p>
-        {requiredTables.length > 0 ? (
+        {routeSubscriptions.requiredTables?.length > 0 ? (
           <>
             <p>All required tables are subscribed:</p>
-            <p className="mt-1">{requiredTables.join(', ')}</p>
+            <p className="mt-1">{routeSubscriptions.requiredTables.join(', ')}</p>
           </>
         ) : (
           <p>No specific tables required for this route</p>
@@ -162,12 +152,12 @@ export function HeaderStatus({ className }: { className?: string }) {
           <div 
             className={cn(
               "flex items-center gap-1.5 text-xs cursor-pointer",
-              isStale || !isFullySubscribed ? "text-amber-500" : (
-                connectionStatus === 'connected' ? "text-muted-foreground" : "text-red-500"
+              routeSubscriptions.isStale || !routeSubscriptions.isFullySubscribed ? "text-amber-500" : (
+                routeSubscriptions.connectionStatus === 'connected' ? "text-muted-foreground" : "text-red-500"
               ),
               className
             )}
-            onClick={isStale ? handleRefresh : undefined}
+            onClick={routeSubscriptions.isStale ? handleRefresh : undefined}
           >
             {getStatusIcon()}
             <span className="hidden sm:inline">
@@ -181,7 +171,7 @@ export function HeaderStatus({ className }: { className?: string }) {
                 e.stopPropagation();
                 handleRefresh();
               }}
-              disabled={isRefreshing || connectionStatus === 'connecting'}
+              disabled={isRefreshing || routeSubscriptions.connectionStatus === 'connecting'}
             >
               <RefreshCw className={`h-2.5 w-2.5 ${isRefreshing ? 'animate-spin' : ''}`} />
               <span className="sr-only">Refresh</span>
