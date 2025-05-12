@@ -41,34 +41,41 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   
   // Use a memoized instance of the manager to prevent unnecessary re-renders
   const manager = useMemo(() => {
-    return UnifiedSubscriptionManager.getInstance(queryClient);
+    return queryClient ? UnifiedSubscriptionManager.getInstance(queryClient) : null;
   }, [queryClient]);
   
   // Memoize update function to ensure consistent reference
   const updateSubscriptionState = useCallback(() => {
+    if (!manager) {
+      console.warn("Subscription manager is not available");
+      return;
+    }
+
     try {
-      // Get active subscriptions and ensure we always work with arrays
-      const subscriptions = manager.getActiveSubscriptions() || [];
-      // Make sure we're working with string arrays
-      const subscriptionKeys = Array.isArray(subscriptions) ? subscriptions.map(sub => String(sub)) : [];
+      // Get active subscriptions with proper null/undefined checks
+      const subscriptions = manager.getActiveSubscriptions ? manager.getActiveSubscriptions() : [];
+      // Make sure we're working with string arrays and handle null/undefined
+      const subscriptionKeys = Array.isArray(subscriptions) ? subscriptions.map(sub => String(sub || '')) : [];
       
-      const subsByTable = manager.getSubscriptionsByTable() || {};
+      const subsByTable = manager.getSubscriptionsByTable ? manager.getSubscriptionsByTable() : {};
       
       // Convert subscriptions by table to expected format, with safety checks
       const formattedSubsByTable: SubscriptionsByTable = {};
-      Object.entries(subsByTable || {}).forEach(([table, subscriptions]) => {
-        if (Array.isArray(subscriptions)) {
-          formattedSubsByTable[table] = subscriptions.map(sub => 
-            typeof sub === 'string' ? sub : String(sub)
-          );
-        } else {
-          formattedSubsByTable[table] = [];
-        }
-      });
+      if (subsByTable && typeof subsByTable === 'object') {
+        Object.entries(subsByTable).forEach(([table, subscriptions]) => {
+          if (Array.isArray(subscriptions)) {
+            formattedSubsByTable[table] = subscriptions
+              .filter(sub => sub !== null && sub !== undefined)
+              .map(sub => typeof sub === 'string' ? sub : String(sub));
+          } else {
+            formattedSubsByTable[table] = [];
+          }
+        });
+      }
       
       setActiveSubscriptions(subscriptionKeys);
       setSubscriptionsByTable(formattedSubsByTable);
-      setConnectionStatus(manager.getConnectionStatus());
+      setConnectionStatus(manager.getConnectionStatus ? manager.getConnectionStatus() : 'disconnected');
       setLastRefreshTime(Date.now());
     } catch (error) {
       console.error("Error updating subscription state:", error);
@@ -80,11 +87,13 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   
   // Memoize debounced update function
   const debouncedUpdate = useMemo(() => {
-    return debounce(updateSubscriptionState, 1000);
+    return updateSubscriptionState ? debounce(updateSubscriptionState, 1000) : () => {};
   }, [updateSubscriptionState]);
   
   // Update state with the current subscriptions
   useEffect(() => {
+    if (!manager) return;
+    
     // Initial state update
     updateSubscriptionState();
     
@@ -94,7 +103,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       clearInterval(intervalId);
     };
-  }, [updateSubscriptionState, debouncedUpdate]);
+  }, [updateSubscriptionState, debouncedUpdate, manager]);
   
   // Memorize callback functions to prevent unnecessary re-renders
   const refreshSubscriptions = useCallback(() => {
@@ -110,20 +119,24 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     if (!manager) return;
     
     if (Array.isArray(table)) {
-      table.forEach(t => manager.subscribeToTable(t, [t]));
-    } else {
+      table.forEach(t => {
+        if (t) manager.subscribeToTable(t, [t]);
+      });
+    } else if (table) {
       manager.subscribeToTable(table, [table]);
     }
   }, [manager]);
   
   const invalidateQueries = useCallback(() => {
     console.log("Invalidating all queries");
-    queryClient.invalidateQueries();
+    if (queryClient) {
+      queryClient.invalidateQueries();
+    }
   }, [queryClient]);
   
   const contextValue = useMemo(() => ({
     activeSubscriptions,
-    subscriptionCount: activeSubscriptions.length,
+    subscriptionCount: activeSubscriptions ? activeSubscriptions.length : 0,
     subscriptionsByTable,
     refreshSubscriptions,
     forceSubscribe,

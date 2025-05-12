@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
@@ -22,15 +23,17 @@ export function useEnhancedRouteSubscriptions() {
   
   // Create manager instance just once and memoize it
   const manager = useMemo(() => 
-    UnifiedSubscriptionManager.getInstance(queryClient),
+    queryClient ? UnifiedSubscriptionManager.getInstance(queryClient) : null,
   [queryClient]);
   
-  const [routeKey, setRouteKey] = useState(location.pathname);
+  const [routeKey, setRouteKey] = useState(location?.pathname || '/');
   const [requiredTables, setRequiredTables] = useState<string[]>([]);
   const [subscribedTables, setSubscribedTables] = useState<string[]>([]);
   const [unsubscribedTables, setUnsubscribedTables] = useState<string[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>(
-    manager.getConnectionStatus()
+    manager && typeof manager.getConnectionStatus === 'function' 
+      ? manager.getConnectionStatus() 
+      : 'connecting'
   );
   
   const [state, setState] = useState({
@@ -53,12 +56,12 @@ export function useEnhancedRouteSubscriptions() {
       .filter(route => path.startsWith(route))
       .sort((a, b) => b.length - a.length); // Sort by specificity (longest first)
       
-    return matchingRoutes[0] || path;
+    return matchingRoutes.length > 0 ? matchingRoutes[0] : path;
   }, []);
   
   // Update route key and required tables when location changes
   useEffect(() => {
-    if (!location || !location.pathname) return;
+    if (!location || !location.pathname || !manager) return;
     
     console.log(`Configuring subscriptions for route: ${location.pathname}`);
     setRouteKey(location.pathname);
@@ -106,6 +109,8 @@ export function useEnhancedRouteSubscriptions() {
   
   // Track page visibility
   useEffect(() => {
+    if (typeof document === 'undefined') return;
+    
     let wasHidden = false;
     let hiddenTime = 0;
     
@@ -151,10 +156,12 @@ export function useEnhancedRouteSubscriptions() {
   
   // Create a checkSubscriptionStatus function and memoize it
   const checkSubscriptionStatus = useCallback(() => {
+    if (!manager) return;
+    
     try {
       // Ensure consistent object structure with optional chaining
       const activeSubscriptions = typeof manager.getActiveSubscriptions === 'function' 
-        ? manager.getActiveSubscriptions() 
+        ? manager.getActiveSubscriptions() || []
         : [];
       
       // Get list of tables that are currently subscribed
@@ -192,6 +199,8 @@ export function useEnhancedRouteSubscriptions() {
   
   // Monitor subscription status
   useEffect(() => {
+    if (!manager) return;
+    
     // Check status immediately
     checkSubscriptionStatus();
     
@@ -199,27 +208,29 @@ export function useEnhancedRouteSubscriptions() {
     const interval = setInterval(checkSubscriptionStatus, 10000); // Every 10 seconds
     
     return () => clearInterval(interval);
-  }, [checkSubscriptionStatus]);
+  }, [checkSubscriptionStatus, manager]);
   
   // If there are missing subscriptions, try to resubscribe periodically
   useEffect(() => {
-    if (unsubscribedTables.length > 0) {
-      console.log("Still missing subscriptions, attempting to resubscribe");
-      const timeout = setTimeout(() => {
-        console.log("Manually forcing refresh of all subscriptions");
-        if (typeof manager.reestablishSubscriptions === 'function') {
-          manager.reestablishSubscriptions();
-        }
-      }, 2000);
-      
-      return () => clearTimeout(timeout);
-    }
+    if (!manager || !unsubscribedTables.length) return;
+    
+    console.log("Still missing subscriptions, attempting to resubscribe");
+    const timeout = setTimeout(() => {
+      console.log("Manually forcing refresh of all subscriptions");
+      if (typeof manager.reestablishSubscriptions === 'function') {
+        manager.reestablishSubscriptions();
+      }
+    }, 2000);
+    
+    return () => clearTimeout(timeout);
   }, [unsubscribedTables, manager]);
   
   /**
    * Force a refresh of all subscriptions - memoize to prevent recreation
    */
   const forceRefresh = useCallback(() => {
+    if (!manager || !queryClient) return;
+    
     console.log('Manually forcing refresh of all subscriptions');
     
     // Reset the stale flag

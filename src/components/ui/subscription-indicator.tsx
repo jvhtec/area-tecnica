@@ -16,22 +16,25 @@ interface SubscriptionIndicatorProps {
 }
 
 export function SubscriptionIndicator({ 
-  tables,
+  tables = [],
   variant = 'default',
   showRefreshButton = false,
   showLabel = false,
   onRefresh,
   className 
 }: SubscriptionIndicatorProps) {
+  // Ensure we always have an array of tables
+  const tablesList = Array.isArray(tables) ? tables : [];
+
   const {
     isSubscribed,
-    tablesSubscribed,
-    tablesUnsubscribed,
-    connectionStatus,
-    lastRefreshFormatted,
-    isStale,
+    tablesSubscribed = [],
+    tablesUnsubscribed = [],
+    connectionStatus = 'disconnected',
+    lastRefreshFormatted = 'unknown',
+    isStale = false,
     refreshSubscription
-  } = useSubscriptionStatus(tables);
+  } = useSubscriptionStatus(tablesList) || {};
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -40,7 +43,7 @@ export function SubscriptionIndicator({
     try {
       if (onRefresh) {
         await onRefresh();
-      } else {
+      } else if (refreshSubscription) {
         refreshSubscription();
       }
     } finally {
@@ -106,10 +109,10 @@ export function SubscriptionIndicator({
       return (
         <div className="text-xs max-w-xs">
           <p className="font-semibold">Partial real-time updates</p>
-          {tablesSubscribed.length > 0 && (
+          {tablesSubscribed && tablesSubscribed.length > 0 && (
             <p>Subscribed: {tablesSubscribed.join(', ')}</p>
           )}
-          {tablesUnsubscribed.length > 0 && (
+          {tablesUnsubscribed && tablesUnsubscribed.length > 0 && (
             <p>Missing: {tablesUnsubscribed.join(', ')}</p>
           )}
           <p className="text-muted-foreground mt-1">Last updated: {lastRefreshFormatted}</p>
@@ -120,7 +123,7 @@ export function SubscriptionIndicator({
     return (
       <div className="text-xs max-w-xs">
         <p className="font-semibold">Real-time updates active</p>
-        <p>Subscribed tables: {tables.join(', ')}</p>
+        <p>Subscribed tables: {tablesList.join(', ')}</p>
         <p className="text-muted-foreground mt-1">Last updated: {lastRefreshFormatted}</p>
       </div>
     );

@@ -17,25 +17,29 @@ export const ConnectionStatus = memo(function ConnectionStatus({
   variant = 'default',
   className = '',
 }: ConnectionStatusProps) {
-  const { connectionStatus } = useSubscriptionContext();
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  // Use a null check with the context
+  const context = useSubscriptionContext();
+  const connectionStatus = context ? context.connectionStatus : 'disconnected';
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   
   // Listen for network status changes
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+      
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
+    }
   }, []);
 
-  // Safe rendering for each variant
-  const renderInlineVariant = () => (
+  // Pre-render the different variants to avoid conditional hook usage
+  const inlineVariant = useMemo(() => (
     <div className={cn('flex items-center gap-1', className)}>
       {connectionStatus === 'connected' ? (
         <>
@@ -54,9 +58,9 @@ export const ConnectionStatus = memo(function ConnectionStatus({
         </>
       )}
     </div>
-  );
+  ), [connectionStatus, className]);
   
-  const renderCompactVariant = () => (
+  const compactVariant = useMemo(() => (
     <div className={cn('relative', className)}>
       {connectionStatus === 'connected' ? (
         <WifiIcon className="h-4 w-4 text-green-500" />
@@ -66,9 +70,9 @@ export const ConnectionStatus = memo(function ConnectionStatus({
         <WifiOffIcon className="h-4 w-4 text-red-500" />
       )}
     </div>
-  );
+  ), [connectionStatus, className]);
   
-  const renderDefaultVariant = () => (
+  const defaultVariant = useMemo(() => (
     <div className={cn('flex items-center gap-2', className)}>
       {connectionStatus === 'connected' ? (
         <>
@@ -89,10 +93,10 @@ export const ConnectionStatus = memo(function ConnectionStatus({
         </>
       )}
     </div>
-  );
+  ), [connectionStatus, isOnline, className]);
   
-  // Render with explicit switch statement to avoid conditional hooks
-  if (variant === 'inline') return renderInlineVariant();
-  if (variant === 'compact') return renderCompactVariant();
-  return renderDefaultVariant();
+  // Return the appropriate variant without using conditions for hook calls
+  if (variant === 'inline') return inlineVariant;
+  if (variant === 'compact') return compactVariant;
+  return defaultVariant;
 });
