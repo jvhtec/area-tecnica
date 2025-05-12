@@ -1,210 +1,95 @@
-import { useState, useEffect, useRef, memo } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
-import { Wifi, WifiOff, AlertCircle, RefreshCw, Loader2 } from "lucide-react";
-import { Button } from "./button";
-import { formatDistanceToNow } from "date-fns";
-import { toast } from "sonner";
+
+import { memo, useEffect, useState } from 'react';
+import { WifiIcon, WifiOffIcon, SignalIcon } from 'lucide-react';
+import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
+import { cn } from '@/lib/utils';
 
 interface ConnectionStatusProps {
-  variant?: 'card' | 'inline';
+  variant?: 'default' | 'compact' | 'inline';
   className?: string;
 }
 
-// Memoize to prevent excessive re-renders
-export const ConnectionStatus = memo(function ConnectionStatus({ 
-  variant = 'card',
-  className
+/**
+ * Component to display the connection status to realtime subscriptions
+ * Memoized to prevent unnecessary re-renders
+ */
+export const ConnectionStatus = memo(function ConnectionStatus({
+  variant = 'default',
+  className = '',
 }: ConnectionStatusProps) {
-  const { 
-    connectionStatus, 
-    refreshSubscriptions,
-    lastRefreshTime,
-    subscriptionCount,
-    activeSubscriptions
-  } = useSubscriptionContext();
+  const { connectionStatus } = useSubscriptionContext();
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
-  const [hasError, setHasError] = useState(false);
-  const lastRefreshRef = useRef(lastRefreshTime);
-  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Update the ref when lastRefreshTime changes to avoid stale closures
+  // Listen for network status changes
   useEffect(() => {
-    lastRefreshRef.current = lastRefreshTime;
-  }, [lastRefreshTime]);
-  
-  // Calculate stale status - use a debounced approach with refs to minimize renders
-  const isStale = Date.now() - (lastRefreshRef.current || Date.now()) > 5 * 60 * 1000; // 5 minutes
-  
-  // Show connection status briefly when there's an issue or on initial load
-  useEffect(() => {
-    const handleStatusChange = () => {
-      if (connectionStatus === 'connecting') {
-        // Always show when connecting
-        setIsVisible(true);
-      }
-      else if (connectionStatus !== 'connected' || isStale) {
-        setIsVisible(true);
-        setHasError(true);
-        
-        // Keep visible while issues persist
-      } else if (hasError) {
-        // If we've recovered from an error, show briefly then hide
-        setIsVisible(true);
-        setHasError(false);
-        
-        // Clear any existing timeout
-        if (refreshTimeoutRef.current) {
-          clearTimeout(refreshTimeoutRef.current);
-        }
-        
-        // Set new timeout
-        refreshTimeoutRef.current = setTimeout(() => {
-          setIsVisible(false);
-          refreshTimeoutRef.current = null;
-        }, 5000);
-      } else {
-        // If everything is good, hide after 5 seconds
-        // Clear any existing timeout
-        if (refreshTimeoutRef.current) {
-          clearTimeout(refreshTimeoutRef.current);
-        }
-        
-        // Set new timeout
-        refreshTimeoutRef.current = setTimeout(() => {
-          setIsVisible(false);
-          refreshTimeoutRef.current = null;
-        }, 5000);
-      }
-    };
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
     
-    handleStatusChange();
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
     
-    // Cleanup timeout on unmount
     return () => {
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
-  }, [connectionStatus, isStale, hasError]);
-  
-  const handleRefresh = async () => {
-    // Prevent multiple rapid refreshes
-    if (isRefreshing) return;
-    
-    setIsRefreshing(true);
-    try {
-      refreshSubscriptions();
-      toast.success("Real-time connections refreshed");
-    } catch (error) {
-      console.error("Error refreshing subscriptions:", error);
-      toast.error("Failed to refresh connections");
-    } finally {
-      // Add a slight delay before allowing another refresh to prevent double-clicks
-      setTimeout(() => {
-        setIsRefreshing(false);
-      }, 500);
-    }
-  };
-  
-  // Format last refresh time
-  let lastRefreshDisplay = "Unknown";
-  try {
-    lastRefreshDisplay = formatDistanceToNow(lastRefreshTime) + " ago";
-  } catch (error) {
-    console.error("Error formatting time:", error);
-  }
-  
-  // If using inline variant, render simpler version
+  }, []);
+
   if (variant === 'inline') {
     return (
-      <div className={`flex items-center gap-2 ${className || ''}`}>
-        {connectionStatus === 'connecting' ? (
-          <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
-        ) : connectionStatus === 'connected' ? (
-          isStale ? (
-            <AlertCircle className="h-4 w-4 text-amber-500" />
-          ) : (
-            <Wifi className="h-4 w-4 text-green-500" />
-          )
+      <div className={cn('flex items-center gap-1', className)}>
+        {connectionStatus === 'connected' ? (
+          <>
+            <WifiIcon className="h-3 w-3 text-green-500" />
+            <span className="text-xs text-muted-foreground">Connected</span>
+          </>
+        ) : connectionStatus === 'connecting' ? (
+          <>
+            <SignalIcon className="h-3 w-3 text-amber-500" />
+            <span className="text-xs text-muted-foreground">Connecting</span>
+          </>
         ) : (
-          <WifiOff className="h-4 w-4 text-red-500" />
+          <>
+            <WifiOffIcon className="h-3 w-3 text-red-500" />
+            <span className="text-xs text-muted-foreground">Disconnected</span>
+          </>
         )}
-        
-        <span className="text-sm">
-          {connectionStatus === 'connecting' ? "Connecting..." :
-           connectionStatus === 'connected' 
-            ? (isStale ? "Data may be stale" : "Connected") 
-            : "Disconnected"}
-        </span>
-        
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={handleRefresh}
-          disabled={isRefreshing || connectionStatus === 'connecting'}
-          className="h-7 w-7 p-0"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-          <span className="sr-only">Refresh</span>
-        </Button>
       </div>
     );
   }
   
+  if (variant === 'compact') {
+    return (
+      <div className={cn('relative', className)}>
+        {connectionStatus === 'connected' ? (
+          <WifiIcon className="h-4 w-4 text-green-500" />
+        ) : connectionStatus === 'connecting' ? (
+          <SignalIcon className="h-4 w-4 text-amber-500" />
+        ) : (
+          <WifiOffIcon className="h-4 w-4 text-red-500" />
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className={`fixed bottom-4 right-4 z-50 max-w-md transition-all duration-300 ease-in-out ${className || ''}`}>
-      {isVisible && (
-        <Card className={`shadow-lg ${
-          connectionStatus === 'connecting' ? 'bg-blue-50' :
-          connectionStatus === 'connected' && !isStale ? 'bg-green-50' : 'bg-red-50'
-        }`}>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {connectionStatus === 'connecting' ? (
-                  <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
-                ) : connectionStatus === 'connected' ? (
-                  isStale ? (
-                    <AlertCircle className="h-5 w-5 text-amber-500" />
-                  ) : (
-                    <Wifi className="h-5 w-5 text-green-500" />
-                  )
-                ) : (
-                  <WifiOff className="h-5 w-5 text-red-500" />
-                )}
-                
-                <div>
-                  <p className="text-sm font-medium">
-                    {connectionStatus === 'connecting' ? "Connecting..." :
-                     connectionStatus === 'connected' 
-                      ? (isStale ? "Data may be stale" : "Connected") 
-                      : "Connection issue"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {connectionStatus === 'connecting' ? "Establishing connection..." :
-                     connectionStatus === 'connected' 
-                      ? `Last updated: ${lastRefreshDisplay}` 
-                      : "Attempting to reconnect..."}
-                  </p>
-                </div>
-              </div>
-              
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleRefresh}
-                disabled={isRefreshing || connectionStatus === 'connecting'}
-                className="h-8 w-8 p-0"
-              >
-                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                <span className="sr-only">Refresh</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+    <div className={cn('flex items-center gap-2', className)}>
+      {connectionStatus === 'connected' ? (
+        <>
+          <WifiIcon className="h-4 w-4 text-green-500" />
+          <span>Connected to realtime updates</span>
+        </>
+      ) : connectionStatus === 'connecting' ? (
+        <>
+          <SignalIcon className="h-4 w-4 text-amber-500" />
+          <span>Connecting to realtime updates</span>
+        </>
+      ) : (
+        <>
+          <WifiOffIcon className="h-4 w-4 text-red-500" />
+          <span>
+            {isOnline ? 'Disconnected from realtime' : 'You are offline'}
+          </span>
+        </>
       )}
     </div>
   );

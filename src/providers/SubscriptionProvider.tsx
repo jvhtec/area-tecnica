@@ -4,11 +4,16 @@ import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
 import { useQueryClient } from "@tanstack/react-query";
 import { debounce } from "@/lib/utils";
 
+export interface SubscriptionsByTable {
+  [tableName: string]: string[];
+}
+
 export type SubscriptionContextType = {
   activeSubscriptions: string[];
   subscriptionCount: number;
+  subscriptionsByTable: SubscriptionsByTable;
   refreshSubscriptions: () => void;
-  forceSubscribe: (table: string) => void;
+  forceSubscribe: (table: string | string[]) => void;
   invalidateQueries: () => void;
   connectionStatus: 'connected' | 'disconnected' | 'connecting';
   lastRefreshTime: number;
@@ -17,6 +22,7 @@ export type SubscriptionContextType = {
 const SubscriptionContext = createContext<SubscriptionContextType>({
   activeSubscriptions: [],
   subscriptionCount: 0,
+  subscriptionsByTable: {},
   refreshSubscriptions: () => {},
   forceSubscribe: () => {},
   invalidateQueries: () => {},
@@ -29,6 +35,7 @@ export const useSubscriptionContext = () => useContext(SubscriptionContext);
 export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const queryClient = useQueryClient();
   const [activeSubscriptions, setActiveSubscriptions] = useState<string[]>([]);
+  const [subscriptionsByTable, setSubscriptionsByTable] = useState<SubscriptionsByTable>({});
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
   const [lastRefreshTime, setLastRefreshTime] = useState<number>(Date.now());
   
@@ -43,9 +50,28 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     // Initial state update
     const updateSubscriptionState = () => {
       const subs = manager.getActiveSubscriptions();
+      const subsByTable = manager.getSubscriptionsByTable() || {};
+      
+      // Convert subscriptions by table to expected format
+      const formattedSubsByTable: SubscriptionsByTable = {};
+      Object.entries(subsByTable).forEach(([table, subscriptions]) => {
+        if (Array.isArray(subscriptions)) {
+          formattedSubsByTable[table] = subscriptions.map(sub => 
+            typeof sub === 'string' ? sub : sub.key || String(sub)
+          );
+        } else {
+          formattedSubsByTable[table] = [];
+        }
+      });
+      
       setActiveSubscriptions(subs);
+      setSubscriptionsByTable(formattedSubsByTable);
       setConnectionStatus(manager.getConnectionStatus());
-      setLastRefreshTime(manager.getLastRefreshTime());
+      
+      // Use hasOwnProperty to safely check for method existence
+      if (typeof manager.getLastRefreshTime === 'function') {
+        setLastRefreshTime(manager.getLastRefreshTime());
+      }
     };
     
     // Set up interval to periodically update the state
@@ -55,9 +81,9 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     const debouncedUpdate = debounce(updateSubscriptionState, 1000);
     
     // Subscribe to subscription changes
-    const unsubscribe = manager.onSubscriptionChange(() => {
-      debouncedUpdate();
-    });
+    const unsubscribe = typeof manager.onSubscriptionChange === 'function' 
+      ? manager.onSubscriptionChange(debouncedUpdate)
+      : () => {}; // Provide a no-op function if onSubscriptionChange doesn't exist
     
     // Set up interval for periodic updates (prevents stale UI)
     const intervalId = setInterval(debouncedUpdate, 10000);
@@ -78,9 +104,13 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   }, [manager]);
   
   const forceSubscribe = useMemo(() => {
-    return (table: string) => {
-      console.log(`Manually subscribing to table: ${table}`);
-      manager.subscribeToTable(table, [table]);
+    return (table: string | string[]) => {
+      console.log(`Manually subscribing to table(s):`, table);
+      if (Array.isArray(table)) {
+        table.forEach(t => manager.subscribeToTable(t, [t]));
+      } else {
+        manager.subscribeToTable(table, [table]);
+      }
     };
   }, [manager]);
   
@@ -94,6 +124,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const contextValue = useMemo(() => ({
     activeSubscriptions,
     subscriptionCount: activeSubscriptions.length,
+    subscriptionsByTable,
     refreshSubscriptions,
     forceSubscribe,
     invalidateQueries,
@@ -101,6 +132,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     lastRefreshTime
   }), [
     activeSubscriptions, 
+    subscriptionsByTable,
     refreshSubscriptions, 
     forceSubscribe, 
     invalidateQueries, 

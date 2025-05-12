@@ -1,6 +1,6 @@
 
-import { useState, useEffect } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { SignUpForm } from "@/components/auth/SignUpForm";
@@ -11,6 +11,7 @@ const Auth = () => {
   const { session, isLoading, error } = useAuth();
   const [showSignUp, setShowSignUp] = useState(false);
   const navigate = useNavigate();
+  const redirectedRef = useRef(false);
   
   useEffect(() => {
     // Remove dark mode for better authentication UI visibility
@@ -25,8 +26,11 @@ const Auth = () => {
   }, []);
 
   // Only redirect once when session is available and not loading
+  // Use a ref to track if we've already redirected to prevent multiple redirects
   useEffect(() => {
-    if (session && !isLoading) {
+    if (session && !isLoading && !redirectedRef.current) {
+      redirectedRef.current = true;
+      console.log("Auth: Session detected, navigating to dashboard");
       navigate("/dashboard", { replace: true });
     }
   }, [session, isLoading, navigate]);
