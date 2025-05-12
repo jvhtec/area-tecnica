@@ -41,60 +41,58 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   
   // Use a memoized instance of the manager to prevent unnecessary re-renders
   const manager = useMemo(() => {
-    const instance = UnifiedSubscriptionManager.getInstance(queryClient);
-    return instance;
+    return UnifiedSubscriptionManager.getInstance(queryClient);
   }, [queryClient]);
+  
+  // Memoize update function to ensure consistent reference
+  const updateSubscriptionState = useMemo(() => {
+    return () => {
+      try {
+        // Get active subscriptions
+        const subscriptions = manager.getActiveSubscriptions();
+        const subscriptionKeys = subscriptions.map(sub => String(sub));
+        
+        const subsByTable = manager.getSubscriptionsByTable() || {};
+        
+        // Convert subscriptions by table to expected format
+        const formattedSubsByTable: SubscriptionsByTable = {};
+        Object.entries(subsByTable).forEach(([table, subscriptions]) => {
+          if (Array.isArray(subscriptions)) {
+            formattedSubsByTable[table] = subscriptions.map(sub => 
+              typeof sub === 'string' ? sub : String(sub)
+            );
+          } else {
+            formattedSubsByTable[table] = [];
+          }
+        });
+        
+        setActiveSubscriptions(subscriptionKeys);
+        setSubscriptionsByTable(formattedSubsByTable);
+        setConnectionStatus(manager.getConnectionStatus());
+        setLastRefreshTime(Date.now());
+      } catch (error) {
+        console.error("Error updating subscription state:", error);
+      }
+    };
+  }, [manager]);
+  
+  // Memoize debounced update function
+  const debouncedUpdate = useMemo(() => {
+    return debounce(updateSubscriptionState, 1000);
+  }, [updateSubscriptionState]);
   
   // Update state with the current subscriptions
   useEffect(() => {
     // Initial state update
-    const updateSubscriptionState = () => {
-      // Get active subscriptions - extract only the keys as strings
-      const subscriptions = manager.getActiveSubscriptions();
-      const subscriptionKeys = subscriptions.map(sub => String(sub));
-      
-      const subsByTable = manager.getSubscriptionsByTable() || {};
-      
-      // Convert subscriptions by table to expected format
-      const formattedSubsByTable: SubscriptionsByTable = {};
-      Object.entries(subsByTable).forEach(([table, subscriptions]) => {
-        if (Array.isArray(subscriptions)) {
-          formattedSubsByTable[table] = subscriptions.map(sub => 
-            typeof sub === 'string' ? sub : String(sub)
-          );
-        } else {
-          formattedSubsByTable[table] = [];
-        }
-      });
-      
-      setActiveSubscriptions(subscriptionKeys);
-      setSubscriptionsByTable(formattedSubsByTable);
-      setConnectionStatus(manager.getConnectionStatus());
-      setLastRefreshTime(Date.now()); // Use current time instead of calling a non-existent method
-    };
-    
-    // Set up interval to periodically update the state
     updateSubscriptionState();
-    
-    // Create debounced version to prevent excessive updates
-    const debouncedUpdate = debounce(updateSubscriptionState, 1000);
-    
-    // Set up event listener for subscription changes
-    const handleSubscriptionChange = () => {
-      debouncedUpdate();
-    };
-    
-    // Add event listener directly
-    const unsubscribe = () => { /* No-op default function */ };
     
     // Set up interval for periodic updates (prevents stale UI)
     const intervalId = setInterval(debouncedUpdate, 10000);
     
     return () => {
-      unsubscribe();
       clearInterval(intervalId);
     };
-  }, [manager]);
+  }, [updateSubscriptionState, debouncedUpdate]);
   
   // Memorize callback functions to prevent unnecessary re-renders
   const refreshSubscriptions = useMemo(() => {

@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
@@ -20,7 +20,11 @@ export const ROUTE_SUBSCRIPTIONS: Record<string, string[]> = {
 export function useEnhancedRouteSubscriptions() {
   const queryClient = useQueryClient();
   const location = useLocation();
-  const manager = UnifiedSubscriptionManager.getInstance(queryClient);
+  
+  // Create manager instance just once and memoize it
+  const manager = useMemo(() => 
+    UnifiedSubscriptionManager.getInstance(queryClient),
+  [queryClient]);
   
   const [routeKey, setRouteKey] = useState(location.pathname);
   const [requiredTables, setRequiredTables] = useState<string[]>([]);
@@ -39,22 +43,27 @@ export function useEnhancedRouteSubscriptions() {
     unsubscribedTables: [] as string[],
   });
   
+  // Memoize function to find matching route
+  const findMatchingRoute = useCallback((path: string) => {
+    const matchingRoutes = Object.keys(ROUTE_SUBSCRIPTIONS)
+      .filter(route => path.startsWith(route))
+      .sort((a, b) => b.length - a.length); // Sort by specificity (longest first)
+      
+    return matchingRoutes[0] || path;
+  }, []);
+  
   // Update route key and required tables when location changes
   useEffect(() => {
     console.log(`Configuring subscriptions for route: ${location.pathname}`);
     setRouteKey(location.pathname);
     
     // Find the most specific route that matches the current path
-    const matchingRoutes = Object.keys(ROUTE_SUBSCRIPTIONS)
-      .filter(route => location.pathname.startsWith(route))
-      .sort((a, b) => b.length - a.length); // Sort by specificity (longest first)
-      
-    const routeKeyForSubs = matchingRoutes[0] || location.pathname;
+    const routeKeyForSubs = findMatchingRoute(location.pathname);
     console.log(`Using route key for subscriptions: ${routeKeyForSubs}`);
     
     // Clean up any subscriptions from the previous route
-    console.log(`Cleaning up subscriptions for route: ${routeKey}`);
     if (routeKey !== location.pathname && typeof manager.cleanupRouteDependentSubscriptions === 'function') {
+      console.log(`Cleaning up subscriptions for route: ${routeKey}`);
       manager.cleanupRouteDependentSubscriptions(routeKey);
     }
     
@@ -82,7 +91,7 @@ export function useEnhancedRouteSubscriptions() {
         manager.registerRouteSubscription(routeKeyForSubs, table);
       }
     });
-  }, [location.pathname, manager]);
+  }, [location.pathname, manager, routeKey, findMatchingRoute]);
   
   // Track page visibility
   useEffect(() => {
@@ -129,11 +138,10 @@ export function useEnhancedRouteSubscriptions() {
     }
   }, [state.wasInactive]);
   
-  // Monitor subscription status
-  useEffect(() => {
-    const checkSubscriptionStatus = () => {
+  // Create a checkSubscriptionStatus function and memoize it
+  const checkSubscriptionStatus = useCallback(() => {
+    try {
       const activeSubscriptions = manager.getActiveSubscriptions?.() || [];
-      const activeSubsCount = activeSubscriptions.length;
       
       // Get list of tables that are currently subscribed
       const currentlySubscribedTables = Object.keys(manager.getSubscriptionsByTable() || {});
@@ -158,8 +166,13 @@ export function useEnhancedRouteSubscriptions() {
       }));
       
       setConnectionStatus(manager.getConnectionStatus());
-    };
-    
+    } catch (error) {
+      console.error("Error checking subscription status:", error);
+    }
+  }, [manager, requiredTables, state.lastActiveTime]);
+  
+  // Monitor subscription status
+  useEffect(() => {
     // Check status immediately
     checkSubscriptionStatus();
     
@@ -167,7 +180,7 @@ export function useEnhancedRouteSubscriptions() {
     const interval = setInterval(checkSubscriptionStatus, 10000); // Every 10 seconds
     
     return () => clearInterval(interval);
-  }, [routeKey, requiredTables, manager, state.lastActiveTime]);
+  }, [checkSubscriptionStatus]);
   
   // If there are missing subscriptions, try to resubscribe periodically
   useEffect(() => {
@@ -183,9 +196,9 @@ export function useEnhancedRouteSubscriptions() {
   }, [unsubscribedTables, manager]);
   
   /**
-   * Force a refresh of all subscriptions
+   * Force a refresh of all subscriptions - memoize to prevent recreation
    */
-  const forceRefresh = () => {
+  const forceRefresh = useCallback(() => {
     console.log('Manually forcing refresh of all subscriptions');
     
     // Reset the stale flag
@@ -203,7 +216,7 @@ export function useEnhancedRouteSubscriptions() {
     setTimeout(() => {
       queryClient.invalidateQueries();
     }, 500);
-  };
+  }, [manager, queryClient]);
   
   return {
     forceRefresh,

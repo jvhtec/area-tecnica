@@ -34,44 +34,41 @@ export const ConnectionStatus = memo(function ConnectionStatus({
     };
   }, []);
 
-  if (variant === 'inline') {
-    return (
-      <div className={cn('flex items-center gap-1', className)}>
-        {connectionStatus === 'connected' ? (
-          <>
-            <WifiIcon className="h-3 w-3 text-green-500" />
-            <span className="text-xs text-muted-foreground">Connected</span>
-          </>
-        ) : connectionStatus === 'connecting' ? (
-          <>
-            <SignalIcon className="h-3 w-3 text-amber-500" />
-            <span className="text-xs text-muted-foreground">Connecting</span>
-          </>
-        ) : (
-          <>
-            <WifiOffIcon className="h-3 w-3 text-red-500" />
-            <span className="text-xs text-muted-foreground">Disconnected</span>
-          </>
-        )}
-      </div>
-    );
-  }
+  // Render different variants based on props, not conditional hook usage
+  const renderInlineVariant = () => (
+    <div className={cn('flex items-center gap-1', className)}>
+      {connectionStatus === 'connected' ? (
+        <>
+          <WifiIcon className="h-3 w-3 text-green-500" />
+          <span className="text-xs text-muted-foreground">Connected</span>
+        </>
+      ) : connectionStatus === 'connecting' ? (
+        <>
+          <SignalIcon className="h-3 w-3 text-amber-500" />
+          <span className="text-xs text-muted-foreground">Connecting</span>
+        </>
+      ) : (
+        <>
+          <WifiOffIcon className="h-3 w-3 text-red-500" />
+          <span className="text-xs text-muted-foreground">Disconnected</span>
+        </>
+      )}
+    </div>
+  );
   
-  if (variant === 'compact') {
-    return (
-      <div className={cn('relative', className)}>
-        {connectionStatus === 'connected' ? (
-          <WifiIcon className="h-4 w-4 text-green-500" />
-        ) : connectionStatus === 'connecting' ? (
-          <SignalIcon className="h-4 w-4 text-amber-500" />
-        ) : (
-          <WifiOffIcon className="h-4 w-4 text-red-500" />
-        )}
-      </div>
-    );
-  }
-
-  return (
+  const renderCompactVariant = () => (
+    <div className={cn('relative', className)}>
+      {connectionStatus === 'connected' ? (
+        <WifiIcon className="h-4 w-4 text-green-500" />
+      ) : connectionStatus === 'connecting' ? (
+        <SignalIcon className="h-4 w-4 text-amber-500" />
+      ) : (
+        <WifiOffIcon className="h-4 w-4 text-red-500" />
+      )}
+    </div>
+  );
+  
+  const renderDefaultVariant = () => (
     <div className={cn('flex items-center gap-2', className)}>
       {connectionStatus === 'connected' ? (
         <>
@@ -93,4 +90,14 @@ export const ConnectionStatus = memo(function ConnectionStatus({
       )}
     </div>
   );
+
+  // Use a switch statement instead of conditional rendering
+  switch (variant) {
+    case 'inline':
+      return renderInlineVariant();
+    case 'compact':
+      return renderCompactVariant();
+    default:
+      return renderDefaultVariant();
+  }
 });

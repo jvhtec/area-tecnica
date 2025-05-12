@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Wifi, WifiOff, Shield, ShieldOff, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,8 +19,8 @@ export function SessionStatusIndicator({
   const { status: sessionStatus, refreshSession } = useSessionManager();
   const { connectionStatus, refreshSubscriptions } = useSubscriptionContext();
   
-  // Combined status for display
-  const getCombinedStatus = () => {
+  // Combined status for display - memoized to prevent recalculations
+  const combinedStatus = useMemo(() => {
     // If session has an error, that's the highest priority
     if (sessionStatus === "error") return "error";
     
@@ -35,7 +35,7 @@ export function SessionStatusIndicator({
     
     // Otherwise everything is good
     return "connected";
-  };
+  }, [sessionStatus, connectionStatus]);
   
   // Handle reconnection
   const handleReconnect = async () => {
@@ -58,9 +58,9 @@ export function SessionStatusIndicator({
     }
   };
   
-  // Get the right status icon
-  const getStatusIcon = (status: string) => {
-    switch (status) {
+  // Get the right status icon - memoized
+  const statusIcon = useMemo(() => {
+    switch (combinedStatus) {
       case "connected":
         return (
           <>
@@ -83,12 +83,6 @@ export function SessionStatusIndicator({
           </>
         );
       case "disconnected":
-        return (
-          <>
-            <WifiOff className="h-3 w-3 text-red-500" />
-            <ShieldOff className="h-3 w-3 text-red-500" />
-          </>
-        );
       case "error":
         return (
           <>
@@ -99,11 +93,11 @@ export function SessionStatusIndicator({
       default:
         return <Loader2 className="h-3 w-3 animate-spin" />;
     }
-  };
+  }, [combinedStatus]);
   
-  // Get status text
-  const getStatusText = (status: string) => {
-    switch (status) {
+  // Get status text - memoized
+  const statusText = useMemo(() => {
+    switch (combinedStatus) {
       case "connected":
         return "Connected";
       case "connecting":
@@ -117,11 +111,11 @@ export function SessionStatusIndicator({
       default:
         return "Unknown";
     }
-  };
+  }, [combinedStatus]);
   
-  // Get tooltip message
-  const getTooltipMessage = (status: string) => {
-    switch (status) {
+  // Get tooltip message - memoized
+  const tooltipMessage = useMemo(() => {
+    switch (combinedStatus) {
       case "connected":
         return "Connected to session and realtime updates";
       case "connecting":
@@ -135,71 +129,63 @@ export function SessionStatusIndicator({
       default:
         return "Unknown status";
     }
-  };
+  }, [combinedStatus]);
   
-  const combinedStatus = getCombinedStatus();
+  // Render based on variant - using functions to avoid conditional hook calls
+  const renderIconVariant = () => (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className={`cursor-help flex ${className}`}>
+            {statusIcon}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{tooltipMessage}</p>
+          {combinedStatus !== "connected" && (
+            <Button 
+              variant="link" 
+              className="p-0 h-auto text-xs" 
+              onClick={handleReconnect}
+            >
+              Click to reconnect
+            </Button>
+          )}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
   
-  // Simple icon-only variant
-  if (variant === "icon") {
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className={`cursor-help flex ${className}`}>
-              {getStatusIcon(combinedStatus)}
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{getTooltipMessage(combinedStatus)}</p>
-            {combinedStatus !== "connected" && (
-              <Button 
-                variant="link" 
-                className="p-0 h-auto text-xs" 
-                onClick={handleReconnect}
-              >
-                Click to reconnect
-              </Button>
-            )}
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  }
+  const renderBadgeVariant = () => (
+    <Badge 
+      variant="outline" 
+      className={`flex items-center gap-1 cursor-pointer ${className}`}
+      onClick={handleReconnect}
+    >
+      <div className="flex items-center">
+        {statusIcon}
+      </div>
+      
+      <span className="text-xs">
+        {statusText}
+      </span>
+      
+      {isRefreshing ? (
+        <Loader2 className="h-3 w-3 animate-spin" />
+      ) : (
+        <RefreshCw className="h-3 w-3" />
+      )}
+    </Badge>
+  );
   
-  // Badge variant
-  if (variant === "badge") {
-    return (
-      <Badge 
-        variant="outline" 
-        className={`flex items-center gap-1 cursor-pointer ${className}`}
-        onClick={handleReconnect}
-      >
-        <div className="flex items-center">
-          {getStatusIcon(combinedStatus)}
-        </div>
-        
-        <span className="text-xs">
-          {getStatusText(combinedStatus)}
-        </span>
-        
-        {isRefreshing ? (
-          <Loader2 className="h-3 w-3 animate-spin" />
-        ) : (
-          <RefreshCw className="h-3 w-3" />
-        )}
-      </Badge>
-    );
-  }
-  
-  // Full variant with more details
-  return (
+  const renderFullVariant = () => (
     <div className={`flex items-center gap-2 ${className}`}>
       <div className="flex items-center">
-        {getStatusIcon(combinedStatus)}
+        {statusIcon}
       </div>
       
       <span>
-        {getTooltipMessage(combinedStatus)}
+        {tooltipMessage}
       </span>
       
       <Button 
@@ -223,4 +209,16 @@ export function SessionStatusIndicator({
       </Button>
     </div>
   );
+
+  // Use a switch instead of conditionals to ensure consistent hook calls
+  switch (variant) {
+    case "icon":
+      return renderIconVariant();
+    case "badge":
+      return renderBadgeVariant();
+    case "full":
+      return renderFullVariant();
+    default:
+      return renderBadgeVariant();
+  }
 }
