@@ -67,7 +67,7 @@ export function SubscriptionStatus() {
             <div>
               <h3 className="text-sm font-medium mb-2">Subscriptions by Table</h3>
               <div className="space-y-2">
-                {Object.keys(subscriptionsByTable).length > 0 ? (
+                {Object.entries(subscriptionsByTable).length > 0 ? (
                   Object.entries(subscriptionsByTable).map(([table, keys]) => (
                     <div key={table} className="text-sm">
                       <div className="flex items-center gap-2 mb-1">

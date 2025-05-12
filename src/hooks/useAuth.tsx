@@ -51,7 +51,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [authInitialized, setAuthInitialized] = useState(false);
   const tokenManager = TokenManager.getInstance();
 
   // Fetch user profile with proper error handling
@@ -164,10 +163,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           description: "You have successfully logged in.",
         });
         
-        // Only navigate once auth is fully initialized to prevent loops
-        if (authInitialized) {
-          navigate("/dashboard");
-        }
+        navigate("/dashboard");
       }
     } catch (error: any) {
       setError(error.message);
@@ -218,10 +214,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           description: "Your account has been created successfully.",
         });
         
-        // Only navigate once auth is fully initialized to prevent loops
-        if (authInitialized) {
-          navigate("/dashboard");
-        }
+        navigate("/dashboard");
       }
     } catch (error: any) {
       setError(error.message);
@@ -287,7 +280,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Initial session setup and auth state subscription
   useEffect(() => {
     let subscription: { unsubscribe: () => void } | null = null;
-    let isFirstLoad = true;
     
     const setupSession = async () => {
       try {
@@ -324,29 +316,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               
               // Refresh subscriptions for new user context
               refreshSubscriptions();
-              
-              // Only navigate on auth changes after initial load to prevent loops
-              if (!isFirstLoad) {
-                navigate('/dashboard');
-              }
             } else {
               setSession(null);
               setUser(null);
               setUserRole(null);
               setUserDepartment(null);
               
-              if (event === 'SIGNED_OUT' && !isFirstLoad) {
+              if (event === 'SIGNED_OUT') {
                 navigate('/auth');
               }
             }
-            
-            // Mark first load as complete
-            isFirstLoad = false;
           }
         );
         
         subscription = authSubscription;
-        setAuthInitialized(true);
       } catch (error: any) {
         console.error("Error in session setup:", error);
         setError(error.message);

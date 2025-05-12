@@ -11,22 +11,20 @@ import { UnifiedSubscriptionManager } from '@/lib/unified-subscription-manager';
  * @returns Status information about the subscriptions
  */
 export function useSubscriptionStatus(tables: string[]) {
-  // Ensure we always have a valid array
-  const tablesToCheck = Array.isArray(tables) ? tables : [];
-  
   const queryClient = useQueryClient();
-  const manager = queryClient ? UnifiedSubscriptionManager.getInstance(queryClient) : null;
+  const manager = UnifiedSubscriptionManager.getInstance(queryClient);
   
-  const context = useSubscriptionContext();
-  const connectionStatus = context?.connectionStatus || 'disconnected';
-  const lastRefreshTime = context?.lastRefreshTime || Date.now();
-  const refreshSubscriptions = context?.refreshSubscriptions || (() => {});
+  const { 
+    connectionStatus, 
+    lastRefreshTime,
+    refreshSubscriptions
+  } = useSubscriptionContext();
   
   const [status, setStatus] = useState({
     isSubscribed: false,
     tablesSubscribed: [] as string[],
     tablesUnsubscribed: [] as string[],
-    connectionStatus,
+    connectionStatus: connectionStatus,
     lastRefreshTime,
     lastRefreshFormatted: '',
     isStale: false
@@ -34,90 +32,51 @@ export function useSubscriptionStatus(tables: string[]) {
   
   // Update status when context changes
   useEffect(() => {
-    if (!manager || !queryClient) {
-      setStatus(prev => ({
-        ...prev,
-        connectionStatus: 'disconnected',
-        isSubscribed: false,
-        tablesSubscribed: [],
-        tablesUnsubscribed: tablesToCheck
-      }));
-      return;
+    // Get current subscription status
+    const subscriptionsByTable = manager.getSubscriptionsByTable();
+    
+    // Determine which tables are subscribed vs unsubscribed
+    const tablesSubscribed = tables.filter(
+      table => subscriptionsByTable[table]?.length > 0
+    );
+    
+    const tablesUnsubscribed = tables.filter(
+      table => !subscriptionsByTable[table] || subscriptionsByTable[table].length === 0
+    );
+    
+    // Format the last refresh time
+    let lastRefreshFormatted = "Unknown";
+    try {
+      lastRefreshFormatted = formatDistanceToNow(lastRefreshTime, { addSuffix: true });
+    } catch (error) {
+      console.error("Error formatting refresh time:", error);
     }
     
-    try {
-      // Get current subscription status - with null safety
-      const subscriptionsByTable = manager && typeof manager.getSubscriptionsByTable === 'function' 
-        ? manager.getSubscriptionsByTable() || {} 
-        : {};
-      
-      if (!subscriptionsByTable || typeof subscriptionsByTable !== 'object') {
-        console.warn('Invalid subscription data returned');
-        return;
-      }
-      
-      // Determine which tables are subscribed vs unsubscribed
-      const tablesSubscribed = tablesToCheck.filter(
-        table => subscriptionsByTable[table] && Array.isArray(subscriptionsByTable[table]) && subscriptionsByTable[table].length > 0
-      );
-      
-      const tablesUnsubscribed = tablesToCheck.filter(
-        table => !subscriptionsByTable[table] || !Array.isArray(subscriptionsByTable[table]) || subscriptionsByTable[table].length === 0
-      );
-      
-      // Format the last refresh time
-      let lastRefreshFormatted = "Unknown";
-      try {
-        if (lastRefreshTime) {
-          lastRefreshFormatted = formatDistanceToNow(lastRefreshTime, { addSuffix: true });
-        }
-      } catch (error) {
-        console.error("Error formatting refresh time:", error);
-      }
-      
-      // Check if all required tables are subscribed
-      const isSubscribed = tablesUnsubscribed.length === 0 && tablesToCheck.length > 0;
-      
-      // Check if data is stale (older than 5 minutes)
-      const isStale = Date.now() - lastRefreshTime > 5 * 60 * 1000;
-      
-      setStatus({
-        isSubscribed,
-        tablesSubscribed,
-        tablesUnsubscribed,
-        connectionStatus,
-        lastRefreshTime,
-        lastRefreshFormatted,
-        isStale
-      });
-    } catch (error) {
-      console.error("Error updating subscription status:", error);
-      
-      // Set safe defaults in case of error
-      setStatus({
-        isSubscribed: false,
-        tablesSubscribed: [],
-        tablesUnsubscribed: tablesToCheck,
-        connectionStatus: 'disconnected',
-        lastRefreshTime,
-        lastRefreshFormatted: 'Error',
-        isStale: true
-      });
-    }
-  }, [tablesToCheck, connectionStatus, lastRefreshTime, manager, queryClient]);
+    // Check if all required tables are subscribed
+    const isSubscribed = tablesUnsubscribed.length === 0 && tables.length > 0;
+    
+    // Check if data is stale (older than 5 minutes)
+    const isStale = Date.now() - lastRefreshTime > 5 * 60 * 1000;
+    
+    setStatus({
+      isSubscribed,
+      tablesSubscribed,
+      tablesUnsubscribed,
+      connectionStatus,
+      lastRefreshTime,
+      lastRefreshFormatted,
+      isStale
+    });
+  }, [tables, connectionStatus, lastRefreshTime, manager]);
   
   // Function to manually refresh subscriptions
   const refreshSubscription = () => {
-    if (!queryClient || !manager) return;
-    
     refreshSubscriptions();
-    console.log('Manually refreshed subscriptions for tables:', tablesToCheck);
+    console.log('Manually refreshed subscriptions for tables:', tables);
     
     // Also invalidate related queries
-    tablesToCheck.forEach(table => {
-      if (table && queryClient) {
-        queryClient.invalidateQueries({ queryKey: [table] });
-      }
+    tables.forEach(table => {
+      queryClient.invalidateQueries({ queryKey: [table] });
     });
   };
   

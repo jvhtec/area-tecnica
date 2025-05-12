@@ -11,8 +11,8 @@ import {
   SidebarTrigger
 } from "@/components/ui/sidebar";
 import { LogOut } from "lucide-react";
-import { useNavigate, useLocation, Outlet, Navigate } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
+import { useNavigate, useLocation, Outlet } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { UserInfo } from "@/components/layout/UserInfo";
@@ -36,14 +36,12 @@ const Layout = () => {
   const queryClient = useQueryClient();
   const { triggered: doomTriggered, reset: resetDoom, handleLogoTap, tapCount } = useKonamiCode();
   const isMobile = useIsMobile();
-  const redirectedRef = useRef(false);
   
   const {
     session,
     userRole,
     userDepartment,
     isLoading,
-    isAuthenticated,
     setSession,
     setUserRole,
     setUserDepartment
@@ -51,16 +49,11 @@ const Layout = () => {
 
   // Redirect technicians to technician dashboard if they somehow get to the regular dashboard
   useEffect(() => {
-    if (!isLoading && isAuthenticated && userRole === 'technician' && location.pathname === '/dashboard') {
+    if (!isLoading && userRole === 'technician' && location.pathname === '/dashboard') {
       console.log('Technician on dashboard, redirecting to technician dashboard');
-      // Use debounce to prevent excessive redirects
-      const redirectTimer = setTimeout(() => {
-        navigate('/technician-dashboard', { replace: true });
-      }, 100);
-      
-      return () => clearTimeout(redirectTimer);
+      navigate('/technician-dashboard');
     }
-  }, [userRole, location.pathname, isLoading, isAuthenticated, navigate]);
+  }, [userRole, location.pathname, isLoading, navigate]);
 
   const handleSignOut = async () => {
     if (isLoggingOut) return;
@@ -75,7 +68,7 @@ const Layout = () => {
       localStorage.clear();
       await supabase.auth.signOut();
       console.log("Sign out successful");
-      navigate('/auth', { replace: true });
+      navigate('/auth');
       toast({
         title: "Success",
         description: "You have been logged out successfully",
@@ -104,15 +97,9 @@ const Layout = () => {
     );
   }
 
-  // Only redirect once to prevent rapid navigation
-  if (!session && !redirectedRef.current) {
-    console.log("No session found in Layout, redirecting to auth");
-    redirectedRef.current = true;
-    return <Navigate to='/auth' replace />;
-  }
-
-  // Guard clause to prevent rendering the layout without a session
   if (!session) {
+    console.log("No session found in Layout, redirecting to auth");
+    navigate('/auth', { replace: true });
     return null;
   }
 

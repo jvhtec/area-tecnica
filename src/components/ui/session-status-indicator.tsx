@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Wifi, WifiOff, Shield, ShieldOff, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,8 +19,8 @@ export function SessionStatusIndicator({
   const { status: sessionStatus, refreshSession } = useSessionManager();
   const { connectionStatus, refreshSubscriptions } = useSubscriptionContext();
   
-  // Combined status for display - memoized to prevent recalculations
-  const combinedStatus = useMemo(() => {
+  // Combined status for display
+  const getCombinedStatus = () => {
     // If session has an error, that's the highest priority
     if (sessionStatus === "error") return "error";
     
@@ -35,7 +35,7 @@ export function SessionStatusIndicator({
     
     // Otherwise everything is good
     return "connected";
-  }, [sessionStatus, connectionStatus]);
+  };
   
   // Handle reconnection
   const handleReconnect = async () => {
@@ -58,9 +58,9 @@ export function SessionStatusIndicator({
     }
   };
   
-  // Memoize all status icons and content to prevent conditional renders
-  const statusIcon = useMemo(() => {
-    switch (combinedStatus) {
+  // Get the right status icon
+  const getStatusIcon = (status: string) => {
+    switch (status) {
       case "connected":
         return (
           <>
@@ -83,6 +83,12 @@ export function SessionStatusIndicator({
           </>
         );
       case "disconnected":
+        return (
+          <>
+            <WifiOff className="h-3 w-3 text-red-500" />
+            <ShieldOff className="h-3 w-3 text-red-500" />
+          </>
+        );
       case "error":
         return (
           <>
@@ -93,11 +99,11 @@ export function SessionStatusIndicator({
       default:
         return <Loader2 className="h-3 w-3 animate-spin" />;
     }
-  }, [combinedStatus]);
+  };
   
-  // Get status text - memoized
-  const statusText = useMemo(() => {
-    switch (combinedStatus) {
+  // Get status text
+  const getStatusText = (status: string) => {
+    switch (status) {
       case "connected":
         return "Connected";
       case "connecting":
@@ -111,11 +117,11 @@ export function SessionStatusIndicator({
       default:
         return "Unknown";
     }
-  }, [combinedStatus]);
+  };
   
-  // Get tooltip message - memoized
-  const tooltipMessage = useMemo(() => {
-    switch (combinedStatus) {
+  // Get tooltip message
+  const getTooltipMessage = (status: string) => {
+    switch (status) {
       case "connected":
         return "Connected to session and realtime updates";
       case "connecting":
@@ -129,63 +135,71 @@ export function SessionStatusIndicator({
       default:
         return "Unknown status";
     }
-  }, [combinedStatus]);
+  };
   
-  // Pre-render all variant components to avoid conditional hook calls
-  const iconVariantComponent = useMemo(() => (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className={`cursor-help flex ${className}`}>
-            {statusIcon}
-          </div>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{tooltipMessage}</p>
-          {combinedStatus !== "connected" && (
-            <Button 
-              variant="link" 
-              className="p-0 h-auto text-xs" 
-              onClick={handleReconnect}
-            >
-              Click to reconnect
-            </Button>
-          )}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  ), [statusIcon, tooltipMessage, combinedStatus, className, handleReconnect]);
+  const combinedStatus = getCombinedStatus();
   
-  const badgeVariantComponent = useMemo(() => (
-    <Badge 
-      variant="outline" 
-      className={`flex items-center gap-1 cursor-pointer ${className}`}
-      onClick={handleReconnect}
-    >
-      <div className="flex items-center">
-        {statusIcon}
-      </div>
-      
-      <span className="text-xs">
-        {statusText}
-      </span>
-      
-      {isRefreshing ? (
-        <Loader2 className="h-3 w-3 animate-spin" />
-      ) : (
-        <RefreshCw className="h-3 w-3" />
-      )}
-    </Badge>
-  ), [statusIcon, statusText, isRefreshing, className, handleReconnect]);
+  // Simple icon-only variant
+  if (variant === "icon") {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className={`cursor-help flex ${className}`}>
+              {getStatusIcon(combinedStatus)}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{getTooltipMessage(combinedStatus)}</p>
+            {combinedStatus !== "connected" && (
+              <Button 
+                variant="link" 
+                className="p-0 h-auto text-xs" 
+                onClick={handleReconnect}
+              >
+                Click to reconnect
+              </Button>
+            )}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
   
-  const fullVariantComponent = useMemo(() => (
+  // Badge variant
+  if (variant === "badge") {
+    return (
+      <Badge 
+        variant="outline" 
+        className={`flex items-center gap-1 cursor-pointer ${className}`}
+        onClick={handleReconnect}
+      >
+        <div className="flex items-center">
+          {getStatusIcon(combinedStatus)}
+        </div>
+        
+        <span className="text-xs">
+          {getStatusText(combinedStatus)}
+        </span>
+        
+        {isRefreshing ? (
+          <Loader2 className="h-3 w-3 animate-spin" />
+        ) : (
+          <RefreshCw className="h-3 w-3" />
+        )}
+      </Badge>
+    );
+  }
+  
+  // Full variant with more details
+  return (
     <div className={`flex items-center gap-2 ${className}`}>
       <div className="flex items-center">
-        {statusIcon}
+        {getStatusIcon(combinedStatus)}
       </div>
       
       <span>
-        {tooltipMessage}
+        {getTooltipMessage(combinedStatus)}
       </span>
       
       <Button 
@@ -208,11 +222,5 @@ export function SessionStatusIndicator({
         )}
       </Button>
     </div>
-  ), [statusIcon, tooltipMessage, isRefreshing, className, handleReconnect]);
-
-  // Use a switch instead of conditionals to ensure consistent hook calls
-  // All variants are pre-rendered with useMemo, so we're just returning the pre-rendered components
-  if (variant === "icon") return iconVariantComponent;
-  if (variant === "badge") return badgeVariantComponent;
-  return fullVariantComponent;
+  );
 }

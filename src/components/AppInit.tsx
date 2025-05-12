@@ -1,5 +1,5 @@
 
-import { useEffect, useRef, memo } from "react";
+import { useEffect } from "react";
 import { connectionRecovery } from "@/lib/connection-recovery-service";
 import { useQueryClient } from "@tanstack/react-query";
 import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
@@ -8,57 +8,31 @@ import { useEnhancedRouteSubscriptions } from "@/hooks/useEnhancedRouteSubscript
 import { toast } from "sonner";
 import { SessionManager } from "@/lib/session-manager";
 import { useSessionManager } from "@/hooks/useSessionManager";
-import { debounce } from "@/lib/utils";
 
 /**
  * Component that initializes app-wide services when the application starts
  * Doesn't render anything to the UI
  * IMPORTANT: Must be used inside QueryClientProvider
- * Using memo to prevent unnecessary re-renders
  */
-export const AppInit = memo(function AppInit() {
+export function AppInit() {
   const queryClient = useQueryClient();
   const location = useLocation();
-  const { isInitialized, status, isAuthenticated } = useSessionManager();
-  const initCompletedRef = useRef(false);
-  const toastDisplayedRef = useRef({
-    stale: false,
-    inactive: false,
-    sessionError: false
-  });
-  
-  // Skip initialization on auth page to prevent loops
-  const shouldInitialize = location.pathname !== '/auth' && isAuthenticated;
+  const { isInitialized, status } = useSessionManager();
   
   // Initialize the connection recovery service
   useEffect(() => {
-    // Skip initialization on auth page to prevent loops
-    if (!shouldInitialize) {
-      return;
-    }
-    
     connectionRecovery.startRecovery();
     console.log('Connection recovery service initialized');
-  }, [shouldInitialize]);
+  }, []);
   
   // Initialize the unified subscription manager
   useEffect(() => {
-    // Skip initialization if conditions aren't met
-    if (!shouldInitialize) {
-      return;
-    }
-    
     const manager = UnifiedSubscriptionManager.getInstance(queryClient);
+    manager.setupVisibilityBasedRefetching();
+    manager.setupNetworkStatusRefetching();
+    console.log('Unified subscription manager initialized');
     
-    // Track initialization status to prevent multiple setups
-    if (!initCompletedRef.current) {
-      manager.setupVisibilityBasedRefetching();
-      manager.setupNetworkStatusRefetching();
-      console.log('Unified subscription manager initialized');
-      initCompletedRef.current = true;
-    }
-    
-    // Rate-limited health check for subscriptions (max once per minute)
+    // Set up a periodic health check for subscriptions
     const healthCheckInterval = setInterval(() => {
       const connectionStatus = manager.getConnectionStatus();
       if (connectionStatus !== 'connected') {
@@ -70,21 +44,13 @@ export const AppInit = memo(function AppInit() {
     return () => {
       clearInterval(healthCheckInterval);
     };
-  }, [queryClient, shouldInitialize]);
+  }, [queryClient]);
   
   // Use the enhanced route subscriptions hook to manage subscriptions based on the current route
-  // Only if conditions are met to prevent constant reinitializations
-  const subscriptionStatus = shouldInitialize 
-    ? useEnhancedRouteSubscriptions() 
-    : { isStale: false, wasInactive: false, forceRefresh: () => {}, isFullySubscribed: true, unsubscribedTables: [] };
+  const subscriptionStatus = useEnhancedRouteSubscriptions();
   
   // Initialize the session manager
   useEffect(() => {
-    // Skip excessive event handlers on auth page
-    if (!shouldInitialize) {
-      return;
-    }
-    
     const sessionManager = SessionManager.getInstance();
     
     // Set up event listeners for session changes
@@ -96,38 +62,19 @@ export const AppInit = memo(function AppInit() {
       }
     });
     
-    // Create a debounced error toast to prevent spamming
-    const debouncedErrorToast = debounce(() => {
-      if (!toastDisplayedRef.current.sessionError) {
-        toastDisplayedRef.current.sessionError = true;
-        toast.error("Authentication error", {
-          description: "There was a problem with your session. Attempting to recover.",
-          id: "session-refresh-error", // Use ID to prevent duplicate toasts
-          onDismiss: () => {
-            // Reset after 30 seconds
-            setTimeout(() => {
-              toastDisplayedRef.current.sessionError = false;
-            }, 30000);
-          }
-        });
-      }
-    }, 2000);
-    
     const sessionErrorUnsubscribe = sessionManager.on("refresh-error", (error) => {
       console.error("Session refresh error:", error);
-      // Use a debounced toast to prevent excessive notifications
-      debouncedErrorToast();
+      toast.error("Authentication error", {
+        description: "There was a problem with your session. Attempting to recover.",
+      });
     });
     
     const recoveryAttemptUnsubscribe = sessionManager.on("recovery-attempt", (attempt) => {
       console.log(`Recovery attempt ${attempt}`);
-      // Only show toast for first attempt to prevent spamming
-      if (attempt === 1) {
-        toast.info("Attempting to restore your session", {
-          description: `Recovery attempt ${attempt}`,
-          id: "session-recovery", // Use ID to prevent duplicate toasts
-        });
-      }
+      toast.info("Attempting to restore your session", {
+        description: `Recovery attempt ${attempt}`,
+        id: "session-recovery", // Use ID to prevent duplicate toasts
+      });
     });
     
     return () => {
@@ -135,76 +82,59 @@ export const AppInit = memo(function AppInit() {
       sessionErrorUnsubscribe();
       recoveryAttemptUnsubscribe();
     };
-  }, [subscriptionStatus, shouldInitialize]);
+  }, [subscriptionStatus]);
   
   // Handle subscription staleness
   useEffect(() => {
-    // Skip on auth page and when not authenticated
-    if (!shouldInitialize) {
-      return;
-    }
-    
-    if (subscriptionStatus.isStale && !toastDisplayedRef.current.stale) {
+    if (subscriptionStatus.isStale) {
       console.log('Subscriptions are stale, refreshing...');
-      // Use a debounced refresh approach to prevent rapid updates
-      const refreshTimer = setTimeout(() => {
-        subscriptionStatus.forceRefresh();
-        
-        // Notify the user that subscriptions are being refreshed (rate-limited)
-        toastDisplayedRef.current.stale = true;
-        toast.info('Refreshing stale data...', {
-          description: 'Your connection was inactive for a while, updating now',
-          id: "stale-refresh-notification", // Use ID to prevent duplicate toasts
-          onDismiss: () => {
-            // Reset after a minute
-            setTimeout(() => {
-              toastDisplayedRef.current.stale = false;
-            }, 60000);
-          }
-        });
-      }, 1000);
+      subscriptionStatus.forceRefresh();
       
-      return () => clearTimeout(refreshTimer);
+      // Notify the user that subscriptions are being refreshed
+      toast.info('Refreshing stale data...', {
+        description: 'Your connection was inactive for a while, updating now',
+      });
     }
-  }, [subscriptionStatus.isStale, shouldInitialize]);
+  }, [subscriptionStatus.isStale]);
   
   // Handle subscription refresh when coming back after inactivity
   useEffect(() => {
-    // Skip on auth page
-    if (!shouldInitialize) {
-      return;
-    }
-    
-    if (subscriptionStatus.wasInactive && !toastDisplayedRef.current.inactive) {
+    if (subscriptionStatus.wasInactive) {
       console.log('Page was inactive, refreshing subscriptions');
       
-      // Debounce to prevent rapid updates
-      const inactivityTimer = setTimeout(() => {
-        // Also validate the session when coming back from inactivity
-        const sessionManager = SessionManager.getInstance();
-        sessionManager.validateAndRefreshSession();
-        
-        // Force a refresh of all queries
-        queryClient.invalidateQueries();
-        
-        // Notify the user that data is being refreshed (rate-limited)
-        toastDisplayedRef.current.inactive = true;
-        toast.info('Updating after inactivity', {
-          description: 'Refreshing data after returning to the page',
-          id: "inactivity-refresh", // Use ID to prevent duplicate toasts
-          onDismiss: () => {
-            // Reset after a minute
-            setTimeout(() => {
-              toastDisplayedRef.current.inactive = false;
-            }, 60000);
-          }
-        });
+      // Also validate the session when coming back from inactivity
+      const sessionManager = SessionManager.getInstance();
+      sessionManager.validateAndRefreshSession();
+      
+      // Force a refresh of all queries
+      queryClient.invalidateQueries();
+      
+      // Notify the user that data is being refreshed
+      toast.info('Updating after inactivity', {
+        description: 'Refreshing data after returning to the page',
+      });
+    }
+  }, [subscriptionStatus.wasInactive, queryClient]);
+  
+  // Handle route changes
+  useEffect(() => {
+    // When route changes, check if the new route has all required subscriptions
+    if (isInitialized && !subscriptionStatus.isFullySubscribed) {
+      console.log('Not fully subscribed to required tables, checking what is missing');
+      console.log('Missing tables:', subscriptionStatus.unsubscribedTables);
+      
+      // If there are missing subscriptions after a short delay, try to reestablish them
+      const delayTimeout = setTimeout(() => {
+        if (subscriptionStatus.unsubscribedTables.length > 0) {
+          console.log('Still missing subscriptions, attempting to resubscribe');
+          subscriptionStatus.forceRefresh();
+        }
       }, 1000);
       
-      return () => clearTimeout(inactivityTimer);
+      return () => clearTimeout(delayTimeout);
     }
-  }, [subscriptionStatus.wasInactive, queryClient, shouldInitialize]);
+  }, [location.pathname, subscriptionStatus, isInitialized]);
   
   // This component doesn't render anything
   return null;
-});
+}

@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { 
   SidebarProvider, 
@@ -11,7 +12,7 @@ import {
 } from "@/components/ui/sidebar";
 import { LogOut } from "lucide-react";
 import { useNavigate, useLocation, Outlet, Navigate } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { UserInfo } from "@/components/layout/UserInfo";
@@ -56,7 +57,7 @@ const Layout = () => {
   // Subscribe to route-specific tables whenever the route changes
   useEffect(() => {
     if (routeSubscriptions.requiredTables?.length > 0) {
-      forceSubscribe(routeSubscriptions.requiredTables); // This will now handle arrays correctly
+      forceSubscribe(routeSubscriptions.requiredTables);
     }
   }, [location.pathname, routeSubscriptions.requiredTables, forceSubscribe]);
 

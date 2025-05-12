@@ -1,164 +1,101 @@
 
-import { createContext, useContext, useEffect, useMemo, useState, ReactNode, useCallback } from "react";
-import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
+import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { debounce } from "@/lib/utils";
+import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
 
-export interface SubscriptionsByTable {
-  [tableName: string]: string[];
+interface SubscriptionContextType {
+  connectionStatus: 'connected' | 'disconnected' | 'connecting';
+  subscriptionCount: number;
+  subscriptionsByTable: Record<string, string[]>;
+  lastRefreshTime: number;
+  activeSubscriptions: Array<any>;
+  refreshSubscriptions: () => void;
+  invalidateQueries: () => void;
+  forceSubscribe: (tables: string[]) => void;
 }
 
-export type SubscriptionContextType = {
-  activeSubscriptions: string[];
-  subscriptionCount: number;
-  subscriptionsByTable: SubscriptionsByTable;
-  refreshSubscriptions: () => void;
-  forceSubscribe: (table: string | string[]) => void;
-  invalidateQueries: () => void;
-  connectionStatus: 'connected' | 'disconnected' | 'connecting';
-  lastRefreshTime: number;
-};
+const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
-// Create a default context value to avoid null checks
-const defaultContextValue: SubscriptionContextType = {
-  activeSubscriptions: [],
-  subscriptionCount: 0,
-  subscriptionsByTable: {},
-  refreshSubscriptions: () => {},
-  forceSubscribe: () => {},
-  invalidateQueries: () => {},
-  connectionStatus: 'disconnected',
-  lastRefreshTime: Date.now(),
-};
-
-const SubscriptionContext = createContext<SubscriptionContextType>(defaultContextValue);
-
-export const useSubscriptionContext = () => useContext(SubscriptionContext);
-
-export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
+/**
+ * Provider component for subscription management
+ */
+export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  const [activeSubscriptions, setActiveSubscriptions] = useState<string[]>([]);
-  const [subscriptionsByTable, setSubscriptionsByTable] = useState<SubscriptionsByTable>({});
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
-  const [lastRefreshTime, setLastRefreshTime] = useState<number>(Date.now());
+  const [manager] = useState(() => UnifiedSubscriptionManager.getInstance(queryClient));
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>(
+    manager.getConnectionStatus()
+  );
+  const [subscriptionCount, setSubscriptionCount] = useState(manager.getSubscriptionCount());
+  const [subscriptionsByTable, setSubscriptionsByTable] = useState<Record<string, string[]>>(
+    manager.getSubscriptionsByTable() || {}
+  );
+  const [lastRefreshTime, setLastRefreshTime] = useState(Date.now());
+  const [activeSubscriptions, setActiveSubscriptions] = useState<Array<any>>(
+    manager.getActiveSubscriptions?.() || []
+  );
   
-  // Use a memoized instance of the manager to prevent unnecessary re-renders
-  const manager = useMemo(() => {
-    return queryClient ? UnifiedSubscriptionManager.getInstance(queryClient) : null;
-  }, [queryClient]);
-  
-  // Memoize update function to ensure consistent reference
-  const updateSubscriptionState = useCallback(() => {
-    if (!manager) {
-      console.warn("Subscription manager is not available");
-      return;
-    }
-
-    try {
-      // Get active subscriptions with proper null/undefined checks
-      const subscriptions = manager.getActiveSubscriptions ? manager.getActiveSubscriptions() : [];
-      // Make sure we're working with string arrays and handle null/undefined
-      const subscriptionKeys = Array.isArray(subscriptions) ? subscriptions.map(sub => String(sub || '')) : [];
-      
-      const subsByTable = manager.getSubscriptionsByTable ? manager.getSubscriptionsByTable() : {};
-      
-      // Convert subscriptions by table to expected format, with safety checks
-      const formattedSubsByTable: SubscriptionsByTable = {};
-      if (subsByTable && typeof subsByTable === 'object') {
-        Object.entries(subsByTable).forEach(([table, subscriptions]) => {
-          if (Array.isArray(subscriptions)) {
-            formattedSubsByTable[table] = subscriptions
-              .filter(sub => sub !== null && sub !== undefined)
-              .map(sub => typeof sub === 'string' ? sub : String(sub));
-          } else {
-            formattedSubsByTable[table] = [];
-          }
-        });
-      }
-      
-      setActiveSubscriptions(subscriptionKeys);
-      setSubscriptionsByTable(formattedSubsByTable);
-      setConnectionStatus(manager.getConnectionStatus && typeof manager.getConnectionStatus === 'function' ? manager.getConnectionStatus() : 'disconnected');
-      setLastRefreshTime(Date.now());
-    } catch (error) {
-      console.error("Error updating subscription state:", error);
-      // Set default values in case of error
-      setActiveSubscriptions([]);
-      setSubscriptionsByTable({});
-    }
-  }, [manager]);
-  
-  // Memoize debounced update function
-  const debouncedUpdate = useMemo(() => {
-    return updateSubscriptionState ? debounce(updateSubscriptionState, 1000) : () => {};
-  }, [updateSubscriptionState]);
-  
-  // Update state with the current subscriptions
+  // Update context values periodically
   useEffect(() => {
-    if (!manager || !queryClient) return;
-    
-    // Initial state update
-    updateSubscriptionState();
-    
-    // Set up interval for periodic updates (prevents stale UI)
-    const intervalId = setInterval(debouncedUpdate, 10000);
-    
-    return () => {
-      clearInterval(intervalId);
+    const updateStatus = () => {
+      setConnectionStatus(manager.getConnectionStatus());
+      setSubscriptionCount(manager.getSubscriptionCount());
+      setSubscriptionsByTable(manager.getSubscriptionsByTable() || {});
+      setActiveSubscriptions(manager.getActiveSubscriptions?.() || []);
     };
-  }, [updateSubscriptionState, debouncedUpdate, manager, queryClient]);
-  
-  // Memorize callback functions to prevent unnecessary re-renders
-  const refreshSubscriptions = useCallback(() => {
-    console.log("Manually reestablishing subscriptions");
-    if (manager && typeof manager.reestablishSubscriptions === 'function') {
-      manager.reestablishSubscriptions();
-    }
-    setLastRefreshTime(Date.now());
-  }, [manager]);
-  
-  const forceSubscribe = useCallback((table: string | string[]) => {
-    console.log(`Manually subscribing to table(s):`, table);
-    if (!manager) return;
     
-    if (Array.isArray(table)) {
-      table.forEach(t => {
-        if (t) manager.subscribeToTable(t, [t]);
-      });
-    } else if (table) {
-      manager.subscribeToTable(table, [table]);
-    }
+    // Update immediately and then every 5 seconds
+    updateStatus();
+    const interval = setInterval(updateStatus, 5000);
+    
+    return () => clearInterval(interval);
   }, [manager]);
   
-  const invalidateQueries = useCallback(() => {
-    console.log("Invalidating all queries");
-    if (queryClient) {
-      queryClient.invalidateQueries();
-    }
-  }, [queryClient]);
+  // Helper function to refresh all subscriptions
+  const refreshSubscriptions = () => {
+    manager.reestablishSubscriptions();
+    setLastRefreshTime(Date.now());
+  };
   
-  const contextValue = useMemo(() => ({
+  // Helper function to invalidate all queries
+  const invalidateQueries = () => {
+    queryClient.invalidateQueries();
+  };
+  
+  // Helper function to force subscribe to specific tables
+  const forceSubscribe = (tables: string[]) => {
+    console.log(`Force subscribing to tables: ${tables.join(', ')}`);
+    tables.forEach(table => {
+      // Basic implementation - in a real app, you might want more sophisticated logic
+      manager.subscribeToTable(table, [table]);
+    });
+    setLastRefreshTime(Date.now());
+  };
+  
+  const contextValue: SubscriptionContextType = {
+    connectionStatus,
+    subscriptionCount,
+    subscriptionsByTable,
+    lastRefreshTime,
     activeSubscriptions,
-    subscriptionCount: activeSubscriptions ? activeSubscriptions.length : 0,
-    subscriptionsByTable,
     refreshSubscriptions,
-    forceSubscribe,
     invalidateQueries,
-    connectionStatus,
-    lastRefreshTime
-  }), [
-    activeSubscriptions, 
-    subscriptionsByTable,
-    refreshSubscriptions, 
-    forceSubscribe, 
-    invalidateQueries, 
-    connectionStatus,
-    lastRefreshTime
-  ]);
+    forceSubscribe,
+  };
   
   return (
     <SubscriptionContext.Provider value={contextValue}>
       {children}
     </SubscriptionContext.Provider>
   );
-};
+}
+
+/**
+ * Hook to access subscription context
+ */
+export function useSubscriptionContext(): SubscriptionContextType {
+  const context = useContext(SubscriptionContext);
+  if (!context) {
+    throw new Error("useSubscriptionContext must be used within a SubscriptionProvider");
+  }
+  return context;
+}

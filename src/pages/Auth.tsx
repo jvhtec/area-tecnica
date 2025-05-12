@@ -1,6 +1,6 @@
 
-import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Navigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { SignUpForm } from "@/components/auth/SignUpForm";
@@ -10,8 +10,6 @@ import { useAuth } from "@/hooks/useAuth";
 const Auth = () => {
   const { session, isLoading, error } = useAuth();
   const [showSignUp, setShowSignUp] = useState(false);
-  const navigate = useNavigate();
-  const redirectedRef = useRef(false);
   
   useEffect(() => {
     // Remove dark mode for better authentication UI visibility
@@ -25,16 +23,6 @@ const Auth = () => {
     };
   }, []);
 
-  // Only redirect once when session is available and not loading
-  // Use a ref to track if we've already redirected to prevent multiple redirects
-  useEffect(() => {
-    if (session && !isLoading && !redirectedRef.current) {
-      redirectedRef.current = true;
-      console.log("Auth: Session detected, navigating to dashboard");
-      navigate("/dashboard", { replace: true });
-    }
-  }, [session, isLoading, navigate]);
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -43,8 +31,9 @@ const Auth = () => {
     );
   }
 
-  // Don't use Navigate component, rely on the useEffect above for redirection
-  // This prevents potential loops and excessive history.replaceState calls
+  if (session) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col px-4 py-8 md:py-12">
