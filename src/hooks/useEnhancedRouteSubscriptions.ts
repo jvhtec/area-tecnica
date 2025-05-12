@@ -1,360 +1,135 @@
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
-import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
-import { useQueryClient } from '@tanstack/react-query';
-import { UnifiedSubscriptionManager } from '@/lib/unified-subscription-manager';
-import { formatDistanceToNow } from 'date-fns';
-import { toast } from 'sonner';
-
-// Define subscription requirements for each route
-export const ROUTE_SUBSCRIPTIONS: Record<string, Array<{
-  table: string,
-  priority: 'high' | 'medium' | 'low'
-}>> = {
-  // Dashboard route needs these tables for real-time updates
-  '/dashboard': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_assignments', priority: 'high' }, 
-    { table: 'job_date_types', priority: 'medium' }, 
-    { table: 'messages', priority: 'medium' }, 
-    { table: 'direct_messages', priority: 'medium' }
-  ],
-  
-  // Department-specific routes
-  '/sound': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_assignments', priority: 'high' }, 
-    { table: 'job_departments', priority: 'medium' }
-  ],
-  '/lights': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_assignments', priority: 'high' }, 
-    { table: 'job_departments', priority: 'medium' }
-  ],
-  '/video': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_assignments', priority: 'high' }, 
-    { table: 'job_departments', priority: 'medium' }
-  ],
-  
-  // Other routes with their required tables
-  '/calendar': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_departments', priority: 'medium' }
-  ],
-  '/technician-dashboard': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_assignments', priority: 'high' }
-  ],
-  '/logistics': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'logistics_events', priority: 'high' }
-  ],
-  '/inventory': [
-    { table: 'equipment', priority: 'high' }, 
-    { table: 'stock_movements', priority: 'high' }, 
-    { table: 'global_stock_entries', priority: 'medium' }
-  ],
-  '/tours': [
-    { table: 'tours', priority: 'high' }, 
-    { table: 'tour_dates', priority: 'medium' }
-  ],
-  '/project-management': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_assignments', priority: 'medium' }, 
-    { table: 'job_departments', priority: 'medium' }
-  ],
-  
-  // Festival specific routes
-  '/festivals': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'festival_artists', priority: 'medium' }, 
-    { table: 'festival_forms', priority: 'low' }
-  ],
-  '/festival-management': [
-    { table: 'festivals', priority: 'high' }, 
-    { table: 'festival_artists', priority: 'high' }, 
-    { table: 'festival_forms', priority: 'medium' },
-    { table: 'festival_shifts', priority: 'medium' },
-    { table: 'festival_shift_assignments', priority: 'medium' },
-    { table: 'festival_gear_setups', priority: 'medium' }
-  ],
-  '/festival-management/artists': [
-    { table: 'festivals', priority: 'high' }, 
-    { table: 'festival_artists', priority: 'high' }, 
-    { table: 'festival_forms', priority: 'high' }
-  ],
-  '/festival-management/gear': [
-    { table: 'festivals', priority: 'high' }, 
-    { table: 'festival_gear', priority: 'high' },
-    { table: 'festival_gear_setups', priority: 'high' }
-  ],
-  '/festival-management/scheduling': [
-    { table: 'festivals', priority: 'high' },
-    { table: 'festival_shifts', priority: 'high' },
-    { table: 'festival_shift_assignments', priority: 'high' },
-    { table: 'profiles', priority: 'medium' }
-  ],
-  '/festival-artist-management': [
-    { table: 'festivals', priority: 'high' }, 
-    { table: 'festival_artists', priority: 'high' }, 
-    { table: 'festival_forms', priority: 'high' }
-  ],
-  '/festival-gear-management': [
-    { table: 'festivals', priority: 'high' }, 
-    { table: 'festival_gear', priority: 'high' }
-  ],
-  
-  // Tool specific routes
-  '/pesos-tool': [
-    { table: 'jobs', priority: 'high' },
-    { table: 'video_memoria_tecnica_documents', priority: 'high' }
-  ],
-  '/consumos-tool': [
-    { table: 'jobs', priority: 'high' },
-    { table: 'power_requirement_tables', priority: 'high' }
-  ],
-  '/memoria-tecnica-tool': [
-    { table: 'jobs', priority: 'high' },
-    { table: 'memoria_tecnica_documents', priority: 'high' }
-  ],
-  
-  // Add more routes as needed
-  '/jobs': [{ table: 'jobs', priority: 'high' }],
-  '/job': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_assignments', priority: 'high' }, 
-    { table: 'job_departments', priority: 'medium' }
-  ],
-  '/settings': [{ table: 'profiles', priority: 'medium' }],
-  '/profile': [{ table: 'profiles', priority: 'high' }],
-  '/users': [{ table: 'profiles', priority: 'high' }],
-  '/users-management': [{ table: 'profiles', priority: 'high' }],
-  '/hoja-de-ruta': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_departments', priority: 'medium' }
-  ],
-  '/labor-po-form': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_departments', priority: 'medium' }
-  ],
-};
-
-// Default tables that should be monitored on all routes
-const GLOBAL_TABLES: Array<{ table: string, priority: 'high' | 'medium' | 'low' }> = [
-  { table: 'profiles', priority: 'medium' }
-];
-
-// Maximum time (in milliseconds) that a subscription can be idle before it's considered stale
-const SUBSCRIPTION_STALE_TIME = 5 * 60 * 1000; // 5 minutes
-// Inactivity threshold after which subscriptions should be refreshed when the page becomes active
-const INACTIVITY_THRESHOLD = 3 * 60 * 1000; // 3 minutes
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
+import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
 
 /**
- * Enhanced hook to determine required subscriptions based on current route
- * and monitor their status with intelligent cleanup
+ * Hook to manage subscriptions based on the current route
  */
 export function useEnhancedRouteSubscriptions() {
-  const location = useLocation();
   const queryClient = useQueryClient();
-  const { lastRefreshTime, connectionStatus } = useSubscriptionContext();
+  const location = useLocation();
   const manager = UnifiedSubscriptionManager.getInstance(queryClient);
-  const lastActiveTimestamp = useRef<number>(Date.now());
-  const wasInactive = useRef<boolean>(false);
   
-  const [status, setStatus] = useState({
-    requiredTables: [] as string[],
-    subscribedTables: [] as string[],
-    unsubscribedTables: [] as string[],
+  const [state, setState] = useState({
     isFullySubscribed: false,
     isStale: false,
-    routeKey: '',
-    formattedLastActivity: ''
+    wasInactive: false,
+    lastActiveTime: Date.now(),
+    unsubscribedTables: [] as string[],
   });
-
-  // Find the most specific route match
-  const findRoutePath = useCallback((pathname: string) => {
-    // First check if we have an exact match
-    if (ROUTE_SUBSCRIPTIONS[pathname]) {
-      return pathname;
-    }
+  
+  // Track page visibility
+  useEffect(() => {
+    let wasHidden = false;
+    let hiddenTime = 0;
     
-    // Handle dynamic routes for festival management
-    if (pathname.includes('/festival-management/')) {
-      // Extract the base path and check for specific sub-routes
-      if (pathname.includes('/artists')) {
-        return '/festival-management/artists';
-      } else if (pathname.includes('/gear')) {
-        return '/festival-management/gear';
-      } else if (pathname.includes('/scheduling')) {
-        return '/festival-management/scheduling';
-      } else {
-        return '/festival-management'; // Default festival management route
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        if (wasHidden) {
+          const inactiveTime = Date.now() - hiddenTime;
+          // If page was hidden for more than 30 seconds, consider it was inactive
+          if (inactiveTime > 30000) {
+            setState(prev => ({
+              ...prev,
+              wasInactive: true,
+              lastActiveTime: Date.now(),
+            }));
+          }
+          wasHidden = false;
+        }
+      } else if (document.visibilityState === "hidden") {
+        wasHidden = true;
+        hiddenTime = Date.now();
       }
-    }
+    };
     
-    // Handle dynamic routes for tool pages
-    if (pathname.includes('/pesos-tool')) {
-      return '/pesos-tool';
-    }
-    if (pathname.includes('/consumos-tool')) {
-      return '/consumos-tool';
-    }
-    if (pathname.includes('/memoria-tecnica-tool')) {
-      return '/memoria-tecnica-tool';
-    }
-    
-    // If no exact match, find the most specific parent route
-    return Object.keys(ROUTE_SUBSCRIPTIONS)
-      .filter(route => pathname.startsWith(route))
-      .sort((a, b) => b.length - a.length)[0] || pathname;
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
   
-  // Check document visibility changes to detect when the user returns to the page
+  // Reset wasInactive flag after it's been handled
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      const now = Date.now();
+    if (state.wasInactive) {
+      const timeout = setTimeout(() => {
+        setState(prev => ({
+          ...prev,
+          wasInactive: false,
+        }));
+      }, 5000); // Reset after 5 seconds
       
-      if (document.visibilityState === 'visible') {
-        // Calculate time since last activity
-        const timeSinceLastActive = now - lastActiveTimestamp.current;
-        
-        // If the page was inactive for longer than the threshold, refresh subscriptions
-        if (timeSinceLastActive > INACTIVITY_THRESHOLD) {
-          wasInactive.current = true;
-          console.log(`Page was inactive for ${timeSinceLastActive}ms, refreshing subscriptions`);
-          
-          // Force refresh all subscriptions
-          const tableNames = [...status.requiredTables];
-          if (tableNames.length > 0) {
-            manager.forceRefreshSubscriptions(tableNames);
-            queryClient.invalidateQueries();
-            
-            toast.info("Refreshing data after inactivity", {
-              description: "Reconnecting to real-time updates..."
-            });
-          }
-        }
-        
-        // Update the last active timestamp
-        lastActiveTimestamp.current = now;
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [manager, queryClient, status.requiredTables]);
-
-  // Subscribe to required tables for the current route
+      return () => clearTimeout(timeout);
+    }
+  }, [state.wasInactive]);
+  
+  // Monitor subscription status
   useEffect(() => {
-    // Reset inactivity state on route change
-    wasInactive.current = false;
-    lastActiveTimestamp.current = Date.now();
-    
-    const pathname = location.pathname;
-    const routeKey = findRoutePath(pathname);
-    
-    console.log('Configuring subscriptions for route:', pathname);
-    console.log('Using route key for subscriptions:', routeKey);
-    
-    // Clean up subscriptions from previous routes
-    manager.cleanupRouteDependentSubscriptions(pathname);
-    
-    // Get required tables for this route
-    const routeTables = ROUTE_SUBSCRIPTIONS[routeKey] || [];
-    
-    if (routeTables.length === 0) {
-      console.log(`No subscription config found for route ${routeKey}, using global tables only`);
-    }
-    
-    // Combine with global tables, ensuring no duplicates
-    const allTables = [...GLOBAL_TABLES];
-    
-    routeTables.forEach(tableInfo => {
-      if (!allTables.some(t => t.table === tableInfo.table)) {
-        allTables.push(tableInfo);
-      } else {
-        // If the table exists but with a lower priority, update it to the higher priority
-        const existingIndex = allTables.findIndex(t => t.table === tableInfo.table);
-        if (existingIndex >= 0) {
-          const existingPriority = allTables[existingIndex].priority;
-          if (getPriorityValue(tableInfo.priority) > getPriorityValue(existingPriority)) {
-            allTables[existingIndex].priority = tableInfo.priority;
-          }
-        }
+    const checkSubscriptionStatus = () => {
+      const routeSubscriptions = manager.getActiveSubscriptions();
+      const activeSubsCount = routeSubscriptions.length;
+      
+      // Determine which tables are missing subscriptions
+      const requiredTables = ['profiles']; // Add more as needed for specific routes
+      const subscribedTables = routeSubscriptions.map(sub => sub.table);
+      const unsubscribedTables = requiredTables.filter(
+        table => !subscribedTables.includes(table)
+      );
+      
+      // Check how long since last activity
+      const staleDuration = 5 * 60 * 1000; // 5 minutes
+      const timeSinceLastActivity = Date.now() - state.lastActiveTime;
+      const isStale = timeSinceLastActivity > staleDuration;
+      
+      setState(prev => ({
+        ...prev,
+        isFullySubscribed: unsubscribedTables.length === 0,
+        isStale: isStale,
+        unsubscribedTables,
+      }));
+      
+      // If we're stale or missing subscriptions, let's output some debugging info
+      if (isStale || unsubscribedTables.length > 0) {
+        console.log(`Subscription status: ${activeSubsCount} active, ${unsubscribedTables.length} missing`);
+        console.log('Time since last activity:', Math.round(timeSinceLastActivity / 1000), 'seconds');
       }
-    });
+    };
     
-    // Subscribe to all tables
-    allTables.forEach(({ table, priority }) => {
-      console.log(`Subscribing to ${table} with priority ${priority}`);
-      manager.subscribeToTable(table, table, undefined, priority);
-      manager.registerRouteSubscription(pathname, `${table}::${table}`);
-    });
+    // Check status immediately
+    checkSubscriptionStatus();
     
-    // Update the local state with table information
-    const tableNames = allTables.map(t => t.table);
+    // Then check periodically
+    const interval = setInterval(checkSubscriptionStatus, 10000); // Every 10 seconds
     
-    const subscriptionsByTable = manager.getSubscriptionsByTable();
-    const subscribedTables = tableNames.filter(
-      table => subscriptionsByTable[table]?.length > 0
-    );
+    return () => clearInterval(interval);
+  }, [location.pathname, manager, state.lastActiveTime]);
+  
+  /**
+   * Force a refresh of all subscriptions
+   */
+  const forceRefresh = () => {
+    console.log('Manually forcing refresh of all subscriptions');
     
-    const unsubscribedTables = tableNames.filter(
-      table => !subscriptionsByTable[table] || subscriptionsByTable[table].length === 0
-    );
+    // Reset the stale flag
+    setState(prev => ({
+      ...prev,
+      isStale: false,
+      lastActiveTime: Date.now(),
+    }));
     
-    const isFullySubscribed = unsubscribedTables.length === 0 && tableNames.length > 0;
+    // Reestablish all subscriptions
+    manager.reestablishSubscriptions();
     
-    // Format last activity time
-    let formattedLastActivity = "Unknown";
-    try {
-      formattedLastActivity = formatDistanceToNow(lastRefreshTime, { addSuffix: true });
-    } catch (error) {
-      console.error("Error formatting time:", error);
-    }
-    
-    const isStale = Date.now() - lastRefreshTime > SUBSCRIPTION_STALE_TIME;
-    
-    setStatus({
-      requiredTables: tableNames,
-      subscribedTables,
-      unsubscribedTables,
-      isFullySubscribed,
-      isStale,
-      routeKey,
-      formattedLastActivity
-    });
-    
-  }, [location.pathname, manager, findRoutePath, lastRefreshTime, queryClient]);
-
-  // Helper to get priority value for comparison
-  function getPriorityValue(priority: 'high' | 'medium' | 'low'): number {
-    switch (priority) {
-      case 'high': return 3;
-      case 'medium': return 2;
-      case 'low': return 1;
-      default: return 2;
-    }
-  }
-
+    // After a short delay, invalidate all queries to fetch fresh data
+    setTimeout(() => {
+      queryClient.invalidateQueries();
+    }, 500);
+  };
+  
   return {
-    ...status,
-    connectionStatus,
-    lastRefreshTime,
-    wasInactive: wasInactive.current,
-    forceRefresh: () => {
-      if (status.requiredTables.length > 0) {
-        console.log('Manually forcing refresh of all subscriptions');
-        manager.forceRefreshSubscriptions(status.requiredTables);
-        queryClient.invalidateQueries();
-        wasInactive.current = false;
-        toast.success('Subscriptions refreshed');
-      }
-    }
+    ...state,
+    forceRefresh,
   };
 }
