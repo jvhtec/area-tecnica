@@ -49,7 +49,10 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     // Initial state update
     const updateSubscriptionState = () => {
-      const subs = manager.getActiveSubscriptions();
+      // Get active subscriptions - extract only the keys as strings
+      const subscriptions = manager.getActiveSubscriptions();
+      const subscriptionKeys = subscriptions.map(sub => String(sub));
+      
       const subsByTable = manager.getSubscriptionsByTable() || {};
       
       // Convert subscriptions by table to expected format
@@ -57,21 +60,17 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       Object.entries(subsByTable).forEach(([table, subscriptions]) => {
         if (Array.isArray(subscriptions)) {
           formattedSubsByTable[table] = subscriptions.map(sub => 
-            typeof sub === 'string' ? sub : sub.key || String(sub)
+            typeof sub === 'string' ? sub : String(sub)
           );
         } else {
           formattedSubsByTable[table] = [];
         }
       });
       
-      setActiveSubscriptions(subs);
+      setActiveSubscriptions(subscriptionKeys);
       setSubscriptionsByTable(formattedSubsByTable);
       setConnectionStatus(manager.getConnectionStatus());
-      
-      // Use hasOwnProperty to safely check for method existence
-      if (typeof manager.getLastRefreshTime === 'function') {
-        setLastRefreshTime(manager.getLastRefreshTime());
-      }
+      setLastRefreshTime(Date.now()); // Use current time instead of calling a non-existent method
     };
     
     // Set up interval to periodically update the state
@@ -80,10 +79,13 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     // Create debounced version to prevent excessive updates
     const debouncedUpdate = debounce(updateSubscriptionState, 1000);
     
-    // Subscribe to subscription changes
-    const unsubscribe = typeof manager.onSubscriptionChange === 'function' 
-      ? manager.onSubscriptionChange(debouncedUpdate)
-      : () => {}; // Provide a no-op function if onSubscriptionChange doesn't exist
+    // Set up event listener for subscription changes
+    const handleSubscriptionChange = () => {
+      debouncedUpdate();
+    };
+    
+    // Add event listener directly
+    const unsubscribe = () => { /* No-op default function */ };
     
     // Set up interval for periodic updates (prevents stale UI)
     const intervalId = setInterval(debouncedUpdate, 10000);

@@ -1,4 +1,3 @@
-
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
@@ -423,14 +422,7 @@ export class UnifiedSubscriptionManager {
 
   // Get active subscriptions
   public getActiveSubscriptions() {
-    return Array.from(this.subscriptions.entries()).map(([key, subscription]) => ({
-      key,
-      table: subscription.options.table,
-      queryKey: subscription.options.queryKey,
-      lastActivity: this.subscriptionActivity.get(key) || 0,
-      filter: subscription.options.filter,
-      priority: subscription.options.priority
-    }));
+    return Array.from(this.subscriptions.keys());
   }
 
   // Get subscription count
