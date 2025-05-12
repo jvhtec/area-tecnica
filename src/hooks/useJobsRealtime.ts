@@ -25,29 +25,39 @@ export function useJobsRealtime() {
   } = useRealtimeQuery(
     ['jobs'],
     async () => {
-      // Fetch the jobs with joined data
-      const { data, error } = await supabase
-        .from('jobs')
-        .select(`
-          *,
-          job_departments(department),
-          job_assignments(technician_id, status)
-        `)
-        .order('start_time', { ascending: true });
-      
-      if (error) throw error;
-      return data || [];
+      // Add error handling for the supabase query
+      try {
+        // Fetch the jobs with joined data
+        const { data, error } = await supabase
+          .from('jobs')
+          .select(`
+            *,
+            job_departments(department),
+            job_assignments(technician_id, status)
+          `)
+          .order('start_time', { ascending: true });
+        
+        if (error) throw error;
+        return data || [];
+      } catch (err) {
+        console.error("Error fetching jobs:", err);
+        throw err;
+      }
     },
     'jobs' // Primary table to subscribe to
   );
   
   // Wrap the refetch function to match expected void return type
   const refetch = async () => {
-    await manualRefresh();
+    try {
+      await manualRefresh();
+    } catch (error) {
+      console.error("Error refreshing jobs:", error);
+    }
   };
   
   return {
-    jobs,
+    jobs: jobs || [],  // Ensure we always return an array
     isLoading,
     isError,
     error,

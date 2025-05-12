@@ -34,7 +34,7 @@ export function useSubscriptionStatus(tables: string[]) {
   
   // Update status when context changes
   useEffect(() => {
-    if (!manager) {
+    if (!manager || !queryClient) {
       setStatus(prev => ({
         ...prev,
         connectionStatus: 'disconnected',
@@ -46,16 +46,23 @@ export function useSubscriptionStatus(tables: string[]) {
     }
     
     try {
-      // Get current subscription status
-      const subscriptionsByTable = manager.getSubscriptionsByTable ? manager.getSubscriptionsByTable() || {} : {};
+      // Get current subscription status - with null safety
+      const subscriptionsByTable = manager && typeof manager.getSubscriptionsByTable === 'function' 
+        ? manager.getSubscriptionsByTable() || {} 
+        : {};
+      
+      if (!subscriptionsByTable || typeof subscriptionsByTable !== 'object') {
+        console.warn('Invalid subscription data returned');
+        return;
+      }
       
       // Determine which tables are subscribed vs unsubscribed
       const tablesSubscribed = tablesToCheck.filter(
-        table => subscriptionsByTable[table]?.length > 0
+        table => subscriptionsByTable[table] && Array.isArray(subscriptionsByTable[table]) && subscriptionsByTable[table].length > 0
       );
       
       const tablesUnsubscribed = tablesToCheck.filter(
-        table => !subscriptionsByTable[table] || subscriptionsByTable[table].length === 0
+        table => !subscriptionsByTable[table] || !Array.isArray(subscriptionsByTable[table]) || subscriptionsByTable[table].length === 0
       );
       
       // Format the last refresh time
@@ -97,18 +104,18 @@ export function useSubscriptionStatus(tables: string[]) {
         isStale: true
       });
     }
-  }, [tablesToCheck, connectionStatus, lastRefreshTime, manager]);
+  }, [tablesToCheck, connectionStatus, lastRefreshTime, manager, queryClient]);
   
   // Function to manually refresh subscriptions
   const refreshSubscription = () => {
-    if (!queryClient) return;
+    if (!queryClient || !manager) return;
     
     refreshSubscriptions();
     console.log('Manually refreshed subscriptions for tables:', tablesToCheck);
     
     // Also invalidate related queries
     tablesToCheck.forEach(table => {
-      if (table) {
+      if (table && queryClient) {
         queryClient.invalidateQueries({ queryKey: [table] });
       }
     });

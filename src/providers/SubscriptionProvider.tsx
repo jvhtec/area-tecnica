@@ -19,7 +19,8 @@ export type SubscriptionContextType = {
   lastRefreshTime: number;
 };
 
-const SubscriptionContext = createContext<SubscriptionContextType>({
+// Create a default context value to avoid null checks
+const defaultContextValue: SubscriptionContextType = {
   activeSubscriptions: [],
   subscriptionCount: 0,
   subscriptionsByTable: {},
@@ -28,7 +29,9 @@ const SubscriptionContext = createContext<SubscriptionContextType>({
   invalidateQueries: () => {},
   connectionStatus: 'disconnected',
   lastRefreshTime: Date.now(),
-});
+};
+
+const SubscriptionContext = createContext<SubscriptionContextType>(defaultContextValue);
 
 export const useSubscriptionContext = () => useContext(SubscriptionContext);
 
@@ -75,7 +78,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       
       setActiveSubscriptions(subscriptionKeys);
       setSubscriptionsByTable(formattedSubsByTable);
-      setConnectionStatus(manager.getConnectionStatus ? manager.getConnectionStatus() : 'disconnected');
+      setConnectionStatus(manager.getConnectionStatus && typeof manager.getConnectionStatus === 'function' ? manager.getConnectionStatus() : 'disconnected');
       setLastRefreshTime(Date.now());
     } catch (error) {
       console.error("Error updating subscription state:", error);
@@ -92,7 +95,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   
   // Update state with the current subscriptions
   useEffect(() => {
-    if (!manager) return;
+    if (!manager || !queryClient) return;
     
     // Initial state update
     updateSubscriptionState();
@@ -103,7 +106,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       clearInterval(intervalId);
     };
-  }, [updateSubscriptionState, debouncedUpdate, manager]);
+  }, [updateSubscriptionState, debouncedUpdate, manager, queryClient]);
   
   // Memorize callback functions to prevent unnecessary re-renders
   const refreshSubscriptions = useCallback(() => {
