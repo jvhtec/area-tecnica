@@ -47,16 +47,16 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   // Memoize update function to ensure consistent reference
   const updateSubscriptionState = useCallback(() => {
     try {
-      // Get active subscriptions as strings
-      const subscriptions = manager.getActiveSubscriptions();
+      // Get active subscriptions and ensure we always work with arrays
+      const subscriptions = manager.getActiveSubscriptions() || [];
       // Make sure we're working with string arrays
-      const subscriptionKeys = subscriptions.map(sub => String(sub));
+      const subscriptionKeys = Array.isArray(subscriptions) ? subscriptions.map(sub => String(sub)) : [];
       
       const subsByTable = manager.getSubscriptionsByTable() || {};
       
-      // Convert subscriptions by table to expected format
+      // Convert subscriptions by table to expected format, with safety checks
       const formattedSubsByTable: SubscriptionsByTable = {};
-      Object.entries(subsByTable).forEach(([table, subscriptions]) => {
+      Object.entries(subsByTable || {}).forEach(([table, subscriptions]) => {
         if (Array.isArray(subscriptions)) {
           formattedSubsByTable[table] = subscriptions.map(sub => 
             typeof sub === 'string' ? sub : String(sub)
@@ -72,6 +72,9 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       setLastRefreshTime(Date.now());
     } catch (error) {
       console.error("Error updating subscription state:", error);
+      // Set default values in case of error
+      setActiveSubscriptions([]);
+      setSubscriptionsByTable({});
     }
   }, [manager]);
   
@@ -96,12 +99,16 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   // Memorize callback functions to prevent unnecessary re-renders
   const refreshSubscriptions = useCallback(() => {
     console.log("Manually reestablishing subscriptions");
-    manager.reestablishSubscriptions();
+    if (manager && typeof manager.reestablishSubscriptions === 'function') {
+      manager.reestablishSubscriptions();
+    }
     setLastRefreshTime(Date.now());
   }, [manager]);
   
   const forceSubscribe = useCallback((table: string | string[]) => {
     console.log(`Manually subscribing to table(s):`, table);
+    if (!manager) return;
+    
     if (Array.isArray(table)) {
       table.forEach(t => manager.subscribeToTable(t, [t]));
     } else {

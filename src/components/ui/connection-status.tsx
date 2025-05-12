@@ -34,8 +34,8 @@ export const ConnectionStatus = memo(function ConnectionStatus({
     };
   }, []);
 
-  // Memoize all variant renderings to prevent conditional hook calls
-  const inlineVariant = useMemo(() => (
+  // Safe rendering for each variant
+  const renderInlineVariant = () => (
     <div className={cn('flex items-center gap-1', className)}>
       {connectionStatus === 'connected' ? (
         <>
@@ -54,9 +54,9 @@ export const ConnectionStatus = memo(function ConnectionStatus({
         </>
       )}
     </div>
-  ), [connectionStatus, className]);
+  );
   
-  const compactVariant = useMemo(() => (
+  const renderCompactVariant = () => (
     <div className={cn('relative', className)}>
       {connectionStatus === 'connected' ? (
         <WifiIcon className="h-4 w-4 text-green-500" />
@@ -66,9 +66,9 @@ export const ConnectionStatus = memo(function ConnectionStatus({
         <WifiOffIcon className="h-4 w-4 text-red-500" />
       )}
     </div>
-  ), [connectionStatus, className]);
+  );
   
-  const defaultVariant = useMemo(() => (
+  const renderDefaultVariant = () => (
     <div className={cn('flex items-center gap-2', className)}>
       {connectionStatus === 'connected' ? (
         <>
@@ -89,15 +89,10 @@ export const ConnectionStatus = memo(function ConnectionStatus({
         </>
       )}
     </div>
-  ), [connectionStatus, isOnline, className]);
-
-  // Use a switch statement instead of conditional rendering to ensure consistent hook calls
-  switch (variant) {
-    case 'inline':
-      return inlineVariant;
-    case 'compact':
-      return compactVariant;
-    default:
-      return defaultVariant;
-  }
+  );
+  
+  // Render with explicit switch statement to avoid conditional hooks
+  if (variant === 'inline') return renderInlineVariant();
+  if (variant === 'compact') return renderCompactVariant();
+  return renderDefaultVariant();
 });

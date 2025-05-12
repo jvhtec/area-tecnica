@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
@@ -45,7 +44,12 @@ export function useEnhancedRouteSubscriptions() {
   
   // Memoize function to find matching route
   const findMatchingRoute = useCallback((path: string) => {
-    const matchingRoutes = Object.keys(ROUTE_SUBSCRIPTIONS)
+    if (!path) return '';
+    
+    const routes = Object.keys(ROUTE_SUBSCRIPTIONS || {});
+    if (!routes || !routes.length) return path;
+    
+    const matchingRoutes = routes
       .filter(route => path.startsWith(route))
       .sort((a, b) => b.length - a.length); // Sort by specificity (longest first)
       
@@ -54,6 +58,8 @@ export function useEnhancedRouteSubscriptions() {
   
   // Update route key and required tables when location changes
   useEffect(() => {
+    if (!location || !location.pathname) return;
+    
     console.log(`Configuring subscriptions for route: ${location.pathname}`);
     setRouteKey(location.pathname);
     
@@ -62,7 +68,7 @@ export function useEnhancedRouteSubscriptions() {
     console.log(`Using route key for subscriptions: ${routeKeyForSubs}`);
     
     // Clean up any subscriptions from the previous route
-    if (routeKey !== location.pathname && typeof manager.cleanupRouteDependentSubscriptions === 'function') {
+    if (routeKey !== location.pathname && manager && typeof manager.cleanupRouteDependentSubscriptions === 'function') {
       console.log(`Cleaning up subscriptions for route: ${routeKey}`);
       manager.cleanupRouteDependentSubscriptions(routeKey);
     }
@@ -84,16 +90,19 @@ export function useEnhancedRouteSubscriptions() {
     setRequiredTables(allRequiredTables);
     
     // For each required table, subscribe with appropriate priority
-    allRequiredTables.forEach(table => {
-      console.log(`Subscribing to ${table} with priority medium`);
-      if (typeof manager.subscribeToTable === 'function') {
+    if (manager && typeof manager.subscribeToTable === 'function') {
+      allRequiredTables.forEach(table => {
+        if (!table) return; // Skip empty table names
+        
+        console.log(`Subscribing to ${table} with priority medium`);
         manager.subscribeToTable(table, [table], undefined, "medium");
+        
         if (typeof manager.registerRouteSubscription === 'function') {
           manager.registerRouteSubscription(routeKeyForSubs, table);
         }
-      }
-    });
-  }, [location.pathname, manager, routeKey, findMatchingRoute]);
+      });
+    }
+  }, [location, manager, routeKey, findMatchingRoute]);
   
   // Track page visibility
   useEffect(() => {
@@ -222,13 +231,13 @@ export function useEnhancedRouteSubscriptions() {
     }));
     
     // Reestablish all subscriptions
-    if (typeof manager.reestablishSubscriptions === 'function') {
+    if (manager && typeof manager.reestablishSubscriptions === 'function') {
       manager.reestablishSubscriptions();
     }
     
     // After a short delay, invalidate all queries to fetch fresh data
     setTimeout(() => {
-      queryClient.invalidateQueries();
+      if (queryClient) queryClient.invalidateQueries();
     }, 500);
   }, [manager, queryClient]);
   
