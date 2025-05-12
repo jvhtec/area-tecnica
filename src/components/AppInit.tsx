@@ -6,8 +6,6 @@ import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
 import { useLocation } from "react-router-dom";
 import { useEnhancedRouteSubscriptions } from "@/hooks/useEnhancedRouteSubscriptions";
 import { toast } from "sonner";
-import { SessionManager } from "@/lib/session-manager";
-import { useSessionManager } from "@/hooks/useSessionManager";
 
 /**
  * Component that initializes app-wide services when the application starts
@@ -17,7 +15,6 @@ import { useSessionManager } from "@/hooks/useSessionManager";
 export function AppInit() {
   const queryClient = useQueryClient();
   const location = useLocation();
-  const { isInitialized, status } = useSessionManager();
   
   // Initialize the connection recovery service
   useEffect(() => {
@@ -49,41 +46,6 @@ export function AppInit() {
   // Use the enhanced route subscriptions hook to manage subscriptions based on the current route
   const subscriptionStatus = useEnhancedRouteSubscriptions();
   
-  // Initialize the session manager
-  useEffect(() => {
-    const sessionManager = SessionManager.getInstance();
-    
-    // Set up event listeners for session changes
-    const sessionRefreshedUnsubscribe = sessionManager.on("session-refreshed", () => {
-      // When session is refreshed, also refresh subscriptions to ensure fresh data
-      if (subscriptionStatus.isStale || !subscriptionStatus.isFullySubscribed) {
-        console.log('Session refreshed, refreshing stale subscriptions');
-        subscriptionStatus.forceRefresh();
-      }
-    });
-    
-    const sessionErrorUnsubscribe = sessionManager.on("refresh-error", (error) => {
-      console.error("Session refresh error:", error);
-      toast.error("Authentication error", {
-        description: "There was a problem with your session. Attempting to recover.",
-      });
-    });
-    
-    const recoveryAttemptUnsubscribe = sessionManager.on("recovery-attempt", (attempt) => {
-      console.log(`Recovery attempt ${attempt}`);
-      toast.info("Attempting to restore your session", {
-        description: `Recovery attempt ${attempt}`,
-        id: "session-recovery", // Use ID to prevent duplicate toasts
-      });
-    });
-    
-    return () => {
-      sessionRefreshedUnsubscribe();
-      sessionErrorUnsubscribe();
-      recoveryAttemptUnsubscribe();
-    };
-  }, [subscriptionStatus]);
-  
   // Handle subscription staleness
   useEffect(() => {
     if (subscriptionStatus.isStale) {
@@ -102,10 +64,6 @@ export function AppInit() {
     if (subscriptionStatus.wasInactive) {
       console.log('Page was inactive, refreshing subscriptions');
       
-      // Also validate the session when coming back from inactivity
-      const sessionManager = SessionManager.getInstance();
-      sessionManager.validateAndRefreshSession();
-      
       // Force a refresh of all queries
       queryClient.invalidateQueries();
       
@@ -119,7 +77,7 @@ export function AppInit() {
   // Handle route changes
   useEffect(() => {
     // When route changes, check if the new route has all required subscriptions
-    if (isInitialized && !subscriptionStatus.isFullySubscribed) {
+    if (!subscriptionStatus.isFullySubscribed) {
       console.log('Not fully subscribed to required tables, checking what is missing');
       console.log('Missing tables:', subscriptionStatus.unsubscribedTables);
       
@@ -133,7 +91,7 @@ export function AppInit() {
       
       return () => clearTimeout(delayTimeout);
     }
-  }, [location.pathname, subscriptionStatus, isInitialized]);
+  }, [location.pathname, subscriptionStatus]);
   
   // This component doesn't render anything
   return null;

@@ -11,23 +11,22 @@ import {
   SidebarTrigger
 } from "@/components/ui/sidebar";
 import { LogOut } from "lucide-react";
-import { useNavigate, useLocation, Outlet, Navigate } from "react-router-dom";
+import { useNavigate, Outlet, Navigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
-import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { UserInfo } from "@/components/layout/UserInfo";
-import { SidebarNavigation } from "@/components/layout/SidebarNavigation";
-import { AboutCard } from "@/components/layout/AboutCard";
-import { NotificationBadge } from "@/components/layout/NotificationBadge";
+import { ThemeToggle } from "./layout/ThemeToggle";
+import { UserInfo } from "./layout/UserInfo";
+import { SidebarNavigation } from "./layout/SidebarNavigation";
+import { AboutCard } from "./layout/AboutCard";
+import { NotificationBadge } from "./layout/NotificationBadge";
 import { useToast } from "@/hooks/use-toast";
-import { useSessionManager } from "@/hooks/useSessionManager";
+import { ReloadButton } from "./ui/reload-button";
 import { useQueryClient } from "@tanstack/react-query";
-import { ReloadButton } from "@/components/ui/reload-button";
 import { useKonamiCode } from "@/hooks/useKonamiCode";
-import { WolfensteinDialog } from "@/components/doom/WolfensteinDialog";
+import { WolfensteinDialog } from "./doom/WolfensteinDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { HeaderStatus } from "@/components/ui/header-status";
-import { useEnhancedRouteSubscriptions as useRouteSubscriptions } from "@/hooks/useEnhancedRouteSubscriptions";
+import { useAuth } from "@/hooks/useAuth";
+import { HeaderStatus } from "./ui/header-status";
+import { useRouteSubscriptions } from "@/hooks/useRouteSubscriptions";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 
 const Layout = () => {
@@ -44,22 +43,19 @@ const Layout = () => {
     userRole,
     userDepartment,
     isLoading,
-    setSession,
-    setUserRole,
-    setUserDepartment,
-    signOut
-  } = useSessionManager();
+    logout
+  } = useAuth();
   
   // Get route-specific subscription info
-  const routeSubscriptions = useRouteSubscriptions();
+  const { requiredTables } = useRouteSubscriptions();
   const { forceSubscribe } = useSubscriptionContext();
   
   // Subscribe to route-specific tables whenever the route changes
   useEffect(() => {
-    if (routeSubscriptions.requiredTables?.length > 0) {
-      forceSubscribe(routeSubscriptions.requiredTables);
+    if (requiredTables.length > 0) {
+      forceSubscribe(requiredTables);
     }
-  }, [location.pathname, routeSubscriptions.requiredTables, forceSubscribe]);
+  }, [location.pathname, requiredTables, forceSubscribe]);
 
   const handleSignOut = async () => {
     if (isLoggingOut) return;
@@ -68,23 +64,9 @@ const Layout = () => {
     console.log("Starting sign out process");
 
     try {
-      setSession(null);
-      setUserRole(null);
-      setUserDepartment(null);
-      localStorage.clear();
-      await signOut();
-      console.log("Sign out successful");
-      navigate('/auth');
-      toast({
-        title: "Success",
-        description: "You have been logged out successfully",
-      });
+      await logout();
     } catch (error) {
       console.error("Error during sign out:", error);
-      toast({
-        title: "Notice",
-        description: "You have been logged out",
-      });
     } finally {
       setIsLoggingOut(false);
     }
