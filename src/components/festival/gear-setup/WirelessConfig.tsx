@@ -54,9 +54,12 @@ export const WirelessConfig = ({
             // For wireless systems, quantity is the sum of handhelds and bodypacks
             updatedSystem.quantity = (updatedSystem.quantity_hh || 0) + (updatedSystem.quantity_bp || 0);
           }
+        } else if (field === 'provided_by') {
+          // Ensure provided_by is strictly typed as 'festival' | 'band'
+          updatedSystem.provided_by = value as 'festival' | 'band';
         } else {
-          // Handle non-numeric fields (model, band, provided_by)
-          updatedSystem[field as 'model' | 'band' | 'provided_by'] = value as string;
+          // Handle non-numeric fields (model, band)
+          updatedSystem[field as 'model' | 'band'] = value as string;
         }
         
         return updatedSystem;
@@ -153,7 +156,7 @@ export const WirelessConfig = ({
             <Label>Provided By</Label>
             <RadioGroup
               value={system.provided_by || defaultProvidedBy}
-              onValueChange={(value) => updateSystem(index, 'provided_by', value)}
+              onValueChange={(value: 'festival' | 'band') => updateSystem(index, 'provided_by', value)}
               className="flex space-x-4 mt-1"
             >
               <div className="flex items-center space-x-2">
