@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -86,13 +87,15 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
       console.log("Generating PDF with:", {
         tourName: tour.name,
         dateSpan,
-        rows: rows
+        rows: rows,
+        tourId: tour.id
       });
 
       const pdfBlob = await exportTourPDF(
         tour.name,
         dateSpan,
-        rows
+        rows,
+        tour.id // Pass the tourId to get the tour logo
       );
       
       console.log("PDF generated successfully, creating download URL");
