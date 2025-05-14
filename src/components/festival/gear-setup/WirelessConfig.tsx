@@ -7,13 +7,15 @@ import { WirelessConfigProps } from "@/types/festival-gear";
 import { WirelessSetup } from "@/types/festival";
 import { EquipmentSelect } from "../form/shared/EquipmentSelect";
 import { WIRELESS_SYSTEMS, IEM_SYSTEMS } from "@/types/festival-equipment";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export const WirelessConfig = ({ 
   systems, 
   onChange, 
   label, 
   includeQuantityTypes = false,
-  isIEM = false
+  isIEM = false,
+  defaultProvidedBy = 'festival'
 }: WirelessConfigProps) => {
   const addSystem = () => {
     const newSystem: WirelessSetup = {
@@ -21,7 +23,8 @@ export const WirelessConfig = ({
       quantity: 0,
       quantity_hh: 0,
       quantity_bp: 0,
-      band: ''
+      band: '',
+      provided_by: defaultProvidedBy
     };
     onChange([...systems, newSystem]);
   };
@@ -52,8 +55,8 @@ export const WirelessConfig = ({
             updatedSystem.quantity = (updatedSystem.quantity_hh || 0) + (updatedSystem.quantity_bp || 0);
           }
         } else {
-          // Handle non-numeric fields (model, band)
-          updatedSystem[field as 'model' | 'band'] = value as string;
+          // Handle non-numeric fields (model, band, provided_by)
+          updatedSystem[field as 'model' | 'band' | 'provided_by'] = value as string;
         }
         
         return updatedSystem;
@@ -144,6 +147,24 @@ export const WirelessConfig = ({
               onChange={(e) => updateSystem(index, 'band', e.target.value)}
               placeholder="e.g., G50, H50"
             />
+          </div>
+          
+          <div>
+            <Label>Provided By</Label>
+            <RadioGroup
+              value={system.provided_by || defaultProvidedBy}
+              onValueChange={(value) => updateSystem(index, 'provided_by', value)}
+              className="flex space-x-4 mt-1"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="festival" id={`${index}-festival`} />
+                <Label htmlFor={`${index}-festival`}>Festival</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="band" id={`${index}-band`} />
+                <Label htmlFor={`${index}-band`}>Band</Label>
+              </div>
+            </RadioGroup>
           </div>
         </div>
       ))}

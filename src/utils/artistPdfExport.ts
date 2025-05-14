@@ -227,7 +227,7 @@ export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
               system.quantity_hh,
               system.model,
               system.band || '-',
-              data.technical.wireless.providedBy
+              system.provided_by || data.technical.wireless.providedBy || 'festival' 
             ]);
           }
           if (system.quantity_bp && system.quantity_bp > 0) {
@@ -236,7 +236,7 @@ export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
               system.quantity_bp,
               system.model,
               system.band || '-',
-              data.technical.wireless.providedBy
+              system.provided_by || data.technical.wireless.providedBy || 'festival'
             ]);
           }
         });
@@ -271,7 +271,7 @@ export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
               system.quantity_hh,
               system.model,
               system.band || '-',
-              data.technical.iem.providedBy
+              system.provided_by || data.technical.iem.providedBy || 'festival'
             ]);
           }
           if (system.quantity_bp && system.quantity_bp > 0) {
@@ -280,7 +280,7 @@ export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
               system.quantity_bp,
               system.model,
               system.band || '-',
-              data.technical.iem.providedBy
+              system.provided_by || data.technical.iem.providedBy || 'festival'
             ]);
           }
         });
