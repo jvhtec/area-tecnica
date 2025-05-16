@@ -132,7 +132,7 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
     body: tableData,
     startY: 30,
     headStyles: {
-      fillColor: [255, 1, 1], // Updated to rgb(225, 1, 1)
+      fillColor: [225, 1, 1], // Fixed to rgb(225, 1, 1)
       textColor: [255, 255, 255],
       fontStyle: 'bold'
     },
@@ -175,11 +175,14 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
       pdf.text(`Generated on ${date}`, 15, pageHeight - 10);
       
       pdf.text(`Page ${i} of ${totalPages}`, pageWidth - 25, pageHeight - 10);
-       // === COMPANY LOGO ===
+      
+      // === COMPANY LOGO ===
       try {
         // Add a small company logo at the bottom right
         const companyLogoUrl = 'public/sector pro logo.png';
         const companyImg = new Image();
+        companyImg.src = companyLogoUrl; // Added the src assignment
+        
         companyImg.onload = () => {
           try {
             // Logo at bottom right
@@ -187,7 +190,7 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
             const ratio = companyImg.width / companyImg.height;
             const logoHeight = logoWidth / ratio;
             
-            doc.addImage(
+            pdf.addImage( // Changed from doc.addImage to pdf.addImage
               companyImg, 
               'PNG', 
               pageWidth - logoWidth - 10, // X position (right aligned)
@@ -195,12 +198,16 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
               logoWidth,
               logoHeight
             );
+          } catch (err) {
+            console.error('Error adding footer logo:', err);
+          }
+        };
         
-          
-          URL.revokeObjectURL(logoUrl);
-        } catch (err) {
-          console.error('Error adding footer logo:', err);
-        }
+        companyImg.onerror = () => {
+          console.error('Failed to load company logo');
+        };
+      } catch (err) {
+        console.error('Error processing company logo:', err);
       }
     }
   };
@@ -209,4 +216,3 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
   
   return pdf.output('blob');
 };
-
