@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -13,6 +14,8 @@ export interface PrintOptions {
   artistTableStages: number[];
   includeArtistRequirements: boolean;
   artistRequirementStages: number[];
+  includeRfIemTable: boolean;
+  rfIemTableStages: number[];
 }
 
 interface PrintOptionsDialogProps {
@@ -36,11 +39,15 @@ export const PrintOptionsDialog = ({
     includeArtistTables: true,
     artistTableStages: Array.from({ length: maxStages }, (_, i) => i + 1),
     includeArtistRequirements: true,
-    artistRequirementStages: Array.from({ length: maxStages }, (_, i) => i + 1)
+    artistRequirementStages: Array.from({ length: maxStages }, (_, i) => i + 1),
+    includeRfIemTable: true,
+    rfIemTableStages: Array.from({ length: maxStages }, (_, i) => i + 1)
   });
 
   const handleStageChange = (section: keyof PrintOptions, stageNumber: number, checked: boolean) => {
-    if (section === 'gearSetupStages' || section === 'shiftScheduleStages' || section === 'artistTableStages' || section === 'artistRequirementStages') {
+    if (section === 'gearSetupStages' || section === 'shiftScheduleStages' || 
+        section === 'artistTableStages' || section === 'artistRequirementStages' || 
+        section === 'rfIemTableStages') {
       setOptions(prev => ({
         ...prev,
         [section]: checked 
@@ -50,7 +57,7 @@ export const PrintOptionsDialog = ({
     }
   };
 
-  const renderStageSelections = (section: 'gearSetupStages' | 'shiftScheduleStages' | 'artistTableStages' | 'artistRequirementStages') => {
+  const renderStageSelections = (section: 'gearSetupStages' | 'shiftScheduleStages' | 'artistTableStages' | 'artistRequirementStages' | 'rfIemTableStages') => {
     return (
       <div className="pl-6 space-y-2">
         <p className="text-sm text-muted-foreground">Select stages:</p>
@@ -139,6 +146,20 @@ export const PrintOptionsDialog = ({
                 <Label htmlFor="artist-requirements">Individual Artist Requirements</Label>
               </div>
               {options.includeArtistRequirements && maxStages > 1 && renderStageSelections('artistRequirementStages')}
+            </div>
+
+            <div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="rf-iem-table"
+                  checked={options.includeRfIemTable}
+                  onCheckedChange={(checked) => 
+                    setOptions(prev => ({ ...prev, includeRfIemTable: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="rf-iem-table">Artist RF & IEM Overview</Label>
+              </div>
+              {options.includeRfIemTable && maxStages > 1 && renderStageSelections('rfIemTableStages')}
             </div>
           </div>
         </div>

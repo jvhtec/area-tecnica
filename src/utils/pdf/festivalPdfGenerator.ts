@@ -1,8 +1,8 @@
-
 import { supabase } from '@/lib/supabase';
 import { exportArtistPDF, ArtistPdfData } from '../artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from '../artistTablePdfExport';
 import { exportShiftsTablePDF, ShiftsTablePdfData } from '../shiftsTablePdfExport';
+import { exportRfIemTablePDF, RfIemTablePdfData } from '../rfIemTablePdfExport';
 import { generateStageGearPDF } from '../gearSetupPdfExport';
 import { fetchLogoUrl } from './logoUtils';
 import { generateCoverPage } from './coverPageGenerator';
@@ -24,6 +24,7 @@ export const generateAndMergeFestivalPDFs = async (
   const shiftPdfs: Blob[] = [];
   const artistTablePdfs: Blob[] = [];
   const individualArtistPdfs: Blob[] = [];
+  let rfIemTablePdf: Blob | null = null;
   
   try {
     const { data: artists, error: artistError } = await supabase
@@ -417,6 +418,49 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
+    // Generate RF & IEM table if option is selected
+    if (options.includeRfIemTable && artists && artists.length > 0) {
+      const filteredArtists = artists.filter(artist => 
+        options.rfIemTableStages.includes(Number(artist.stage))
+      );
+      
+      const sortedArtists = [...filteredArtists].sort((a, b) => {
+        if (a.stage < b.stage) return -1;
+        if (a.stage > b.stage) return 1;
+        
+        if (a.date < b.date) return -1;
+        if (a.date > b.date) return 1;
+        
+        return (a.name || '').localeCompare(b.name || '');
+      });
+      
+      console.log(`Generating RF & IEM table with ${sortedArtists.length} artists`);
+      
+      if (sortedArtists.length > 0) {
+        const rfIemData: RfIemTablePdfData = {
+          jobTitle,
+          logoUrl,
+          artists: sortedArtists.map(artist => {
+            return {
+              name: artist.name || 'Unnamed Artist',
+              stage: artist.stage || 1,
+              wirelessSystems: artist.wireless_systems || [],
+              iemSystems: artist.iem_systems || [],
+              wirelessProvidedBy: artist.wireless_provided_by || 'festival',
+              iemProvidedBy: artist.iem_provided_by || 'festival'
+            };
+          })
+        };
+        
+        try {
+          rfIemTablePdf = await exportRfIemTablePDF(rfIemData);
+          console.log(`Generated RF & IEM table PDF, size: ${rfIemTablePdf.size} bytes`);
+        } catch (err) {
+          console.error('Error generating RF & IEM table PDF:', err);
+        }
+      }
+    }
+    
     const tocSections = [];
     
     if (options.includeGearSetup && gearPdfs.length > 0) {
@@ -431,6 +475,9 @@ export const generateAndMergeFestivalPDFs = async (
     if (options.includeArtistRequirements && individualArtistPdfs.length > 0) {
       tocSections.push({ title: "Individual Artist Requirements", pageCount: individualArtistPdfs.length });
     }
+    if (options.includeRfIemTable && rfIemTablePdf) {
+      tocSections.push({ title: "Artist RF & IEM Overview", pageCount: 1 });
+    }
     
     console.log(`Table of contents sections:`, tocSections);
     
@@ -443,7 +490,8 @@ export const generateAndMergeFestivalPDFs = async (
       ...(options.includeGearSetup ? gearPdfs : []),
       ...(options.includeShiftSchedules ? shiftPdfs : []),
       ...(options.includeArtistTables ? artistTablePdfs : []),
-      ...(options.includeArtistRequirements ? individualArtistPdfs : [])
+      ...(options.includeArtistRequirements ? individualArtistPdfs : []),
+      ...(options.includeRfIemTable && rfIemTablePdf ? [rfIemTablePdf] : [])
     ];
     
     console.log(`Total PDFs to merge: ${selectedPdfs.length}`);

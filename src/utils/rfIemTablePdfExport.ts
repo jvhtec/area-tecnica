@@ -1,0 +1,170 @@
+
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+export interface RfIemSystemData {
+  model: string;
+  quantity_hh?: number;
+  quantity_bp?: number;
+  band?: string;
+  provided_by?: 'festival' | 'band';
+}
+
+export interface ArtistRfIemData {
+  name: string;
+  stage: number;
+  wirelessSystems: RfIemSystemData[];
+  iemSystems: RfIemSystemData[];
+  wirelessProvidedBy: string;
+  iemProvidedBy: string;
+}
+
+export interface RfIemTablePdfData {
+  jobTitle: string;
+  logoUrl?: string;
+  artists: ArtistRfIemData[];
+}
+
+export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob> => {
+  const pdf = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+
+  // Add logo if provided
+  if (data.logoUrl) {
+    try {
+      // Fetch logo
+      const response = await fetch(data.logoUrl);
+      const logoBlob = await response.blob();
+      const logoUrl = URL.createObjectURL(logoBlob);
+      
+      // Calculate max dimensions for logo
+      const maxLogoWidth = 40;
+      const maxLogoHeight = 15;
+      
+      pdf.addImage(
+        logoUrl,
+        'PNG',
+        pageWidth - maxLogoWidth - 15,
+        10,
+        maxLogoWidth,
+        maxLogoHeight
+      );
+      
+      // Clean up URL object
+      URL.revokeObjectURL(logoUrl);
+    } catch (err) {
+      console.error('Error loading logo:', err);
+    }
+  }
+
+  // Add title
+  pdf.setFontSize(18);
+  pdf.text(`${data.jobTitle} - Artist RF & IEM Overview`, 15, 20);
+  
+  // Prepare table data
+  const tableData = data.artists.map(artist => {
+    // Calculate total RF handhelds and bodypacks
+    const totalRfHH = artist.wirelessSystems.reduce((sum, sys) => sum + (sys.quantity_hh || 0), 0);
+    const totalRfBP = artist.wirelessSystems.reduce((sum, sys) => sum + (sys.quantity_bp || 0), 0);
+    
+    // Calculate total IEM channels and bodypacks
+    const totalIemChannels = artist.iemSystems.reduce((sum, sys) => sum + (sys.quantity_hh || 0), 0);
+    const totalIemBodpacks = artist.iemSystems.reduce((sum, sys) => sum + (sys.quantity_bp || 0), 0);
+    
+    // Get RF frequency bands
+    const rfBands = [...new Set(artist.wirelessSystems
+      .filter(sys => sys.band)
+      .map(sys => sys.band)
+    )].join(', ');
+    
+    // Get IEM frequency bands
+    const iemBands = [...new Set(artist.iemSystems
+      .filter(sys => sys.band)
+      .map(sys => sys.band)
+    )].join(', ');
+
+    return [
+      artist.name,
+      `Stage ${artist.stage}`,
+      artist.wirelessProvidedBy,
+      rfBands, 
+      totalRfHH,
+      totalRfBP,
+      artist.iemProvidedBy,
+      iemBands,
+      totalIemChannels,
+      totalIemBodpacks
+    ];
+  });
+
+  // Add the table with headers
+  autoTable(pdf, {
+    head: [[
+      'Artist Name', 
+      'Stage',
+      'RF Provided By', 
+      'RF Bands', 
+      'Handhelds',
+      'Bodypacks',
+      'IEM Provided By',
+      'IEM Bands', 
+      'IEM Channels',
+      'IEM Bodypacks'
+    ]],
+    body: tableData,
+    startY: 30,
+    headStyles: {
+      fillColor: [126, 105, 171],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold'
+    },
+    alternateRowStyles: {
+      fillColor: [240, 240, 245]
+    },
+    styles: {
+      fontSize: 9,
+      cellPadding: 3,
+      lineColor: [200, 200, 200],
+      lineWidth: 0.1
+    },
+    columnStyles: {
+      0: { cellWidth: 40 }, // Artist name
+      1: { cellWidth: 15 }, // Stage
+      2: { cellWidth: 22 }, // RF Provider
+      3: { cellWidth: 25 }, // RF Bands
+      4: { cellWidth: 15 }, // Handhelds
+      5: { cellWidth: 15 }, // Bodypacks
+      6: { cellWidth: 22 }, // IEM Provider
+      7: { cellWidth: 25 }, // IEM Bands
+      8: { cellWidth: 15 }, // IEM Channels
+      9: { cellWidth: 15 }, // IEM Bodypacks
+    }
+  });
+
+  // Add footer with date and page numbers
+  const addFooter = () => {
+    const totalPages = pdf.getNumberOfPages();
+    
+    for (let i = 1; i <= totalPages; i++) {
+      pdf.setPage(i);
+      
+      pdf.setFontSize(8);
+      pdf.setTextColor(100);
+      
+      const date = new Date().toLocaleDateString();
+      pdf.text(`Generated on ${date}`, 15, pageHeight - 10);
+      
+      pdf.text(`Page ${i} of ${totalPages}`, pageWidth - 25, pageHeight - 10);
+    }
+  };
+  
+  addFooter();
+  
+  return pdf.output('blob');
+};
