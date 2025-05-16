@@ -77,13 +77,15 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
     const totalIemChannels = artist.iemSystems.reduce((sum, sys) => sum + (sys.quantity_hh || 0), 0);
     const totalIemBodpacks = artist.iemSystems.reduce((sum, sys) => sum + (sys.quantity_bp || 0), 0);
     
-    // Get RF frequency bands
+    // Get RF models and frequency bands
+    const rfModels = [...new Set(artist.wirelessSystems.map(sys => sys.model))].join(', ');
     const rfBands = [...new Set(artist.wirelessSystems
       .filter(sys => sys.band)
       .map(sys => sys.band)
     )].join(', ');
     
-    // Get IEM frequency bands
+    // Get IEM models and frequency bands
+    const iemModels = [...new Set(artist.iemSystems.map(sys => sys.model))].join(', ');
     const iemBands = [...new Set(artist.iemSystems
       .filter(sys => sys.band)
       .map(sys => sys.band)
@@ -93,10 +95,12 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
       artist.name,
       `Stage ${artist.stage}`,
       artist.wirelessProvidedBy,
+      rfModels,
       rfBands, 
       totalRfHH,
       totalRfBP,
       artist.iemProvidedBy,
+      iemModels,
       iemBands,
       totalIemChannels,
       totalIemBodpacks
@@ -108,11 +112,13 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
     head: [[
       'Artist Name', 
       'Stage',
-      'RF Provided By', 
+      'RF Provided By',
+      'RF Models',
       'RF Bands', 
       'Handhelds',
       'Bodypacks',
       'IEM Provided By',
+      'IEM Models',
       'IEM Bands', 
       'IEM Channels',
       'IEM Bodypacks'
@@ -137,13 +143,15 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
       0: { cellWidth: 40 }, // Artist name
       1: { cellWidth: 15 }, // Stage
       2: { cellWidth: 22 }, // RF Provider
-      3: { cellWidth: 25 }, // RF Bands
-      4: { cellWidth: 15 }, // Handhelds
-      5: { cellWidth: 15 }, // Bodypacks
-      6: { cellWidth: 22 }, // IEM Provider
-      7: { cellWidth: 25 }, // IEM Bands
-      8: { cellWidth: 15 }, // IEM Channels
-      9: { cellWidth: 15 }, // IEM Bodypacks
+      3: { cellWidth: 30 }, // RF Models
+      4: { cellWidth: 25 }, // RF Bands
+      5: { cellWidth: 15 }, // Handhelds
+      6: { cellWidth: 15 }, // Bodypacks
+      7: { cellWidth: 22 }, // IEM Provider
+      8: { cellWidth: 30 }, // IEM Models
+      9: { cellWidth: 25 }, // IEM Bands
+      10: { cellWidth: 15 }, // IEM Channels
+      11: { cellWidth: 15 }, // IEM Bodypacks
     }
   });
 
