@@ -175,30 +175,27 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
       pdf.text(`Generated on ${date}`, 15, pageHeight - 10);
       
       pdf.text(`Page ${i} of ${totalPages}`, pageWidth - 25, pageHeight - 10);
-      
-      // Add centered logo at the bottom if provided
-      if (data.logoUrl) {
-        try {
-          const response = await fetch(data.logoUrl);
-          const logoBlob = await response.blob();
-          const logoUrl = URL.createObjectURL(logoBlob);
-          
-          // Calculate logo dimensions for bottom placement
-          const bottomLogoWidth = 30;
-          const bottomLogoHeight = 12;
-          
-          // Center the logo horizontally at the bottom
-          const logoX = (pageWidth - bottomLogoWidth) / 2;
-          const logoY = pageHeight - bottomLogoHeight - 5;
-          
-          pdf.addImage(
-            logoUrl,
-            'PNG',
-            logoX,
-            logoY,
-            bottomLogoWidth,
-            bottomLogoHeight
-          );
+       // === COMPANY LOGO ===
+      try {
+        // Add a small company logo at the bottom right
+        const companyLogoUrl = 'public/sector pro logo.png';
+        const companyImg = new Image();
+        companyImg.onload = () => {
+          try {
+            // Logo at bottom right
+            const logoWidth = 20;
+            const ratio = companyImg.width / companyImg.height;
+            const logoHeight = logoWidth / ratio;
+            
+            doc.addImage(
+              companyImg, 
+              'PNG', 
+              pageWidth - logoWidth - 10, // X position (right aligned)
+              pageHeight - logoHeight - 10, // Y position (bottom aligned)
+              logoWidth,
+              logoHeight
+            );
+        
           
           URL.revokeObjectURL(logoUrl);
         } catch (err) {
