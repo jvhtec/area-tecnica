@@ -67,8 +67,14 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
   pdf.setFontSize(18);
   pdf.text(`${data.jobTitle} - Artist RF & IEM Overview`, 15, 20);
   
+  // Filter artists to only include those with RF or IEM data
+  const filteredArtists = data.artists.filter(artist => 
+    (artist.wirelessSystems && artist.wirelessSystems.length > 0) || 
+    (artist.iemSystems && artist.iemSystems.length > 0)
+  );
+  
   // Prepare table data
-  const tableData = data.artists.map(artist => {
+  const tableData = filteredArtists.map(artist => {
     // Calculate total RF handhelds and bodypacks
     const totalRfHH = artist.wirelessSystems.reduce((sum, sys) => sum + (sys.quantity_hh || 0), 0);
     const totalRfBP = artist.wirelessSystems.reduce((sum, sys) => sum + (sys.quantity_bp || 0), 0);
@@ -126,7 +132,7 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
     body: tableData,
     startY: 30,
     headStyles: {
-      fillColor: [126, 105, 171],
+      fillColor: [225, 1, 1], // Updated to rgb(225, 1, 1)
       textColor: [255, 255, 255],
       fontStyle: 'bold'
     },
@@ -169,6 +175,36 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
       pdf.text(`Generated on ${date}`, 15, pageHeight - 10);
       
       pdf.text(`Page ${i} of ${totalPages}`, pageWidth - 25, pageHeight - 10);
+      
+      // Add centered logo at the bottom if provided
+      if (data.logoUrl) {
+        try {
+          const response = await fetch(data.logoUrl);
+          const logoBlob = await response.blob();
+          const logoUrl = URL.createObjectURL(logoBlob);
+          
+          // Calculate logo dimensions for bottom placement
+          const bottomLogoWidth = 30;
+          const bottomLogoHeight = 12;
+          
+          // Center the logo horizontally at the bottom
+          const logoX = (pageWidth - bottomLogoWidth) / 2;
+          const logoY = pageHeight - bottomLogoHeight - 5;
+          
+          pdf.addImage(
+            logoUrl,
+            'PNG',
+            logoX,
+            logoY,
+            bottomLogoWidth,
+            bottomLogoHeight
+          );
+          
+          URL.revokeObjectURL(logoUrl);
+        } catch (err) {
+          console.error('Error adding footer logo:', err);
+        }
+      }
     }
   };
   
