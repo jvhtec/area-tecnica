@@ -132,7 +132,7 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
     body: tableData,
     startY: 30,
     headStyles: {
-      fillColor: [225, 1, 1], // Fixed to rgb(225, 1, 1)
+      fillColor: [215, 1, 1], // Fixed to rgb(225, 1, 1)
       textColor: [255, 255, 255],
       fontStyle: 'bold'
     },
