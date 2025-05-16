@@ -132,7 +132,7 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
     body: tableData,
     startY: 30,
     headStyles: {
-      fillColor: [125, 1, 1], // Fixed to rgb(225, 1, 1)
+      fillColor: [125, 1, 1], // Red color for header
       textColor: [255, 255, 255],
       fontStyle: 'bold'
     },
@@ -161,63 +161,57 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
     }
   });
 
-  // Add footer with date and page numbers
+  // Add footer with date, page numbers, and company logo
   const addFooter = async () => {
-    const totalPages = pdf.getNumberOfPages();
-    
-    for (let i = 1; i <= totalPages; i++) {
-      pdf.setPage(i);
+    return new Promise<void>((resolve) => {
+      const totalPages = pdf.getNumberOfPages();
       
-      pdf.setFontSize(8);
-      pdf.setTextColor(100);
+      // First add the date and page numbers to all pages
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        
+        pdf.setFontSize(8);
+        pdf.setTextColor(100);
+        
+        const date = new Date().toLocaleDateString();
+        pdf.text(`Generated on ${date}`, 15, pageHeight - 10);
+        
+        pdf.text(`Page ${i} of ${totalPages}`, pageWidth - 25, pageHeight - 10);
+      }
       
-      const date = new Date().toLocaleDateString();
-      pdf.text(`Generated on ${date}`, 15, pageHeight - 10);
+      // Now add the logo to the center bottom of all pages
+      const logo = new Image();
+      logo.crossOrigin = 'anonymous';
+      logo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
       
-      pdf.text(`Page ${i} of ${totalPages}`, pageWidth - 25, pageHeight - 10);
-      
-     // === LOGO & CREATED DATE SECTION ===
-        // Position Sector Pro logo at the bottom with adequate spacing
-        const logo = new Image();
-        logo.crossOrigin = 'anonymous';
-        logo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
-
-        logo.onload = () => {
-          const logoWidth = 50;
-          const logoHeight = logoWidth * (logo.height / logo.width);
-          const totalPagesAfterLogo = (doc.internal as any).pages.length - 1;
-
-          for (let i = 1; i <= totalPagesAfterLogo; i++) {
-            doc.setPage(i);
-            const xPosition = (pageWidth - logoWidth) / 2;
-            const yLogo = pageHeight - 20;
-            try {
-              doc.addImage(logo, 'PNG', xPosition, yLogo - logoHeight, logoWidth, logoHeight);
-            } catch (error) {
-              console.error(`Error adding logo on page ${i}:`, error);
-            }
+      logo.onload = () => {
+        const logoWidth = 50;
+        const logoHeight = logoWidth * (logo.height / logo.width);
+        
+        for (let i = 1; i <= totalPages; i++) {
+          pdf.setPage(i);
+          const xPosition = (pageWidth - logoWidth) / 2;
+          const yLogo = pageHeight - 20;
+          
+          try {
+            pdf.addImage(logo, 'PNG', xPosition, yLogo - logoHeight, logoWidth, logoHeight);
+          } catch (error) {
+            console.error(`Error adding logo on page ${i}:`, error);
           }
-
-          doc.setPage(totalPagesAfterLogo);
-          doc.setFontSize(10);
-          doc.setTextColor(51, 51, 51);
-          doc.text(`Created: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
-          const blob = doc.output('blob');
-          resolve(blob);
-        };
-
-        logo.onerror = () => {
-          console.error('Failed to load logo');
-          const totalPagesAfterLogo = (doc.internal as any).pages.length - 1;
-          doc.setPage(totalPagesAfterLogo);
-          doc.setFontSize(10);
-          doc.setTextColor(51, 51, 51);
-          doc.text(`Created: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
-          const blob = doc.output('blob');
-          resolve(blob);
-        };
+        }
+        
+        resolve();
       };
-
+      
+      logo.onerror = () => {
+        console.error('Failed to load logo');
+        resolve();
+      };
+    });
+  };
+  
+  // Call the async footer function
+  await addFooter();
   
   return pdf.output('blob');
 };
