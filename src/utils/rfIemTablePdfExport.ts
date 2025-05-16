@@ -132,7 +132,7 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
     body: tableData,
     startY: 30,
     headStyles: {
-      fillColor: [215, 1, 1], // Fixed to rgb(225, 1, 1)
+      fillColor: [125, 1, 1], // Fixed to rgb(225, 1, 1)
       textColor: [255, 255, 255],
       fontStyle: 'bold'
     },
@@ -176,43 +176,48 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
       
       pdf.text(`Page ${i} of ${totalPages}`, pageWidth - 25, pageHeight - 10);
       
-      // === COMPANY LOGO ===
-      try {
-        // Add a small company logo at the bottom right
-        const companyLogoUrl = 'public/sector pro logo.png';
-        const companyImg = new Image();
-        companyImg.src = companyLogoUrl; // Added the src assignment
-        
-        companyImg.onload = () => {
-          try {
-            // Logo at bottom right
-            const logoWidth = 20;
-            const ratio = companyImg.width / companyImg.height;
-            const logoHeight = logoWidth / ratio;
-            
-            pdf.addImage( // Changed from doc.addImage to pdf.addImage
-              companyImg, 
-              'PNG', 
-              pageWidth - logoWidth - 10, // X position (right aligned)
-              pageHeight - logoHeight - 10, // Y position (bottom aligned)
-              logoWidth,
-              logoHeight
-            );
-          } catch (err) {
-            console.error('Error adding footer logo:', err);
+     // === LOGO & CREATED DATE SECTION ===
+        // Position Sector Pro logo at the bottom with adequate spacing
+        const logo = new Image();
+        logo.crossOrigin = 'anonymous';
+        logo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
+
+        logo.onload = () => {
+          const logoWidth = 50;
+          const logoHeight = logoWidth * (logo.height / logo.width);
+          const totalPagesAfterLogo = (doc.internal as any).pages.length - 1;
+
+          for (let i = 1; i <= totalPagesAfterLogo; i++) {
+            doc.setPage(i);
+            const xPosition = (pageWidth - logoWidth) / 2;
+            const yLogo = pageHeight - 20;
+            try {
+              doc.addImage(logo, 'PNG', xPosition, yLogo - logoHeight, logoWidth, logoHeight);
+            } catch (error) {
+              console.error(`Error adding logo on page ${i}:`, error);
+            }
           }
+
+          doc.setPage(totalPagesAfterLogo);
+          doc.setFontSize(10);
+          doc.setTextColor(51, 51, 51);
+          doc.text(`Created: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
+          const blob = doc.output('blob');
+          resolve(blob);
         };
-        
-        companyImg.onerror = () => {
-          console.error('Failed to load company logo');
+
+        logo.onerror = () => {
+          console.error('Failed to load logo');
+          const totalPagesAfterLogo = (doc.internal as any).pages.length - 1;
+          doc.setPage(totalPagesAfterLogo);
+          doc.setFontSize(10);
+          doc.setTextColor(51, 51, 51);
+          doc.text(`Created: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
+          const blob = doc.output('blob');
+          resolve(blob);
         };
-      } catch (err) {
-        console.error('Error processing company logo:', err);
-      }
-    }
-  };
-  
-  await addFooter();
+      };
+
   
   return pdf.output('blob');
 };
