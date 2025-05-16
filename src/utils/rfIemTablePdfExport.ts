@@ -162,7 +162,7 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
   });
 
   // Add footer with date and page numbers
-  const addFooter = () => {
+  const addFooter = async () => {
     const totalPages = pdf.getNumberOfPages();
     
     for (let i = 1; i <= totalPages; i++) {
@@ -208,7 +208,8 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
     }
   };
   
-  addFooter();
+  await addFooter();
   
   return pdf.output('blob');
 };
+
