@@ -523,17 +523,14 @@ export const generateAndMergeFestivalPDFs = async (
     
     const tocSections = [];
     
-    if (options.includeGearSetup && gearPdfs.length > 0) {
-      tocSections.push({ title: "Stage Equipment Setup", pageCount: gearPdfs.length });
-    }
     if (options.includeShiftSchedules && shiftPdfs.length > 0) {
       tocSections.push({ title: "Staff Shift Schedules", pageCount: shiftPdfs.length });
     }
+    if (options.includeGearSetup && gearPdfs.length > 0) {
+      tocSections.push({ title: "Stage Equipment Setup", pageCount: gearPdfs.length });
+    }
     if (options.includeArtistTables && artistTablePdfs.length > 0) {
       tocSections.push({ title: "Artist Schedule Tables", pageCount: artistTablePdfs.length });
-    }
-    if (options.includeArtistRequirements && individualArtistPdfs.length > 0) {
-      tocSections.push({ title: "Individual Artist Requirements", pageCount: individualArtistPdfs.length });
     }
     if (options.includeRfIemTable && rfIemTablePdf) {
       tocSections.push({ title: "Artist RF & IEM Overview", pageCount: 1 });
@@ -541,21 +538,25 @@ export const generateAndMergeFestivalPDFs = async (
     if (options.includeInfrastructureTable && infrastructureTablePdf) {
       tocSections.push({ title: "Infrastructure Needs Overview", pageCount: 1 });
     }
+    if (options.includeArtistRequirements && individualArtistPdfs.length > 0) {
+      tocSections.push({ title: "Individual Artist Requirements", pageCount: individualArtistPdfs.length });
+    }
     
     console.log(`Table of contents sections:`, tocSections);
     
     const coverPage = await generateCoverPage(jobId, jobTitle, logoUrl);
     const tableOfContents = await generateTableOfContents(tocSections, logoUrl);
     
+    // Updated PDF order according to requirements
     const selectedPdfs = [
       coverPage,
       tableOfContents,
-      ...(options.includeGearSetup ? gearPdfs : []),
-      ...(options.includeShiftSchedules ? shiftPdfs : []),
-      ...(options.includeArtistTables ? artistTablePdfs : []),
-      ...(options.includeArtistRequirements ? individualArtistPdfs : []),
-      ...(options.includeRfIemTable && rfIemTablePdf ? [rfIemTablePdf] : []),
-      ...(options.includeInfrastructureTable && infrastructureTablePdf ? [infrastructureTablePdf] : [])
+      ...(options.includeShiftSchedules ? shiftPdfs : []),       // 1. Staff Shifts Schedule
+      ...(options.includeGearSetup ? gearPdfs : []),             // 2. Stage Equipment Setups
+      ...(options.includeArtistTables ? artistTablePdfs : []),   // 3. Artist Schedule Tables
+      ...(options.includeRfIemTable && rfIemTablePdf ? [rfIemTablePdf] : []),  // 4. RF and IEM Overview
+      ...(options.includeInfrastructureTable && infrastructureTablePdf ? [infrastructureTablePdf] : []),  // 5. Infrastructure Needs Overview
+      ...(options.includeArtistRequirements ? individualArtistPdfs : [])  // 6. Individual Artist Requirements
     ];
     
     console.log(`Total PDFs to merge: ${selectedPdfs.length}`);
