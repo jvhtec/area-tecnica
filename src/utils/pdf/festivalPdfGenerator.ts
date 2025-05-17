@@ -3,6 +3,7 @@ import { exportArtistPDF, ArtistPdfData } from '../artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from '../artistTablePdfExport';
 import { exportShiftsTablePDF, ShiftsTablePdfData } from '../shiftsTablePdfExport';
 import { exportRfIemTablePDF, RfIemTablePdfData } from '../rfIemTablePdfExport';
+import { exportInfrastructureTablePDF, ArtistInfrastructureData } from '../infrastructureTablePdfExport';
 import { generateStageGearPDF } from '../gearSetupPdfExport';
 import { fetchLogoUrl } from './logoUtils';
 import { generateCoverPage } from './coverPageGenerator';
@@ -25,6 +26,7 @@ export const generateAndMergeFestivalPDFs = async (
   const artistTablePdfs: Blob[] = [];
   const individualArtistPdfs: Blob[] = [];
   let rfIemTablePdf: Blob | null = null;
+  let infrastructureTablePdf: Blob | null = null;
   
   try {
     const { data: artists, error: artistError } = await supabase
@@ -461,6 +463,64 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
+    // Generate Infrastructure table if option is selected
+    if (options.includeInfrastructureTable && artists && artists.length > 0) {
+      const filteredArtists = artists.filter(artist => 
+        options.infrastructureTableStages.includes(Number(artist.stage))
+      );
+      
+      const sortedArtists = [...filteredArtists].sort((a, b) => {
+        if (a.stage < b.stage) return -1;
+        if (a.stage > b.stage) return 1;
+        
+        if (a.date < b.date) return -1;
+        if (a.date > b.date) return 1;
+        
+        return (a.name || '').localeCompare(b.name || '');
+      });
+      
+      console.log(`Generating Infrastructure table with ${sortedArtists.length} artists`);
+      
+      if (sortedArtists.length > 0) {
+        const infrastructureData = {
+          jobTitle,
+          logoUrl,
+          artists: sortedArtists.map(artist => {
+            return {
+              name: artist.name || 'Unnamed Artist',
+              stage: artist.stage || 1,
+              providedBy: artist.infrastructure_provided_by || 'festival',
+              cat6: { 
+                enabled: Boolean(artist.infra_cat6 || false), 
+                quantity: Number(artist.infra_cat6_quantity || 0) 
+              },
+              hma: { 
+                enabled: Boolean(artist.infra_hma || false), 
+                quantity: Number(artist.infra_hma_quantity || 0) 
+              },
+              coax: { 
+                enabled: Boolean(artist.infra_coax || false), 
+                quantity: Number(artist.infra_coax_quantity || 0) 
+              },
+              opticalconDuo: { 
+                enabled: Boolean(artist.infra_opticalcon_duo || false), 
+                quantity: Number(artist.infra_opticalcon_duo_quantity || 0) 
+              },
+              analog: Number(artist.infra_analog || 0),
+              other: String(artist.other_infrastructure || '')
+            } as ArtistInfrastructureData;
+          })
+        };
+        
+        try {
+          infrastructureTablePdf = await exportInfrastructureTablePDF(infrastructureData);
+          console.log(`Generated Infrastructure table PDF, size: ${infrastructureTablePdf.size} bytes`);
+        } catch (err) {
+          console.error('Error generating Infrastructure table PDF:', err);
+        }
+      }
+    }
+    
     const tocSections = [];
     
     if (options.includeGearSetup && gearPdfs.length > 0) {
@@ -478,6 +538,9 @@ export const generateAndMergeFestivalPDFs = async (
     if (options.includeRfIemTable && rfIemTablePdf) {
       tocSections.push({ title: "Artist RF & IEM Overview", pageCount: 1 });
     }
+    if (options.includeInfrastructureTable && infrastructureTablePdf) {
+      tocSections.push({ title: "Infrastructure Needs Overview", pageCount: 1 });
+    }
     
     console.log(`Table of contents sections:`, tocSections);
     
@@ -491,7 +554,8 @@ export const generateAndMergeFestivalPDFs = async (
       ...(options.includeShiftSchedules ? shiftPdfs : []),
       ...(options.includeArtistTables ? artistTablePdfs : []),
       ...(options.includeArtistRequirements ? individualArtistPdfs : []),
-      ...(options.includeRfIemTable && rfIemTablePdf ? [rfIemTablePdf] : [])
+      ...(options.includeRfIemTable && rfIemTablePdf ? [rfIemTablePdf] : []),
+      ...(options.includeInfrastructureTable && infrastructureTablePdf ? [infrastructureTablePdf] : [])
     ];
     
     console.log(`Total PDFs to merge: ${selectedPdfs.length}`);

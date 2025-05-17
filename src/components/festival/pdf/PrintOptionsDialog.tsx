@@ -16,6 +16,8 @@ export interface PrintOptions {
   artistRequirementStages: number[];
   includeRfIemTable: boolean;
   rfIemTableStages: number[];
+  includeInfrastructureTable: boolean;
+  infrastructureTableStages: number[];
 }
 
 interface PrintOptionsDialogProps {
@@ -41,13 +43,15 @@ export const PrintOptionsDialog = ({
     includeArtistRequirements: true,
     artistRequirementStages: Array.from({ length: maxStages }, (_, i) => i + 1),
     includeRfIemTable: true,
-    rfIemTableStages: Array.from({ length: maxStages }, (_, i) => i + 1)
+    rfIemTableStages: Array.from({ length: maxStages }, (_, i) => i + 1),
+    includeInfrastructureTable: true,
+    infrastructureTableStages: Array.from({ length: maxStages }, (_, i) => i + 1)
   });
 
   const handleStageChange = (section: keyof PrintOptions, stageNumber: number, checked: boolean) => {
     if (section === 'gearSetupStages' || section === 'shiftScheduleStages' || 
         section === 'artistTableStages' || section === 'artistRequirementStages' || 
-        section === 'rfIemTableStages') {
+        section === 'rfIemTableStages' || section === 'infrastructureTableStages') {
       setOptions(prev => ({
         ...prev,
         [section]: checked 
@@ -57,7 +61,7 @@ export const PrintOptionsDialog = ({
     }
   };
 
-  const renderStageSelections = (section: 'gearSetupStages' | 'shiftScheduleStages' | 'artistTableStages' | 'artistRequirementStages' | 'rfIemTableStages') => {
+  const renderStageSelections = (section: 'gearSetupStages' | 'shiftScheduleStages' | 'artistTableStages' | 'artistRequirementStages' | 'rfIemTableStages' | 'infrastructureTableStages') => {
     return (
       <div className="pl-6 space-y-2">
         <p className="text-sm text-muted-foreground">Select stages:</p>
@@ -160,6 +164,20 @@ export const PrintOptionsDialog = ({
                 <Label htmlFor="rf-iem-table">Artist RF & IEM Overview</Label>
               </div>
               {options.includeRfIemTable && maxStages > 1 && renderStageSelections('rfIemTableStages')}
+            </div>
+
+            <div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="infrastructure-table"
+                  checked={options.includeInfrastructureTable}
+                  onCheckedChange={(checked) => 
+                    setOptions(prev => ({ ...prev, includeInfrastructureTable: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="infrastructure-table">Infrastructure Needs Overview</Label>
+              </div>
+              {options.includeInfrastructureTable && maxStages > 1 && renderStageSelections('infrastructureTableStages')}
             </div>
           </div>
         </div>
