@@ -93,8 +93,10 @@ const Festivals = () => {
         artistTableStages: [1], // Default to stage 1
         includeArtistRequirements: true,
         artistRequirementStages: [1], // Default to stage 1
-        includeRfIemTable: true, // Add the missing property
-        rfIemTableStages: [1] // Add the missing property, default to stage 1
+        includeRfIemTable: true,
+        rfIemTableStages: [1],
+        includeInfrastructureTable: true, // Add the missing property
+        infrastructureTableStages: [1] // Add the missing property
       };
       
       const mergedPdf = await generateAndMergeFestivalPDFs(jobId, jobTitle, defaultOptions);
