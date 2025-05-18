@@ -81,7 +81,7 @@ export function monitorConnectionHealth(
           description: 'Real-time updates active',
           duration: 3000
         });
-      } else if (lastStatus === 'connected') {
+      } else {
         toast.warning('Connection lost', {
           description: 'Attempting to reconnect...',
           duration: 5000

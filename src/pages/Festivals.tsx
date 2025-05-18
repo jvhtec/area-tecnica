@@ -140,9 +140,7 @@ const Festivals = () => {
   };
 
   // Handle refresh button click with enhanced recovery
-  const handleRefreshClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    
+  const handleRefreshClick = async () => {
     try {
       toast.info("Refreshing festival data...");
       

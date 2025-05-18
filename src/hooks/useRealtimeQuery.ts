@@ -53,10 +53,15 @@ export function useRealtimeQuery<T>(
       }
     },
     ...options,
-    onError: (error) => {
-      console.error(`Query error for ${String(queryKey)}:`, error);
-      if (options?.onError) {
-        options.onError(error);
+    // Use onSettled instead of onError for error handling per tanstack/react-query v5
+    onSettled: (data, error) => {
+      if (error) {
+        console.error(`Query error for ${String(queryKey)}:`, error);
+        if (options?.onSettled) {
+          options.onSettled(data, error);
+        }
+      } else if (options?.onSettled) {
+        options.onSettled(data, null);
       }
     }
   });
@@ -69,7 +74,7 @@ export function useRealtimeQuery<T>(
       console.log(`Manually refreshing data for ${String(queryKey)}...`);
       
       // First try to refresh the subscription
-      if (!isSubscribed) {
+      if (!isSubscribed && refreshSubscription) {
         await refreshSubscription();
       }
       
