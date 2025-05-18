@@ -9,5 +9,14 @@ import type { Database } from './types';
  */
 export const supabase = baseClient as unknown as ReturnType<typeof import('@supabase/supabase-js').createClient<Database>>;
 
-// Re-export utility functions from the enhanced client
-export { checkNetworkConnection, getRealtimeConnectionStatus, ensureRealtimeConnection } from '@/lib/enhanced-supabase-client';
+// Re-export utility functions from all client modules
+export { 
+  checkNetworkConnection, 
+  getRealtimeConnectionStatus 
+} from '@/lib/supabase-client';
+
+export { 
+  ensureRealtimeConnection,
+  monitorConnectionHealth,
+  forceRefreshSubscriptions 
+} from '@/lib/enhanced-supabase-client';

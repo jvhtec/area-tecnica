@@ -1,6 +1,7 @@
 
 // Re-export the main Supabase client and utilities
 import { supabase, checkNetworkConnection, getRealtimeConnectionStatus } from './supabase-client';
+import { toast } from 'sonner';
 
 export { 
   supabase, 
@@ -15,17 +16,38 @@ export {
  */
 export async function ensureRealtimeConnection(): Promise<boolean> {
   const status = getRealtimeConnectionStatus();
+  console.log('Current realtime connection status:', status);
   
   if (status === 'DISCONNECTED') {
     console.log('Realtime connection is disconnected, attempting recovery');
     const isNetworkAvailable = await checkNetworkConnection();
     
     if (isNetworkAvailable) {
+      console.log('Network connection available, triggering reconnect event');
       // Dispatch reconnect event to trigger subscription recovery
       window.dispatchEvent(new CustomEvent('supabase-reconnect'));
-      return true;
+      
+      // Wait briefly for connection to establish
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Check if recovery was successful
+      const newStatus = getRealtimeConnectionStatus();
+      console.log('After recovery attempt, status is:', newStatus);
+      
+      if (newStatus === 'CONNECTED') {
+        console.log('Realtime connection successfully recovered');
+        toast.success('Connection restored', { duration: 3000 });
+        return true;
+      }
+      
+      console.log('Realtime connection recovery in progress...');
+      return false;
     } else {
       console.log('Network connection unavailable, cannot recover realtime connection');
+      toast.error('Network connection issue', { 
+        description: 'Please check your internet connection',
+        duration: 5000
+      });
       return false;
     }
   }
@@ -55,6 +77,15 @@ export function monitorConnectionHealth(
       // If we're now connected, trigger a data refresh
       if (currentStatus) {
         window.dispatchEvent(new CustomEvent('connection-restored'));
+        toast.success('Connection restored', { 
+          description: 'Real-time updates active',
+          duration: 3000
+        });
+      } else if (lastStatus === 'connected') {
+        toast.warning('Connection lost', {
+          description: 'Attempting to reconnect...',
+          duration: 5000
+        });
       }
     }
     
@@ -65,4 +96,28 @@ export function monitorConnectionHealth(
   }, 30000); // Check every 30 seconds
   
   return () => clearInterval(checkInterval);
+}
+
+/**
+ * Force refresh all subscriptions for the given tables
+ * @param tables List of table names to refresh
+ */
+export async function forceRefreshSubscriptions(tables: string[]): Promise<boolean> {
+  try {
+    // Dispatch a custom event that subscription managers can listen for
+    window.dispatchEvent(new CustomEvent('force-refresh-subscriptions', { 
+      detail: { tables } 
+    }));
+    
+    // Also trigger the general reconnect event
+    window.dispatchEvent(new CustomEvent('supabase-reconnect'));
+    
+    // Wait briefly for the subscription refresh to occur
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    return true;
+  } catch (error) {
+    console.error('Error forcing subscription refresh:', error);
+    return false;
+  }
 }

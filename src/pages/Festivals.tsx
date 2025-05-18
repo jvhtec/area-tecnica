@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useJobsRealtime } from "@/hooks/useJobsRealtime";
@@ -5,13 +6,14 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { JobCard } from "@/components/jobs/JobCard";
 import { Separator } from "@/components/ui/separator";
 import { Tent, Printer, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
-import { supabase } from "@/lib/enhanced-supabase-client";
+import { supabase, ensureRealtimeConnection } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { useAuthSession } from "@/hooks/auth/useAuthSession";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
+import { useConnectionStatus } from "@/hooks/useConnectionStatus";
 
 /**
  * Festivals page component showing all festival events
@@ -24,13 +26,15 @@ const Festivals = () => {
     isError, 
     error, 
     isRefreshing, 
-    refetch
+    refetch,
+    subscriptionStatus
   } = useJobsRealtime();
   
   const [festivalJobs, setFestivalJobs] = useState<any[]>([]);
   const [festivalLogos, setFestivalLogos] = useState<Record<string, string>>({});
   const [isPrinting, setIsPrinting] = useState<Record<string, boolean>>({});
   const { userRole } = useAuthSession();
+  const { status: connectionStatus, recoverConnection } = useConnectionStatus();
 
   // Filter jobs to only show festivals
   useEffect(() => {
@@ -41,6 +45,18 @@ const Festivals = () => {
       festivals.forEach(fetchFestivalLogo);
     }
   }, [jobs]);
+
+  // Auto-recover connection if needed
+  useEffect(() => {
+    if (isError || (connectionStatus !== 'connected' && !isLoading)) {
+      console.log("Connection issue detected, attempting recovery...");
+      const attemptRecovery = async () => {
+        await recoverConnection();
+        refetch();
+      };
+      attemptRecovery();
+    }
+  }, [isError, connectionStatus, isLoading, recoverConnection, refetch]);
 
   // Fetch festival logo for each festival job
   const fetchFestivalLogo = async (job: any) => {
@@ -95,8 +111,8 @@ const Festivals = () => {
         artistRequirementStages: [1], // Default to stage 1
         includeRfIemTable: true,
         rfIemTableStages: [1],
-        includeInfrastructureTable: true, // Add the missing property
-        infrastructureTableStages: [1] // Add the missing property
+        includeInfrastructureTable: true,
+        infrastructureTableStages: [1]
       };
       
       const mergedPdf = await generateAndMergeFestivalPDFs(jobId, jobTitle, defaultOptions);
@@ -123,10 +139,29 @@ const Festivals = () => {
     }
   };
 
-  // Handle refresh button click
-  const handleRefreshClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+  // Handle refresh button click with enhanced recovery
+  const handleRefreshClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    refetch();
+    
+    try {
+      toast.info("Refreshing festival data...");
+      
+      // First try to ensure realtime connection
+      const connectionRestored = await ensureRealtimeConnection();
+      
+      if (connectionRestored) {
+        await refetch();
+        toast.success("Festival data refreshed");
+      } else {
+        // If connection couldn't be restored, try the full recovery
+        await recoverConnection();
+        await refetch();
+        toast.success("Connection restored and data refreshed");
+      }
+    } catch (error) {
+      console.error("Error during refresh:", error);
+      toast.error("Could not refresh data. Please try again.");
+    }
   };
 
   const canPrintDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
@@ -143,9 +178,9 @@ const Festivals = () => {
           
           <div className="flex items-center gap-2">
             <SubscriptionIndicator 
-              tables={['jobs', 'job_assignments', 'job_departments', 'festival_logos']} 
+              tables={['jobs', 'job_assignments', 'job_departments', 'job_date_types', 'festival_logos']} 
               showRefreshButton 
-              onRefresh={refetch}
+              onRefresh={handleRefreshClick}
               showLabel
             />
           </div>
@@ -160,6 +195,9 @@ const Festivals = () => {
             <div className="flex flex-col justify-center items-center h-40">
               <Loader2 className="h-8 w-8 animate-spin mb-2 text-primary" />
               <p className="text-muted-foreground">Loading festivals...</p>
+              {connectionStatus !== 'connected' && (
+                <p className="text-amber-500 mt-2">Establishing connection...</p>
+              )}
             </div>
           ) : isError ? (
             <div className="flex flex-col justify-center items-center h-40 text-center">
@@ -168,13 +206,15 @@ const Festivals = () => {
               <p className="text-muted-foreground mt-2 max-w-md">
                 {error instanceof Error ? error.message : 'An unknown error occurred'}
               </p>
+              <p className="text-sm text-muted-foreground mt-2">Connection status: {connectionStatus}</p>
               <Button 
                 variant="outline" 
                 size="sm" 
                 onClick={handleRefreshClick}
                 className="mt-4"
               >
-                Try Again
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Reconnect & Try Again
               </Button>
             </div>
           ) : festivalJobs.length === 0 ? (
