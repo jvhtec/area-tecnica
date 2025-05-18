@@ -1,7 +1,7 @@
 
 // Re-export the main Supabase client and utilities
 import { supabase, checkNetworkConnection, getRealtimeConnectionStatus } from './supabase-client';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 
 export { 
   supabase, 

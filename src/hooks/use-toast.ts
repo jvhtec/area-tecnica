@@ -140,39 +140,45 @@ function dispatch(action: Action) {
   });
 }
 
-type Toast = Omit<ToastData, "id"> & {
+// Enhanced toast function that adapts to sonner's API
+function toast(options: string | React.ReactNode | Omit<ToastData, "id"> | {
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+  action?: ToasterActionElement;
+  variant?: "default" | "destructive";
   id?: string;
   onOpenChange?: (open: boolean) => void;
-};
-
-function toast({ ...props }: Toast) {
-  const id = props.id || genId();
-
-  const update = (props: Toast) =>
-    dispatch({
-      type: "UPDATE_TOAST",
-      toast: { ...props, id },
-    });
-
-  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id });
-
-  dispatch({
-    type: "ADD_TOAST",
-    toast: {
-      ...props,
+}) {
+  // Handle simple string toast
+  if (typeof options === 'string' || React.isValidElement(options)) {
+    return toastPrimitive(options);
+  }
+  
+  const { id = genId(), variant, ...rest } = options as any;
+  
+  // Map variant to sonner's equivalent
+  if (variant === 'destructive') {
+    return toastPrimitive.error(rest.title, {
+      description: rest.description,
       id,
-      onOpenChange: (open) => {
-        if (!open) dismiss();
-      },
-    },
+      ...rest
+    });
+  }
+  
+  return toastPrimitive(rest.title, {
+    description: rest.description,
+    id,
+    ...rest
   });
-
-  return {
-    id: id,
-    dismiss,
-    update,
-  };
 }
+
+// Add other toast variants to match sonner API
+toast.success = toastPrimitive.success;
+toast.error = toastPrimitive.error;
+toast.warning = toastPrimitive.warning;
+toast.info = toastPrimitive.info;
+toast.loading = toastPrimitive.loading;
+toast.custom = toastPrimitive;
 
 function useToast() {
   const [state, setState] = React.useState<State>(memoryState);
@@ -194,5 +200,5 @@ function useToast() {
   };
 }
 
-// Re-export sonner's toast directly
+// Export both the hook and the standalone function
 export { toast, useToast };

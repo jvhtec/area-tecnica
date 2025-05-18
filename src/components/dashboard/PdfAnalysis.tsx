@@ -1,9 +1,10 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload, FileText, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/use-toast";
 import {
   Table,
   TableBody,
@@ -21,7 +22,6 @@ interface AnalysisResult {
 export const PdfAnalysis = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<AnalysisResult | null>(null);
-  const { toast } = useToast();
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -65,17 +65,14 @@ export const PdfAnalysis = () => {
       console.log('Analysis completed:', analysisData);
       setResults(analysisData);
 
-      toast({
-        title: "Analysis Complete",
-        description: "The PDF has been successfully analyzed.",
+      toast.success("Analysis Complete", {
+        description: "The PDF has been successfully analyzed."
       });
 
     } catch (error: any) {
       console.error('Error in handleFileUpload:', error);
-      toast({
-        title: "Analysis Failed",
-        description: error.message,
-        variant: "destructive",
+      toast.error("Analysis Failed", {
+        description: error.message
       });
     } finally {
       setIsAnalyzing(false);

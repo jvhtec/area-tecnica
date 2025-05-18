@@ -1,8 +1,8 @@
 
 import { useQuery, QueryKey, UseQueryOptions } from '@tanstack/react-query';
-import { useTableSubscription } from './useUnifiedSubscription';
+import { useTableSubscription } from './useTableSubscription';
 import { useState, useEffect } from 'react';
-import { toast } from 'sonner';
+import { toast } from "@/hooks/use-toast";
 
 /**
  * Hook that combines React Query with Supabase realtime subscriptions
@@ -53,15 +53,14 @@ export function useRealtimeQuery<T>(
       }
     },
     ...options,
-    // Use onSettled instead of onError for error handling per tanstack/react-query v5
     onSettled: (data, error) => {
       if (error) {
         console.error(`Query error for ${String(queryKey)}:`, error);
-        if (options?.onSettled) {
-          options.onSettled(data, error);
-        }
-      } else if (options?.onSettled) {
-        options.onSettled(data, null);
+      }
+      
+      // Call the original onSettled if provided
+      if (options?.onSettled) {
+        options.onSettled(data, error);
       }
     }
   });
@@ -86,7 +85,6 @@ export function useRealtimeQuery<T>(
     } catch (error) {
       console.error(`Error in manual refresh for ${String(queryKey)}:`, error);
       toast.error(`Failed to refresh ${tableName} data`, { 
-        id: `refresh-error-${tableName}`,
         description: 'Please try again'
       });
       throw error;

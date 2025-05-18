@@ -7,7 +7,7 @@ import { useState } from "react";
 import { TourDateManagementDialog } from "../tours/TourDateManagementDialog";
 import { TourCard } from "../tours/TourCard";
 import CreateTourDialog from "../tours/CreateTourDialog";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { exportTourPDF } from "@/lib/tourPdfExport";
 import { format } from "date-fns";
 
@@ -19,7 +19,6 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
   const [selectedTourId, setSelectedTourId] = useState<string | null>(null);
   const [isDatesDialogOpen, setIsDatesDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const { toast } = useToast();
 
   const { data: tours = [] } = useQuery({
     queryKey: ["tours"],
@@ -64,10 +63,8 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
       console.log("Starting PDF export for tour:", tour.name);
       
       if (!tour.tour_dates || tour.tour_dates.length === 0) {
-        toast({
-          title: "Error",
-          description: "No tour dates available to print",
-          variant: "destructive",
+        toast.error("Error", {
+          description: "No tour dates available to print"
         });
         return;
       }
@@ -109,16 +106,13 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      toast({
-        title: "Success",
-        description: "Tour schedule exported successfully",
+      toast.success("Success", {
+        description: "Tour schedule exported successfully"
       });
     } catch (error: any) {
       console.error("Error exporting PDF:", error);
-      toast({
-        title: "Error",
-        description: "Failed to export PDF: " + (error.message || "Unknown error"),
-        variant: "destructive",
+      toast.error("Error", {
+        description: "Failed to export PDF: " + (error.message || "Unknown error")
       });
     }
   };
