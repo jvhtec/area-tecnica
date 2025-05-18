@@ -1,10 +1,10 @@
 
 import { QueryClient, QueryOptions, DefaultOptions } from "@tanstack/react-query";
-import { SubscriptionManager } from "@/lib/subscription-manager";
+import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
 
 // Advanced query cache configuration
 const queryCacheConfig = {
-  gcTime: 5 * 60 * 1000, // 5 minutes - how long to keep unused data in cache
+  gcTime: 10 * 60 * 1000, // 10 minutes - how long to keep unused data in cache
 };
 
 // Advanced mutation cache configuration
@@ -15,8 +15,8 @@ const mutationCacheConfig = {
 // Configure default options with intelligent defaults
 const defaultQueryOptions: DefaultOptions = {
   queries: {
-    staleTime: 1000 * 60 * 2, // 2 minutes - how long before data is considered stale
-    retry: 2, // Retry failed queries twice
+    staleTime: 1000 * 60 * 5, // 5 minutes - how long before data is considered stale
+    retry: 3, // Retry failed queries three times
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff with max of 30s
     refetchOnWindowFocus: true, // Refetch when window regains focus
     refetchOnMount: true, // Refetch when component mounts
@@ -24,27 +24,25 @@ const defaultQueryOptions: DefaultOptions = {
   },
   mutations: {
     retry: 1, // Only retry mutations once
-    retryDelay: 1000, // Fixed retry delay for mutations
+    retryDelay: 2000, // Fixed retry delay for mutations
   },
 };
 
 // Create a singleton query client with optimized configuration
 export const queryClient = new QueryClient({
   defaultOptions: defaultQueryOptions,
+  queryCache: queryCacheConfig,
+  mutationCache: mutationCacheConfig
 });
 
 // Setup function to initialize React Query and Subscriptions
 export const setupReactQuery = () => {
   // Initialize the subscription manager
-  const subscriptionManager = SubscriptionManager.getInstance(queryClient);
+  const subscriptionManager = UnifiedSubscriptionManager.getInstance(queryClient);
   
   // Set up global refetch strategies
   subscriptionManager.setupVisibilityBasedRefetching();
   subscriptionManager.setupNetworkStatusRefetching();
-  
-  // Set up core tables that most pages need
-  subscriptionManager.subscribeToTable('profiles', 'profiles');
-  subscriptionManager.subscribeToTable('jobs', 'jobs');
   
   return { queryClient, subscriptionManager };
 };
@@ -53,6 +51,8 @@ export const setupReactQuery = () => {
 export const createQueryClient = () => {
   return new QueryClient({
     defaultOptions: defaultQueryOptions,
+    queryCache: queryCacheConfig,
+    mutationCache: mutationCacheConfig
   });
 };
 

@@ -1,5 +1,5 @@
 
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase-client"; // Updated import path
 
 /**
  * TokenManager - Enhanced singleton class for JWT token management
@@ -19,14 +19,44 @@ export class TokenManager {
   private maxBackoff: number = 30000; // Max 30s backoff
   private consecutiveFailures: number = 0;
   private listeners: Set<() => void> = new Set();
+  private refreshTimer: number | null = null;
 
-  private constructor() {}
+  private constructor() {
+    // Set up automatic token refresh check
+    this.setupAutoRefresh();
+  }
 
   public static getInstance(): TokenManager {
     if (!TokenManager.instance) {
       TokenManager.instance = new TokenManager();
     }
     return TokenManager.instance;
+  }
+
+  /**
+   * Set up automatic token refresh based on expiration time
+   */
+  private setupAutoRefresh() {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+
+    // Check session and set up refresh timer
+    this.getSession(false).then(session => {
+      if (!session) return;
+      
+      const refreshTime = this.calculateRefreshTime(session);
+      console.log(`Scheduling next token refresh in ${Math.round(refreshTime / 1000)} seconds`);
+      
+      this.refreshTimer = window.setTimeout(() => {
+        console.log('Auto-refreshing token...');
+        this.refreshToken().then(() => {
+          // Reset the auto-refresh timer after successful refresh
+          this.setupAutoRefresh();
+        });
+      }, refreshTime);
+    });
   }
 
   /**
@@ -101,6 +131,9 @@ export class TokenManager {
           
           // Notify listeners of successful refresh
           this.notifyListeners();
+
+          // Trigger global reconnect event to reestablish subscriptions with new token
+          window.dispatchEvent(new CustomEvent('supabase-reconnect'));
           
           resolve({ session: data.session, error: null });
         }
@@ -245,6 +278,12 @@ export class TokenManager {
       await supabase.auth.signOut();
       this.tokenExpiryTimes.clear();
       this.lastRefreshTime = 0;
+      
+      // Clear refresh timer
+      if (this.refreshTimer) {
+        clearTimeout(this.refreshTimer);
+        this.refreshTimer = null;
+      }
     } catch (error) {
       console.error("Error signing out:", error);
       throw error;

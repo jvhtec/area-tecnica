@@ -1,211 +1,123 @@
 
-import { supabase, checkNetworkConnection } from './enhanced-supabase-client';
-import { toast } from "sonner";
+import { supabase } from './supabase-client';
+import { TokenManager } from './token-manager';
 
-class ConnectionRecoveryService {
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 10;
-  private baseReconnectDelay = 2000; // 2 seconds
-  private maxReconnectDelay = 60000; // 1 minute
-  private reconnectTimeoutId: number | null = null;
-  private isRecovering = false;
-  private lastNotificationTime = 0;
-  private notificationCooldown = 15000; // 15 seconds between notifications
-  
-  constructor() {
-    this.setupNetworkListeners();
-  }
-  
-  private setupNetworkListeners() {
-    // Listen for online/offline events
-    window.addEventListener('online', () => {
-      this.handleNetworkRecovery();
-    });
-    
-    window.addEventListener('offline', () => {
-      this.handleNetworkDisconnection();
-    });
-    
-    // Listen for visibility changes (tab focus)
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        this.checkConnection();
-      }
-    });
-  }
-  
-  private handleNetworkRecovery() {
-    console.log("Network connection recovered, checking WebSockets");
-    
-    // Reset reconnect attempts when network recovers
-    this.reconnectAttempts = 0;
-    
-    // Show notification with cooldown
-    this.showConnectionNotification('Network connection restored, reconnecting...', 'success');
-    
-    // Start recovery process
-    this.startRecovery();
-  }
-  
-  private handleNetworkDisconnection() {
-    console.log("Network connection lost");
-    
-    // Show notification
-    this.showConnectionNotification('Network connection lost', 'error');
-    
-    // Clear any pending reconnect attempts
-    if (this.reconnectTimeoutId) {
-      window.clearTimeout(this.reconnectTimeoutId);
-      this.reconnectTimeoutId = null;
-    }
-  }
-  
-  private async checkConnection() {
-    console.log("Checking connection status");
-    
-    try {
-      // Check if we have a network connection
-      const hasNetwork = await checkNetworkConnection();
-      
-      if (!hasNetwork) {
-        console.log("No network connection detected");
-        return;
-      }
-      
-      // Check if any realtime channels are disconnected
-      const channels = supabase.getChannels();
-      const hasDisconnectedChannels = channels.some(channel => {
-        return channel.state !== 'joined';
-      });
-      
-      if (hasDisconnectedChannels) {
-        console.log("Detected disconnected channels, starting recovery");
-        this.startRecovery();
-      }
-    } catch (error) {
-      console.error("Error checking connection:", error);
-    }
-  }
-  
-  private showConnectionNotification(message: string, type: 'success' | 'error' | 'info') {
-    const now = Date.now();
-    
-    // Limit notification frequency
-    if (now - this.lastNotificationTime < this.notificationCooldown) {
-      return;
-    }
-    
-    this.lastNotificationTime = now;
-    
-    if (type === 'success') {
-      toast.success(message);
-    } else if (type === 'error') {
-      toast.error(message);
-    } else {
-      toast.info(message);
-    }
-  }
+/**
+ * Service that handles automatic recovery of connections
+ * when network issues or token expiration occurs
+ */
+export const connectionRecovery = {
+  isActive: false,
+  recoveryInterval: null as NodeJS.Timeout | null,
+  lastRecoveryAttempt: 0,
+  recoveryInProgress: false,
   
   startRecovery() {
-    // Don't start multiple recovery processes
-    if (this.isRecovering) {
-      return;
-    }
+    if (this.isActive) return;
+    this.isActive = true;
     
-    this.isRecovering = true;
+    console.log('Starting connection recovery service');
     
-    this.attemptReconnect();
-  }
+    // Add online/offline event listeners
+    window.addEventListener('online', this.handleNetworkStatusChange);
+    window.addEventListener('offline', this.handleNetworkStatusChange);
+    
+    // Add visibility change listener
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    
+    // Setup periodic health check
+    this.recoveryInterval = setInterval(() => this.performHealthCheck(), 60000); // Every minute
+    
+    // Perform initial health check
+    setTimeout(() => this.performHealthCheck(), 5000);
+  },
   
-  private async attemptReconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log("Max reconnection attempts reached");
-      this.showConnectionNotification(
-        'Unable to restore connection after multiple attempts', 
-        'error'
-      );
-      this.isRecovering = false;
-      return;
+  stopRecovery() {
+    if (!this.isActive) return;
+    
+    console.log('Stopping connection recovery service');
+    
+    // Remove event listeners
+    window.removeEventListener('online', this.handleNetworkStatusChange);
+    window.removeEventListener('offline', this.handleNetworkStatusChange);
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    
+    // Clear interval
+    if (this.recoveryInterval) {
+      clearInterval(this.recoveryInterval);
+      this.recoveryInterval = null;
     }
     
-    try {
-      console.log(`Reconnection attempt ${this.reconnectAttempts + 1}`);
-      
-      // Check network before attempting reconnect
-      const hasNetwork = await checkNetworkConnection();
-      
-      if (!hasNetwork) {
-        console.log("No network connection, delaying reconnect");
-        this.scheduleNextReconnect();
-        return;
-      }
-      
-      // Get all active channels
-      const channels = supabase.getChannels();
-      
-      if (channels.length === 0) {
-        console.log("No channels to reconnect");
-        this.isRecovering = false;
-        return;
-      }
-      
-      // Remove all channels and recreate them
-      channels.forEach(channel => {
-        try {
-          console.log(`Removing channel: ${channel.topic}`);
-          supabase.removeChannel(channel);
-        } catch (error) {
-          console.error(`Error removing channel ${channel.topic}:`, error);
-        }
-      });
-      
-      // Signal success
-      this.reconnectAttempts = 0;
-      this.isRecovering = false;
-      
-      // Show success notification if this was a recovery (not initial connection)
-      if (this.reconnectAttempts > 0) {
-        this.showConnectionNotification('Connection restored', 'success');
-      }
-      
-      // Broadcast a custom event so components can refresh their subscriptions
+    this.isActive = false;
+  },
+  
+  handleNetworkStatusChange() {
+    if (navigator.onLine) {
+      console.log('Network connection restored, triggering recovery');
+      // Dispatch custom event for Supabase reconnect
       window.dispatchEvent(new CustomEvent('supabase-reconnect'));
       
-    } catch (error) {
-      console.error("Error during reconnection:", error);
-      this.scheduleNextReconnect();
+      // Force refreshing token
+      TokenManager.getInstance().refreshToken().catch(err => {
+        console.error('Error refreshing token on network change:', err);
+      });
+    } else {
+      console.log('Network connection lost');
     }
-  }
+  },
   
-  private scheduleNextReconnect() {
-    // Clear any existing timeout
-    if (this.reconnectTimeoutId) {
-      window.clearTimeout(this.reconnectTimeoutId);
+  handleVisibilityChange() {
+    if (document.visibilityState === 'visible') {
+      console.log('Tab became visible, checking connection health');
+      // Schedule health check with a slight delay to ensure everything is loaded
+      setTimeout(() => connectionRecovery.performHealthCheck(), 1000);
     }
+  },
+  
+  async performHealthCheck() {
+    if (this.recoveryInProgress) return;
     
-    // Calculate delay with exponential backoff and jitter
-    const delay = Math.min(
-      this.baseReconnectDelay * Math.pow(1.5, this.reconnectAttempts) * (0.9 + Math.random() * 0.2),
-      this.maxReconnectDelay
-    );
+    // Don't check too frequently
+    const now = Date.now();
+    if (now - this.lastRecoveryAttempt < 30000) return; // 30 seconds minimum between attempts
     
-    console.log(`Scheduling next reconnect attempt in ${Math.round(delay / 1000)}s`);
-    
-    this.reconnectAttempts++;
-    
-    // Schedule next attempt
-    this.reconnectTimeoutId = window.setTimeout(() => {
-      this.attemptReconnect();
-    }, delay);
+    try {
+      this.recoveryInProgress = true;
+      this.lastRecoveryAttempt = now;
+      
+      console.log('Performing connection health check');
+      
+      // Get authentication session
+      const { data } = await supabase.auth.getSession();
+      const session = data.session;
+      
+      if (!session) {
+        console.log('No active session found during health check');
+        return;
+      }
+      
+      // Check token expiration
+      const tokenManager = TokenManager.getInstance();
+      const isExpiring = await tokenManager.checkTokenExpiration(session, 10 * 60 * 1000); // 10 minute buffer
+      
+      if (isExpiring) {
+        console.log('Token is expiring soon, refreshing');
+        await tokenManager.refreshToken();
+      }
+      
+      // Check realtime connection
+      const channels = supabase.getChannels();
+      const hasHealthyConnection = channels.some(channel => channel.state === 'joined');
+      
+      if (!hasHealthyConnection && channels.length > 0) {
+        console.log('Realtime connection unhealthy, triggering reconnect');
+        window.dispatchEvent(new CustomEvent('supabase-reconnect'));
+      }
+      
+    } catch (error) {
+      console.error('Error in connection health check:', error);
+    } finally {
+      this.recoveryInProgress = false;
+    }
   }
-}
-
-// Export singleton instance
-export const connectionRecovery = new ConnectionRecoveryService();
-
-// Export a hook for components to use
-export function useConnectionRecovery() {
-  return {
-    startRecovery: () => connectionRecovery.startRecovery(),
-  };
-}
+};

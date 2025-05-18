@@ -1,11 +1,12 @@
 
-import { useEffect } from "react";
-import { connectionRecovery } from "@/lib/connection-recovery-service";
+import { useEffect, useRef } from "react";
+import { checkNetworkConnection, getRealtimeConnectionStatus } from "@/lib/supabase-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
 import { useLocation } from "react-router-dom";
 import { useEnhancedRouteSubscriptions } from "@/hooks/useEnhancedRouteSubscriptions";
 import { toast } from "sonner";
+import { TokenManager } from "@/lib/token-manager";
 
 /**
  * Component that initializes app-wide services when the application starts
@@ -15,31 +16,61 @@ import { toast } from "sonner";
 export function AppInit() {
   const queryClient = useQueryClient();
   const location = useLocation();
+  const isInitialized = useRef(false);
+  const lastConnectionCheck = useRef(0);
+  const connectionCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Initialize the connection recovery service
+  // Initialize app services once
   useEffect(() => {
-    connectionRecovery.startRecovery();
-    console.log('Connection recovery service initialized');
-  }, []);
-  
-  // Initialize the unified subscription manager
-  useEffect(() => {
+    if (isInitialized.current) return;
+    isInitialized.current = true;
+    
+    console.log('Initializing core services...');
+    
+    // Initialize token manager
+    const tokenManager = TokenManager.getInstance();
+    
+    // Initialize the subscription manager
     const manager = UnifiedSubscriptionManager.getInstance(queryClient);
     manager.setupVisibilityBasedRefetching();
     manager.setupNetworkStatusRefetching();
-    console.log('Unified subscription manager initialized');
     
-    // Set up a periodic health check for subscriptions
-    const healthCheckInterval = setInterval(() => {
-      const connectionStatus = manager.getConnectionStatus();
-      if (connectionStatus !== 'connected') {
-        console.log(`Connection status is ${connectionStatus}, attempting to reconnect`);
+    // Set up periodic connection health check
+    const checkConnectionHealth = async () => {
+      // Don't check too frequently
+      const now = Date.now();
+      if (now - lastConnectionCheck.current < 30000) return;
+      lastConnectionCheck.current = now;
+      
+      // Get current connection status
+      const rtStatus = getRealtimeConnectionStatus();
+      const hasNetworkConnection = await checkNetworkConnection();
+      
+      // If realtime is disconnected but we have network, try to reconnect
+      if (rtStatus === 'DISCONNECTED' && hasNetworkConnection) {
+        console.log('Detected realtime disconnect with active network, attempting recovery');
         manager.reestablishSubscriptions();
+        
+        // Check if token needs refresh
+        tokenManager.getSession(true).catch(err => {
+          console.error('Error refreshing session during recovery:', err);
+        });
       }
+    };
+    
+    // Set up health check interval
+    connectionCheckIntervalRef.current = setInterval(() => {
+      checkConnectionHealth().catch(err => {
+        console.error('Error in connection health check:', err);
+      });
     }, 60000); // Check every minute
     
+    // Return cleanup
     return () => {
-      clearInterval(healthCheckInterval);
+      if (connectionCheckIntervalRef.current) {
+        clearInterval(connectionCheckIntervalRef.current);
+        connectionCheckIntervalRef.current = null;
+      }
     };
   }, [queryClient]);
   
