@@ -4,6 +4,7 @@ import Layout from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
 import { FestivalManagementWrapper } from "@/components/festival/FestivalManagementWrapper";
 import Auth from "@/pages/Auth";
+import { RequireAuth } from "@/components/RequireAuth";
 
 // Create a placeholder for missing pages
 const Placeholder = () => (

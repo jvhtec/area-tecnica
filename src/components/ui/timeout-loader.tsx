@@ -1,116 +1,143 @@
 
-import React, { useState, useEffect } from 'react';
-import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { ReloadIcon, AlertCircle } from 'lucide-react';
 
 interface TimeoutLoaderProps {
+  /** Duration in ms before showing timeout UI */
+  timeout?: number;
+  /** Loading state */
   isLoading: boolean;
-  timeout?: number;  // Timeout in milliseconds (default: 15000 - 15 seconds)
+  /** Error state */
+  isError?: boolean;
+  /** Error message */
+  error?: Error | null;
+  /** Additional loading message */
   message?: string;
+  /** Function to call on retry */
   onRetry?: () => void;
-  children: React.ReactNode;
+  /** Duration scaling factor on each retry */
+  backoffFactor?: number;
+  /** Maximum timeout value */
+  maxTimeout?: number;
+  /** Custom loading component */
+  loadingComponent?: React.ReactNode;
+  /** Component to render when timed out but not error */
+  timeoutComponent?: React.ReactNode;
 }
 
+/**
+ * TimeoutLoader - Enhanced loading component with timeout detection and retry
+ */
 export function TimeoutLoader({
+  timeout = 10000,
   isLoading,
-  timeout = 15000,
-  message = "Loading is taking longer than expected",
+  isError = false,
+  error,
+  message = "Loading data...",
   onRetry,
-  children
+  backoffFactor = 1.5,
+  maxTimeout = 30000,
+  loadingComponent,
+  timeoutComponent,
 }: TimeoutLoaderProps) {
-  const [hasTimedOut, setHasTimedOut] = useState(false);
-  const [timeoutId, setTimeoutId] = useState<number | null>(null);
-  const [isRetrying, setIsRetrying] = useState(false);
-
-  // Reset the timeout whenever loading state changes
+  const [showTimeout, setShowTimeout] = useState(false);
+  const [timeoutDuration, setTimeoutDuration] = useState(timeout);
+  const [retryCount, setRetryCount] = useState(0);
+  
+  // Reset timeout state when loading state changes
   useEffect(() => {
-    // Clear any existing timeout
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-      setTimeoutId(null);
-    }
-
-    // If we're loading, set a new timeout
     if (isLoading) {
-      setHasTimedOut(false);
-      
-      // Set timeout to show a message if loading takes too long
-      const id = window.setTimeout(() => {
+      setShowTimeout(false);
+      const timer = setTimeout(() => {
         if (isLoading) {
-          setHasTimedOut(true);
-          toast.warning("Loading data is taking longer than expected", {
-            description: "Network might be slow or disconnected"
-          });
+          setShowTimeout(true);
         }
-      }, timeout);
+      }, timeoutDuration);
       
-      setTimeoutId(Number(id));
+      return () => clearTimeout(timer);
     }
-    
-    // Cleanup on unmount
-    return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [isLoading, timeout]);
-
-  // Handle retry
-  const handleRetry = async () => {
-    if (!onRetry) return;
-    
-    setIsRetrying(true);
-    try {
-      await onRetry();
-      toast.success("Retry successful");
-    } catch (error) {
-      console.error("Retry failed:", error);
-      toast.error("Retry failed", {
-        description: "Please check your network connection"
-      });
-    } finally {
-      setIsRetrying(false);
-      setHasTimedOut(false);
+  }, [isLoading, timeoutDuration]);
+  
+  // Handle retry with exponential backoff
+  const handleRetry = useCallback(() => {
+    if (onRetry) {
+      onRetry();
+      setRetryCount(prev => prev + 1);
+      
+      // Calculate new timeout with backoff
+      const newTimeout = Math.min(
+        timeout * Math.pow(backoffFactor, retryCount),
+        maxTimeout
+      );
+      setTimeoutDuration(newTimeout);
+      
+      // Reset timeout UI
+      setShowTimeout(false);
     }
-  };
-
-  // Show loading indicator for normal loading states
-  if (isLoading && !hasTimedOut) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 min-h-[200px]">
-        <Loader2 className="h-8 w-8 text-muted-foreground animate-spin mb-4" />
-        <p className="text-muted-foreground">Loading...</p>
+  }, [onRetry, retryCount, timeout, backoffFactor, maxTimeout]);
+  
+  // Default loading component
+  const defaultLoadingComponent = (
+    <div className="flex flex-col items-center justify-center p-8 text-center">
+      <div className="animate-spin mb-4">
+        <ReloadIcon className="h-8 w-8" />
       </div>
-    );
+      <p className="text-muted-foreground">{message}</p>
+      {retryCount > 0 && (
+        <p className="text-sm text-muted-foreground mt-2">
+          Retry attempt: {retryCount}
+        </p>
+      )}
+    </div>
+  );
+  
+  // Default timeout component
+  const defaultTimeoutComponent = (
+    <div className="flex flex-col items-center justify-center p-8 text-center">
+      <Alert className="mb-4">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Taking longer than expected</AlertTitle>
+        <AlertDescription>
+          This is taking longer than usual. The connection might be slow.
+        </AlertDescription>
+      </Alert>
+      <Button onClick={handleRetry} variant="outline" className="mt-4">
+        <ReloadIcon className="mr-2 h-4 w-4" />
+        Retry
+      </Button>
+    </div>
+  );
+  
+  // Error component
+  const errorComponent = (
+    <div className="flex flex-col items-center justify-center p-8 text-center">
+      <Alert className="mb-4 border-destructive">
+        <AlertCircle className="h-4 w-4 text-destructive" />
+        <AlertTitle>Error loading data</AlertTitle>
+        <AlertDescription>
+          {error?.message || "Something went wrong. Please try again."}
+        </AlertDescription>
+      </Alert>
+      <Button onClick={handleRetry} variant="outline" className="mt-4">
+        <ReloadIcon className="mr-2 h-4 w-4" />
+        Retry
+      </Button>
+    </div>
+  );
+  
+  if (isError) {
+    return errorComponent;
   }
   
-  // Show timeout message with retry button when loading takes too long
-  if (isLoading && hasTimedOut) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 min-h-[200px] border border-dashed border-yellow-300 rounded-md bg-yellow-50 dark:bg-yellow-950 dark:border-yellow-800">
-        <AlertCircle className="h-8 w-8 text-yellow-500 mb-4" />
-        <h3 className="font-semibold mb-2">Taking longer than expected</h3>
-        <p className="text-muted-foreground text-center mb-4">{message}</p>
-        {onRetry && (
-          <Button 
-            variant="outline" 
-            onClick={handleRetry}
-            disabled={isRetrying}
-            className="flex items-center gap-2"
-          >
-            {isRetrying ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            Retry
-          </Button>
-        )}
-      </div>
-    );
+  if (isLoading && !showTimeout) {
+    return loadingComponent || defaultLoadingComponent;
   }
   
-  // If not loading, show the children
-  return <>{children}</>;
+  if (isLoading && showTimeout) {
+    return timeoutComponent || defaultTimeoutComponent;
+  }
+  
+  return null;
 }
