@@ -26,8 +26,8 @@ import { WolfensteinDialog } from "./doom/WolfensteinDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/useAuth";
 import { HeaderStatus } from "./ui/header-status";
-import { useRouteSubscriptions } from "@/hooks/useRouteSubscriptions";
-import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
+import { ConnectionStatusIndicator } from "./ui/connection-status-indicator";
+import { useOptimizedMultiTableSubscription } from "@/hooks/useOptimizedSubscription";
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -46,16 +46,22 @@ const Layout = () => {
     logout
   } = useAuth();
   
-  // Get route-specific subscription info
-  const { requiredTables } = useRouteSubscriptions();
-  const { forceSubscribe } = useSubscriptionContext();
+  // Use optimized subscriptions for route-specific tables
+  const { resetAllSubscriptions } = useOptimizedMultiTableSubscription([
+    { table: 'profiles', queryKey: ['profiles'], priority: 'high' },
+    { table: 'jobs', queryKey: ['jobs'], priority: 'high' }
+  ]);
   
   // Subscribe to route-specific tables whenever the route changes
   useEffect(() => {
-    if (requiredTables.length > 0) {
-      forceSubscribe(requiredTables);
+    // This effect will run when the route changes
+    console.log("Route changed, refreshing data if needed");
+    
+    // Only trigger a data refresh if we have a session
+    if (session) {
+      resetAllSubscriptions();
     }
-  }, [location.pathname, requiredTables, forceSubscribe]);
+  }, [location.pathname, session]);
 
   const handleSignOut = async () => {
     if (isLoggingOut) return;
@@ -147,6 +153,7 @@ const Layout = () => {
               <SidebarTrigger />
             </div>
             <div className="flex items-center gap-2">
+              <ConnectionStatusIndicator className="mr-1" variant={isMobile ? "compact" : "default"} />
               <HeaderStatus className="mr-3 hidden sm:flex" />
               <ReloadButton onReload={handleReload} />
             </div>

@@ -1,7 +1,7 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { Department } from "@/types/department";
-import { useJobs } from "@/hooks/useJobs";
-import { format, isWithinInterval, addWeeks, addMonths, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
+import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -16,8 +16,10 @@ import { DirectMessagesList } from "@/components/messages/DirectMessagesList";
 import { Button } from "@/components/ui/button";
 import { DirectMessageDialog } from "@/components/messages/DirectMessageDialog";
 import { DashboardContent } from "@/components/dashboard/DashboardContent";
-import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
+import { useOptimizedMultiTableSubscription } from "@/hooks/useOptimizedSubscription";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { DashboardJobsList } from "@/components/dashboard/DashboardJobsList";
+import { useJobs } from "@/hooks/useJobs";
 
 const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
   if (!date || !jobs) return [];
@@ -55,18 +57,17 @@ const Dashboard = () => {
   const { data: jobs, isLoading } = useJobs();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { forceSubscribe } = useSubscriptionContext();
   
-  useEffect(() => {
-    forceSubscribe([
-      'jobs', 
-      'job_assignments', 
-      'job_date_types', 
-      'messages', 
-      'direct_messages',
-      'tours'
-    ]);
-  }, [forceSubscribe]);
+  // Use our optimized subscription hook instead of forceSubscribe
+  const { resetAllSubscriptions, isAllConnected } = useOptimizedMultiTableSubscription([
+    { table: 'jobs', queryKey: ['jobs'], priority: 'high' },
+    { table: 'job_assignments', queryKey: ['jobs', 'assignments'], priority: 'high' },
+    { table: 'job_departments', queryKey: ['jobs', 'departments'] },
+    { table: 'job_date_types', queryKey: ['jobs', 'dates'] },
+    { table: 'messages', queryKey: ['messages'], enabled: userRole === 'management' },
+    { table: 'direct_messages', queryKey: ['direct_messages'], enabled: !!userId },
+    { table: 'tours', queryKey: ['tours'] }
+  ]);
 
   useEffect(() => {
     const fetchUserRoleAndPrefs = async () => {
@@ -245,6 +246,15 @@ const Dashboard = () => {
           </CardContent>
         )}
       </Card>
+
+      {/* Use our new paginated component for better performance on the dashboard */}
+      <DashboardJobsList
+        title="All Jobs"
+        onJobClick={handleJobClick}
+        onEditClick={handleEditClick}
+        onDeleteClick={handleDeleteClick}
+        userRole={userRole}
+      />
 
       <DashboardContent
         date={date}
