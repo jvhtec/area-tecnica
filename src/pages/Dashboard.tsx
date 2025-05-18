@@ -44,13 +44,13 @@ const DashboardWithDateRange = () => {
     setRangeType(newTimeSpan as any);
   };
 
-  // Fetch jobs based on date range - the hook now needs the date range params
+  // Fetch jobs based on date range - pass the params object with start and end dates
   const { data: jobs = [], isLoading } = useJobs({
     startDate,
     endDate,
   });
   
-  // Set up realtime subscriptions for jobs - this function expects only one argument
+  // Set up realtime subscriptions for jobs - using the updated hook signature
   useRealtimeSubscription('jobs', jobsKeys.calendar());
 
   // Filter jobs for the selected date

@@ -4,8 +4,14 @@ import { supabase } from "@/lib/supabase-client"; // Updated import path
 import { useMultiTableSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 
-export const useJobs = () => {
+interface UseJobsParams {
+  startDate?: Date;
+  endDate?: Date;
+}
+
+export const useJobs = (params?: UseJobsParams) => {
   const queryClient = useQueryClient();
+  const { startDate, endDate } = params || {};
 
   // Set up multi-table subscriptions using our enhanced hooks
   useMultiTableSubscription([
@@ -15,14 +21,14 @@ export const useJobs = () => {
   ]);
 
   return useQuery({
-    queryKey: ["jobs"],
+    queryKey: ["jobs", startDate?.toISOString(), endDate?.toISOString()],
     queryFn: async () => {
-      console.log("Fetching jobs...");
+      console.log("Fetching jobs...", { startDate, endDate });
       
       // Add retry logic
       const fetchWithRetry = async (retries = 3) => {
         try {
-          const { data: jobs, error } = await supabase
+          let query = supabase
             .from("jobs")
             .select(`
               *,
@@ -42,6 +48,17 @@ export const useJobs = () => {
               tour_date:tour_dates(*)
             `)
             .order("start_time", { ascending: true });
+
+          // Apply date filters if provided
+          if (startDate) {
+            query = query.gte('start_time', startDate.toISOString());
+          }
+          
+          if (endDate) {
+            query = query.lte('start_time', endDate.toISOString());
+          }
+
+          const { data: jobs, error } = await query;
 
           if (error) {
             console.error("Error fetching jobs:", error);
