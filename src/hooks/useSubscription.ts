@@ -22,5 +22,7 @@ export function useRelatedTablesSubscription(
     priority
   }));
   
+  // Import the useMultiTableSubscription hook from useTableSubscription.ts
+  const { useMultiTableSubscription } = require('./useTableSubscription');
   return useMultiTableSubscription(tableConfigs);
 }

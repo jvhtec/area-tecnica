@@ -1,4 +1,3 @@
-
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "./supabase-client";
 
@@ -51,13 +50,18 @@ export class UnifiedSubscriptionManager {
    */
   private setupPingChannel() {
     if (this.pingChannelId) {
-      supabase.removeChannel(supabase.getChannel(this.pingChannelId));
+      // Find and remove channel by ID if it exists
+      const channels = supabase.getChannels();
+      const existingChannel = channels.find(ch => ch.subscribe.toString().includes(this.pingChannelId!));
+      if (existingChannel) {
+        supabase.removeChannel(existingChannel);
+      }
       this.pingChannelId = null;
     }
 
     try {
       const pingChannel = supabase.channel('ping');
-      this.pingChannelId = pingChannel.id;
+      this.pingChannelId = 'ping'; // Store channel name instead of ID
       
       pingChannel
         .on('presence', { event: 'sync' }, () => {

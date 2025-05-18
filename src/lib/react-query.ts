@@ -2,16 +2,6 @@
 import { QueryClient, QueryOptions, DefaultOptions } from "@tanstack/react-query";
 import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
 
-// Advanced query cache configuration
-const queryCacheConfig = {
-  gcTime: 10 * 60 * 1000, // 10 minutes - how long to keep unused data in cache
-};
-
-// Advanced mutation cache configuration
-const mutationCacheConfig = {
-  gcTime: 5 * 60 * 1000, // 5 minutes
-};
-
 // Configure default options with intelligent defaults
 const defaultQueryOptions: DefaultOptions = {
   queries: {
@@ -21,18 +11,18 @@ const defaultQueryOptions: DefaultOptions = {
     refetchOnWindowFocus: true, // Refetch when window regains focus
     refetchOnMount: true, // Refetch when component mounts
     refetchOnReconnect: true, // Refetch when network reconnects
+    gcTime: 10 * 60 * 1000, // 10 minutes - how long to keep unused data in cache
   },
   mutations: {
     retry: 1, // Only retry mutations once
     retryDelay: 2000, // Fixed retry delay for mutations
+    gcTime: 5 * 60 * 1000, // 5 minutes - how long to keep unused mutation data
   },
 };
 
 // Create a singleton query client with optimized configuration
 export const queryClient = new QueryClient({
-  defaultOptions: defaultQueryOptions,
-  queryCache: queryCacheConfig,
-  mutationCache: mutationCacheConfig
+  defaultOptions: defaultQueryOptions
 });
 
 // Setup function to initialize React Query and Subscriptions
@@ -50,9 +40,7 @@ export const setupReactQuery = () => {
 // Factory function to create a new QueryClient with the same defaults
 export const createQueryClient = () => {
   return new QueryClient({
-    defaultOptions: defaultQueryOptions,
-    queryCache: queryCacheConfig,
-    mutationCache: mutationCacheConfig
+    defaultOptions: defaultQueryOptions
   });
 };
 

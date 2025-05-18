@@ -4,8 +4,8 @@ import { Wifi, WifiOff, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { getRealtimeConnectionStatus } from "@/lib/enhanced-supabase-client";
-import { useConnectionRecovery } from "@/lib/connection-recovery-service";
+import { getRealtimeConnectionStatus } from "@/lib/supabase-client";
+import { connectionRecovery } from "@/lib/connection-recovery-service";
 import { toast } from "sonner";
 
 interface ConnectionIndicatorProps {
@@ -21,7 +21,6 @@ export function ConnectionIndicator({
     getRealtimeConnectionStatus()
   );
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { startRecovery } = useConnectionRecovery();
   
   // Update status periodically
   useEffect(() => {
@@ -40,7 +39,7 @@ export function ConnectionIndicator({
     setIsRefreshing(true);
     
     try {
-      startRecovery();
+      connectionRecovery.startRecovery();
       toast.info("Attempting to restore connection...");
       
       // Set a timeout to reset the refreshing state
