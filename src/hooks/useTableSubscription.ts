@@ -1,158 +1,145 @@
+import { useState, useEffect, useRef } from 'react';
+import { UnifiedSubscriptionManager } from '@/lib/unified-subscription-manager';
+import { useQueryClient } from '@tanstack/react-query';
 
-import { useState, useEffect } from 'react';
-import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
-import { getRealtimeConnectionStatus } from '@/lib/supabase-client';
-import { forceRefreshSubscriptions } from '@/lib/enhanced-supabase-client';
+type SubscriptionOptions = {
+  filter?: {
+    event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*',
+    schema?: string,
+    filter?: string
+  },
+  priority?: 'high' | 'medium' | 'low',
+  onSubscriptionError?: () => void,
+  onSubscriptionReconnect?: () => void
+};
 
 /**
- * Hook to monitor subscription status for specific tables
- * @param tableName Array of table names to monitor
- * @param queryKey Query key for this subscription
- * @returns Subscription status details
+ * Hook for subscribing to Supabase table changes with enhanced performance and reliability
+ * 
+ * @param table The table name to subscribe to
+ * @param queryKey The query key to invalidate on changes (string or string[])
+ * @param options Additional subscription options
+ * @returns Subscription status information
  */
 export function useTableSubscription(
-  tableName: string,
-  queryKey: string | string[]
+  table: string,
+  queryKey: string | string[],
+  options?: SubscriptionOptions
 ) {
-  const { 
-    connectionStatus: globalConnectionStatus, 
-    activeSubscriptions, 
-    lastRefreshTime,
-    refreshSubscriptions,
-    subscriptionsByTable
-  } = useSubscriptionContext();
-
-  const [isSubscribed, setIsSubscribed] = useState(false);
+  const queryClient = useQueryClient();
+  const subscriptionManager = UnifiedSubscriptionManager.getInstance(queryClient);
   const [isStale, setIsStale] = useState(false);
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
-
-  // Effect to update subscription status
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  
+  // Keep track of subscription keys for cleanup
+  const subscriptionKeyRef = useRef<string | null>(null);
+  const tableInfoRef = useRef({ table, queryKey });
+  
+  // Update refs when inputs change
   useEffect(() => {
-    // Check if the table is actively subscribed
-    const tableSubscriptions = subscriptionsByTable[tableName] || [];
-    setIsSubscribed(tableSubscriptions.length > 0 && globalConnectionStatus === 'connected');
-    
-    // Check if data is stale (older than 5 minutes)
-    const now = Date.now();
-    const fiveMinutes = 5 * 60 * 1000;
-    setIsStale(now - lastRefreshTime > fiveMinutes);
-    
-    // Update last activity time
-    if (tableSubscriptions.length > 0) {
-      setLastActivity(lastRefreshTime);
+    tableInfoRef.current = { table, queryKey };
+  }, [table, queryKey]);
+  
+  // Set up subscription
+  useEffect(() => {
+    if (!table || !queryKey) {
+      return;
     }
     
-  }, [tableName, activeSubscriptions, globalConnectionStatus, lastRefreshTime, subscriptionsByTable]);
-
-  // Function to refresh subscription for this specific table
-  const refreshSubscription = async () => {
-    console.log(`Refreshing subscription for table: ${tableName}`);
-    
     try {
-      // Ensure primary Supabase realtime connection is active
-      const realtimeStatus = getRealtimeConnectionStatus();
+      // Create a normalized key for the subscription
+      const normalizedQueryKey = Array.isArray(queryKey) 
+        ? JSON.stringify(queryKey) 
+        : queryKey;
+        
+      const subscriptionKey = `${table}::${normalizedQueryKey}`;
+      subscriptionKeyRef.current = subscriptionKey;
       
-      if (realtimeStatus !== 'CONNECTED') {
-        // If not connected, force a connection refresh first
-        await forceRefreshSubscriptions([tableName]);
-      }
+      console.log(`Setting up subscription for table ${table} with key ${normalizedQueryKey}`);
       
-      // Then refresh all subscriptions in the provider
-      refreshSubscriptions();
+      // Subscribe to the table
+      const subscription = subscriptionManager.subscribeToTable(
+        table, 
+        queryKey, 
+        options?.filter, 
+        options?.priority || 'medium'
+      );
       
-      return true;
+      // Update subscription status
+      const checkSubscriptionStatus = () => {
+        const status = subscriptionManager.getSubscriptionStatus(table, queryKey);
+        setIsSubscribed(status.isConnected);
+        setLastActivity(status.lastActivity);
+        
+        // Check if data is stale (no activity for over 5 minutes)
+        const now = Date.now();
+        setIsStale(now - status.lastActivity > 5 * 60 * 1000);
+      };
+      
+      // Check initial status
+      checkSubscriptionStatus();
+      
+      // Set up interval to check status
+      const statusInterval = setInterval(checkSubscriptionStatus, 30000);
+      
+      // Set up connection status listener
+      const handleConnectionChange = () => {
+        const connectionStatus = subscriptionManager.getConnectionStatus();
+        
+        if (connectionStatus === 'disconnected') {
+          setIsSubscribed(false);
+          if (options?.onSubscriptionError) {
+            options.onSubscriptionError();
+          }
+        } else if (connectionStatus === 'connected') {
+          checkSubscriptionStatus();
+          if (options?.onSubscriptionReconnect) {
+            options.onSubscriptionReconnect();
+          }
+        }
+      };
+      
+      // Listen for connection status changes
+      window.addEventListener('supabase-connection-change', handleConnectionChange);
+      
+      // Clean up subscription
+      return () => {
+        clearInterval(statusInterval);
+        window.removeEventListener('supabase-connection-change', handleConnectionChange);
+        
+        // No need to unsubscribe as the subscription manager handles cleanup
+      };
     } catch (error) {
-      console.error('Error refreshing subscription:', error);
+      console.error(`Error setting up subscription for ${table}:`, error);
+      setIsSubscribed(false);
+      if (options?.onSubscriptionError) {
+        options.onSubscriptionError();
+      }
+      return () => {};
+    }
+  }, [table, queryKey, queryClient, options]);
+  
+  // Provide a function to manually refresh the subscription
+  const refreshSubscription = () => {
+    try {
+      if (subscriptionKeyRef.current) {
+        subscriptionManager.forceRefreshSubscriptions([tableInfoRef.current.table]);
+        setLastActivity(Date.now());
+        setIsStale(false);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error(`Error refreshing subscription for ${tableInfoRef.current.table}:`, error);
       return false;
     }
   };
-
+  
   return {
     isSubscribed,
     isStale,
     lastActivity,
     refreshSubscription
   };
-}
-
-/**
- * Hook for subscribing to multiple tables at once
- */
-export function useMultiTableSubscription(
-  tables: Array<{ 
-    table: string, 
-    queryKey: string | string[]
-  }>
-) {
-  const { 
-    connectionStatus: globalConnectionStatus, 
-    activeSubscriptions, 
-    lastRefreshTime,
-    refreshSubscriptions,
-    subscriptionsByTable
-  } = useSubscriptionContext();
-
-  const [statuses, setStatuses] = useState<Record<string, any>>({});
-  
-  useEffect(() => {
-    // Update statuses for each table
-    const newStatuses: Record<string, any> = {};
-    
-    tables.forEach(({ table }) => {
-      const tableSubscriptions = subscriptionsByTable[table] || [];
-      const isSubscribed = tableSubscriptions.length > 0 && globalConnectionStatus === 'connected';
-      const now = Date.now();
-      const fiveMinutes = 5 * 60 * 1000;
-      const isStale = now - lastRefreshTime > fiveMinutes;
-      
-      newStatuses[table] = {
-        isSubscribed,
-        isStale,
-        lastActivity: tableSubscriptions.length > 0 ? lastRefreshTime : 0
-      };
-    });
-    
-    setStatuses(newStatuses);
-  }, [tables, activeSubscriptions, globalConnectionStatus, lastRefreshTime, subscriptionsByTable]);
-
-  // Check overall status
-  const isAllSubscribed = Object.values(statuses).every(status => status?.isSubscribed);
-  const isAnyStale = Object.values(statuses).some(status => status?.isStale);
-
-  const refreshSubscription = async () => {
-    try {
-      // Get all table names
-      const tableNames = tables.map(t => t.table);
-      
-      // Force refresh subscriptions for all tables
-      await forceRefreshSubscriptions(tableNames);
-      
-      // Then refresh all subscriptions in the provider
-      refreshSubscriptions();
-      
-      return true;
-    } catch (error) {
-      console.error('Error refreshing subscriptions:', error);
-      return false;
-    }
-  };
-
-  return {
-    isSubscribed: isAllSubscribed,
-    isStale: isAnyStale,
-    tableStatuses: statuses,
-    refreshSubscription
-  };
-}
-
-/**
- * Hook for subscribing to a specific row in a table
- */
-export function useRowSubscription(
-  tableName: string,
-  rowId: string,
-  queryKey: string | string[]
-) {
-  // Use the base hook but could be enhanced with row-specific logic
-  return useTableSubscription(tableName, queryKey);
 }

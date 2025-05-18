@@ -1,7 +1,8 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { Department } from "@/types/department";
 import { useJobs } from "@/hooks/useJobs";
-import { format, isWithinInterval, addWeeks, addMonths, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
+import { isWithinInterval } from "date-fns";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -17,17 +18,21 @@ import { Button } from "@/components/ui/button";
 import { DirectMessageDialog } from "@/components/messages/DirectMessageDialog";
 import { DashboardContent } from "@/components/dashboard/DashboardContent";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
+import { useDateRange, DateRangeProvider } from "@/context/DateRangeContext";
+import { getStartOfDay, getEndOfDay } from "@/lib/date-utils";
+import { jobsKeys, messagesKeys, toursKeys } from "@/lib/query-keys";
 
+// Memoized function to get jobs for a selected date
 const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
   if (!date || !jobs) return [];
   
-  const selectedDate = startOfDay(date);
+  const selectedDate = getStartOfDay(date);
   
   return jobs.filter(job => {
     if (job.job_type === 'tour') return false;
     
-    const jobStartDate = startOfDay(new Date(job.start_time));
-    const jobEndDate = endOfDay(new Date(job.end_time));
+    const jobStartDate = getStartOfDay(job.start_time);
+    const jobEndDate = getEndOfDay(job.end_time);
     
     return isWithinInterval(selectedDate, {
       start: jobStartDate,
@@ -36,9 +41,8 @@ const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
   });
 };
 
-const Dashboard = () => {
+const DashboardContent = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [timeSpan, setTimeSpan] = useState<string>("1week");
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
@@ -54,7 +58,9 @@ const Dashboard = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { forceSubscribe } = useSubscriptionContext();
+  const { rangeType, setRangeType } = useDateRange();
   
+  // Setup necessary subscriptions
   useEffect(() => {
     forceSubscribe([
       'jobs', 
@@ -66,50 +72,77 @@ const Dashboard = () => {
     ]);
   }, [forceSubscribe]);
 
+  // Load user profile data
   useEffect(() => {
     const fetchUserRoleAndPrefs = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.id) {
-        setUserId(session.user.id);
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("role, tours_expanded")
-          .eq("id", session.user.id)
-          .single();
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user?.id) {
+          setUserId(session.user.id);
+          
+          // Use query client to avoid duplicate fetch
+          const cachedProfile = queryClient.getQueryData(['profiles', 'detail', session.user.id]);
+          
+          if (cachedProfile) {
+            // Use cached profile data if available
+            setUserRole(cachedProfile.role);
+            setShowTours(cachedProfile.tours_expanded ?? true);
+          } else {
+            // Fetch profile data if not cached
+            const { data, error } = await supabase
+              .from("profiles")
+              .select("role, tours_expanded, time_span")
+              .eq("id", session.user.id)
+              .single();
 
-        if (error) {
-          console.error("Error fetching user role and preferences:", error);
-          return;
-        }
+            if (error) {
+              console.error("Error fetching user role and preferences:", error);
+              return;
+            }
 
-        if (data) {
-          setUserRole(data.role);
-          setShowTours(data.tours_expanded !== null && data.tours_expanded !== undefined ? data.tours_expanded : true);
-
+            if (data) {
+              setUserRole(data.role);
+              setShowTours(data.tours_expanded !== null && data.tours_expanded !== undefined ? data.tours_expanded : true);
+              
+              // Set time span from user preferences
+              if (data.time_span) {
+                setRangeType(data.time_span as any);
+              }
+              
+              // Cache the profile data
+              queryClient.setQueryData(['profiles', 'detail', session.user.id], data);
+            }
+          }
+          
+          // Check for message URL parameter
           const params = new URLSearchParams(window.location.search);
           if (params.get("showMessages") === "true") {
             setShowMessages(true);
           }
         }
+      } catch (error) {
+        console.error("Error in fetchUserRoleAndPrefs:", error);
       }
     };
 
     fetchUserRoleAndPrefs();
-  }, []);
+  }, [queryClient, setRangeType]);
 
-  const handleJobClick = (jobId: string) => {
+  // Job interaction handlers
+  const handleJobClick = useCallback((jobId: string) => {
     if (userRole === "logistics") return;
     setSelectedJobId(jobId);
     setIsAssignmentDialogOpen(true);
-  };
+  }, [userRole]);
 
-  const handleEditClick = (job: any) => {
+  const handleEditClick = useCallback((job: any) => {
     if (userRole === "logistics") return;
     setSelectedJob(job);
     setIsEditDialogOpen(true);
-  };
+  }, [userRole]);
 
-  const handleDeleteClick = async (jobId: string) => {
+  const handleDeleteClick = useCallback(async (jobId: string) => {
     if (userRole === "logistics") return;
 
     if (!window.confirm("Are you sure you want to delete this job?")) return;
@@ -117,20 +150,20 @@ const Dashboard = () => {
     try {
       console.log("Starting job deletion process for job:", jobId);
 
-      const { error: assignmentsError } = await supabase
-        .from("job_assignments")
-        .delete()
-        .eq("job_id", jobId);
-
-      if (assignmentsError) throw assignmentsError;
-
-      const { error: departmentsError } = await supabase
-        .from("job_departments")
-        .delete()
-        .eq("job_id", jobId);
-
-      if (departmentsError) throw departmentsError;
-
+      // Optimize delete operations by using Promise.all for parallel operations
+      await Promise.all([
+        supabase
+          .from("job_assignments")
+          .delete()
+          .eq("job_id", jobId),
+          
+        supabase
+          .from("job_departments")
+          .delete()
+          .eq("job_id", jobId)
+      ]);
+      
+      // Delete the job last
       const { error: jobError } = await supabase
         .from("jobs")
         .delete()
@@ -143,7 +176,8 @@ const Dashboard = () => {
         description: "The job and all related records have been removed.",
       });
 
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      // Use specific query invalidation
+      queryClient.invalidateQueries({ queryKey: jobsKeys.all() });
     } catch (error: any) {
       console.error("Error in deletion process:", error);
       toast({
@@ -152,22 +186,27 @@ const Dashboard = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [queryClient, toast, userRole]);
 
+  // Invalidate queries when date types change
   const handleDateTypeChange = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    queryClient.invalidateQueries({ queryKey: jobsKeys.all() });
   }, [queryClient]);
 
-  const selectedDateJobs = getSelectedDateJobs(date, jobs);
+  // Get jobs for selected date
+  const selectedDateJobs = getSelectedDateJobs(date, jobs || []);
 
+  // Toggle tours visibility and save preference
   const handleToggleTours = async () => {
     const newValue = !showTours;
     setShowTours(newValue);
+    
     if (userId) {
       const { error } = await supabase
         .from("profiles")
         .update({ tours_expanded: newValue })
         .eq("id", userId);
+        
       if (error) {
         console.error("Error updating tours preference:", error);
       }
@@ -176,7 +215,7 @@ const Dashboard = () => {
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-8">
-      <DashboardHeader timeSpan={timeSpan} onTimeSpanChange={setTimeSpan} />
+      <DashboardHeader />
 
       {userRole === "management" && (
         <Card className="w-full">
@@ -278,6 +317,15 @@ const Dashboard = () => {
         onOpenChange={setNewMessageDialogOpen}
       />
     </div>
+  );
+};
+
+// Wrap the Dashboard with DateRangeProvider
+const Dashboard = () => {
+  return (
+    <DateRangeProvider>
+      <DashboardContent />
+    </DateRangeProvider>
   );
 };
 
