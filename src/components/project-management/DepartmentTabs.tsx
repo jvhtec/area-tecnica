@@ -1,4 +1,3 @@
-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { JobCardNew } from "@/components/dashboard/JobCardNew";
 import { Department } from "@/types/department";
@@ -46,12 +45,12 @@ export const DepartmentTabs = ({
                   onEditClick={() => {}}
                   onDeleteClick={() => {}}
                   onJobClick={() => {}}
-                  userRole={userRole}
                   department={dept as Department}
+                  userRole={userRole}
                   onDeleteDocument={onDeleteDocument}
                   showUpload={true}
                   showManageArtists={true}
-                  isProjectManagementPage={true}
+                  isProjectManagementPage={true} // Add this prop
                 />
               ))}
             </div>
