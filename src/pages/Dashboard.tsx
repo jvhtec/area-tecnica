@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { DirectMessageDialog } from "@/components/messages/DirectMessageDialog";
 import { DashboardContent } from "@/components/dashboard/DashboardContent";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
   if (!date || !jobs) return [];
@@ -49,7 +50,8 @@ const Dashboard = () => {
   const [showTours, setShowTours] = useState(true);
   const [showMessages, setShowMessages] = useState(false);
   const [newMessageDialogOpen, setNewMessageDialogOpen] = useState(false);
-
+  
+  const isMobile = useIsMobile();
   const { data: jobs, isLoading } = useJobs();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -175,25 +177,25 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-6 space-y-8">
+    <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-6 space-y-4 sm:space-y-6 md:space-y-8">
       <DashboardHeader timeSpan={timeSpan} onTimeSpanChange={setTimeSpan} />
 
       {userRole === "management" && (
         <Card className="w-full">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="w-6 h-6" />
+          <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-6">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6" />
               Messages
             </CardTitle>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                size="sm"
+                size={isMobile ? "sm" : "default"}
                 onClick={() => setNewMessageDialogOpen(true)}
-                className="gap-2"
+                className="gap-1 sm:gap-2 text-xs sm:text-sm"
               >
-                <Send className="h-4 w-4" />
-                New Message
+                <Send className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className={isMobile ? "hidden" : "inline"}>New Message</span>
               </Button>
               <button
                 onClick={() => setShowMessages(!showMessages)}
@@ -205,10 +207,10 @@ const Dashboard = () => {
           </CardHeader>
           {showMessages && (
             <CardContent>
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 <MessagesList />
-                <div className="border-t pt-6">
-                  <h3 className="text-lg font-medium mb-4">Direct Messages</h3>
+                <div className="border-t pt-4 sm:pt-6">
+                  <h3 className="text-base sm:text-lg font-medium mb-3 sm:mb-4">Direct Messages</h3>
                   <DirectMessagesList />
                 </div>
               </div>
@@ -218,8 +220,8 @@ const Dashboard = () => {
       )}
 
       <Card className="w-full bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-6">
+          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
             Tours {new Date().getFullYear()}
           </CardTitle>
           <Button
@@ -232,7 +234,7 @@ const Dashboard = () => {
           </Button>
         </CardHeader>
         {showTours && (
-          <CardContent>
+          <CardContent className="p-3 sm:p-6">
             <TourChips
               onTourClick={(tourId) => {
                 if (userRole === "logistics") return;

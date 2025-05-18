@@ -1,7 +1,9 @@
+
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useEffect } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DashboardHeaderProps {
   timeSpan: string;
@@ -10,6 +12,7 @@ interface DashboardHeaderProps {
 
 export const DashboardHeader = ({ timeSpan, onTimeSpanChange }: DashboardHeaderProps) => {
   const { preferences, updatePreferences } = useUserPreferences();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (preferences?.time_span && preferences.time_span !== timeSpan) {
@@ -25,10 +28,10 @@ export const DashboardHeader = ({ timeSpan, onTimeSpanChange }: DashboardHeaderP
   };
 
   return (
-    <div className="flex justify-between items-center">
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
       <h1 className="text-2xl font-semibold">Dashboard</h1>
       <Select value={timeSpan} onValueChange={handleTimeSpanChange}>
-        <SelectTrigger className="w-[180px]">
+        <SelectTrigger className={isMobile ? "w-full" : "w-[180px]"}>
           <SelectValue placeholder="Select time span" />
         </SelectTrigger>
         <SelectContent>
