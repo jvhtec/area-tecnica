@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/enhanced-supabase-client';
+import { supabase, ensureRealtimeConnection } from '@/lib/enhanced-supabase-client';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -58,6 +58,14 @@ export function useFestival(festivalId: string) {
       
       // Increment retry count for UI feedback
       setRetryCount(prev => prev + 1);
+      
+      // Check if we can recover the connection
+      if (retryCount <= maxRetries) {
+        const connectionRecovered = await ensureRealtimeConnection();
+        if (connectionRecovered) {
+          console.log('Connection recovered, retrying festival fetch');
+        }
+      }
       
       throw new Error(`Failed to fetch festival: ${error.message}`);
     }

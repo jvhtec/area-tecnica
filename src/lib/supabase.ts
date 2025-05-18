@@ -1,3 +1,3 @@
 
-// Re-export the unified client for backward compatibility
-export { supabase } from './supabase-client';
+// Re-export the unified client from the canonical path
+export { supabase, checkNetworkConnection, getRealtimeConnectionStatus, ensureRealtimeConnection } from './supabase-client';

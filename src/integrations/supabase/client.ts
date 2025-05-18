@@ -1,26 +1,13 @@
 
-import { createClient } from '@supabase/supabase-js';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/api-config';
+// Import the unified client from the canonical location
+import { supabase as baseClient } from '@/lib/supabase-client';
 import type { Database } from './types';
 
 /**
  * Main Supabase client with type support
- * This exports the same instance as src/lib/supabase-client.ts but with types
+ * This is a typed wrapper around the unified client instance
  */
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce',
-    storage: localStorage,
-    storageKey: 'supabase.auth.token',
-  },
-  realtime: {
-    params: {
-      eventsPerSecond: 1, // Reduce frequency to avoid rate limits
-    },
-    timeout: 30000, // Increase timeout to 30 seconds (from default 10s)
-    heartbeatIntervalMs: 15000, // Send heartbeat every 15 seconds
-  },
-});
+export const supabase = baseClient as unknown as ReturnType<typeof import('@supabase/supabase-js').createClient<Database>>;
+
+// Re-export any other utility functions from the base client as needed
+export { checkNetworkConnection, getRealtimeConnectionStatus, ensureRealtimeConnection } from '@/lib/enhanced-supabase-client';

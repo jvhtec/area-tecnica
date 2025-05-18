@@ -1,12 +1,11 @@
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useCallback, useEffect, useState } from "react";
+import { TokenManager } from "@/lib/token-manager";
 
 export const useSessionRefresh = () => {
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const refreshTimeoutRef = useRef<NodeJS.Timeout>();
-  const visibilityTimeoutRef = useRef<NodeJS.Timeout>();
+  const tokenManager = TokenManager.getInstance();
 
   const refreshSession = useCallback(async () => {
     console.log("Attempting session refresh...");
@@ -17,17 +16,12 @@ export const useSessionRefresh = () => {
 
     try {
       setIsRefreshing(true);
-      const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+      const success = await tokenManager.refreshToken();
       
-      if (error) {
-        console.error("Error refreshing session:", error);
-        throw error;
-      }
-
-      if (currentSession) {
+      if (success) {
         console.log("Session refreshed successfully");
         setLastRefresh(Date.now());
-        return currentSession;
+        return await tokenManager.getSession();
       }
 
       console.log("No session found during refresh");
@@ -40,55 +34,24 @@ export const useSessionRefresh = () => {
     }
   }, [isRefreshing]);
 
-  // Handle tab visibility changes
+  // Subscribe to token refresh events
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        console.log("Tab became visible, scheduling session refresh");
-        if (visibilityTimeoutRef.current) {
-          clearTimeout(visibilityTimeoutRef.current);
-        }
-        visibilityTimeoutRef.current = setTimeout(() => {
-          refreshSession();
-        }, 1000);
-      }
-    };
+    const unsubscribe = tokenManager.subscribe(() => {
+      setLastRefresh(Date.now());
+    });
+    
+    return unsubscribe;
+  }, []);
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      if (visibilityTimeoutRef.current) {
-        clearTimeout(visibilityTimeoutRef.current);
-      }
-    };
-  }, [refreshSession]);
-
-  // Periodic session refresh
+  // Update last refresh time when component mounts
   useEffect(() => {
-    const REFRESH_INTERVAL = 4 * 60 * 1000; // 4 minutes
+    setLastRefresh(tokenManager.getTimeSinceLastRefresh());
+  }, []);
 
-    const scheduleNextRefresh = () => {
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-
-      refreshTimeoutRef.current = setTimeout(() => {
-        if (document.visibilityState === "visible") {
-          console.log("Initiating periodic session refresh");
-          refreshSession();
-        }
-        scheduleNextRefresh();
-      }, REFRESH_INTERVAL);
-    };
-
-    scheduleNextRefresh();
-
-    return () => {
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-    };
-  }, [refreshSession]);
-
-  return { refreshSession, lastRefresh, isRefreshing };
+  return { 
+    refreshSession, 
+    lastRefresh, 
+    isRefreshing,
+    tokenManager
+  };
 };

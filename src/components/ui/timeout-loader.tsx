@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { ReloadIcon, AlertCircle } from 'lucide-react';
+import { LoaderIcon, AlertCircle } from 'lucide-react';
 
 interface TimeoutLoaderProps {
   /** Duration in ms before showing timeout UI */
@@ -82,7 +82,7 @@ export function TimeoutLoader({
   const defaultLoadingComponent = (
     <div className="flex flex-col items-center justify-center p-8 text-center">
       <div className="animate-spin mb-4">
-        <ReloadIcon className="h-8 w-8" />
+        <LoaderIcon className="h-8 w-8" />
       </div>
       <p className="text-muted-foreground">{message}</p>
       {retryCount > 0 && (
@@ -104,7 +104,7 @@ export function TimeoutLoader({
         </AlertDescription>
       </Alert>
       <Button onClick={handleRetry} variant="outline" className="mt-4">
-        <ReloadIcon className="mr-2 h-4 w-4" />
+        <LoaderIcon className="mr-2 h-4 w-4" />
         Retry
       </Button>
     </div>
@@ -121,7 +121,7 @@ export function TimeoutLoader({
         </AlertDescription>
       </Alert>
       <Button onClick={handleRetry} variant="outline" className="mt-4">
-        <ReloadIcon className="mr-2 h-4 w-4" />
+        <LoaderIcon className="mr-2 h-4 w-4" />
         Retry
       </Button>
     </div>
