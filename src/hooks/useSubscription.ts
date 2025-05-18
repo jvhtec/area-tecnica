@@ -2,9 +2,6 @@
 // Re-export from the unified table subscription hook
 import { useTableSubscription } from './useTableSubscription';
 
-// Export the useTableSubscription hook
-export { useTableSubscription };
-
 /**
  * Hook for subscribing to related tables that should all invalidate the same query
  */

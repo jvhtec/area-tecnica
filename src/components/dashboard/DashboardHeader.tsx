@@ -1,10 +1,9 @@
-
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useEffect } from "react";
 
-export interface DashboardHeaderProps {
+interface DashboardHeaderProps {
   timeSpan: string;
   onTimeSpanChange: (value: string) => void;
 }

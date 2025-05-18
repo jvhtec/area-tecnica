@@ -3,24 +3,23 @@ import { CalendarSection } from "./CalendarSection";
 import { TodaySchedule } from "./TodaySchedule";
 import { DepartmentSchedule } from "./DepartmentSchedule";
 import { Music2, Lightbulb, Video } from "lucide-react";
-import { Dispatch, SetStateAction } from "react";
 
 interface DashboardContentProps {
   date: Date | undefined;
-  setDate: Dispatch<SetStateAction<Date>>;
+  setDate: (date: Date | undefined) => void;
   jobs: any[];
   selectedDateJobs: any[];
   onEditClick: (job: any) => void;
-  onDeleteClick: (jobId: string) => Promise<void>;
+  onDeleteClick: (jobId: string) => void;
   onJobClick: (jobId: string) => void;
   userRole: string | null;
-  onDateTypeChange: () => void; 
+  onDateTypeChange: () => void;  // Added this prop to the interface
 }
 
 export const DashboardContent = ({
   date,
   setDate,
-  jobs = [],
+  jobs = [], // Provide default empty array
   selectedDateJobs,
   onEditClick,
   onDeleteClick,
@@ -42,7 +41,7 @@ export const DashboardContent = ({
       <div className="w-full">
         <CalendarSection 
           date={date} 
-          onDateSelect={(newDate) => setDate(newDate as Date)} 
+          onDateSelect={setDate} 
           jobs={jobs} 
           onDateTypeChange={onDateTypeChange}
         />

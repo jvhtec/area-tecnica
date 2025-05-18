@@ -1,67 +1,168 @@
 
-import { useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useEffect, useRef } from "react";
+import { RealtimeChannel } from "@supabase/supabase-js";
+import { supabase } from "@/lib/enhanced-supabase-client";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
-type SubscriptionConfig = {
+type SubscriptionOptions = {
   table: string;
+  schema?: string;
+  event?: "INSERT" | "UPDATE" | "DELETE" | "*";
   filter?: string;
-  queryKey?: any;
+  queryKey: string | string[];
 };
 
 /**
- * Hook for setting up Supabase realtime subscriptions
- * @param tableOrConfig Single table name as string or subscription config object or array of configs
- * @param queryKey Optional query key to invalidate (when using simple string table parameter)
+ * A React hook for subscribing to Supabase real-time changes with enhanced reliability
  */
-export function useRealtimeSubscription(
-  tableOrConfig: string | SubscriptionConfig | SubscriptionConfig[],
-  queryKey?: any
-) {
+export function useRealtimeSubscription(options: SubscriptionOptions | SubscriptionOptions[]) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const subscriptionsRef = useRef<SubscriptionOptions[]>([]);
+  
+  // Normalize options to array
+  const subscriptions = Array.isArray(options) ? options : [options];
+  
   useEffect(() => {
-    let channels: any[] = [];
-
-    const setupSubscription = (table: string, filter?: string) => {
-      // Set up a Supabase realtime subscription
-      const channelConfig: any = {
-        event: '*', 
-        schema: 'public', 
-        table 
+    // Store current subscriptions for reconnect event
+    subscriptionsRef.current = subscriptions;
+    
+    // Create a unique channel name based on the subscribed tables
+    const tables = subscriptions.map(sub => sub.table).join("-");
+    const channelName = `${tables}-${Math.random().toString(36).substring(2, 10)}`;
+    
+    console.log(`Creating channel ${channelName} for tables: ${tables}`);
+    
+    // Create the channel
+    const channel = supabase.channel(channelName);
+    channelRef.current = channel;
+    
+    // Add subscriptions to the channel
+    subscriptions.forEach(sub => {
+      const { table, schema = "public", event = "*", filter, queryKey } = sub;
+      
+      // Configure the subscription
+      const config: any = {
+        event,
+        schema,
+        table
       };
       
       // Add filter if provided
       if (filter) {
-        channelConfig.filter = filter;
+        config.filter = filter;
       }
       
-      const channel = supabase
-        .channel(`public:${table}:${Date.now()}`)
-        .on('postgres_changes', channelConfig, (payload) => {
-          console.log('Realtime update:', payload);
-        })
-        .subscribe();
+      // Subscribe to the table
+      channel.on(
+        "postgres_changes",
+        config,
+        (payload) => {
+          console.log(`Received ${payload.eventType} for ${table}:`, payload);
+          
+          // Invalidate related queries
+          if (Array.isArray(queryKey)) {
+            queryClient.invalidateQueries({ queryKey });
+          } else {
+            queryClient.invalidateQueries({ queryKey: [queryKey] });
+          }
+        }
+      );
+    });
+    
+    // Handle connection status
+    let hasConnected = false;
+    
+    // Subscribe to the channel
+    channel.subscribe((status) => {
+      console.log(`Channel ${channelName} status:`, status);
+      
+      if (status === "SUBSCRIBED") {
+        // Mark as connected
+        hasConnected = true;
+      } else if (status === "CHANNEL_ERROR" && hasConnected) {
+        // Only show error if we were previously connected (to avoid startup errors)
+        console.error(`Error in channel ${channelName}`);
+        toast({
+          title: "Connection issue",
+          description: "Real-time updates may be delayed",
+          variant: "destructive",
+        });
+      }
+    });
+    
+    // Listen for reconnect events
+    const handleReconnect = () => {
+      if (channelRef.current) {
+        console.log(`Reconnecting channel ${channelName}`);
         
-      return channel;
+        // Remove the old channel
+        try {
+          supabase.removeChannel(channelRef.current);
+        } catch (e) {
+          console.error("Error removing channel during reconnect:", e);
+        }
+        
+        // Create a new channel with the same configuration
+        const newChannel = supabase.channel(`${channelName}-reconnect`);
+        channelRef.current = newChannel;
+        
+        // Re-add all subscriptions
+        subscriptionsRef.current.forEach(sub => {
+          const { table, schema = "public", event = "*", filter, queryKey } = sub;
+          
+          const config: any = { event, schema, table };
+          if (filter) config.filter = filter;
+          
+          newChannel.on("postgres_changes", config, (payload) => {
+            console.log(`Received ${payload.eventType} for ${table} (reconnected):`, payload);
+            
+            if (Array.isArray(queryKey)) {
+              queryClient.invalidateQueries({ queryKey });
+            } else {
+              queryClient.invalidateQueries({ queryKey: [queryKey] });
+            }
+          });
+        });
+        
+        // Subscribe to the new channel
+        newChannel.subscribe((status) => {
+          console.log(`Reconnected channel status:`, status);
+        });
+        
+        // Refresh data
+        subscriptionsRef.current.forEach(sub => {
+          const { queryKey } = sub;
+          if (Array.isArray(queryKey)) {
+            queryClient.invalidateQueries({ queryKey });
+          } else {
+            queryClient.invalidateQueries({ queryKey: [queryKey] });
+          }
+        });
+      }
     };
-
-    // Handle different parameter types
-    if (typeof tableOrConfig === 'string') {
-      // Simple case: just a table name
-      channels.push(setupSubscription(tableOrConfig));
-    } else if (Array.isArray(tableOrConfig)) {
-      // Array of configs
-      tableOrConfig.forEach(config => {
-        channels.push(setupSubscription(config.table, config.filter));
-      });
-    } else {
-      // Single config object
-      channels.push(setupSubscription(tableOrConfig.table, tableOrConfig.filter));
-    }
-
-    // Clean up subscriptions when component unmounts
+    
+    window.addEventListener('supabase-reconnect', handleReconnect);
+    
+    // Cleanup function
     return () => {
-      channels.forEach(channel => {
-        supabase.removeChannel(channel);
-      });
+      window.removeEventListener('supabase-reconnect', handleReconnect);
+      
+      if (channelRef.current) {
+        try {
+          console.log(`Removing channel ${channelName}`);
+          supabase.removeChannel(channelRef.current);
+        } catch (e) {
+          console.error("Error removing channel during cleanup:", e);
+        }
+        channelRef.current = null;
+      }
     };
-  }, [tableOrConfig, queryKey]);
+  }, [JSON.stringify(subscriptions), queryClient, toast]);
+  
+  return {
+    isSubscribed: !!channelRef.current
+  };
 }

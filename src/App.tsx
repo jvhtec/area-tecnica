@@ -1,94 +1,106 @@
 
-import { Route, Routes, useLocation } from 'react-router-dom';
-import Layout from './components/Layout'; // Keep default import
-import { RequireAuth } from './components/RequireAuth';
-import { Suspense, lazy, useEffect } from 'react';
-import { AppInit } from './components/AppInit';
-import { ErrorBoundary } from 'react-error-boundary';
-import { Toaster } from 'sonner';
-import { SubscriptionProvider } from '@/providers/SubscriptionProvider';
-import { DateProvider } from '@/hooks/useDateContext';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ThemeProvider } from '@/components/theme-provider';
+import { Toaster } from '@/components/ui/toaster';
+import { queryClient } from '@/lib/react-query';
+import Layout from '@/components/layout/Layout';
+import Auth from '@/pages/Auth';
+import Dashboard from '@/pages/Dashboard';
+import Sound from '@/pages/Sound';
+import Lights from '@/pages/Lights';
+import Video from '@/pages/Video';
+import Profile from '@/pages/Profile';
+import Settings from '@/pages/Settings';
+import ProjectManagement from '@/pages/ProjectManagement';
+import TechnicianDashboard from '@/pages/TechnicianDashboard';
+import PesosTool from '@/pages/PesosTool';
+import LightsPesosTool from '@/pages/LightsPesosTool';
+import VideoPesosTool from '@/pages/VideoPesosTool';
+import ConsumosTool from '@/pages/ConsumosTool';
+import LightsConsumosTool from '@/pages/LightsConsumosTool';
+import VideoConsumosTool from '@/pages/VideoConsumosTool';
+import ExcelTool from '@/pages/ExcelTool';
+import HojaDeRuta from '@/pages/HojaDeRuta';
+import LaborPOForm from '@/pages/LaborPOForm';
+import Logistics from '@/pages/Logistics';
+import FestivalManagement from '@/pages/FestivalManagement';
+import FestivalArtistManagement from '@/pages/FestivalArtistManagement';
+import LightsDisponibilidad from '@/pages/LightsDisponibilidad';
+import LightsMemoriaTecnica from '@/pages/LightsMemoriaTecnica';
+import VideoMemoriaTecnica from '@/pages/VideoMemoriaTecnica';
+import { EquipmentManagement } from '@/pages/EquipmentManagement';
+import { ArtistRequirementsForm } from '@/components/festival/ArtistRequirementsForm';
+import { FormSubmitted } from '@/components/festival/FormSubmitted';
+import FestivalGearManagement from '@/pages/FestivalGearManagement';
+import Festivals from '@/pages/Festivals';
+import { AuthProvider } from "@/hooks/useAuth";
+import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { AppInit } from "@/components/AppInit";
 
-// Lazy-loaded components for better initial load performance
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-
-// Add placeholder component for missing pages
-const PlaceholderPage = () => (
-  <div className="p-4">
-    <h1 className="text-2xl font-bold mb-4">Page Under Construction</h1>
-    <p className="text-muted-foreground">This page is currently being developed.</p>
-  </div>
-);
-
-// Use placeholder for pages that don't exist yet
-const Jobs = lazy(() => Promise.resolve({ default: PlaceholderPage }));
-const ProjectManagement = lazy(() => Promise.resolve({ default: PlaceholderPage }));
-const Disponibilidad = lazy(() => Promise.resolve({ default: PlaceholderPage }));
-const Equipment = lazy(() => Promise.resolve({ default: PlaceholderPage }));
-const Lights = lazy(() => import('./pages/Lights'));
-const Sound = lazy(() => import('./pages/Sound'));
-const Video = lazy(() => import('./pages/Video'));
-const Auth = lazy(() => import('./pages/Auth'));
-const Profile = lazy(() => import('./pages/Profile'));
-const LaborPOForm = lazy(() => import('./pages/LaborPOForm'));
-const HojaDeRuta = lazy(() => import('./pages/HojaDeRuta'));
-const FestivalScheduling = lazy(() => Promise.resolve({ default: PlaceholderPage }));
-const Logistics = lazy(() => import('./pages/Logistics'));
-
-import './App.css';
-
-function App() {
-  const location = useLocation();
-  
-  // Track page views and performance
-  useEffect(() => {
-    // Log navigation for performance monitoring
-    console.log(`Page navigation: ${location.pathname}${location.search}`);
-    
-    // Report performance metrics
-    if (window.performance) {
-      const perf = window.performance.timing;
-      const pageLoadTime = perf.loadEventEnd - perf.navigationStart;
-      console.log(`Page load time: ${pageLoadTime}ms`);
-    }
-    
-    // Scroll to top on route change
-    window.scrollTo(0, 0);
-  }, [location]);
-
+export default function App() {
   return (
-    <ErrorBoundary fallback={<div>Something went wrong. Please refresh the page.</div>}>
-      <SubscriptionProvider>
-        <DateProvider>
-          <AppInit>
-            <Suspense fallback={<div>Loading...</div>}>
-              <Routes>
-                <Route path="/" element={<Layout />}>
-                  <Route element={<RequireAuth />}>
-                    <Route index element={<Dashboard />} />
-                    <Route path="/jobs" element={<Jobs />} />
-                    <Route path="/project-management" element={<ProjectManagement />} />
-                    <Route path="/disponibilidad" element={<Disponibilidad />} />
-                    <Route path="/equipment" element={<Equipment />} />
-                    <Route path="/lights" element={<Lights />} />
-                    <Route path="/sound" element={<Sound />} />
-                    <Route path="/video" element={<Video />} />
-                    <Route path="/profile" element={<Profile />} />
-                    <Route path="/labor-po-form" element={<LaborPOForm />} />
-                    <Route path="/hoja-de-ruta" element={<HojaDeRuta />} />
-                    <Route path="/festival-scheduling" element={<FestivalScheduling />} />
-                    <Route path="/logistics" element={<Logistics />} />
-                  </Route>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider defaultTheme="system" storageKey="sector-pro-theme">
+        <SubscriptionProvider>
+          <Router>
+            <AuthProvider>
+              <div className="app">
+                <AppInit />
+                <Routes>
+                  <Route path="/" element={<Auth />} />
                   <Route path="/auth" element={<Auth />} />
-                </Route>
-              </Routes>
-            </Suspense>
-            <Toaster position="top-right" />
-          </AppInit>
-        </DateProvider>
-      </SubscriptionProvider>
-    </ErrorBoundary>
+                  {/* Public Routes */}
+                  <Route path="festival">
+                    <Route path="artist-form/:token" element={<ArtistRequirementsForm />} />
+                    <Route path="form-submitted" element={<FormSubmitted />} />
+                  </Route>
+                  
+                  {/* Protected Routes */}
+                  <Route element={<Layout />}>
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/sound" element={<Sound />} />
+                    <Route path="/lights" element={<Lights />} />
+                    <Route path="/video" element={<Video />} />
+                    <Route path="/logistics" element={<Logistics />} />
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/settings" element={<Settings />} />
+                    <Route path="/project-management" element={<ProjectManagement />} />
+                    <Route path="/equipment-management" element={<EquipmentManagement />} />
+                    <Route path="/festivals" element={<Festivals />} />
+                    <Route path="/technician-dashboard" element={<TechnicianDashboard />} />
+                    
+                    {/* Tools Routes */}
+                    <Route path="/pesos-tool" element={<PesosTool />} />
+                    <Route path="/lights-pesos-tool" element={<LightsPesosTool />} />
+                    <Route path="/video-pesos-tool" element={<VideoPesosTool />} />
+                    <Route path="/consumos-tool" element={<ConsumosTool />} />
+                    <Route path="/lights-consumos-tool" element={<LightsConsumosTool />} />
+                    <Route path="/video-consumos-tool" element={<VideoConsumosTool />} />
+                    <Route path="/lights-memoria-tecnica" element={<LightsMemoriaTecnica />} />
+                    <Route path="/video-memoria-tecnica" element={<VideoMemoriaTecnica />} />
+                    <Route path="/excel-tool" element={<ExcelTool />} />
+                    <Route path="/hoja-de-ruta" element={<HojaDeRuta />} />
+                    <Route path="/labor-po-form" element={<LaborPOForm />} />
+                    
+                    {/* Disponibilidad Routes */}
+                    <Route path="/lights-disponibilidad" element={<LightsDisponibilidad />} />
+                    
+                    {/* Festival Management Routes */}
+                    <Route path="/festival-management/:jobId" element={<FestivalManagement />} />
+                    <Route path="/festival-management/:jobId/artists" element={<FestivalArtistManagement />} />
+                    <Route path="/festival-management/:jobId/gear" element={<FestivalGearManagement />} />
+                    <Route path="/festival-management/:jobId/scheduling" element={<FestivalManagement />} />
+                  </Route>
+                </Routes>
+                <Toaster />
+              </div>
+            </AuthProvider>
+          </Router>
+        </SubscriptionProvider>
+      </ThemeProvider>
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
   );
 }
-
-export default App;
