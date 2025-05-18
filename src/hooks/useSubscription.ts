@@ -1,6 +1,6 @@
 
 // Re-export from the unified table subscription hook
-export { useTableSubscription } from './useTableSubscription';
+import { useTableSubscription } from './useTableSubscription';
 
 /**
  * Hook for subscribing to related tables that should all invalidate the same query
@@ -39,4 +39,24 @@ export function useRelatedTablesSubscription(
     // This is a no-op as we can't directly refresh subscriptions
     refreshSubscription: async () => true
   };
+}
+
+/**
+ * Hook for subscribing to multiple tables at once
+ * Alternative name for useRelatedTablesSubscription for backward compatibility
+ */
+export function useMultiTableSubscription(
+  tables: Array<{ 
+    table: string, 
+    queryKey: string | string[]
+  }>
+) {
+  // Convert tables array to format expected by useRelatedTablesSubscription
+  const tableNames = tables.map(t => t.table);
+  const queryKey = tables.length > 0 ? tables[0].queryKey : 'defaultKey';
+  
+  // Use the related tables subscription hook
+  const result = useRelatedTablesSubscription(queryKey, tableNames);
+  
+  return result;
 }
