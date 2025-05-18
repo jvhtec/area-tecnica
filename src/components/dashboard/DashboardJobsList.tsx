@@ -119,18 +119,16 @@ export function DashboardJobsList({
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-xl flex items-center gap-2">
             {title}
-            <CollapsibleTrigger 
-              asChild
-              onClick={() => setIsExpanded(!isExpanded)}
-              aria-label={isExpanded ? "Collapse jobs list" : "Expand jobs list"}
-            >
-              <Button variant="ghost" size="sm" className="p-1 h-auto">
-                {isExpanded ? 
-                  <ChevronUp className="h-4 w-4" /> : 
-                  <ChevronDown className="h-4 w-4" />
-                }
-              </Button>
-            </CollapsibleTrigger>
+            <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="p-1 h-auto">
+                  {isExpanded ? 
+                    <ChevronUp className="h-4 w-4" /> : 
+                    <ChevronDown className="h-4 w-4" />
+                  }
+                </Button>
+              </CollapsibleTrigger>
+            </Collapsible>
           </CardTitle>
           <div className="flex items-center gap-2">
             <Button
@@ -192,9 +190,9 @@ export function DashboardJobsList({
                             <JobCardNew 
                               key={job.id}
                               job={job}
-                              onJobClick={() => onJobClick && onJobClick(job.id)}
-                              onEditClick={onEditClick ? () => onEditClick(job) : undefined}
-                              onDeleteClick={onDeleteClick ? () => onDeleteClick(job.id) : undefined}
+                              onJobClick={onJobClick}
+                              onEditClick={onEditClick}
+                              onDeleteClick={onDeleteClick}
                               userRole={userRole}
                               className={isJobToday ? "border-primary bg-primary/5" : ""}
                             />
