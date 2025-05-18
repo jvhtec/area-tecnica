@@ -65,10 +65,10 @@ export class TokenManager {
   /**
    * Refresh the token
    */
-  public async refreshToken(): Promise<boolean> {
+  public async refreshToken(): Promise<any> {
     if (this.isRefreshing) {
       console.log('Token refresh already in progress');
-      return false;
+      return { session: null, error: false };
     }
     
     try {
@@ -78,20 +78,20 @@ export class TokenManager {
       
       if (error) {
         console.error('Error refreshing token:', error);
-        return false;
+        return { session: null, error };
       }
       
       if (data.session) {
         this.lastRefresh = Date.now();
         this.notifySubscribers();
         this.scheduleNextRefresh(data.session);
-        return true;
+        return { session: data.session, error: null };
       }
       
-      return false;
+      return { session: null, error: null };
     } catch (error) {
       console.error('Exception during token refresh:', error);
-      return false;
+      return { session: null, error };
     } finally {
       this.isRefreshing = false;
     }
@@ -107,6 +107,19 @@ export class TokenManager {
     
     const { data } = await supabase.auth.getSession();
     return data.session;
+  }
+
+  /**
+   * Sign the user out
+   */
+  public async signOut(): Promise<{ error: any }> {
+    try {
+      const { error } = await supabase.auth.signOut();
+      return { error };
+    } catch (error) {
+      console.error('Error during sign out:', error);
+      return { error };
+    }
   }
   
   /**
@@ -174,6 +187,50 @@ export class TokenManager {
   public getTimeSinceLastRefresh(): number {
     return Date.now() - this.lastRefresh;
   }
+
+  /**
+   * Calculate optimal refresh time based on session expiry
+   * @param session Current authentication session
+   * @returns Milliseconds until next refresh
+   */
+  public calculateRefreshTime(session: any): number {
+    if (!session?.expires_at) {
+      // Default refresh every 30 minutes if no expiry
+      return 30 * 60 * 1000;
+    }
+    
+    const expiresAt = session.expires_at * 1000; // Convert to milliseconds
+    const now = Date.now();
+    const timeUntilExpiry = expiresAt - now;
+    
+    if (timeUntilExpiry <= 0) {
+      // Already expired, refresh immediately
+      return 0;
+    }
+    
+    // Refresh 5 minutes before expiry or at 25% of remaining time, whichever is earlier
+    const safetyBuffer = Math.min(5 * 60 * 1000, timeUntilExpiry * 0.25);
+    return Math.max(timeUntilExpiry - safetyBuffer, 0);
+  }
+
+  /**
+   * Check if token is close to expiration
+   * @param session Current authentication session
+   * @param thresholdMs Time in milliseconds that is considered "close to expiration"
+   * @returns Boolean indicating if token is close to expiration
+   */
+  public checkTokenExpiration(session: any, thresholdMs: number = 5 * 60 * 1000): boolean {
+    if (!session?.expires_at) {
+      return false;
+    }
+    
+    const expiresAt = session.expires_at * 1000; // Convert to milliseconds
+    const now = Date.now();
+    const timeUntilExpiry = expiresAt - now;
+    
+    // Return true if we're within the threshold of expiration
+    return timeUntilExpiry < thresholdMs;
+  }
   
   /**
    * Force synchronization of session and subscriptions
@@ -181,14 +238,15 @@ export class TokenManager {
    */
   public async synchronizeState(): Promise<boolean> {
     // Refresh the token
-    const tokenRefreshed = await this.refreshToken();
+    const { session } = await this.refreshToken();
     
     // Dispatch events to coordinate with other systems
-    if (tokenRefreshed) {
+    if (session) {
       window.dispatchEvent(new CustomEvent('supabase-reconnect'));
       window.dispatchEvent(new CustomEvent('connection-restored'));
+      return true;
     }
     
-    return tokenRefreshed;
+    return false;
   }
 }

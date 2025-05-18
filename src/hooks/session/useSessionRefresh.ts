@@ -16,12 +16,17 @@ export const useSessionRefresh = () => {
 
     try {
       setIsRefreshing(true);
-      const success = await tokenManager.refreshToken();
+      const { session, error } = await tokenManager.refreshToken();
       
-      if (success) {
+      if (error) {
+        console.error("Session refresh error:", error);
+        return null;
+      }
+      
+      if (session) {
         console.log("Session refreshed successfully");
         setLastRefresh(Date.now());
-        return await tokenManager.getSession();
+        return session;
       }
 
       console.log("No session found during refresh");
