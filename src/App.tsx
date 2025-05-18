@@ -1,5 +1,6 @@
+
 import { Route, Routes, useLocation } from 'react-router-dom';
-import { Layout } from './components/Layout';
+import Layout from './components/Layout'; // Fixed import
 import { RequireAuth } from './components/RequireAuth';
 import { Suspense, lazy, useEffect } from 'react';
 import { AppInit } from './components/AppInit';
@@ -10,10 +11,20 @@ import { DateProvider } from '@/hooks/useDateContext';
 
 // Lazy-loaded components for better initial load performance
 const Dashboard = lazy(() => import('./pages/Dashboard'));
-const Jobs = lazy(() => import('./pages/Jobs'));
-const ProjectManagement = lazy(() => import('./pages/ProjectManagement'));
-const Disponibilidad = lazy(() => import('./pages/Disponibilidad'));
-const Equipment = lazy(() => import('./pages/Equipment'));
+
+// Add placeholder component for missing pages
+const PlaceholderPage = () => (
+  <div className="p-4">
+    <h1 className="text-2xl font-bold mb-4">Page Under Construction</h1>
+    <p className="text-muted-foreground">This page is currently being developed.</p>
+  </div>
+);
+
+// Use placeholder for missing pages
+const Jobs = lazy(() => Promise.resolve({ default: PlaceholderPage }));
+const ProjectManagement = lazy(() => Promise.resolve({ default: PlaceholderPage }));
+const Disponibilidad = lazy(() => Promise.resolve({ default: PlaceholderPage }));
+const Equipment = lazy(() => Promise.resolve({ default: PlaceholderPage }));
 const Lights = lazy(() => import('./pages/Lights'));
 const Sound = lazy(() => import('./pages/Sound'));
 const Video = lazy(() => import('./pages/Video'));
@@ -21,7 +32,7 @@ const Auth = lazy(() => import('./pages/Auth'));
 const Profile = lazy(() => import('./pages/Profile'));
 const LaborPOForm = lazy(() => import('./pages/LaborPOForm'));
 const HojaDeRuta = lazy(() => import('./pages/HojaDeRuta'));
-const FestivalScheduling = lazy(() => import('./pages/FestivalScheduling'));
+const FestivalScheduling = lazy(() => Promise.resolve({ default: PlaceholderPage }));
 const Logistics = lazy(() => import('./pages/Logistics'));
 
 import './App.css';
@@ -53,7 +64,7 @@ function App() {
             <Suspense fallback={<div>Loading...</div>}>
               <Routes>
                 <Route path="/" element={<Layout />}>
-                  <Route path="/" element={<RequireAuth />}>
+                  <Route path="/" element={<RequireAuth children={<></>} />}>
                     <Route index element={<Dashboard />} />
                     <Route path="/jobs" element={<Jobs />} />
                     <Route path="/project-management" element={<ProjectManagement />} />
@@ -65,7 +76,7 @@ function App() {
                     <Route path="/profile" element={<Profile />} />
                     <Route path="/labor-po-form" element={<LaborPOForm />} />
                     <Route path="/hoja-de-ruta" element={<HojaDeRuta />} />
-					          <Route path="/festival-scheduling" element={<FestivalScheduling />} />
+                    <Route path="/festival-scheduling" element={<FestivalScheduling />} />
                     <Route path="/logistics" element={<Logistics />} />
                   </Route>
                   <Route path="/auth" element={<Auth />} />
