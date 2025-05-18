@@ -111,7 +111,7 @@ export function DashboardJobsList({
               <div key={monthYear} className="space-y-2">
                 <h3 className="text-sm font-medium text-muted-foreground">{monthYear}</h3>
                 <div className="space-y-3">
-                  {monthJobs.map(job => (
+                  {Array.isArray(monthJobs) && monthJobs.map(job => (
                     <JobCardNew 
                       key={job.id}
                       job={job}
