@@ -3,14 +3,22 @@ import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Edit, Trash } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Department } from "@/types/department";
+import { JobDocument } from "@/types/job";
 
 interface JobCardNewProps {
   job: any;
-  onJobClick?: () => void;
-  onEditClick?: () => void;
-  onDeleteClick?: () => void;
+  onJobClick?: (jobId: string) => void;
+  onEditClick?: (job: any) => void;
+  onDeleteClick?: (jobId: string) => void;
   userRole?: string | null;
   className?: string;
+  department?: Department;
+  onDeleteDocument?: (jobId: string, document: JobDocument) => void;
+  showUpload?: boolean;
+  showManageArtists?: boolean;
+  hideTasks?: boolean;
+  isProjectManagementPage?: boolean;
 }
 
 export function JobCardNew({ 
@@ -19,7 +27,13 @@ export function JobCardNew({
   onEditClick, 
   onDeleteClick,
   userRole,
-  className
+  className,
+  department,
+  onDeleteDocument,
+  showUpload,
+  showManageArtists,
+  hideTasks,
+  isProjectManagementPage
 }: JobCardNewProps) {
   // Format date and time
   const startDate = parseISO(job.start_time);
@@ -38,6 +52,12 @@ export function JobCardNew({
   
   // Format job title with department indicators
   const departments = job.job_departments?.map((d: any) => d.department)?.join(", ");
+
+  const handleJobClick = () => {
+    if (onJobClick) {
+      onJobClick(job.id);
+    }
+  };
   
   return (
     <div 
@@ -46,7 +66,7 @@ export function JobCardNew({
         onJobClick && "hover:border-primary",
         className
       )}
-      onClick={onJobClick}
+      onClick={handleJobClick}
     >
       <div className="flex justify-between items-start">
         <div>
@@ -96,7 +116,7 @@ export function JobCardNew({
               variant="outline" 
               size="sm" 
               className="h-7 px-2"
-              onClick={onEditClick}
+              onClick={() => onEditClick(job)}
             >
               <Edit className="h-3.5 w-3.5" />
               <span className="sr-only">Edit</span>
@@ -107,7 +127,7 @@ export function JobCardNew({
               variant="ghost"
               size="sm"
               className="h-7 px-2 hover:bg-destructive/10 hover:text-destructive"
-              onClick={onDeleteClick}
+              onClick={() => onDeleteClick(job.id)}
             >
               <Trash className="h-3.5 w-3.5" />
               <span className="sr-only">Delete</span>
