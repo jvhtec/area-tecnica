@@ -1,35 +1,19 @@
-import { createBrowserRouter } from "react-router-dom";
-import { Layout } from "@/components/Layout";
-import { Dashboard } from "@/pages/Dashboard";
-import { FestivalManagementWrapper } from "@/components/festival/FestivalManagementWrapper";
-import { Auth } from "@/pages/Auth";
-import { CreateProfile } from "@/pages/CreateProfile";
-import { RequireAuth } from "@/components/RequireAuth";
-import { Jobs } from "@/pages/Jobs";
-import { JobDetails } from "@/pages/JobDetails";
-import { CreateJob } from "@/pages/CreateJob";
-import { EditJob } from "@/pages/EditJob";
-import { ViewOnlyJobDetails } from "@/pages/ViewOnlyJobDetails";
-import { Contacts } from "@/pages/Contacts";
-import { ContactDetails } from "@/pages/ContactDetails";
-import { CreateContact } from "@/pages/CreateContact";
-import { EditContact } from "@/pages/EditContact";
-import { Locations } from "@/pages/Locations";
-import { LocationDetails } from "@/pages/LocationDetails";
-import { CreateLocation } from "@/pages/CreateLocation";
-import { EditLocation } from "@/pages/EditLocation";
-import { Departments } from "@/pages/Departments";
-import { DepartmentDetails } from "@/pages/DepartmentDetails";
-import { CreateDepartment } from "@/pages/CreateDepartment";
-import { EditDepartment } from "@/pages/EditDepartment";
-import { Documents } from "@/pages/Documents";
-import { Settings } from "@/pages/Settings";
-import { Users } from "@/pages/Users";
-import { UserDetails } from "@/pages/UserDetails";
-import { CreateUser } from "@/pages/CreateUser";
-import { EditUser } from "@/pages/EditUser";
-import { ViewOnlyProfile } from "@/pages/ViewOnlyProfile";
 
+import { createBrowserRouter } from "react-router-dom";
+import Layout from "@/components/Layout";
+import Dashboard from "@/pages/Dashboard";
+import { FestivalManagementWrapper } from "@/components/festival/FestivalManagementWrapper";
+import Auth from "@/pages/Auth";
+
+// Create a placeholder for missing pages
+const Placeholder = () => (
+  <div className="p-4">
+    <h1 className="text-2xl font-bold mb-4">Page Under Construction</h1>
+    <p className="text-muted-foreground">This page is currently being developed.</p>
+  </div>
+);
+
+// Define our router with the updated imports
 const router = createBrowserRouter([
   {
     path: "/",
@@ -45,99 +29,99 @@ const router = createBrowserRouter([
       },
       {
         path: "/jobs",
-        element: <Jobs />,
+        element: <Placeholder />,
       },
       {
         path: "/jobs/:jobId",
-        element: <JobDetails />,
+        element: <Placeholder />,
       },
       {
         path: "/jobs/view/:jobId",
-        element: <ViewOnlyJobDetails />,
+        element: <Placeholder />,
       },
       {
         path: "/jobs/create",
-        element: <CreateJob />,
+        element: <Placeholder />,
       },
       {
         path: "/jobs/edit/:jobId",
-        element: <EditJob />,
+        element: <Placeholder />,
       },
       {
         path: "/contacts",
-        element: <Contacts />,
+        element: <Placeholder />,
       },
       {
         path: "/contacts/:contactId",
-        element: <ContactDetails />,
+        element: <Placeholder />,
       },
       {
         path: "/contacts/create",
-        element: <CreateContact />,
+        element: <Placeholder />,
       },
       {
         path: "/contacts/edit/:contactId",
-        element: <EditContact />,
+        element: <Placeholder />,
       },
       {
         path: "/locations",
-        element: <Locations />,
+        element: <Placeholder />,
       },
       {
         path: "/locations/:locationId",
-        element: <LocationDetails />,
+        element: <Placeholder />,
       },
       {
         path: "/locations/create",
-        element: <CreateLocation />,
+        element: <Placeholder />,
       },
       {
         path: "/locations/edit/:locationId",
-        element: <EditLocation />,
+        element: <Placeholder />,
       },
       {
         path: "/departments",
-        element: <Departments />,
+        element: <Placeholder />,
       },
       {
         path: "/departments/:departmentId",
-        element: <DepartmentDetails />,
+        element: <Placeholder />,
       },
       {
         path: "/departments/create",
-        element: <CreateDepartment />,
+        element: <Placeholder />,
       },
       {
         path: "/departments/edit/:departmentId",
-        element: <EditDepartment />,
+        element: <Placeholder />,
       },
       {
         path: "/documents",
-        element: <Documents />,
+        element: <Placeholder />,
       },
       {
         path: "/settings",
-        element: <Settings />,
+        element: <Placeholder />,
       },
       {
         path: "/users",
-        element: <Users />,
+        element: <Placeholder />,
       },
       {
         path: "/users/:userId",
-        element: <UserDetails />,
+        element: <Placeholder />,
       },
       {
         path: "/users/create",
-        element: <CreateUser />,
+        element: <Placeholder />,
       },
       {
         path: "/users/edit/:userId",
-        element: <EditUser />,
+        element: <Placeholder />,
       },
       {
         path: "/profile/view/:profileId",
-        element: <ViewOnlyProfile />,
+        element: <Placeholder />,
       },
     ],
   },
@@ -147,11 +131,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/create-profile",
-    element: (
-      <RequireAuth>
-        <CreateProfile />
-      </RequireAuth>
-    ),
+    element: <Placeholder />,
   },
 ]);
 
