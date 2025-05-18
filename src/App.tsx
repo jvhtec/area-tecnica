@@ -1,6 +1,6 @@
 
 import { Route, Routes, useLocation } from 'react-router-dom';
-import Layout from './components/Layout'; // Fixed import
+import Layout from './components/Layout'; // Keep default import
 import { RequireAuth } from './components/RequireAuth';
 import { Suspense, lazy, useEffect } from 'react';
 import { AppInit } from './components/AppInit';
@@ -20,7 +20,7 @@ const PlaceholderPage = () => (
   </div>
 );
 
-// Use placeholder for missing pages
+// Use placeholder for pages that don't exist yet
 const Jobs = lazy(() => Promise.resolve({ default: PlaceholderPage }));
 const ProjectManagement = lazy(() => Promise.resolve({ default: PlaceholderPage }));
 const Disponibilidad = lazy(() => Promise.resolve({ default: PlaceholderPage }));
@@ -64,7 +64,7 @@ function App() {
             <Suspense fallback={<div>Loading...</div>}>
               <Routes>
                 <Route path="/" element={<Layout />}>
-                  <Route path="/" element={<RequireAuth children={<></>} />}>
+                  <Route element={<RequireAuth />}>
                     <Route index element={<Dashboard />} />
                     <Route path="/jobs" element={<Jobs />} />
                     <Route path="/project-management" element={<ProjectManagement />} />

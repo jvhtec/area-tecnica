@@ -46,18 +46,14 @@ const DashboardWithDateRange = () => {
 
   // Fetch jobs based on date range
   const { data: jobs = [], isLoading } = useJobs({
-    startDate: startDate,
-    endDate: endDate,
+    startDate,
+    endDate,
   });
   
   // Set up realtime subscriptions for jobs
   useRealtimeSubscription(
     'jobs', 
-    jobsKeys.calendar(), 
-    {
-      filter: { event: '*' },
-      priority: 'high'
-    }
+    jobsKeys.calendar()
   );
 
   // Filter jobs for the selected date

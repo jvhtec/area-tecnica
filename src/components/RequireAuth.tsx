@@ -1,10 +1,10 @@
 
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 
 export interface RequireAuthProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 export const RequireAuth: React.FC<RequireAuthProps> = ({ children }) => {
@@ -23,6 +23,6 @@ export const RequireAuth: React.FC<RequireAuthProps> = ({ children }) => {
     return <Navigate to="/auth" replace />;
   }
 
-  // If authenticated, render children
-  return <>{children}</>;
+  // If authenticated, render children or outlet for nested routes
+  return children ? <>{children}</> : <Outlet />;
 };
