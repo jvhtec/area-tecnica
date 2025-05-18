@@ -11,6 +11,8 @@ export const connectionRecovery = {
   recoveryInterval: null as NodeJS.Timeout | null,
   lastRecoveryAttempt: 0,
   recoveryInProgress: false,
+  consecutiveFailures: 0,
+  maxRetryDelay: 30000, // 30 seconds maximum backoff
   
   startRecovery() {
     if (this.isActive) return;
@@ -112,10 +114,25 @@ export const connectionRecovery = {
       if (!hasHealthyConnection && channels.length > 0) {
         console.log('Realtime connection unhealthy, triggering reconnect');
         window.dispatchEvent(new CustomEvent('supabase-reconnect'));
+        
+        // Apply backoff if we have consecutive failures
+        if (this.consecutiveFailures > 0) {
+          const backoffDelay = Math.min(
+            Math.pow(2, this.consecutiveFailures) * 1000, 
+            this.maxRetryDelay
+          );
+          console.log(`Applying exponential backoff: ${backoffDelay}ms after ${this.consecutiveFailures} failures`);
+          await new Promise(resolve => setTimeout(resolve, backoffDelay));
+        }
+        this.consecutiveFailures++;
+      } else if (hasHealthyConnection) {
+        // Reset failures counter when connection is healthy
+        this.consecutiveFailures = 0;
       }
       
     } catch (error) {
       console.error('Error in connection health check:', error);
+      this.consecutiveFailures++;
     } finally {
       this.recoveryInProgress = false;
     }

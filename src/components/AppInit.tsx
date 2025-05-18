@@ -7,6 +7,7 @@ import { useLocation } from "react-router-dom";
 import { useEnhancedRouteSubscriptions } from "@/hooks/useEnhancedRouteSubscriptions";
 import { toast } from "sonner";
 import { TokenManager } from "@/lib/token-manager";
+import { connectionRecovery } from "@/lib/connection-recovery-service";
 
 /**
  * Component that initializes app-wide services when the application starts
@@ -34,6 +35,15 @@ export function AppInit() {
     const manager = UnifiedSubscriptionManager.getInstance(queryClient);
     manager.setupVisibilityBasedRefetching();
     manager.setupNetworkStatusRefetching();
+    
+    // Start connection recovery service
+    connectionRecovery.startRecovery();
+    
+    // Subscribe to token refresh events
+    tokenManager.subscribe(() => {
+      console.log("Token refreshed, updating subscriptions");
+      manager.reestablishSubscriptions();
+    });
     
     // Set up periodic connection health check
     const checkConnectionHealth = async () => {
@@ -71,6 +81,7 @@ export function AppInit() {
         clearInterval(connectionCheckIntervalRef.current);
         connectionCheckIntervalRef.current = null;
       }
+      connectionRecovery.stopRecovery();
     };
   }, [queryClient]);
   
@@ -110,7 +121,6 @@ export function AppInit() {
     // When route changes, check if the new route has all required subscriptions
     if (!subscriptionStatus.isFullySubscribed) {
       console.log('Not fully subscribed to required tables, checking what is missing');
-      console.log('Missing tables:', subscriptionStatus.unsubscribedTables);
       
       // If there are missing subscriptions after a short delay, try to reestablish them
       const delayTimeout = setTimeout(() => {
