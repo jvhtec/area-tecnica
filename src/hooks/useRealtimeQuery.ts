@@ -28,7 +28,7 @@ export function useRealtimeQuery<T>(
     : String(queryKey);
   
   // Call the subscription hook and track subscription status
-  const { isSubscribed, isStale, refreshSubscription } = useTableSubscription(tableName, stringifiedQueryKey);
+  const { isSubscribed, isStale } = useTableSubscription(tableName, stringifiedQueryKey);
   
   // Track query state changes for debugging
   useEffect(() => {
@@ -61,11 +61,6 @@ export function useRealtimeQuery<T>(
     
     try {
       console.log(`Manually refreshing data for ${String(queryKey)}...`);
-      
-      // First try to refresh the subscription
-      if (!isSubscribed && refreshSubscription) {
-        await refreshSubscription();
-      }
       
       // Then refetch data
       await query.refetch();

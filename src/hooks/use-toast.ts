@@ -140,12 +140,13 @@ function dispatch(action: Action) {
   });
 }
 
-// Enhanced toast function that adapts to sonner's API
+// Enhanced toast function that adapts to sonner's API and handles variant conversion
 function toast(options: string | React.ReactNode | Omit<ToastData, "id"> | {
   title?: React.ReactNode;
   description?: React.ReactNode;
   action?: ToasterActionElement;
   id?: string;
+  variant?: "default" | "destructive" | "success" | "warning" | "info";
   onOpenChange?: (open: boolean) => void;
 }) {
   // Handle simple string toast
@@ -153,9 +154,46 @@ function toast(options: string | React.ReactNode | Omit<ToastData, "id"> | {
     return toastPrimitive(options);
   }
   
-  const { id = genId(), ...rest } = options as any;
+  const { id = genId(), variant, ...rest } = options as any;
   
-  // Use sonner's API
+  // Map variant to the appropriate sonner method
+  if (variant) {
+    switch (variant) {
+      case "destructive":
+        return toastPrimitive.error(rest.title, {
+          description: rest.description,
+          id,
+          ...rest
+        });
+      case "success":
+        return toastPrimitive.success(rest.title, {
+          description: rest.description,
+          id,
+          ...rest
+        });
+      case "warning":
+        return toastPrimitive.warning(rest.title, {
+          description: rest.description,
+          id,
+          ...rest
+        });
+      case "info":
+        return toastPrimitive.info(rest.title, {
+          description: rest.description,
+          id,
+          ...rest
+        });
+      default:
+        // Default case for "default" variant or no variant
+        return toastPrimitive(rest.title, {
+          description: rest.description,
+          id,
+          ...rest
+        });
+    }
+  }
+
+  // Use sonner's API for default case
   return toastPrimitive(rest.title, {
     description: rest.description,
     id,
@@ -163,11 +201,27 @@ function toast(options: string | React.ReactNode | Omit<ToastData, "id"> | {
   });
 }
 
-// Add other toast variants to match sonner API
-toast.success = toastPrimitive.success;
-toast.error = toastPrimitive.error;
-toast.warning = toastPrimitive.warning;
-toast.info = toastPrimitive.info;
+// Add API-compatible methods for backward compatibility
+toast.success = (title: string, options?: any) => {
+  const { description, ...rest } = options || {};
+  return toastPrimitive.success(title, { description, ...rest });
+};
+
+toast.error = (title: string, options?: any) => {
+  const { description, ...rest } = options || {};
+  return toastPrimitive.error(title, { description, ...rest });
+};
+
+toast.warning = (title: string, options?: any) => {
+  const { description, ...rest } = options || {};
+  return toastPrimitive.warning(title, { description, ...rest });
+};
+
+toast.info = (title: string, options?: any) => {
+  const { description, ...rest } = options || {};
+  return toastPrimitive.info(title, { description, ...rest });
+};
+
 toast.loading = toastPrimitive.loading;
 toast.custom = toastPrimitive;
 

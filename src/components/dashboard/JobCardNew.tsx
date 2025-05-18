@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -241,10 +240,8 @@ export function JobCardNew({
 
     if (foldersAreCreated) {
       console.log("Folders already exist, preventing creation");
-      toast({
-        title: "Folders already created",
-        description: "Flex folders have already been created for this job.",
-        variant: "destructive"
+      toast.error("Folders already created", {
+        description: "Flex folders have already been created for this job."
       });
       return;
     }
@@ -260,10 +257,8 @@ export function JobCardNew({
 
       if (existingFolders && existingFolders.length > 0) {
         console.log("Found existing folders in final check:", existingFolders);
-        toast({
-          title: "Folders already exist",
-          description: "Flex folders have already been created for this job.",
-          variant: "destructive"
+        toast.error("Folders already exist", {
+          description: "Flex folders have already been created for this job."
         });
         return;
       }
@@ -281,16 +276,13 @@ export function JobCardNew({
       await updateFolderStatus.mutateAsync();
 
       console.log("Successfully created folders for job:", job.id);
-      toast({
-        title: "Success",
+      toast.success("Success", {
         description: "Flex folders have been created successfully."
       });
     } catch (error: any) {
       console.error("Error creating Flex folders:", error);
-      toast({
-        title: "Error creating folders",
-        description: error.message,
-        variant: "destructive"
+      toast.error("Error creating folders", {
+        description: error.message
       });
     }
   };
@@ -325,10 +317,8 @@ export function JobCardNew({
     e.stopPropagation();
 
     if (!["admin", "management"].includes(userRole || "")) {
-      toast({
-        title: "Permission denied",
-        description: "Only management users can delete jobs",
-        variant: "destructive"
+      toast.error("Permission denied", {
+        description: "Only management users can delete jobs"
       });
       return;
     }
@@ -419,18 +409,15 @@ export function JobCardNew({
       if (jobError) throw jobError;
 
       onDeleteClick(job.id);
-      toast({
-        title: "Success",
+      toast.success("Success", {
         description: "Job deleted successfully"
       });
 
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
     } catch (error: any) {
       console.error("Error deleting job:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete job",
-        variant: "destructive"
+      toast.error("Error", {
+        description: error.message || "Failed to delete job"
       });
     }
   };
@@ -467,15 +454,12 @@ export function JobCardNew({
 
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
 
-      toast({
-        title: "Document uploaded",
+      toast.success("Document uploaded", {
         description: "The document has been successfully uploaded."
       });
     } catch (err: any) {
-      toast({
-        title: "Upload failed",
-        description: err.message,
-        variant: "destructive"
+      toast.error("Upload failed", {
+        description: err.message
       });
     }
   };
@@ -496,10 +480,8 @@ export function JobCardNew({
       window.open(data.signedUrl, "_blank");
     } catch (err: any) {
       console.error("Error in handleViewDocument:", err);
-      toast({
-        title: "Error viewing document",
-        description: err.message,
-        variant: "destructive"
+      toast.error("Error viewing document", {
+        description: err.message
       });
     }
   };
@@ -529,16 +511,13 @@ export function JobCardNew({
 
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
 
-      toast({
-        title: "Document deleted",
+      toast.success("Document deleted", {
         description: "The document has been successfully deleted."
       });
     } catch (err: any) {
       console.error("Error in handleDeleteDocument:", err);
-      toast({
-        title: "Error deleting document",
-        description: err.message,
-        variant: "destructive"
+      toast.error("Error deleting document", {
+        description: err.message
       });
     }
   };
@@ -551,8 +530,7 @@ export function JobCardNew({
     await queryClient.invalidateQueries({ queryKey: ["sound-tasks", job.id] });
     await queryClient.invalidateQueries({ queryKey: ["sound-personnel", job.id] });
 
-    toast({
-      title: "Data refreshed",
+    toast.success("Data refreshed", {
       description: "The job information has been updated."
     });
   };

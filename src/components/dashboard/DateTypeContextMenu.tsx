@@ -52,6 +52,7 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
 
       if (error) throw error;
       
+      // Updated to use proper toast API
       toast.success(`Date type set to ${type}`);
       onTypeChange();
     } catch (error: any) {

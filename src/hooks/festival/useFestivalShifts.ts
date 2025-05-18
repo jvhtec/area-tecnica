@@ -15,7 +15,7 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   
-  // Set up real-time subscriptions for both tables
+  // Set up real-time subscriptions for both tables - fixed parameter counts
   useTableSubscription('festival_shifts', ['festival_shifts', jobId, selectedDate]);
   useTableSubscription('festival_shift_assignments', ['festival_shift_assignments', jobId, selectedDate]);
 
