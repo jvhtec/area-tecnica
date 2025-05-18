@@ -17,9 +17,7 @@ export function useRelatedTablesSubscription(
 ) {
   const tableConfigs = tables.map(table => ({
     table,
-    queryKey,
-    filter: { schema },
-    priority
+    queryKey
   }));
   
   // Import the useMultiTableSubscription hook from useTableSubscription.ts

@@ -74,3 +74,85 @@ export function useTableSubscription(
     refreshSubscription
   };
 }
+
+/**
+ * Hook for subscribing to multiple tables at once
+ */
+export function useMultiTableSubscription(
+  tables: Array<{ 
+    table: string, 
+    queryKey: string | string[]
+  }>
+) {
+  const { 
+    connectionStatus: globalConnectionStatus, 
+    activeSubscriptions, 
+    lastRefreshTime,
+    refreshSubscriptions,
+    subscriptionsByTable
+  } = useSubscriptionContext();
+
+  const [statuses, setStatuses] = useState<Record<string, any>>({});
+  
+  useEffect(() => {
+    // Update statuses for each table
+    const newStatuses: Record<string, any> = {};
+    
+    tables.forEach(({ table }) => {
+      const tableSubscriptions = subscriptionsByTable[table] || [];
+      const isSubscribed = tableSubscriptions.length > 0 && globalConnectionStatus === 'connected';
+      const now = Date.now();
+      const fiveMinutes = 5 * 60 * 1000;
+      const isStale = now - lastRefreshTime > fiveMinutes;
+      
+      newStatuses[table] = {
+        isSubscribed,
+        isStale,
+        lastActivity: tableSubscriptions.length > 0 ? lastRefreshTime : 0
+      };
+    });
+    
+    setStatuses(newStatuses);
+  }, [tables, activeSubscriptions, globalConnectionStatus, lastRefreshTime, subscriptionsByTable]);
+
+  // Check overall status
+  const isAllSubscribed = Object.values(statuses).every(status => status?.isSubscribed);
+  const isAnyStale = Object.values(statuses).some(status => status?.isStale);
+
+  const refreshSubscription = async () => {
+    try {
+      // Get all table names
+      const tableNames = tables.map(t => t.table);
+      
+      // Force refresh subscriptions for all tables
+      await forceRefreshSubscriptions(tableNames);
+      
+      // Then refresh all subscriptions in the provider
+      refreshSubscriptions();
+      
+      return true;
+    } catch (error) {
+      console.error('Error refreshing subscriptions:', error);
+      return false;
+    }
+  };
+
+  return {
+    isSubscribed: isAllSubscribed,
+    isStale: isAnyStale,
+    tableStatuses: statuses,
+    refreshSubscription
+  };
+}
+
+/**
+ * Hook for subscribing to a specific row in a table
+ */
+export function useRowSubscription(
+  tableName: string,
+  rowId: string,
+  queryKey: string | string[]
+) {
+  // Use the base hook but could be enhanced with row-specific logic
+  return useTableSubscription(tableName, queryKey);
+}

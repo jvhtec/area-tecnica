@@ -52,17 +52,7 @@ export function useRealtimeQuery<T>(
         throw error;
       }
     },
-    ...options,
-    onSettled: (data, error) => {
-      if (error) {
-        console.error(`Query error for ${String(queryKey)}:`, error);
-      }
-      
-      // Call the original onSettled if provided
-      if (options?.onSettled) {
-        options.onSettled(data, error);
-      }
-    }
+    ...options
   });
   
   // Function to manually refresh data with enhanced error handling

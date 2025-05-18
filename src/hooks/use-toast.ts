@@ -1,15 +1,15 @@
 
-import { Toast, toast as toastPrimitive } from "sonner";
+import { toast as toastPrimitive } from "sonner";
 import * as React from "react";
 
-type ToasterToast = Toast;
+type ToasterToast = any;
 
 const TOAST_LIMIT = 20;
 const TOAST_REMOVE_DELAY = 1000000;
 
 type ToasterActionElement = React.ReactElement<unknown> | null;
 
-type ToasterProps = React.ComponentPropsWithoutRef<typeof Toast>;
+type ToasterProps = React.ComponentPropsWithoutRef<typeof toastPrimitive>;
 
 type ToastData = {
   id: string;
@@ -145,7 +145,6 @@ function toast(options: string | React.ReactNode | Omit<ToastData, "id"> | {
   title?: React.ReactNode;
   description?: React.ReactNode;
   action?: ToasterActionElement;
-  variant?: "default" | "destructive";
   id?: string;
   onOpenChange?: (open: boolean) => void;
 }) {
@@ -154,17 +153,9 @@ function toast(options: string | React.ReactNode | Omit<ToastData, "id"> | {
     return toastPrimitive(options);
   }
   
-  const { id = genId(), variant, ...rest } = options as any;
+  const { id = genId(), ...rest } = options as any;
   
-  // Map variant to sonner's equivalent
-  if (variant === 'destructive') {
-    return toastPrimitive.error(rest.title, {
-      description: rest.description,
-      id,
-      ...rest
-    });
-  }
-  
+  // Use sonner's API
   return toastPrimitive(rest.title, {
     description: rest.description,
     id,
