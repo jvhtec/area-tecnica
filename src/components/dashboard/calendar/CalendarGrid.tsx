@@ -5,18 +5,31 @@ import { cn } from "@/lib/utils";
 import { CalendarJobCard } from "./CalendarJobCard";
 
 interface CalendarGridProps {
-  allDays: Date[];
+  allDays?: Date[];
+  days?: Date[];
   currentMonth: Date;
   getJobsForDate: (date: Date) => any[];
   onDateSelect: (date: Date) => void;
+  jobs?: any[];
+  selectedJobTypes?: string[];
+  department?: string;
+  onDateTypeChange?: () => void;
 }
 
 export const CalendarGrid: React.FC<CalendarGridProps> = ({
   allDays,
+  days,
   currentMonth,
   getJobsForDate,
   onDateSelect,
+  jobs,
+  selectedJobTypes,
+  department,
+  onDateTypeChange,
 }) => {
+  // Use either allDays or days, depending on which is provided
+  const daysToDisplay = allDays || days || [];
+  
   return (
     <div className="border rounded-lg overflow-x-auto">
       <div className="grid grid-cols-7 gap-px bg-muted" style={{ minWidth: "980px" }}>
@@ -25,7 +38,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             {day}
           </div>
         ))}
-        {allDays.map((day, i) => {
+        {daysToDisplay.map((day, i) => {
           const dayJobs = getJobsForDate(day);
           const isCurrentMonth = isSameMonth(day, currentMonth);
           const maxVisibleJobs = 7;

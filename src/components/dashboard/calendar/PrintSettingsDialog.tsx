@@ -25,6 +25,8 @@ interface PrintSettingsDialogProps {
   generatePDF: (range: "month" | "quarter" | "year") => void;
   currentMonth: Date;
   selectedJobTypes: string[];
+  onSave?: (settings: PrintSettings) => void; // Added for backward compatibility
+  settings?: PrintSettings; // Added for backward compatibility
 }
 
 export const PrintSettingsDialog: React.FC<PrintSettingsDialogProps> = ({
@@ -35,7 +37,12 @@ export const PrintSettingsDialog: React.FC<PrintSettingsDialogProps> = ({
   generatePDF,
   currentMonth,
   selectedJobTypes,
+  onSave,
+  settings,
 }) => {
+  // For backward compatibility, use provided settings or fallback to printSettings
+  const activeSettings = settings || printSettings;
+  
   useEffect(() => {
     if (showDialog) {
       const newJobTypes = {
@@ -49,47 +56,52 @@ export const PrintSettingsDialog: React.FC<PrintSettingsDialogProps> = ({
     }
   }, [showDialog, selectedJobTypes, setPrintSettings]);
 
+  // Handle the save action, either with the provided onSave or using the legacy method
+  const handleSave = (range: "month" | "quarter" | "year") => {
+    if (onSave) {
+      // New method
+      const updatedSettings = { ...activeSettings, range };
+      onSave(updatedSettings);
+    } else {
+      // Legacy method
+      generatePDF(range);
+    }
+  };
+
   return (
-    <Dialog open={showDialog} onOpenChange={setShowDialog}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Select Print Range</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Job Types to Include:</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(printSettings.jobTypes).map(([type, checked]) => (
-                <div key={type} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`print-${type}`}
-                    checked={checked}
-                    onCheckedChange={(checked) => {
-                      setPrintSettings((prev) => ({
-                        ...prev,
-                        jobTypes: {
-                          ...prev.jobTypes,
-                          [type]: !!checked,
-                        },
-                      }));
-                    }}
-                  />
-                  <Label htmlFor={`print-${type}`} className="capitalize">
-                    {type}
-                  </Label>
-                </div>
-              ))}
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Job Types to Include:</Label>
+        <div className="grid grid-cols-2 gap-2">
+          {Object.entries(activeSettings.jobTypes).map(([type, checked]) => (
+            <div key={type} className="flex items-center space-x-2">
+              <Checkbox
+                id={`print-${type}`}
+                checked={checked}
+                onCheckedChange={(checked) => {
+                  setPrintSettings((prev) => ({
+                    ...prev,
+                    jobTypes: {
+                      ...prev.jobTypes,
+                      [type]: !!checked,
+                    },
+                  }));
+                }}
+              />
+              <Label htmlFor={`print-${type}`} className="capitalize">
+                {type}
+              </Label>
             </div>
-          </div>
-          <Button onClick={() => generatePDF("month")}>
-            Current Month ({format(currentMonth, "MMMM yyyy")})
-          </Button>
-          <Button onClick={() => generatePDF("quarter")}>Next Quarter</Button>
-          <Button onClick={() => generatePDF("year")}>
-            Whole Year ({format(currentMonth, "yyyy")})
-          </Button>
+          ))}
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+      <Button onClick={() => handleSave("month")}>
+        Current Month ({format(currentMonth, "MMMM yyyy")})
+      </Button>
+      <Button onClick={() => handleSave("quarter")}>Next Quarter</Button>
+      <Button onClick={() => handleSave("year")}>
+        Whole Year ({format(currentMonth, "yyyy")})
+      </Button>
+    </div>
   );
 };

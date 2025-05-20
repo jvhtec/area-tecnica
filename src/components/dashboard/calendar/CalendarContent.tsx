@@ -4,7 +4,7 @@ import { CalendarHeader } from "./CalendarHeader";
 import { CalendarGrid } from "./CalendarGrid";
 import { CalendarFilters } from "./CalendarFilters";
 import { PrintSettingsDialog } from "./PrintSettingsDialog";
-import { DateTypesContext } from "./DateTypesContext";
+import { useDateTypesContext } from "./DateTypesContext";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useCalendarContext } from "./CalendarProvider";
 
@@ -25,6 +25,8 @@ export const CalendarContent: React.FC<CalendarContentProps> = ({
   onDateSelect,
   onDateTypeChange,
 }) => {
+  const { dateTypes } = useDateTypesContext();
+  
   const {
     isCollapsed,
     isDropdownOpen,
@@ -42,8 +44,6 @@ export const CalendarContent: React.FC<CalendarContentProps> = ({
     handleTodayClick,
     generatePDF
   } = useCalendarContext();
-
-  const dateTypesContext = React.useContext(DateTypesContext);
   
   return (
     <div className="space-y-4">
@@ -61,34 +61,42 @@ export const CalendarContent: React.FC<CalendarContentProps> = ({
       {!isCollapsed && (
         <div className="mb-4">
           <CalendarFilters 
+            distinctJobTypes={distinctJobTypes}
+            selectedJobTypes={selectedJobTypes}
             isDropdownOpen={isDropdownOpen}
             setIsDropdownOpen={setIsDropdownOpen}
-            selectedJobTypes={selectedJobTypes}
-            distinctJobTypes={distinctJobTypes}
-            handleJobTypeSelection={handleJobTypeSelection}
+            onJobTypeSelection={handleJobTypeSelection}
           />
         </div>
       )}
       
       <CalendarGrid 
-        days={allDays} 
+        allDays={allDays} 
         jobs={jobs} 
         currentMonth={currentMonth} 
         onDateSelect={onDateSelect}
         selectedJobTypes={selectedJobTypes}
         department={department}
         onDateTypeChange={onDateTypeChange}
+        getJobsForDate={(date) => {
+          // This is a temporary placeholder for the method
+          return jobs.filter(job => {
+            // Basic filter logic to be replaced by actual implementation
+            return true;
+          });
+        }}
       />
       
       <Dialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
         <DialogContent>
           <PrintSettingsDialog 
-            onSave={(settings) => {
-              setPrintSettings(settings);
-              generatePDF(settings.range, dateTypesContext?.dateTypes || {});
-              setShowPrintDialog(false);
-            }}
-            settings={printSettings}
+            showDialog={showPrintDialog}
+            setShowDialog={setShowPrintDialog}
+            printSettings={printSettings}
+            setPrintSettings={setPrintSettings}
+            generatePDF={(range) => generatePDF(range, dateTypes)}
+            currentMonth={currentMonth}
+            selectedJobTypes={selectedJobTypes}
           />
         </DialogContent>
       </Dialog>

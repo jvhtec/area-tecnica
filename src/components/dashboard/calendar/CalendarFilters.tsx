@@ -8,6 +8,7 @@ interface CalendarFiltersProps {
   isDropdownOpen: boolean;
   setIsDropdownOpen: (open: boolean) => void;
   onJobTypeSelection: (type: string) => void;
+  handleJobTypeSelection?: (type: string) => void; // Added for backward compatibility
 }
 
 export const CalendarFilters: React.FC<CalendarFiltersProps> = ({
@@ -16,7 +17,11 @@ export const CalendarFilters: React.FC<CalendarFiltersProps> = ({
   isDropdownOpen,
   setIsDropdownOpen,
   onJobTypeSelection,
+  handleJobTypeSelection,
 }) => {
+  // Use the appropriate function (handleJobTypeSelection is kept for backward compatibility)
+  const handleSelection = onJobTypeSelection || handleJobTypeSelection;
+  
   return (
     <div className="relative mb-4">
       <button
@@ -32,7 +37,7 @@ export const CalendarFilters: React.FC<CalendarFiltersProps> = ({
             <div
               key={type}
               className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-              onClick={() => onJobTypeSelection(type)}
+              onClick={() => handleSelection?.(type)}
             >
               <span className="text-sm text-black dark:text-white">{type}</span>
               {selectedJobTypes.includes(type) && <Check className="h-4 w-4 text-blue-500" />}
