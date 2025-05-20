@@ -17,9 +17,9 @@ export const useUnifiedSubscriptions = (tables: string[], queryKey: string | str
     const subscriptions = tables.map(table => 
       subscriptionManager.subscribeToTable({
         table,
+        queryKey: queryKey,
         schema: 'public',
-        event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
-        queryKey: queryKey
+        event: '*' // Listen for all events (INSERT, UPDATE, DELETE)
       })
     );
     
