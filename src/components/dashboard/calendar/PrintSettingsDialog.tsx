@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export interface PrintSettings {
   range: "month" | "quarter" | "year";
@@ -50,44 +50,46 @@ export const PrintSettingsDialog: React.FC<PrintSettingsDialogProps> = ({
   }, [showDialog, selectedJobTypes, setPrintSettings]);
 
   return (
-    <DialogContent>
-      <DialogHeader>
-        <DialogTitle>Select Print Range</DialogTitle>
-      </DialogHeader>
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label>Job Types to Include:</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {Object.entries(printSettings.jobTypes).map(([type, checked]) => (
-              <div key={type} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`print-${type}`}
-                  checked={checked}
-                  onCheckedChange={(checked) => {
-                    setPrintSettings((prev) => ({
-                      ...prev,
-                      jobTypes: {
-                        ...prev.jobTypes,
-                        [type]: !!checked,
-                      },
-                    }));
-                  }}
-                />
-                <Label htmlFor={`print-${type}`} className="capitalize">
-                  {type}
-                </Label>
-              </div>
-            ))}
+    <Dialog open={showDialog} onOpenChange={setShowDialog}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Select Print Range</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Job Types to Include:</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {Object.entries(printSettings.jobTypes).map(([type, checked]) => (
+                <div key={type} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`print-${type}`}
+                    checked={checked}
+                    onCheckedChange={(checked) => {
+                      setPrintSettings((prev) => ({
+                        ...prev,
+                        jobTypes: {
+                          ...prev.jobTypes,
+                          [type]: !!checked,
+                        },
+                      }));
+                    }}
+                  />
+                  <Label htmlFor={`print-${type}`} className="capitalize">
+                    {type}
+                  </Label>
+                </div>
+              ))}
+            </div>
           </div>
+          <Button onClick={() => generatePDF("month")}>
+            Current Month ({format(currentMonth, "MMMM yyyy")})
+          </Button>
+          <Button onClick={() => generatePDF("quarter")}>Next Quarter</Button>
+          <Button onClick={() => generatePDF("year")}>
+            Whole Year ({format(currentMonth, "yyyy")})
+          </Button>
         </div>
-        <Button onClick={() => generatePDF("month")}>
-          Current Month ({format(currentMonth, "MMMM yyyy")})
-        </Button>
-        <Button onClick={() => generatePDF("quarter")}>Next Quarter</Button>
-        <Button onClick={() => generatePDF("year")}>
-          Whole Year ({format(currentMonth, "yyyy")})
-        </Button>
-      </div>
-    </DialogContent>
+      </DialogContent>
+    </Dialog>
   );
 };
