@@ -15,12 +15,14 @@ export const useUnifiedSubscriptions = (tables: string[], queryKey: string | str
     
     // Subscribe to all tables
     const subscriptions = tables.map(table => 
-      subscriptionManager.subscribeToTable({
+      subscriptionManager.subscribeToTable(
         table,
-        queryKey: queryKey,
-        schema: 'public',
-        event: '*' // Listen for all events (INSERT, UPDATE, DELETE)
-      })
+        queryKey,
+        {
+          event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
+          schema: 'public'
+        }
+      )
     );
     
     // Clean up subscriptions on unmount
