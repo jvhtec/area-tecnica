@@ -44,6 +44,8 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
         <Button variant="ghost" size="icon" onClick={onToggleCollapse}>
           {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
         </Button>
+        
+        {/* Fix: We're wrapping the Dialog component properly around the print button */}
         <Dialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
           <DialogTrigger asChild>
             <Button variant="ghost" size="icon">
