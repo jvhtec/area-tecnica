@@ -13,7 +13,7 @@ interface DashboardContentProps {
   onDeleteClick: (jobId: string) => void;
   onJobClick: (jobId: string) => void;
   userRole: string | null;
-  onDateTypeChange: () => void;  // Added this prop to the interface
+  onDateTypeChange: () => void;
 }
 
 export const DashboardContent = ({
@@ -36,7 +36,7 @@ export const DashboardContent = ({
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       {/* Calendar section - full width */}
       <div className="w-full">
         <CalendarSection 
@@ -60,7 +60,7 @@ export const DashboardContent = ({
       </div>
 
       {/* Department schedules section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-8">
         <DepartmentSchedule
           name="sound"
           icon={Music2}
