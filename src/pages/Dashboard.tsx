@@ -1,25 +1,23 @@
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Department } from "@/types/department";
+import { useJobs } from "@/hooks/useJobs";
 import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
+import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
+import { supabase } from "@/lib/supabase";
+import { useDashboardSubscriptions } from "@/hooks/useUnifiedSubscriptions";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { DashboardContent } from "@/components/dashboard/DashboardContent";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
-import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { TourChips } from "@/components/dashboard/TourChips";
 import { MessageSquare, Send, ChevronDown, ChevronUp } from "lucide-react";
 import { MessagesList } from "@/components/messages/MessagesList";
 import { DirectMessagesList } from "@/components/messages/DirectMessagesList";
 import { Button } from "@/components/ui/button";
 import { DirectMessageDialog } from "@/components/messages/DirectMessageDialog";
-import { DashboardContent } from "@/components/dashboard/DashboardContent";
-import { useOptimizedMultiTableSubscription } from "@/hooks/useOptimizedSubscription";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { DashboardJobsList } from "@/components/dashboard/DashboardJobsList";
-import { useJobs } from "@/hooks/useJobs";
 
 const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
   if (!date || !jobs) return [];
@@ -40,35 +38,42 @@ const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
 };
 
 const Dashboard = () => {
-  const [date, setDate] = useState<Date | undefined>(new Date());
-  const [timeSpan, setTimeSpan] = useState<string>("1week");
-  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [selectedJob, setSelectedJob] = useState<any>(null);
-  const [selectedDepartment, setSelectedDepartment] = useState<Department>("sound");
+  // User data & preferences
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [showTours, setShowTours] = useState(true);
   const [showMessages, setShowMessages] = useState(false);
+  
+  // Dashboard state
+  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [timeSpan, setTimeSpan] = useState<string>("1week");
+  const [selectedDepartment, setSelectedDepartment] = useState<Department>("sound");
+  
+  // Modal state
+  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [newMessageDialogOpen, setNewMessageDialogOpen] = useState(false);
-  
-  const isMobile = useIsMobile();
-  const { data: jobs, isLoading } = useJobs();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  
-  // Use our optimized subscription hook instead of forceSubscribe
-  const { resetAllSubscriptions, isAllConnected } = useOptimizedMultiTableSubscription([
-    { table: 'jobs', queryKey: ['jobs'], priority: 'high' },
-    { table: 'job_assignments', queryKey: ['jobs', 'assignments'], priority: 'high' },
-    { table: 'job_departments', queryKey: ['jobs', 'departments'] },
-    { table: 'job_date_types', queryKey: ['jobs', 'dates'] },
-    { table: 'messages', queryKey: ['messages'], enabled: userRole === 'management' },
-    { table: 'direct_messages', queryKey: ['direct_messages'], enabled: !!userId },
-    { table: 'tours', queryKey: ['tours'] }
-  ]);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [selectedJob, setSelectedJob] = useState<any>(null);
 
+  // Data fetching
+  const { data: jobs, isLoading } = useJobs();
+  const { forceSubscribe } = useSubscriptionContext();
+  useDashboardSubscriptions();
+  
+  // Setup subscriptions
+  useEffect(() => {
+    forceSubscribe([
+      'jobs', 
+      'job_assignments', 
+      'job_date_types', 
+      'messages', 
+      'direct_messages',
+      'tours'
+    ]);
+  }, [forceSubscribe]);
+
+  // Fetch user data
   useEffect(() => {
     const fetchUserRoleAndPrefs = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -100,6 +105,7 @@ const Dashboard = () => {
     fetchUserRoleAndPrefs();
   }, []);
 
+  // Event handlers
   const handleJobClick = (jobId: string) => {
     if (userRole === "logistics") return;
     setSelectedJobId(jobId);
@@ -113,55 +119,14 @@ const Dashboard = () => {
   };
 
   const handleDeleteClick = async (jobId: string) => {
-    if (userRole === "logistics") return;
-
-    if (!window.confirm("Are you sure you want to delete this job?")) return;
-
-    try {
-      console.log("Starting job deletion process for job:", jobId);
-
-      const { error: assignmentsError } = await supabase
-        .from("job_assignments")
-        .delete()
-        .eq("job_id", jobId);
-
-      if (assignmentsError) throw assignmentsError;
-
-      const { error: departmentsError } = await supabase
-        .from("job_departments")
-        .delete()
-        .eq("job_id", jobId);
-
-      if (departmentsError) throw departmentsError;
-
-      const { error: jobError } = await supabase
-        .from("jobs")
-        .delete()
-        .eq("job_id", jobId);
-
-      if (jobError) throw jobError;
-
-      toast({
-        title: "Job deleted successfully",
-        description: "The job and all related records have been removed.",
-      });
-
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
-    } catch (error: any) {
-      console.error("Error in deletion process:", error);
-      toast({
-        title: "Error deleting job",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
+    console.log("Delete job called from Dashboard");
+    // This is handled by the JobCardNew component's delete functionality
   };
 
-  const handleDateTypeChange = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ["jobs"] });
-  }, [queryClient]);
-
-  const selectedDateJobs = getSelectedDateJobs(date, jobs);
+  const handleDateTypeChange = () => {
+    console.log("Date type change called from Dashboard");
+    // This is handled by the CalendarSection component
+  };
 
   const handleToggleTours = async () => {
     const newValue = !showTours;
@@ -177,26 +142,28 @@ const Dashboard = () => {
     }
   };
 
+  const selectedDateJobs = getSelectedDateJobs(date, jobs);
+
   return (
-    <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-6 space-y-4 sm:space-y-6 md:space-y-8">
+    <div className="container mx-auto px-4 py-6 space-y-8">
       <DashboardHeader timeSpan={timeSpan} onTimeSpanChange={setTimeSpan} />
 
       {userRole === "management" && (
         <Card className="w-full">
-          <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-6">
-            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-              <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6" />
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="w-6 h-6" />
               Messages
             </CardTitle>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                size={isMobile ? "sm" : "default"}
+                size="sm"
                 onClick={() => setNewMessageDialogOpen(true)}
-                className="gap-1 sm:gap-2 text-xs sm:text-sm"
+                className="gap-2"
               >
-                <Send className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className={isMobile ? "hidden" : "inline"}>New Message</span>
+                <Send className="h-4 w-4" />
+                New Message
               </Button>
               <button
                 onClick={() => setShowMessages(!showMessages)}
@@ -208,10 +175,10 @@ const Dashboard = () => {
           </CardHeader>
           {showMessages && (
             <CardContent>
-              <div className="space-y-4 sm:space-y-6">
+              <div className="space-y-6">
                 <MessagesList />
-                <div className="border-t pt-4 sm:pt-6">
-                  <h3 className="text-base sm:text-lg font-medium mb-3 sm:mb-4">Direct Messages</h3>
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-medium mb-4">Direct Messages</h3>
                   <DirectMessagesList />
                 </div>
               </div>
@@ -221,8 +188,8 @@ const Dashboard = () => {
       )}
 
       <Card className="w-full bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30">
-        <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-6">
-          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
             Tours {new Date().getFullYear()}
           </CardTitle>
           <Button
@@ -235,7 +202,7 @@ const Dashboard = () => {
           </Button>
         </CardHeader>
         {showTours && (
-          <CardContent className="p-3 sm:p-6">
+          <CardContent>
             <TourChips
               onTourClick={(tourId) => {
                 if (userRole === "logistics") return;
@@ -246,15 +213,6 @@ const Dashboard = () => {
           </CardContent>
         )}
       </Card>
-
-      {/* Use our new paginated component for better performance on the dashboard */}
-      <DashboardJobsList
-        title="All Jobs"
-        onJobClick={handleJobClick}
-        onEditClick={handleEditClick}
-        onDeleteClick={handleDeleteClick}
-        userRole={userRole}
-      />
 
       <DashboardContent
         date={date}

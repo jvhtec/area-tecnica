@@ -26,8 +26,8 @@ import { WolfensteinDialog } from "./doom/WolfensteinDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/useAuth";
 import { HeaderStatus } from "./ui/header-status";
-import { ConnectionStatusIndicator } from "./ui/connection-status-indicator";
-import { useOptimizedMultiTableSubscription } from "@/hooks/useOptimizedSubscription";
+import { useRouteSubscriptions } from "@/hooks/useRouteSubscriptions";
+import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -46,22 +46,16 @@ const Layout = () => {
     logout
   } = useAuth();
   
-  // Use optimized subscriptions for route-specific tables
-  const { resetAllSubscriptions } = useOptimizedMultiTableSubscription([
-    { table: 'profiles', queryKey: ['profiles'], priority: 'high' },
-    { table: 'jobs', queryKey: ['jobs'], priority: 'high' }
-  ]);
+  // Get route-specific subscription info
+  const { requiredTables } = useRouteSubscriptions();
+  const { forceSubscribe } = useSubscriptionContext();
   
   // Subscribe to route-specific tables whenever the route changes
   useEffect(() => {
-    // This effect will run when the route changes
-    console.log("Route changed, refreshing data if needed");
-    
-    // Only trigger a data refresh if we have a session
-    if (session) {
-      resetAllSubscriptions();
+    if (requiredTables.length > 0) {
+      forceSubscribe(requiredTables);
     }
-  }, [location.pathname, session]);
+  }, [location.pathname, requiredTables, forceSubscribe]);
 
   const handleSignOut = async () => {
     if (isLoggingOut) return;
@@ -97,9 +91,9 @@ const Layout = () => {
   }
 
   return (
-    <SidebarProvider defaultOpen={!isMobile}>
+    <SidebarProvider defaultOpen={true}>
       <div className="min-h-screen flex w-full">
-        <Sidebar collapsible={isMobile ? "offcanvas" : "icon"}>
+        <Sidebar>
           <SidebarContent>
             <SidebarGroup>
               <SidebarGroupContent>
@@ -148,17 +142,16 @@ const Layout = () => {
           </SidebarFooter>
         </Sidebar>
         <div className="flex-1">
-          <header className="border-b p-2 sm:p-4 flex justify-between items-center bg-background">
+          <header className="border-b p-4 flex justify-between items-center bg-background">
             <div className="flex items-center gap-2">
               <SidebarTrigger />
             </div>
             <div className="flex items-center gap-2">
-              <ConnectionStatusIndicator className="mr-1" variant={isMobile ? "compact" : "default"} />
-              <HeaderStatus className="mr-3 hidden sm:flex" />
+              <HeaderStatus className="mr-3" />
               <ReloadButton onReload={handleReload} />
             </div>
           </header>
-          <main className="p-3 sm:p-4 md:p-6">
+          <main className="p-6">
             <Outlet />
           </main>
         </div>
