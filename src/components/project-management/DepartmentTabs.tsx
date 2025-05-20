@@ -1,5 +1,6 @@
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { JobCardNew } from "@/components/dashboard/JobCardNew";
+import { JobCardNew } from "@/components/jobs/cards/JobCardNew";
 import { Department } from "@/types/department";
 import { Loader2 } from "lucide-react";
 
@@ -50,7 +51,7 @@ export const DepartmentTabs = ({
                   onDeleteDocument={onDeleteDocument}
                   showUpload={true}
                   showManageArtists={true}
-                  isProjectManagementPage={true} // Add this prop
+                  isProjectManagementPage={true}
                 />
               ))}
             </div>
