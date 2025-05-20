@@ -3,7 +3,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Printer } from "lucide-react";
 import { format } from "date-fns";
-import { Dialog, DialogTrigger } from "@/components/ui/dialog";
+import { DialogTrigger } from "@/components/ui/dialog";
 
 interface CalendarHeaderProps {
   currentMonth: Date;
@@ -23,7 +23,6 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   onTodayClick,
   isCollapsed,
   onToggleCollapse,
-  showPrintDialog,
   setShowPrintDialog,
 }) => {
   return (
@@ -45,15 +44,13 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
         </Button>
         
-        {/* Fix: We're wrapping the Dialog component properly around the print button */}
-        <Dialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
-          <DialogTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <Printer className="h-4 w-4" />
-            </Button>
-          </DialogTrigger>
-        </Dialog>
+        <DialogTrigger asChild>
+          <Button variant="ghost" size="icon" onClick={() => setShowPrintDialog(true)}>
+            <Printer className="h-4 w-4" />
+          </Button>
+        </DialogTrigger>
       </div>
     </div>
   );
 };
+
