@@ -1,11 +1,11 @@
 
 import React from "react";
 import { CalendarHeader } from "./CalendarHeader";
-import { CalendarFilters } from "./CalendarFilters";
 import { CalendarGrid } from "./CalendarGrid";
+import { CalendarFilters } from "./CalendarFilters";
 import { PrintSettingsDialog } from "./PrintSettingsDialog";
-import { getJobsForDate } from "./CalendarUtils";
-import { useDateTypesContext } from "./DateTypesContext";
+import { DateTypesContext } from "./DateTypesContext";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useCalendarContext } from "./CalendarProvider";
 
 interface CalendarContentProps {
@@ -13,7 +13,7 @@ interface CalendarContentProps {
   currentMonth: Date;
   jobs: any[];
   department?: string;
-  onDateSelect: (date: Date | undefined) => void;
+  onDateSelect: (date: Date) => void;
   onDateTypeChange: () => void;
 }
 
@@ -25,8 +25,6 @@ export const CalendarContent: React.FC<CalendarContentProps> = ({
   onDateSelect,
   onDateTypeChange,
 }) => {
-  const { dateTypes } = useDateTypesContext();
-  
   const {
     isCollapsed,
     isDropdownOpen,
@@ -42,15 +40,13 @@ export const CalendarContent: React.FC<CalendarContentProps> = ({
     handlePreviousMonth,
     handleNextMonth,
     handleTodayClick,
-    generatePDF,
+    generatePDF
   } = useCalendarContext();
-  
-  const handleGeneratePDF = (range: "month" | "quarter" | "year") => {
-    generatePDF(range, dateTypes);
-  };
+
+  const dateTypesContext = React.useContext(DateTypesContext);
   
   return (
-    <>
+    <div className="space-y-4">
       <CalendarHeader
         currentMonth={currentMonth}
         onPreviousMonth={handlePreviousMonth}
@@ -62,32 +58,40 @@ export const CalendarContent: React.FC<CalendarContentProps> = ({
         setShowPrintDialog={setShowPrintDialog}
       />
       
-      <PrintSettingsDialog
-        showDialog={showPrintDialog}
-        setShowDialog={setShowPrintDialog}
-        printSettings={printSettings}
-        setPrintSettings={setPrintSettings}
-        generatePDF={handleGeneratePDF}
-        currentMonth={currentMonth}
-        selectedJobTypes={selectedJobTypes}
-      />
-      
-      <CalendarFilters
-        distinctJobTypes={distinctJobTypes}
-        selectedJobTypes={selectedJobTypes}
-        isDropdownOpen={isDropdownOpen}
-        setIsDropdownOpen={setIsDropdownOpen}
-        onJobTypeSelection={handleJobTypeSelection}
-      />
-      
       {!isCollapsed && (
-        <CalendarGrid
-          allDays={allDays}
-          currentMonth={currentMonth}
-          getJobsForDate={(date) => getJobsForDate(jobs, date, department, selectedJobTypes)}
-          onDateSelect={onDateSelect}
-        />
+        <div className="mb-4">
+          <CalendarFilters 
+            isDropdownOpen={isDropdownOpen}
+            setIsDropdownOpen={setIsDropdownOpen}
+            selectedJobTypes={selectedJobTypes}
+            distinctJobTypes={distinctJobTypes}
+            handleJobTypeSelection={handleJobTypeSelection}
+          />
+        </div>
       )}
-    </>
+      
+      <CalendarGrid 
+        days={allDays} 
+        jobs={jobs} 
+        currentMonth={currentMonth} 
+        onDateSelect={onDateSelect}
+        selectedJobTypes={selectedJobTypes}
+        department={department}
+        onDateTypeChange={onDateTypeChange}
+      />
+      
+      <Dialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
+        <DialogContent>
+          <PrintSettingsDialog 
+            onSave={(settings) => {
+              setPrintSettings(settings);
+              generatePDF(settings.range, dateTypesContext?.dateTypes || {});
+              setShowPrintDialog(false);
+            }}
+            settings={printSettings}
+          />
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 };

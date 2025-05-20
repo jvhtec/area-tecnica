@@ -3,7 +3,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Printer } from "lucide-react";
 import { format } from "date-fns";
-import { DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 
 interface CalendarHeaderProps {
   currentMonth: Date;
@@ -44,13 +44,14 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
         </Button>
         
-        <DialogTrigger asChild>
-          <Button variant="ghost" size="icon" onClick={() => setShowPrintDialog(true)}>
-            <Printer className="h-4 w-4" />
-          </Button>
-        </DialogTrigger>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="ghost" size="icon" onClick={() => setShowPrintDialog(true)}>
+              <Printer className="h-4 w-4" />
+            </Button>
+          </DialogTrigger>
+        </Dialog>
       </div>
     </div>
   );
 };
-
