@@ -22,107 +22,107 @@ const router = createBrowserRouter([
     children: [
       { 
         path: "/", 
-        element: <Dashboard /> 
+        element: <RequireAuth><Dashboard /></RequireAuth> 
       },
       { 
         path: "/festival-management/:festivalId", 
-        element: <FestivalManagementWrapper /> 
+        element: <RequireAuth><FestivalManagementWrapper /></RequireAuth> 
       },
       {
         path: "/jobs",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/jobs/:jobId",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/jobs/view/:jobId",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/jobs/create",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/jobs/edit/:jobId",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/contacts",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/contacts/:contactId",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/contacts/create",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/contacts/edit/:contactId",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/locations",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/locations/:locationId",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/locations/create",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/locations/edit/:locationId",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/departments",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/departments/:departmentId",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/departments/create",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/departments/edit/:departmentId",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/documents",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/settings",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/users",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/users/:userId",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/users/create",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/users/edit/:userId",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
       {
         path: "/profile/view/:profileId",
-        element: <Placeholder />,
+        element: <RequireAuth><Placeholder /></RequireAuth>,
       },
     ],
   },
