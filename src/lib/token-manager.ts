@@ -6,8 +6,8 @@ type TokenManagerSubscriber = () => void;
 
 class TokenManager {
   private static instance: TokenManager;
+  private _lastRefreshTime: number = 0;
   private refreshPromise: Promise<{ session: Session | null; error: AuthError | null }> | null = null;
-  private lastRefreshTime: number = 0;
   private refreshInterval: number = 3600000; // 1 hour in milliseconds
   private sessionExpiryBuffer: number = 300000; // 5 minutes in milliseconds
   private subscribers: TokenManagerSubscriber[] = [];
@@ -25,6 +25,13 @@ class TokenManager {
       TokenManager.instance = new TokenManager();
     }
     return TokenManager.instance;
+  }
+  
+  /**
+   * Get the last refresh time
+   */
+  public get lastRefreshTime(): number {
+    return this._lastRefreshTime;
   }
 
   /**
@@ -72,7 +79,7 @@ class TokenManager {
    * @returns Time in milliseconds
    */
   public getTimeSinceLastRefresh(): number {
-    return Date.now() - this.lastRefreshTime;
+    return Date.now() - this._lastRefreshTime;
   }
 
   /**
@@ -155,7 +162,7 @@ class TokenManager {
       this.refreshPromise = new Promise(async (resolve) => {
         try {
           const { data, error } = await supabase.auth.refreshSession();
-          this.lastRefreshTime = Date.now();
+          this._lastRefreshTime = Date.now();
           
           if (error) {
             console.error('Error refreshing session:', error);
@@ -192,7 +199,7 @@ class TokenManager {
       
       if (!error) {
         // Reset refresh time when signing out
-        this.lastRefreshTime = 0;
+        this._lastRefreshTime = 0;
         // Notify subscribers about sign out
         this.notifySubscribers();
       }

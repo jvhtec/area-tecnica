@@ -97,7 +97,10 @@ export function PerformanceMonitor() {
     
     // Network request monitoring
     const monitorNetworkRequests = () => {
+      // Store original functions before overriding them
       const originalFetch = window.fetch;
+      const originalXhrOpen = XMLHttpRequest.prototype.open;
+      const originalXhrSend = XMLHttpRequest.prototype.send;
       
       window.fetch = async function(input, init) {
         const requestId = Math.random().toString(36).substring(2);
@@ -110,7 +113,7 @@ export function PerformanceMonitor() {
           url = input.url;
           method = input.method;
         } else {
-          url = input.toString();
+          url = String(input);
         }
         
         if (init?.method) {
@@ -127,6 +130,7 @@ export function PerformanceMonitor() {
         setNetworkRequests(prev => [...prev, request]);
         
         try {
+          // Use the stored original fetch function
           const response = await originalFetch.apply(this, [input, init]);
           
           // Update request with success info
@@ -162,13 +166,11 @@ export function PerformanceMonitor() {
       };
       
       // Monitor XMLHttpRequest as well
-      const originalXhrOpen = XMLHttpRequest.prototype.open;
-      const originalXhrSend = XMLHttpRequest.prototype.send;
-      
       XMLHttpRequest.prototype.open = function(method, url) {
         this._perfMonRequestId = Math.random().toString(36).substring(2);
         this._perfMonMethod = method;
         this._perfMonUrl = url;
+        // Use the stored original XHR open function
         originalXhrOpen.apply(this, arguments as any);
       };
       
@@ -176,7 +178,7 @@ export function PerformanceMonitor() {
         if (this._perfMonRequestId && this._perfMonUrl) {
           const request: NetworkRequest = {
             id: this._perfMonRequestId,
-            url: this._perfMonUrl.toString(),
+            url: String(this._perfMonUrl),
             method: this._perfMonMethod || 'GET',
             startTime: performance.now()
           };
@@ -213,27 +215,27 @@ export function PerformanceMonitor() {
           });
         }
         
+        // Use the stored original XHR send function
         originalXhrSend.apply(this, arguments as any);
+      };
+      
+      // Return a cleanup function that restores the original functions
+      return () => {
+        window.fetch = originalFetch;
+        XMLHttpRequest.prototype.open = originalXhrOpen;
+        XMLHttpRequest.prototype.send = originalXhrSend;
       };
     };
     
     updateMetrics();
-    monitorNetworkRequests();
+    const cleanup = monitorNetworkRequests();
     
     const interval = setInterval(updateMetrics, 5000);
     
     return () => {
       clearInterval(interval);
-      // Restore original fetch and XHR methods
-      if (window.fetch !== originalFetch) {
-        window.fetch = originalFetch;
-      }
-      if (XMLHttpRequest.prototype.open !== originalXhrOpen) {
-        XMLHttpRequest.prototype.open = originalXhrOpen;
-      }
-      if (XMLHttpRequest.prototype.send !== originalXhrSend) {
-        XMLHttpRequest.prototype.send = originalXhrSend;
-      }
+      // Call the cleanup function to restore original methods
+      cleanup();
     };
   }, []);
 

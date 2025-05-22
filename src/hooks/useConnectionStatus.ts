@@ -74,7 +74,7 @@ export function useConnectionStatus() {
       const connectionRecovered = await ensureRealtimeConnection();
       
       // Second, try to refresh token if needed
-      const timeSinceRefresh = Date.now() - tokenManager.lastRefreshTime;
+      const timeSinceRefresh = Date.now() - tokenManager.lastRefreshTime; // Using the public getter
       if (timeSinceRefresh > 10 * 60 * 1000) { // 10 minutes
         await tokenManager.refreshToken();
       }
