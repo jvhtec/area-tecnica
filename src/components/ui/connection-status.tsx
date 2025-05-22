@@ -1,176 +1,88 @@
 
-import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import React, { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { RefreshCw, Wifi, WifiOff, XCircle } from "lucide-react";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
-import { Wifi, WifiOff, AlertCircle, RefreshCw, Loader2 } from "lucide-react";
-import { Button } from "./button";
-import { formatDistanceToNow } from "date-fns";
-import { toast } from "sonner";
+import { ensureRealtimeConnection } from "@/lib/enhanced-supabase-client";
 
-interface ConnectionStatusProps {
-  variant?: 'card' | 'inline';
-  className?: string;
-}
-
-export function ConnectionStatus({ 
-  variant = 'card',
-  className
-}: ConnectionStatusProps) {
-  const { 
-    connectionStatus, 
-    activeSubscriptions, 
-    lastRefreshTime,
-    refreshSubscriptions
-  } = useSubscriptionContext();
+export function ConnectionStatus() {
+  const { connectionStatus, isNetworkAvailable, forceRefresh } = useSubscriptionContext();
+  const [isVisible, setIsVisible] = useState(false);
+  const [isRecovering, setIsRecovering] = useState(false);
   
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
-  const [hasError, setHasError] = useState(false);
-  
-  // Calculate stale status
-  const isStale = Date.now() - lastRefreshTime > 5 * 60 * 1000; // 5 minutes
-  
-  // Show connection status briefly when there's an issue or on initial load
+  // Only show when disconnected for 5+ seconds
   useEffect(() => {
-    if (connectionStatus === 'connecting') {
-      // Always show when connecting
-      setIsVisible(true);
-    }
-    else if (connectionStatus !== 'connected' || isStale) {
-      setIsVisible(true);
-      setHasError(true);
-      
-      // Keep visible while issues persist
-    } else if (hasError) {
-      // If we've recovered from an error, show briefly then hide
-      setIsVisible(true);
-      setHasError(false);
-      
-      const timeout = setTimeout(() => {
-        setIsVisible(false);
+    let timeoutId: number;
+    
+    if (connectionStatus === 'DISCONNECTED' && !isNetworkAvailable) {
+      // Wait 5 seconds before showing the banner
+      timeoutId = window.setTimeout(() => {
+        setIsVisible(true);
       }, 5000);
-      
-      return () => clearTimeout(timeout);
     } else {
-      // If everything is good, hide after 5 seconds
-      const timeout = setTimeout(() => {
-        setIsVisible(false);
-      }, 5000);
-      
-      return () => clearTimeout(timeout);
+      setIsVisible(false);
     }
-  }, [connectionStatus, isStale, hasError]);
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [connectionStatus, isNetworkAvailable]);
   
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
+  if (!isVisible) return null;
+  
+  const handleReconnect = async () => {
+    setIsRecovering(true);
+    
     try {
-      refreshSubscriptions();
-      toast.success("Real-time connections refreshed");
+      // Try to recover connection
+      const recovered = await ensureRealtimeConnection();
+      
+      if (recovered) {
+        // Force refresh data
+        forceRefresh();
+        setIsVisible(false);
+      }
     } catch (error) {
-      console.error("Error refreshing subscriptions:", error);
-      toast.error("Failed to refresh connections");
+      console.error("Error recovering connection:", error);
     } finally {
-      setIsRefreshing(false);
+      setIsRecovering(false);
     }
   };
   
-  // Format last refresh time
-  let lastRefreshDisplay = "Unknown";
-  try {
-    lastRefreshDisplay = formatDistanceToNow(lastRefreshTime) + " ago";
-  } catch (error) {
-    console.error("Error formatting time:", error);
-  }
-  
-  // If using inline variant, render simpler version
-  if (variant === 'inline') {
-    return (
-      <div className={`flex items-center gap-2 ${className || ''}`}>
-        {connectionStatus === 'connecting' ? (
-          <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
-        ) : connectionStatus === 'connected' ? (
-          isStale ? (
-            <AlertCircle className="h-4 w-4 text-amber-500" />
-          ) : (
-            <Wifi className="h-4 w-4 text-green-500" />
-          )
-        ) : (
-          <WifiOff className="h-4 w-4 text-red-500" />
-        )}
-        
-        <span className="text-sm">
-          {connectionStatus === 'connecting' ? "Connecting..." :
-           connectionStatus === 'connected' 
-            ? (isStale ? "Data may be stale" : "Connected") 
-            : "Disconnected"}
-        </span>
-        
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={handleRefresh}
-          disabled={isRefreshing || connectionStatus === 'connecting'}
-          className="h-7 w-7 p-0"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-          <span className="sr-only">Refresh</span>
-        </Button>
-      </div>
-    );
-  }
-  
   return (
-    <div className={`fixed bottom-4 right-4 z-50 max-w-md transition-all duration-300 ease-in-out ${className || ''}`}>
-      {isVisible && (
-        <Card className={`shadow-lg ${
-          connectionStatus === 'connecting' ? 'bg-blue-50' :
-          connectionStatus === 'connected' && !isStale ? 'bg-green-50' : 'bg-red-50'
-        }`}>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {connectionStatus === 'connecting' ? (
-                  <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
-                ) : connectionStatus === 'connected' ? (
-                  isStale ? (
-                    <AlertCircle className="h-5 w-5 text-amber-500" />
-                  ) : (
-                    <Wifi className="h-5 w-5 text-green-500" />
-                  )
-                ) : (
-                  <WifiOff className="h-5 w-5 text-red-500" />
-                )}
-                
-                <div>
-                  <p className="text-sm font-medium">
-                    {connectionStatus === 'connecting' ? "Connecting..." :
-                     connectionStatus === 'connected' 
-                      ? (isStale ? "Data may be stale" : "Connected") 
-                      : "Connection issue"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {connectionStatus === 'connecting' ? "Establishing connection..." :
-                     connectionStatus === 'connected' 
-                      ? `Last updated: ${lastRefreshDisplay}` 
-                      : "Attempting to reconnect..."}
-                  </p>
-                </div>
-              </div>
-              
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleRefresh}
-                disabled={isRefreshing || connectionStatus === 'connecting'}
-                className="h-8 w-8 p-0"
-              >
-                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                <span className="sr-only">Refresh</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+    <div className="fixed bottom-4 right-4 z-50 bg-destructive/90 text-destructive-foreground rounded-lg shadow-lg p-4 animate-in fade-in slide-in-from-right">
+      <div className="flex items-center gap-3">
+        <WifiOff className="h-5 w-5" />
+        <div className="flex-1">
+          <h4 className="font-medium">Connection lost</h4>
+          <p className="text-xs opacity-80">The application is experiencing connectivity issues</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleReconnect} 
+            disabled={isRecovering}
+            className="bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90"
+          >
+            {isRecovering ? (
+              <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            Reconnect
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setIsVisible(false)}
+            className="text-destructive-foreground hover:bg-destructive-foreground/10"
+          >
+            <XCircle className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

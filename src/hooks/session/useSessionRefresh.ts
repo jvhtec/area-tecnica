@@ -37,7 +37,7 @@ export const useSessionRefresh = () => {
     } finally {
       setIsRefreshing(false);
     }
-  }, [isRefreshing]);
+  }, [isRefreshing, tokenManager]);
 
   // Subscribe to token refresh events
   useEffect(() => {
@@ -46,12 +46,12 @@ export const useSessionRefresh = () => {
     });
     
     return unsubscribe;
-  }, []);
+  }, [tokenManager]);
 
   // Update last refresh time when component mounts
   useEffect(() => {
     setLastRefresh(tokenManager.getTimeSinceLastRefresh());
-  }, []);
+  }, [tokenManager]);
 
   return { 
     refreshSession, 

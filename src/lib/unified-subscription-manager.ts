@@ -1,496 +1,476 @@
-import { QueryClient } from "@tanstack/react-query";
-import { supabase } from "./supabase-client";
 
 /**
- * Enhanced subscription manager that centralizes all Supabase realtime subscriptions
- * and coordinates them with React Query cache invalidation
+ * Unified Subscription Manager
+ * Centralized manager for all Supabase realtime subscriptions
+ * Prevents duplicate subscriptions and ensures efficient resource usage
  */
+
+import { QueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
+
+type SubscriptionPriority = 'high' | 'medium' | 'low';
+type QueryKeyType = string | (string | number)[];
+
+interface SubscriptionOptions {
+  event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*';
+  schema?: string;
+  filter?: string;
+}
+
+interface SubscriptionMetadata {
+  id: string;
+  table: string;
+  queryKey: QueryKeyType;
+  filter?: SubscriptionOptions;
+  priority: SubscriptionPriority;
+  channel: any;
+  lastActivity: number;
+  isConnected: boolean;
+  errorCount: number;
+  routes: Set<string>;
+}
+
 export class UnifiedSubscriptionManager {
   private static instance: UnifiedSubscriptionManager;
   private queryClient: QueryClient;
-  private subscriptions: Map<string, { unsubscribe: () => void, options: any }>;
-  private pendingSubscriptions: Map<string, any>;
-  private routeSubscriptions: Map<string, Set<string>>;
-  private lastReconnectAttempt: number;
-  private connectionStatus: 'connected' | 'disconnected' | 'connecting';
-  private pingChannelId: string | null;
-  private tableLastActivity: Map<string, number>;
-  private visibilityChangeHandler: () => void;
-  private networkStatusHandler: () => void;
+  private subscriptions: Map<string, SubscriptionMetadata> = new Map();
+  private subscriptionsByTable: Record<string, string[]> = {};
+  private subscriptionsByQueryKey: Record<string, string[]> = {};
+  private routeSubscriptions: Record<string, Set<string>> = {};
+  private lastRefreshTime: number = Date.now();
+  private connectionStatus: 'CONNECTED' | 'CONNECTING' | 'DISCONNECTED' = 'CONNECTING';
+  private pingIntervalId: number | null = null;
+  private networkRetryTimeoutId: number | null = null;
 
   private constructor(queryClient: QueryClient) {
     this.queryClient = queryClient;
-    this.subscriptions = new Map();
-    this.pendingSubscriptions = new Map();
-    this.routeSubscriptions = new Map();
-    this.tableLastActivity = new Map();
-    this.lastReconnectAttempt = 0;
-    this.connectionStatus = 'connecting';
-    this.pingChannelId = null;
-    
-    // Initialize connection
-    this.setupPingChannel();
-
-    // Setup event to notify components when connections recover
-    window.addEventListener('supabase-reconnect', () => this.reestablishSubscriptions());
+    this.setupVisibilityBasedRefetching();
+    this.setupNetworkStatusRefetching();
+    this.setupRefreshEvents();
+    this.startPingInterval();
   }
 
-  /**
-   * Singleton pattern implementation
-   */
   public static getInstance(queryClient: QueryClient): UnifiedSubscriptionManager {
     if (!UnifiedSubscriptionManager.instance) {
       UnifiedSubscriptionManager.instance = new UnifiedSubscriptionManager(queryClient);
+    } else if (queryClient) {
+      // Update query client reference if provided
+      UnifiedSubscriptionManager.instance.queryClient = queryClient;
     }
     return UnifiedSubscriptionManager.instance;
   }
-  
-  /**
-   * Setup a ping channel to monitor connection status
-   */
-  private setupPingChannel() {
-    if (this.pingChannelId) {
-      // Find and remove channel by ID if it exists
-      const channels = supabase.getChannels();
-      const existingChannel = channels.find(ch => ch.subscribe.toString().includes(this.pingChannelId!));
-      if (existingChannel) {
-        supabase.removeChannel(existingChannel);
-      }
-      this.pingChannelId = null;
+
+  private getQueryKeyString(queryKey: QueryKeyType): string {
+    if (typeof queryKey === 'string') {
+      return queryKey;
+    }
+    return JSON.stringify(queryKey);
+  }
+
+  private getSubscriptionKey(table: string, queryKey: QueryKeyType, filter?: SubscriptionOptions): string {
+    const queryKeyStr = this.getQueryKeyString(queryKey);
+    const filterStr = filter ? JSON.stringify(filter) : '';
+    return `${table}::${queryKeyStr}::${filterStr}`;
+  }
+
+  public subscribeToTable(
+    table: string,
+    queryKey: QueryKeyType,
+    filter?: SubscriptionOptions,
+    priority: SubscriptionPriority = 'medium'
+  ) {
+    const subscriptionKey = this.getSubscriptionKey(table, queryKey, filter);
+    const queryKeyStr = this.getQueryKeyString(queryKey);
+
+    // If subscription already exists, increment reference count and return existing
+    if (this.subscriptions.has(subscriptionKey)) {
+      const existing = this.subscriptions.get(subscriptionKey)!;
+      console.log(`Reusing existing subscription for ${table} with key ${queryKeyStr}`);
+      return {
+        unsubscribe: () => {}
+      };
     }
 
-    try {
-      const pingChannel = supabase.channel('ping');
-      this.pingChannelId = 'ping'; // Store channel name instead of ID
-      
-      pingChannel
-        .on('presence', { event: 'sync' }, () => {
-          this.connectionStatus = 'connected';
-          console.log('Ping channel sync event - connection active');
-        })
-        .on('system', { event: 'disconnect' }, () => {
-          this.connectionStatus = 'disconnected';
-          console.log('Ping channel disconnect event - connection lost');
-        })
-        .on('system', { event: 'reconnected' }, () => {
-          this.connectionStatus = 'connected';
-          console.log('Ping channel reconnected - connection restored');
-          this.reestablishSubscriptions();
-        })
-        .subscribe((status) => {
-          console.log(`Ping channel status: ${status}`);
+    console.log(`Creating new subscription for ${table} with key ${queryKeyStr}`);
+
+    // Create Supabase channel for realtime subscription
+    const channel = supabase.channel(`table-changes-${subscriptionKey}`)
+      .on('presence', { event: 'sync' }, () => {
+        console.log(`Subscription presence sync: ${table}`);
+      })
+      .on('postgres_changes', {
+        event: filter?.event || '*',
+        schema: filter?.schema || 'public',
+        table,
+        filter: filter?.filter
+      }, (payload) => {
+        console.log(`Realtime change in ${table}:`, payload);
+
+        // Record activity and update status
+        const subscription = this.subscriptions.get(subscriptionKey);
+        if (subscription) {
+          subscription.lastActivity = Date.now();
+        }
+
+        // Update shared state
+        this.lastRefreshTime = Date.now();
+        this.connectionStatus = 'CONNECTED';
+
+        // Invalidate query cache based on queryKey
+        this.invalidateQuery(queryKey);
+      })
+      .subscribe((status) => {
+        console.log(`Subscription status for ${table}:`, status);
+        
+        const subscription = this.subscriptions.get(subscriptionKey);
+        if (subscription) {
+          subscription.isConnected = status === 'SUBSCRIBED';
+          
           if (status === 'SUBSCRIBED') {
-            this.connectionStatus = 'connected';
-          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-            this.connectionStatus = 'disconnected';
-          } else {
-            this.connectionStatus = 'connecting';
+            subscription.errorCount = 0;
+          } else if (status === 'CHANNEL_ERROR') {
+            subscription.errorCount += 1;
           }
-        });
-    } catch (error) {
-      console.error('Error setting up ping channel:', error);
-      this.connectionStatus = 'disconnected';
-    }
-  }
-
-  /**
-   * Reestablish all subscriptions, typically after a connection loss
-   */
-  public reestablishSubscriptions(): boolean {
-    console.log('Manually reestablishing subscriptions');
-    this.setupPingChannel();
-    
-    const now = Date.now();
-    // Don't attempt reconnection too frequently
-    if (now - this.lastReconnectAttempt < 5000) {
-      console.log('Reconnection attempt too soon, skipping');
-      return false;
-    }
-    
-    this.lastReconnectAttempt = now;
-    this.connectionStatus = 'connecting';
-    
-    // Copy all existing subscriptions to pending
-    this.subscriptions.forEach((subscription, key) => {
-      this.pendingSubscriptions.set(key, subscription.options);
-    });
-    
-    // Clean up existing subscriptions
-    this.unsubscribeAll(false);
-    
-    // Resubscribe to all tables
-    this.pendingSubscriptions.forEach((options, key) => {
-      this.subscribeToTable(options.table, options.queryKey, options.filter, options.priority);
-      this.pendingSubscriptions.delete(key);
-    });
-    
-    // Perform a full query invalidation to refresh data
-    this.queryClient.invalidateQueries();
-    
-    this.connectionStatus = 'connected';
-    console.log('Supabase subscriptions reestablished');
-    
-    return true;
-  }
-
-  /**
-   * Cleanup subscriptions when leaving a route
-   */
-  public cleanupRouteDependentSubscriptions(route: string) {
-    console.log(`Cleaning up subscriptions for route: ${route}`);
-    
-    // Get the set of subscription keys associated with this route
-    const subscriptionKeys = this.routeSubscriptions.get(route);
-    
-    if (!subscriptionKeys || subscriptionKeys.size === 0) {
-      console.log(`No subscriptions found for route ${route}`);
-      return;
-    }
-    
-    // Check each subscription to see if it's used by other routes before unsubscribing
-    subscriptionKeys.forEach(key => {
-      let isUsedElsewhere = false;
-      
-      // Check if this subscription is used by any other route
-      this.routeSubscriptions.forEach((keys, otherRoute) => {
-        if (otherRoute !== route && keys.has(key)) {
-          isUsedElsewhere = true;
         }
       });
-      
-      // If not used elsewhere, unsubscribe
-      if (!isUsedElsewhere) {
-        console.log(`Unsubscribing from ${key} as it's no longer needed`);
-        const subscription = this.subscriptions.get(key);
-        if (subscription) {
-          subscription.unsubscribe();
-          this.subscriptions.delete(key);
-        }
-      } else {
-        console.log(`Keeping subscription to ${key} as it's used by other routes`);
-      }
-    });
-    
-    // Clear the route's subscription list
-    this.routeSubscriptions.delete(route);
-  }
 
-  /**
-   * Subscribe to a single table with intelligent cache invalidation
-   */
-  public subscribeToTable(
-    table: string, 
-    queryKey: string | string[], 
-    filter?: {
-      event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*',
-      schema?: string,
-      filter?: string
-    },
-    priority: 'high' | 'medium' | 'low' = 'medium'
-  ) {
-    const normalizedQueryKey = Array.isArray(queryKey) 
-      ? JSON.stringify(queryKey) 
-      : queryKey;
-      
-    const subscriptionKey = `${table}::${normalizedQueryKey}`;
-    
-    // Check if we already have this subscription
-    if (this.subscriptions.has(subscriptionKey)) {
-      console.log(`Already subscribed to ${table} with query key ${normalizedQueryKey}`);
-      return this.subscriptions.get(subscriptionKey);
-    }
-    
-    console.log(`Subscribing to ${table} with query key ${normalizedQueryKey} (priority: ${priority})`);
-    
-    try {
-      // Configure the subscription
-      const eventType = filter?.event || '*';
-      const schema = filter?.schema || 'public';
-      const eventFilter = filter?.filter || undefined;
-      
-      // Create a unique channel name based on the subscription
-      const channelName = `${table}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-      const channel = supabase.channel(channelName);
-      
-      // Configure channel with the subscription options
-      const subscriptionConfig: any = {
-        event: eventType,
-        schema: schema,
-        table: table
-      };
-      
-      if (eventFilter) {
-        subscriptionConfig.filter = eventFilter;
-      }
-      
-      const channelSubscription = channel
-        .on('postgres_changes', subscriptionConfig, (payload) => {
-          console.log(`Received ${payload.eventType} for ${table}:`, payload);
-          
-          // Update last activity timestamp
-          this.tableLastActivity.set(subscriptionKey, Date.now());
-          
-          // Invalidate React Query cache based on the query key
-          if (Array.isArray(queryKey)) {
-            this.queryClient.invalidateQueries({ queryKey });
-          } else {
-            this.queryClient.invalidateQueries({ queryKey: [queryKey] });
-          }
-        })
-        .subscribe((status) => {
-          console.log(`Channel ${channelName} status:`, status);
-          
-          // If channel subscription fails, retry with backoff
-          if (status === 'CHANNEL_ERROR') {
-            console.error(`Error subscribing to ${table}, will retry...`);
-            setTimeout(() => {
-              if (this.subscriptions.has(subscriptionKey)) {
-                console.log(`Retrying subscription to ${table}`);
-                const sub = this.subscriptions.get(subscriptionKey);
-                if (sub) {
-                  try {
-                    sub.unsubscribe();
-                  } catch (e) {
-                    console.error('Error unsubscribing during retry:', e);
-                  }
-                  this.subscriptions.delete(subscriptionKey);
-                }
-                this.subscribeToTable(table, queryKey, filter, priority);
-              }
-            }, 5000); // Try again in 5 seconds
-          }
-        });
-      
-      // Create an object with unsubscribe function
-      const subscription = {
-        unsubscribe: () => {
-          console.log(`Unsubscribing from ${table} with query key ${normalizedQueryKey}`);
-          try {
-            supabase.removeChannel(channel);
-          } catch (error) {
-            console.error(`Error removing channel for ${table}:`, error);
-          }
-        },
-        options: { table, queryKey, filter, priority }
-      };
-      
-      // Store the subscription for later cleanup
-      this.subscriptions.set(subscriptionKey, subscription);
-      
-      // Initialize last activity timestamp
-      this.tableLastActivity.set(subscriptionKey, Date.now());
-      
-      return subscription;
-    } catch (error) {
-      console.error(`Error subscribing to ${table}:`, error);
-      return { unsubscribe: () => {} };
-    }
-  }
+    // Register subscription
+    const metadata: SubscriptionMetadata = {
+      id: subscriptionKey,
+      table,
+      queryKey,
+      filter,
+      priority,
+      channel,
+      lastActivity: Date.now(),
+      isConnected: false,
+      errorCount: 0,
+      routes: new Set()
+    };
 
-  /**
-   * Register a subscription with a specific route
-   */
-  public registerRouteSubscription(route: string, subscriptionKey: string) {
-    if (!this.routeSubscriptions.has(route)) {
-      this.routeSubscriptions.set(route, new Set());
+    // Store in collections
+    this.subscriptions.set(subscriptionKey, metadata);
+    
+    // Update table index
+    if (!this.subscriptionsByTable[table]) {
+      this.subscriptionsByTable[table] = [];
     }
+    this.subscriptionsByTable[table].push(subscriptionKey);
     
-    this.routeSubscriptions.get(route)?.add(subscriptionKey);
-  }
+    // Update queryKey index
+    if (!this.subscriptionsByQueryKey[queryKeyStr]) {
+      this.subscriptionsByQueryKey[queryKeyStr] = [];
+    }
+    this.subscriptionsByQueryKey[queryKeyStr].push(subscriptionKey);
 
-  /**
-   * Subscribe to multiple tables at once
-   */
-  public subscribeToTables(
-    tableConfigs: Array<{
-      table: string, 
-      queryKey: string | string[],
-      filter?: {
-        event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*',
-        schema?: string,
-        filter?: string
-      },
-      priority?: 'high' | 'medium' | 'low'
-    }>
-  ) {
-    const subscriptions = tableConfigs.map(config => 
-      this.subscribeToTable(
-        config.table, 
-        config.queryKey, 
-        config.filter, 
-        config.priority || 'medium'
-      )
-    );
-    
-    // Return a composite unsubscribe function
+    // Return unsubscribe function
     return {
       unsubscribe: () => {
-        subscriptions.forEach(subscription => subscription.unsubscribe());
+        this.unsubscribe(subscriptionKey, table, queryKeyStr);
       }
     };
   }
 
-  /**
-   * Unsubscribe from all subscriptions
-   */
-  public unsubscribeAll(clearPending: boolean = true) {
-    console.log('Unsubscribing from all subscriptions');
-    this.subscriptions.forEach((subscription, key) => {
-      try {
-        subscription.unsubscribe();
-      } catch (error) {
-        console.error(`Error unsubscribing from ${key}:`, error);
+  public subscribeToTables(
+    tables: Array<{
+      table: string;
+      queryKey: QueryKeyType;
+      filter?: SubscriptionOptions;
+      priority?: SubscriptionPriority;
+    }>
+  ) {
+    const subscriptions = tables.map(({ table, queryKey, filter, priority }) => 
+      this.subscribeToTable(table, queryKey, filter, priority || 'medium')
+    );
+
+    return {
+      unsubscribe: () => {
+        subscriptions.forEach(sub => sub.unsubscribe());
       }
-    });
-    
-    this.subscriptions.clear();
-    
-    if (clearPending) {
-      this.pendingSubscriptions.clear();
+    };
+  }
+
+  private unsubscribe(subscriptionKey: string, table: string, queryKeyStr: string) {
+    const subscription = this.subscriptions.get(subscriptionKey);
+    if (!subscription) return;
+
+    // Remove from route registrations
+    if (subscription.routes.size === 0) {
+      console.log(`Unsubscribing from ${table} with key ${queryKeyStr}`);
+
+      // Remove from Supabase
+      subscription.channel.unsubscribe();
+
+      // Remove from our collections
+      this.subscriptions.delete(subscriptionKey);
+      
+      // Remove from table index
+      if (this.subscriptionsByTable[table]) {
+        this.subscriptionsByTable[table] = this.subscriptionsByTable[table]
+          .filter(key => key !== subscriptionKey);
+        
+        if (this.subscriptionsByTable[table].length === 0) {
+          delete this.subscriptionsByTable[table];
+        }
+      }
+      
+      // Remove from queryKey index
+      if (this.subscriptionsByQueryKey[queryKeyStr]) {
+        this.subscriptionsByQueryKey[queryKeyStr] = this.subscriptionsByQueryKey[queryKeyStr]
+          .filter(key => key !== subscriptionKey);
+        
+        if (this.subscriptionsByQueryKey[queryKeyStr].length === 0) {
+          delete this.subscriptionsByQueryKey[queryKeyStr];
+        }
+      }
     }
   }
 
-  /**
-   * Setup automatic refetching when window visibility changes
-   */
-  public setupVisibilityBasedRefetching() {
-    // Clean up existing handler if it exists
-    if (this.visibilityChangeHandler) {
-      document.removeEventListener('visibilitychange', this.visibilityChangeHandler);
+  public registerRouteSubscription(route: string, subscriptionKey: string) {
+    const subscription = this.subscriptions.get(subscriptionKey);
+    if (!subscription) return;
+
+    // Add route to subscription metadata
+    subscription.routes.add(route);
+
+    // Track route subscriptions
+    if (!this.routeSubscriptions[route]) {
+      this.routeSubscriptions[route] = new Set();
+    }
+    this.routeSubscriptions[route].add(subscriptionKey);
+  }
+
+  public cleanupRouteDependentSubscriptions(route: string) {
+    const subscriptionKeys = this.routeSubscriptions[route];
+    if (!subscriptionKeys) return;
+
+    subscriptionKeys.forEach(key => {
+      const subscription = this.subscriptions.get(key);
+      if (subscription) {
+        // Remove route from subscription
+        subscription.routes.delete(route);
+
+        // If no routes left and not a high priority subscription, unsubscribe
+        if (subscription.routes.size === 0 && subscription.priority !== 'high') {
+          this.unsubscribe(
+            key, 
+            subscription.table,
+            this.getQueryKeyString(subscription.queryKey)
+          );
+        }
+      }
+    });
+
+    // Clean up route tracking
+    delete this.routeSubscriptions[route];
+  }
+
+  private invalidateQuery(queryKey: QueryKeyType) {
+    if (typeof queryKey === 'string') {
+      this.queryClient.invalidateQueries({ queryKey: [queryKey] });
+    } else {
+      this.queryClient.invalidateQueries({ queryKey });
+    }
+  }
+
+  public getSubscriptionsByTable() {
+    return { ...this.subscriptionsByTable };
+  }
+
+  public getSubscriptionStatus(table: string, queryKey: QueryKeyType) {
+    const queryKeyStr = this.getQueryKeyString(queryKey);
+    const keys = this.subscriptionsByTable[table] || [];
+    
+    // Find subscription matching both table and queryKey
+    for (const key of keys) {
+      const subscription = this.subscriptions.get(key);
+      if (subscription && this.getQueryKeyString(subscription.queryKey) === queryKeyStr) {
+        return {
+          isConnected: subscription.isConnected,
+          lastActivity: subscription.lastActivity,
+          errorCount: subscription.errorCount
+        };
+      }
     }
     
-    // Create new handler
-    this.visibilityChangeHandler = () => {
+    return {
+      isConnected: false,
+      lastActivity: 0,
+      errorCount: 0
+    };
+  }
+
+  public setupVisibilityBasedRefetching() {
+    if (typeof document === 'undefined') return;
+
+    document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
-        console.log('Tab became visible, checking for stale data...');
-        const now = Date.now();
-        let hasStaleData = false;
+        console.log('Tab became visible, checking for stale data');
         
-        // Check if any subscription has stale data
-        this.tableLastActivity.forEach((lastActivity, key) => {
-          if (now - lastActivity > 5 * 60 * 1000) { // 5 minutes
-            console.log(`Stale data detected for ${key}`);
-            hasStaleData = true;
+        // Calculate time since last activity
+        const now = Date.now();
+        const timeSinceLastRefresh = now - this.lastRefreshTime;
+        
+        // If more than 2 minutes since last refresh, reestablish subscriptions
+        if (timeSinceLastRefresh > 2 * 60 * 1000) {
+          console.log('Tab was inactive for a while, reestablishing subscriptions');
+          this.reestablishSubscriptions();
+        }
+      }
+    });
+  }
+
+  public setupNetworkStatusRefetching() {
+    if (typeof window === 'undefined') return;
+
+    window.addEventListener('online', () => {
+      console.log('Network reconnected, reestablishing subscriptions');
+      this.reestablishSubscriptions();
+    });
+    
+    // Custom reconnect event listener
+    window.addEventListener('supabase-reconnect', () => {
+      console.log('Supabase reconnect requested, reestablishing subscriptions');
+      this.reestablishSubscriptions();
+    });
+    
+    // Force refresh event listener
+    window.addEventListener('force-refresh-subscriptions', (event: any) => {
+      const tables = event.detail?.tables;
+      if (tables && Array.isArray(tables)) {
+        console.log('Force refresh requested for tables:', tables);
+        this.forceRefreshSubscriptions(tables);
+      } else {
+        console.log('Force refresh requested for all subscriptions');
+        this.reestablishSubscriptions();
+      }
+    });
+  }
+  
+  private setupRefreshEvents() {
+    window.addEventListener('connection-restored', () => {
+      console.log('Connection restored, invalidating queries');
+      this.queryClient.invalidateQueries();
+    });
+  }
+  
+  private startPingInterval() {
+    // Clear any existing interval
+    if (this.pingIntervalId) {
+      clearInterval(this.pingIntervalId);
+    }
+    
+    // Check connection health every minute
+    this.pingIntervalId = window.setInterval(() => {
+      this.pingConnection();
+    }, 60000);
+  }
+  
+  private async pingConnection() {
+    try {
+      // Fetch realtime status from supabase
+      const { data } = await supabase.rpc('supabase_realtime_status');
+      
+      // Update connection status
+      this.connectionStatus = data?.is_connected ? 'CONNECTED' : 'DISCONNECTED';
+      
+      // If disconnected, attempt to reconnect
+      if (!data?.is_connected) {
+        console.log('Realtime connection lost, attempting to reconnect');
+        this.scheduleReconnect();
+      }
+    } catch (error) {
+      console.error('Error pinging connection:', error);
+      this.connectionStatus = 'DISCONNECTED';
+      this.scheduleReconnect();
+    }
+  }
+  
+  private scheduleReconnect() {
+    // Avoid multiple concurrent reconnect attempts
+    if (this.networkRetryTimeoutId) {
+      clearTimeout(this.networkRetryTimeoutId);
+    }
+    
+    // Attempt reconnect with exponential backoff
+    const backoff = Math.floor(Math.random() * 5000) + 1000; // 1-6s random backoff
+    console.log(`Scheduling reconnect in ${backoff}ms`);
+    
+    this.networkRetryTimeoutId = window.setTimeout(() => {
+      this.reestablishSubscriptions();
+      this.networkRetryTimeoutId = null;
+    }, backoff);
+  }
+
+  public reestablishSubscriptions() {
+    console.log('Reestablishing all active subscriptions');
+    
+    // Update refresh time
+    this.lastRefreshTime = Date.now();
+    
+    // Loop through active subscriptions
+    this.subscriptions.forEach((metadata, key) => {
+      try {
+        // Unsubscribe from current channel
+        if (metadata.channel) {
+          metadata.channel.unsubscribe();
+        }
+        
+        // Create new subscription with same parameters
+        const { table, queryKey, filter, priority, routes } = metadata;
+        
+        // Create Supabase channel for realtime subscription
+        const channel = supabase.channel(`table-changes-${key}-${Date.now()}`)
+          .on('postgres_changes', {
+            event: filter?.event || '*',
+            schema: filter?.schema || 'public',
+            table,
+            filter: filter?.filter
+          }, (payload) => {
+            console.log(`Realtime change in ${table}:`, payload);
+            
+            // Record activity
+            metadata.lastActivity = Date.now();
+            this.lastRefreshTime = Date.now();
+            
+            // Invalidate query cache based on queryKey
+            this.invalidateQuery(queryKey);
+          })
+          .subscribe();
+          
+        // Update metadata
+        metadata.channel = channel;
+        metadata.lastActivity = Date.now();
+        
+        // Invalidate related query to get fresh data
+        this.invalidateQuery(queryKey);
+      } catch (error) {
+        console.error(`Error reestablishing subscription ${key}:`, error);
+      }
+    });
+  }
+  
+  public forceRefreshSubscriptions(tables: string[]) {
+    console.log(`Forcing refresh for tables: ${tables.join(', ')}`);
+    
+    // Update refresh time
+    this.lastRefreshTime = Date.now();
+    
+    // Invalidate queries for each table
+    tables.forEach(table => {
+      const subscriptionKeys = this.subscriptionsByTable[table];
+      if (subscriptionKeys) {
+        subscriptionKeys.forEach(key => {
+          const subscription = this.subscriptions.get(key);
+          if (subscription) {
+            // Invalidate related query
+            this.invalidateQuery(subscription.queryKey);
+            
+            // Update activity timestamp
+            subscription.lastActivity = Date.now();
           }
         });
-        
-        // If we have stale data, invalidate all queries
-        if (hasStaleData) {
-          console.log('Refreshing stale data...');
-          this.queryClient.invalidateQueries();
-        }
       }
-    };
-    
-    document.addEventListener('visibilitychange', this.visibilityChangeHandler);
-  }
-
-  /**
-   * Setup automatic refetching when network status changes
-   */
-  public setupNetworkStatusRefetching() {
-    // Clean up existing handler if it exists
-    if (this.networkStatusHandler) {
-      window.removeEventListener('online', this.networkStatusHandler);
-    }
-    
-    // Create new handler
-    this.networkStatusHandler = () => {
-      console.log('Network connection restored, refreshing data...');
-      this.reestablishSubscriptions();
-      this.queryClient.invalidateQueries();
-    };
-    
-    window.addEventListener('online', this.networkStatusHandler);
-  }
-
-  /**
-   * Get all subscriptions grouped by table
-   */
-  public getSubscriptionsByTable(): Record<string, string[]> {
-    const result: Record<string, string[]> = {};
-    
-    this.subscriptions.forEach((subscription, key) => {
-      const [table] = key.split('::');
-      if (!result[table]) {
-        result[table] = [];
-      }
-      result[table].push(key);
-    });
-    
-    return result;
-  }
-
-  /**
-   * Get all active subscriptions
-   */
-  public getActiveSubscriptions(): string[] {
-    return Array.from(this.subscriptions.keys());
-  }
-
-  /**
-   * Get total number of active subscriptions
-   */
-  public getSubscriptionCount(): number {
-    return this.subscriptions.size;
-  }
-
-  /**
-   * Get current connection status
-   */
-  public getConnectionStatus(): 'connected' | 'disconnected' | 'connecting' {
-    return this.connectionStatus;
-  }
-
-  /**
-   * Get subscription status for a specific table
-   */
-  public getSubscriptionStatus(table: string, queryKey: string | string[]): { isConnected: boolean, lastActivity: number } {
-    const normalizedQueryKey = Array.isArray(queryKey) ? JSON.stringify(queryKey) : queryKey;
-    const subscriptionKey = `${table}::${normalizedQueryKey}`;
-    
-    const isConnected = this.subscriptions.has(subscriptionKey) && this.connectionStatus === 'connected';
-    const lastActivity = this.tableLastActivity.get(subscriptionKey) || 0;
-    
-    return { isConnected, lastActivity };
-  }
-
-  /**
-   * Force refresh subscriptions for specific tables
-   */
-  public forceRefreshSubscriptions(tables: string[]) {
-    console.log(`Forcing refresh of subscriptions for tables: ${tables.join(', ')}`);
-    
-    // For each table, find all related subscriptions
-    tables.forEach(table => {
-      // Get all subscriptions for this table
-      const subscriptionKeys = Array.from(this.subscriptions.keys())
-        .filter(key => key.startsWith(`${table}::`));
-      
-      // For each subscription, unsubscribe and then resubscribe
-      subscriptionKeys.forEach(key => {
-        const subscription = this.subscriptions.get(key);
-        if (subscription) {
-          try {
-            const { table, queryKey, filter, priority } = subscription.options;
-            
-            // Unsubscribe
-            subscription.unsubscribe();
-            this.subscriptions.delete(key);
-            
-            // Resubscribe
-            this.subscribeToTable(table, queryKey, filter, priority);
-            
-            // Update activity timestamp to now
-            this.tableLastActivity.set(key, Date.now());
-          } catch (error) {
-            console.error(`Error refreshing subscription ${key}:`, error);
-          }
-        }
-      });
-      
-      // Invalidate queries related to this table
-      this.queryClient.invalidateQueries({ queryKey: [table] });
     });
   }
 }
