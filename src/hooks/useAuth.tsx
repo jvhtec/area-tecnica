@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useContext, createContext, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
@@ -83,7 +82,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const { session: refreshedSession, error } = await tokenManager.refreshToken();
       
       if (error) {
-        console.error("Session refresh error:", error);
+        console.log("Session refresh error:", error);
         
         // Handle expired session
         if (error.message && error.message.includes('expired')) {
@@ -286,13 +285,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setIsLoading(true);
         
         // Get initial session
-        const initialSession = await tokenManager.getSession();
+        const initialSession = await supabase.auth.getSession();
         
-        if (initialSession) {
-          setSession(initialSession);
-          setUser(initialSession.user);
+        if (initialSession.data.session) {
+          setSession(initialSession.data.session);
+          setUser(initialSession.data.session.user);
           
-          const profile = await fetchUserProfile(initialSession.user.id);
+          const profile = await fetchUserProfile(initialSession.data.session.user.id);
           if (profile) {
             setUserRole(profile.role);
             setUserDepartment(profile.department);
@@ -361,8 +360,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         // Only refresh if we have a session and it might be stale
-        if (session && tokenManager.checkTokenExpiration(session, 10 * 60 * 1000)) {
-          refreshSession();
+        if (session) {
+          tokenManager.checkTokenExpiration().then(isExpiring => {
+            if (isExpiring) {
+              refreshSession();
+            }
+          });
         }
       }
     };

@@ -46,7 +46,7 @@ export function AppInit() {
     manager.setupNetworkStatusRefetching();
     
     // Subscribe to token refresh events
-    tokenManager.subscribe(() => {
+    const unsubscribe = tokenManager.subscribe(() => {
       console.log("Token refreshed, updating subscriptions");
       manager.reestablishSubscriptions();
     });
@@ -79,6 +79,7 @@ export function AppInit() {
     
     // Return cleanup
     return () => {
+      unsubscribe();
       window.removeEventListener('online', debouncedConnectionCheck);
       window.removeEventListener('offline', debouncedConnectionCheck);
       window.removeEventListener('token-refresh-needed', handleTokenRefreshNeeded);

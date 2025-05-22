@@ -50,7 +50,7 @@ export const useSessionRefresh = () => {
 
   // Update last refresh time when component mounts
   useEffect(() => {
-    setLastRefresh(tokenManager.getTimeSinceLastRefresh());
+    setLastRefresh(Date.now() - tokenManager.getTimeSinceLastRefresh());
   }, [tokenManager]);
 
   return { 

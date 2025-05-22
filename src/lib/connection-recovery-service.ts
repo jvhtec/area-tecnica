@@ -1,5 +1,5 @@
 
-import { supabase } from './supabase-client';
+import { supabase } from './supabase';
 import { TokenManager } from './token-manager';
 
 /**
@@ -100,7 +100,7 @@ export const connectionRecovery = {
       
       // Check token expiration
       const tokenManager = TokenManager.getInstance();
-      const isExpiring = await tokenManager.checkTokenExpiration(session, 10 * 60 * 1000); // 10 minute buffer
+      const isExpiring = await tokenManager.checkTokenExpiration(session);
       
       if (isExpiring) {
         console.log('Token is expiring soon, refreshing');

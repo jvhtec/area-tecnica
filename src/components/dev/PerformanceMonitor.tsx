@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -83,11 +82,15 @@ export function PerformanceMonitor() {
 
       // Try to get memory usage if available
       if ('memory' in performance) {
-        // @ts-ignore - TypeScript doesn't know about the memory API
-        const memoryInfo = (performance as any).memory;
-        if (memoryInfo && memoryInfo.usedJSHeapSize && memoryInfo.jsHeapSizeLimit) {
-          const usedPercent = (memoryInfo.usedJSHeapSize / memoryInfo.jsHeapSizeLimit) * 100;
-          setMemoryUsage(usedPercent);
+        try {
+          // @ts-ignore - TypeScript doesn't know about the memory API
+          const memoryInfo = (performance as any).memory;
+          if (memoryInfo && memoryInfo.usedJSHeapSize && memoryInfo.jsHeapSizeLimit) {
+            const usedPercent = (memoryInfo.usedJSHeapSize / memoryInfo.jsHeapSizeLimit) * 100;
+            setMemoryUsage(usedPercent);
+          }
+        } catch (error) {
+          console.error("Error accessing memory info:", error);
         }
       }
     };
@@ -98,8 +101,21 @@ export function PerformanceMonitor() {
       
       window.fetch = async function(input, init) {
         const requestId = Math.random().toString(36).substring(2);
-        const url = typeof input === 'string' ? input : input instanceof Request ? input.url : input.toString();
-        const method = init?.method || (input instanceof Request ? input.method : 'GET');
+        let url = "";
+        let method = "GET";
+        
+        if (typeof input === 'string') {
+          url = input;
+        } else if (input instanceof Request) {
+          url = input.url;
+          method = input.method;
+        } else {
+          url = input.toString();
+        }
+        
+        if (init?.method) {
+          method = init.method;
+        }
         
         const request: NetworkRequest = {
           id: requestId,
@@ -208,9 +224,16 @@ export function PerformanceMonitor() {
     
     return () => {
       clearInterval(interval);
-      window.fetch = originalFetch;
-      XMLHttpRequest.prototype.open = originalXhrOpen;
-      XMLHttpRequest.prototype.send = originalXhrSend;
+      // Restore original fetch and XHR methods
+      if (window.fetch !== originalFetch) {
+        window.fetch = originalFetch;
+      }
+      if (XMLHttpRequest.prototype.open !== originalXhrOpen) {
+        XMLHttpRequest.prototype.open = originalXhrOpen;
+      }
+      if (XMLHttpRequest.prototype.send !== originalXhrSend) {
+        XMLHttpRequest.prototype.send = originalXhrSend;
+      }
     };
   }, []);
 
@@ -405,3 +428,55 @@ export function PerformanceMonitor() {
     </div>
   );
 }
+
+// Add the missing helper functions
+PerformanceMonitor.prototype.toggleVisibility = function() {
+  this.setIsVisible(!this.isVisible);
+};
+
+PerformanceMonitor.prototype.formatDuration = function(ms: number): string {
+  return ms < 1000 ? `${ms.toFixed(0)} ms` : `${(ms / 1000).toFixed(2)} s`;
+};
+
+PerformanceMonitor.prototype.calculateNetworkStats = function() {
+  const completed = this.networkRequests.filter(req => req.endTime);
+  
+  if (completed.length === 0) return { avg: 0, max: 0, total: 0, success: 0, failed: 0 };
+  
+  const durations = completed.map(req => (req.endTime || 0) - req.startTime);
+  const avg = durations.reduce((sum, time) => sum + time, 0) / durations.length;
+  const max = Math.max(...durations);
+  const total = completed.length;
+  const success = completed.filter(req => req.status && req.status < 400).length;
+  const failed = completed.filter(req => req.error || (req.status && req.status >= 400)).length;
+  
+  return { avg, max, total, success, failed };
+};
+
+PerformanceMonitor.prototype.renderMemoryUsage = function() {
+  const color = this.memoryUsage > 80 ? 'bg-red-500' : this.memoryUsage > 50 ? 'bg-yellow-500' : 'bg-green-500';
+  
+  return (
+    <div className="mt-4">
+      <div className="flex justify-between mb-1">
+        <span className="text-sm">Memory Usage</span>
+        <span className="text-sm">{this.memoryUsage.toFixed(1)}%</span>
+      </div>
+      <Progress value={this.memoryUsage} className="h-2" indicatorClassName={color} />
+    </div>
+  );
+};
+
+PerformanceMonitor.prototype.renderCpuUsage = function() {
+  const color = this.cpuUsage > 80 ? 'bg-red-500' : this.cpuUsage > 50 ? 'bg-yellow-500' : 'bg-green-500';
+  
+  return (
+    <div className="mt-4">
+      <div className="flex justify-between mb-1">
+        <span className="text-sm">CPU Usage (est.)</span>
+        <span className="text-sm">{this.cpuUsage.toFixed(1)}%</span>
+      </div>
+      <Progress value={this.cpuUsage} className="h-2" indicatorClassName={color} />
+    </div>
+  );
+};
