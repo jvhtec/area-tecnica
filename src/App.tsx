@@ -8,16 +8,19 @@ import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { PerformanceMonitor } from "@/components/dev/PerformanceMonitor";
 import router from "@/routes";
 import { RouterProvider } from "react-router-dom";
+import { AuthProvider } from "@/hooks/useAuth";
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
         <SubscriptionProvider>
-          <AppInit />
-          <RouterProvider router={router} />
-          <Toaster />
-          {process.env.NODE_ENV === 'development' && <PerformanceMonitor />}
+          <AuthProvider>
+            <AppInit />
+            <RouterProvider router={router} />
+            <Toaster />
+            {process.env.NODE_ENV === 'development' && <PerformanceMonitor />}
+          </AuthProvider>
         </SubscriptionProvider>
       </ThemeProvider>
     </QueryClientProvider>

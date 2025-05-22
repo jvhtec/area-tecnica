@@ -19,6 +19,7 @@ export const RequireAuth: React.FC<RequireAuthProps> = ({ children }) => {
   }
 
   if (!session) {
+    console.log("No session in RequireAuth, redirecting to auth page");
     // Redirect to login if not authenticated
     return <Navigate to="/auth" replace />;
   }

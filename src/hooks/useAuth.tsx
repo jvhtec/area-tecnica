@@ -1,396 +1,192 @@
-import { useState, useEffect, useCallback, useContext, createContext, ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
-import { useToast } from "@/hooks/use-toast";
-import { Session } from "@supabase/supabase-js";
-import { TokenManager } from "@/lib/token-manager";
-import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 
+import { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import { supabase } from '@/lib/supabase';
+import { User, Session, AuthError } from '@supabase/supabase-js';
+import { useToast } from './use-toast';
+import { useNavigate } from 'react-router-dom';
+import { TokenManager } from '@/lib/token-manager';
+
+// Define the context type
 interface AuthContextType {
+  user: User | null;
   session: Session | null;
-  user: any | null;
-  userRole: string | null;
-  userDepartment: string | null;
   isLoading: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  signUp: (userData: SignUpData) => Promise<void>;
+  userRole: string | null;
+  userDepartment: string | null;
   logout: () => Promise<void>;
   refreshSession: () => Promise<Session | null>;
 }
 
-interface SignUpData {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  phone?: string;
-  department?: string;
-  dni?: string;
-  residencia?: string;
-}
+// Create the context with a default value
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  session: null,
+  isLoading: true,
+  error: null,
+  userRole: null,
+  userDepartment: null,
+  logout: async () => {},
+  refreshSession: async () => null,
+});
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
-};
-
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const { refreshSubscriptions, invalidateQueries } = useSubscriptionContext();
+// Provider component
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<any | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [userDepartment, setUserDepartment] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userDepartment, setUserDepartment] = useState<string | null>(null);
+  const { toast } = useToast();
+  const navigate = useNavigate();
   const tokenManager = TokenManager.getInstance();
 
-  // Fetch user profile with proper error handling
+  // Fetch the user's profile data
   const fetchUserProfile = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('role, department')
         .eq('id', userId)
-        .maybeSingle();
+        .single();
 
       if (error) {
-        console.error("Error fetching user profile:", error);
-        return null;
+        console.error('Error fetching user profile:', error);
+        return;
       }
 
-      return data;
+      if (data) {
+        setUserRole(data.role);
+        setUserDepartment(data.department);
+      }
     } catch (error) {
-      console.error("Exception in fetchUserProfile:", error);
-      return null;
+      console.error('Error in fetchUserProfile:', error);
     }
   }, []);
 
-  // Advanced and safe session refresh with proper error handling
+  // Refresh the user session
   const refreshSession = useCallback(async (): Promise<Session | null> => {
     try {
-      console.log("Starting session refresh");
-      
-      // Use the token manager to handle refresh
-      const { session: refreshedSession, error } = await tokenManager.refreshToken();
+      const { session, error } = await tokenManager.refreshToken();
       
       if (error) {
-        console.log("Session refresh error:", error);
-        
-        // Handle expired session
-        if (error.message && error.message.includes('expired')) {
-          setSession(null);
-          setUser(null);
-          setUserRole(null);
-          setUserDepartment(null);
-          navigate('/auth');
-          toast({
-            title: "Session expired",
-            description: "Your session has expired. Please log in again.",
-            variant: "destructive",
-          });
-        }
+        console.error('Session refresh error:', error);
+        setError(error.message);
         return null;
       }
       
-      if (refreshedSession) {
-        console.log("Session refreshed successfully");
-        setSession(refreshedSession);
-        setUser(refreshedSession.user);
-        
-        // Only fetch profile if user changed
-        if (!user || user.id !== refreshedSession.user.id) {
-          const profile = await fetchUserProfile(refreshedSession.user.id);
-          if (profile) {
-            setUserRole(profile.role);
-            setUserDepartment(profile.department);
-          }
-        }
-        
-        // Refresh subscriptions and invalidate queries for fresh data
-        refreshSubscriptions();
-        invalidateQueries();
-        
-        return refreshedSession;
+      if (session) {
+        setSession(session);
+        setUser(session.user);
+        return session;
       }
       
-      console.log("No session returned from refresh");
       return null;
     } catch (error) {
-      console.error("Exception in refreshSession:", error);
+      console.error('Unexpected error in refreshSession:', error);
       return null;
     }
-  }, [fetchUserProfile, navigate, user, tokenManager, toast, refreshSubscriptions, invalidateQueries]);
+  }, [tokenManager]);
 
-  // Login function
-  const login = async (email: string, password: string) => {
+  // Log out the user
+  const logout = useCallback(async () => {
     try {
-      setIsLoading(true);
-      setError(null);
+      const { error } = await tokenManager.signOut();
       
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.toLowerCase(),
-        password,
-      });
-
       if (error) {
+        console.error('Error signing out:', error);
         setError(error.message);
-        toast({
-          title: "Login failed",
-          description: error.message,
-          variant: "destructive",
-        });
         return;
       }
-
-      if (data.user) {
-        const profile = await fetchUserProfile(data.user.id);
-        if (profile) {
-          setUserRole(profile.role);
-          setUserDepartment(profile.department);
-        }
-        
-        toast({
-          title: "Welcome back!",
-          description: "You have successfully logged in.",
-        });
-        
-        navigate("/dashboard");
-      }
-    } catch (error: any) {
-      setError(error.message);
-      toast({
-        title: "Login failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Sign Up function
-  const signUp = async (userData: SignUpData) => {
-    try {
-      setIsLoading(true);
-      setError(null);
       
-      const { data, error } = await supabase.auth.signUp({
-        email: userData.email.toLowerCase(),
-        password: userData.password,
-        options: {
-          data: {
-            first_name: userData.firstName,
-            last_name: userData.lastName,
-            phone: userData.phone,
-            department: userData.department,
-            dni: userData.dni,
-            residencia: userData.residencia,
-          },
-        },
-      });
-
-      if (error) {
-        setError(error.message);
-        toast({
-          title: "Signup failed",
-          description: error.message,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (data.user) {
-        toast({
-          title: "Welcome!",
-          description: "Your account has been created successfully.",
-        });
-        
-        navigate("/dashboard");
-      }
-    } catch (error: any) {
-      setError(error.message);
-      toast({
-        title: "Signup failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Logout function
-  const logout = async () => {
-    try {
-      setIsLoading(true);
-      
-      await tokenManager.signOut();
-      
-      // Clear all state
-      setSession(null);
       setUser(null);
+      setSession(null);
       setUserRole(null);
       setUserDepartment(null);
-      
-      toast({
-        title: "Success",
-        description: "You have been logged out successfully",
-      });
-      
-      navigate('/auth');
-    } catch (error: any) {
-      setError(error.message);
-      toast({
-        title: "Logout failed",
-        description: error.message,
-        variant: "destructive",
-      });
-      // Still navigate to auth page even if there's an error
-      navigate('/auth');
-    } finally {
-      setIsLoading(false);
+      navigate('/auth', { replace: true });
+    } catch (error) {
+      console.error('Unexpected error in logout:', error);
     }
-  };
+  }, [navigate, tokenManager]);
 
-  // Setup predictive token refresh
+  // Set up auth state listener and check initial session
   useEffect(() => {
-    if (!session) return;
+    setIsLoading(true);
     
-    // Calculate optimal refresh time
-    const refreshTime = tokenManager.calculateRefreshTime(session);
-    console.log(`Scheduling token refresh in ${Math.round(refreshTime/1000)} seconds`);
-    
-    const refreshTimer = setTimeout(() => {
-      console.log("Executing scheduled token refresh");
-      refreshSession();
-    }, refreshTime);
-    
-    return () => clearTimeout(refreshTimer);
-  }, [session, refreshSession, tokenManager]);
-
-  // Initial session setup and auth state subscription
-  useEffect(() => {
-    let subscription: { unsubscribe: () => void } | null = null;
-    
-    const setupSession = async () => {
-      try {
-        setIsLoading(true);
+    // First set up the auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, currentSession) => {
+        console.log('Auth state change:', event);
         
-        // Get initial session
-        const initialSession = await supabase.auth.getSession();
+        setSession(currentSession);
+        setUser(currentSession?.user || null);
         
-        if (initialSession.data.session) {
-          setSession(initialSession.data.session);
-          setUser(initialSession.data.session.user);
-          
-          const profile = await fetchUserProfile(initialSession.data.session.user.id);
-          if (profile) {
-            setUserRole(profile.role);
-            setUserDepartment(profile.department);
-          }
+        // If user is logged in, fetch their profile
+        if (currentSession?.user) {
+          // Use setTimeout to avoid potential circular issues
+          setTimeout(() => {
+            fetchUserProfile(currentSession.user.id);
+          }, 0);
+        } else if (event === 'SIGNED_OUT') {
+          // Clear user data on sign out
+          setUserRole(null);
+          setUserDepartment(null);
         }
+      }
+    );
+
+    // Then check for existing session
+    const getInitialSession = async () => {
+      try {
+        const currentSession = await tokenManager.getSession();
+        setSession(currentSession);
+        setUser(currentSession?.user || null);
         
-        // Set up the auth state change listener
-        const { data } = await supabase.auth.onAuthStateChange(
-          async (event, authStateSession) => {
-            console.log("Auth state changed:", event);
-            
-            if (authStateSession) {
-              setSession(authStateSession);
-              setUser(authStateSession.user);
-              
-              const profile = await fetchUserProfile(authStateSession.user.id);
-              if (profile) {
-                setUserRole(profile.role);
-                setUserDepartment(profile.department);
-              }
-              
-              // Refresh subscriptions for new user context
-              refreshSubscriptions();
-            } else {
-              setSession(null);
-              setUser(null);
-              setUserRole(null);
-              setUserDepartment(null);
-              
-              if (event === 'SIGNED_OUT') {
-                navigate('/auth');
-              }
-            }
-          }
-        );
-        
-        subscription = data.subscription;
-      } catch (error: any) {
-        console.error("Error in session setup:", error);
-        setError(error.message);
+        if (currentSession?.user) {
+          await fetchUserProfile(currentSession.user.id);
+        }
+      } catch (err) {
+        console.error('Error checking session:', err);
+        setError('Failed to get user session');
       } finally {
         setIsLoading(false);
       }
     };
-    
-    setupSession();
-    
-    return () => {
-      if (subscription) {
-        subscription.unsubscribe();
-      }
-    };
-  }, [navigate, fetchUserProfile, tokenManager, refreshSubscriptions]);
 
-  // Network status monitoring
-  useEffect(() => {
-    const handleOnline = () => {
-      refreshSession();
-      toast({
-        title: "Connection restored",
-        description: "You are back online",
-        variant: "default",
-      });
-    };
-    
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        // Only refresh if we have a session and it might be stale
-        if (session) {
-          tokenManager.checkTokenExpiration().then(isExpiring => {
-            if (isExpiring) {
-              refreshSession();
-            }
-          });
-        }
-      }
-    };
-    
-    window.addEventListener('online', handleOnline);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [refreshSession, session, toast, tokenManager]);
+    getInitialSession();
 
-  const value = {
-    session,
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchUserProfile]);
+
+  // Value for the context provider
+  const contextValue: AuthContextType = {
     user,
-    userRole,
-    userDepartment,
+    session,
     isLoading,
     error,
-    login,
-    signUp,
+    userRole,
+    userDepartment,
     logout,
     refreshSession,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+// Custom hook to use the auth context
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  
+  return context;
 };

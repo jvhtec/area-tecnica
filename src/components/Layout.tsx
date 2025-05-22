@@ -11,7 +11,7 @@ import {
   SidebarTrigger
 } from "@/components/ui/sidebar";
 import { LogOut } from "lucide-react";
-import { useNavigate, Outlet, Navigate, useLocation } from "react-router-dom";
+import { useNavigate, Outlet, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { ThemeToggle } from "./layout/ThemeToggle";
 import { UserInfo } from "./layout/UserInfo";
@@ -83,11 +83,6 @@ const Layout = () => {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white" />
       </div>
     );
-  }
-
-  if (!session) {
-    console.log("No session found in Layout, redirecting to auth");
-    return <Navigate to="/auth" replace />;
   }
 
   return (

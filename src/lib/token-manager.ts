@@ -4,7 +4,7 @@ import { Session, User, AuthError } from '@supabase/supabase-js';
 
 type TokenManagerSubscriber = () => void;
 
-class TokenManager {
+export class TokenManager {
   private static instance: TokenManager;
   private _lastRefreshTime: number = 0;
   private refreshPromise: Promise<{ session: Session | null; error: AuthError | null }> | null = null;
@@ -64,14 +64,19 @@ class TokenManager {
    * @returns Current session or null
    */
   public async getSession(): Promise<Session | null> {
-    const { data, error } = await supabase.auth.getSession();
-    
-    if (error) {
-      console.error('Error getting session:', error);
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Error getting session:', error);
+        return null;
+      }
+      
+      return data.session;
+    } catch (error) {
+      console.error('Unexpected error in getSession:', error);
       return null;
     }
-    
-    return data.session;
   }
 
   /**
@@ -89,33 +94,38 @@ class TokenManager {
    * @returns True if token was refreshed or needs refreshing, false otherwise
    */
   public async checkTokenExpiration(session?: Session | null, bufferTime?: number): Promise<boolean> {
-    // Use provided session or get current session
-    const sessionToCheck = session || (await this.getSession());
-    const bufferToUse = bufferTime || this.sessionExpiryBuffer;
+    try {
+      // Use provided session or get current session
+      const sessionToCheck = session || (await this.getSession());
+      const bufferToUse = bufferTime || this.sessionExpiryBuffer;
 
-    if (!sessionToCheck) {
-      console.log('No active session found during token check');
+      if (!sessionToCheck) {
+        console.log('No active session found during token check');
+        return false;
+      }
+
+      const expiresAt = sessionToCheck.expires_at;
+      if (!expiresAt) {
+        console.log('Session has no expiration time');
+        return false;
+      }
+
+      const expiryTime = expiresAt * 1000; // Convert to milliseconds
+      const now = Date.now();
+      const timeUntilExpiry = expiryTime - now;
+
+      // If token expires within the buffer time, refresh it
+      if (timeUntilExpiry < bufferToUse) {
+        console.log(`Token expires in ${timeUntilExpiry}ms, refreshing...`);
+        await this.refreshToken();
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Error checking token expiration:', error);
       return false;
     }
-
-    const expiresAt = sessionToCheck.expires_at;
-    if (!expiresAt) {
-      console.log('Session has no expiration time');
-      return false;
-    }
-
-    const expiryTime = expiresAt * 1000; // Convert to milliseconds
-    const now = Date.now();
-    const timeUntilExpiry = expiryTime - now;
-
-    // If token expires within the buffer time, refresh it
-    if (timeUntilExpiry < bufferToUse) {
-      console.log(`Token expires in ${timeUntilExpiry}ms, refreshing...`);
-      await this.refreshToken();
-      return true;
-    }
-
-    return false;
   }
 
   /**
@@ -185,6 +195,7 @@ class TokenManager {
       return await this.refreshPromise;
     } catch (e) {
       console.error('Unexpected error in refreshSession:', e);
+      this.refreshPromise = null;
       return { session: null, error: e as AuthError };
     }
   }
@@ -214,4 +225,3 @@ class TokenManager {
 
 // Export a singleton instance
 export const tokenManager = TokenManager.getInstance();
-export { TokenManager }; // Also export the class for testing or extension
