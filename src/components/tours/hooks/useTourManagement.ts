@@ -106,58 +106,188 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
       console.log("Found tour dates:", tourDates);
 
       if (tourDates && tourDates.length > 0) {
-        // First delete flex folders
-        const { error: flexFoldersError } = await supabase
-          .from("flex_folders")
-          .delete()
-          .in("tour_date_id", tourDates.map(td => td.id));
-
-        if (flexFoldersError) {
-          console.error("Error deleting flex folders:", flexFoldersError);
-          throw flexFoldersError;
-        }
-
-        // Get all jobs associated with these tour dates
-        const { data: jobs, error: jobsError } = await supabase
+        // First get all jobs associated with these tour dates
+        const { data: jobs, error: jobsQueryError } = await supabase
           .from("jobs")
           .select("id")
           .in("tour_date_id", tourDates.map(td => td.id));
 
-        if (jobsError) {
-          console.error("Error fetching jobs:", jobsError);
-          throw jobsError;
+        if (jobsQueryError) {
+          console.error("Error fetching jobs:", jobsQueryError);
+          throw jobsQueryError;
         }
 
         console.log("Found jobs:", jobs);
 
         if (jobs && jobs.length > 0) {
-          // Delete job assignments
+          const jobIds = jobs.map(j => j.id);
+
+          // 1. Delete power requirement tables first (this was causing the foreign key violation)
+          const { error: powerTablesError } = await supabase
+            .from("power_requirement_tables")
+            .delete()
+            .in("job_id", jobIds);
+
+          if (powerTablesError) {
+            console.error("Error deleting power requirement tables:", powerTablesError);
+            throw powerTablesError;
+          }
+
+          // 2. Delete flex folders
+          const { error: flexFoldersError } = await supabase
+            .from("flex_folders")
+            .delete()
+            .in("job_id", jobIds);
+
+          if (flexFoldersError) {
+            console.error("Error deleting flex folders:", flexFoldersError);
+            throw flexFoldersError;
+          }
+
+          // 3. Delete job assignments
           const { error: assignmentsError } = await supabase
             .from("job_assignments")
             .delete()
-            .in("job_id", jobs.map(j => j.id));
+            .in("job_id", jobIds);
 
           if (assignmentsError) {
             console.error("Error deleting job assignments:", assignmentsError);
             throw assignmentsError;
           }
 
-          // Delete job departments
+          // 4. Delete task documents for all departments
+          const { error: taskDocsError } = await supabase
+            .from("task_documents")
+            .delete()
+            .or(
+              `sound_task_id.in.(select id from sound_job_tasks where job_id in (${jobIds.map(id => `'${id}'`).join(',')})),` +
+              `lights_task_id.in.(select id from lights_job_tasks where job_id in (${jobIds.map(id => `'${id}'`).join(',')})),` +
+              `video_task_id.in.(select id from video_job_tasks where job_id in (${jobIds.map(id => `'${id}'`).join(',')}))`
+            );
+
+          if (taskDocsError) {
+            console.error("Error deleting task documents:", taskDocsError);
+            throw taskDocsError;
+          }
+
+          // 5. Delete department tasks (sound, lights, video)
+          await Promise.all([
+            supabase.from("sound_job_tasks").delete().in("job_id", jobIds),
+            supabase.from("lights_job_tasks").delete().in("job_id", jobIds),
+            supabase.from("video_job_tasks").delete().in("job_id", jobIds)
+          ]);
+
+          // 6. Delete department personnel (sound, lights, video)
+          await Promise.all([
+            supabase.from("sound_job_personnel").delete().in("job_id", jobIds),
+            supabase.from("lights_job_personnel").delete().in("job_id", jobIds),
+            supabase.from("video_job_personnel").delete().in("job_id", jobIds)
+          ]);
+
+          // 7. Delete job documents
+          const { error: jobDocsError } = await supabase
+            .from("job_documents")
+            .delete()
+            .in("job_id", jobIds);
+
+          if (jobDocsError) {
+            console.error("Error deleting job documents:", jobDocsError);
+            throw jobDocsError;
+          }
+
+          // 8. Delete logistics events
+          const { error: logisticsError } = await supabase
+            .from("logistics_events")
+            .delete()
+            .in("job_id", jobIds);
+            
+          if (logisticsError) {
+            console.error("Error deleting logistics events:", logisticsError);
+            throw logisticsError;
+          }
+
+          // 9. Delete hoja de ruta
+          const { error: hojaError } = await supabase
+            .from("hoja_de_ruta")
+            .delete()
+            .in("job_id", jobIds);
+            
+          if (hojaError) {
+            console.error("Error deleting hoja de ruta:", hojaError);
+            throw hojaError;
+          }
+
+          // 10. Delete memoria_tecnica_documents
+          const { error: memoriaError } = await supabase
+            .from("memoria_tecnica_documents")
+            .delete()
+            .in("job_id", jobIds);
+            
+          if (memoriaError) {
+            console.error("Error deleting memoria tecnica documents:", memoriaError);
+            throw memoriaError;
+          }
+
+          // 11. Delete lights_memoria_tecnica_documents
+          const { error: lightsMemoriaError } = await supabase
+            .from("lights_memoria_tecnica_documents")
+            .delete()
+            .in("job_id", jobIds);
+            
+          if (lightsMemoriaError) {
+            console.error("Error deleting lights memoria tecnica documents:", lightsMemoriaError);
+            throw lightsMemoriaError;
+          }
+
+          // 12. Delete video_memoria_tecnica_documents
+          const { error: videoMemoriaError } = await supabase
+            .from("video_memoria_tecnica_documents")
+            .delete()
+            .in("job_id", jobIds);
+            
+          if (videoMemoriaError) {
+            console.error("Error deleting video memoria tecnica documents:", videoMemoriaError);
+            throw videoMemoriaError;
+          }
+
+          // 13. Delete job departments
           const { error: departmentsError } = await supabase
             .from("job_departments")
             .delete()
-            .in("job_id", jobs.map(j => j.id));
+            .in("job_id", jobIds);
 
           if (departmentsError) {
             console.error("Error deleting job departments:", departmentsError);
             throw departmentsError;
           }
 
-          // Delete jobs
+          // 14. Delete job_date_types
+          const { error: dateTypesError } = await supabase
+            .from("job_date_types")
+            .delete()
+            .in("job_id", jobIds);
+            
+          if (dateTypesError) {
+            console.error("Error deleting job date types:", dateTypesError);
+            throw dateTypesError;
+          }
+
+          // 15. Delete job_milestones
+          const { error: milestonesError } = await supabase
+            .from("job_milestones")
+            .delete()
+            .in("job_id", jobIds);
+            
+          if (milestonesError) {
+            console.error("Error deleting job milestones:", milestonesError);
+            throw milestonesError;
+          }
+
+          // 16. Delete jobs
           const { error: jobsDeleteError } = await supabase
             .from("jobs")
             .delete()
-            .in("id", jobs.map(j => j.id));
+            .in("id", jobIds);
 
           if (jobsDeleteError) {
             console.error("Error deleting jobs:", jobsDeleteError);
@@ -175,6 +305,17 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
           console.error("Error deleting tour dates:", tourDatesDeleteError);
           throw tourDatesDeleteError;
         }
+      }
+
+      // Delete tour logos
+      const { error: tourLogosError } = await supabase
+        .from("tour_logos")
+        .delete()
+        .eq("tour_id", tour.id);
+        
+      if (tourLogosError) {
+        console.error("Error deleting tour logos:", tourLogosError);
+        throw tourLogosError;
       }
 
       // Finally delete the tour
