@@ -12,6 +12,7 @@ interface SubscriptionIndicatorProps {
   className?: string;
   showRefreshButton?: boolean;
   onRefresh?: () => void;
+  showLabel?: boolean;
 }
 
 export function SubscriptionIndicator({
@@ -19,7 +20,8 @@ export function SubscriptionIndicator({
   variant = "normal",
   className,
   showRefreshButton = false,
-  onRefresh
+  onRefresh,
+  showLabel = false
 }: SubscriptionIndicatorProps) {
   const { subscriptionsByTable, connectionStatus, forceRefresh, lastRefreshTime } = useSubscriptionContext();
   

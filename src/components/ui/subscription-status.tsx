@@ -28,7 +28,7 @@ export function SubscriptionStatus() {
       <CardHeader className="pb-2 cursor-pointer" onClick={() => setExpanded(!expanded)}>
         <div className="flex justify-between items-center">
           <CardTitle className="text-lg flex items-center gap-2">
-            {connectionStatus === 'connected' ? (
+            {connectionStatus === 'CONNECTED' ? (
               <Wifi className="h-4 w-4 text-green-500" />
             ) : (
               <WifiOff className="h-4 w-4 text-red-500" />

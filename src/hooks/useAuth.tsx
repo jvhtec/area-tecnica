@@ -300,7 +300,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         
         // Set up the auth state change listener
-        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+        const { data } = await supabase.auth.onAuthStateChange(
           async (event, authStateSession) => {
             console.log("Auth state changed:", event);
             
@@ -329,7 +329,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         );
         
-        subscription = authSubscription;
+        subscription = data.subscription;
       } catch (error: any) {
         console.error("Error in session setup:", error);
         setError(error.message);

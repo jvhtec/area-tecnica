@@ -11,6 +11,10 @@ interface SubscriptionContextType {
   isNetworkAvailable: boolean;
   forceRefresh: (tables?: string[]) => void;
   forceSubscribe: (tables: string[]) => void;
+  refreshSubscriptions: () => void;
+  invalidateQueries: () => void;
+  activeSubscriptions: string[];
+  subscriptionCount: number;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType>({
@@ -20,6 +24,10 @@ const SubscriptionContext = createContext<SubscriptionContextType>({
   isNetworkAvailable: true,
   forceRefresh: () => {},
   forceSubscribe: () => {},
+  refreshSubscriptions: () => {},
+  invalidateQueries: () => {},
+  activeSubscriptions: [],
+  subscriptionCount: 0
 });
 
 export const useSubscriptionContext = () => useContext(SubscriptionContext);
@@ -35,6 +43,8 @@ export const SubscriptionProvider = ({ children }: SubscriptionProviderProps) =>
   const [connectionStatus, setConnectionStatus] = useState<'CONNECTED' | 'CONNECTING' | 'DISCONNECTED'>('CONNECTING');
   const [subscriptionsByTable, setSubscriptionsByTable] = useState<Record<string, string[]>>({});
   const [isNetworkAvailable, setIsNetworkAvailable] = useState<boolean>(true);
+  const [activeSubscriptions, setActiveSubscriptions] = useState<string[]>([]);
+  const [subscriptionCount, setSubscriptionCount] = useState<number>(0);
   
   // Check network status initially and set up polling
   useEffect(() => {
@@ -63,6 +73,11 @@ export const SubscriptionProvider = ({ children }: SubscriptionProviderProps) =>
     const updateStats = () => {
       const tables = manager.getSubscriptionsByTable();
       setSubscriptionsByTable(tables);
+      
+      // Count active subscriptions
+      const allSubscriptions = Object.values(tables).flat();
+      setActiveSubscriptions(allSubscriptions);
+      setSubscriptionCount(allSubscriptions.length);
     };
     
     // Initial update
@@ -99,13 +114,28 @@ export const SubscriptionProvider = ({ children }: SubscriptionProviderProps) =>
     setLastRefreshTime(Date.now());
   }, [manager, queryClient]);
   
+  // General refresh subscriptions method
+  const refreshSubscriptions = useCallback(() => {
+    manager.reestablishSubscriptions();
+    setLastRefreshTime(Date.now());
+  }, [manager]);
+  
+  // General invalidate queries method
+  const invalidateQueries = useCallback(() => {
+    queryClient.invalidateQueries();
+  }, [queryClient]);
+  
   const value = {
     lastRefreshTime,
     connectionStatus,
     subscriptionsByTable,
     isNetworkAvailable,
     forceRefresh,
-    forceSubscribe
+    forceSubscribe,
+    refreshSubscriptions,
+    invalidateQueries,
+    activeSubscriptions,
+    subscriptionCount
   };
   
   return (

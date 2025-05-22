@@ -46,9 +46,9 @@ export function HeaderStatus({ className }: { className?: string }) {
   };
   
   const getStatusIcon = () => {
-    if (connectionStatus === 'connecting') {
+    if (connectionStatus === 'CONNECTING') {
       return <Loader2 className="h-3 w-3 text-blue-500 animate-spin" />;
-    } else if (connectionStatus !== 'connected') {
+    } else if (connectionStatus !== 'CONNECTED') {
       return <WifiOff className="h-3 w-3 text-red-500" />;
     } else if (isStale) {
       return <Clock className="h-3 w-3 text-amber-500" />;
@@ -60,9 +60,9 @@ export function HeaderStatus({ className }: { className?: string }) {
   };
   
   const getStatusText = () => {
-    if (connectionStatus === 'connecting') {
+    if (connectionStatus === 'CONNECTING') {
       return "Connecting...";
-    } else if (connectionStatus !== 'connected') {
+    } else if (connectionStatus !== 'CONNECTED') {
       return "Offline";
     } else if (isStale) {
       return "Stale data";
@@ -85,7 +85,7 @@ export function HeaderStatus({ className }: { className?: string }) {
   };
   
   const getTooltipContent = () => {
-    if (connectionStatus === 'connecting') {
+    if (connectionStatus === 'CONNECTING') {
       return (
         <div className="text-xs max-w-xs">
           <p className="font-semibold">Establishing connection</p>
@@ -94,7 +94,7 @@ export function HeaderStatus({ className }: { className?: string }) {
       );
     }
     
-    if (connectionStatus !== 'connected') {
+    if (connectionStatus !== 'CONNECTED') {
       return (
         <div className="text-xs max-w-xs">
           <p className="font-semibold">Connection lost</p>
@@ -163,7 +163,7 @@ export function HeaderStatus({ className }: { className?: string }) {
             className={cn(
               "flex items-center gap-1.5 text-xs cursor-pointer",
               isStale || !isFullySubscribed ? "text-amber-500" : (
-                connectionStatus === 'connected' ? "text-muted-foreground" : "text-red-500"
+                connectionStatus === 'CONNECTED' ? "text-muted-foreground" : "text-red-500"
               ),
               className
             )}
@@ -181,7 +181,7 @@ export function HeaderStatus({ className }: { className?: string }) {
                 e.stopPropagation();
                 handleRefresh();
               }}
-              disabled={isRefreshing || connectionStatus === 'connecting'}
+              disabled={isRefreshing || connectionStatus === 'CONNECTING'}
             >
               <RefreshCw className={`h-2.5 w-2.5 ${isRefreshing ? 'animate-spin' : ''}`} />
               <span className="sr-only">Refresh</span>

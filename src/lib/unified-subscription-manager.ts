@@ -1,4 +1,3 @@
-
 /**
  * Unified Subscription Manager
  * Centralized manager for all Supabase realtime subscriptions
@@ -94,16 +93,21 @@ export class UnifiedSubscriptionManager {
     console.log(`Creating new subscription for ${table} with key ${queryKeyStr}`);
 
     // Create Supabase channel for realtime subscription
-    const channel = supabase.channel(`table-changes-${subscriptionKey}`)
+    const channel = supabase.channel(`table-changes-${subscriptionKey}`);
+    
+    channel
       .on('presence', { event: 'sync' }, () => {
         console.log(`Subscription presence sync: ${table}`);
-      })
+      });
+      
+    // Add postgres changes listener
+    channel
       .on('postgres_changes', {
         event: filter?.event || '*',
         schema: filter?.schema || 'public',
         table,
         filter: filter?.filter
-      }, (payload) => {
+      } as any, (payload: any) => {
         console.log(`Realtime change in ${table}:`, payload);
 
         // Record activity and update status
@@ -119,7 +123,7 @@ export class UnifiedSubscriptionManager {
         // Invalidate query cache based on queryKey
         this.invalidateQuery(queryKey);
       })
-      .subscribe((status) => {
+      .subscribe((status: string) => {
         console.log(`Subscription status for ${table}:`, status);
         
         const subscription = this.subscriptions.get(subscriptionKey);
@@ -420,23 +424,25 @@ export class UnifiedSubscriptionManager {
         const { table, queryKey, filter, priority, routes } = metadata;
         
         // Create Supabase channel for realtime subscription
-        const channel = supabase.channel(`table-changes-${key}-${Date.now()}`)
-          .on('postgres_changes', {
-            event: filter?.event || '*',
-            schema: filter?.schema || 'public',
-            table,
-            filter: filter?.filter
-          }, (payload) => {
-            console.log(`Realtime change in ${table}:`, payload);
-            
-            // Record activity
-            metadata.lastActivity = Date.now();
-            this.lastRefreshTime = Date.now();
-            
-            // Invalidate query cache based on queryKey
-            this.invalidateQuery(queryKey);
-          })
-          .subscribe();
+        const channel = supabase.channel(`table-changes-${key}-${Date.now()}`);
+        
+        // Add postgres changes listener
+        channel.on('postgres_changes', {
+          event: filter?.event || '*',
+          schema: filter?.schema || 'public',
+          table,
+          filter: filter?.filter
+        } as any, (payload: any) => {
+          console.log(`Realtime change in ${table}:`, payload);
+          
+          // Record activity
+          metadata.lastActivity = Date.now();
+          this.lastRefreshTime = Date.now();
+          
+          // Invalidate query cache based on queryKey
+          this.invalidateQuery(queryKey);
+        })
+        .subscribe();
           
         // Update metadata
         metadata.channel = channel;
