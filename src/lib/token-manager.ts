@@ -1,19 +1,21 @@
-
 import { supabase } from './supabase';
-import { Session, AuthError } from '@supabase/supabase-js';
+import { Session, User, AuthError } from '@supabase/supabase-js';
 
-/**
- * TokenManager - Singleton responsible for managing auth tokens and refresh
- * Provides centralized token refresh mechanism to prevent multiple simultaneous refreshes
- */
-export class TokenManager {
+class TokenManager {
   private static instance: TokenManager;
+  private refreshPromise: Promise<{ session: Session | null; error: AuthError | null }> | null = null;
   private lastRefreshTime: number = 0;
-  private refreshPromise: Promise<{session: Session | null; error: AuthError | null}> | null = null;
-  private subscribers: Set<() => void> = new Set();
+  private refreshInterval: number = 3600000; // 1 hour in milliseconds
+  private sessionExpiryBuffer: number = 300000; // 5 minutes in milliseconds
 
-  private constructor() {}
+  private constructor() {
+    // Initialize any token-related listeners or state here
+    console.log('TokenManager initialized');
+  }
 
+  /**
+   * Get the singleton instance of TokenManager
+   */
   public static getInstance(): TokenManager {
     if (!TokenManager.instance) {
       TokenManager.instance = new TokenManager();
@@ -22,144 +24,124 @@ export class TokenManager {
   }
 
   /**
-   * Get current session with token validation
+   * Check if the current session token is about to expire and refresh if needed
+   * @returns True if token was refreshed, false otherwise
    */
-  public async getSession(): Promise<Session | null> {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session && this.isTokenExpired(session)) {
-        console.log("Session token expired, refreshing...");
-        return (await this.refreshToken()).session;
-      }
-      return session;
-    } catch (error) {
-      console.error("Error getting session:", error);
-      return null;
+  public async checkTokenExpiration(): Promise<boolean> {
+    const { data } = await supabase.auth.getSession();
+    const session = data.session;
+
+    if (!session) {
+      console.log('No active session found during token check');
+      return false;
     }
+
+    const expiresAt = session.expires_at;
+    if (!expiresAt) {
+      console.log('Session has no expiration time');
+      return false;
+    }
+
+    const expiryTime = expiresAt * 1000; // Convert to milliseconds
+    const now = Date.now();
+    const timeUntilExpiry = expiryTime - now;
+
+    // If token expires within the buffer time, refresh it
+    if (timeUntilExpiry < this.sessionExpiryBuffer) {
+      console.log(`Token expires in ${timeUntilExpiry}ms, refreshing...`);
+      await this.refreshSession();
+      return true;
+    }
+
+    return false;
   }
 
   /**
-   * Check if a token is expired
-   * @param session The session to check
-   * @param buffer Time buffer in ms (default: 60s)
+   * Calculate the optimal time until the next token refresh check
+   * @returns Time in milliseconds until next refresh
    */
-  public isTokenExpired(session: Session, buffer: number = 60000): boolean {
-    if (!session.expires_at) return false;
-    
-    const expiresAt = session.expires_at * 1000; // Convert to ms
+  public calculateRefreshTime(): number {
+    const { data } = supabase.auth.getSession();
+    const session = data.session;
+
+    if (!session || !session.expires_at) {
+      // If no session or expiry, check again in the standard interval
+      return this.refreshInterval;
+    }
+
+    const expiryTime = session.expires_at * 1000; // Convert to milliseconds
     const now = Date.now();
-    
-    return now >= expiresAt - buffer;
+    const timeUntilExpiry = expiryTime - now;
+
+    // If expiry is sooner than our buffer, check very soon
+    if (timeUntilExpiry < this.sessionExpiryBuffer) {
+      return Math.max(5000, timeUntilExpiry - 60000); // Check 1 minute before expiry or in 5 seconds
+    }
+
+    // Otherwise check at a reasonable time before expiry
+    return Math.min(
+      this.refreshInterval,
+      timeUntilExpiry - this.sessionExpiryBuffer
+    );
   }
 
   /**
-   * Calculate optimal time to refresh token (75% of remaining time)
-   * @param session Current session
+   * Refresh the authentication session
+   * @returns The refreshed session or null if refresh failed
    */
-  public calculateRefreshTime(session: Session): number {
-    if (!session.expires_at) return 3600 * 1000; // Default to 1 hour
-    
-    const expiresAt = session.expires_at * 1000; // Convert to ms
-    const now = Date.now();
-    const totalDuration = expiresAt - now;
-    
-    if (totalDuration <= 0) return 0; // Already expired
-    
-    // Refresh at 75% of the way through the session lifetime
-    const refreshTime = totalDuration * 0.75;
-    
-    // Cap it between 5 minutes and 1 hour
-    return Math.min(Math.max(refreshTime, 5 * 60 * 1000), 60 * 60 * 1000);
-  }
-  
-  /**
-   * Check if token will expire within the specified time
-   */
-  public checkTokenExpiration(session: Session, timeWindow: number): boolean {
-    if (!session.expires_at) return false;
-    
-    const expiresAt = session.expires_at * 1000; // Convert to ms
-    const now = Date.now();
-    
-    return now >= expiresAt - timeWindow;
-  }
-
-  /**
-   * Refresh the auth token with debouncing
-   * Returns the current refreshPromise if one is in progress
-   */
-  public async refreshToken(): Promise<{session: Session | null; error: AuthError | null}> {
-    // If a refresh is already in progress, return the existing promise
+  public async refreshSession(): Promise<{ session: Session | null; error: AuthError | null }> {
+    // If there's already a refresh in progress, return that promise
     if (this.refreshPromise) {
       return this.refreshPromise;
     }
 
-    // Start a new refresh
-    console.log("Starting token refresh");
-    this.refreshPromise = supabase.auth.refreshSession()
-      .then(result => {
-        this.lastRefreshTime = Date.now();
-        
-        // Notify subscribers of token refresh
-        if (result.data.session) {
-          this.notifySubscribers();
-        }
-        
-        return result;
-      })
-      .catch(error => {
-        console.error("Error refreshing token:", error);
-        return { data: { session: null }, error };
-      })
-      .finally(() => {
-        this.refreshPromise = null;
-      });
-
-    return this.refreshPromise;
-  }
-
-  /**
-   * Sign out the user and clear tokens
-   */
-  public async signOut(): Promise<void> {
+    console.log('Refreshing authentication session...');
+    
     try {
-      await supabase.auth.signOut();
-      this.lastRefreshTime = 0;
-    } catch (error) {
-      console.error("Error signing out:", error);
-      throw error;
+      // Create a new refresh promise
+      this.refreshPromise = new Promise(async (resolve) => {
+        try {
+          const { data, error } = await supabase.auth.refreshSession();
+          this.lastRefreshTime = Date.now();
+          
+          if (error) {
+            console.error('Error refreshing session:', error);
+            resolve({ session: null, error });
+          } else {
+            console.log('Session refreshed successfully');
+            resolve({ session: data.session, error: null });
+          }
+        } catch (e) {
+          console.error('Exception during session refresh:', e);
+          resolve({ session: null, error: e as AuthError });
+        } finally {
+          // Clear the promise so we can refresh again later
+          this.refreshPromise = null;
+        }
+      });
+      
+      return await this.refreshPromise;
+    } catch (e) {
+      console.error('Unexpected error in refreshSession:', e);
+      return { session: null, error: e as AuthError };
     }
   }
   
   /**
-   * Get time since last refresh
+   * Sign out the current user and clear session data
+   * @returns A promise that resolves when sign out is complete
    */
-  public getTimeSinceLastRefresh(): number {
-    return this.lastRefreshTime > 0 ? this.lastRefreshTime : Date.now();
-  }
-
-  /**
-   * Subscribe to token refresh events
-   * @param callback Function to call on token refresh
-   * @returns Unsubscribe function
-   */
-  public subscribe(callback: () => void): () => void {
-    this.subscribers.add(callback);
-    return () => {
-      this.subscribers.delete(callback);
-    };
-  }
-
-  /**
-   * Notify all subscribers of token refresh
-   */
-  private notifySubscribers(): void {
-    this.subscribers.forEach(callback => {
-      try {
-        callback();
-      } catch (error) {
-        console.error("Error in token refresh subscriber:", error);
-      }
-    });
+  public async signOut(): Promise<{ error: AuthError | null }> {
+    try {
+      const { error } = await supabase.auth.signOut();
+      return { error };
+    } catch (e) {
+      console.error('Error during sign out:', e);
+      return { error: e as AuthError };
+    }
   }
 }
+
+// Export a singleton instance
+export const tokenManager = TokenManager.getInstance();
+export { TokenManager }; // Also export the class for testing or extension

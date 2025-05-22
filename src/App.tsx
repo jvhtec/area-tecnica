@@ -7,21 +7,20 @@ import { AppInit } from "@/components/AppInit";
 import { queryClient } from "@/lib/react-query";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { PerformanceMonitor } from "@/components/dev/PerformanceMonitor";
-import Routes from "@/routes";
+import router from "@/routes";
+import { RouterProvider } from "react-router-dom";
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
-          <SubscriptionProvider>
-            <AppInit />
-            <Routes />
-            <Toaster />
-            {process.env.NODE_ENV === 'development' && <PerformanceMonitor />}
-          </SubscriptionProvider>
-        </ThemeProvider>
-      </BrowserRouter>
+      <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
+        <SubscriptionProvider>
+          <AppInit />
+          <RouterProvider router={router} />
+          <Toaster />
+          {process.env.NODE_ENV === 'development' && <PerformanceMonitor />}
+        </SubscriptionProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
