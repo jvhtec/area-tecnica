@@ -106,7 +106,7 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
       console.log("Found tour dates:", tourDates);
 
       if (tourDates && tourDates.length > 0) {
-        // First get all jobs associated with these tour dates
+        // Get all jobs associated with these tour dates
         const { data: jobs, error: jobsQueryError } = await supabase
           .from("jobs")
           .select("id")
@@ -121,6 +121,9 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
 
         if (jobs && jobs.length > 0) {
           const jobIds = jobs.map(j => j.id);
+          
+          // Fix: Format the job IDs properly for use in the SQL queries
+          const formattedJobIds = jobIds.join("','");
 
           // 1. Delete power requirement tables first (this was causing the foreign key violation)
           const { error: powerTablesError } = await supabase
@@ -156,18 +159,48 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
           }
 
           // 4. Delete task documents for all departments
-          const { error: taskDocsError } = await supabase
-            .from("task_documents")
-            .delete()
-            .or(
-              `sound_task_id.in.(select id from sound_job_tasks where job_id in (${jobIds.map(id => `'${id}'`).join(',')})),` +
-              `lights_task_id.in.(select id from lights_job_tasks where job_id in (${jobIds.map(id => `'${id}'`).join(',')})),` +
-              `video_task_id.in.(select id from video_job_tasks where job_id in (${jobIds.map(id => `'${id}'`).join(',')}))`
-            );
-
-          if (taskDocsError) {
-            console.error("Error deleting task documents:", taskDocsError);
-            throw taskDocsError;
+          // Fix: Using separate queries instead of complex OR condition that was causing errors
+          try {
+            // First get all sound task IDs
+            const { data: soundTasks } = await supabase
+              .from("sound_job_tasks")
+              .select("id")
+              .in("job_id", jobIds);
+              
+            // Then get all lights task IDs
+            const { data: lightsTasks } = await supabase
+              .from("lights_job_tasks")
+              .select("id")
+              .in("job_id", jobIds);
+              
+            // Then get all video task IDs
+            const { data: videoTasks } = await supabase
+              .from("video_job_tasks")
+              .select("id") 
+              .in("job_id", jobIds);
+              
+            // Collect all task IDs
+            const soundTaskIds = soundTasks ? soundTasks.map(task => task.id) : [];
+            const lightsTaskIds = lightsTasks ? lightsTasks.map(task => task.id) : [];
+            const videoTaskIds = videoTasks ? videoTasks.map(task => task.id) : [];
+            
+            // Delete sound task documents
+            if (soundTaskIds.length > 0) {
+              await supabase.from("task_documents").delete().in("sound_task_id", soundTaskIds);
+            }
+            
+            // Delete lights task documents
+            if (lightsTaskIds.length > 0) {
+              await supabase.from("task_documents").delete().in("lights_task_id", lightsTaskIds);
+            }
+            
+            // Delete video task documents
+            if (videoTaskIds.length > 0) {
+              await supabase.from("task_documents").delete().in("video_task_id", videoTaskIds);
+            }
+          } catch (error) {
+            console.error("Error deleting task documents:", error);
+            throw error;
           }
 
           // 5. Delete department tasks (sound, lights, video)
