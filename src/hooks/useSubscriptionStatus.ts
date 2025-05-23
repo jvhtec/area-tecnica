@@ -42,7 +42,7 @@ export function useSubscriptionStatus(tables: string[]) {
     
     setTablesSubscribed(subscribed);
     setTablesUnsubscribed(unsubscribed);
-    setIsSubscribed(unsubscribed.length === 0 && globalConnectionStatus === 'CONNECTED');
+    setIsSubscribed(unsubscribed.length === 0 && globalConnectionStatus === 'connected');
     
     // Check if data is stale (older than 5 minutes)
     const now = Date.now();

@@ -8,13 +8,9 @@ import { useEnhancedRouteSubscriptions } from "@/hooks/useEnhancedRouteSubscript
 import { toast } from "sonner";
 import { TokenManager } from "@/lib/token-manager";
 
-// Debounce function to prevent excessive executions
-const debounce = (fn: Function, ms = 300) => {
-  let timeoutId: ReturnType<typeof setTimeout>;
-  return function(this: any, ...args: any[]) {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn.apply(this, args), ms);
-  };
+// Exponential backoff helper
+const calculateBackoff = (attempt: number, baseMs: number = 1000, maxMs: number = 30000): number => {
+  return Math.min(baseMs * Math.pow(2, attempt), maxMs);
 };
 
 /**
@@ -46,44 +42,62 @@ export function AppInit() {
     manager.setupNetworkStatusRefetching();
     
     // Subscribe to token refresh events
-    const unsubscribe = tokenManager.subscribe(() => {
+    tokenManager.subscribe(() => {
       console.log("Token refreshed, updating subscriptions");
       manager.reestablishSubscriptions();
     });
     
-    // Listen for network status changes with debounce
-    const debouncedConnectionCheck = debounce(async () => {
+    // Set up periodic connection health check with exponential backoff
+    const checkConnectionHealth = async () => {
+      // Don't check too frequently
       const now = Date.now();
-      if (now - lastConnectionCheck.current < 10000) return; // Don't check more than once every 10s
+      if (now - lastConnectionCheck.current < 30000) return;
       lastConnectionCheck.current = now;
       
-      console.log("Checking connection status...");
-      const isOnline = navigator.onLine;
-      const rtStatus = getRealtimeConnectionStatus();
-      
-      if (isOnline && rtStatus === 'DISCONNECTED') {
-        await ensureRealtimeConnection();
+      try {
+        // Get current connection status
+        const rtStatus = getRealtimeConnectionStatus();
+        const hasNetworkConnection = await checkNetworkConnection();
+        
+        // If realtime is disconnected but we have network, try to reconnect
+        if (rtStatus === 'DISCONNECTED' && hasNetworkConnection) {
+          console.log('Detected realtime disconnect with active network, attempting recovery');
+          
+          // Increment attempts for backoff calculation
+          connectionAttempts.current += 1;
+          
+          // Apply exponential backoff
+          const backoff = calculateBackoff(connectionAttempts.current - 1);
+          console.log(`Reconnection attempt ${connectionAttempts.current} with backoff: ${backoff}ms`);
+          
+          // Wait for backoff period
+          await new Promise(resolve => setTimeout(resolve, backoff));
+          
+          // Attempt reconnection
+          manager.reestablishSubscriptions();
+          
+          // Also check if token needs refresh
+          tokenManager.getSession(true).catch(err => {
+            console.error('Error refreshing session during recovery:', err);
+          });
+        } else if (rtStatus === 'CONNECTED') {
+          // Reset attempts counter when connected
+          connectionAttempts.current = 0;
+        }
+      } catch (error) {
+        console.error('Error in connection health check:', error);
       }
-    }, 1000);
+    };
     
-    window.addEventListener('online', debouncedConnectionCheck);
-    window.addEventListener('offline', debouncedConnectionCheck);
-    
-    // Set up custom token refresh event listener
-    const handleTokenRefreshNeeded = debounce(() => {
-      console.log("Token refresh requested");
-      tokenManager.refreshToken().catch(console.error);
-    }, 500);
-    
-    window.addEventListener('token-refresh-needed', handleTokenRefreshNeeded);
+    // Set up health check interval
+    connectionCheckIntervalRef.current = setInterval(() => {
+      checkConnectionHealth().catch(err => {
+        console.error('Error in connection health check:', err);
+      });
+    }, 60000); // Check every minute
     
     // Return cleanup
     return () => {
-      unsubscribe();
-      window.removeEventListener('online', debouncedConnectionCheck);
-      window.removeEventListener('offline', debouncedConnectionCheck);
-      window.removeEventListener('token-refresh-needed', handleTokenRefreshNeeded);
-      
       if (connectionCheckIntervalRef.current) {
         clearInterval(connectionCheckIntervalRef.current);
         connectionCheckIntervalRef.current = null;
@@ -98,40 +112,70 @@ export function AppInit() {
   useEffect(() => {
     if (subscriptionStatus.isStale) {
       console.log('Subscriptions are stale, refreshing...');
+      subscriptionStatus.forceRefresh();
       
-      // Only refresh if we haven't done so recently (debounce)
-      const debounceTime = 30000; // 30 seconds
-      const now = Date.now();
-      
-      if (now - lastConnectionCheck.current > debounceTime) {
-        lastConnectionCheck.current = now;
-        subscriptionStatus.forceRefresh();
-        
-        // Notify the user that subscriptions are being refreshed
-        toast.info('Refreshing stale data...', {
-          description: 'Your connection was inactive for a while, updating now',
-        });
-      }
+      // Notify the user that subscriptions are being refreshed
+      toast.info('Refreshing stale data...', {
+        description: 'Your connection was inactive for a while, updating now',
+      });
     }
   }, [subscriptionStatus.isStale]);
   
-  // Handle route changes
+  // Handle subscription refresh when coming back after inactivity
   useEffect(() => {
-    // When route changes, check if we need to recover subscriptions
+    if (subscriptionStatus.wasInactive) {
+      console.log('Page was inactive, refreshing subscriptions');
+      
+      // Force a refresh of all queries
+      queryClient.invalidateQueries();
+    }
+  }, [subscriptionStatus.wasInactive, queryClient]);
+  
+  // Handle route changes with improved subscription management
+  useEffect(() => {
+    // When route changes, check if the new route has all required subscriptions
     if (!subscriptionStatus.isFullySubscribed) {
-      console.log('Missing subscriptions for route:', location.pathname);
+      console.log('Not fully subscribed to required tables for route:', location.pathname);
       console.log('Missing tables:', subscriptionStatus.unsubscribedTables);
       
-      const attemptRecovery = debounce(() => {
-        if (subscriptionStatus.unsubscribedTables.length > 0) {
-          console.log("Attempting to recover missing subscriptions");
-          subscriptionStatus.forceRefresh();
-        }
-      }, 500);
+      // Progressive retry with exponential backoff
+      const retrySubscriptions = (attempt: number) => {
+        if (attempt > 3) return; // Maximum 3 retry attempts
+        
+        const delay = calculateBackoff(attempt);
+        setTimeout(() => {
+          if (subscriptionStatus.unsubscribedTables.length > 0) {
+            console.log(`Retry ${attempt + 1}: Re-establishing subscriptions for:`, subscriptionStatus.unsubscribedTables);
+            subscriptionStatus.forceRefresh();
+            retrySubscriptions(attempt + 1);
+          }
+        }, delay);
+      };
       
-      attemptRecovery();
+      // Start retry process after initial delay
+      retrySubscriptions(0);
     }
   }, [location.pathname, subscriptionStatus]);
+  
+  // Listen for network reconnection events
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('Network connection restored');
+      ensureRealtimeConnection().then(success => {
+        if (success) {
+          queryClient.invalidateQueries();
+          toast.success('Connection restored', {
+            description: 'Network is back online, refreshing data'
+          });
+        }
+      });
+    };
+    
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [queryClient]);
   
   // This component doesn't render anything
   return null;

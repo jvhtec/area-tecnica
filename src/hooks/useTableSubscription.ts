@@ -30,7 +30,7 @@ export function useTableSubscription(
   useEffect(() => {
     // Check if the table is actively subscribed
     const tableSubscriptions = subscriptionsByTable[tableName] || [];
-    setIsSubscribed(tableSubscriptions.length > 0 && globalConnectionStatus === 'CONNECTED');
+    setIsSubscribed(tableSubscriptions.length > 0 && globalConnectionStatus === 'connected');
     
     // Check if data is stale (older than 5 minutes)
     const now = Date.now();
@@ -100,7 +100,7 @@ export function useMultiTableSubscription(
     
     tables.forEach(({ table }) => {
       const tableSubscriptions = subscriptionsByTable[table] || [];
-      const isSubscribed = tableSubscriptions.length > 0 && globalConnectionStatus === 'CONNECTED';
+      const isSubscribed = tableSubscriptions.length > 0 && globalConnectionStatus === 'connected';
       const now = Date.now();
       const fiveMinutes = 5 * 60 * 1000;
       const isStale = now - lastRefreshTime > fiveMinutes;
