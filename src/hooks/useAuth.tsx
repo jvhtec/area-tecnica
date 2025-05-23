@@ -14,6 +14,17 @@ interface AuthContextType {
   error: string | null;
   userRole: string | null;
   userDepartment: string | null;
+  login: (email: string, password: string) => Promise<void>;
+  signUp: (data: {
+    email: string;
+    password: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    department?: string;
+    dni?: string;
+    residencia?: string;
+  }) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<Session | null>;
 }
@@ -26,6 +37,8 @@ const AuthContext = createContext<AuthContextType>({
   error: null,
   userRole: null,
   userDepartment: null,
+  login: async () => {},
+  signUp: async () => {},
   logout: async () => {},
   refreshSession: async () => null,
 });
@@ -64,6 +77,107 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.error('Error in fetchUserProfile:', error);
     }
   }, []);
+  
+  // Login with email and password
+  const login = useCallback(async (email: string, password: string) => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) {
+        console.error('Login error:', error);
+        setError(error.message);
+        return;
+      }
+      
+      if (data?.session) {
+        setSession(data.session);
+        setUser(data.session.user);
+        
+        // Fetch user profile after successful login
+        await fetchUserProfile(data.session.user.id);
+        
+        toast({
+          title: "Login successful",
+          description: `Welcome back, ${email}`,
+        });
+        
+        navigate('/dashboard', { replace: true });
+      }
+    } catch (error: any) {
+      console.error('Unexpected error during login:', error);
+      setError(error.message || 'An unexpected error occurred during login');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [navigate, fetchUserProfile, toast]);
+
+  // Sign up a new user
+  const signUp = useCallback(async (data: {
+    email: string;
+    password: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    department?: string;
+    dni?: string;
+    residencia?: string;
+  }) => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      
+      const { email, password, ...metaData } = data;
+      
+      const { data: authData, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: metaData.firstName,
+            last_name: metaData.lastName,
+            phone: metaData.phone,
+            department: metaData.department,
+            dni: metaData.dni,
+            residencia: metaData.residencia,
+          },
+        },
+      });
+      
+      if (error) {
+        console.error('Signup error:', error);
+        setError(error.message);
+        return;
+      }
+      
+      if (authData?.session) {
+        setSession(authData.session);
+        setUser(authData.session.user);
+        
+        toast({
+          title: "Signup successful",
+          description: "Your account has been created successfully",
+        });
+        
+        navigate('/dashboard', { replace: true });
+      } else if (authData?.user) {
+        toast({
+          title: "Verification required",
+          description: "Please check your email for verification instructions",
+        });
+      }
+    } catch (error: any) {
+      console.error('Unexpected error during signup:', error);
+      setError(error.message || 'An unexpected error occurred during signup');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [navigate, toast]);
 
   // Refresh the user session
   const refreshSession = useCallback(async (): Promise<Session | null> => {
@@ -169,6 +283,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     error,
     userRole,
     userDepartment,
+    login,
+    signUp,
     logout,
     refreshSession,
   };
