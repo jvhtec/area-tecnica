@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useJobsRealtime } from "@/hooks/useJobsRealtime";
@@ -14,9 +13,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { useConnectionStatus } from "@/hooks/useConnectionStatus";
+import { FestivalsPagination } from "@/components/ui/festivals-pagination";
+
+const ITEMS_PER_PAGE = 9; // 3x3 grid
 
 /**
- * Festivals page component showing all festival events
+ * Festivals page component showing all festival events with pagination
  */
 const Festivals = () => {
   const navigate = useNavigate();
@@ -33,6 +35,7 @@ const Festivals = () => {
   const [festivalJobs, setFestivalJobs] = useState<any[]>([]);
   const [festivalLogos, setFestivalLogos] = useState<Record<string, string>>({});
   const [isPrinting, setIsPrinting] = useState<Record<string, boolean>>({});
+  const [currentPage, setCurrentPage] = useState(1);
   const { userRole } = useAuth();
   const { status: connectionStatus, recoverConnection } = useConnectionStatus();
 
@@ -45,6 +48,17 @@ const Festivals = () => {
       festivals.forEach(fetchFestivalLogo);
     }
   }, [jobs]);
+
+  // Reset to first page when festivals change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [festivalJobs.length]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(festivalJobs.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedFestivals = festivalJobs.slice(startIndex, endIndex);
 
   // Auto-recover connection if needed
   useEffect(() => {
@@ -223,42 +237,54 @@ const Festivals = () => {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {festivalJobs.map((job) => (
-                <div key={job.id} className="relative">
-                  <div onClick={() => handleJobClick(job.id)} className="cursor-pointer">
-                    <JobCard 
-                      job={job} 
-                      onJobClick={() => handleJobClick(job.id)} 
-                      onEditClick={emptyFunction} 
-                      onDeleteClick={emptyFunction}
-                      userRole={userRole}
-                      department="sound"
-                      festivalLogo={festivalLogos[job.id]}
-                      hideFestivalControls={true}
-                    />
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {paginatedFestivals.map((job) => (
+                  <div key={job.id} className="relative">
+                    <div onClick={() => handleJobClick(job.id)} className="cursor-pointer">
+                      <JobCard 
+                        job={job} 
+                        onJobClick={() => handleJobClick(job.id)} 
+                        onEditClick={emptyFunction} 
+                        onDeleteClick={emptyFunction}
+                        userRole={userRole}
+                        department="sound"
+                        festivalLogo={festivalLogos[job.id]}
+                        hideFestivalControls={true}
+                      />
+                    </div>
+                    {canPrintDocuments && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="absolute top-2 right-2 z-10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePrintAllDocumentation(job.id, job.title);
+                        }}
+                        disabled={isPrinting[job.id]}
+                      >
+                        {isPrinting[job.id] ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Printer className="h-4 w-4" />
+                        )}
+                        <span className="sr-only">Print Documentation</span>
+                      </Button>
+                    )}
                   </div>
-                  {canPrintDocuments && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="absolute top-2 right-2 z-10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePrintAllDocumentation(job.id, job.title);
-                      }}
-                      disabled={isPrinting[job.id]}
-                    >
-                      {isPrinting[job.id] ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Printer className="h-4 w-4" />
-                      )}
-                      <span className="sr-only">Print Documentation</span>
-                    </Button>
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
+              
+              {totalPages > 1 && (
+                <FestivalsPagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  totalItems={festivalJobs.length}
+                  itemsPerPage={ITEMS_PER_PAGE}
+                />
+              )}
             </div>
           )}
         </CardContent>
