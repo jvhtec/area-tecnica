@@ -130,20 +130,18 @@ const PesosTool: React.FC = () => {
   // Helper to generate an SX suffix.
   // Returns a string such as "SX01" or "SX01, SX02" depending on useDualMotors.
   const getSuffix = () => {
-    if (department === 'sound') {
-      if (useDualMotors) {
-        soundTableCounter++;
-        const num1 = soundTableCounter.toString().padStart(2, '0');
-        soundTableCounter++;
-        const num2 = soundTableCounter.toString().padStart(2, '0');
-        return `SX${num1}, SX${num2}`;
-      } else {
-        soundTableCounter++;
-        const num = soundTableCounter.toString().padStart(2, '0');
-        return `SX${num}`;
-      }
+    // Since this is the PesosTool for sound department
+    if (useDualMotors) {
+      soundTableCounter++;
+      const num1 = soundTableCounter.toString().padStart(2, '0');
+      soundTableCounter++;
+      const num2 = soundTableCounter.toString().padStart(2, '0');
+      return `SX${num1}, SX${num2}`;
+    } else {
+      soundTableCounter++;
+      const num = soundTableCounter.toString().padStart(2, '0');
+      return `SX${num}`;
     }
-    return '';
   };
 
   const addRow = () => {
