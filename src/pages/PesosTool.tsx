@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTourWeightDefaults } from '@/hooks/useTourWeightDefaults';
+import { TourDefaultsSimpleForm } from '@/components/tours/TourDefaultsSimpleForm';
 
 // Database for sound components.
 const soundComponentDatabase = [
@@ -99,6 +100,8 @@ const PesosTool: React.FC = () => {
   const {
     weightDefaults,
     createDefault: createTourDefault,
+    updateDefault: updateTourDefault,
+    deleteDefault: deleteTourDefault,
     isLoading: tourDefaultsLoading
   } = useTourWeightDefaults(tourId || '');
 
@@ -403,6 +406,30 @@ const PesosTool: React.FC = () => {
     }
   };
 
+  // If in defaults mode, show simplified interface
+  if (isDefaults) {
+    const defaultItems = weightDefaults.map(wd => ({
+      id: wd.id,
+      name: wd.item_name,
+      value: wd.weight_kg,
+      quantity: wd.quantity,
+      category: wd.category || undefined
+    }));
+
+    return (
+      <TourDefaultsSimpleForm
+        tourId={tourId!}
+        tourName={tourName}
+        type="weight"
+        defaults={defaultItems}
+        onSave={handleSaveDefault}
+        onUpdate={handleUpdateDefault}
+        onDelete={handleDeleteDefault}
+        onBack={handleBackNavigation}
+      />
+    );
+  }
+
   return (
     <Card className="w-full max-w-4xl mx-auto my-6">
       <CardHeader className="space-y-1">
@@ -411,12 +438,12 @@ const PesosTool: React.FC = () => {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <CardTitle className="text-2xl font-bold">
-            {isDefaults ? 'Tour Weight Defaults' : 'Weight Calculator'}
+            Weight Calculator
           </CardTitle>
         </div>
         {isTourContext && (
           <p className="text-sm text-muted-foreground text-center">
-            {isDefaults ? 'Setting default weight requirements for tour' : 'Creating weight requirements for specific dates'}
+            Creating weight requirements for specific dates
           </p>
         )}
       </CardHeader>

@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useTourPowerDefaults } from '@/hooks/useTourPowerDefaults';
+import { TourDefaultsSimpleForm } from '@/components/tours/TourDefaultsSimpleForm';
 
 const soundComponentDatabase = [
   { id: 1, name: 'LA12X', watts: 2900 },
@@ -76,6 +77,8 @@ const ConsumosTool: React.FC = () => {
   const {
     powerDefaults,
     createDefault: createTourDefault,
+    updateDefault: updateTourDefault,
+    deleteDefault: deleteTourDefault,
     isLoading: tourDefaultsLoading
   } = useTourPowerDefaults(tourId || '');
 
@@ -372,6 +375,90 @@ const ConsumosTool: React.FC = () => {
     }
   };
 
+  // If in defaults mode, show simplified interface
+  if (isDefaults) {
+    const defaultItems = powerDefaults.map(pd => ({
+      id: pd.id,
+      name: pd.table_name,
+      value: pd.total_watts,
+      quantity: 1,
+      category: undefined
+    }));
+
+    return (
+      <TourDefaultsSimpleForm
+        tourId={tourId!}
+        tourName={tourName}
+        type="power"
+        defaults={defaultItems}
+        onSave={handleSaveDefault}
+        onUpdate={handleUpdateDefault}
+        onDelete={handleDeleteDefault}
+        onBack={handleBackNavigation}
+      />
+    );
+  }
+
+  const handleSaveDefault = async (item: { name: string; value: number; quantity: number; category?: string }) => {
+    if (!tourId) return;
+
+    await createTourDefault({
+      tour_id: tourId,
+      table_name: item.name,
+      total_watts: item.value * item.quantity,
+      current_per_phase: (item.value * item.quantity) / (VOLTAGE_3PHASE * POWER_FACTOR * PHASES),
+      pdu_type: recommendPDU((item.value * item.quantity) / (VOLTAGE_3PHASE * POWER_FACTOR * PHASES)),
+      custom_pdu_type: undefined,
+      includes_hoist: false,
+      department: null
+    });
+  };
+
+  const handleUpdateDefault = async (id: string, updates: any) => {
+    const powerDefault = powerDefaults.find(pd => pd.id === id);
+    if (!powerDefault) return;
+
+    const totalWatts = (updates.value ?? powerDefault.total_watts) * (updates.quantity ?? 1);
+    const currentPerPhase = totalWatts / (VOLTAGE_3PHASE * POWER_FACTOR * PHASES);
+
+    await updateTourDefault({
+      id,
+      tour_id: powerDefault.tour_id,
+      table_name: updates.name ?? powerDefault.table_name,
+      total_watts: totalWatts,
+      current_per_phase: currentPerPhase,
+      pdu_type: powerDefault.pdu_type,
+      custom_pdu_type: powerDefault.custom_pdu_type,
+      includes_hoist: powerDefault.includes_hoist,
+      department: powerDefault.department
+    });
+  };
+
+  const handleDeleteDefault = async (id: string) => {
+    await deleteTourDefault(id);
+  };
+
+  // Get tour name for display
+  const [tourName, setTourName] = useState<string>('');
+
+  useEffect(() => {
+    const fetchTourName = async () => {
+      if (tourId) {
+        const { data } = await supabase
+          .from('tours')
+          .select('name')
+          .eq('id', tourId)
+          .single();
+        
+        if (data) {
+          setTourName(data.name);
+        }
+      }
+    };
+
+    fetchTourName();
+  }, [tourId]);
+
   return (
     <Card className="w-full max-w-4xl mx-auto my-6">
       <CardHeader className="space-y-1">
@@ -380,12 +467,12 @@ const ConsumosTool: React.FC = () => {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <CardTitle className="text-2xl font-bold">
-            {isDefaults ? 'Tour Power Defaults' : 'Power Calculator'}
+            Power Calculator
           </CardTitle>
         </div>
         {isTourContext && (
           <p className="text-sm text-muted-foreground text-center">
-            {isDefaults ? 'Setting default power requirements for tour' : 'Creating power requirements for specific dates'}
+            Creating power requirements for specific dates
           </p>
         )}
       </CardHeader>

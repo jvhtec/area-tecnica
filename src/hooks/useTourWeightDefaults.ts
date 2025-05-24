@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +18,7 @@ export const useTourWeightDefaults = (tourId: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: weightDefaults = [], isLoading } = useQuery({
+  const { data: weightDefaults = [], isLoading, error } = useQuery({
     queryKey: ["tour-weight-defaults", tourId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -34,7 +33,7 @@ export const useTourWeightDefaults = (tourId: string) => {
     enabled: !!tourId,
   });
 
-  const createDefaultMutation = useMutation({
+  const createMutation = useMutation({
     mutationFn: async (weightDefault: Omit<TourWeightDefault, "id" | "created_at" | "updated_at">) => {
       const { data, error } = await supabase
         .from("tour_weight_defaults")
@@ -61,67 +60,51 @@ export const useTourWeightDefaults = (tourId: string) => {
     },
   });
 
-  const updateDefaultMutation = useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<TourWeightDefault> & { id: string }) => {
-      const { data, error } = await supabase
-        .from("tour_weight_defaults")
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
+  const updateMutation = useMutation({
+    mutationFn: async (data: TourWeightDefault) => {
+      const { error } = await supabase
+        .from('tour_weight_defaults')
+        .update({
+          item_name: data.item_name,
+          weight_kg: data.weight_kg,
+          quantity: data.quantity,
+          category: data.category,
+          department: data.department
+        })
+        .eq('id', data.id);
 
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tour-weight-defaults", tourId] });
-      toast({
-        title: "Success",
-        description: "Weight default updated successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update weight default",
-        variant: "destructive",
-      });
+      queryClient.invalidateQueries({ queryKey: ['tour-weight-defaults', tourId] });
     },
   });
 
-  const deleteDefaultMutation = useMutation({
+  const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from("tour_weight_defaults")
+        .from('tour_weight_defaults')
         .delete()
-        .eq("id", id);
+        .eq('id', id);
 
       if (error) throw error;
+      return id;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tour-weight-defaults", tourId] });
-      toast({
-        title: "Success",
-        description: "Weight default deleted successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete weight default",
-        variant: "destructive",
-      });
+      queryClient.invalidateQueries({ queryKey: ['tour-weight-defaults', tourId] });
     },
   });
 
   return {
-    weightDefaults,
+    weightDefaults: data || [],
     isLoading,
-    createDefault: createDefaultMutation.mutate,
-    updateDefault: updateDefaultMutation.mutate,
-    deleteDefault: deleteDefaultMutation.mutate,
-    isCreating: createDefaultMutation.isPending,
-    isUpdating: updateDefaultMutation.isPending,
-    isDeleting: deleteDefaultMutation.isPending,
+    error,
+    createDefault: createMutation.mutateAsync,
+    updateDefault: updateMutation.mutateAsync,
+    deleteDefault: deleteMutation.mutateAsync,
+    isCreating: createMutation.isPending,
+    isUpdating: updateMutation.isPending,
+    isDeleting: deleteMutation.isPending,
   };
 };
