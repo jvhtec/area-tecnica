@@ -1,3 +1,4 @@
+
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, ChevronsUpDown, Download } from 'lucide-react';
@@ -5,7 +6,7 @@ import { format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks }
 import { es } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase';
-import { useSessionManager } from '@/hooks/useSessionManager';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
@@ -28,7 +29,7 @@ interface Equipment {
 }
 
 export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps) {
-  const { session } = useSessionManager();
+  const { session } = useAuth();
   const { toast } = useToast();
   const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(selectedDate));
   const [isOpen, setIsOpen] = useState(() => {
