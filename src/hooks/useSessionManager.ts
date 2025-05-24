@@ -5,6 +5,7 @@ import { useSessionRefresh } from "./session/useSessionRefresh";
 import { useProfileData } from "./session/useProfileData";
 import { useProfileChanges } from "./session/useProfileChanges";
 import { useAuthSession } from "./auth/useAuthSession";
+import { Session } from "@supabase/supabase-js";
 
 export const useSessionManager = () => {
   const navigate = useNavigate();
@@ -103,9 +104,9 @@ export const useSessionManager = () => {
   );
 
   // Add setSession function for Layout compatibility
-  const setSession = useCallback(() => {
+  const setSession = useCallback((newSession: Session | null) => {
     // This is a placeholder - the session is managed by useAuthSession
-    console.log("setSession called - session is managed by centralized auth");
+    console.log("setSession called with:", newSession, "- session is managed by centralized auth");
   }, []);
 
   return {
