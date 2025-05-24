@@ -37,13 +37,15 @@ export const EventDetailsSection = ({
             {isLoadingJobs ? (
               <SelectItem value="loading">Cargando trabajos...</SelectItem>
             ) : jobs?.length === 0 ? (
-              <SelectItem value="unselected">No hay trabajos disponibles</SelectItem>
+              <SelectItem value="no-jobs">No hay trabajos disponibles</SelectItem>
             ) : (
-              jobs?.map((job: any) => (
-                <SelectItem key={job.id} value={job.id}>
-                  {job.title}
-                </SelectItem>
-              ))
+              jobs
+                ?.filter(job => job.id && job.id.trim() !== '') // Filter out jobs with empty IDs
+                .map((job: any) => (
+                  <SelectItem key={job.id} value={job.id}>
+                    {job.title}
+                  </SelectItem>
+                ))
             )}
           </SelectContent>
         </Select>
