@@ -2697,6 +2697,100 @@ export type Database = {
           },
         ]
       }
+      tour_date_power_overrides: {
+        Row: {
+          created_at: string | null
+          current_per_phase: number
+          custom_pdu_type: string | null
+          department: string | null
+          id: string
+          includes_hoist: boolean | null
+          pdu_type: string
+          table_name: string
+          total_watts: number
+          tour_date_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_per_phase: number
+          custom_pdu_type?: string | null
+          department?: string | null
+          id?: string
+          includes_hoist?: boolean | null
+          pdu_type: string
+          table_name: string
+          total_watts: number
+          tour_date_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_per_phase?: number
+          custom_pdu_type?: string | null
+          department?: string | null
+          id?: string
+          includes_hoist?: boolean | null
+          pdu_type?: string
+          table_name?: string
+          total_watts?: number
+          tour_date_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_date_power_overrides_tour_date_id_fkey"
+            columns: ["tour_date_id"]
+            isOneToOne: false
+            referencedRelation: "tour_dates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tour_date_weight_overrides: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          department: string | null
+          id: string
+          item_name: string
+          quantity: number | null
+          tour_date_id: string
+          updated_at: string | null
+          weight_kg: number
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          department?: string | null
+          id?: string
+          item_name: string
+          quantity?: number | null
+          tour_date_id: string
+          updated_at?: string | null
+          weight_kg: number
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          department?: string | null
+          id?: string
+          item_name?: string
+          quantity?: number | null
+          tour_date_id?: string
+          updated_at?: string | null
+          weight_kg?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_date_weight_overrides_tour_date_id_fkey"
+            columns: ["tour_date_id"]
+            isOneToOne: false
+            referencedRelation: "tour_dates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tour_dates: {
         Row: {
           created_at: string
@@ -2773,6 +2867,100 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "tour_logos_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tour_power_defaults: {
+        Row: {
+          created_at: string | null
+          current_per_phase: number
+          custom_pdu_type: string | null
+          department: string | null
+          id: string
+          includes_hoist: boolean | null
+          pdu_type: string
+          table_name: string
+          total_watts: number
+          tour_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_per_phase: number
+          custom_pdu_type?: string | null
+          department?: string | null
+          id?: string
+          includes_hoist?: boolean | null
+          pdu_type: string
+          table_name: string
+          total_watts: number
+          tour_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_per_phase?: number
+          custom_pdu_type?: string | null
+          department?: string | null
+          id?: string
+          includes_hoist?: boolean | null
+          pdu_type?: string
+          table_name?: string
+          total_watts?: number
+          tour_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_power_defaults_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tour_weight_defaults: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          department: string | null
+          id: string
+          item_name: string
+          quantity: number | null
+          tour_id: string
+          updated_at: string | null
+          weight_kg: number
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          department?: string | null
+          id?: string
+          item_name: string
+          quantity?: number | null
+          tour_id: string
+          updated_at?: string | null
+          weight_kg: number
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          department?: string | null
+          id?: string
+          item_name?: string
+          quantity?: number | null
+          tour_id?: string
+          updated_at?: string | null
+          weight_kg?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_weight_defaults_tour_id_fkey"
             columns: ["tour_id"]
             isOneToOne: false
             referencedRelation: "tours"
