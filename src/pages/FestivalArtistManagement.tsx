@@ -7,19 +7,16 @@ import { ArtistTable } from "@/components/festival/ArtistTable";
 import { ArtistManagementDialog } from "@/components/festival/ArtistManagementDialog";
 import { ArtistTableFilters } from "@/components/festival/ArtistTableFilters";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/enhanced-supabase-client"; // Updated import
-import { ConnectionIndicator } from "@/components/ui/connection-indicator"; // Import the new component
-import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription"; // Import the new hook
+import { supabase } from "@/lib/enhanced-supabase-client";
+import { ConnectionIndicator } from "@/components/ui/connection-indicator";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { 
   format, 
   eachDayOfInterval, 
   isValid, 
   addDays,
-  subDays,
   parseISO,
-  isBefore,
-  startOfDay,
   setHours,
   setMinutes
 } from "date-fns";
@@ -28,6 +25,7 @@ import { exportArtistTablePDF } from "@/utils/artistTablePdfExport";
 import { DateTypeContextMenu } from "@/components/dashboard/DateTypeContextMenu";
 import { useQuery } from "@tanstack/react-query";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useArtistsQuery } from "@/hooks/useArtistsQuery";
 
 const DAY_START_HOUR = 7; // Festival day starts at 7:00 AM
 
@@ -35,8 +33,6 @@ const FestivalArtistManagement = () => {
   const { jobId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [artists, setArtists] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
   const [jobTitle, setJobTitle] = useState("");
@@ -53,6 +49,15 @@ const FestivalArtistManagement = () => {
   const [dateTypes, setDateTypes] = useState<Record<string, string>>({});
   const [dayStartTime, setDayStartTime] = useState<string>("07:00");
   const [logoUrl, setLogoUrl] = useState("");
+
+  // Use React Query for artists data
+  const { 
+    artists, 
+    isLoading: artistsLoading, 
+    deleteArtist, 
+    isDeletingArtist,
+    invalidateArtists 
+  } = useArtistsQuery(jobId, selectedDate, dayStartTime);
 
   const { data: festivalSettings } = useQuery({
     queryKey: ['festival-settings', jobId],
@@ -130,6 +135,13 @@ const FestivalArtistManagement = () => {
     }
   }, [dateTypeData]);
 
+  // Enhanced real-time subscription that invalidates queries
+  useRealtimeSubscription({
+    table: "festival_artists",
+    filter: `job_id=eq.${jobId}`,
+    queryKey: ["festival-artists", jobId, selectedDate]
+  });
+
   const toFestivalDay = (date: Date, time: string): Date => {
     const [hours, minutes] = time.split(':').map(Number);
     const showTime = new Date(date);
@@ -183,76 +195,6 @@ const FestivalArtistManagement = () => {
     fetchJobDetails();
   }, [jobId]);
 
-  // Use our new realtime subscription hook instead of manual subscription
-  useRealtimeSubscription({
-    table: "festival_artists",
-    filter: `job_id=eq.${jobId}`,
-    queryKey: ["festival-artists", jobId, selectedDate]
-  });
-  
-  const fetchArtists = async () => {
-    try {
-      if (!jobId || !selectedDate) {
-        setIsLoading(false);
-        return;
-      }
-      
-      const [startHour, startMinute] = dayStartTime.split(':').map(Number);
-      
-      const selectedDateObj = parseISO(selectedDate);
-      const festivalDayStart = setMinutes(setHours(selectedDateObj, startHour || 7), startMinute || 0);
-      const nextDayObj = addDays(selectedDateObj, 1);
-      const festivalDayEnd = setMinutes(setHours(nextDayObj, startHour || 7), startMinute || 0);
-      
-      console.log("Fetching artists for festival day:", format(festivalDayStart, 'yyyy-MM-dd HH:mm'), "to", format(festivalDayEnd, 'yyyy-MM-dd HH:mm'));
-      
-      const { data, error } = await supabase
-        .from("festival_artists")
-        .select("*")
-        .eq("job_id", jobId)
-        .eq("date", selectedDate)
-        .order("show_start", { ascending: true });
-
-      if (error) throw error;
-      
-      console.log("Fetched artists:", data);
-      
-      const processedArtists = data?.map(artist => {
-        if (artist.isaftermidnight !== undefined) {
-          return artist;
-        }
-        
-        if (!artist.show_start) return artist;
-        
-        const [hours] = artist.show_start.split(':').map(Number);
-        const isAfterMidnight = hours < startHour;
-        
-        return {
-          ...artist,
-          isaftermidnight: isAfterMidnight
-        };
-      }) || [];
-      
-      setArtists(processedArtists);
-    } catch (error: any) {
-      console.error("Error fetching artists:", error);
-      toast({
-        title: "Error",
-        description: "Could not load artists",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (selectedDate) {
-      setIsLoading(true);
-      fetchArtists();
-    }
-  }, [jobId, selectedDate, dayStartTime]);
-
   const handleAddArtist = () => {
     setSelectedArtist(null);
     setIsDialogOpen(true);
@@ -264,29 +206,16 @@ const FestivalArtistManagement = () => {
   };
 
   const handleDeleteArtist = async (artist: any) => {
-    try {
-      setIsLoading(true);
-      
-      const { error } = await supabase
-        .from("festival_artists")
-        .delete()
-        .eq("id", artist.id);
+    deleteArtist(artist.id);
+  };
 
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Artist deleted successfully",
-      });
-    } catch (error: any) {
-      console.error("Error deleting artist:", error);
-      toast({
-        title: "Error",
-        description: "Could not delete artist: " + error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+  const handleArtistDialogClose = (wasUpdated: boolean = false) => {
+    setIsDialogOpen(false);
+    setSelectedArtist(null);
+    
+    // Invalidate artists query if there was an update
+    if (wasUpdated) {
+      invalidateArtists();
     }
   };
 
@@ -438,7 +367,7 @@ const FestivalArtistManagement = () => {
         </Button>
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">{jobTitle}</h1>
-          <ConnectionIndicator /> {/* Add the connection indicator */}
+          <ConnectionIndicator />
         </div>
       </div>
 
@@ -541,7 +470,7 @@ const FestivalArtistManagement = () => {
                     {isShowDate(date) ? (
                       <ArtistTable
                         artists={artists}
-                        isLoading={isLoading}
+                        isLoading={artistsLoading}
                         onEditArtist={handleEditArtist}
                         onDeleteArtist={handleDeleteArtist}
                         searchTerm={searchTerm}
@@ -562,7 +491,7 @@ const FestivalArtistManagement = () => {
             ) : (
               <ArtistTable
                 artists={artists}
-                isLoading={isLoading}
+                isLoading={artistsLoading}
                 onEditArtist={handleEditArtist}
                 onDeleteArtist={handleDeleteArtist}
                 searchTerm={searchTerm}
@@ -578,7 +507,7 @@ const FestivalArtistManagement = () => {
       {showArtistControls && (
         <ArtistManagementDialog
           open={isDialogOpen}
-          onOpenChange={setIsDialogOpen}
+          onOpenChange={handleArtistDialogClose}
           artist={selectedArtist}
           jobId={jobId}
           selectedDate={selectedDate}
