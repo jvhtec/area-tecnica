@@ -14,8 +14,7 @@ export const WirelessConfig = ({
   onChange, 
   label, 
   includeQuantityTypes = false,
-  isIEM = false,
-  defaultProvidedBy = 'festival'
+  isIEM = false
 }: WirelessConfigProps) => {
   const addSystem = () => {
     const newSystem: WirelessSetup = {
@@ -24,7 +23,7 @@ export const WirelessConfig = ({
       quantity_hh: 0,
       quantity_bp: 0,
       band: '',
-      provided_by: defaultProvidedBy
+      provided_by: 'festival' // Default to festival for new systems
     };
     onChange([...systems, newSystem]);
   };
@@ -155,7 +154,7 @@ export const WirelessConfig = ({
           <div>
             <Label>Provided By</Label>
             <RadioGroup
-              value={system.provided_by || defaultProvidedBy}
+              value={system.provided_by || 'festival'}
               onValueChange={(value: 'festival' | 'band') => updateSystem(index, 'provided_by', value)}
               className="flex space-x-4 mt-1"
             >
