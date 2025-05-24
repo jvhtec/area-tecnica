@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArtistForm } from "./ArtistForm";
+import { ArtistManagementForm } from "./ArtistManagementForm";
 import { useArtistMutations } from "@/hooks/useArtistMutations";
 
 interface ArtistManagementDialogProps {
@@ -108,7 +108,7 @@ export const ArtistManagementDialog = ({
             {artist ? "Edit Artist" : "Add Artist"}
           </DialogTitle>
         </DialogHeader>
-        <ArtistForm
+        <ArtistManagementForm
           initialData={formData}
           onSave={handleSave}
           onCancel={handleClose}
