@@ -12,6 +12,8 @@ import { supabase } from '@/lib/supabase';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTourWeightDefaults } from '@/hooks/useTourWeightDefaults';
+import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
+import { useTourDateOverrides } from '@/hooks/useTourDateOverrides';
 
 // Database for sound components.
 const soundComponentDatabase = [
@@ -66,6 +68,8 @@ interface Table {
   dualMotors?: boolean;
   riggingPoints?: string; // Stores the generated SX suffix(es)
   clusterId?: string;     // New property to group tables (e.g. mirrored pair)
+  defaultTableId?: string;
+  overrideId?: string;
 }
 
 interface SummaryRow {
@@ -82,9 +86,11 @@ const PesosTool: React.FC = () => {
   
   // Tour context detection
   const tourId = searchParams.get('tourId');
+  const tourDateId = searchParams.get('tourDateId');
   const mode = searchParams.get('mode'); // 'defaults' or 'override'
   const isDefaults = mode === 'defaults';
   const isTourContext = !!tourId;
+  const isTourDateContext = !!tourDateId;
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<JobSelection | null>(null);
@@ -94,20 +100,30 @@ const PesosTool: React.FC = () => {
   const [mirroredCluster, setMirroredCluster] = useState(false);
   const [cablePick, setCablePick] = useState(false);
   const [cablePickWeight, setCablePickWeight] = useState('100');
+  const [currentSetName, setCurrentSetName] = useState('');
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
     rows: [{ quantity: '', componentId: '', weight: '' }],
   });
 
-  // Tour defaults hook
+  // New hooks for tour defaults
   const {
-    weightDefaults,
-    createDefault: createTourDefault,
-    updateDefault: updateTourDefault,
-    deleteDefault: deleteTourDefault,
-    isLoading: tourDefaultsLoading
-  } = useTourWeightDefaults(tourId || '');
+    defaultSets,
+    defaultTables,
+    createSet,
+    createTable: createDefaultTable,
+    deleteSet,
+    deleteTable: deleteDefaultTable,
+    isLoading: defaultsLoading
+  } = useTourDefaultSets(tourId || '', 'sound');
+
+  const {
+    weightOverrides,
+    createWeightOverride,
+    deleteOverride,
+    isLoading: overridesLoading
+  } = useTourDateOverrides(tourDateId || '', 'weight');
 
   // Get tour name for display
   const [tourName, setTourName] = useState<string>('');
@@ -140,23 +156,52 @@ const PesosTool: React.FC = () => {
 
   // Load existing tour defaults when in defaults mode
   useEffect(() => {
-    if (isDefaults && weightDefaults.length > 0) {
-      const convertedTables = weightDefaults.map((def, index) => ({
-        name: def.item_name,
-        rows: [{
-          quantity: def.quantity.toString(),
+    if (isDefaults && defaultTables.length > 0) {
+      // Group tables by set and convert to our local format
+      const convertedTables = defaultTables
+        .filter(dt => dt.table_type === 'weight')
+        .map((dt, index) => ({
+          name: dt.table_name,
+          rows: dt.table_data.rows || [{
+            quantity: '1',
+            componentId: '',
+            weight: dt.total_value.toString(),
+            componentName: dt.table_name,
+            totalWeight: dt.total_value
+          }],
+          totalWeight: dt.total_value,
+          id: Date.now() + index,
+          clusterId: dt.metadata?.clusterId,
+          dualMotors: dt.metadata?.dualMotors,
+          riggingPoints: dt.metadata?.riggingPoints,
+          defaultTableId: dt.id
+        }));
+      setTables(convertedTables);
+    }
+  }, [isDefaults, defaultTables]);
+
+  // Load tour date overrides when in tour date context
+  useEffect(() => {
+    if (isTourDateContext && weightOverrides.length > 0) {
+      const convertedTables = weightOverrides.map((override, index) => ({
+        name: override.item_name,
+        rows: override.override_data?.tableData?.rows || [{
+          quantity: override.quantity.toString(),
           componentId: '',
-          weight: def.weight_kg.toString(),
-          componentName: def.item_name,
-          totalWeight: def.weight_kg * def.quantity
+          weight: override.weight_kg.toString(),
+          componentName: override.item_name,
+          totalWeight: override.weight_kg * override.quantity
         }],
-        totalWeight: def.weight_kg * def.quantity,
+        totalWeight: override.weight_kg * override.quantity,
         id: Date.now() + index,
-        clusterId: `default-${index}`
+        clusterId: override.override_data?.tableData?.clusterId,
+        dualMotors: override.override_data?.tableData?.dualMotors,
+        riggingPoints: override.override_data?.tableData?.riggingPoints,
+        overrideId: override.id
       }));
       setTables(convertedTables);
     }
-  }, [isDefaults, weightDefaults]);
+  }, [isTourDateContext, weightOverrides]);
 
   // Helper to generate an SX suffix.
   // Returns a string such as "SX01" or "SX01, SX02" depending on useDualMotors.
@@ -209,33 +254,95 @@ const PesosTool: React.FC = () => {
     setSelectedJob(job);
   };
 
-  const saveAsTourDefault = async (table: Table) => {
-    if (!tourId) return;
+  const saveAsDefaultSet = async () => {
+    if (!tourId || !currentSetName || tables.length === 0) {
+      toast({
+        title: 'Missing information',
+        description: 'Please enter a set name and create at least one table',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
-      // Save each row as a separate tour default
+      // Create the default set
+      const defaultSet = await createSet({
+        tour_id: tourId,
+        name: currentSetName,
+        description: `Weight calculation set with ${tables.length} tables`,
+        department: 'sound'
+      });
+
+      // Save each table as a default table
+      for (const table of tables) {
+        await createDefaultTable({
+          set_id: defaultSet.id,
+          table_name: table.name,
+          table_data: {
+            rows: table.rows,
+            toolType: 'pesos'
+          },
+          table_type: 'weight',
+          total_value: table.totalWeight || 0,
+          metadata: {
+            dualMotors: table.dualMotors,
+            riggingPoints: table.riggingPoints,
+            clusterId: table.clusterId
+          }
+        });
+      }
+
+      toast({
+        title: 'Success',
+        description: `Default set "${currentSetName}" saved successfully`,
+      });
+
+      // Reset form
+      setCurrentSetName('');
+      setTables([]);
+      resetCurrentTable();
+    } catch (error: any) {
+      console.error('Error saving default set:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save default set',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const saveAsOverride = async (table: Table) => {
+    if (!tourDateId) return;
+
+    try {
+      // Save each row as a separate override (to match existing structure)
       for (const row of table.rows) {
         if (row.componentName && row.totalWeight) {
-          await createTourDefault({
-            tour_id: tourId,
+          await createWeightOverride({
+            tour_date_id: tourDateId,
+            default_table_id: table.defaultTableId,
             item_name: row.componentName,
             weight_kg: parseFloat(row.weight),
             quantity: parseInt(row.quantity),
             category: null,
-            department: null
+            department: 'sound',
+            override_data: {
+              tableData: table,
+              toolType: 'pesos'
+            }
           });
         }
       }
 
       toast({
         title: 'Success',
-        description: isDefaults ? 'Weight default saved successfully' : 'Weight defaults saved to tour successfully',
+        description: 'Override saved for this tour date',
       });
     } catch (error: any) {
-      console.error('Error saving tour defaults:', error);
+      console.error('Error saving override:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save tour defaults',
+        description: 'Failed to save override',
         variant: 'destructive',
       });
     }
@@ -280,7 +387,7 @@ const PesosTool: React.FC = () => {
         clusterId: newClusterId,
       };
       setTables((prev) => [...prev, newTable]);
-      saveAsTourDefault(newTable);
+      saveAsDefaultSet(newTable);
     } else if (mirroredCluster) {
       // For mirrored clusters, generate two tables sharing the same clusterId.
       const leftSuffix = getSuffix();
@@ -451,7 +558,12 @@ const PesosTool: React.FC = () => {
                 Managing defaults for: <span className="font-medium">{tourName}</span>
               </p>
             )}
-            {isTourContext && !isDefaults && (
+            {isTourDateContext && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Creating overrides for tour date
+              </p>
+            )}
+            {isTourContext && !isDefaults && !isTourDateContext && (
               <p className="text-sm text-muted-foreground mt-1">
                 Creating weight requirements for tour: <span className="font-medium">{tourName}</span>
               </p>
@@ -462,6 +574,18 @@ const PesosTool: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
+          {isDefaults && (
+            <div className="space-y-2">
+              <Label htmlFor="setName">Default Set Name</Label>
+              <Input
+                id="setName"
+                value={currentSetName}
+                onChange={(e) => setCurrentSetName(e.target.value)}
+                placeholder="Enter set name (e.g., 'Main Stage Rigging')"
+              />
+            </div>
+          )}
+
           {!isTourContext && (
             <div className="space-y-2">
               <Label htmlFor="jobSelect">Select Job</Label>
@@ -604,6 +728,41 @@ const PesosTool: React.FC = () => {
             )}
           </div>
 
+          {/* Display existing default sets */}
+          {isDefaults && defaultSets.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Existing Default Sets</h3>
+              {defaultSets.map((set) => {
+                const setTables = defaultTables.filter(dt => dt.set_id === set.id && dt.table_type === 'weight');
+                return (
+                  <div key={set.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-medium">{set.name}</h4>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteSet(set.id)}
+                      >
+                        Delete Set
+                      </Button>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      {set.description} • {setTables.length} tables
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {setTables.map((table) => (
+                        <div key={table.id} className="text-sm border rounded p-2">
+                          <div className="font-medium">{table.table_name}</div>
+                          <div className="text-muted-foreground">{table.total_value.toFixed(2)} kg</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Table display with save as default option */}
           {tables.map((table) => (
             <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
@@ -614,7 +773,7 @@ const PesosTool: React.FC = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => saveAsTourDefault(table)}
+                      onClick={() => saveAsDefaultSet(table)}
                     >
                       <Save className="h-4 w-4 mr-1" />
                       Save as Default

@@ -2702,9 +2702,11 @@ export type Database = {
           created_at: string | null
           current_per_phase: number
           custom_pdu_type: string | null
+          default_table_id: string | null
           department: string | null
           id: string
           includes_hoist: boolean | null
+          override_data: Json | null
           pdu_type: string
           table_name: string
           total_watts: number
@@ -2715,9 +2717,11 @@ export type Database = {
           created_at?: string | null
           current_per_phase: number
           custom_pdu_type?: string | null
+          default_table_id?: string | null
           department?: string | null
           id?: string
           includes_hoist?: boolean | null
+          override_data?: Json | null
           pdu_type: string
           table_name: string
           total_watts: number
@@ -2728,9 +2732,11 @@ export type Database = {
           created_at?: string | null
           current_per_phase?: number
           custom_pdu_type?: string | null
+          default_table_id?: string | null
           department?: string | null
           id?: string
           includes_hoist?: boolean | null
+          override_data?: Json | null
           pdu_type?: string
           table_name?: string
           total_watts?: number
@@ -2738,6 +2744,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "tour_date_power_overrides_default_table_id_fkey"
+            columns: ["default_table_id"]
+            isOneToOne: false
+            referencedRelation: "tour_default_tables"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tour_date_power_overrides_tour_date_id_fkey"
             columns: ["tour_date_id"]
@@ -2751,9 +2764,11 @@ export type Database = {
         Row: {
           category: string | null
           created_at: string | null
+          default_table_id: string | null
           department: string | null
           id: string
           item_name: string
+          override_data: Json | null
           quantity: number | null
           tour_date_id: string
           updated_at: string | null
@@ -2762,9 +2777,11 @@ export type Database = {
         Insert: {
           category?: string | null
           created_at?: string | null
+          default_table_id?: string | null
           department?: string | null
           id?: string
           item_name: string
+          override_data?: Json | null
           quantity?: number | null
           tour_date_id: string
           updated_at?: string | null
@@ -2773,15 +2790,24 @@ export type Database = {
         Update: {
           category?: string | null
           created_at?: string | null
+          default_table_id?: string | null
           department?: string | null
           id?: string
           item_name?: string
+          override_data?: Json | null
           quantity?: number | null
           tour_date_id?: string
           updated_at?: string | null
           weight_kg?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "tour_date_weight_overrides_default_table_id_fkey"
+            columns: ["default_table_id"]
+            isOneToOne: false
+            referencedRelation: "tour_default_tables"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tour_date_weight_overrides_tour_date_id_fkey"
             columns: ["tour_date_id"]
@@ -2829,6 +2855,88 @@ export type Database = {
             columns: ["tour_id"]
             isOneToOne: false
             referencedRelation: "tours"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tour_default_sets: {
+        Row: {
+          created_at: string
+          department: string | null
+          description: string | null
+          id: string
+          name: string
+          tour_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          department?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          tour_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          department?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          tour_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_default_sets_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tour_default_tables: {
+        Row: {
+          created_at: string
+          id: string
+          metadata: Json | null
+          set_id: string
+          table_data: Json
+          table_name: string
+          table_type: string
+          total_value: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          set_id: string
+          table_data: Json
+          table_name: string
+          table_type: string
+          total_value?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          set_id?: string
+          table_data?: Json
+          table_name?: string
+          table_type?: string
+          total_value?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_default_tables_set_id_fkey"
+            columns: ["set_id"]
+            isOneToOne: false
+            referencedRelation: "tour_default_sets"
             referencedColumns: ["id"]
           },
         ]

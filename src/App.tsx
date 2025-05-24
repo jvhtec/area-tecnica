@@ -86,6 +86,22 @@ export default function App() {
                     <Route path="/hoja-de-ruta" element={<HojaDeRuta />} />
                     <Route path="/labor-po-form" element={<LaborPOForm />} />
                     
+                    {/* Tour-specific tool routes */}
+                    <Route path="/tours/:tourId/sound/pesos" element={<PesosTool />} />
+                    <Route path="/tours/:tourId/sound/consumos" element={<ConsumosTool />} />
+                    <Route path="/tours/:tourId/lights/pesos" element={<LightsPesosTool />} />
+                    <Route path="/tours/:tourId/lights/consumos" element={<LightsConsumosTool />} />
+                    <Route path="/tours/:tourId/video/pesos" element={<VideoPesosTool />} />
+                    <Route path="/tours/:tourId/video/consumos" element={<VideoConsumosTool />} />
+                    
+                    {/* Tour date-specific tool routes */}
+                    <Route path="/tour-dates/:tourDateId/sound/pesos" element={<PesosTool />} />
+                    <Route path="/tour-dates/:tourDateId/sound/consumos" element={<ConsumosTool />} />
+                    <Route path="/tour-dates/:tourDateId/lights/pesos" element={<LightsPesosTool />} />
+                    <Route path="/tour-dates/:tourDateId/lights/consumos" element={<LightsConsumosTool />} />
+                    <Route path="/tour-dates/:tourDateId/video/pesos" element={<VideoPesosTool />} />
+                    <Route path="/tour-dates/:tourDateId/video/consumos" element={<VideoConsumosTool />} />
+                    
                     {/* Disponibilidad Routes */}
                     <Route path="/lights-disponibilidad" element={<LightsDisponibilidad />} />
                     
