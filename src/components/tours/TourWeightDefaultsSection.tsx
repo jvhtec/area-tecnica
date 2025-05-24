@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +25,7 @@ const defaultForm: WeightDefaultForm = {
   weight_kg: "",
   quantity: "1",
   category: "",
-  department: "",
+  department: "all",
 };
 
 export const TourWeightDefaultsSection: React.FC<TourWeightDefaultsSectionProps> = ({ tourId }) => {
@@ -54,7 +55,7 @@ export const TourWeightDefaultsSection: React.FC<TourWeightDefaultsSectionProps>
       weight_kg: parseFloat(formData.weight_kg),
       quantity: parseInt(formData.quantity) || 1,
       category: formData.category || null,
-      department: formData.department || null,
+      department: formData.department === "all" ? null : formData.department,
     };
 
     if (editingId) {
@@ -73,7 +74,7 @@ export const TourWeightDefaultsSection: React.FC<TourWeightDefaultsSectionProps>
       weight_kg: weightDefault.weight_kg.toString(),
       quantity: weightDefault.quantity.toString(),
       category: weightDefault.category || "",
-      department: weightDefault.department || "",
+      department: weightDefault.department || "all",
     });
     setEditingId(weightDefault.id);
   };
@@ -204,7 +205,7 @@ export const TourWeightDefaultsSection: React.FC<TourWeightDefaultsSectionProps>
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Departments</SelectItem>
+                    <SelectItem value="all">All Departments</SelectItem>
                     <SelectItem value="sound">Sound</SelectItem>
                     <SelectItem value="lights">Lights</SelectItem>
                     <SelectItem value="video">Video</SelectItem>

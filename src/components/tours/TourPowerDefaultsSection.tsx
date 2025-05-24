@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +30,7 @@ const defaultForm: PowerDefaultForm = {
   total_watts: "",
   current_per_phase: "",
   includes_hoist: false,
-  department: "",
+  department: "all",
 };
 
 export const TourPowerDefaultsSection: React.FC<TourPowerDefaultsSectionProps> = ({ tourId }) => {
@@ -61,7 +62,7 @@ export const TourPowerDefaultsSection: React.FC<TourPowerDefaultsSectionProps> =
       total_watts: parseFloat(formData.total_watts),
       current_per_phase: parseFloat(formData.current_per_phase),
       includes_hoist: formData.includes_hoist,
-      department: formData.department || null,
+      department: formData.department === "all" ? null : formData.department,
     };
 
     if (editingId) {
@@ -82,7 +83,7 @@ export const TourPowerDefaultsSection: React.FC<TourPowerDefaultsSectionProps> =
       total_watts: powerDefault.total_watts.toString(),
       current_per_phase: powerDefault.current_per_phase.toString(),
       includes_hoist: powerDefault.includes_hoist,
-      department: powerDefault.department || "",
+      department: powerDefault.department || "all",
     });
     setEditingId(powerDefault.id);
   };
@@ -169,7 +170,7 @@ export const TourPowerDefaultsSection: React.FC<TourPowerDefaultsSectionProps> =
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Departments</SelectItem>
+                    <SelectItem value="all">All Departments</SelectItem>
                     <SelectItem value="sound">Sound</SelectItem>
                     <SelectItem value="lights">Lights</SelectItem>
                     <SelectItem value="video">Video</SelectItem>
