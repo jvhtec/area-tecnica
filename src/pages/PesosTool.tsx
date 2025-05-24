@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -387,7 +388,6 @@ const PesosTool: React.FC = () => {
         clusterId: newClusterId,
       };
       setTables((prev) => [...prev, newTable]);
-      saveAsDefaultSet(newTable);
     } else if (mirroredCluster) {
       // For mirrored clusters, generate two tables sharing the same clusterId.
       const leftSuffix = getSuffix();
@@ -773,7 +773,7 @@ const PesosTool: React.FC = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => saveAsDefaultSet(table)}
+                      onClick={() => saveAsDefaultSet()}
                     >
                       <Save className="h-4 w-4 mr-1" />
                       Save as Default
