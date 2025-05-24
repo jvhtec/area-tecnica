@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, ArrowLeft } from 'lucide-react';
+import { FileText, ArrowLeft, Save } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTourWeightDefaults } from '@/hooks/useTourWeightDefaults';
 
 // Database for sound components.
 const soundComponentDatabase = [
@@ -77,7 +78,13 @@ const PesosTool: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
-  const department = 'sound';
+  const [searchParams] = useSearchParams();
+  
+  // Tour context detection
+  const tourId = searchParams.get('tourId');
+  const mode = searchParams.get('mode'); // 'defaults' or 'override'
+  const isDefaults = mode === 'defaults';
+  const isTourContext = !!tourId;
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<JobSelection | null>(null);
@@ -85,15 +92,40 @@ const PesosTool: React.FC = () => {
   const [tables, setTables] = useState<Table[]>([]);
   const [useDualMotors, setUseDualMotors] = useState(false);
   const [mirroredCluster, setMirroredCluster] = useState(false);
-
-  // State for Cable Pick option.
   const [cablePick, setCablePick] = useState(false);
   const [cablePickWeight, setCablePickWeight] = useState('100');
+
+  // Tour defaults hook
+  const {
+    weightDefaults,
+    createDefault: createTourDefault,
+    isLoading: tourDefaultsLoading
+  } = useTourWeightDefaults(tourId || '');
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
     rows: [{ quantity: '', componentId: '', weight: '' }],
   });
+
+  // Load existing tour defaults when in defaults mode
+  useEffect(() => {
+    if (isDefaults && weightDefaults.length > 0) {
+      const convertedTables = weightDefaults.map((def, index) => ({
+        name: def.item_name,
+        rows: [{
+          quantity: def.quantity.toString(),
+          componentId: '',
+          weight: def.weight_kg.toString(),
+          componentName: def.item_name,
+          totalWeight: def.weight_kg * def.quantity
+        }],
+        totalWeight: def.weight_kg * def.quantity,
+        id: Date.now() + index,
+        clusterId: `default-${index}`
+      }));
+      setTables(convertedTables);
+    }
+  }, [isDefaults, weightDefaults]);
 
   // Helper to generate an SX suffix.
   // Returns a string such as "SX01" or "SX01, SX02" depending on useDualMotors.
@@ -146,6 +178,38 @@ const PesosTool: React.FC = () => {
     setSelectedJobId(jobId);
     const job = jobs?.find((j) => j.id === jobId) || null;
     setSelectedJob(job);
+  };
+
+  const saveAsTourDefault = async (table: Table) => {
+    if (!tourId) return;
+
+    try {
+      // Save each row as a separate tour default
+      for (const row of table.rows) {
+        if (row.componentName && row.totalWeight) {
+          await createTourDefault({
+            tour_id: tourId,
+            item_name: row.componentName,
+            weight_kg: parseFloat(row.weight),
+            quantity: parseInt(row.quantity),
+            category: null,
+            department: null
+          });
+        }
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Weight defaults saved to tour successfully',
+      });
+    } catch (error: any) {
+      console.error('Error saving tour defaults:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save tour defaults',
+        variant: 'destructive',
+      });
+    }
   };
 
   const generateTable = () => {
@@ -333,86 +397,110 @@ const PesosTool: React.FC = () => {
     }
   };
 
+  const handleBackNavigation = () => {
+    if (isTourContext) {
+      navigate('/tours');
+    } else {
+      navigate('/sound');
+    }
+  };
+
   return (
     <Card className="w-full max-w-4xl mx-auto my-6">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/sound')}>
+          <Button variant="ghost" size="icon" onClick={handleBackNavigation}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <CardTitle className="text-2xl font-bold">Weight Calculator</CardTitle>
+          <CardTitle className="text-2xl font-bold">
+            {isDefaults ? 'Tour Weight Defaults' : 'Weight Calculator'}
+          </CardTitle>
         </div>
+        {isTourContext && (
+          <p className="text-sm text-muted-foreground text-center">
+            {isDefaults ? 'Setting default weight requirements for tour' : 'Creating weight requirements for specific dates'}
+          </p>
+        )}
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="jobSelect">Select Job</Label>
-            <Select value={selectedJobId} onValueChange={handleJobSelect}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a job" />
-              </SelectTrigger>
-              <SelectContent>
-                {jobs?.map((job) => (
-                  <SelectItem key={job.id} value={job.id}>
-                    {job.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!isDefaults && (
+            <div className="space-y-2">
+              <Label htmlFor="jobSelect">Select Job</Label>
+              <Select value={selectedJobId} onValueChange={handleJobSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a job" />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobs?.map((job) => (
+                    <SelectItem key={job.id} value={job.id}>
+                      {job.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
-            <Label htmlFor="tableName">Table Name</Label>
+            <Label htmlFor="tableName">
+              {isDefaults ? 'Item Name' : 'Table Name'}
+            </Label>
             <Input
               id="tableName"
               value={tableName}
               onChange={(e) => setTableName(e.target.value)}
-              placeholder="Enter table name"
+              placeholder={isDefaults ? "Enter item name" : "Enter table name"}
             />
-            <div className="flex items-center space-x-2 mt-2">
-              <Checkbox
-                id="dualMotors"
-                checked={useDualMotors}
-                onCheckedChange={(checked) => setUseDualMotors(checked as boolean)}
-              />
-              <Label htmlFor="dualMotors" className="text-sm font-medium">
-                Dual Motors Configuration
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2 mt-2">
-              <Checkbox
-                id="mirroredCluster"
-                checked={mirroredCluster}
-                onCheckedChange={(checked) => setMirroredCluster(checked as boolean)}
-              />
-              <Label htmlFor="mirroredCluster" className="text-sm font-medium">
-                Mirrored Cluster
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2 mt-2">
-              <Checkbox
-                id="cablePick"
-                checked={cablePick}
-                onCheckedChange={(checked) => setCablePick(checked as boolean)}
-              />
-              <Label htmlFor="cablePick" className="text-sm font-medium">
-                Cable Pick
-              </Label>
-              {cablePick && (
-                <Select value={cablePickWeight} onValueChange={(value) => setCablePickWeight(value)}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue placeholder="Select weight" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {['100', '200', '300', '400', '500'].map((w) => (
-                      <SelectItem key={w} value={w}>
-                        {w} kg
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
+            
+            {!isDefaults && (
+              <>
+                <div className="flex items-center space-x-2 mt-2">
+                  <Checkbox
+                    id="dualMotors"
+                    checked={useDualMotors}
+                    onCheckedChange={(checked) => setUseDualMotors(checked as boolean)}
+                  />
+                  <Label htmlFor="dualMotors" className="text-sm font-medium">
+                    Dual Motors Configuration
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 mt-2">
+                  <Checkbox
+                    id="mirroredCluster"
+                    checked={mirroredCluster}
+                    onCheckedChange={(checked) => setMirroredCluster(checked as boolean)}
+                  />
+                  <Label htmlFor="mirroredCluster" className="text-sm font-medium">
+                    Mirrored Cluster
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 mt-2">
+                  <Checkbox
+                    id="cablePick"
+                    checked={cablePick}
+                    onCheckedChange={(checked) => setCablePick(checked as boolean)}
+                  />
+                  <Label htmlFor="cablePick" className="text-sm font-medium">
+                    Cable Pick
+                  </Label>
+                  {cablePick && (
+                    <Select value={cablePickWeight} onValueChange={(value) => setCablePickWeight(value)}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue placeholder="Select weight" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['100', '200', '300', '400', '500'].map((w) => (
+                          <SelectItem key={w} value={w}>
+                            {w} kg
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           <div className="border rounded-lg overflow-hidden">
@@ -465,12 +553,12 @@ const PesosTool: React.FC = () => {
           <div className="flex gap-2">
             <Button onClick={addRow}>Add Row</Button>
             <Button onClick={generateTable} variant="secondary">
-              Generate Table
+              {isDefaults ? 'Save as Default' : 'Generate Table'}
             </Button>
             <Button onClick={resetCurrentTable} variant="destructive">
               Reset
             </Button>
-            {tables.length > 0 && (
+            {tables.length > 0 && !isDefaults && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
                 <FileText className="w-4 h-4" />
                 Export &amp; Upload PDF
@@ -478,13 +566,26 @@ const PesosTool: React.FC = () => {
             )}
           </div>
 
+          {/* Table display with save as default option */}
           {tables.map((table) => (
             <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
                 <h3 className="font-semibold">{table.name}</h3>
-                <Button variant="destructive" size="sm" onClick={() => table.id && removeTable(table.id)}>
-                  Remove Table
-                </Button>
+                <div className="flex gap-2">
+                  {!isDefaults && isTourContext && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => saveAsTourDefault(table)}
+                    >
+                      <Save className="h-4 w-4 mr-1" />
+                      Save as Default
+                    </Button>
+                  )}
+                  <Button variant="destructive" size="sm" onClick={() => table.id && removeTable(table.id)}>
+                    Remove Table
+                  </Button>
+                </div>
               </div>
               <table className="w-full">
                 <thead className="bg-muted/50">

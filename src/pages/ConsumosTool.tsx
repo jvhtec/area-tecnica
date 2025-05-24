@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, ArrowLeft } from 'lucide-react';
+import { FileText, ArrowLeft, Save } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useTourPowerDefaults } from '@/hooks/useTourPowerDefaults';
 
 const soundComponentDatabase = [
   { id: 1, name: 'LA12X', watts: 2900 },
@@ -57,6 +58,13 @@ const ConsumosTool: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
+  const [searchParams] = useSearchParams();
+  
+  // Tour context detection
+  const tourId = searchParams.get('tourId');
+  const mode = searchParams.get('mode'); // 'defaults' or 'override'
+  const isDefaults = mode === 'defaults';
+  const isTourContext = !!tourId;
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<JobSelection | null>(null);
@@ -64,10 +72,40 @@ const ConsumosTool: React.FC = () => {
   const [tables, setTables] = useState<Table[]>([]);
   const [safetyMargin, setSafetyMargin] = useState(0);
 
+  // Tour defaults hook
+  const {
+    powerDefaults,
+    createDefault: createTourDefault,
+    isLoading: tourDefaultsLoading
+  } = useTourPowerDefaults(tourId || '');
+
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
     rows: [{ quantity: '', componentId: '', watts: '' }],
   });
+
+  // Load existing tour defaults when in defaults mode
+  useEffect(() => {
+    if (isDefaults && powerDefaults.length > 0) {
+      const convertedTables = powerDefaults.map((def, index) => ({
+        name: def.table_name,
+        rows: [{
+          quantity: '1',
+          componentId: '',
+          watts: def.total_watts.toString(),
+          componentName: def.table_name,
+          totalWatts: def.total_watts
+        }],
+        totalWatts: def.total_watts,
+        currentPerPhase: def.current_per_phase,
+        pduType: def.pdu_type,
+        customPduType: def.custom_pdu_type,
+        includesHoist: def.includes_hoist,
+        id: Date.now() + index
+      }));
+      setTables(convertedTables);
+    }
+  }, [isDefaults, powerDefaults]);
 
   const addRow = () => {
     setCurrentTable((prev) => ({
@@ -147,6 +185,35 @@ const ConsumosTool: React.FC = () => {
     }
   };
 
+  const saveAsTourDefault = async (table: Table) => {
+    if (!tourId) return;
+
+    try {
+      await createTourDefault({
+        tour_id: tourId,
+        table_name: table.name,
+        pdu_type: table.customPduType || table.pduType || '',
+        custom_pdu_type: table.customPduType,
+        total_watts: table.totalWatts || 0,
+        current_per_phase: table.currentPerPhase || 0,
+        includes_hoist: table.includesHoist || false,
+        department: null
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Power default saved to tour successfully',
+      });
+    } catch (error: any) {
+      console.error('Error saving tour default:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save tour default',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const generateTable = () => {
     if (!tableName) {
       toast({
@@ -187,7 +254,10 @@ const ConsumosTool: React.FC = () => {
 
     setTables((prev) => [...prev, newTable]);
 
-    if (selectedJobId) {
+    // Auto-save as tour default if in defaults mode
+    if (isDefaults && tourId) {
+      saveAsTourDefault(newTable);
+    } else if (selectedJobId) {
       savePowerRequirementTable(newTable);
     }
 
@@ -294,52 +364,71 @@ const ConsumosTool: React.FC = () => {
     }
   };
 
+  const handleBackNavigation = () => {
+    if (isTourContext) {
+      navigate('/tours');
+    } else {
+      navigate('/sound');
+    }
+  };
+
   return (
     <Card className="w-full max-w-4xl mx-auto my-6">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/sound')}>
+          <Button variant="ghost" size="icon" onClick={handleBackNavigation}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <CardTitle className="text-2xl font-bold">Power Calculator</CardTitle>
+          <CardTitle className="text-2xl font-bold">
+            {isDefaults ? 'Tour Power Defaults' : 'Power Calculator'}
+          </CardTitle>
         </div>
+        {isTourContext && (
+          <p className="text-sm text-muted-foreground text-center">
+            {isDefaults ? 'Setting default power requirements for tour' : 'Creating power requirements for specific dates'}
+          </p>
+        )}
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="safetyMargin">Safety Margin</Label>
-            <Select
-              value={safetyMargin.toString()}
-              onValueChange={(value) => setSafetyMargin(Number(value))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select Safety Margin" />
-              </SelectTrigger>
-              <SelectContent>
-                {[0, 10, 20, 30, 40, 50].map((percentage) => (
-                  <SelectItem key={percentage} value={percentage.toString()}>
-                    {percentage}%
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!isDefaults && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="safetyMargin">Safety Margin</Label>
+                <Select
+                  value={safetyMargin.toString()}
+                  onValueChange={(value) => setSafetyMargin(Number(value))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Safety Margin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[0, 10, 20, 30, 40, 50].map((percentage) => (
+                      <SelectItem key={percentage} value={percentage.toString()}>
+                        {percentage}%
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="jobSelect">Select Job</Label>
-            <Select value={selectedJobId} onValueChange={handleJobSelect}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a job" />
-              </SelectTrigger>
-              <SelectContent>
-                {jobs?.map((job) => (
-                  <SelectItem key={job.id} value={job.id}>
-                    {job.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="jobSelect">Select Job</Label>
+                <Select value={selectedJobId} onValueChange={handleJobSelect}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a job" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {jobs?.map((job) => (
+                      <SelectItem key={job.id} value={job.id}>
+                        {job.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="tableName">Table Name</Label>
@@ -406,14 +495,14 @@ const ConsumosTool: React.FC = () => {
           <div className="flex gap-2">
             <Button onClick={addRow}>Add Row</Button>
             <Button onClick={generateTable} variant="secondary">
-              Generate Table
+              {isDefaults ? 'Save as Default' : 'Generate Table'}
             </Button>
             <Button onClick={resetCurrentTable} variant="destructive">
               Reset
             </Button>
-            {tables.length > 0 && (
+            {tables.length > 0 && !isDefaults && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
-                <FileText className="w-4 h-4" />
+                <FileText className="h-4 w-4" />
                 Export & Upload PDF
               </Button>
             )}
@@ -423,13 +512,25 @@ const ConsumosTool: React.FC = () => {
             <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
                 <h3 className="font-semibold">{table.name}</h3>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => table.id && removeTable(table.id)}
-                >
-                  Remove Table
-                </Button>
+                <div className="flex gap-2">
+                  {!isDefaults && isTourContext && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => saveAsTourDefault(table)}
+                    >
+                      <Save className="h-4 w-4 mr-1" />
+                      Save as Default
+                    </Button>
+                  )}
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => table.id && removeTable(table.id)}
+                  >
+                    Remove Table
+                  </Button>
+                </div>
               </div>
 
               <div className="p-4 bg-muted/50 space-y-4">

@@ -1,9 +1,8 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, MoreVertical, Settings, FileText, Printer, Zap, Weight, FolderPlus, Image } from "lucide-react";
+import { Calendar, MapPin, MoreVertical, Settings, FileText, Printer, FolderPlus, Image } from "lucide-react";
 import { format } from "date-fns";
 import { useState, useEffect } from "react";
 import { TourManagementDialog } from "./TourManagementDialog";
@@ -22,7 +21,6 @@ interface TourCardProps {
 export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCardProps) => {
   const { toast } = useToast();
   const [isManagementOpen, setIsManagementOpen] = useState(false);
-  const [isPowerWeightOpen, setIsPowerWeightOpen] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   // Fetch tour logo
@@ -191,10 +189,6 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
                   <Calendar className="h-4 w-4 mr-2" />
                   Manage Dates
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setIsPowerWeightOpen(true)}>
-                  <Zap className="h-4 w-4 mr-2" />
-                  Power & Weight Defaults
-                </DropdownMenuItem>
                 <DropdownMenuItem 
                   onClick={handleCreateFlexFolders}
                   disabled={tour.flex_folders_created}
@@ -276,16 +270,10 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
         </CardContent>
       </Card>
 
-      {/* Management dialogs */}
+      {/* Management dialog */}
       <TourManagementDialog
         open={isManagementOpen}
         onOpenChange={setIsManagementOpen}
-        tour={tour}
-      />
-      
-      <TourPowerWeightDefaultsDialog
-        open={isPowerWeightOpen}
-        onOpenChange={setIsPowerWeightOpen}
         tour={tour}
       />
     </>
