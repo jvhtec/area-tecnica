@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -72,6 +73,11 @@ const ConsumosTool: React.FC = () => {
   const [tables, setTables] = useState<Table[]>([]);
   const [safetyMargin, setSafetyMargin] = useState(0);
 
+  const [currentTable, setCurrentTable] = useState<Table>({
+    name: '',
+    rows: [{ quantity: '', componentId: '', watts: '' }],
+  });
+
   // Tour defaults hook
   const {
     powerDefaults,
@@ -102,46 +108,6 @@ const ConsumosTool: React.FC = () => {
     fetchTourName();
   }, [tourId]);
 
-  // Handler functions for defaults mode
-  const handleSaveDefault = async (item: { name: string; value: number; quantity: number; category?: string }) => {
-    if (!tourId) return;
-
-    await createTourDefault({
-      tour_id: tourId,
-      table_name: item.name,
-      total_watts: item.value * item.quantity,
-      current_per_phase: (item.value * item.quantity) / (VOLTAGE_3PHASE * POWER_FACTOR * PHASES),
-      pdu_type: recommendPDU((item.value * item.quantity) / (VOLTAGE_3PHASE * POWER_FACTOR * PHASES)),
-      custom_pdu_type: undefined,
-      includes_hoist: false,
-      department: null
-    });
-  };
-
-  const handleUpdateDefault = async (id: string, updates: any) => {
-    const powerDefault = powerDefaults.find(pd => pd.id === id);
-    if (!powerDefault) return;
-
-    const totalWatts = (updates.value ?? powerDefault.total_watts) * (updates.quantity ?? 1);
-    const currentPerPhase = totalWatts / (VOLTAGE_3PHASE * POWER_FACTOR * PHASES);
-
-    await updateTourDefault({
-      id,
-      tour_id: powerDefault.tour_id,
-      table_name: updates.name ?? powerDefault.table_name,
-      total_watts: totalWatts,
-      current_per_phase: currentPerPhase,
-      pdu_type: powerDefault.pdu_type,
-      custom_pdu_type: powerDefault.custom_pdu_type,
-      includes_hoist: powerDefault.includes_hoist,
-      department: powerDefault.department
-    });
-  };
-
-  const handleDeleteDefault = async (id: string) => {
-    await deleteTourDefault(id);
-  };
-
   const handleBackNavigation = () => {
     if (isTourContext) {
       navigate('/tours');
@@ -149,35 +115,6 @@ const ConsumosTool: React.FC = () => {
       navigate('/sound');
     }
   };
-
-  // If in defaults mode, show simplified interface
-  if (isDefaults) {
-    const defaultItems = powerDefaults.map(pd => ({
-      id: pd.id,
-      name: pd.table_name,
-      value: pd.total_watts,
-      quantity: 1,
-      category: undefined
-    }));
-
-    return (
-      <TourDefaultsSimpleForm
-        tourId={tourId!}
-        tourName={tourName}
-        type="power"
-        defaults={defaultItems}
-        onSave={handleSaveDefault}
-        onUpdate={handleUpdateDefault}
-        onDelete={handleDeleteDefault}
-        onBack={handleBackNavigation}
-      />
-    );
-  }
-
-  const [currentTable, setCurrentTable] = useState<Table>({
-    name: '',
-    rows: [{ quantity: '', componentId: '', watts: '' }],
-  });
 
   // Load existing tour defaults when in defaults mode
   useEffect(() => {
