@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +8,7 @@ import { PresetWithItems, Equipment, PresetItem } from '@/types/equipment';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Save, X } from 'lucide-react';
-import { useSessionManager } from '@/hooks/useSessionManager';
+import { useAuth } from '@/hooks/useAuth';
 
 interface PresetEditorProps {
   preset?: PresetWithItems;
@@ -19,7 +18,7 @@ interface PresetEditorProps {
 }
 
 export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel }: PresetEditorProps) => {
-  const { session } = useSessionManager();
+  const { session } = useAuth();
   const [name, setName] = useState(preset?.name || '');
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
     if (!preset?.items) return {};

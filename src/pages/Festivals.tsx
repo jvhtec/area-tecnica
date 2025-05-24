@@ -10,7 +10,7 @@ import { supabase, ensureRealtimeConnection } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
-import { useAuthSession } from "@/hooks/auth/useAuthSession";
+import { useAuth } from "@/hooks/useAuth";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { useConnectionStatus } from "@/hooks/useConnectionStatus";
@@ -33,7 +33,7 @@ const Festivals = () => {
   const [festivalJobs, setFestivalJobs] = useState<any[]>([]);
   const [festivalLogos, setFestivalLogos] = useState<Record<string, string>>({});
   const [isPrinting, setIsPrinting] = useState<Record<string, boolean>>({});
-  const { userRole } = useAuthSession();
+  const { userRole } = useAuth();
   const { status: connectionStatus, recoverConnection } = useConnectionStatus();
 
   // Filter jobs to only show festivals
