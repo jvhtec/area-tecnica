@@ -1,14 +1,14 @@
 
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuthSession } from '@/hooks/auth/useAuthSession';
+import { useAuth } from '@/hooks/useAuth';
 
 interface RequireAuthProps {
   children: React.ReactNode;
 }
 
 export const RequireAuth: React.FC<RequireAuthProps> = ({ children }) => {
-  const { session, isLoading } = useAuthSession();
+  const { session, isLoading } = useAuth();
 
   if (isLoading) {
     return (
