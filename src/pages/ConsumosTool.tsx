@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -144,6 +143,38 @@ const ConsumosTool: React.FC = () => {
     await deleteTourDefault(id);
   };
 
+  const handleBackNavigation = () => {
+    if (isTourContext) {
+      navigate('/tours');
+    } else {
+      navigate('/sound');
+    }
+  };
+
+  // If in defaults mode, show simplified interface
+  if (isDefaults) {
+    const defaultItems = powerDefaults.map(pd => ({
+      id: pd.id,
+      name: pd.table_name,
+      value: pd.total_watts,
+      quantity: 1,
+      category: undefined
+    }));
+
+    return (
+      <TourDefaultsSimpleForm
+        tourId={tourId!}
+        tourName={tourName}
+        type="power"
+        defaults={defaultItems}
+        onSave={handleSaveDefault}
+        onUpdate={handleUpdateDefault}
+        onDelete={handleDeleteDefault}
+        onBack={handleBackNavigation}
+      />
+    );
+  }
+
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
     rows: [{ quantity: '', componentId: '', watts: '' }],
@@ -171,30 +202,6 @@ const ConsumosTool: React.FC = () => {
       setTables(convertedTables);
     }
   }, [isDefaults, powerDefaults]);
-
-  // If in defaults mode, show simplified interface
-  if (isDefaults) {
-    const defaultItems = powerDefaults.map(pd => ({
-      id: pd.id,
-      name: pd.table_name,
-      value: pd.total_watts,
-      quantity: 1,
-      category: undefined
-    }));
-
-    return (
-      <TourDefaultsSimpleForm
-        tourId={tourId!}
-        tourName={tourName}
-        type="power"
-        defaults={defaultItems}
-        onSave={handleSaveDefault}
-        onUpdate={handleUpdateDefault}
-        onDelete={handleDeleteDefault}
-        onBack={handleBackNavigation}
-      />
-    );
-  }
 
   const addRow = () => {
     setCurrentTable((prev) => ({
@@ -450,14 +457,6 @@ const ConsumosTool: React.FC = () => {
         description: 'Failed to generate or upload the PDF.',
         variant: 'destructive',
       });
-    }
-  };
-
-  const handleBackNavigation = () => {
-    if (isTourContext) {
-      navigate('/tours');
-    } else {
-      navigate('/sound');
     }
   };
 
