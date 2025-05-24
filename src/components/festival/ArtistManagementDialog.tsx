@@ -31,7 +31,7 @@ export const ArtistManagementDialog = ({
         // Editing existing artist
         setFormData(artist);
       } else {
-        // Creating new artist
+        // Creating new artist - remove global provider fields
         setFormData({
           job_id: jobId,
           date: selectedDate,
@@ -49,9 +49,7 @@ export const ArtistManagementDialog = ({
           mon_console: "",
           mon_console_provided_by: "festival",
           wireless_systems: [],
-          wireless_provided_by: "festival",
           iem_systems: [],
-          iem_provided_by: "festival",
           monitors_enabled: false,
           monitors_quantity: 0,
           extras_sf: false,
@@ -78,12 +76,15 @@ export const ArtistManagementDialog = ({
 
   const handleSave = async (data: any) => {
     try {
+      // Remove any remaining global provider fields before saving
+      const { wireless_provided_by, iem_provided_by, ...cleanData } = data;
+      
       if (artist) {
         // Update existing artist
-        await updateArtist({ id: artist.id, ...data });
+        await updateArtist({ id: artist.id, ...cleanData });
       } else {
         // Create new artist
-        await createArtist(data);
+        await createArtist(cleanData);
       }
       
       // Close dialog and notify that there was an update

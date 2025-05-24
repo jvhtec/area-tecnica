@@ -15,8 +15,6 @@ export interface ArtistRfIemData {
   stage: number;
   wirelessSystems: RfIemSystemData[];
   iemSystems: RfIemSystemData[];
-  wirelessProvidedBy: string;
-  iemProvidedBy: string;
 }
 
 export interface RfIemTablePdfData {
@@ -24,6 +22,20 @@ export interface RfIemTablePdfData {
   logoUrl?: string;
   artists: ArtistRfIemData[];
 }
+
+// Helper function to aggregate provider information from systems
+const getProviderSummary = (systems: RfIemSystemData[]): string => {
+  if (!systems || systems.length === 0) return '';
+  
+  const providers = systems.map(system => system.provided_by || 'festival');
+  const uniqueProviders = [...new Set(providers)];
+  
+  if (uniqueProviders.length === 1) {
+    return uniqueProviders[0] === 'festival' ? 'Festival' : 'Band';
+  } else {
+    return 'Mixed';
+  }
+};
 
 export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob> => {
   const pdf = new jsPDF({
@@ -97,15 +109,19 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
       .map(sys => sys.band)
     )].join(', ');
 
+    // Get provider summaries from individual systems
+    const rfProvidedBy = getProviderSummary(artist.wirelessSystems);
+    const iemProvidedBy = getProviderSummary(artist.iemSystems);
+
     return [
       artist.name,
       `Stage ${artist.stage}`,
-      artist.wirelessProvidedBy,
+      rfProvidedBy,
       rfModels,
       rfBands, 
       totalRfHH,
       totalRfBP,
-      artist.iemProvidedBy,
+      iemProvidedBy,
       iemModels,
       iemBands,
       totalIemChannels,

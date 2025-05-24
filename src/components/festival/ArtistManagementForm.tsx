@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -239,22 +238,6 @@ export const ArtistManagementForm = ({
               label="Wireless Systems"
               includeQuantityTypes={true}
             />
-            <div className="space-y-2">
-              <Label>Provided By</Label>
-              <Select
-                value={formData.wireless_provided_by || "festival"}
-                onValueChange={(value) => updateFormData("wireless_provided_by", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="festival">Festival</SelectItem>
-                  <SelectItem value="artist">Artist</SelectItem>
-                  <SelectItem value="production">Production</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
           <div className="space-y-4">
             <WirelessConfig
@@ -264,22 +247,6 @@ export const ArtistManagementForm = ({
               includeQuantityTypes={true}
               isIEM={true}
             />
-            <div className="space-y-2">
-              <Label>Provided By</Label>
-              <Select
-                value={formData.iem_provided_by || "festival"}
-                onValueChange={(value) => updateFormData("iem_provided_by", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="festival">Festival</SelectItem>
-                  <SelectItem value="artist">Artist</SelectItem>
-                  <SelectItem value="production">Production</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         </div>
       </div>
