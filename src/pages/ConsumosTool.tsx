@@ -78,8 +78,7 @@ const ConsumosTool: React.FC = () => {
   const [tables, setTables] = useState<Table[]>([]);
   const [safetyMargin, setSafetyMargin] = useState(0);
   const [currentSetName, setCurrentSetName] = useState('');
-  const [tourName, setTourName] = useState<string>('');
-  const [tourDateInfo, setTourDateInfo] = useState<{ date: string; location: string } | null>(null);
+  const [tourInfo, setTourInfo] = useState<{ name: string; date?: string; location?: string } | null>(null);
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
@@ -104,9 +103,7 @@ const ConsumosTool: React.FC = () => {
     isLoading: overridesLoading
   } = useTourDateOverrides(tourDateId || '', 'power');
 
-  // Get tour name for display
-  const [tourName, setTourName] = useState<string>('');
-
+  // Get tour information for display
   useEffect(() => {
     const fetchTourInfo = async () => {
       if (tourId) {
@@ -117,7 +114,7 @@ const ConsumosTool: React.FC = () => {
           .single();
         
         if (data) {
-          setTourName(data.name);
+          setTourInfo({ name: data.name });
         }
       }
 
@@ -134,7 +131,8 @@ const ConsumosTool: React.FC = () => {
           .single();
         
         if (data) {
-          setTourDateInfo({
+          setTourInfo({
+            name: tourInfo?.name || 'Tour',
             date: new Date(data.date).toLocaleDateString(),
             location: (data.locations as any)?.name || 'Unknown location'
           });
@@ -535,20 +533,20 @@ const ConsumosTool: React.FC = () => {
             <CardTitle className="text-2xl font-bold">
               Power Calculator
             </CardTitle>
-            {isDefaults && (
+            {isDefaults && tourInfo && (
               <p className="text-sm text-muted-foreground mt-1">
-                Managing defaults for: <span className="font-medium">{tourName}</span>
+                Managing defaults for: <span className="font-medium">{tourInfo.name}</span>
               </p>
             )}
-            {isTourDateContext && tourDateInfo && (
+            {isTourDateContext && tourInfo && (
               <div className="text-sm text-muted-foreground mt-1">
                 <p>Creating overrides for tour date</p>
-                <p className="font-medium">{tourDateInfo.date} - {tourDateInfo.location}</p>
+                <p className="font-medium">{tourInfo.date} - {tourInfo.location}</p>
               </div>
             )}
-            {isTourContext && !isDefaults && !isTourDateContext && (
+            {isTourContext && !isDefaults && !isTourDateContext && tourInfo && (
               <p className="text-sm text-muted-foreground mt-1">
-                Creating power requirements for tour: <span className="font-medium">{tourName}</span>
+                Creating power requirements for tour: <span className="font-medium">{tourInfo.name}</span>
               </p>
             )}
           </div>

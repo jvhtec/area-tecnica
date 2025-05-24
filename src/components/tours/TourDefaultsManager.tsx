@@ -20,7 +20,7 @@ export const TourDefaultsManager = ({
   tour,
 }: TourDefaultsManagerProps) => {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('power');
+  const [activeTab, setActiveTab] = useState('sound');
 
   // Fetch defaults for each department
   const {
@@ -107,6 +107,19 @@ export const TourDefaultsManager = ({
         variant: 'destructive',
       });
     }
+  };
+
+  // Wrapper functions to handle Promise<string> to Promise<void> conversion
+  const handleDeleteSoundSet = async (id: string): Promise<void> => {
+    await deleteSoundSet(id);
+  };
+
+  const handleDeleteLightsSet = async (id: string): Promise<void> => {
+    await deleteLightsSet(id);
+  };
+
+  const handleDeleteVideoSet = async (id: string): Promise<void> => {
+    await deleteVideoSet(id);
   };
 
   const renderDepartmentDefaults = (department: string, sets: any[], tables: any[], deleteSet: (id: string) => Promise<void>) => {
@@ -231,7 +244,7 @@ export const TourDefaultsManager = ({
             {soundLoading ? (
               <p>Loading sound defaults...</p>
             ) : (
-              renderDepartmentDefaults('sound', soundDefaultSets, soundDefaultTables, deleteSoundSet)
+              renderDepartmentDefaults('sound', soundDefaultSets, soundDefaultTables, handleDeleteSoundSet)
             )}
           </TabsContent>
           
@@ -239,7 +252,7 @@ export const TourDefaultsManager = ({
             {lightsLoading ? (
               <p>Loading lights defaults...</p>
             ) : (
-              renderDepartmentDefaults('lights', lightsDefaultSets, lightsDefaultTables, deleteLightsSet)
+              renderDepartmentDefaults('lights', lightsDefaultSets, lightsDefaultTables, handleDeleteLightsSet)
             )}
           </TabsContent>
           
@@ -247,7 +260,7 @@ export const TourDefaultsManager = ({
             {videoLoading ? (
               <p>Loading video defaults...</p>
             ) : (
-              renderDepartmentDefaults('video', videoDefaultSets, videoDefaultTables, deleteVideoSet)
+              renderDepartmentDefaults('video', videoDefaultSets, videoDefaultTables, handleDeleteVideoSet)
             )}
           </TabsContent>
         </Tabs>
