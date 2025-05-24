@@ -62,20 +62,20 @@ export const useTourWeightDefaults = (tourId: string) => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: TourWeightDefault) => {
+    mutationFn: async (weightDefault: TourWeightDefault) => {
       const { error } = await supabase
         .from('tour_weight_defaults')
         .update({
-          item_name: data.item_name,
-          weight_kg: data.weight_kg,
-          quantity: data.quantity,
-          category: data.category,
-          department: data.department
+          item_name: weightDefault.item_name,
+          weight_kg: weightDefault.weight_kg,
+          quantity: weightDefault.quantity,
+          category: weightDefault.category,
+          department: weightDefault.department
         })
-        .eq('id', data.id);
+        .eq('id', weightDefault.id);
 
       if (error) throw error;
-      return data;
+      return weightDefault;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tour-weight-defaults', tourId] });

@@ -59,7 +59,16 @@ export const TourWeightDefaultsSection: React.FC<TourWeightDefaultsSectionProps>
     };
 
     if (editingId) {
-      updateDefault({ id: editingId, ...weightData });
+      // For updates, we need to include the required fields
+      const existingDefault = weightDefaults.find(wd => wd.id === editingId);
+      if (existingDefault) {
+        updateDefault({
+          id: editingId,
+          ...weightData,
+          created_at: existingDefault.created_at,
+          updated_at: new Date().toISOString()
+        });
+      }
       setEditingId(null);
     } else {
       createDefault(weightData);

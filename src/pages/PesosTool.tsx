@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -161,6 +160,38 @@ const PesosTool: React.FC = () => {
   const handleDeleteDefault = async (id: string) => {
     await deleteTourDefault(id);
   };
+
+  const handleBackNavigation = () => {
+    if (isTourContext) {
+      navigate('/tours');
+    } else {
+      navigate('/sound');
+    }
+  };
+
+  // If in defaults mode, show simplified interface
+  if (isDefaults) {
+    const defaultItems = weightDefaults.map(wd => ({
+      id: wd.id,
+      name: wd.item_name,
+      value: wd.weight_kg,
+      quantity: wd.quantity,
+      category: wd.category || undefined
+    }));
+
+    return (
+      <TourDefaultsSimpleForm
+        tourId={tourId!}
+        tourName={tourName}
+        type="weight"
+        defaults={defaultItems}
+        onSave={handleSaveDefault}
+        onUpdate={handleUpdateDefault}
+        onDelete={handleDeleteDefault}
+        onBack={handleBackNavigation}
+      />
+    );
+  }
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
@@ -454,38 +485,6 @@ const PesosTool: React.FC = () => {
       });
     }
   };
-
-  const handleBackNavigation = () => {
-    if (isTourContext) {
-      navigate('/tours');
-    } else {
-      navigate('/sound');
-    }
-  };
-
-  // If in defaults mode, show simplified interface
-  if (isDefaults) {
-    const defaultItems = weightDefaults.map(wd => ({
-      id: wd.id,
-      name: wd.item_name,
-      value: wd.weight_kg,
-      quantity: wd.quantity,
-      category: wd.category || undefined
-    }));
-
-    return (
-      <TourDefaultsSimpleForm
-        tourId={tourId!}
-        tourName={tourName}
-        type="weight"
-        defaults={defaultItems}
-        onSave={handleSaveDefault}
-        onUpdate={handleUpdateDefault}
-        onDelete={handleDeleteDefault}
-        onBack={handleBackNavigation}
-      />
-    );
-  }
 
   return (
     <Card className="w-full max-w-4xl mx-auto my-6">
