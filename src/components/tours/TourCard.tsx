@@ -3,11 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, MoreVertical, Settings, FileText, Printer, Zap, Weight } from "lucide-react";
+import { Calendar, MapPin, MoreVertical, Settings, FileText, Printer, Zap, Weight, FolderPlus, Image } from "lucide-react";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TourManagementDialog } from "./TourManagementDialog";
 import { TourPowerWeightDefaultsDialog } from "./TourPowerWeightDefaultsDialog";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
+import { createAllFoldersForJob } from "@/utils/flex-folders";
 
 interface TourCardProps {
   tour: any;
@@ -17,8 +20,36 @@ interface TourCardProps {
 }
 
 export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCardProps) => {
+  const { toast } = useToast();
   const [isManagementOpen, setIsManagementOpen] = useState(false);
   const [isPowerWeightOpen, setIsPowerWeightOpen] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  // Fetch tour logo
+  useEffect(() => {
+    const fetchTourLogo = async () => {
+      if (!tour.id) return;
+      
+      const { data, error } = await supabase
+        .from('tour_logos')
+        .select('file_path')
+        .eq('tour_id', tour.id)
+        .maybeSingle();
+
+      if (!error && data?.file_path) {
+        const { data: publicUrlData } = supabase
+          .storage
+          .from('tour-logos')
+          .getPublicUrl(data.file_path);
+          
+        if (publicUrlData?.publicUrl) {
+          setLogoUrl(publicUrlData.publicUrl);
+        }
+      }
+    };
+
+    fetchTourLogo();
+  }, [tour.id]);
 
   const getUpcomingDates = () => {
     if (!tour.tour_dates) return [];
@@ -29,21 +60,121 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
 
   const upcomingDates = getUpcomingDates();
 
+  const handleCreateFlexFolders = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (tour.flex_folders_created) {
+      toast({
+        title: "Folders already created",
+        description: "Flex folders have already been created for this tour.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      console.log("Creating flex folders for tour:", tour.id);
+      
+      // Get tour dates to create folders for each
+      const { data: tourDates, error: tourDatesError } = await supabase
+        .from("tour_dates")
+        .select("*")
+        .eq("tour_id", tour.id)
+        .order("date", { ascending: true });
+
+      if (tourDatesError) {
+        console.error("Error fetching tour dates:", tourDatesError);
+        throw tourDatesError;
+      }
+
+      if (!tourDates || tourDates.length === 0) {
+        toast({
+          title: "No tour dates",
+          description: "Cannot create folders - no tour dates found.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Create folders for each tour date
+      for (const tourDate of tourDates) {
+        // Create a mock job object for the folder creation
+        const mockJob = {
+          id: `tour-${tour.id}-date-${tourDate.id}`,
+          title: `${tour.name} - ${format(new Date(tourDate.date), 'MMM d, yyyy')}`,
+          tour_id: tour.id,
+          tour_date_id: tourDate.id,
+          start_time: tourDate.date,
+          end_time: tourDate.date
+        };
+
+        const documentNumber = new Date(tourDate.date)
+          .toISOString()
+          .slice(2, 10)
+          .replace(/-/g, "");
+
+        const formattedDate = new Date(tourDate.date).toISOString().split(".")[0] + ".000Z";
+        
+        await createAllFoldersForJob(mockJob, formattedDate, formattedDate, documentNumber);
+      }
+
+      // Mark tour as having folders created
+      const { error: updateError } = await supabase
+        .from("tours")
+        .update({ flex_folders_created: true })
+        .eq("id", tour.id);
+
+      if (updateError) {
+        console.error("Error updating tour:", updateError);
+        throw updateError;
+      }
+
+      toast({
+        title: "Success",
+        description: "Flex folders have been created for all tour dates."
+      });
+    } catch (error: any) {
+      console.error("Error creating Flex folders:", error);
+      toast({
+        title: "Error creating folders",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <>
       <Card className="cursor-pointer hover:shadow-md transition-shadow">
         <CardHeader 
-          className="pb-3"
+          className="pb-3 relative"
           style={{ backgroundColor: `${tour.color}20` }}
         >
           <div className="flex justify-between items-start">
             <div className="flex-1" onClick={onTourClick}>
-              <CardTitle className="text-lg mb-2">{tour.name}</CardTitle>
-              {tour.description && (
-                <p className="text-sm text-muted-foreground line-clamp-2">
-                  {tour.description}
-                </p>
-              )}
+              <div className="flex items-start gap-3 mb-2">
+                {logoUrl && (
+                  <div className="w-12 h-12 flex-shrink-0">
+                    <img
+                      src={logoUrl}
+                      alt="Tour logo"
+                      className="w-full h-full object-contain rounded"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+                <div className="flex-1">
+                  <CardTitle className="text-lg">{tour.name}</CardTitle>
+                  {tour.description && (
+                    <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                      {tour.description}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -63,6 +194,13 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
                 <DropdownMenuItem onClick={() => setIsPowerWeightOpen(true)}>
                   <Zap className="h-4 w-4 mr-2" />
                   Power & Weight Defaults
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={handleCreateFlexFolders}
+                  disabled={tour.flex_folders_created}
+                >
+                  <FolderPlus className="h-4 w-4 mr-2" />
+                  {tour.flex_folders_created ? "Folders Created" : "Create Flex Folders"}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onPrint}>
                   <Printer className="h-4 w-4 mr-2" />
@@ -110,11 +248,17 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
             )}
 
             {/* Status badges */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {tour.flex_folders_created && (
                 <Badge variant="secondary" className="text-xs">
                   <FileText className="h-3 w-3 mr-1" />
                   Flex Ready
+                </Badge>
+              )}
+              {logoUrl && (
+                <Badge variant="secondary" className="text-xs">
+                  <Image className="h-3 w-3 mr-1" />
+                  Logo
                 </Badge>
               )}
               <Badge 
