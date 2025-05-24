@@ -2,10 +2,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { TokenManager } from "@/lib/token-manager";
 
 /**
- * Centralized session management hook
- * Replaces multiple getSession() calls with a single source of truth
+ * Centralized session management hook with caching
+ * Replaces multiple getSession() calls with a single cached source of truth
  */
 export const useAuthSession = () => {
   const [session, setSession] = useState<Session | null>(null);
@@ -13,13 +14,16 @@ export const useAuthSession = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
+  
+  const tokenManager = TokenManager.getInstance();
 
-  // Memoized session getter to prevent redundant calls
+  // Memoized session getter to prevent redundant calls using cache
   const getSessionOnce = useCallback(async () => {
     if (isInitialized) return session;
     
     try {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      // Use cached session from TokenManager
+      const currentSession = await tokenManager.getCachedSession();
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
@@ -45,7 +49,7 @@ export const useAuthSession = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [session, isInitialized]);
+  }, [session, isInitialized, tokenManager]);
 
   // Initialize session on mount
   useEffect(() => {
@@ -88,9 +92,12 @@ export const useAuthSession = () => {
   return {
     session,
     user,
-    userRole, // Add userRole for Festival pages
+    userRole,
     isLoading,
     isInitialized,
-    getSessionOnce
+    getSessionOnce,
+    // Expose cache utilities for debugging/monitoring
+    clearCache: tokenManager.clearCache.bind(tokenManager),
+    getCacheStatus: tokenManager.getCacheStatus.bind(tokenManager)
   };
 };

@@ -1,11 +1,12 @@
-
 import { supabase } from '@/lib/supabase-client';
+import { Session } from '@supabase/supabase-js';
 
 /**
  * Token Manager - Singleton class for managing auth tokens and refresh logic
  * - Handles automatic token refresh on expiry
  * - Manages subscription to token refresh events
  * - Coordinates token-related operations across the app
+ * - Caches session data to reduce redundant calls
  */
 export class TokenManager {
   private static instance: TokenManager;
@@ -14,10 +15,18 @@ export class TokenManager {
   private refreshTimeout: number | null = null;
   private lastRefresh: number = Date.now();
   
+  // Session caching properties
+  private cachedSession: Session | null = null;
+  private sessionCacheTime: number = 0;
+  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  
   private constructor() {
     // Set up auth state change listener
     supabase.auth.onAuthStateChange((event, session) => {
       console.log(`Auth state changed: ${event}`);
+      
+      // Update cached session whenever auth state changes
+      this.updateCachedSession(session);
       
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         this.lastRefresh = Date.now();
@@ -63,6 +72,40 @@ export class TokenManager {
   }
   
   /**
+   * Update the cached session and timestamp
+   */
+  private updateCachedSession(session: Session | null): void {
+    this.cachedSession = session;
+    this.sessionCacheTime = Date.now();
+  }
+  
+  /**
+   * Check if cached session is still valid
+   */
+  private isCacheValid(): boolean {
+    const now = Date.now();
+    const cacheAge = now - this.sessionCacheTime;
+    return cacheAge < this.CACHE_DURATION;
+  }
+  
+  /**
+   * Get cached session if valid, otherwise fetch fresh session
+   */
+  public async getCachedSession(): Promise<Session | null> {
+    // Return cached session if it's still valid
+    if (this.cachedSession && this.isCacheValid()) {
+      console.log('Returning cached session');
+      return this.cachedSession;
+    }
+    
+    // Cache is invalid or empty, fetch fresh session
+    console.log('Fetching fresh session (cache miss or expired)');
+    const { data } = await supabase.auth.getSession();
+    this.updateCachedSession(data.session);
+    return data.session;
+  }
+  
+  /**
    * Refresh the token
    */
   public async refreshToken(): Promise<any> {
@@ -83,6 +126,7 @@ export class TokenManager {
       
       if (data.session) {
         this.lastRefresh = Date.now();
+        this.updateCachedSession(data.session);
         this.notifySubscribers();
         this.scheduleNextRefresh(data.session);
         return { session: data.session, error: null };
@@ -105,8 +149,7 @@ export class TokenManager {
       await this.refreshToken();
     }
     
-    const { data } = await supabase.auth.getSession();
-    return data.session;
+    return this.getCachedSession();
   }
 
   /**
@@ -114,6 +157,9 @@ export class TokenManager {
    */
   public async signOut(): Promise<{ error: any }> {
     try {
+      // Clear cached session
+      this.updateCachedSession(null);
+      
       const { error } = await supabase.auth.signOut();
       return { error };
     } catch (error) {
@@ -248,5 +294,27 @@ export class TokenManager {
     }
     
     return false;
+  }
+  
+  /**
+   * Clear session cache (useful for testing or forced refresh)
+   */
+  public clearCache(): void {
+    console.log('Clearing session cache');
+    this.cachedSession = null;
+    this.sessionCacheTime = 0;
+  }
+  
+  /**
+   * Get cache status for debugging
+   */
+  public getCacheStatus(): { hasCache: boolean; cacheAge: number; isValid: boolean } {
+    const now = Date.now();
+    const cacheAge = now - this.sessionCacheTime;
+    return {
+      hasCache: !!this.cachedSession,
+      cacheAge,
+      isValid: this.isCacheValid()
+    };
   }
 }
