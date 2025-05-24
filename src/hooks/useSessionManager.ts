@@ -1,14 +1,14 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
 import { useSessionRefresh } from "./session/useSessionRefresh";
 import { useProfileData } from "./session/useProfileData";
 import { useProfileChanges } from "./session/useProfileChanges";
+import { useAuthSession } from "./auth/useAuthSession";
 
 export const useSessionManager = () => {
   const navigate = useNavigate();
-  const [session, setSession] = useState<any>(null);
+  const { session, user, isLoading: sessionLoading } = useAuthSession();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -17,13 +17,17 @@ export const useSessionManager = () => {
   const { refreshSession } = useSessionRefresh();
   const { fetchUserProfile } = useProfileData();
 
+  // Update loading state based on session loading
+  useEffect(() => {
+    setIsLoading(sessionLoading);
+  }, [sessionLoading]);
+
   const handleSessionUpdate = useCallback(async (currentSession: any) => {
     setIdleTime(0);
     console.log("Session update handler called with session:", !!currentSession);
 
     if (!currentSession?.user?.id) {
       console.log("No valid session or user ID, clearing user data");
-      setSession(null);
       setUserRole(null);
       setUserDepartment(null);
       setIsLoading(false);
@@ -32,8 +36,6 @@ export const useSessionManager = () => {
     }
 
     console.log("Session found, updating user data for ID:", currentSession.user.id);
-    
-    setSession(currentSession);
     setIsLoading(false);
 
     try {
@@ -54,6 +56,18 @@ export const useSessionManager = () => {
     }
   }, [fetchUserProfile, navigate]);
 
+  // Handle session changes from centralized auth
+  useEffect(() => {
+    if (session) {
+      handleSessionUpdate(session);
+    } else if (!sessionLoading) {
+      // Only clear if we're not loading
+      setUserRole(null);
+      setUserDepartment(null);
+      navigate("/auth");
+    }
+  }, [session, sessionLoading, handleSessionUpdate]);
+
   useEffect(() => {
     const idleInterval = setInterval(() => {
       setIdleTime((prevIdleTime) => prevIdleTime + 1);
@@ -68,40 +82,6 @@ export const useSessionManager = () => {
       setIdleTime(0);
     }
   }, [idleTime, refreshSession]);
-
-  useEffect(() => {
-    console.log("Setting up session...");
-    let subscription: { unsubscribe: () => void } | null = null;
-
-    const setupSession = async () => {
-      try {
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        console.log("Initial session check:", !!initialSession);
-        
-        await handleSessionUpdate(initialSession);
-        
-        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
-          async (_event, authStateSession) => {
-            console.log("Auth state changed:", _event);
-            await handleSessionUpdate(authStateSession);
-          }
-        );
-        
-        subscription = authSubscription;
-      } catch (error) {
-        console.error("Error in session setup:", error);
-        setIsLoading(false);
-      }
-    };
-
-    setupSession();
-
-    return () => {
-      if (subscription) {
-        subscription.unsubscribe();
-      }
-    };
-  }, [handleSessionUpdate]);
 
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -127,7 +107,6 @@ export const useSessionManager = () => {
     userRole,
     userDepartment,
     isLoading,
-    setSession,
     setUserRole,
     setUserDepartment
   };
