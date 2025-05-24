@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useJobsRealtime } from "@/hooks/useJobsRealtime";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -14,6 +15,7 @@ import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { useConnectionStatus } from "@/hooks/useConnectionStatus";
 import { FestivalsPagination } from "@/components/ui/festivals-pagination";
+import { findClosestFestival, calculatePageForFestival } from "@/utils/dateUtils";
 
 const ITEMS_PER_PAGE = 9; // 3x3 grid
 
@@ -36,8 +38,10 @@ const Festivals = () => {
   const [festivalLogos, setFestivalLogos] = useState<Record<string, string>>({});
   const [isPrinting, setIsPrinting] = useState<Record<string, boolean>>({});
   const [currentPage, setCurrentPage] = useState(1);
+  const [highlightedFestivalId, setHighlightedFestivalId] = useState<string | null>(null);
   const { userRole } = useAuth();
   const { status: connectionStatus, recoverConnection } = useConnectionStatus();
+  const festivalRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Filter jobs to only show festivals
   useEffect(() => {
@@ -49,10 +53,33 @@ const Festivals = () => {
     }
   }, [jobs]);
 
-  // Reset to first page when festivals change
+  // Auto-center on closest festival when festivals are loaded
   useEffect(() => {
-    setCurrentPage(1);
-  }, [festivalJobs.length]);
+    if (festivalJobs.length > 0) {
+      const closestFestival = findClosestFestival(festivalJobs);
+      if (closestFestival) {
+        const targetPage = calculatePageForFestival(festivalJobs, closestFestival, ITEMS_PER_PAGE);
+        setCurrentPage(targetPage);
+        setHighlightedFestivalId(closestFestival.id);
+        
+        // Scroll to the festival after a brief delay to ensure rendering
+        setTimeout(() => {
+          scrollToFestival(closestFestival.id);
+        }, 300);
+      }
+    }
+  }, [festivalJobs]);
+
+  // Clear highlight after some time
+  useEffect(() => {
+    if (highlightedFestivalId) {
+      const timer = setTimeout(() => {
+        setHighlightedFestivalId(null);
+      }, 3000); // Remove highlight after 3 seconds
+      
+      return () => clearTimeout(timer);
+    }
+  }, [highlightedFestivalId]);
 
   // Calculate pagination
   const totalPages = Math.ceil(festivalJobs.length / ITEMS_PER_PAGE);
@@ -99,6 +126,18 @@ const Festivals = () => {
       }
     } catch (err) {
       console.error('Error in fetchFestivalLogo:', err);
+    }
+  };
+
+  // Scroll to specific festival
+  const scrollToFestival = (festivalId: string) => {
+    const festivalElement = festivalRefs.current[festivalId];
+    if (festivalElement) {
+      festivalElement.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center',
+        inline: 'center'
+      });
     }
   };
 
@@ -240,8 +279,21 @@ const Festivals = () => {
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {paginatedFestivals.map((job) => (
-                  <div key={job.id} className="relative">
-                    <div onClick={() => handleJobClick(job.id)} className="cursor-pointer">
+                  <div 
+                    key={job.id} 
+                    className="relative"
+                    ref={(el) => {
+                      festivalRefs.current[job.id] = el;
+                    }}
+                  >
+                    <div 
+                      onClick={() => handleJobClick(job.id)} 
+                      className={`cursor-pointer transition-all duration-300 ${
+                        highlightedFestivalId === job.id 
+                          ? 'ring-2 ring-primary ring-offset-2 shadow-lg scale-105' 
+                          : ''
+                      }`}
+                    >
                       <JobCard 
                         job={job} 
                         onJobClick={() => handleJobClick(job.id)} 
