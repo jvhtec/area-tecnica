@@ -78,6 +78,8 @@ const ConsumosTool: React.FC = () => {
   const [tables, setTables] = useState<Table[]>([]);
   const [safetyMargin, setSafetyMargin] = useState(0);
   const [currentSetName, setCurrentSetName] = useState('');
+  const [tourName, setTourName] = useState<string>('');
+  const [tourDateInfo, setTourDateInfo] = useState<{ date: string; location: string } | null>(null);
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
@@ -106,7 +108,7 @@ const ConsumosTool: React.FC = () => {
   const [tourName, setTourName] = useState<string>('');
 
   useEffect(() => {
-    const fetchTourName = async () => {
+    const fetchTourInfo = async () => {
       if (tourId) {
         const { data } = await supabase
           .from('tours')
@@ -118,10 +120,30 @@ const ConsumosTool: React.FC = () => {
           setTourName(data.name);
         }
       }
+
+      if (tourDateId) {
+        const { data } = await supabase
+          .from('tour_dates')
+          .select(`
+            date,
+            locations (
+              name
+            )
+          `)
+          .eq('id', tourDateId)
+          .single();
+        
+        if (data) {
+          setTourDateInfo({
+            date: new Date(data.date).toLocaleDateString(),
+            location: (data.locations as any)?.name || 'Unknown location'
+          });
+        }
+      }
     };
 
-    fetchTourName();
-  }, [tourId]);
+    fetchTourInfo();
+  }, [tourId, tourDateId]);
 
   const handleBackNavigation = () => {
     if (isTourContext) {
@@ -518,10 +540,11 @@ const ConsumosTool: React.FC = () => {
                 Managing defaults for: <span className="font-medium">{tourName}</span>
               </p>
             )}
-            {isTourDateContext && (
-              <p className="text-sm text-muted-foreground mt-1">
-                Creating overrides for tour date
-              </p>
+            {isTourDateContext && tourDateInfo && (
+              <div className="text-sm text-muted-foreground mt-1">
+                <p>Creating overrides for tour date</p>
+                <p className="font-medium">{tourDateInfo.date} - {tourDateInfo.location}</p>
+              </div>
             )}
             {isTourContext && !isDefaults && !isTourDateContext && (
               <p className="text-sm text-muted-foreground mt-1">
@@ -534,6 +557,21 @@ const ConsumosTool: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
+          {/* Tour date override notification */}
+          {isTourDateContext && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                <p className="text-sm font-medium text-blue-900">
+                  Override Mode Active
+                </p>
+              </div>
+              <p className="text-sm text-blue-700 mt-1">
+                Any tables you create will be saved as overrides for this specific tour date.
+              </p>
+            </div>
+          )}
+
           {isDefaults && (
             <div className="space-y-2">
               <Label htmlFor="setName">Default Set Name</Label>
@@ -705,6 +743,32 @@ const ConsumosTool: React.FC = () => {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Display existing overrides for tour dates */}
+          {isTourDateContext && powerOverrides.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Existing Overrides for This Date</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {powerOverrides.map((override) => (
+                  <div key={override.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-medium">{override.table_name}</h4>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteOverride({ id: override.id, table: 'power' })}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {override.total_watts.toFixed(2)} W • {override.current_per_phase.toFixed(2)} A
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

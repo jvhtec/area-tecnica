@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -128,9 +127,10 @@ const PesosTool: React.FC = () => {
 
   // Get tour name for display
   const [tourName, setTourName] = useState<string>('');
+  const [tourDateInfo, setTourDateInfo] = useState<{ date: string; location: string } | null>(null);
 
   useEffect(() => {
-    const fetchTourName = async () => {
+    const fetchTourInfo = async () => {
       if (tourId) {
         const { data } = await supabase
           .from('tours')
@@ -142,10 +142,30 @@ const PesosTool: React.FC = () => {
           setTourName(data.name);
         }
       }
+
+      if (tourDateId) {
+        const { data } = await supabase
+          .from('tour_dates')
+          .select(`
+            date,
+            locations (
+              name
+            )
+          `)
+          .eq('id', tourDateId)
+          .single();
+        
+        if (data) {
+          setTourDateInfo({
+            date: new Date(data.date).toLocaleDateString(),
+            location: (data.locations as any)?.name || 'Unknown location'
+          });
+        }
+      }
     };
 
-    fetchTourName();
-  }, [tourId]);
+    fetchTourInfo();
+  }, [tourId, tourDateId]);
 
   const handleBackNavigation = () => {
     if (isTourContext) {
@@ -316,24 +336,20 @@ const PesosTool: React.FC = () => {
     if (!tourDateId) return;
 
     try {
-      // Save each row as a separate override (to match existing structure)
-      for (const row of table.rows) {
-        if (row.componentName && row.totalWeight) {
-          await createWeightOverride({
-            tour_date_id: tourDateId,
-            default_table_id: table.defaultTableId,
-            item_name: row.componentName,
-            weight_kg: parseFloat(row.weight),
-            quantity: parseInt(row.quantity),
-            category: null,
-            department: 'sound',
-            override_data: {
-              tableData: table,
-              toolType: 'pesos'
-            }
-          });
+      // Save the table as an override
+      await createWeightOverride({
+        tour_date_id: tourDateId,
+        default_table_id: table.defaultTableId,
+        item_name: table.name,
+        weight_kg: table.totalWeight || 0,
+        quantity: 1,
+        category: null,
+        department: 'sound',
+        override_data: {
+          tableData: table,
+          toolType: 'pesos'
         }
-      }
+      });
 
       toast({
         title: 'Success',
@@ -388,6 +404,17 @@ const PesosTool: React.FC = () => {
         clusterId: newClusterId,
       };
       setTables((prev) => [...prev, newTable]);
+    } else if (isTourDateContext) {
+      // For tour date context, create table and save as override
+      const newTable: Table = {
+        name: tableName,
+        rows: calculatedRows,
+        totalWeight,
+        id: Date.now(),
+        clusterId: newClusterId,
+      };
+      setTables((prev) => [...prev, newTable]);
+      saveAsOverride(newTable);
     } else if (mirroredCluster) {
       // For mirrored clusters, generate two tables sharing the same clusterId.
       const leftSuffix = getSuffix();
@@ -558,10 +585,11 @@ const PesosTool: React.FC = () => {
                 Managing defaults for: <span className="font-medium">{tourName}</span>
               </p>
             )}
-            {isTourDateContext && (
-              <p className="text-sm text-muted-foreground mt-1">
-                Creating overrides for tour date
-              </p>
+            {isTourDateContext && tourDateInfo && (
+              <div className="text-sm text-muted-foreground mt-1">
+                <p>Creating overrides for tour date</p>
+                <p className="font-medium">{tourDateInfo.date} - {tourDateInfo.location}</p>
+              </div>
             )}
             {isTourContext && !isDefaults && !isTourDateContext && (
               <p className="text-sm text-muted-foreground mt-1">
@@ -574,6 +602,21 @@ const PesosTool: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
+          {/* Tour date override notification */}
+          {isTourDateContext && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                <p className="text-sm font-medium text-blue-900">
+                  Override Mode Active
+                </p>
+              </div>
+              <p className="text-sm text-blue-700 mt-1">
+                Any tables you create will be saved as overrides for this specific tour date.
+              </p>
+            </div>
+          )}
+
           {isDefaults && (
             <div className="space-y-2">
               <Label htmlFor="setName">Default Set Name</Label>
@@ -760,6 +803,32 @@ const PesosTool: React.FC = () => {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Display existing overrides for tour dates */}
+          {isTourDateContext && weightOverrides.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Existing Overrides for This Date</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {weightOverrides.map((override) => (
+                  <div key={override.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-medium">{override.item_name}</h4>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteOverride({ id: override.id, table: 'weight' })}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {(override.weight_kg * override.quantity).toFixed(2)} kg
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

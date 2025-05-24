@@ -3,10 +3,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { TourColorSection } from "./TourColorSection";
 import { TourDeleteSection } from "./TourDeleteSection";
+import { TourDefaultsManager } from "./TourDefaultsManager";
 import { useTourManagement } from "./hooks/useTourManagement";
 import { TourLogoManager } from "./TourLogoManager";
 import { useNavigate } from "react-router-dom";
-import { Calculator, Weight } from "lucide-react";
+import { Calculator, Weight, Settings } from "lucide-react";
+import { useState } from "react";
 
 interface TourManagementDialogProps {
   open: boolean;
@@ -21,6 +23,7 @@ export const TourManagementDialog = ({
 }: TourManagementDialogProps) => {
   const navigate = useNavigate();
   const { handleColorChange, handleNameChange, handleDelete } = useTourManagement(tour, () => onOpenChange(false));
+  const [defaultsManagerOpen, setDefaultsManagerOpen] = useState(false);
 
   const handlePowerDefaults = () => {
     // Navigate to ConsumosTool with tour context
@@ -34,53 +37,75 @@ export const TourManagementDialog = ({
     onOpenChange(false);
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Manage Tour: {tour.name}</DialogTitle>
-        </DialogHeader>
-        
-        <div className="space-y-6">
-          <div className="border-b pb-4">
-            <h3 className="text-sm font-medium mb-3">Tour Logo</h3>
-            <TourLogoManager tourId={tour.id} />
-          </div>
-          
-          <div className="border-b pb-4">
-            <TourColorSection 
-              color={tour.color} 
-              tourName={tour.name}
-              onColorChange={handleColorChange}
-              onNameChange={handleNameChange}
-            />
-          </div>
+  const handleManageDefaults = () => {
+    setDefaultsManagerOpen(true);
+  };
 
-          <div className="border-b pb-4">
-            <h3 className="text-sm font-medium mb-3">Tour Defaults</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                variant="outline"
-                onClick={handlePowerDefaults}
-                className="flex items-center gap-2"
-              >
-                <Calculator className="h-4 w-4" />
-                Set Power Defaults
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleWeightDefaults}
-                className="flex items-center gap-2"
-              >
-                <Weight className="h-4 w-4" />
-                Set Weight Defaults
-              </Button>
-            </div>
-          </div>
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Manage Tour: {tour.name}</DialogTitle>
+          </DialogHeader>
           
-          <TourDeleteSection onDelete={handleDelete} />
-        </div>
-      </DialogContent>
-    </Dialog>
+          <div className="space-y-6">
+            <div className="border-b pb-4">
+              <h3 className="text-sm font-medium mb-3">Tour Logo</h3>
+              <TourLogoManager tourId={tour.id} />
+            </div>
+            
+            <div className="border-b pb-4">
+              <TourColorSection 
+                color={tour.color} 
+                tourName={tour.name}
+                onColorChange={handleColorChange}
+                onNameChange={handleNameChange}
+              />
+            </div>
+
+            <div className="border-b pb-4">
+              <h3 className="text-sm font-medium mb-3">Tour Defaults</h3>
+              <div className="grid grid-cols-1 gap-3">
+                <Button
+                  variant="outline"
+                  onClick={handleManageDefaults}
+                  className="flex items-center gap-2"
+                >
+                  <Settings className="h-4 w-4" />
+                  Manage All Defaults & Export PDFs
+                </Button>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={handlePowerDefaults}
+                    className="flex items-center gap-2"
+                  >
+                    <Calculator className="h-4 w-4" />
+                    Set Power Defaults
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleWeightDefaults}
+                    className="flex items-center gap-2"
+                  >
+                    <Weight className="h-4 w-4" />
+                    Set Weight Defaults
+                  </Button>
+                </div>
+              </div>
+            </div>
+            
+            <TourDeleteSection onDelete={handleDelete} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <TourDefaultsManager
+        open={defaultsManagerOpen}
+        onOpenChange={setDefaultsManagerOpen}
+        tour={tour}
+      />
+    </>
   );
 };
