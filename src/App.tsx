@@ -71,7 +71,9 @@ export default function App() {
                     <Route path="/festivals" element={<Festivals />} />
                     <Route path="/technician-dashboard" element={<TechnicianDashboard />} />
                     
-                    {/* Tools Routes */}
+                    {/* Tools Routes - Both nested and original paths for compatibility */}
+                    <Route path="/sound/pesos" element={<PesosTool />} />
+                    <Route path="/sound/consumos" element={<ConsumosTool />} />
                     <Route path="/pesos-tool" element={<PesosTool />} />
                     <Route path="/lights-pesos-tool" element={<LightsPesosTool />} />
                     <Route path="/video-pesos-tool" element={<VideoPesosTool />} />

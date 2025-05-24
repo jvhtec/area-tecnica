@@ -12,7 +12,6 @@ import { supabase } from '@/lib/supabase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useTourPowerDefaults } from '@/hooks/useTourPowerDefaults';
-import { TourDefaultsSimpleForm } from '@/components/tours/TourDefaultsSimpleForm';
 
 const soundComponentDatabase = [
   { id: 1, name: 'LA12X', watts: 2900 },
@@ -298,7 +297,7 @@ const ConsumosTool: React.FC = () => {
 
       toast({
         title: 'Success',
-        description: 'Power default saved to tour successfully',
+        description: isDefaults ? 'Power default saved successfully' : 'Power default saved to tour successfully',
       });
     } catch (error: any) {
       console.error('Error saving tour default:', error);
@@ -350,8 +349,8 @@ const ConsumosTool: React.FC = () => {
 
     setTables((prev) => [...prev, newTable]);
 
-    // Auto-save as tour default if in defaults mode
-    if (isDefaults && tourId) {
+    // Auto-save as tour default if in defaults mode or tour context
+    if (isDefaults || isTourContext) {
       saveAsTourDefault(newTable);
     } else if (selectedJobId) {
       savePowerRequirementTable(newTable);
@@ -467,15 +466,23 @@ const ConsumosTool: React.FC = () => {
           <Button variant="ghost" size="icon" onClick={handleBackNavigation}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <CardTitle className="text-2xl font-bold">
-            Power Calculator
-          </CardTitle>
+          <div className="text-center">
+            <CardTitle className="text-2xl font-bold">
+              Power Calculator
+            </CardTitle>
+            {isDefaults && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Managing defaults for: <span className="font-medium">{tourName}</span>
+              </p>
+            )}
+            {isTourContext && !isDefaults && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Creating power requirements for tour: <span className="font-medium">{tourName}</span>
+              </p>
+            )}
+          </div>
+          <div></div>
         </div>
-        {isTourContext && (
-          <p className="text-sm text-muted-foreground text-center">
-            Creating power requirements for specific dates
-          </p>
-        )}
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
@@ -500,31 +507,35 @@ const ConsumosTool: React.FC = () => {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="jobSelect">Select Job</Label>
-                <Select value={selectedJobId} onValueChange={handleJobSelect}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a job" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {jobs?.map((job) => (
-                      <SelectItem key={job.id} value={job.id}>
-                        {job.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!isTourContext && (
+                <div className="space-y-2">
+                  <Label htmlFor="jobSelect">Select Job</Label>
+                  <Select value={selectedJobId} onValueChange={handleJobSelect}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a job" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {jobs?.map((job) => (
+                        <SelectItem key={job.id} value={job.id}>
+                          {job.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="tableName">Table Name</Label>
+            <Label htmlFor="tableName">
+              {isDefaults ? 'Power Default Name' : 'Table Name'}
+            </Label>
             <Input
               id="tableName"
               value={tableName}
               onChange={(e) => setTableName(e.target.value)}
-              placeholder="Enter table name"
+              placeholder={isDefaults ? "Enter default name (e.g., FoH Rack)" : "Enter table name"}
             />
           </div>
 
@@ -583,12 +594,12 @@ const ConsumosTool: React.FC = () => {
           <div className="flex gap-2">
             <Button onClick={addRow}>Add Row</Button>
             <Button onClick={generateTable} variant="secondary">
-              {isDefaults ? 'Save as Default' : 'Generate Table'}
+              {isDefaults ? 'Save Default' : 'Generate Table'}
             </Button>
             <Button onClick={resetCurrentTable} variant="destructive">
               Reset
             </Button>
-            {tables.length > 0 && !isDefaults && (
+            {tables.length > 0 && !isDefaults && !isTourContext && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
                 <FileText className="h-4 w-4" />
                 Export & Upload PDF
@@ -621,45 +632,47 @@ const ConsumosTool: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-4 bg-muted/50 space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id={`hoist-${table.id}`}
-                      checked={table.includesHoist}
-                      onCheckedChange={(checked) =>
-                        table.id && updateTableSettings(table.id, { includesHoist: !!checked })
-                      }
-                    />
-                    <Label htmlFor={`hoist-${table.id}`}>Include Hoist Power (CEE32A 3P+N+G)</Label>
-                  </div>
+              {!isDefaults && (
+                <div className="p-4 bg-muted/50 space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id={`hoist-${table.id}`}
+                        checked={table.includesHoist}
+                        onCheckedChange={(checked) =>
+                          table.id && updateTableSettings(table.id, { includesHoist: !!checked })
+                        }
+                      />
+                      <Label htmlFor={`hoist-${table.id}`}>Include Hoist Power (CEE32A 3P+N+G)</Label>
+                    </div>
 
-                  <div className="flex items-center gap-2">
-                    <Label>Override PDU Type:</Label>
-                    <Select
-                      value={table.customPduType || 'default'}
-                      onValueChange={(value) =>
-                        table.id &&
-                        updateTableSettings(table.id, {
-                          customPduType: value === 'default' ? undefined : value,
-                        })
-                      }
-                    >
-                      <SelectTrigger className="w-[200px]">
-                        <SelectValue placeholder="Use suggested PDU" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="default">Use suggested PDU</SelectItem>
-                        {PDU_TYPES.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {type}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-2">
+                      <Label>Override PDU Type:</Label>
+                      <Select
+                        value={table.customPduType || 'default'}
+                        onValueChange={(value) =>
+                          table.id &&
+                          updateTableSettings(table.id, {
+                            customPduType: value === 'default' ? undefined : value,
+                          })
+                        }
+                      >
+                        <SelectTrigger className="w-[200px]">
+                          <SelectValue placeholder="Use suggested PDU" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="default">Use suggested PDU</SelectItem>
+                          {PDU_TYPES.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               <table className="w-full">
                 <thead className="bg-muted/50">
@@ -685,29 +698,33 @@ const ConsumosTool: React.FC = () => {
                     </td>
                     <td className="px-4 py-3">{table.totalWatts?.toFixed(2)} W</td>
                   </tr>
-                  <tr className="border-t bg-muted/50 font-medium">
-                    <td colSpan={3} className="px-4 py-3 text-right">
-                      Current per Phase:
-                    </td>
-                    <td className="px-4 py-3">{table.currentPerPhase?.toFixed(2)} A</td>
-                  </tr>
-                  <tr className="border-t bg-muted/50 font-medium">
-                    <td colSpan={3} className="px-4 py-3 text-right">
-                      Suggested PDU:
-                    </td>
-                    <td className="px-4 py-3">{table.pduType}</td>
-                  </tr>
-                  {table.customPduType && (
-                    <tr className="border-t bg-muted/50 font-medium text-primary">
-                      <td colSpan={3} className="px-4 py-3 text-right">
-                        Selected PDU Override:
-                      </td>
-                      <td className="px-4 py-3">{table.customPduType}</td>
-                    </tr>
+                  {!isDefaults && (
+                    <>
+                      <tr className="border-t bg-muted/50 font-medium">
+                        <td colSpan={3} className="px-4 py-3 text-right">
+                          Current per Phase:
+                        </td>
+                        <td className="px-4 py-3">{table.currentPerPhase?.toFixed(2)} A</td>
+                      </tr>
+                      <tr className="border-t bg-muted/50 font-medium">
+                        <td colSpan={3} className="px-4 py-3 text-right">
+                          Suggested PDU:
+                        </td>
+                        <td className="px-4 py-3">{table.pduType}</td>
+                      </tr>
+                      {table.customPduType && (
+                        <tr className="border-t bg-muted/50 font-medium text-primary">
+                          <td colSpan={3} className="px-4 py-3 text-right">
+                            Selected PDU Override:
+                          </td>
+                          <td className="px-4 py-3">{table.customPduType}</td>
+                        </tr>
+                      )}
+                    </>
                   )}
                 </tbody>
               </table>
-              {table.includesHoist && (
+              {!isDefaults && table.includesHoist && (
                 <div className="px-4 py-2 text-sm text-gray-500 bg-muted/30 italic">
                   Additional Hoist Power Required: CEE32A 3P+N+G
                 </div>

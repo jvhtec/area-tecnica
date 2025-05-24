@@ -12,7 +12,6 @@ import { supabase } from '@/lib/supabase';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTourWeightDefaults } from '@/hooks/useTourWeightDefaults';
-import { TourDefaultsSimpleForm } from '@/components/tours/TourDefaultsSimpleForm';
 
 // Database for sound components.
 const soundComponentDatabase = [
@@ -96,6 +95,11 @@ const PesosTool: React.FC = () => {
   const [cablePick, setCablePick] = useState(false);
   const [cablePickWeight, setCablePickWeight] = useState('100');
 
+  const [currentTable, setCurrentTable] = useState<Table>({
+    name: '',
+    rows: [{ quantity: '', componentId: '', weight: '' }],
+  });
+
   // Tour defaults hook
   const {
     weightDefaults,
@@ -126,41 +130,6 @@ const PesosTool: React.FC = () => {
     fetchTourName();
   }, [tourId]);
 
-  // Handler functions for defaults mode
-  const handleSaveDefault = async (item: { name: string; value: number; quantity: number; category?: string }) => {
-    if (!tourId) return;
-
-    await createTourDefault({
-      tour_id: tourId,
-      item_name: item.name,
-      weight_kg: item.value,
-      quantity: item.quantity,
-      category: item.category || null,
-      department: null
-    });
-  };
-
-  const handleUpdateDefault = async (id: string, updates: any) => {
-    const weightDefault = weightDefaults.find(wd => wd.id === id);
-    if (!weightDefault) return;
-
-    await updateTourDefault({
-      id,
-      tour_id: weightDefault.tour_id,
-      item_name: updates.name ?? weightDefault.item_name,
-      weight_kg: updates.value ?? weightDefault.weight_kg,
-      quantity: updates.quantity ?? weightDefault.quantity,
-      category: updates.category ?? weightDefault.category,
-      department: weightDefault.department,
-      created_at: weightDefault.created_at,
-      updated_at: weightDefault.updated_at
-    });
-  };
-
-  const handleDeleteDefault = async (id: string) => {
-    await deleteTourDefault(id);
-  };
-
   const handleBackNavigation = () => {
     if (isTourContext) {
       navigate('/tours');
@@ -168,35 +137,6 @@ const PesosTool: React.FC = () => {
       navigate('/sound');
     }
   };
-
-  // If in defaults mode, show simplified interface
-  if (isDefaults) {
-    const defaultItems = weightDefaults.map(wd => ({
-      id: wd.id,
-      name: wd.item_name,
-      value: wd.weight_kg,
-      quantity: wd.quantity,
-      category: wd.category || undefined
-    }));
-
-    return (
-      <TourDefaultsSimpleForm
-        tourId={tourId!}
-        tourName={tourName}
-        type="weight"
-        defaults={defaultItems}
-        onSave={handleSaveDefault}
-        onUpdate={handleUpdateDefault}
-        onDelete={handleDeleteDefault}
-        onBack={handleBackNavigation}
-      />
-    );
-  }
-
-  const [currentTable, setCurrentTable] = useState<Table>({
-    name: '',
-    rows: [{ quantity: '', componentId: '', weight: '' }],
-  });
 
   // Load existing tour defaults when in defaults mode
   useEffect(() => {
@@ -289,7 +229,7 @@ const PesosTool: React.FC = () => {
 
       toast({
         title: 'Success',
-        description: 'Weight defaults saved to tour successfully',
+        description: isDefaults ? 'Weight default saved successfully' : 'Weight defaults saved to tour successfully',
       });
     } catch (error: any) {
       console.error('Error saving tour defaults:', error);
@@ -330,7 +270,18 @@ const PesosTool: React.FC = () => {
     // For grouping cable pick later, assign a new clusterId for this generation.
     const newClusterId = Date.now().toString();
 
-    if (mirroredCluster) {
+    if (isDefaults) {
+      // In defaults mode, just save a simple table
+      const newTable: Table = {
+        name: tableName,
+        rows: calculatedRows,
+        totalWeight,
+        id: Date.now(),
+        clusterId: newClusterId,
+      };
+      setTables((prev) => [...prev, newTable]);
+      saveAsTourDefault(newTable);
+    } else if (mirroredCluster) {
       // For mirrored clusters, generate two tables sharing the same clusterId.
       const leftSuffix = getSuffix();
       const rightSuffix = getSuffix();
@@ -429,7 +380,6 @@ const PesosTool: React.FC = () => {
     }
 
     try {
-      // Fetch the job logo (festival or tour)
       let logoUrl: string | undefined = undefined;
       try {
         const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
@@ -437,7 +387,6 @@ const PesosTool: React.FC = () => {
         console.log("Logo URL for PDF:", logoUrl);
       } catch (logoError) {
         console.error("Error fetching logo:", logoError);
-        // Continue without the logo if there's an error
       }
 
       const jobDateStr = new Date().toLocaleDateString('en-GB');
@@ -450,7 +399,7 @@ const PesosTool: React.FC = () => {
         summaryRows,
         undefined,
         undefined,
-        logoUrl // Pass the logo URL to the PDF generator
+        logoUrl
       );
 
       const fileName = `Pesos Report - ${selectedJob.title}.pdf`;
@@ -493,19 +442,27 @@ const PesosTool: React.FC = () => {
           <Button variant="ghost" size="icon" onClick={handleBackNavigation}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <CardTitle className="text-2xl font-bold">
-            Weight Calculator
-          </CardTitle>
+          <div className="text-center">
+            <CardTitle className="text-2xl font-bold">
+              Weight Calculator
+            </CardTitle>
+            {isDefaults && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Managing defaults for: <span className="font-medium">{tourName}</span>
+              </p>
+            )}
+            {isTourContext && !isDefaults && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Creating weight requirements for tour: <span className="font-medium">{tourName}</span>
+              </p>
+            )}
+          </div>
+          <div></div>
         </div>
-        {isTourContext && (
-          <p className="text-sm text-muted-foreground text-center">
-            Creating weight requirements for specific dates
-          </p>
-        )}
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {!isDefaults && (
+          {!isTourContext && (
             <div className="space-y-2">
               <Label htmlFor="jobSelect">Select Job</Label>
               <Select value={selectedJobId} onValueChange={handleJobSelect}>
@@ -525,13 +482,13 @@ const PesosTool: React.FC = () => {
 
           <div className="space-y-2">
             <Label htmlFor="tableName">
-              {isDefaults ? 'Item Name' : 'Table Name'}
+              {isDefaults ? 'Weight Default Name' : 'Table Name'}
             </Label>
             <Input
               id="tableName"
               value={tableName}
               onChange={(e) => setTableName(e.target.value)}
-              placeholder={isDefaults ? "Enter item name" : "Enter table name"}
+              placeholder={isDefaults ? "Enter default name (e.g., K2 Array)" : "Enter table name"}
             />
             
             {!isDefaults && (
@@ -634,12 +591,12 @@ const PesosTool: React.FC = () => {
           <div className="flex gap-2">
             <Button onClick={addRow}>Add Row</Button>
             <Button onClick={generateTable} variant="secondary">
-              {isDefaults ? 'Save as Default' : 'Generate Table'}
+              {isDefaults ? 'Save Default' : 'Generate Table'}
             </Button>
             <Button onClick={resetCurrentTable} variant="destructive">
               Reset
             </Button>
-            {tables.length > 0 && !isDefaults && (
+            {tables.length > 0 && !isDefaults && !isTourContext && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
                 <FileText className="w-4 h-4" />
                 Export &amp; Upload PDF
@@ -690,11 +647,11 @@ const PesosTool: React.FC = () => {
                     <td colSpan={3} className="px-4 py-3 text-right">
                       Total Weight:
                     </td>
-                    <td className="px-4 py-3">{table.totalWeight?.toFixed(2)}</td>
+                    <td className="px-4 py-3">{table.totalWeight?.toFixed(2)} kg</td>
                   </tr>
                 </tbody>
               </table>
-              {table.dualMotors && (
+              {!isDefaults && table.dualMotors && (
                 <div className="px-4 py-2 text-sm text-gray-500 bg-muted/30 italic">
                   *This configuration uses dual motors. Load is distributed between two motors for safety and redundancy.
                 </div>
