@@ -12,6 +12,7 @@ export const useAuthSession = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   // Memoized session getter to prevent redundant calls
   const getSessionOnce = useCallback(async () => {
@@ -21,6 +22,20 @@ export const useAuthSession = () => {
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
+      
+      // Fetch user role if session exists
+      if (currentSession?.user?.id) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', currentSession.user.id)
+          .maybeSingle();
+        
+        if (profileData) {
+          setUserRole(profileData.role);
+        }
+      }
+      
       setIsInitialized(true);
       return currentSession;
     } catch (error) {
@@ -46,6 +61,23 @@ export const useAuthSession = () => {
         console.log("Auth state changed:", event);
         setSession(newSession);
         setUser(newSession?.user ?? null);
+        
+        // Fetch user role for new session
+        if (newSession?.user?.id) {
+          supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', newSession.user.id)
+            .maybeSingle()
+            .then(({ data }) => {
+              if (data) {
+                setUserRole(data.role);
+              }
+            });
+        } else {
+          setUserRole(null);
+        }
+        
         setIsLoading(false);
       }
     );
@@ -56,6 +88,7 @@ export const useAuthSession = () => {
   return {
     session,
     user,
+    userRole, // Add userRole for Festival pages
     isLoading,
     isInitialized,
     getSessionOnce

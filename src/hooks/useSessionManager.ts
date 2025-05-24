@@ -102,12 +102,19 @@ export const useSessionManager = () => {
     setUserDepartment
   );
 
+  // Add setSession function for Layout compatibility
+  const setSession = useCallback(() => {
+    // This is a placeholder - the session is managed by useAuthSession
+    console.log("setSession called - session is managed by centralized auth");
+  }, []);
+
   return {
     session,
     userRole,
     userDepartment,
     isLoading,
     setUserRole,
-    setUserDepartment
+    setUserDepartment,
+    setSession // Add this for Layout compatibility
   };
 };
