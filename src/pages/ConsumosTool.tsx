@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -81,6 +82,67 @@ const ConsumosTool: React.FC = () => {
     deleteDefault: deleteTourDefault,
     isLoading: tourDefaultsLoading
   } = useTourPowerDefaults(tourId || '');
+
+  // Get tour name for display
+  const [tourName, setTourName] = useState<string>('');
+
+  useEffect(() => {
+    const fetchTourName = async () => {
+      if (tourId) {
+        const { data } = await supabase
+          .from('tours')
+          .select('name')
+          .eq('id', tourId)
+          .single();
+        
+        if (data) {
+          setTourName(data.name);
+        }
+      }
+    };
+
+    fetchTourName();
+  }, [tourId]);
+
+  // Handler functions for defaults mode
+  const handleSaveDefault = async (item: { name: string; value: number; quantity: number; category?: string }) => {
+    if (!tourId) return;
+
+    await createTourDefault({
+      tour_id: tourId,
+      table_name: item.name,
+      total_watts: item.value * item.quantity,
+      current_per_phase: (item.value * item.quantity) / (VOLTAGE_3PHASE * POWER_FACTOR * PHASES),
+      pdu_type: recommendPDU((item.value * item.quantity) / (VOLTAGE_3PHASE * POWER_FACTOR * PHASES)),
+      custom_pdu_type: undefined,
+      includes_hoist: false,
+      department: null
+    });
+  };
+
+  const handleUpdateDefault = async (id: string, updates: any) => {
+    const powerDefault = powerDefaults.find(pd => pd.id === id);
+    if (!powerDefault) return;
+
+    const totalWatts = (updates.value ?? powerDefault.total_watts) * (updates.quantity ?? 1);
+    const currentPerPhase = totalWatts / (VOLTAGE_3PHASE * POWER_FACTOR * PHASES);
+
+    await updateTourDefault({
+      id,
+      tour_id: powerDefault.tour_id,
+      table_name: updates.name ?? powerDefault.table_name,
+      total_watts: totalWatts,
+      current_per_phase: currentPerPhase,
+      pdu_type: powerDefault.pdu_type,
+      custom_pdu_type: powerDefault.custom_pdu_type,
+      includes_hoist: powerDefault.includes_hoist,
+      department: powerDefault.department
+    });
+  };
+
+  const handleDeleteDefault = async (id: string) => {
+    await deleteTourDefault(id);
+  };
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',

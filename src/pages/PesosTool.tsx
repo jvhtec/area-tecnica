@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -104,6 +105,62 @@ const PesosTool: React.FC = () => {
     deleteDefault: deleteTourDefault,
     isLoading: tourDefaultsLoading
   } = useTourWeightDefaults(tourId || '');
+
+  // Get tour name for display
+  const [tourName, setTourName] = useState<string>('');
+
+  useEffect(() => {
+    const fetchTourName = async () => {
+      if (tourId) {
+        const { data } = await supabase
+          .from('tours')
+          .select('name')
+          .eq('id', tourId)
+          .single();
+        
+        if (data) {
+          setTourName(data.name);
+        }
+      }
+    };
+
+    fetchTourName();
+  }, [tourId]);
+
+  // Handler functions for defaults mode
+  const handleSaveDefault = async (item: { name: string; value: number; quantity: number; category?: string }) => {
+    if (!tourId) return;
+
+    await createTourDefault({
+      tour_id: tourId,
+      item_name: item.name,
+      weight_kg: item.value,
+      quantity: item.quantity,
+      category: item.category || null,
+      department: null
+    });
+  };
+
+  const handleUpdateDefault = async (id: string, updates: any) => {
+    const weightDefault = weightDefaults.find(wd => wd.id === id);
+    if (!weightDefault) return;
+
+    await updateTourDefault({
+      id,
+      tour_id: weightDefault.tour_id,
+      item_name: updates.name ?? weightDefault.item_name,
+      weight_kg: updates.value ?? weightDefault.weight_kg,
+      quantity: updates.quantity ?? weightDefault.quantity,
+      category: updates.category ?? weightDefault.category,
+      department: weightDefault.department,
+      created_at: weightDefault.created_at,
+      updated_at: weightDefault.updated_at
+    });
+  };
+
+  const handleDeleteDefault = async (id: string) => {
+    await deleteTourDefault(id);
+  };
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',

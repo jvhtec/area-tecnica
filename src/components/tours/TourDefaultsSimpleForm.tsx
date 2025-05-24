@@ -1,9 +1,9 @@
+
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trash2, Plus, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -78,13 +78,13 @@ export const TourDefaultsSimpleForm: React.FC<TourDefaultsSimpleFormProps> = ({
     }
   };
 
-  const handleUpdate = async (id: string, field: string, value: string) => {
+  const handleUpdate = async (id: string, field: keyof DefaultItem, value: string | number) => {
     try {
       const updates: Partial<DefaultItem> = {};
       if (field === 'value' || field === 'quantity') {
-        updates[field] = parseFloat(value) || 0;
+        updates[field] = typeof value === 'string' ? parseFloat(value) : value;
       } else {
-        updates[field as keyof DefaultItem] = value as any;
+        updates[field] = value as string;
       }
       
       await onUpdate(id, updates);
