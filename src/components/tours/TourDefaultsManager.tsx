@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -224,20 +225,12 @@ export const TourDefaultsManager = ({
       safetyMargin = defaultTables[0]?.metadata?.safetyMargin || 0;
     }
 
-    // Combine defaults and overrides with proper typing
-    const combinedTables = [
-      ...defaultTables.map(table => ({
-        name: `${table.table_name} (Default)`,
-        rows: table.table_data.rows || [],
-        totalWeight: type === 'weight' ? table.total_value : undefined,
-        totalWatts: type === 'power' ? table.total_value : undefined,
-        currentPerPhase: table.metadata?.currentPerPhase,
-        pduType: table.metadata?.pduType,
-        toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
-        id: Date.now() + Math.random()
-      })),
-      ...(overrides || []).map((override: any) => ({
-        name: `${override.table_name || override.item_name} (Override)`,
+    let combinedTables;
+
+    // If overrides exist, use only overrides, otherwise use defaults
+    if (overrides && overrides.length > 0) {
+      combinedTables = overrides.map((override: any) => ({
+        name: override.table_name || override.item_name,
         rows: override.override_data?.rows || [],
         totalWeight: type === 'weight' ? override.weight_kg * (override.quantity || 1) : undefined,
         totalWatts: type === 'power' ? override.total_watts : undefined,
@@ -245,8 +238,19 @@ export const TourDefaultsManager = ({
         pduType: type === 'power' ? override.pdu_type : undefined,
         toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
         id: Date.now() + Math.random()
-      }))
-    ];
+      }));
+    } else {
+      combinedTables = defaultTables.map(table => ({
+        name: table.table_name,
+        rows: table.table_data.rows || [],
+        totalWeight: type === 'weight' ? table.total_value : undefined,
+        totalWatts: type === 'power' ? table.total_value : undefined,
+        currentPerPhase: table.metadata?.currentPerPhase,
+        pduType: table.metadata?.pduType,
+        toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+        id: Date.now() + Math.random()
+      }));
+    }
 
     if (combinedTables.length === 0) return;
 
