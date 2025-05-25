@@ -65,7 +65,7 @@ interface Table {
   name: string;
   rows: TableRow[];
   totalWeight?: number;
-  id?: number;
+  id?: number | string;
   dualMotors?: boolean;
   riggingPoints?: string; // Stores the generated SX suffix(es)
   clusterId?: string;     // New property to group tables (e.g. mirrored pair)
@@ -630,7 +630,7 @@ const PesosTool: React.FC = () => {
                 name: d.item_name,
                 rows: [],
                 totalWeight: d.weight_kg * d.quantity,
-                id: `default-${d.id}`,
+                id: `default-${d.id}` as string,
                 clusterId: undefined,
                 riggingPoints: ''
               }));
@@ -648,12 +648,12 @@ const PesosTool: React.FC = () => {
             name: o.item_name,
             rows: o.override_data?.tableData?.rows || [],
             totalWeight: o.weight_kg * o.quantity,
-            id: `override-${o.id}`,
+            id: `override-${o.id}` as string,
             clusterId: o.override_data?.tableData?.clusterId,
             riggingPoints: o.override_data?.tableData?.riggingPoints || ''
           }));
 
-          // Create a map of override table names
+          // Create a map of override table names for faster lookup
           const overrideTableNames = new Set(overrideTables.map(t => t.name));
 
           // Filter out defaults that have been overridden

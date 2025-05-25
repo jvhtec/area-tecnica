@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -52,7 +51,7 @@ interface Table {
   currentPerPhase?: number;
   pduType?: string;
   customPduType?: string;
-  id?: number;
+  id?: number | string;
   includesHoist?: boolean;
 }
 
@@ -347,7 +346,7 @@ const ConsumosTool: React.FC = () => {
                 pduType: d.pdu_type,
                 customPduType: d.custom_pdu_type,
                 includesHoist: d.includes_hoist,
-                id: `default-${d.id}`
+                id: `default-${d.id}` as string
               }));
             }
           }
@@ -367,10 +366,10 @@ const ConsumosTool: React.FC = () => {
             pduType: o.pdu_type,
             customPduType: o.custom_pdu_type,
             includesHoist: o.includes_hoist,
-            id: `override-${o.id}`
+            id: `override-${o.id}` as string
           }));
 
-          // Create a map of override table names
+          // Create a map of override table names for faster lookup
           const overrideTableNames = new Set(overrideTables.map(t => t.name));
 
           // Filter out defaults that have been overridden
