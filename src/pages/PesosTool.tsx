@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -75,7 +76,7 @@ interface Table {
   name: string;
   rows: TableRow[];
   totalWeight?: number;
-  id?: number;
+  id?: number | string; // Allow both number and string for compatibility
   dualMotors?: boolean;
   riggingPoints?: string;
   clusterId?: string;
@@ -897,18 +898,18 @@ const PesosTool: React.FC = () => {
           )}
 
           {/* Display existing overrides for tour dates */}
-          {isTourDateContext && weightOverrides.length > 0 && (
+          {isTourDateContext && existingOverrides.length > 0 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Existing Overrides for This Date</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {weightOverrides.map((override) => (
+                {existingOverrides.map((override) => (
                   <div key={override.id} className="border rounded-lg p-4">
                     <div className="flex justify-between items-center mb-2">
                       <h4 className="font-medium">{override.item_name}</h4>
                       <Button
                         variant="destructive"
                         size="sm"
-                        onClick={() => deleteOverride({ id: override.id, table: 'weight' })}
+                        onClick={() => deleteOverrideTable(override.id)}
                       >
                         Delete
                       </Button>
