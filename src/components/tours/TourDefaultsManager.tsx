@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -104,53 +105,25 @@ export const TourDefaultsManager = ({
         console.error('Error fetching tour logo:', error);
       }
 
-      // Convert to the format expected by exportToPDF with proper typing and clean names
+      // Convert to the format expected by exportToPDF with proper typing
       const tables = filteredTables.map(table => ({
-        name: table.table_name, // Clean name without suffixes
+        name: table.table_name,
         rows: table.table_data.rows || [],
         totalWeight: type === 'weight' ? table.total_value : undefined,
         totalWatts: type === 'power' ? table.total_value : undefined,
         currentPerPhase: table.metadata?.currentPerPhase,
         pduType: table.metadata?.pduType,
-        customPduType: table.metadata?.customPduType,
-        includesHoist: table.metadata?.includesHoist,
         toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
-        id: Date.now() + Math.random()
+        id: Date.now()
       }));
-
-      // Apply safety margin to tables
-      const tablesWithSafetyMargin = tables.map(table => {
-        if (type === 'power' && table.totalWatts && safetyMargin > 0) {
-          const adjustedWatts = table.totalWatts * (1 + safetyMargin / 100);
-          const wattsPerPhase = adjustedWatts / 3;
-          const currentPerPhase = wattsPerPhase / (400 * 0.85); // VOLTAGE_3PHASE * POWER_FACTOR
-          
-          return {
-            ...table,
-            totalWatts: adjustedWatts,
-            currentPerPhase: currentPerPhase
-          };
-        }
-        return table;
-      });
-
-      // Generate summary for weight reports
-      let summaryRows;
-      if (type === 'weight') {
-        summaryRows = tablesWithSafetyMargin.map(table => ({
-          clusterName: table.name,
-          riggingPoints: 'Standard rigging points',
-          clusterWeight: table.totalWeight || 0
-        }));
-      }
 
       const pdfBlob = await exportToPDF(
         `${tour.name} - ${department.toUpperCase()} ${type.toUpperCase()} Defaults`,
-        tablesWithSafetyMargin,
+        tables,
         type,
         tour.name,
         new Date().toLocaleDateString('en-GB'),
-        summaryRows,
+        undefined,
         undefined,
         safetyMargin,
         logoUrl
@@ -191,7 +164,7 @@ export const TourDefaultsManager = ({
         return;
       }
 
-      // Fetch tour logo once
+      // Fetch tour logo
       let logoUrl: string | undefined;
       try {
         logoUrl = await fetchTourLogo(tour.id);
@@ -231,81 +204,42 @@ export const TourDefaultsManager = ({
       .eq('tour_date_id', tourDate.id)
       .eq('department', department);
 
-    // Check if we have any overrides
-    const hasOverrides = overrides && overrides.length > 0;
-
-    let combinedTables = [];
-
-    if (hasOverrides) {
-      // If overrides exist, ONLY use overrides (no defaults)
-      console.log(`Tour date ${tourDate.id} has overrides, excluding defaults`);
-      combinedTables = (overrides || []).map((override: any) => ({
-        name: override.table_name || override.item_name, // Clean name without suffixes
-        rows: override.override_data?.rows || [],
-        totalWeight: type === 'weight' ? override.weight_kg * (override.quantity || 1) : undefined,
-        totalWatts: type === 'power' ? override.total_watts : undefined,
-        currentPerPhase: type === 'power' ? override.current_per_phase : undefined,
-        pduType: type === 'power' ? override.pdu_type : undefined,
-        customPduType: type === 'power' ? override.custom_pdu_type : undefined,
-        includesHoist: type === 'power' ? override.includes_hoist : undefined,
-        toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
-        id: Date.now() + Math.random()
-      }));
-    } else {
-      // No overrides, use defaults only
-      console.log(`Tour date ${tourDate.id} has no overrides, using defaults`);
-      combinedTables = defaultTables.map(table => ({
-        name: table.table_name, // Clean name without suffixes
+    // Combine defaults and overrides with proper typing
+    const combinedTables = [
+      ...defaultTables.map(table => ({
+        name: `${table.table_name} (Default)`,
         rows: table.table_data.rows || [],
         totalWeight: type === 'weight' ? table.total_value : undefined,
         totalWatts: type === 'power' ? table.total_value : undefined,
         currentPerPhase: table.metadata?.currentPerPhase,
         pduType: table.metadata?.pduType,
-        customPduType: table.metadata?.customPduType,
-        includesHoist: table.metadata?.includesHoist,
         toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
         id: Date.now() + Math.random()
-      }));
-    }
+      })),
+      ...(overrides || []).map((override: any) => ({
+        name: `${override.table_name || override.item_name} (Override)`,
+        rows: override.override_data?.rows || [],
+        totalWeight: type === 'weight' ? override.weight_kg * (override.quantity || 1) : undefined,
+        totalWatts: type === 'power' ? override.total_watts : undefined,
+        currentPerPhase: type === 'power' ? override.current_per_phase : undefined,
+        pduType: type === 'power' ? override.pdu_type : undefined,
+        toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+        id: Date.now() + Math.random()
+      }))
+    ];
 
     if (combinedTables.length === 0) return;
-
-    // Apply safety margin to tables
-    const tablesWithSafetyMargin = combinedTables.map(table => {
-      if (type === 'power' && table.totalWatts && safetyMargin > 0) {
-        const adjustedWatts = table.totalWatts * (1 + safetyMargin / 100);
-        const wattsPerPhase = adjustedWatts / 3;
-        const currentPerPhase = wattsPerPhase / (400 * 0.85); // VOLTAGE_3PHASE * POWER_FACTOR
-        
-        return {
-          ...table,
-          totalWatts: adjustedWatts,
-          currentPerPhase: currentPerPhase
-        };
-      }
-      return table;
-    });
-
-    // Generate summary for weight reports
-    let summaryRows;
-    if (type === 'weight') {
-      summaryRows = tablesWithSafetyMargin.map(table => ({
-        clusterName: table.name,
-        riggingPoints: 'Standard rigging points',
-        clusterWeight: table.totalWeight || 0
-      }));
-    }
 
     const locationName = (tourDate.locations as any)?.name || 'Unknown Location';
     const dateStr = new Date(tourDate.date).toLocaleDateString('en-GB');
 
     const pdfBlob = await exportToPDF(
       `${tour.name} - ${locationName} - ${department.toUpperCase()} ${type.toUpperCase()}`,
-      tablesWithSafetyMargin,
+      combinedTables,
       type,
       tour.name,
       dateStr,
-      summaryRows,
+      undefined,
       undefined,
       safetyMargin,
       logoUrl

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, ArrowLeft, Save, Trash2 } from 'lucide-react';
+import { FileText, ArrowLeft, Save } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
@@ -98,7 +98,6 @@ const PesosTool: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<JobSelection | null>(null);
   const [tableName, setTableName] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
-  const [savedOverrides, setSavedOverrides] = useState<Table[]>([]);
   const [useDualMotors, setUseDualMotors] = useState(false);
   const [mirroredCluster, setMirroredCluster] = useState(false);
   const [cablePick, setCablePick] = useState(false);
@@ -267,43 +266,6 @@ const PesosTool: React.FC = () => {
       setTables(convertedTables);
     }
   }, [isTourDateContext, weightOverrides]);
-
-  // Load existing overrides when in job override mode
-  useEffect(() => {
-    if (isJobOverrideMode && selectedJob?.tour_date_id) {
-      loadExistingOverrides();
-    } else {
-      setSavedOverrides([]);
-    }
-  }, [isJobOverrideMode, selectedJob?.tour_date_id]);
-
-  const loadExistingOverrides = async () => {
-    if (!selectedJob?.tour_date_id) return;
-
-    try {
-      const { data: overrides } = await supabase
-        .from('tour_date_weight_overrides')
-        .select('*')
-        .eq('tour_date_id', selectedJob.tour_date_id)
-        .eq('department', 'sound');
-
-      if (overrides) {
-        const existingOverrides: Table[] = overrides.map(o => ({
-          name: o.item_name,
-          rows: o.override_data?.tableData?.rows || [],
-          totalWeight: o.weight_kg * o.quantity,
-          id: `saved-${o.id}`,
-          clusterId: o.override_data?.tableData?.clusterId,
-          dualMotors: o.override_data?.tableData?.dualMotors,
-          riggingPoints: o.override_data?.tableData?.riggingPoints,
-          overrideId: o.id
-        }));
-        setSavedOverrides(existingOverrides);
-      }
-    } catch (error) {
-      console.error('Error loading existing overrides:', error);
-    }
-  };
 
   // Helper to generate an SX suffix.
   // Returns a string such as "SX01" or "SX01, SX02" depending on useDualMotors.
@@ -598,85 +560,7 @@ const PesosTool: React.FC = () => {
   };
 
   const removeTable = (tableId: number | string) => {
-    if (typeof tableId === 'string' && tableId.startsWith('saved-')) {
-      // This is a saved override, delete from database
-      const overrideId = tableId.replace('saved-', '');
-      deleteOverride({ id: overrideId, table: 'weight' });
-      setSavedOverrides((prev) => prev.filter((table) => table.id !== tableId));
-    } else {
-      // This is a current session table, just remove from state
-      setTables((prev) => prev.filter((table) => table.id !== tableId));
-    }
-  };
-
-  const saveOverridesToDatabase = async () => {
-    if (!isJobOverrideMode || !selectedJob?.tour_date_id || tables.length === 0) {
-      toast({
-        title: 'Nothing to save',
-        description: 'No tables to save as overrides',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      for (const table of tables) {
-        // Check if override already exists
-        const { data: existingOverride } = await supabase
-          .from('tour_date_weight_overrides')
-          .select('id')
-          .eq('tour_date_id', selectedJob.tour_date_id)
-          .eq('item_name', table.name)
-          .eq('department', 'sound')
-          .single();
-
-        if (existingOverride) {
-          // Update existing override
-          await supabase
-            .from('tour_date_weight_overrides')
-            .update({
-              weight_kg: table.totalWeight || 0,
-              quantity: 1,
-              override_data: {
-                tableData: table,
-                toolType: 'pesos'
-              }
-            })
-            .eq('id', existingOverride.id);
-        } else {
-          // Create new override
-          await supabase.from('tour_date_weight_overrides').insert({
-            tour_date_id: selectedJob.tour_date_id,
-            item_name: table.name,
-            weight_kg: table.totalWeight || 0,
-            quantity: 1,
-            category: null,
-            department: 'sound',
-            override_data: {
-              tableData: table,
-              toolType: 'pesos'
-            }
-          });
-        }
-      }
-
-      toast({
-        title: 'Success',
-        description: `${tables.length} override table(s) saved successfully`,
-      });
-
-      // Reload saved overrides and clear current tables
-      await loadExistingOverrides();
-      setTables([]);
-      resetCurrentTable();
-    } catch (error: any) {
-      console.error('Error saving overrides:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to save override tables',
-        variant: 'destructive',
-      });
-    }
+    setTables((prev) => prev.filter((table) => table.id !== tableId));
   };
 
   const handleExportPDF = async () => {
@@ -689,9 +573,7 @@ const PesosTool: React.FC = () => {
       return;
     }
 
-    // Create summary rows from current tables and saved overrides
-    const allTables = [...tables, ...savedOverrides];
-    const summaryRows: SummaryRow[] = allTables.map((table) => {
+    const summaryRows: SummaryRow[] = tables.map((table) => {
       const cleanName = table.name.split('(')[0].trim();
       return {
         clusterName: cleanName,
@@ -723,21 +605,69 @@ const PesosTool: React.FC = () => {
     }
 
     try {
-      let tablesToExport = allTables;
+      let tablesToExport = tables;
 
-      // If in override mode, only use current tables and saved overrides (NO defaults)
+      // If in override mode, get defaults and overrides, then replace defaults with overrides
       if (isJobOverrideMode && selectedJob.tour_date_id) {
-        console.log('Override mode: using only current tables and saved overrides');
-        console.log('Current weight tables:', tables);
-        console.log('Saved weight overrides:', savedOverrides);
-        // tablesToExport is already set correctly above
-      } else {
-        // For non-override mode, also include any saved weight tables for this job
-        // But since we don't have a separate weight tables storage for jobs, just use current tables
-        console.log('Non-override mode: using current tables');
-      }
+        try {
+          // Get tour defaults
+          const { data: tourData } = await supabase
+            .from('tour_dates')
+            .select('tour_id')
+            .eq('id', selectedJob.tour_date_id)
+            .single();
 
-      console.log('Final weight tables for export:', tablesToExport);
+          let defaultTables: Table[] = [];
+          if (tourData?.tour_id) {
+            const { data: defaults } = await supabase
+              .from('tour_weight_defaults')
+              .select('*')
+              .eq('tour_id', tourData.tour_id)
+              .eq('department', 'sound');
+
+            if (defaults) {
+              defaultTables = defaults.map(d => ({
+                name: d.item_name,
+                rows: [],
+                totalWeight: d.weight_kg * d.quantity,
+                id: `default-${d.id}` as string,
+                clusterId: undefined,
+                riggingPoints: ''
+              }));
+            }
+          }
+
+          // Get overrides for this date
+          const { data: overrides } = await supabase
+            .from('tour_date_weight_overrides')
+            .select('*')
+            .eq('tour_date_id', selectedJob.tour_date_id)
+            .eq('department', 'sound');
+
+          const overrideTables: Table[] = (overrides || []).map(o => ({
+            name: o.item_name,
+            rows: o.override_data?.tableData?.rows || [],
+            totalWeight: o.weight_kg * o.quantity,
+            id: `override-${o.id}` as string,
+            clusterId: o.override_data?.tableData?.clusterId,
+            riggingPoints: o.override_data?.tableData?.riggingPoints || ''
+          }));
+
+          // Create a map of override table names for faster lookup
+          const overrideTableNames = new Set(overrideTables.map(t => t.name));
+
+          // Filter out defaults that have been overridden
+          const filteredDefaults = defaultTables.filter(d => !overrideTableNames.has(d.name));
+
+          // Combine filtered defaults with overrides and current tables
+          tablesToExport = [...filteredDefaults, ...overrideTables, ...tables];
+
+        } catch (error) {
+          console.error('Error loading defaults/overrides for PDF:', error);
+          // Fall back to just current tables
+          tablesToExport = tables;
+        }
+      }
 
       let logoUrl: string | undefined = undefined;
       try {
@@ -857,7 +787,7 @@ const PesosTool: React.FC = () => {
                 </p>
               </div>
               <p className="text-sm text-blue-700 mt-1">
-                This job is part of a tour. Create tables and use "Save Override Tables" to save them for this specific tour date.
+                This job is part of a tour. Any tables you create will be saved as overrides for the specific tour date.
               </p>
             </div>
           )}
@@ -1149,49 +1079,6 @@ const PesosTool: React.FC = () => {
                   *This configuration uses dual motors. Load is distributed between two motors for safety and redundancy.
                 </div>
               )}
-            </div>
-          ))}
-
-          {/* Display saved overrides first */}
-          {savedOverrides.map((table) => (
-            <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
-              <div className="bg-muted px-4 py-3 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold">{table.name}</h3>
-                  <Badge variant="outline" className="bg-green-50 text-green-700">Saved Override</Badge>
-                </div>
-                <Button 
-                  variant="destructive" 
-                  size="sm" 
-                  onClick={() => table.id && removeTable(table.id)}
-                  className="gap-2"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete Override
-                </Button>
-              </div>
-              {/* ... keep existing code (table display) the same */}
-            </div>
-          ))}
-
-          {/* Display current session tables */}
-          {tables.map((table) => (
-            <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
-              <div className="bg-muted px-4 py-3 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold">{table.name}</h3>
-                  {isJobOverrideMode && (
-                    <Badge variant="outline" className="bg-orange-50 text-orange-700">Unsaved</Badge>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  {/* ... keep existing code (save as default button) the same */}
-                  <Button variant="destructive" size="sm" onClick={() => table.id && removeTable(table.id)}>
-                    Remove Table
-                  </Button>
-                </div>
-              </div>
-              {/* ... keep existing code (table display) the same */}
             </div>
           ))}
         </div>

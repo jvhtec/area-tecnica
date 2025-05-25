@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, ArrowLeft, Save, Trash2 } from 'lucide-react';
+import { FileText, ArrowLeft } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
@@ -64,7 +64,6 @@ const ConsumosTool: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<JobSelection | null>(null);
   const [tableName, setTableName] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
-  const [savedOverrides, setSavedOverrides] = useState<Table[]>([]);
   const [safetyMargin, setSafetyMargin] = useState(0);
   const [selectedPduType, setSelectedPduType] = useState<string>('default');
   const [customPduType, setCustomPduType] = useState('');
@@ -113,44 +112,6 @@ const ConsumosTool: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading job tour info:', error);
-    }
-  };
-
-  // Load existing overrides when in job override mode
-  useEffect(() => {
-    if (isJobOverrideMode && selectedJob?.tour_date_id) {
-      loadExistingOverrides();
-    } else {
-      setSavedOverrides([]);
-    }
-  }, [isJobOverrideMode, selectedJob?.tour_date_id]);
-
-  const loadExistingOverrides = async () => {
-    if (!selectedJob?.tour_date_id) return;
-
-    try {
-      const { data: overrides } = await supabase
-        .from('tour_date_power_overrides')
-        .select('*')
-        .eq('tour_date_id', selectedJob.tour_date_id)
-        .eq('department', 'sound');
-
-      if (overrides) {
-        const existingOverrides: Table[] = overrides.map(o => ({
-          name: o.table_name,
-          rows: o.override_data?.rows || [],
-          totalWatts: o.total_watts,
-          currentPerPhase: o.current_per_phase,
-          pduType: o.pdu_type,
-          customPduType: o.custom_pdu_type,
-          includesHoist: o.includes_hoist,
-          id: `saved-${o.id}`,
-          overrideId: o.id
-        }));
-        setSavedOverrides(existingOverrides);
-      }
-    } catch (error) {
-      console.error('Error loading existing overrides:', error);
     }
   };
 
@@ -282,109 +243,6 @@ const ConsumosTool: React.FC = () => {
     }
   };
 
-  const saveOverridesToDatabase = async () => {
-    if (!isJobOverrideMode || !selectedJob?.tour_date_id || tables.length === 0) {
-      toast({
-        title: 'Nothing to save',
-        description: 'No tables to save as overrides',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      for (const table of tables) {
-        // Check if override already exists
-        const { data: existingOverride } = await supabase
-          .from('tour_date_power_overrides')
-          .select('id')
-          .eq('tour_date_id', selectedJob.tour_date_id)
-          .eq('table_name', table.name)
-          .eq('department', 'sound')
-          .single();
-
-        if (existingOverride) {
-          // Update existing override
-          await supabase
-            .from('tour_date_power_overrides')
-            .update({
-              total_watts: table.totalWatts || 0,
-              current_per_phase: table.currentPerPhase || 0,
-              pdu_type: table.customPduType || table.pduType || '',
-              custom_pdu_type: table.customPduType,
-              includes_hoist: table.includesHoist || false,
-              override_data: {
-                rows: table.rows,
-                toolType: 'consumos'
-              }
-            })
-            .eq('id', existingOverride.id);
-        } else {
-          // Create new override
-          await supabase.from('tour_date_power_overrides').insert({
-            tour_date_id: selectedJob.tour_date_id,
-            table_name: table.name,
-            total_watts: table.totalWatts || 0,
-            current_per_phase: table.currentPerPhase || 0,
-            pdu_type: table.customPduType || table.pduType || '',
-            custom_pdu_type: table.customPduType,
-            includes_hoist: table.includesHoist || false,
-            department: 'sound',
-            override_data: {
-              rows: table.rows,
-              toolType: 'consumos'
-            }
-          });
-        }
-      }
-
-      toast({
-        title: 'Success',
-        description: `${tables.length} override table(s) saved successfully`,
-      });
-
-      // Reload saved overrides and clear current tables
-      await loadExistingOverrides();
-      setTables([]);
-      resetCurrentTable();
-    } catch (error: any) {
-      console.error('Error saving overrides:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to save override tables',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const deleteOverride = async (overrideId: string) => {
-    if (!overrideId || !overrideId.startsWith('saved-')) return;
-
-    const actualId = overrideId.replace('saved-', '');
-    
-    try {
-      await supabase
-        .from('tour_date_power_overrides')
-        .delete()
-        .eq('id', actualId);
-
-      toast({
-        title: 'Success',
-        description: 'Override table deleted successfully',
-      });
-
-      // Reload saved overrides
-      await loadExistingOverrides();
-    } catch (error: any) {
-      console.error('Error deleting override:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete override table',
-        variant: 'destructive',
-      });
-    }
-  };
-
   const generateTable = () => {
     if (!tableName) {
       toast({
@@ -425,8 +283,8 @@ const ConsumosTool: React.FC = () => {
 
     setTables((prev) => [...prev, newTable]);
     
-    // Only auto-save if NOT in override mode
-    if (!isJobOverrideMode && selectedJobId) {
+    // Save to database if job is selected
+    if (selectedJobId) {
       savePowerRequirementTable(newTable);
     }
     
@@ -445,13 +303,7 @@ const ConsumosTool: React.FC = () => {
   };
 
   const removeTable = (tableId: number | string) => {
-    if (typeof tableId === 'string' && tableId.startsWith('saved-')) {
-      // This is a saved override, delete from database
-      deleteOverride(tableId);
-    } else {
-      // This is a current session table, just remove from state
-      setTables((prev) => prev.filter((table) => table.id !== tableId));
-    }
+    setTables((prev) => prev.filter((table) => table.id !== tableId));
   };
 
   const handleExportPDF = async () => {
@@ -465,60 +317,73 @@ const ConsumosTool: React.FC = () => {
     }
 
     try {
-      let tablesToExport = [...tables, ...savedOverrides];
+      let tablesToExport = tables;
 
-      // If in override mode, only use current tables and saved overrides (NO defaults)
+      // If in override mode, get defaults and overrides, then replace defaults with overrides
       if (isJobOverrideMode && selectedJob.tour_date_id) {
-        console.log('Override mode: using only current tables and saved overrides');
-        console.log('Current tables:', tables);
-        console.log('Saved overrides:', savedOverrides);
-        // tablesToExport is already set correctly above
-      } else {
-        // For non-override mode, fetch any existing power requirement tables for this job
         try {
-          const { data: existingTables } = await supabase
-            .from('power_requirement_tables')
+          // Get tour defaults
+          const { data: tourData } = await supabase
+            .from('tour_dates')
+            .select('tour_id')
+            .eq('id', selectedJob.tour_date_id)
+            .single();
+
+          let defaultTables: Table[] = [];
+          if (tourData?.tour_id) {
+            const { data: defaults } = await supabase
+              .from('tour_power_defaults')
+              .select('*')
+              .eq('tour_id', tourData.tour_id)
+              .eq('department', 'sound');
+
+            if (defaults) {
+              defaultTables = defaults.map(d => ({
+                name: d.table_name,
+                rows: [],
+                totalWatts: d.total_watts,
+                currentPerPhase: d.current_per_phase,
+                pduType: d.pdu_type,
+                customPduType: d.custom_pdu_type,
+                includesHoist: d.includes_hoist,
+                id: `default-${d.id}` as string
+              }));
+            }
+          }
+
+          // Get overrides for this date
+          const { data: overrides } = await supabase
+            .from('tour_date_power_overrides')
             .select('*')
-            .eq('job_id', selectedJobId)
+            .eq('tour_date_id', selectedJob.tour_date_id)
             .eq('department', 'sound');
 
-          if (existingTables && existingTables.length > 0) {
-            const savedTables = existingTables.map(table => ({
-              name: table.table_name,
-              rows: [], // Power tables don't store individual rows
-              totalWatts: Number(table.total_watts),
-              currentPerPhase: Number(table.current_per_phase),
-              pduType: table.pdu_type,
-              customPduType: table.custom_pdu_type,
-              includesHoist: table.includes_hoist,
-              id: table.id
-            }));
-            tablesToExport = [...tablesToExport, ...savedTables];
-          }
+          const overrideTables: Table[] = (overrides || []).map(o => ({
+            name: o.table_name,
+            rows: o.override_data?.rows || [],
+            totalWatts: o.total_watts,
+            currentPerPhase: o.current_per_phase,
+            pduType: o.pdu_type,
+            customPduType: o.custom_pdu_type,
+            includesHoist: o.includes_hoist,
+            id: `override-${o.id}` as string
+          }));
+
+          // Create a map of override table names for faster lookup
+          const overrideTableNames = new Set(overrideTables.map(t => t.name));
+
+          // Filter out defaults that have been overridden
+          const filteredDefaults = defaultTables.filter(d => !overrideTableNames.has(d.name));
+
+          // Combine filtered defaults with overrides and current tables
+          tablesToExport = [...filteredDefaults, ...overrideTables, ...tables];
+
         } catch (error) {
-          console.error('Error fetching existing power tables:', error);
+          console.error('Error loading defaults/overrides for PDF:', error);
+          // Fall back to just current tables
+          tablesToExport = tables;
         }
       }
-
-      // Apply safety margin to all tables during export
-      const tablesWithSafetyMargin = tablesToExport.map(table => {
-        if (table.totalWatts && safetyMargin > 0) {
-          const adjustedWatts = table.totalWatts * (1 + safetyMargin / 100);
-          const wattsPerPhase = adjustedWatts / PHASES;
-          const currentPerPhase = wattsPerPhase / (VOLTAGE_3PHASE * POWER_FACTOR);
-          
-          console.log(`Applied ${safetyMargin}% safety margin to ${table.name}: ${table.totalWatts}W -> ${adjustedWatts}W`);
-          
-          return {
-            ...table,
-            totalWatts: adjustedWatts,
-            currentPerPhase: currentPerPhase
-          };
-        }
-        return table;
-      });
-
-      console.log('Final tables for export with safety margin:', tablesWithSafetyMargin);
 
       let logoUrl: string | undefined = undefined;
       try {
@@ -546,7 +411,7 @@ const ConsumosTool: React.FC = () => {
       const jobDateStr = new Date().toLocaleDateString('en-GB');
       const pdfBlob = await exportToPDF(
         selectedJob.title,
-        tablesWithSafetyMargin.map((table) => ({ ...table, toolType: 'consumos' })),
+        tablesToExport.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
         selectedJob.title,
         jobDateStr,
@@ -622,7 +487,7 @@ const ConsumosTool: React.FC = () => {
                 </p>
               </div>
               <p className="text-sm text-blue-700 mt-1">
-                This job is part of a tour. Create tables and use "Save Override Tables" to save them for this specific tour date.
+                This job is part of a tour. Any tables you create will be saved as overrides for the specific tour date.
               </p>
             </div>
           )}
@@ -762,13 +627,7 @@ const ConsumosTool: React.FC = () => {
             <Button onClick={resetCurrentTable} variant="destructive">
               Reset
             </Button>
-            {isJobOverrideMode && tables.length > 0 && (
-              <Button onClick={saveOverridesToDatabase} variant="outline" className="gap-2">
-                <Save className="h-4 w-4" />
-                Save Override Tables
-              </Button>
-            )}
-            {(tables.length > 0 || savedOverrides.length > 0) && (
+            {tables.length > 0 && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
                 <FileText className="h-4 w-4" />
                 Export & Upload PDF
@@ -776,83 +635,13 @@ const ConsumosTool: React.FC = () => {
             )}
           </div>
 
-          {/* Display saved overrides first */}
-          {savedOverrides.map((table) => (
-            <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
-              <div className="bg-muted px-4 py-3 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold">{table.name}</h3>
-                  <Badge variant="outline" className="bg-green-50 text-green-700">Saved Override</Badge>
-                </div>
-                <Button 
-                  variant="destructive" 
-                  size="sm" 
-                  onClick={() => table.id && removeTable(table.id)}
-                  className="gap-2"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete Override
-                </Button>
-              </div>
-              
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium">Quantity</th>
-                    <th className="px-4 py-3 text-left font-medium">Component</th>
-                    <th className="px-4 py-3 text-left font-medium">Watts (per unit)</th>
-                    <th className="px-4 py-3 text-left font-medium">Total Watts</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {table.rows.map((row, index) => (
-                    <tr key={index} className="border-t">
-                      <td className="px-4 py-3">{row.quantity}</td>
-                      <td className="px-4 py-3">{row.componentName}</td>
-                      <td className="px-4 py-3">{row.watts}</td>
-                      <td className="px-4 py-3">{row.totalWatts?.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                  <tr className="border-t bg-muted/50 font-medium">
-                    <td colSpan={3} className="px-4 py-3 text-right">
-                      Total Watts:
-                    </td>
-                    <td className="px-4 py-3">{table.totalWatts?.toFixed(2)} W</td>
-                  </tr>
-                  <tr className="border-t bg-muted/50 font-medium">
-                    <td colSpan={3} className="px-4 py-3 text-right">
-                      Current per Phase:
-                    </td>
-                    <td className="px-4 py-3">{table.currentPerPhase?.toFixed(2)} A</td>
-                  </tr>
-                  <tr className="border-t bg-muted/50 font-medium">
-                    <td colSpan={3} className="px-4 py-3 text-right">
-                      PDU Type:
-                    </td>
-                    <td className="px-4 py-3">
-                      {table.customPduType || table.pduType}
-                    </td>
-                  </tr>
-                  {table.includesHoist && (
-                    <tr className="border-t bg-muted/50 font-medium">
-                      <td colSpan={4} className="px-4 py-3">
-                        Additional Hoist Power Required: CEE32A 3P+N+G
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          ))}
-
-          {/* Display current session tables */}
           {tables.map((table) => (
             <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold">{table.name}</h3>
                   {isJobOverrideMode && (
-                    <Badge variant="outline" className="bg-orange-50 text-orange-700">Unsaved</Badge>
+                    <Badge variant="outline" className="bg-orange-50 text-orange-700">Override</Badge>
                   )}
                 </div>
                 <Button variant="destructive" size="sm" onClick={() => table.id && removeTable(table.id)}>
