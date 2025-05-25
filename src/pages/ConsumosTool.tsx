@@ -50,6 +50,7 @@ export interface Table {
   name: string;
   rows: TableRow[];
   totalWatts?: number;
+  adjustedWatts?: number;
   currentPerPhase?: number;
   pduType?: string;
   id?: number;
@@ -284,7 +285,7 @@ const ConsumosTool: React.FC = () => {
     const adjustedWatts = totalWatts * (1 + safetyMargin / 100);
     const wattsPerPhase = adjustedWatts / PHASES;
     const currentPerPhase = wattsPerPhase / (VOLTAGE_3PHASE * POWER_FACTOR);
-    return { wattsPerPhase, currentPerPhase };
+    return { wattsPerPhase, currentPerPhase, adjustedWatts };
   };
 
   const recommendPDU = (current: number) => {
@@ -479,13 +480,14 @@ const ConsumosTool: React.FC = () => {
     });
 
     const totalWatts = calculatedRows.reduce((sum, row) => sum + (row.totalWatts || 0), 0);
-    const { currentPerPhase } = calculatePhaseCurrents(totalWatts);
+    const { currentPerPhase, adjustedWatts } = calculatePhaseCurrents(totalWatts);
     const pduSuggestion = recommendPDU(currentPerPhase);
 
     const newTable: Table = {
       name: tableName,
       rows: calculatedRows,
       totalWatts,
+      adjustedWatts,
       currentPerPhase,
       pduType: pduSuggestion,
       id: Date.now(),
@@ -585,8 +587,8 @@ const ConsumosTool: React.FC = () => {
         tables.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
         title,
+        'sound',
         jobDate,
-        undefined,
         undefined,
         safetyMargin,
         logoUrl
@@ -973,6 +975,14 @@ const ConsumosTool: React.FC = () => {
                     </td>
                     <td className="px-4 py-3">{table.totalWatts?.toFixed(2)} W</td>
                   </tr>
+                  {safetyMargin > 0 && (
+                    <tr className="border-t bg-muted/50 font-medium">
+                      <td colSpan={3} className="px-4 py-3 text-right">
+                        Adjusted Watts ({safetyMargin}% safety margin):
+                      </td>
+                      <td className="px-4 py-3">{table.adjustedWatts?.toFixed(2)} W</td>
+                    </tr>
+                  )}
                   <tr className="border-t bg-muted/50 font-medium">
                     <td colSpan={3} className="px-4 py-3 text-right">
                       Current per Phase:

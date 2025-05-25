@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,7 @@ interface Table {
   name: string;
   rows: TableRow[];
   totalWatts?: number;
+  adjustedWatts?: number;
   currentPerPhase?: number;
   pduType?: string;
   customPduType?: string;
@@ -118,7 +120,7 @@ const VideoConsumosTool: React.FC = () => {
     const adjustedWatts = totalWatts * (1 + safetyMargin / 100);
     const wattsPerPhase = adjustedWatts / PHASES;
     const currentPerPhase = wattsPerPhase / (VOLTAGE_3PHASE * POWER_FACTOR);
-    return { wattsPerPhase, currentPerPhase };
+    return { wattsPerPhase, currentPerPhase, adjustedWatts };
   };
 
   const recommendPDU = (current: number) => {
@@ -205,13 +207,14 @@ const VideoConsumosTool: React.FC = () => {
     });
 
     const totalWatts = calculatedRows.reduce((sum, row) => sum + (row.totalWatts || 0), 0);
-    const { currentPerPhase } = calculatePhaseCurrents(totalWatts);
+    const { currentPerPhase, adjustedWatts } = calculatePhaseCurrents(totalWatts);
     const pduSuggestion = recommendPDU(currentPerPhase);
 
     const newTable = {
       name: tableName,
       rows: calculatedRows,
       totalWatts,
+      adjustedWatts,
       currentPerPhase,
       pduType: selectedPduType === 'default' ? pduSuggestion : selectedPduType,
       customPduType: customPduType,
@@ -288,7 +291,8 @@ const VideoConsumosTool: React.FC = () => {
         'video',
         undefined,
         undefined,
-        undefined
+        safetyMargin,
+        logoUrl
       );
 
       const fileName = `Video Power Report - ${jobToUse.title}.pdf`;
@@ -407,6 +411,25 @@ const VideoConsumosTool: React.FC = () => {
               ))}
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label htmlFor="safetyMargin">Safety Margin</Label>
+            <Select
+              value={safetyMargin.toString()}
+              onValueChange={(value) => setSafetyMargin(Number(value))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select Safety Margin" />
+              </SelectTrigger>
+              <SelectContent>
+                {[0, 10, 20, 30, 40, 50].map((percentage) => (
+                  <SelectItem key={percentage} value={percentage.toString()}>
+                    {percentage}%
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="jobSelect">Select Job</Label>
@@ -532,7 +555,7 @@ const VideoConsumosTool: React.FC = () => {
             )}
           </div>
 
-          {/* Updated tables section to show override badges */}
+          {/* Updated tables section to show safety margin adjusted watts */}
           {tables.map((table) => (
             <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
@@ -577,6 +600,14 @@ const VideoConsumosTool: React.FC = () => {
                     </td>
                     <td className="px-4 py-3">{table.totalWatts?.toFixed(2)} W</td>
                   </tr>
+                  {safetyMargin > 0 && (
+                    <tr className="border-t bg-muted/50 font-medium">
+                      <td colSpan={3} className="px-4 py-3 text-right">
+                        Adjusted Watts ({safetyMargin}% safety margin):
+                      </td>
+                      <td className="px-4 py-3">{table.adjustedWatts?.toFixed(2)} W</td>
+                    </tr>
+                  )}
                   <tr className="border-t bg-muted/50 font-medium">
                     <td colSpan={3} className="px-4 py-3 text-right">
                       Current per Phase:
