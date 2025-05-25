@@ -104,6 +104,9 @@ export const TourDefaultsManager = ({
         console.error('Error fetching tour logo:', error);
       }
 
+      // Get the safety margin from the first table's metadata, defaulting to 0
+      const safetyMargin = filteredTables[0]?.metadata?.safetyMargin || 0;
+
       // Convert to the format expected by exportToPDF with proper typing
       const tables = filteredTables.map(table => ({
         name: table.table_name,
@@ -116,6 +119,17 @@ export const TourDefaultsManager = ({
         id: Date.now()
       }));
 
+      // Calculate power summary for power exports
+      let powerSummary;
+      if (type === 'power') {
+        const totalSystemWatts = tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
+        const totalSystemAmps = tables.reduce((sum, table) => {
+          const amps = table.currentPerPhase || 0;
+          return sum + amps;
+        }, 0);
+        powerSummary = { totalSystemWatts, totalSystemAmps };
+      }
+
       const pdfBlob = await exportToPDF(
         `${tour.name} - ${department.toUpperCase()} ${type.toUpperCase()} Defaults`,
         tables,
@@ -123,8 +137,8 @@ export const TourDefaultsManager = ({
         tour.name,
         new Date().toLocaleDateString('en-GB'),
         undefined,
-        undefined,
-        0, // Remove safety margin from exports
+        powerSummary,
+        safetyMargin,
         logoUrl
       );
 
@@ -203,6 +217,14 @@ export const TourDefaultsManager = ({
       .eq('tour_date_id', tourDate.id)
       .eq('department', department);
 
+    // Determine safety margin - use from overrides if available, otherwise from defaults
+    let safetyMargin = 0;
+    if (overrides && overrides.length > 0) {
+      safetyMargin = overrides[0]?.override_data?.safetyMargin || 0;
+    } else if (defaultTables.length > 0) {
+      safetyMargin = defaultTables[0]?.metadata?.safetyMargin || 0;
+    }
+
     // Combine defaults and overrides with proper typing
     const combinedTables = [
       ...defaultTables.map(table => ({
@@ -229,6 +251,17 @@ export const TourDefaultsManager = ({
 
     if (combinedTables.length === 0) return;
 
+    // Calculate power summary for power exports
+    let powerSummary;
+    if (type === 'power') {
+      const totalSystemWatts = combinedTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
+      const totalSystemAmps = combinedTables.reduce((sum, table) => {
+        const amps = table.currentPerPhase || 0;
+        return sum + amps;
+      }, 0);
+      powerSummary = { totalSystemWatts, totalSystemAmps };
+    }
+
     const locationName = (tourDate.locations as any)?.name || 'Unknown Location';
     const dateStr = new Date(tourDate.date).toLocaleDateString('en-GB');
 
@@ -239,8 +272,8 @@ export const TourDefaultsManager = ({
       tour.name,
       dateStr,
       undefined,
-      undefined,
-      0, // Remove safety margin from exports
+      powerSummary,
+      safetyMargin,
       logoUrl
     );
 
