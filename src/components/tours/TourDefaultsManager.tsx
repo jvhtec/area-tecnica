@@ -26,7 +26,6 @@ export const TourDefaultsManager = ({
 }: TourDefaultsManagerProps) => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('sound');
-  const [safetyMargin, setSafetyMargin] = useState(0);
   const [tourDates, setTourDates] = useState<any[]>([]);
 
   // Fetch defaults for each department
@@ -125,7 +124,7 @@ export const TourDefaultsManager = ({
         new Date().toLocaleDateString('en-GB'),
         undefined,
         undefined,
-        safetyMargin,
+        0, // Remove safety margin from exports
         logoUrl
       );
 
@@ -241,7 +240,7 @@ export const TourDefaultsManager = ({
       dateStr,
       undefined,
       undefined,
-      safetyMargin,
+      0, // Remove safety margin from exports
       logoUrl
     );
 
@@ -275,26 +274,6 @@ export const TourDefaultsManager = ({
 
     return (
       <div className="space-y-6">
-        {/* Safety Margin Selection */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <Label htmlFor="safetyMargin" className="text-sm font-medium">Safety Margin for PDF Exports</Label>
-          <Select
-            value={safetyMargin.toString()}
-            onValueChange={(value) => setSafetyMargin(Number(value))}
-          >
-            <SelectTrigger className="w-full mt-1">
-              <SelectValue placeholder="Select Safety Margin" />
-            </SelectTrigger>
-            <SelectContent>
-              {[0, 10, 20, 30, 40, 50].map((percentage) => (
-                <SelectItem key={percentage} value={percentage.toString()}>
-                  {percentage}%
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
         {/* Power Defaults */}
         <div>
           <div className="flex items-center justify-between mb-4">
@@ -422,26 +401,6 @@ export const TourDefaultsManager = ({
           <p className="text-sm text-green-700 mb-4">
             Export individual PDFs for each tour date, including both defaults and overrides.
           </p>
-          
-          {/* Safety Margin Selection */}
-          <div className="mb-4">
-            <Label htmlFor="tourDateSafetyMargin" className="text-sm font-medium">Safety Margin for Tour Date PDFs</Label>
-            <Select
-              value={safetyMargin.toString()}
-              onValueChange={(value) => setSafetyMargin(Number(value))}
-            >
-              <SelectTrigger className="w-full mt-1">
-                <SelectValue placeholder="Select Safety Margin" />
-              </SelectTrigger>
-              <SelectContent>
-                {[0, 10, 20, 30, 40, 50].map((percentage) => (
-                  <SelectItem key={percentage} value={percentage.toString()}>
-                    {percentage}%
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
         </div>
 
         {tourDates.length > 0 ? (
