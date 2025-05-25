@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { TourColorSection } from "./TourColorSection";
@@ -9,7 +8,8 @@ import { TourLogoManager } from "./TourLogoManager";
 import { useNavigate } from "react-router-dom";
 import { Calculator, Weight, Settings } from "lucide-react";
 import { useState } from "react";
-import { useTourDates } from "./hooks/useTourDates";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 
 interface TourManagementDialogProps {
   open: boolean;
@@ -27,7 +27,29 @@ export const TourManagementDialog = ({
   const navigate = useNavigate();
   const { handleColorChange, handleNameChange, handleDelete } = useTourManagement(tour, () => onOpenChange(false));
   const [defaultsManagerOpen, setDefaultsManagerOpen] = useState(false);
-  const { data: tourDates = [] } = useTourDates(tour?.id);
+  
+  // Fetch tour dates from database
+  const { data: tourDates = [] } = useQuery({
+    queryKey: ['tour-dates', tour?.id],
+    queryFn: async () => {
+      if (!tour?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('tour_dates')
+        .select(`
+          id,
+          date,
+          location_id,
+          locations(name)
+        `)
+        .eq('tour_id', tour.id)
+        .order('date');
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!tour?.id,
+  });
 
   const handlePowerDefaults = () => {
     // Navigate to ConsumosTool with tour context
