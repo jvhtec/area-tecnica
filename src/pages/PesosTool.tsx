@@ -14,6 +14,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTourWeightDefaults } from '@/hooks/useTourWeightDefaults';
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 import { useTourDateOverrides } from '@/hooks/useTourDateOverrides';
+import { Badge } from '@/components/ui/badge';
 
 // Database for sound components.
 const soundComponentDatabase = [
@@ -70,6 +71,7 @@ interface Table {
   clusterId?: string;     // New property to group tables (e.g. mirrored pair)
   defaultTableId?: string;
   overrideId?: string;
+  isOverride?: boolean;
 }
 
 interface SummaryRow {
@@ -102,6 +104,10 @@ const PesosTool: React.FC = () => {
   const [cablePickWeight, setCablePickWeight] = useState('100');
   const [currentSetName, setCurrentSetName] = useState('');
 
+  // Job-based override mode detection
+  const [isJobOverrideMode, setIsJobOverrideMode] = useState(false);
+  const [jobTourInfo, setJobTourInfo] = useState<{ tourName: string; date: string; location: string } | null>(null);
+
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
     rows: [{ quantity: '', componentId: '', weight: '' }],
@@ -128,6 +134,43 @@ const PesosTool: React.FC = () => {
   // Get tour name for display
   const [tourName, setTourName] = useState<string>('');
   const [tourDateInfo, setTourDateInfo] = useState<{ date: string; location: string } | null>(null);
+
+  // Detect job-based override mode
+  useEffect(() => {
+    if (selectedJob?.tour_date_id && !isTourContext) {
+      setIsJobOverrideMode(true);
+      loadJobTourInfo();
+    } else {
+      setIsJobOverrideMode(false);
+      setJobTourInfo(null);
+    }
+  }, [selectedJob, isTourContext]);
+
+  const loadJobTourInfo = async () => {
+    if (!selectedJob?.tour_date_id) return;
+
+    try {
+      const { data } = await supabase
+        .from('tour_dates')
+        .select(`
+          date,
+          tour:tours(name),
+          location:locations(name)
+        `)
+        .eq('id', selectedJob.tour_date_id)
+        .single();
+
+      if (data) {
+        setJobTourInfo({
+          tourName: (data.tour as any)?.name || 'Unknown Tour',
+          date: new Date(data.date).toLocaleDateString(),
+          location: (data.location as any)?.name || 'Unknown Location'
+        });
+      }
+    } catch (error) {
+      console.error('Error loading job tour info:', error);
+    }
+  };
 
   useEffect(() => {
     const fetchTourInfo = async () => {
@@ -333,6 +376,39 @@ const PesosTool: React.FC = () => {
   };
 
   const saveAsOverride = async (table: Table) => {
+    // Job-based override mode
+    if (isJobOverrideMode && selectedJob?.tour_date_id) {
+      try {
+        await createWeightOverride({
+          tour_date_id: selectedJob.tour_date_id,
+          default_table_id: table.defaultTableId,
+          item_name: table.name,
+          weight_kg: table.totalWeight || 0,
+          quantity: 1,
+          category: null,
+          department: 'sound',
+          override_data: {
+            tableData: table,
+            toolType: 'pesos'
+          }
+        });
+
+        toast({
+          title: 'Success',
+          description: 'Override saved for tour date',
+        });
+        return;
+      } catch (error: any) {
+        console.error('Error saving override:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to save override',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     if (!tourDateId) return;
 
     try {
@@ -404,14 +480,15 @@ const PesosTool: React.FC = () => {
         clusterId: newClusterId,
       };
       setTables((prev) => [...prev, newTable]);
-    } else if (isTourDateContext) {
-      // For tour date context, create table and save as override
+    } else if (isTourDateContext || isJobOverrideMode) {
+      // For tour date context or job override mode, create table and save as override
       const newTable: Table = {
         name: tableName,
         rows: calculatedRows,
         totalWeight,
         id: Date.now(),
         clusterId: newClusterId,
+        isOverride: true
       };
       setTables((prev) => [...prev, newTable]);
       saveAsOverride(newTable);
@@ -596,12 +673,33 @@ const PesosTool: React.FC = () => {
                 Creating weight requirements for tour: <span className="font-medium">{tourName}</span>
               </p>
             )}
+            {isJobOverrideMode && jobTourInfo && (
+              <div className="text-sm text-muted-foreground mt-1 flex items-center justify-center gap-2">
+                <Badge variant="secondary">Override Mode</Badge>
+                <p>Tour: {jobTourInfo.tourName} • {jobTourInfo.date} - {jobTourInfo.location}</p>
+              </div>
+            )}
           </div>
           <div></div>
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
+          {/* Job-based override notification */}
+          {isJobOverrideMode && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                <p className="text-sm font-medium text-blue-900">
+                  Job Override Mode Active
+                </p>
+              </div>
+              <p className="text-sm text-blue-700 mt-1">
+                This job is part of a tour. Any tables you create will be saved as overrides for the specific tour date.
+              </p>
+            </div>
+          )}
+
           {/* Tour date override notification */}
           {isTourDateContext && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
