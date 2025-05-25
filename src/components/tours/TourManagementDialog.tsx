@@ -40,13 +40,22 @@ export const TourManagementDialog = ({
           id,
           date,
           location_id,
-          locations(name)
+          locations!inner(name)
         `)
         .eq('tour_id', tour.id)
         .order('date');
       
       if (error) throw error;
-      return data || [];
+      
+      // Transform the data to match the expected TourDate interface
+      return (data || []).map(item => ({
+        id: item.id,
+        date: item.date,
+        location_id: item.location_id,
+        locations: {
+          name: Array.isArray(item.locations) ? item.locations[0]?.name || 'Unknown location' : item.locations?.name || 'Unknown location'
+        }
+      }));
     },
     enabled: !!tour?.id,
   });
