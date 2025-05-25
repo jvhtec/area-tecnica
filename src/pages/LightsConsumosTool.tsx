@@ -91,7 +91,8 @@ interface Table {
   pduType?: string;
   customPduType?: string;
   includesHoist?: boolean;
-  id?: number;
+  id?: number | string;
+  isDefault?: boolean;
 }
 
 const LightsConsumosTool: React.FC = () => {

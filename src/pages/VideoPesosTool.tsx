@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,8 +33,9 @@ interface Table {
   name: string;
   rows: TableRow[];
   totalWeight?: number;
-  id?: number;
+  id?: number | string;
   dualMotors?: boolean;
+  isDefault?: boolean;
 }
 
 const VideoPesosTool: React.FC = () => {
@@ -57,6 +59,7 @@ const VideoPesosTool: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [tableName, setTableName] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
+  const [defaultTables, setDefaultTables] = useState<Table[]>([]);
   const [useDualMotors, setUseDualMotors] = useState(false);
 
   const [currentTable, setCurrentTable] = useState<Table>({

@@ -43,8 +43,9 @@ interface Table {
   currentPerPhase?: number;
   pduType?: string;
   customPduType?: string;
-  id?: number;
+  id?: number | string;
   includesHoist?: boolean;
+  isDefault?: boolean;
 }
 
 const VideoConsumosTool: React.FC = () => {
