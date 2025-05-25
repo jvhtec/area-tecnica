@@ -136,11 +136,11 @@ const PesosTool: React.FC = () => {
     if (isOverrideMode && defaultTables.length > 0) {
       const weightDefaults = defaultTables
         .filter(table => table.table_type === 'weight')
-        .map(table => ({
+        .map((table, index) => ({
           name: `${table.table_name} (Default)`,
           rows: table.table_data.rows || [],
           totalWeight: table.total_value,
-          id: `default-${table.id}`,
+          id: -(index + 1), // Use negative numbers to avoid conflicts
           isDefault: true
         }));
       
