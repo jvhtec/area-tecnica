@@ -102,8 +102,8 @@ const LightsConsumosTool: React.FC = () => {
   const [tables, setTables] = useState<Table[]>([]);
   const [safetyMargin, setSafetyMargin] = useState(0);
   const [includesHoist, setIncludesHoist] = useState(false);
-  const [selectedPduType, setSelectedPduType] = useState<string>(''); // selección de anulación
-  const [customPduType, setCustomPduType] = useState<string>(''); // si es personalizado
+  const [selectedPduType, setSelectedPduType] = useState<string>('');
+  const [customPduType, setCustomPduType] = useState<string>('');
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
@@ -273,6 +273,17 @@ const LightsConsumosTool: React.FC = () => {
     }
 
     try {
+      // Fetch the job logo (festival or tour)
+      let logoUrl: string | undefined = undefined;
+      try {
+        const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
+        logoUrl = await fetchJobLogo(selectedJobId);
+        console.log("Logo URL for PDF:", logoUrl);
+      } catch (logoError) {
+        console.error("Error fetching logo:", logoError);
+        // Continue without the logo if there's an error
+      }
+
       const pdfBlob = await exportToPDF(
         selectedJob.title,
         tables.map((table) => ({ ...table, toolType: 'consumos' })),
@@ -281,7 +292,8 @@ const LightsConsumosTool: React.FC = () => {
         undefined,
         undefined,
         undefined,
-        safetyMargin
+        safetyMargin,
+        logoUrl
       );
 
       const fileName = `Informe de Potencia - ${selectedJob.title}.pdf`;

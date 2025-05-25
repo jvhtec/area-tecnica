@@ -450,7 +450,7 @@ const ConsumosTool: React.FC = () => {
   };
 
   const handleExportPDF = async () => {
-    if (!selectedJobId || !selectedJob) {
+    if (!isTourContext && (!selectedJobId || !selectedJob)) {
       toast({
         title: 'No job selected',
         description: 'Please select a job before exporting.',
@@ -460,11 +460,16 @@ const ConsumosTool: React.FC = () => {
     }
 
     try {
-      // Fetch the job logo (festival or tour)
+      // Fetch the appropriate logo
       let logoUrl: string | undefined = undefined;
       try {
-        const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
-        logoUrl = await fetchJobLogo(selectedJobId);
+        if (isTourContext && tourId) {
+          const { fetchTourLogo } = await import('@/utils/pdf/logoUtils');
+          logoUrl = await fetchTourLogo(tourId);
+        } else if (selectedJobId) {
+          const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
+          logoUrl = await fetchJobLogo(selectedJobId);
+        }
         console.log("Logo URL for PDF:", logoUrl);
       } catch (logoError) {
         console.error("Error fetching logo:", logoError);
@@ -473,31 +478,46 @@ const ConsumosTool: React.FC = () => {
 
       // Convert the job date into a proper string (if available)
       let jobDate: string;
-      if (selectedJob && (selectedJob as any).date) {
-        jobDate = new Date((selectedJob as any).date).toLocaleDateString('en-GB');
+      let title: string;
+      
+      if (isTourContext) {
+        title = tourInfo?.name || 'Tour Power Report';
+        if (tourInfo?.date) {
+          jobDate = tourInfo.date;
+        } else {
+          jobDate = new Date().toLocaleDateString('en-GB');
+        }
       } else {
-        jobDate = new Date().toLocaleDateString('en-GB');
+        title = selectedJob!.title;
+        if (selectedJob && (selectedJob as any).date) {
+          jobDate = new Date((selectedJob as any).date).toLocaleDateString('en-GB');
+        } else {
+          jobDate = new Date().toLocaleDateString('en-GB');
+        }
       }
 
       const pdfBlob = await exportToPDF(
-        selectedJob.title,
+        title,
         tables.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
-        selectedJob.title,
+        title,
         jobDate,
         undefined,
         undefined,
         safetyMargin,
-        logoUrl  // Pass the logo URL to the PDF generator
+        logoUrl
       );
 
-      const fileName = `Power Report - ${selectedJob.title}.pdf`;
-      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-      const filePath = `sound/${selectedJobId}/${crypto.randomUUID()}.pdf`;
+      const fileName = `Power Report - ${title}.pdf`;
+      
+      if (!isTourContext) {
+        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+        const filePath = `sound/${selectedJobId}/${crypto.randomUUID()}.pdf`;
 
-      const { error: uploadError } = await supabase.storage.from('task_documents').upload(filePath, file);
+        const { error: uploadError } = await supabase.storage.from('task_documents').upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+        if (uploadError) throw uploadError;
+      }
 
       toast({
         title: 'Success',
@@ -582,45 +602,44 @@ const ConsumosTool: React.FC = () => {
             </div>
           )}
 
-          {!isDefaults && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="safetyMargin">Safety Margin</Label>
-                <Select
-                  value={safetyMargin.toString()}
-                  onValueChange={(value) => setSafetyMargin(Number(value))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Safety Margin" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[0, 10, 20, 30, 40, 50].map((percentage) => (
-                      <SelectItem key={percentage} value={percentage.toString()}>
-                        {percentage}%
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          {/* Show safety margin for all tour contexts and non-tour contexts */}
+          {(isTourContext || !isDefaults) && (
+            <div className="space-y-2">
+              <Label htmlFor="safetyMargin">Safety Margin</Label>
+              <Select
+                value={safetyMargin.toString()}
+                onValueChange={(value) => setSafetyMargin(Number(value))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Safety Margin" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[0, 10, 20, 30, 40, 50].map((percentage) => (
+                    <SelectItem key={percentage} value={percentage.toString()}>
+                      {percentage}%
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-              {!isTourContext && (
-                <div className="space-y-2">
-                  <Label htmlFor="jobSelect">Select Job</Label>
-                  <Select value={selectedJobId} onValueChange={handleJobSelect}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a job" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {jobs?.map((job) => (
-                        <SelectItem key={job.id} value={job.id}>
-                          {job.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </>
+          {!isTourContext && (
+            <div className="space-y-2">
+              <Label htmlFor="jobSelect">Select Job</Label>
+              <Select value={selectedJobId} onValueChange={handleJobSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a job" />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobs?.map((job) => (
+                    <SelectItem key={job.id} value={job.id}>
+                      {job.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
 
           <div className="space-y-2">

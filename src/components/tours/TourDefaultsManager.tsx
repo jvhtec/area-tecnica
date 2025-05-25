@@ -3,10 +3,15 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { useTourDefaultSets } from "@/hooks/useTourDefaultSets";
+import { useTourDateOverrides } from "@/hooks/useTourDateOverrides";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Weight, Calculator, Trash2 } from "lucide-react";
+import { FileText, Weight, Calculator, Trash2, Download, Calendar } from "lucide-react";
 import { exportToPDF } from "@/utils/pdfExport";
+import { fetchTourLogo } from "@/utils/pdf/logoUtils";
+import { supabase } from "@/lib/supabase";
 
 interface TourDefaultsManagerProps {
   open: boolean;
@@ -21,6 +26,8 @@ export const TourDefaultsManager = ({
 }: TourDefaultsManagerProps) => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('sound');
+  const [safetyMargin, setSafetyMargin] = useState(0);
+  const [tourDates, setTourDates] = useState<any[]>([]);
 
   // Fetch defaults for each department
   const {
@@ -44,6 +51,34 @@ export const TourDefaultsManager = ({
     isLoading: videoLoading
   } = useTourDefaultSets(tour?.id || '', 'video');
 
+  // Fetch tour dates
+  React.useEffect(() => {
+    const fetchTourDates = async () => {
+      if (!tour?.id) return;
+      
+      const { data, error } = await supabase
+        .from('tour_dates')
+        .select(`
+          id,
+          date,
+          locations (
+            name
+          )
+        `)
+        .eq('tour_id', tour.id)
+        .order('date', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching tour dates:', error);
+        return;
+      }
+
+      setTourDates(data || []);
+    };
+
+    fetchTourDates();
+  }, [tour?.id]);
+
   const handleBulkPDFExport = async (department: string, type: 'power' | 'weight') => {
     try {
       const relevantSets = department === 'sound' ? soundDefaultSets : 
@@ -60,6 +95,14 @@ export const TourDefaultsManager = ({
           variant: 'destructive',
         });
         return;
+      }
+
+      // Fetch tour logo
+      let logoUrl: string | undefined;
+      try {
+        logoUrl = await fetchTourLogo(tour.id);
+      } catch (error) {
+        console.error('Error fetching tour logo:', error);
       }
 
       // Convert to the format expected by exportToPDF
@@ -82,7 +125,8 @@ export const TourDefaultsManager = ({
         new Date().toLocaleDateString('en-GB'),
         undefined,
         undefined,
-        0
+        safetyMargin,
+        logoUrl
       );
 
       const fileName = `${tour.name} - ${department} ${type} defaults.pdf`;
@@ -109,6 +153,109 @@ export const TourDefaultsManager = ({
     }
   };
 
+  const handleBulkTourDateExport = async (department: string, type: 'power' | 'weight') => {
+    try {
+      if (tourDates.length === 0) {
+        toast({
+          title: 'No tour dates found',
+          description: 'No tour dates available for export',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Fetch tour logo
+      let logoUrl: string | undefined;
+      try {
+        logoUrl = await fetchTourLogo(tour.id);
+      } catch (error) {
+        console.error('Error fetching tour logo:', error);
+      }
+
+      // Export one PDF per tour date
+      for (const tourDate of tourDates) {
+        await exportTourDatePDF(tourDate, department, type, logoUrl);
+      }
+
+      toast({
+        title: 'Success',
+        description: `Exported ${tourDates.length} PDFs for all tour dates`,
+      });
+    } catch (error) {
+      console.error('Error exporting bulk tour date PDFs:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to export tour date PDFs',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const exportTourDatePDF = async (tourDate: any, department: string, type: 'power' | 'weight', logoUrl?: string) => {
+    // Get defaults
+    const relevantTables = department === 'sound' ? soundDefaultTables : 
+                          department === 'lights' ? lightsDefaultTables : videoDefaultTables;
+    const defaultTables = relevantTables.filter(table => table.table_type === type);
+
+    // Get overrides for this tour date
+    const { data: overrides } = await supabase
+      .from(type === 'power' ? 'tour_date_power_overrides' : 'tour_date_weight_overrides')
+      .select('*')
+      .eq('tour_date_id', tourDate.id)
+      .eq('department', department);
+
+    // Combine defaults and overrides
+    const combinedTables = [
+      ...defaultTables.map(table => ({
+        name: `${table.table_name} (Default)`,
+        rows: table.table_data.rows || [],
+        totalWeight: type === 'weight' ? table.total_value : undefined,
+        totalWatts: type === 'power' ? table.total_value : undefined,
+        currentPerPhase: table.metadata?.currentPerPhase,
+        pduType: table.metadata?.pduType,
+        toolType: table.table_data.toolType || (type === 'power' ? 'consumos' : 'pesos'),
+        id: Date.now() + Math.random()
+      })),
+      ...(overrides || []).map((override: any) => ({
+        name: `${override.table_name || override.item_name} (Override)`,
+        rows: override.override_data?.rows || [],
+        totalWeight: type === 'weight' ? override.weight_kg * (override.quantity || 1) : undefined,
+        totalWatts: type === 'power' ? override.total_watts : undefined,
+        currentPerPhase: type === 'power' ? override.current_per_phase : undefined,
+        pduType: type === 'power' ? override.pdu_type : undefined,
+        toolType: type === 'power' ? 'consumos' : 'pesos',
+        id: Date.now() + Math.random()
+      }))
+    ];
+
+    if (combinedTables.length === 0) return;
+
+    const locationName = (tourDate.locations as any)?.name || 'Unknown Location';
+    const dateStr = new Date(tourDate.date).toLocaleDateString('en-GB');
+
+    const pdfBlob = await exportToPDF(
+      `${tour.name} - ${locationName} - ${department.toUpperCase()} ${type.toUpperCase()}`,
+      combinedTables,
+      type,
+      tour.name,
+      dateStr,
+      undefined,
+      undefined,
+      safetyMargin,
+      logoUrl
+    );
+
+    const fileName = `${tour.name} - ${dateStr} - ${locationName} - ${department} ${type}.pdf`;
+    const url = window.URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+
   // Wrapper functions to handle Promise<string> to Promise<void> conversion
   const handleDeleteSoundSet = async (id: string): Promise<void> => {
     await deleteSoundSet(id);
@@ -128,6 +275,26 @@ export const TourDefaultsManager = ({
 
     return (
       <div className="space-y-6">
+        {/* Safety Margin Selection */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <Label htmlFor="safetyMargin" className="text-sm font-medium">Safety Margin for PDF Exports</Label>
+          <Select
+            value={safetyMargin.toString()}
+            onValueChange={(value) => setSafetyMargin(Number(value))}
+          >
+            <SelectTrigger className="w-full mt-1">
+              <SelectValue placeholder="Select Safety Margin" />
+            </SelectTrigger>
+            <SelectContent>
+              {[0, 10, 20, 30, 40, 50].map((percentage) => (
+                <SelectItem key={percentage} value={percentage.toString()}>
+                  {percentage}%
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Power Defaults */}
         <div>
           <div className="flex items-center justify-between mb-4">
@@ -143,7 +310,16 @@ export const TourDefaultsManager = ({
                 disabled={powerTables.length === 0}
               >
                 <FileText className="h-4 w-4 mr-1" />
-                Export Power PDF
+                Export Defaults PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleBulkTourDateExport(department, 'power')}
+                disabled={powerTables.length === 0 || tourDates.length === 0}
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Bulk Tour Date PDFs
               </Button>
             </div>
           </div>
@@ -193,7 +369,16 @@ export const TourDefaultsManager = ({
                 disabled={weightTables.length === 0}
               >
                 <FileText className="h-4 w-4 mr-1" />
-                Export Weight PDF
+                Export Defaults PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleBulkTourDateExport(department, 'weight')}
+                disabled={weightTables.length === 0 || tourDates.length === 0}
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Bulk Tour Date PDFs
               </Button>
             </div>
           </div>
@@ -226,18 +411,102 @@ export const TourDefaultsManager = ({
     );
   };
 
+  const renderTourDatesTab = () => {
+    return (
+      <div className="space-y-6">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
+            <Calendar className="h-5 w-5" />
+            Tour Dates ({tourDates.length})
+          </h3>
+          <p className="text-sm text-green-700 mb-4">
+            Export individual PDFs for each tour date, including both defaults and overrides.
+          </p>
+          
+          {/* Safety Margin Selection */}
+          <div className="mb-4">
+            <Label htmlFor="tourDateSafetyMargin" className="text-sm font-medium">Safety Margin for Tour Date PDFs</Label>
+            <Select
+              value={safetyMargin.toString()}
+              onValueChange={(value) => setSafetyMargin(Number(value))}
+            >
+              <SelectTrigger className="w-full mt-1">
+                <SelectValue placeholder="Select Safety Margin" />
+              </SelectTrigger>
+              <SelectContent>
+                {[0, 10, 20, 30, 40, 50].map((percentage) => (
+                  <SelectItem key={percentage} value={percentage.toString()}>
+                    {percentage}%
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {tourDates.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4">
+            {tourDates.map((tourDate) => (
+              <div key={tourDate.id} className="border rounded-lg p-4">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h4 className="font-medium">
+                      {new Date(tourDate.date).toLocaleDateString('en-GB')}
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      {(tourDate.locations as any)?.name || 'Unknown Location'}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {['sound', 'lights', 'video'].map((dept) => (
+                    <div key={dept} className="space-y-2">
+                      <h5 className="text-sm font-medium capitalize">{dept}</h5>
+                      <div className="flex flex-col gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => exportTourDatePDF(tourDate, dept, 'power')}
+                          className="text-xs"
+                        >
+                          Power PDF
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => exportTourDatePDF(tourDate, dept, 'weight')}
+                          className="text-xs"
+                        >
+                          Weight PDF
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-muted-foreground">No tour dates configured</p>
+        )}
+      </div>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Tour Defaults: {tour?.name}</DialogTitle>
         </DialogHeader>
         
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="sound">Sound</TabsTrigger>
             <TabsTrigger value="lights">Lights</TabsTrigger>
             <TabsTrigger value="video">Video</TabsTrigger>
+            <TabsTrigger value="tour-dates">Tour Dates</TabsTrigger>
           </TabsList>
           
           <TabsContent value="sound" className="mt-6">
@@ -262,6 +531,10 @@ export const TourDefaultsManager = ({
             ) : (
               renderDepartmentDefaults('video', videoDefaultSets, videoDefaultTables, handleDeleteVideoSet)
             )}
+          </TabsContent>
+
+          <TabsContent value="tour-dates" className="mt-6">
+            {renderTourDatesTab()}
           </TabsContent>
         </Tabs>
       </DialogContent>
