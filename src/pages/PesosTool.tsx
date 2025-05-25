@@ -375,92 +375,8 @@ const PesosTool: React.FC = () => {
     }
   };
 
-  const saveOverrideTables = async () => {
-    if (!tourDateId && !isJobOverrideMode) return;
-
-    const tablesToSave = isDefaults ? tables : unsavedTables;
-    if (tablesToSave.length === 0) {
-      toast({
-        title: 'No tables to save',
-        description: 'Please create some tables first',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      const targetTourDateId = tourDateId || selectedJob?.tour_date_id;
-      if (!targetTourDateId) {
-        throw new Error('No tour date ID available');
-      }
-
-      for (const table of tablesToSave) {
-        await createWeightOverride({
-          tour_date_id: targetTourDateId,
-          default_table_id: table.defaultTableId,
-          item_name: table.name,
-          weight_kg: table.totalWeight || 0,
-          quantity: 1,
-          category: null,
-          department: 'sound',
-          override_data: {
-            tableData: table,
-            toolType: 'pesos'
-          }
-        });
-      }
-
-      toast({
-        title: 'Success',
-        description: `Saved ${tablesToSave.length} override table(s)`,
-      });
-
-      // Clear unsaved tables after successful save
-      setUnsavedTables([]);
-      
-      // Refresh the page data
-      window.location.reload();
-    } catch (error: any) {
-      console.error('Error saving override tables:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to save override tables',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const deleteOverrideTable = async (table: Table) => {
-    if (!table.overrideId) return;
-
-    try {
-      await deleteOverride({ id: table.overrideId, table: 'weight' });
-      
-      // Remove from local state
-      setTables(prev => prev.filter(t => t.id !== table.id));
-      
-      toast({
-        title: 'Success',
-        description: 'Override table deleted',
-      });
-    } catch (error) {
-      console.error('Error deleting override table:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete override table',
-        variant: 'destructive',
-      });
-    }
-  };
-
   const saveAsOverride = async (table: Table) => {
-    // In override modes, don't auto-save, just add to unsaved tables
-    if (isTourDateContext || isJobOverrideMode) {
-      setUnsavedTables(prev => [...prev, table]);
-      return;
-    }
-
-    // Job-based override mode - save immediately for backwards compatibility
+    // Job-based override mode
     if (isJobOverrideMode && selectedJob?.tour_date_id) {
       try {
         await createWeightOverride({
@@ -496,6 +412,7 @@ const PesosTool: React.FC = () => {
     if (!tourDateId) return;
 
     try {
+      // Save the table as an override
       await createWeightOverride({
         tour_date_id: tourDateId,
         default_table_id: table.defaultTableId,
@@ -629,21 +546,8 @@ const PesosTool: React.FC = () => {
   };
 
   const removeTable = (tableId: number) => {
-    const table = tables.find(t => t.id === tableId);
-    
-    if (table?.isOverride && table.overrideId) {
-      // Delete override from database
-      deleteOverrideTable(table);
-    } else {
-      // Remove from local state only
-      setTables((prev) => prev.filter((table) => table.id !== tableId));
-      
-      // Also remove from unsaved tables if it exists there
-      setUnsavedTables(prev => prev.filter(t => t.id !== tableId));
-    }
+    setTables((prev) => prev.filter((table) => table.id !== tableId));
   };
-
-  const [unsavedTables, setUnsavedTables] = useState<Table[]>([]);
 
   const handleExportPDF = async () => {
     if (!selectedJobId || !selectedJob) {
@@ -957,15 +861,6 @@ const PesosTool: React.FC = () => {
             <Button onClick={resetCurrentTable} variant="destructive">
               Reset
             </Button>
-            
-            {/* Manual save button for override modes */}
-            {(isTourDateContext || isJobOverrideMode) && unsavedTables.length > 0 && (
-              <Button onClick={saveOverrideTables} variant="outline" className="gap-2">
-                <Save className="h-4 w-4" />
-                Save Override Tables ({unsavedTables.length})
-              </Button>
-            )}
-            
             {tables.length > 0 && !isDefaults && !isTourContext && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
                 <FileText className="w-4 h-4" />

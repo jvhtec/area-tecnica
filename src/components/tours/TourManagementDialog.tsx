@@ -1,30 +1,20 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { TourColorSection } from "./TourColorSection";
 import { TourDeleteSection } from "./TourDeleteSection";
-import TourDefaultsManager from "./TourDefaultsManager";
+import { TourDefaultsManager } from "./TourDefaultsManager";
 import { useTourManagement } from "./hooks/useTourManagement";
 import { TourLogoManager } from "./TourLogoManager";
 import { useNavigate } from "react-router-dom";
 import { Calculator, Weight, Settings } from "lucide-react";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
 
 interface TourManagementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tour: any;
   tourDateId?: string; // Add optional tour date ID for override mode
-}
-
-interface TourDateQueryResult {
-  id: string;
-  date: string;
-  location_id: string;
-  locations: {
-    name: string;
-  }[];
 }
 
 export const TourManagementDialog = ({
@@ -36,38 +26,6 @@ export const TourManagementDialog = ({
   const navigate = useNavigate();
   const { handleColorChange, handleNameChange, handleDelete } = useTourManagement(tour, () => onOpenChange(false));
   const [defaultsManagerOpen, setDefaultsManagerOpen] = useState(false);
-  
-  // Fetch tour dates from database
-  const { data: tourDates = [] } = useQuery({
-    queryKey: ['tour-dates', tour?.id],
-    queryFn: async () => {
-      if (!tour?.id) return [];
-      
-      const { data, error } = await supabase
-        .from('tour_dates')
-        .select(`
-          id,
-          date,
-          location_id,
-          locations!inner(name)
-        `)
-        .eq('tour_id', tour.id)
-        .order('date');
-      
-      if (error) throw error;
-      
-      // Transform the data to match the expected TourDate interface
-      return (data as TourDateQueryResult[] || []).map(item => ({
-        id: item.id,
-        date: item.date,
-        location_id: item.location_id,
-        locations: {
-          name: item.locations[0]?.name || 'Unknown location'
-        }
-      }));
-    },
-    enabled: !!tour?.id,
-  });
 
   const handlePowerDefaults = () => {
     // Navigate to ConsumosTool with tour context
@@ -168,18 +126,11 @@ export const TourManagementDialog = ({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={defaultsManagerOpen} onOpenChange={setDefaultsManagerOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Tour Defaults & Export Manager</DialogTitle>
-          </DialogHeader>
-          <TourDefaultsManager
-            tourId={tour.id}
-            tourName={tour.name}
-            tourDates={tourDates}
-          />
-        </DialogContent>
-      </Dialog>
+      <TourDefaultsManager
+        open={defaultsManagerOpen}
+        onOpenChange={setDefaultsManagerOpen}
+        tour={tour}
+      />
     </>
   );
 };

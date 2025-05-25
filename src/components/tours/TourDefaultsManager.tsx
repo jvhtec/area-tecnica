@@ -1,178 +1,135 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { FileText, Download, Trash2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
-import { exportToPDF } from '@/utils/pdfExport';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
-interface TourDate {
-  id: string;
-  date: string;
-  location_id: string;
-  locations: {
-    name: string;
-  };
-}
+import React, { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { useTourDefaultSets } from "@/hooks/useTourDefaultSets";
+import { useTourDateOverrides } from "@/hooks/useTourDateOverrides";
+import { useToast } from "@/hooks/use-toast";
+import { FileText, Weight, Calculator, Trash2, Download, Calendar } from "lucide-react";
+import { exportToPDF } from "@/utils/pdfExport";
+import { fetchTourLogo } from "@/utils/pdf/logoUtils";
+import { supabase } from "@/lib/supabase";
 
 interface TourDefaultsManagerProps {
-  tourId: string;
-  tourName: string;
-  tourDates: TourDate[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  tour: any;
 }
 
-const TourDefaultsManager: React.FC<TourDefaultsManagerProps> = ({
-  tourId,
-  tourName,
-  tourDates
-}) => {
+export const TourDefaultsManager = ({
+  open,
+  onOpenChange,
+  tour,
+}: TourDefaultsManagerProps) => {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('defaults');
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState(0);
-  const [totalExports, setTotalExports] = useState(0);
+  const [activeTab, setActiveTab] = useState('sound');
+  const [safetyMargin, setSafetyMargin] = useState(0);
+  const [tourDates, setTourDates] = useState<any[]>([]);
 
-  const exportTourDatePDF = async (tourDate: TourDate) => {
-    try {
-      // Check for overrides first
-      const [powerOverrides, weightOverrides] = await Promise.all([
-        supabase
-          .from('tour_date_power_overrides')
-          .select('*')
-          .eq('tour_date_id', tourDate.id),
-        supabase
-          .from('tour_date_weight_overrides')
-          .select('*')
-          .eq('tour_date_id', tourDate.id)
-      ]);
+  // Fetch defaults for each department
+  const {
+    defaultSets: soundDefaultSets,
+    defaultTables: soundDefaultTables,
+    deleteSet: deleteSoundSet,
+    isLoading: soundLoading
+  } = useTourDefaultSets(tour?.id || '', 'sound');
 
-      const hasOverrides = (powerOverrides.data?.length || 0) > 0 || (weightOverrides.data?.length || 0) > 0;
+  const {
+    defaultSets: lightsDefaultSets,
+    defaultTables: lightsDefaultTables,
+    deleteSet: deleteLightsSet,
+    isLoading: lightsLoading
+  } = useTourDefaultSets(tour?.id || '', 'lights');
 
-      let tables: any[] = [];
-      let summaryRows: any[] = [];
+  const {
+    defaultSets: videoDefaultSets,
+    defaultTables: videoDefaultTables,
+    deleteSet: deleteVideoSet,
+    isLoading: videoLoading
+  } = useTourDefaultSets(tour?.id || '', 'video');
 
-      if (hasOverrides) {
-        // Use only overrides, no defaults
-        const powerTables = powerOverrides.data?.map(override => ({
-          name: override.table_name,
-          rows: override.override_data?.rows || [],
-          totalWatts: override.total_watts,
-          currentPerPhase: override.current_per_phase,
-          pduType: override.pdu_type,
-          customPduType: override.custom_pdu_type,
-          includesHoist: override.includes_hoist,
-          toolType: 'consumos' as const
-        })) || [];
+  // Fetch tour dates
+  React.useEffect(() => {
+    const fetchTourDates = async () => {
+      if (!tour?.id) return;
+      
+      const { data, error } = await supabase
+        .from('tour_dates')
+        .select(`
+          id,
+          date,
+          locations (
+            name
+          )
+        `)
+        .eq('tour_id', tour.id)
+        .order('date', { ascending: true });
 
-        const weightTables = weightOverrides.data?.map(override => ({
-          name: override.item_name,
-          rows: override.override_data?.tableData?.rows || [{
-            quantity: override.quantity.toString(),
-            componentName: override.item_name,
-            weight: (override.weight_kg / override.quantity).toString(),
-            totalWeight: override.weight_kg
-          }],
-          totalWeight: override.weight_kg,
-          toolType: 'pesos' as const
-        })) || [];
-
-        tables = [...powerTables, ...weightTables];
-
-        // Generate summary for weight tables
-        if (weightTables.length > 0) {
-          summaryRows = weightTables.map(table => ({
-            clusterName: table.name,
-            riggingPoints: 'SX01', // Default rigging point for overrides
-            clusterWeight: table.totalWeight || 0
-          }));
-        }
-      } else {
-        // Use defaults if no overrides exist
-        const defaultTables = await supabase
-          .from('tour_default_tables')
-          .select(`
-            *,
-            tour_default_sets!inner(tour_id, department)
-          `)
-          .eq('tour_default_sets.tour_id', tourId);
-
-        if (defaultTables.data) {
-          const powerDefaults = defaultTables.data
-            .filter(table => table.table_type === 'power')
-            .map(table => ({
-              name: table.table_name,
-              rows: table.table_data?.rows || [],
-              totalWatts: table.total_value,
-              currentPerPhase: table.metadata?.currentPerPhase,
-              pduType: table.metadata?.pduType,
-              customPduType: table.metadata?.customPduType,
-              includesHoist: table.metadata?.includesHoist,
-              toolType: 'consumos' as const
-            }));
-
-          const weightDefaults = defaultTables.data
-            .filter(table => table.table_type === 'weight')
-            .map(table => ({
-              name: table.table_name,
-              rows: table.table_data?.rows || [],
-              totalWeight: table.total_value,
-              toolType: 'pesos' as const
-            }));
-
-          tables = [...powerDefaults, ...weightDefaults];
-
-          // Generate summary for weight defaults
-          if (weightDefaults.length > 0) {
-            summaryRows = weightDefaults.map((table, index) => ({
-              clusterName: table.name,
-              riggingPoints: `SX${String(index + 1).padStart(2, '0')}`,
-              clusterWeight: table.totalWeight || 0
-            }));
-          }
-        }
+      if (error) {
+        console.error('Error fetching tour dates:', error);
+        return;
       }
 
-      if (tables.length === 0) {
+      setTourDates(data || []);
+    };
+
+    fetchTourDates();
+  }, [tour?.id]);
+
+  const handleBulkPDFExport = async (department: string, type: 'power' | 'weight') => {
+    try {
+      const relevantSets = department === 'sound' ? soundDefaultSets : 
+                          department === 'lights' ? lightsDefaultSets : videoDefaultSets;
+      const relevantTables = department === 'sound' ? soundDefaultTables : 
+                            department === 'lights' ? lightsDefaultTables : videoDefaultTables;
+
+      const filteredTables = relevantTables.filter(table => table.table_type === type);
+
+      if (filteredTables.length === 0) {
         toast({
-          title: 'No data available',
-          description: 'No tables found for this tour date',
+          title: 'No defaults found',
+          description: `No ${type} defaults found for ${department} department`,
           variant: 'destructive',
         });
         return;
       }
 
-      // Determine report type
-      const hasWeightTables = tables.some(t => t.toolType === 'pesos');
-      const hasPowerTables = tables.some(t => t.toolType === 'consumos');
-      const reportType = hasWeightTables && !hasPowerTables ? 'weight' : 'power';
-
-      // Load tour logo
+      // Fetch tour logo
       let logoUrl: string | undefined;
       try {
-        const { fetchTourLogo } = await import('@/utils/pdf/logoUtils');
-        logoUrl = await fetchTourLogo(tourId);
+        logoUrl = await fetchTourLogo(tour.id);
       } catch (error) {
-        console.error('Error loading tour logo:', error);
+        console.error('Error fetching tour logo:', error);
       }
 
-      // Generate PDF
+      // Convert to the format expected by exportToPDF with proper typing
+      const tables = filteredTables.map(table => ({
+        name: table.table_name,
+        rows: table.table_data.rows || [],
+        totalWeight: type === 'weight' ? table.total_value : undefined,
+        totalWatts: type === 'power' ? table.total_value : undefined,
+        currentPerPhase: table.metadata?.currentPerPhase,
+        pduType: table.metadata?.pduType,
+        toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+        id: Date.now()
+      }));
+
       const pdfBlob = await exportToPDF(
-        `${tourName} - ${new Date(tourDate.date).toLocaleDateString()}`,
+        `${tour.name} - ${department.toUpperCase()} ${type.toUpperCase()} Defaults`,
         tables,
-        reportType,
-        `${tourName} - ${new Date(tourDate.date).toLocaleDateString()}`,
-        tourDate.date,
-        summaryRows.length > 0 ? summaryRows : undefined,
+        type,
+        tour.name,
+        new Date().toLocaleDateString('en-GB'),
         undefined,
-        0, // Safety margin - could be made configurable
+        undefined,
+        safetyMargin,
         logoUrl
       );
 
-      // Download the PDF
-      const fileName = `${tourName} - ${new Date(tourDate.date).toLocaleDateString()} - Report.pdf`;
+      const fileName = `${tour.name} - ${department} ${type} defaults.pdf`;
       const url = window.URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -196,289 +153,391 @@ const TourDefaultsManager: React.FC<TourDefaultsManagerProps> = ({
     }
   };
 
-  const exportAllPDFs = async () => {
-    if (tourDates.length === 0) {
-      toast({
-        title: 'No tour dates',
-        description: 'There are no tour dates to export',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setIsExporting(true);
-    setExportProgress(0);
-    setTotalExports(tourDates.length);
-
+  const handleBulkTourDateExport = async (department: string, type: 'power' | 'weight') => {
     try {
-      for (let i = 0; i < tourDates.length; i++) {
-        await exportTourDatePDF(tourDates[i]);
-        setExportProgress(i + 1);
-      }
-
-      toast({
-        title: 'Export complete',
-        description: `Successfully exported ${tourDates.length} PDFs`,
-      });
-    } catch (error) {
-      console.error('Error during bulk export:', error);
-      toast({
-        title: 'Export error',
-        description: 'Some PDFs failed to export',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const deleteTourDefaults = async () => {
-    try {
-      // First get all default sets for this tour
-      const { data: defaultSets, error: setsError } = await supabase
-        .from('tour_default_sets')
-        .select('id')
-        .eq('tour_id', tourId);
-
-      if (setsError) throw setsError;
-      if (!defaultSets || defaultSets.length === 0) {
+      if (tourDates.length === 0) {
         toast({
-          title: 'No defaults',
-          description: 'No default sets found for this tour',
+          title: 'No tour dates found',
+          description: 'No tour dates available for export',
+          variant: 'destructive',
         });
         return;
       }
 
-      // Delete all default sets (cascade will delete tables)
-      const { error: deleteError } = await supabase
-        .from('tour_default_sets')
-        .delete()
-        .eq('tour_id', tourId);
+      // Fetch tour logo
+      let logoUrl: string | undefined;
+      try {
+        logoUrl = await fetchTourLogo(tour.id);
+      } catch (error) {
+        console.error('Error fetching tour logo:', error);
+      }
 
-      if (deleteError) throw deleteError;
+      // Export one PDF per tour date
+      for (const tourDate of tourDates) {
+        await exportTourDatePDF(tourDate, department, type, logoUrl);
+      }
 
       toast({
         title: 'Success',
-        description: 'All tour defaults have been deleted',
+        description: `Exported ${tourDates.length} PDFs for all tour dates`,
       });
     } catch (error) {
-      console.error('Error deleting tour defaults:', error);
+      console.error('Error exporting bulk tour date PDFs:', error);
       toast({
         title: 'Error',
-        description: 'Failed to delete tour defaults',
+        description: 'Failed to export tour date PDFs',
         variant: 'destructive',
       });
     }
   };
 
-  return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Tour Defaults & Overrides</CardTitle>
-        <CardDescription>
-          Manage default settings and overrides for this tour
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4">
-            <TabsTrigger value="defaults">Defaults</TabsTrigger>
-            <TabsTrigger value="overrides">Date Overrides</TabsTrigger>
-            <TabsTrigger value="export">Export</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="defaults" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-medium">Default Settings</h3>
-                <p className="text-sm text-muted-foreground">
-                  These settings will apply to all tour dates unless overridden
-                </p>
-              </div>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete All Defaults
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will permanently delete all default settings for this tour.
-                      This action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={deleteTourDefaults}>
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+  const exportTourDatePDF = async (tourDate: any, department: string, type: 'power' | 'weight', logoUrl?: string) => {
+    // Get defaults
+    const relevantTables = department === 'sound' ? soundDefaultTables : 
+                          department === 'lights' ? lightsDefaultTables : videoDefaultTables;
+    const defaultTables = relevantTables.filter(table => table.table_type === type);
+
+    // Get overrides for this tour date
+    const { data: overrides } = await supabase
+      .from(type === 'power' ? 'tour_date_power_overrides' : 'tour_date_weight_overrides')
+      .select('*')
+      .eq('tour_date_id', tourDate.id)
+      .eq('department', department);
+
+    // Combine defaults and overrides with proper typing
+    const combinedTables = [
+      ...defaultTables.map(table => ({
+        name: `${table.table_name} (Default)`,
+        rows: table.table_data.rows || [],
+        totalWeight: type === 'weight' ? table.total_value : undefined,
+        totalWatts: type === 'power' ? table.total_value : undefined,
+        currentPerPhase: table.metadata?.currentPerPhase,
+        pduType: table.metadata?.pduType,
+        toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+        id: Date.now() + Math.random()
+      })),
+      ...(overrides || []).map((override: any) => ({
+        name: `${override.table_name || override.item_name} (Override)`,
+        rows: override.override_data?.rows || [],
+        totalWeight: type === 'weight' ? override.weight_kg * (override.quantity || 1) : undefined,
+        totalWatts: type === 'power' ? override.total_watts : undefined,
+        currentPerPhase: type === 'power' ? override.current_per_phase : undefined,
+        pduType: type === 'power' ? override.pdu_type : undefined,
+        toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+        id: Date.now() + Math.random()
+      }))
+    ];
+
+    if (combinedTables.length === 0) return;
+
+    const locationName = (tourDate.locations as any)?.name || 'Unknown Location';
+    const dateStr = new Date(tourDate.date).toLocaleDateString('en-GB');
+
+    const pdfBlob = await exportToPDF(
+      `${tour.name} - ${locationName} - ${department.toUpperCase()} ${type.toUpperCase()}`,
+      combinedTables,
+      type,
+      tour.name,
+      dateStr,
+      undefined,
+      undefined,
+      safetyMargin,
+      logoUrl
+    );
+
+    const fileName = `${tour.name} - ${dateStr} - ${locationName} - ${department} ${type}.pdf`;
+    const url = window.URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+
+  // Wrapper functions to handle Promise<string> to Promise<void> conversion
+  const handleDeleteSoundSet = async (id: string): Promise<void> => {
+    await deleteSoundSet(id);
+  };
+
+  const handleDeleteLightsSet = async (id: string): Promise<void> => {
+    await deleteLightsSet(id);
+  };
+
+  const handleDeleteVideoSet = async (id: string): Promise<void> => {
+    await deleteVideoSet(id);
+  };
+
+  const renderDepartmentDefaults = (department: string, sets: any[], tables: any[], deleteSet: (id: string) => Promise<void>) => {
+    const powerTables = tables.filter(t => t.table_type === 'power');
+    const weightTables = tables.filter(t => t.table_type === 'weight');
+
+    return (
+      <div className="space-y-6">
+        {/* Safety Margin Selection */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <Label htmlFor="safetyMargin" className="text-sm font-medium">Safety Margin for PDF Exports</Label>
+          <Select
+            value={safetyMargin.toString()}
+            onValueChange={(value) => setSafetyMargin(Number(value))}
+          >
+            <SelectTrigger className="w-full mt-1">
+              <SelectValue placeholder="Select Safety Margin" />
+            </SelectTrigger>
+            <SelectContent>
+              {[0, 10, 20, 30, 40, 50].map((percentage) => (
+                <SelectItem key={percentage} value={percentage.toString()}>
+                  {percentage}%
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Power Defaults */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-lg font-semibold flex items-center gap-2">
+              <Calculator className="h-5 w-5" />
+              Power Defaults ({powerTables.length})
+            </h4>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleBulkPDFExport(department, 'power')}
+                disabled={powerTables.length === 0}
+              >
+                <FileText className="h-4 w-4 mr-1" />
+                Export Defaults PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleBulkTourDateExport(department, 'power')}
+                disabled={powerTables.length === 0 || tourDates.length === 0}
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Bulk Tour Date PDFs
+              </Button>
             </div>
-            
+          </div>
+          {powerTables.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Button 
-                variant="outline" 
-                className="h-auto py-6 flex flex-col items-center justify-center"
-                onClick={() => window.location.href = `/sound/pesos?tourId=${tourId}&mode=defaults`}
-              >
-                <div className="text-lg font-medium">Sound Weight Defaults</div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  Configure default weight settings for sound equipment
-                </div>
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                className="h-auto py-6 flex flex-col items-center justify-center"
-                onClick={() => window.location.href = `/sound/consumos?tourId=${tourId}&mode=defaults`}
-              >
-                <div className="text-lg font-medium">Sound Power Defaults</div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  Configure default power requirements for sound equipment
-                </div>
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                className="h-auto py-6 flex flex-col items-center justify-center"
-                onClick={() => window.location.href = `/lights/pesos?tourId=${tourId}&mode=defaults`}
-              >
-                <div className="text-lg font-medium">Lights Weight Defaults</div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  Configure default weight settings for lighting equipment
-                </div>
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                className="h-auto py-6 flex flex-col items-center justify-center"
-                onClick={() => window.location.href = `/lights/consumos?tourId=${tourId}&mode=defaults`}
-              >
-                <div className="text-lg font-medium">Lights Power Defaults</div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  Configure default power requirements for lighting equipment
-                </div>
-              </Button>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="overrides" className="space-y-4">
-            <div>
-              <h3 className="text-lg font-medium">Date-Specific Overrides</h3>
-              <p className="text-sm text-muted-foreground">
-                Create overrides for specific tour dates when requirements differ from defaults
-              </p>
-            </div>
-            
-            <div className="border rounded-md">
-              <div className="bg-muted px-4 py-2 border-b">
-                <div className="grid grid-cols-3 gap-4 font-medium">
-                  <div>Date</div>
-                  <div>Location</div>
-                  <div>Actions</div>
-                </div>
-              </div>
-              
-              <div className="divide-y">
-                {tourDates.length > 0 ? (
-                  tourDates.map((date) => (
-                    <div key={date.id} className="px-4 py-3">
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>{new Date(date.date).toLocaleDateString()}</div>
-                        <div>{date.locations?.name || 'Unknown location'}</div>
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => window.location.href = `/sound/pesos?tourId=${tourId}&tourDateId=${date.id}`}
-                          >
-                            Sound Weight
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => window.location.href = `/sound/consumos?tourId=${tourId}&tourDateId=${date.id}`}
-                          >
-                            Sound Power
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="px-4 py-8 text-center text-muted-foreground">
-                    No tour dates found. Add dates to the tour first.
+              {powerTables.map((table) => (
+                <div key={table.id} className="border rounded-lg p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <h5 className="font-medium">{table.table_name}</h5>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteSet(table.set_id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                )}
-              </div>
+                  <p className="text-sm text-muted-foreground">
+                    {table.total_value.toFixed(2)} W
+                  </p>
+                  {table.metadata?.currentPerPhase && (
+                    <p className="text-xs text-muted-foreground">
+                      {table.metadata.currentPerPhase.toFixed(2)} A per phase
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
-          </TabsContent>
-          
-          <TabsContent value="export" className="space-y-4">
-            <div>
-              <h3 className="text-lg font-medium">Export Reports</h3>
-              <p className="text-sm text-muted-foreground">
-                Generate PDF reports for all tour dates
-              </p>
-            </div>
-            
-            <div className="flex flex-col gap-4">
-              <Button 
-                onClick={exportAllPDFs} 
-                disabled={isExporting}
-                className="w-full sm:w-auto"
+          ) : (
+            <p className="text-muted-foreground">No power defaults configured</p>
+          )}
+        </div>
+
+        {/* Weight Defaults */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-lg font-semibold flex items-center gap-2">
+              <Weight className="h-5 w-5" />
+              Weight Defaults ({weightTables.length})
+            </h4>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleBulkPDFExport(department, 'weight')}
+                disabled={weightTables.length === 0}
               >
-                <FileText className="h-4 w-4 mr-2" />
-                {isExporting ? `Exporting (${exportProgress}/${totalExports})` : 'Export All Date Reports'}
+                <FileText className="h-4 w-4 mr-1" />
+                Export Defaults PDF
               </Button>
-              
-              <div className="border rounded-md">
-                <div className="bg-muted px-4 py-2 border-b">
-                  <div className="grid grid-cols-3 gap-4 font-medium">
-                    <div>Date</div>
-                    <div>Location</div>
-                    <div>Actions</div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleBulkTourDateExport(department, 'weight')}
+                disabled={weightTables.length === 0 || tourDates.length === 0}
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Bulk Tour Date PDFs
+              </Button>
+            </div>
+          </div>
+          {weightTables.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {weightTables.map((table) => (
+                <div key={table.id} className="border rounded-lg p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <h5 className="font-medium">{table.table_name}</h5>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteSet(table.set_id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {table.total_value.toFixed(2)} kg
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground">No weight defaults configured</p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderTourDatesTab = () => {
+    return (
+      <div className="space-y-6">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
+            <Calendar className="h-5 w-5" />
+            Tour Dates ({tourDates.length})
+          </h3>
+          <p className="text-sm text-green-700 mb-4">
+            Export individual PDFs for each tour date, including both defaults and overrides.
+          </p>
+          
+          {/* Safety Margin Selection */}
+          <div className="mb-4">
+            <Label htmlFor="tourDateSafetyMargin" className="text-sm font-medium">Safety Margin for Tour Date PDFs</Label>
+            <Select
+              value={safetyMargin.toString()}
+              onValueChange={(value) => setSafetyMargin(Number(value))}
+            >
+              <SelectTrigger className="w-full mt-1">
+                <SelectValue placeholder="Select Safety Margin" />
+              </SelectTrigger>
+              <SelectContent>
+                {[0, 10, 20, 30, 40, 50].map((percentage) => (
+                  <SelectItem key={percentage} value={percentage.toString()}>
+                    {percentage}%
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {tourDates.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4">
+            {tourDates.map((tourDate) => (
+              <div key={tourDate.id} className="border rounded-lg p-4">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h4 className="font-medium">
+                      {new Date(tourDate.date).toLocaleDateString('en-GB')}
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      {(tourDate.locations as any)?.name || 'Unknown Location'}
+                    </p>
                   </div>
                 </div>
                 
-                <div className="divide-y">
-                  {tourDates.length > 0 ? (
-                    tourDates.map((date) => (
-                      <div key={date.id} className="px-4 py-3">
-                        <div className="grid grid-cols-3 gap-4">
-                          <div>{new Date(date.date).toLocaleDateString()}</div>
-                          <div>{date.locations?.name || 'Unknown location'}</div>
-                          <div>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => exportTourDatePDF(date)}
-                            >
-                              <Download className="h-4 w-4 mr-2" />
-                              Export PDF
-                            </Button>
-                          </div>
-                        </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {['sound', 'lights', 'video'].map((dept) => (
+                    <div key={dept} className="space-y-2">
+                      <h5 className="text-sm font-medium capitalize">{dept}</h5>
+                      <div className="flex flex-col gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => exportTourDatePDF(tourDate, dept, 'power')}
+                          className="text-xs"
+                        >
+                          Power PDF
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => exportTourDatePDF(tourDate, dept, 'weight')}
+                          className="text-xs"
+                        >
+                          Weight PDF
+                        </Button>
                       </div>
-                    ))
-                  ) : (
-                    <div className="px-4 py-8 text-center text-muted-foreground">
-                      No tour dates found. Add dates to the tour first.
                     </div>
-                  )}
+                  ))}
                 </div>
               </div>
-            </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-muted-foreground">No tour dates configured</p>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Tour Defaults: {tour?.name}</DialogTitle>
+        </DialogHeader>
+        
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="sound">Sound</TabsTrigger>
+            <TabsTrigger value="lights">Lights</TabsTrigger>
+            <TabsTrigger value="video">Video</TabsTrigger>
+            <TabsTrigger value="tour-dates">Tour Dates</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="sound" className="mt-6">
+            {soundLoading ? (
+              <p>Loading sound defaults...</p>
+            ) : (
+              renderDepartmentDefaults('sound', soundDefaultSets, soundDefaultTables, handleDeleteSoundSet)
+            )}
+          </TabsContent>
+          
+          <TabsContent value="lights" className="mt-6">
+            {lightsLoading ? (
+              <p>Loading lights defaults...</p>
+            ) : (
+              renderDepartmentDefaults('lights', lightsDefaultSets, lightsDefaultTables, handleDeleteLightsSet)
+            )}
+          </TabsContent>
+          
+          <TabsContent value="video" className="mt-6">
+            {videoLoading ? (
+              <p>Loading video defaults...</p>
+            ) : (
+              renderDepartmentDefaults('video', videoDefaultSets, videoDefaultTables, handleDeleteVideoSet)
+            )}
+          </TabsContent>
+
+          <TabsContent value="tour-dates" className="mt-6">
+            {renderTourDatesTab()}
           </TabsContent>
         </Tabs>
-      </CardContent>
-    </Card>
+      </DialogContent>
+    </Dialog>
   );
 };
-
-export default TourDefaultsManager;
