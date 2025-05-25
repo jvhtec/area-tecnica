@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -81,8 +80,6 @@ export const TourDefaultsManager = ({
 
   const handleBulkPDFExport = async (department: string, type: 'power' | 'weight') => {
     try {
-      const relevantSets = department === 'sound' ? soundDefaultSets : 
-                          department === 'lights' ? lightsDefaultSets : videoDefaultSets;
       const relevantTables = department === 'sound' ? soundDefaultTables : 
                             department === 'lights' ? lightsDefaultTables : videoDefaultTables;
 
@@ -97,7 +94,6 @@ export const TourDefaultsManager = ({
         return;
       }
 
-      // Fetch tour logo
       let logoUrl: string | undefined;
       try {
         logoUrl = await fetchTourLogo(tour.id);
@@ -105,17 +101,26 @@ export const TourDefaultsManager = ({
         console.error('Error fetching tour logo:', error);
       }
 
-      // Convert to the format expected by exportToPDF with proper typing
       const tables = filteredTables.map(table => ({
-        name: table.table_name,
+        name: table.table_name, // No suffix for defaults
         rows: table.table_data.rows || [],
         totalWeight: type === 'weight' ? table.total_value : undefined,
         totalWatts: type === 'power' ? table.total_value : undefined,
         currentPerPhase: table.metadata?.currentPerPhase,
         pduType: table.metadata?.pduType,
+        customPduType: table.metadata?.customPduType,
+        includesHoist: table.metadata?.includesHoist,
         toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
         id: Date.now()
       }));
+
+      // Calculate power summary for consumos exports
+      let powerSummary;
+      if (type === 'power') {
+        const totalSystemWatts = tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
+        const totalSystemAmps = tables.reduce((sum, table) => sum + (table.currentPerPhase || 0) * 3, 0);
+        powerSummary = { totalSystemWatts, totalSystemAmps };
+      }
 
       const pdfBlob = await exportToPDF(
         `${tour.name} - ${department.toUpperCase()} ${type.toUpperCase()} Defaults`,
@@ -124,7 +129,7 @@ export const TourDefaultsManager = ({
         tour.name,
         new Date().toLocaleDateString('en-GB'),
         undefined,
-        undefined,
+        powerSummary,
         safetyMargin,
         logoUrl
       );
@@ -164,7 +169,6 @@ export const TourDefaultsManager = ({
         return;
       }
 
-      // Fetch tour logo
       let logoUrl: string | undefined;
       try {
         logoUrl = await fetchTourLogo(tour.id);
@@ -172,7 +176,6 @@ export const TourDefaultsManager = ({
         console.error('Error fetching tour logo:', error);
       }
 
-      // Export one PDF per tour date
       for (const tourDate of tourDates) {
         await exportTourDatePDF(tourDate, department, type, logoUrl);
       }
@@ -198,49 +201,82 @@ export const TourDefaultsManager = ({
     const defaultTables = relevantTables.filter(table => table.table_type === type);
 
     // Get overrides for this tour date
+    const overrideTableName = type === 'power' ? 'tour_date_power_overrides' : 'tour_date_weight_overrides';
     const { data: overrides } = await supabase
-      .from(type === 'power' ? 'tour_date_power_overrides' : 'tour_date_weight_overrides')
+      .from(overrideTableName)
       .select('*')
       .eq('tour_date_id', tourDate.id)
       .eq('department', department);
 
-    // Combine defaults and overrides with proper typing
-    const combinedTables = [
-      ...defaultTables.map(table => ({
-        name: `${table.table_name} (Default)`,
-        rows: table.table_data.rows || [],
-        totalWeight: type === 'weight' ? table.total_value : undefined,
-        totalWatts: type === 'power' ? table.total_value : undefined,
-        currentPerPhase: table.metadata?.currentPerPhase,
-        pduType: table.metadata?.pduType,
-        toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
-        id: Date.now() + Math.random()
-      })),
-      ...(overrides || []).map((override: any) => ({
-        name: `${override.table_name || override.item_name} (Override)`,
-        rows: override.override_data?.rows || [],
+    // Create a map of overrides by table name for easy lookup
+    const overrideMap = new Map();
+    (overrides || []).forEach((override: any) => {
+      const tableName = override.table_name || override.item_name;
+      overrideMap.set(tableName, override);
+    });
+
+    // Build final tables list: prioritize overrides, fallback to defaults
+    const finalTables: any[] = [];
+    const processedTableNames = new Set();
+
+    // First, add all overrides (these take priority)
+    (overrides || []).forEach((override: any) => {
+      const tableName = override.table_name || override.item_name;
+      processedTableNames.add(tableName);
+      
+      finalTables.push({
+        name: tableName, // Clean name without suffix
+        rows: override.override_data?.tableData?.rows || override.override_data?.rows || [],
         totalWeight: type === 'weight' ? override.weight_kg * (override.quantity || 1) : undefined,
         totalWatts: type === 'power' ? override.total_watts : undefined,
         currentPerPhase: type === 'power' ? override.current_per_phase : undefined,
         pduType: type === 'power' ? override.pdu_type : undefined,
+        customPduType: type === 'power' ? override.custom_pdu_type : undefined,
+        includesHoist: type === 'power' ? override.includes_hoist : undefined,
         toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
         id: Date.now() + Math.random()
-      }))
-    ];
+      });
+    });
 
-    if (combinedTables.length === 0) return;
+    // Then, add defaults only if no override exists for that table
+    defaultTables.forEach((defaultTable) => {
+      if (!processedTableNames.has(defaultTable.table_name)) {
+        finalTables.push({
+          name: defaultTable.table_name, // Clean name without suffix
+          rows: defaultTable.table_data.rows || [],
+          totalWeight: type === 'weight' ? defaultTable.total_value : undefined,
+          totalWatts: type === 'power' ? defaultTable.total_value : undefined,
+          currentPerPhase: defaultTable.metadata?.currentPerPhase,
+          pduType: defaultTable.metadata?.pduType,
+          customPduType: defaultTable.metadata?.customPduType,
+          includesHoist: defaultTable.metadata?.includesHoist,
+          toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+          id: Date.now() + Math.random()
+        });
+      }
+    });
+
+    if (finalTables.length === 0) return;
+
+    // Calculate power summary for consumos exports
+    let powerSummary;
+    if (type === 'power') {
+      const totalSystemWatts = finalTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
+      const totalSystemAmps = finalTables.reduce((sum, table) => sum + (table.currentPerPhase || 0) * 3, 0);
+      powerSummary = { totalSystemWatts, totalSystemAmps };
+    }
 
     const locationName = (tourDate.locations as any)?.name || 'Unknown Location';
     const dateStr = new Date(tourDate.date).toLocaleDateString('en-GB');
 
     const pdfBlob = await exportToPDF(
       `${tour.name} - ${locationName} - ${department.toUpperCase()} ${type.toUpperCase()}`,
-      combinedTables,
+      finalTables,
       type,
       tour.name,
       dateStr,
       undefined,
-      undefined,
+      powerSummary,
       safetyMargin,
       logoUrl
     );
@@ -275,7 +311,6 @@ export const TourDefaultsManager = ({
 
     return (
       <div className="space-y-6">
-        {/* Safety Margin Selection */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <Label htmlFor="safetyMargin" className="text-sm font-medium">Safety Margin for PDF Exports</Label>
           <Select
@@ -295,7 +330,6 @@ export const TourDefaultsManager = ({
           </Select>
         </div>
 
-        {/* Power Defaults */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h4 className="text-lg font-semibold flex items-center gap-2">
@@ -354,7 +388,6 @@ export const TourDefaultsManager = ({
           )}
         </div>
 
-        {/* Weight Defaults */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h4 className="text-lg font-semibold flex items-center gap-2">
@@ -423,7 +456,6 @@ export const TourDefaultsManager = ({
             Export individual PDFs for each tour date, including both defaults and overrides.
           </p>
           
-          {/* Safety Margin Selection */}
           <div className="mb-4">
             <Label htmlFor="tourDateSafetyMargin" className="text-sm font-medium">Safety Margin for Tour Date PDFs</Label>
             <Select
