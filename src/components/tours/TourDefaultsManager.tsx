@@ -105,7 +105,7 @@ export const TourDefaultsManager = ({
         console.error('Error fetching tour logo:', error);
       }
 
-      // Convert to the format expected by exportToPDF
+      // Convert to the format expected by exportToPDF with proper typing
       const tables = filteredTables.map(table => ({
         name: table.table_name,
         rows: table.table_data.rows || [],
@@ -113,7 +113,7 @@ export const TourDefaultsManager = ({
         totalWatts: type === 'power' ? table.total_value : undefined,
         currentPerPhase: table.metadata?.currentPerPhase,
         pduType: table.metadata?.pduType,
-        toolType: table.table_data.toolType || (type === 'power' ? 'consumos' : 'pesos'),
+        toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
         id: Date.now()
       }));
 
@@ -204,7 +204,7 @@ export const TourDefaultsManager = ({
       .eq('tour_date_id', tourDate.id)
       .eq('department', department);
 
-    // Combine defaults and overrides
+    // Combine defaults and overrides with proper typing
     const combinedTables = [
       ...defaultTables.map(table => ({
         name: `${table.table_name} (Default)`,
@@ -213,7 +213,7 @@ export const TourDefaultsManager = ({
         totalWatts: type === 'power' ? table.total_value : undefined,
         currentPerPhase: table.metadata?.currentPerPhase,
         pduType: table.metadata?.pduType,
-        toolType: table.table_data.toolType || (type === 'power' ? 'consumos' : 'pesos'),
+        toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
         id: Date.now() + Math.random()
       })),
       ...(overrides || []).map((override: any) => ({
@@ -223,7 +223,7 @@ export const TourDefaultsManager = ({
         totalWatts: type === 'power' ? override.total_watts : undefined,
         currentPerPhase: type === 'power' ? override.current_per_phase : undefined,
         pduType: type === 'power' ? override.pdu_type : undefined,
-        toolType: type === 'power' ? 'consumos' : 'pesos',
+        toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
         id: Date.now() + Math.random()
       }))
     ];
