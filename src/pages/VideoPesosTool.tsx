@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -181,8 +180,11 @@ const VideoPesosTool: React.FC = () => {
     setTableName('');
   };
 
-  const removeTable = (tableId: number) => {
-    setTables((prev) => prev.filter((table) => table.id !== tableId));
+  const removeTable = (tableId: number | string) => {
+    // Only allow removal of regular tables (numeric IDs), not default tables
+    if (typeof tableId === 'number') {
+      setTables((prev) => prev.filter((table) => table.id !== tableId));
+    }
   };
 
   const handleExportPDF = async () => {
@@ -423,14 +425,17 @@ const VideoPesosTool: React.FC = () => {
                     <Badge variant="outline" className="bg-orange-50 text-orange-700">Override</Badge>
                   )}
                 </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => table.id && removeTable(table.id)}
-                >
-                  Remove Table
-                </Button>
+                {typeof table.id === 'number' && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => removeTable(table.id as number)}
+                  >
+                    Remove Table
+                  </Button>
+                )}
               </div>
+              
               <table className="w-full">
                 <thead className="bg-muted/50">
                   <tr>

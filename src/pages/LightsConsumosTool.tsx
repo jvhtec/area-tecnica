@@ -307,23 +307,29 @@ const LightsConsumosTool: React.FC = () => {
     setTableName('');
   };
 
-  const removeTable = (tableId: number) => {
-    setTables((prev) => prev.filter((table) => table.id !== tableId));
+  const removeTable = (tableId: number | string) => {
+    // Only allow removal of regular tables (numeric IDs), not default tables
+    if (typeof tableId === 'number') {
+      setTables((prev) => prev.filter((table) => table.id !== tableId));
+    }
   };
 
-  const updateTableSettings = (tableId: number, updates: Partial<Table>) => {
-    setTables((prev) =>
-      prev.map((table) => {
-        if (table.id === tableId) {
-          const updatedTable = { ...table, ...updates };
-          if (selectedJobId) {
-            savePowerRequirementTable(updatedTable);
+  const updateTableSettings = (tableId: number | string, updates: Partial<Table>) => {
+    // Only allow updates to regular tables (numeric IDs), not default tables
+    if (typeof tableId === 'number') {
+      setTables((prev) =>
+        prev.map((table) => {
+          if (table.id === tableId) {
+            const updatedTable = { ...table, ...updates };
+            if (selectedJobId) {
+              savePowerRequirementTable(updatedTable);
+            }
+            return updatedTable;
           }
-          return updatedTable;
-        }
-        return table;
-      })
-    );
+          return table;
+        })
+      );
+    }
   };
 
   const handleExportPDF = async () => {
@@ -638,53 +644,57 @@ const LightsConsumosTool: React.FC = () => {
                     <Badge variant="outline" className="bg-orange-50 text-orange-700">Override</Badge>
                   )}
                 </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => table.id && removeTable(table.id)}
-                >
-                  Eliminar Tabla
-                </Button>
+                {typeof table.id === 'number' && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => removeTable(table.id as number)}
+                  >
+                    Eliminar Tabla
+                  </Button>
+                )}
               </div>
               
-              <div className="p-4 bg-muted/50 space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id={`hoist-${table.id}`}
-                      checked={table.includesHoist}
-                      onCheckedChange={(checked) => 
-                        table.id && updateTableSettings(table.id, { includesHoist: !!checked })
-                      }
-                    />
-                    <Label htmlFor={`hoist-${table.id}`}>Incluir Potencia para Polipasto (CEE32A 3P+N+G)</Label>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Label>Anulación de Tipo de PDU:</Label>
-                    <Select
-                      value={table.customPduType || 'default'}
-                      onValueChange={(value) => 
-                        table.id && updateTableSettings(table.id, { 
-                          customPduType: value === 'default' ? undefined : value 
-                        })
-                      }
-                    >
-                      <SelectTrigger className="w-[200px]">
-                        <SelectValue placeholder="Usar PDU sugerido" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="default">Usar PDU sugerido</SelectItem>
-                        {PDU_TYPES.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {type}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+              {typeof table.id === 'number' && (
+                <div className="p-4 bg-muted/50 space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id={`hoist-${table.id}`}
+                        checked={table.includesHoist}
+                        onCheckedChange={(checked) => 
+                          updateTableSettings(table.id as number, { includesHoist: !!checked })
+                        }
+                      />
+                      <Label htmlFor={`hoist-${table.id}`}>Incluir Potencia para Polipasto (CEE32A 3P+N+G)</Label>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <Label>Anulación de Tipo de PDU:</Label>
+                      <Select
+                        value={table.customPduType || 'default'}
+                        onValueChange={(value) => 
+                          updateTableSettings(table.id as number, { 
+                            customPduType: value === 'default' ? undefined : value 
+                          })
+                        }
+                      >
+                        <SelectTrigger className="w-[200px]">
+                          <SelectValue placeholder="Usar PDU sugerido" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="default">Usar PDU sugerido</SelectItem>
+                          {PDU_TYPES.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               <table className="w-full">
                 <thead className="bg-muted/50">
