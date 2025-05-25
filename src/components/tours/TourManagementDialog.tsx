@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { TourColorSection } from "./TourColorSection";
 import { TourDeleteSection } from "./TourDeleteSection";
-import { TourDefaultsManager } from "./TourDefaultsManager";
+import TourDefaultsManager from "./TourDefaultsManager";
 import { useTourManagement } from "./hooks/useTourManagement";
 import { TourLogoManager } from "./TourLogoManager";
 import { useNavigate } from "react-router-dom";
