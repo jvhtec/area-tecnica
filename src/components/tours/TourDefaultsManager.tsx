@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import { useTourDateOverrides } from "@/hooks/useTourDateOverrides";
 import { useToast } from "@/hooks/use-toast";
 import { FileText, Weight, Calculator, Trash2, Download, Calendar } from "lucide-react";
 import { exportToPDF } from "@/utils/pdfExport";
-import { fetchTourLogo } from "@/utils/pdf/logoUtils";
+import { fetchTourLogo } from "@/utils/pdf/tourLogoUtils";
 import { supabase } from "@/lib/supabase";
 
 interface TourDefaultsManagerProps {
@@ -102,7 +103,7 @@ export const TourDefaultsManager = ({
       }
 
       const tables = filteredTables.map(table => ({
-        name: table.table_name, // No suffix for defaults
+        name: table.table_name,
         rows: table.table_data.rows || [],
         totalWeight: type === 'weight' ? table.total_value : undefined,
         totalWatts: type === 'power' ? table.total_value : undefined,
@@ -225,7 +226,7 @@ export const TourDefaultsManager = ({
       processedTableNames.add(tableName);
       
       finalTables.push({
-        name: tableName, // Clean name without suffix
+        name: tableName,
         rows: override.override_data?.tableData?.rows || override.override_data?.rows || [],
         totalWeight: type === 'weight' ? override.weight_kg * (override.quantity || 1) : undefined,
         totalWatts: type === 'power' ? override.total_watts : undefined,
@@ -242,7 +243,7 @@ export const TourDefaultsManager = ({
     defaultTables.forEach((defaultTable) => {
       if (!processedTableNames.has(defaultTable.table_name)) {
         finalTables.push({
-          name: defaultTable.table_name, // Clean name without suffix
+          name: defaultTable.table_name,
           rows: defaultTable.table_data.rows || [],
           totalWeight: type === 'weight' ? defaultTable.total_value : undefined,
           totalWatts: type === 'power' ? defaultTable.total_value : undefined,
