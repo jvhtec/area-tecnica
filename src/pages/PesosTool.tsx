@@ -1,31 +1,20 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, ArrowLeft, Save, Trash2 } from 'lucide-react';
+import { FileText, ArrowLeft, Save } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTourWeightDefaults } from '@/hooks/useTourWeightDefaults';
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
+import { useTourDateOverrides } from '@/hooks/useTourDateOverrides';
 import { Badge } from '@/components/ui/badge';
-import { useOverrideManagement } from '@/hooks/useOverrideManagement';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 
 // Database for sound components.
 const soundComponentDatabase = [
@@ -76,10 +65,10 @@ interface Table {
   name: string;
   rows: TableRow[];
   totalWeight?: number;
-  id?: number | string; // Allow both number and string for compatibility
+  id?: number;
   dualMotors?: boolean;
-  riggingPoints?: string;
-  clusterId?: string;
+  riggingPoints?: string; // Stores the generated SX suffix(es)
+  clusterId?: string;     // New property to group tables (e.g. mirrored pair)
   defaultTableId?: string;
   overrideId?: string;
   isOverride?: boolean;
@@ -136,20 +125,11 @@ const PesosTool: React.FC = () => {
   } = useTourDefaultSets(tourId || '', 'sound');
 
   const {
-    unsavedTables,
-    existingOverrides,
-    addUnsavedTable,
-    removeUnsavedTable,
-    saveAllOverrides,
-    deleteOverrideTable,
-    setJobOverrideContext,
-    hasUnsavedChanges,
-    overridesLoading
-  } = useOverrideManagement(
-    isTourDateContext ? tourDateId : null,
-    'sound',
-    'weight'
-  );
+    weightOverrides,
+    createWeightOverride,
+    deleteOverride,
+    isLoading: overridesLoading
+  } = useTourDateOverrides(tourDateId || '', 'weight');
 
   // Get tour name for display
   const [tourName, setTourName] = useState<string>('');
@@ -159,14 +139,12 @@ const PesosTool: React.FC = () => {
   useEffect(() => {
     if (selectedJob?.tour_date_id && !isTourContext) {
       setIsJobOverrideMode(true);
-      setJobOverrideContext(selectedJob.tour_date_id);
       loadJobTourInfo();
     } else {
       setIsJobOverrideMode(false);
-      setJobOverrideContext(null);
       setJobTourInfo(null);
     }
-  }, [selectedJob, isTourContext, setJobOverrideContext]);
+  }, [selectedJob, isTourContext]);
 
   const loadJobTourInfo = async () => {
     if (!selectedJob?.tour_date_id) return;
@@ -266,10 +244,10 @@ const PesosTool: React.FC = () => {
     }
   }, [isDefaults, defaultTables]);
 
-  // Load existing overrides
+  // Load tour date overrides when in tour date context
   useEffect(() => {
-    if ((isTourDateContext || isJobOverrideMode) && existingOverrides.length > 0) {
-      const convertedTables = existingOverrides.map((override, index) => ({
+    if (isTourDateContext && weightOverrides.length > 0) {
+      const convertedTables = weightOverrides.map((override, index) => ({
         name: override.item_name,
         rows: override.override_data?.tableData?.rows || [{
           quantity: override.quantity.toString(),
@@ -279,16 +257,15 @@ const PesosTool: React.FC = () => {
           totalWeight: override.weight_kg * override.quantity
         }],
         totalWeight: override.weight_kg * override.quantity,
-        id: `override-${override.id}`,
+        id: Date.now() + index,
         clusterId: override.override_data?.tableData?.clusterId,
         dualMotors: override.override_data?.tableData?.dualMotors,
         riggingPoints: override.override_data?.tableData?.riggingPoints,
-        overrideId: override.id,
-        isOverride: true
+        overrideId: override.id
       }));
       setTables(convertedTables);
     }
-  }, [isTourDateContext, isJobOverrideMode, existingOverrides]);
+  }, [isTourDateContext, weightOverrides]);
 
   // Helper to generate an SX suffix.
   // Returns a string such as "SX01" or "SX01, SX02" depending on useDualMotors.
@@ -398,6 +375,72 @@ const PesosTool: React.FC = () => {
     }
   };
 
+  const saveAsOverride = async (table: Table) => {
+    // Job-based override mode
+    if (isJobOverrideMode && selectedJob?.tour_date_id) {
+      try {
+        await createWeightOverride({
+          tour_date_id: selectedJob.tour_date_id,
+          default_table_id: table.defaultTableId,
+          item_name: table.name,
+          weight_kg: table.totalWeight || 0,
+          quantity: 1,
+          category: null,
+          department: 'sound',
+          override_data: {
+            tableData: table,
+            toolType: 'pesos'
+          }
+        });
+
+        toast({
+          title: 'Success',
+          description: 'Override saved for tour date',
+        });
+        return;
+      } catch (error: any) {
+        console.error('Error saving override:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to save override',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
+    if (!tourDateId) return;
+
+    try {
+      // Save the table as an override
+      await createWeightOverride({
+        tour_date_id: tourDateId,
+        default_table_id: table.defaultTableId,
+        item_name: table.name,
+        weight_kg: table.totalWeight || 0,
+        quantity: 1,
+        category: null,
+        department: 'sound',
+        override_data: {
+          tableData: table,
+          toolType: 'pesos'
+        }
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Override saved for this tour date',
+      });
+    } catch (error: any) {
+      console.error('Error saving override:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save override',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const generateTable = () => {
     if (!tableName) {
       toast({
@@ -447,9 +490,8 @@ const PesosTool: React.FC = () => {
         clusterId: newClusterId,
         isOverride: true
       };
-      
-      // Add to unsaved tables instead of saving immediately
-      addUnsavedTable(newTable);
+      setTables((prev) => [...prev, newTable]);
+      saveAsOverride(newTable);
     } else if (mirroredCluster) {
       // For mirrored clusters, generate two tables sharing the same clusterId.
       const leftSuffix = getSuffix();
@@ -503,21 +545,8 @@ const PesosTool: React.FC = () => {
     setTableName('');
   };
 
-  const removeTable = (tableId: number | string) => {
-    if (typeof tableId === 'string' && tableId.startsWith('override-')) {
-      // Remove from unsaved tables if it's an unsaved override
-      removeUnsavedTable(tableId);
-    } else {
-      // Remove from regular tables
-      setTables((prev) => prev.filter((table) => table.id !== tableId));
-    }
-  };
-
-  const handleDeleteOverride = async (overrideId: string) => {
-    const success = await deleteOverrideTable(overrideId);
-    if (success) {
-      setTables((prev) => prev.filter((table) => table.overrideId !== overrideId));
-    }
+  const removeTable = (tableId: number) => {
+    setTables((prev) => prev.filter((table) => table.id !== tableId));
   };
 
   const handleExportPDF = async () => {
@@ -656,7 +685,7 @@ const PesosTool: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {/* Override mode notifications */}
+          {/* Job-based override notification */}
           {isJobOverrideMode && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
@@ -671,6 +700,7 @@ const PesosTool: React.FC = () => {
             </div>
           )}
 
+          {/* Tour date override notification */}
           {isTourDateContext && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
@@ -682,29 +712,6 @@ const PesosTool: React.FC = () => {
               <p className="text-sm text-blue-700 mt-1">
                 Any tables you create will be saved as overrides for this specific tour date.
               </p>
-            </div>
-          )}
-
-          {/* Manual save section for override modes */}
-          {(isTourDateContext || isJobOverrideMode) && hasUnsavedChanges && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-yellow-900">
-                    Unsaved Override Tables ({unsavedTables.length})
-                  </p>
-                  <p className="text-sm text-yellow-700 mt-1">
-                    You have unsaved override tables. Save them when ready.
-                  </p>
-                </div>
-                <Button
-                  onClick={saveAllOverrides}
-                  className="flex items-center gap-2"
-                >
-                  <Save className="h-4 w-4" />
-                  Save Override Tables
-                </Button>
-              </div>
             </div>
           )}
 
@@ -898,18 +905,18 @@ const PesosTool: React.FC = () => {
           )}
 
           {/* Display existing overrides for tour dates */}
-          {isTourDateContext && existingOverrides.length > 0 && (
+          {isTourDateContext && weightOverrides.length > 0 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Existing Overrides for This Date</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {existingOverrides.map((override) => (
+                {weightOverrides.map((override) => (
                   <div key={override.id} className="border rounded-lg p-4">
                     <div className="flex justify-between items-center mb-2">
                       <h4 className="font-medium">{override.item_name}</h4>
                       <Button
                         variant="destructive"
                         size="sm"
-                        onClick={() => deleteOverrideTable(override.id)}
+                        onClick={() => deleteOverride({ id: override.id, table: 'weight' })}
                       >
                         Delete
                       </Button>
@@ -923,116 +930,8 @@ const PesosTool: React.FC = () => {
             </div>
           )}
 
-          {/* Display unsaved override tables */}
-          {unsavedTables.map((table) => (
-            <div key={table.id} className="border rounded-lg overflow-hidden mt-6 border-yellow-300">
-              <div className="bg-yellow-50 px-4 py-3 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold">{table.name}</h3>
-                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Unsaved Override</Badge>
-                </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => removeUnsavedTable(table.id!)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium">Quantity</th>
-                    <th className="px-4 py-3 text-left font-medium">Component</th>
-                    <th className="px-4 py-3 text-left font-medium">Weight (per unit)</th>
-                    <th className="px-4 py-3 text-left font-medium">Total Weight</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {table.rows.map((row, index) => (
-                    <tr key={index} className="border-t">
-                      <td className="px-4 py-3">{row.quantity}</td>
-                      <td className="px-4 py-3">{row.componentName}</td>
-                      <td className="px-4 py-3">{row.weight}</td>
-                      <td className="px-4 py-3">{row.totalWeight?.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                  <tr className="border-t bg-muted/50 font-medium">
-                    <td colSpan={3} className="px-4 py-3 text-right">
-                      Total Weight:
-                    </td>
-                    <td className="px-4 py-3">{table.totalWeight?.toFixed(2)} kg</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          ))}
-
-          {/* Display saved override tables */}
-          {tables.filter(table => table.isOverride).map((table) => (
-            <div key={table.id} className="border rounded-lg overflow-hidden mt-6 border-blue-300">
-              <div className="bg-blue-50 px-4 py-3 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold">{table.name}</h3>
-                  <Badge variant="outline" className="bg-blue-100 text-blue-800">Saved Override</Badge>
-                </div>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Override Table</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to delete this override table? This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => table.overrideId && handleDeleteOverride(table.overrideId)}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-              
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium">Quantity</th>
-                    <th className="px-4 py-3 text-left font-medium">Component</th>
-                    <th className="px-4 py-3 text-left font-medium">Weight (per unit)</th>
-                    <th className="px-4 py-3 text-left font-medium">Total Weight</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {table.rows.map((row, index) => (
-                    <tr key={index} className="border-t">
-                      <td className="px-4 py-3">{row.quantity}</td>
-                      <td className="px-4 py-3">{row.componentName}</td>
-                      <td className="px-4 py-3">{row.weight}</td>
-                      <td className="px-4 py-3">{row.totalWeight?.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                  <tr className="border-t bg-muted/50 font-medium">
-                    <td colSpan={3} className="px-4 py-3 text-right">
-                      Total Weight:
-                    </td>
-                    <td className="px-4 py-3">{table.totalWeight?.toFixed(2)} kg</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          ))}
-
-          {/* Display regular tables */}
-          {tables.filter(table => !table.isOverride).map((table) => (
+          {/* Table display with save as default option */}
+          {tables.map((table) => (
             <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
                 <h3 className="font-semibold">{table.name}</h3>
