@@ -24,7 +24,7 @@ interface TourDateQueryResult {
   location_id: string;
   locations: {
     name: string;
-  };
+  }[];
 }
 
 export const TourManagementDialog = ({
@@ -62,7 +62,7 @@ export const TourManagementDialog = ({
         date: item.date,
         location_id: item.location_id,
         locations: {
-          name: item.locations?.name || 'Unknown location'
+          name: item.locations[0]?.name || 'Unknown location'
         }
       }));
     },
