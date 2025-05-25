@@ -473,6 +473,31 @@ const ConsumosTool: React.FC = () => {
         console.log('Current tables:', tables);
         console.log('Saved overrides:', savedOverrides);
         // tablesToExport is already set correctly above
+      } else {
+        // For non-override mode, fetch any existing power requirement tables for this job
+        try {
+          const { data: existingTables } = await supabase
+            .from('power_requirement_tables')
+            .select('*')
+            .eq('job_id', selectedJobId)
+            .eq('department', 'sound');
+
+          if (existingTables && existingTables.length > 0) {
+            const savedTables = existingTables.map(table => ({
+              name: table.table_name,
+              rows: [], // Power tables don't store individual rows
+              totalWatts: Number(table.total_watts),
+              currentPerPhase: Number(table.current_per_phase),
+              pduType: table.pdu_type,
+              customPduType: table.custom_pdu_type,
+              includesHoist: table.includes_hoist,
+              id: table.id
+            }));
+            tablesToExport = [...tablesToExport, ...savedTables];
+          }
+        } catch (error) {
+          console.error('Error fetching existing power tables:', error);
+        }
       }
 
       // Apply safety margin to all tables during export

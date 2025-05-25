@@ -731,6 +731,10 @@ const PesosTool: React.FC = () => {
         console.log('Current weight tables:', tables);
         console.log('Saved weight overrides:', savedOverrides);
         // tablesToExport is already set correctly above
+      } else {
+        // For non-override mode, also include any saved weight tables for this job
+        // But since we don't have a separate weight tables storage for jobs, just use current tables
+        console.log('Non-override mode: using current tables');
       }
 
       console.log('Final weight tables for export:', tablesToExport);
