@@ -4,76 +4,39 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, ArrowLeft } from 'lucide-react';
+import { FileText, ArrowLeft, Save } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
-import { useJobSelection } from '@/hooks/useJobSelection';
+import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
-import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
+import { useTourPowerDefaults } from '@/hooks/useTourPowerDefaults';
+import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
+import { useTourDateOverrides } from '@/hooks/useTourDateOverrides';
 import { Badge } from '@/components/ui/badge';
 
 const soundComponentDatabase = [
-  { id: 1, name: 'ROBERT JULIAT ARAMIS', watts: 1700 },
-  { id: 2, name: 'ROBERT JULIAT MERLIN', watts: 2200 },
-  { id: 3, name: 'ROBERT JULIAT CYRANO', watts: 2500 },
-  { id: 4, name: 'ROBERT JULIAT LANCELOT', watts: 4000 },
-  { id: 5, name: 'ROBERT JULIAT KORRIGAN', watts: 1200 },
-  { id: 6, name: 'ROBE BMFL SPOT', watts: 1700 },
-  { id: 7, name: 'MARTIN MAC ENCORE', watts: 880 },
-  { id: 8, name: 'CLAY PAKY SHARPY X FRAME', watts: 1200 },
-  { id: 9, name: 'VARI-LITE VL3600', watts: 900 },
-  { id: 10, name: 'AYRTON DOMINO LT', watts: 1100 },
-  { id: 11, name: 'AYRTON HURACAN LT', watts: 1100 },
-  { id: 12, name: 'AYRTON PERSEO BEAM', watts: 500 },
-  { id: 13, name: 'MARTIN ATOMIC 3000', watts: 3400 },
-  { id: 14, name: 'MDG THE ONE', watts: 1100 },
-  { id: 15, name: 'MDG ATMe', watts: 400 },
-  { id: 16, name: 'CHAUVET COLORado 2 QUAD ZOOM', watts: 200 },
-  { id: 17, name: 'CHAUVET COLORado 1 SOLO', watts: 150 },
-  { id: 18, name: 'CHAUVET COLORado 3 SOLO', watts: 250 },
-  { id: 19, name: 'CHAUVET COLORado 1 QUAD IP', watts: 150 },
-  { id: 20, name: 'CHAUVET COLORado 2 QUAD IP', watts: 200 },
-  { id: 21, name: 'CHAUVET COLORado 3 QUAD IP', watts: 250 },
-  { id: 22, name: 'CHAUVET COLOR STRIKE M', watts: 1100 },
-  { id: 23, name: 'SGM Q-8', watts: 850 },
-  { id: 24, name: 'SGM P-6', watts: 440 },
-  { id: 25, name: 'SGM G-SPOT', watts: 440 },
-  { id: 26, name: 'ROBE FORTE', watts: 1050 },
-  { id: 27, name: 'ELATION SIXPAR 200IP', watts: 180 },
-  { id: 28, name: 'ELATION SEVENPAR 19IP', watts: 220 },
-  { id: 29, name: 'ELATION FUZE PROFILE Z350', watts: 480 },
-  { id: 30, name: 'ELATION FUZE WASH FR', watts: 320 },
-  { id: 31, name: 'ELATION FUZE PROFILE CW', watts: 320 },
-  { id: 32, name: 'ETC SOURCE FOUR LED S2', watts: 120 },
-  { id: 33, name: 'ETC COLORSOURCE SPOT', watts: 180 },
-  { id: 34, name: 'ETC COLORSOURCE PAR', watts: 115 },
-  { id: 35, name: 'ARRI L5-C', watts: 115 },
-  { id: 36, name: 'ARRI S60-C', watts: 650 },
-  { id: 37, name: 'ARRI S30-C', watts: 220 },
-  { id: 38, name: 'ASTERA TITAN TUBE', watts: 72 },
-  { id: 39, name: 'ASTERA HYPERION TUBE', watts: 144 },
-  { id: 40, name: 'BATTEN 12CELL', watts: 360 },
-  { id: 41, name: 'BATTEN 8CELL', watts: 240 },
-  { id: 42, name: 'BATTEN 4CELL', watts: 120 },
-  { id: 43, name: 'BATTEN SINGLE', watts: 30 },
-  { id: 44, name: 'RISER 1M', watts: 100 },
-  { id: 45, name: 'RISER 0.5M', watts: 50 },
-  { id: 46, name: 'FAN', watts: 100 },
-  { id: 47, name: 'HAZER', watts: 500 },
-  { id: 48, name: 'STROBE', watts: 1000 },
-  { id: 49, name: 'CONFETTI BLOWER', watts: 1000 },
-  { id: 50, name: 'LOW FOG MACHINE', watts: 1000 },
-  { id: 51, name: 'Followspot position', watts: 2000 },
+  { id: 1, name: 'LA12X', watts: 2900 },
+  { id: 2, name: 'LA8', watts: 2500 },
+  { id: 3, name: 'LA4X', watts: 2000 },
+  { id: 4, name: 'PLM20000D', watts: 2900 },
+  { id: 5, name: 'Control FoH (L)', watts: 3500 },
+  { id: 6, name: 'Control FoH (S)', watts: 1500 },
+  { id: 7, name: 'Control Mon (L)', watts: 3500 },
+  { id: 8, name: 'Control Mon (S)', watts: 1500 },
+  { id: 9, name: 'RF Rack', watts: 2500 },
+  { id: 10, name: 'Backline', watts: 2500 },
+  { id: 11, name: 'Varios', watts: 1500 },
+  { id: 12, name: 'Shure ULXD', watts: 1000 },
+  { id: 13, name: 'Yamaha CL5', watts: 1200 },
 ];
 
 const VOLTAGE_3PHASE = 400;
 const POWER_FACTOR = 0.85;
 const PHASES = 3;
 
-const PDU_TYPES = ['CEE32A 3P+N+G', 'CEE63A 3P+N+G', 'CEE400A 3P+N+G'];
+const PDU_TYPES = ['CEE32A 3P+N+G', 'CEE63A 3P+N+G', 'CEE125A 3P+N+G'];
 
 interface TableRow {
   quantity: string;
@@ -83,16 +46,19 @@ interface TableRow {
   totalWatts?: number;
 }
 
-interface Table {
+export interface Table {
   name: string;
   rows: TableRow[];
   totalWatts?: number;
   currentPerPhase?: number;
   pduType?: string;
-  customPduType?: string;
-  id?: number | string;
+  id?: number;
   includesHoist?: boolean;
+  customPduType?: string;
+  defaultTableId?: string;
+  overrideId?: string;
   isDefault?: boolean;
+  isOverride?: boolean;
 }
 
 const ConsumosTool: React.FC = () => {
@@ -101,30 +67,184 @@ const ConsumosTool: React.FC = () => {
   const { data: jobs } = useJobSelection();
   const [searchParams] = useSearchParams();
   
-  // Tour override mode detection
+  // Tour context detection
   const tourId = searchParams.get('tourId');
   const tourDateId = searchParams.get('tourDateId');
-  
-  const { 
-    isOverrideMode, 
-    overrideData, 
-    isLoading: overrideLoading,
-    saveOverride 
-  } = useTourOverrideMode(tourId || undefined, tourDateId || undefined, 'sound');
+  const mode = searchParams.get('mode'); // 'defaults' or 'override'
+  const isDefaults = mode === 'defaults';
+  const isTourContext = !!tourId;
+  const isTourDateContext = !!tourDateId;
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
-  const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [selectedJob, setSelectedJob] = useState<JobSelection | null>(null);
   const [tableName, setTableName] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
   const [safetyMargin, setSafetyMargin] = useState(0);
-  const [selectedPduType, setSelectedPduType] = useState<string>('default');
-  const [customPduType, setCustomPduType] = useState('');
-  const [includesHoist, setIncludesHoist] = useState(false);
+  const [currentSetName, setCurrentSetName] = useState('');
+  const [tourInfo, setTourInfo] = useState<{ name: string; date?: string; location?: string } | null>(null);
+
+  // Job-based override mode detection
+  const [isJobOverrideMode, setIsJobOverrideMode] = useState(false);
+  const [jobTourInfo, setJobTourInfo] = useState<{ tourName: string; date: string; location: string } | null>(null);
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
     rows: [{ quantity: '', componentId: '', watts: '' }],
   });
+
+  // New hooks for tour defaults
+  const {
+    defaultSets,
+    defaultTables,
+    createSet,
+    createTable: createDefaultTable,
+    deleteSet,
+    deleteTable: deleteDefaultTable,
+    isLoading: defaultsLoading
+  } = useTourDefaultSets(tourId || '', 'sound');
+
+  const {
+    powerOverrides,
+    createPowerOverride,
+    deleteOverride,
+    isLoading: overridesLoading
+  } = useTourDateOverrides(tourDateId || '', 'power');
+
+  // Detect job-based override mode
+  useEffect(() => {
+    if (selectedJob?.tour_date_id && !isTourContext) {
+      setIsJobOverrideMode(true);
+      loadJobTourInfo();
+    } else {
+      setIsJobOverrideMode(false);
+      setJobTourInfo(null);
+    }
+  }, [selectedJob, isTourContext]);
+
+  const loadJobTourInfo = async () => {
+    if (!selectedJob?.tour_date_id) return;
+
+    try {
+      const { data } = await supabase
+        .from('tour_dates')
+        .select(`
+          date,
+          tour:tours(name),
+          location:locations(name)
+        `)
+        .eq('id', selectedJob.tour_date_id)
+        .single();
+
+      if (data) {
+        setJobTourInfo({
+          tourName: (data.tour as any)?.name || 'Unknown Tour',
+          date: new Date(data.date).toLocaleDateString(),
+          location: (data.location as any)?.name || 'Unknown Location'
+        });
+      }
+    } catch (error) {
+      console.error('Error loading job tour info:', error);
+    }
+  };
+
+  // Get tour information for display
+  useEffect(() => {
+    const fetchTourInfo = async () => {
+      if (tourId) {
+        const { data } = await supabase
+          .from('tours')
+          .select('name')
+          .eq('id', tourId)
+          .single();
+        
+        if (data) {
+          setTourInfo({ name: data.name });
+        }
+      }
+
+      if (tourDateId) {
+        const { data } = await supabase
+          .from('tour_dates')
+          .select(`
+            date,
+            locations (
+              name
+            )
+          `)
+          .eq('id', tourDateId)
+          .single();
+        
+        if (data) {
+          setTourInfo({
+            name: tourInfo?.name || 'Tour',
+            date: new Date(data.date).toLocaleDateString(),
+            location: (data.locations as any)?.name || 'Unknown location'
+          });
+        }
+      }
+    };
+
+    fetchTourInfo();
+  }, [tourId, tourDateId]);
+
+  const handleBackNavigation = () => {
+    if (isTourContext) {
+      navigate('/tours');
+    } else {
+      navigate('/sound');
+    }
+  };
+
+  // Load existing tour defaults when in defaults mode
+  useEffect(() => {
+    if (isDefaults && defaultTables.length > 0) {
+      // Group tables by set and convert to our local format
+      const convertedTables = defaultTables
+        .filter(dt => dt.table_type === 'power')
+        .map((dt, index) => ({
+          name: dt.table_name,
+          rows: dt.table_data.rows || [{
+            quantity: '1',
+            componentId: '',
+            watts: dt.total_value.toString(),
+            componentName: dt.table_name,
+            totalWatts: dt.total_value
+          }],
+          totalWatts: dt.total_value,
+          currentPerPhase: dt.metadata?.currentPerPhase || 0,
+          pduType: dt.metadata?.pduType || '',
+          customPduType: dt.metadata?.customPduType,
+          includesHoist: dt.metadata?.includesHoist || false,
+          id: Date.now() + index,
+          defaultTableId: dt.id
+        }));
+      setTables(convertedTables);
+    }
+  }, [isDefaults, defaultTables]);
+
+  // Load tour date overrides when in tour date context
+  useEffect(() => {
+    if (isTourDateContext && powerOverrides.length > 0) {
+      const convertedTables = powerOverrides.map((override, index) => ({
+        name: override.table_name,
+        rows: override.override_data?.rows || [{
+          quantity: '1',
+          componentId: '',
+          watts: override.total_watts.toString(),
+          componentName: override.table_name,
+          totalWatts: override.total_watts
+        }],
+        totalWatts: override.total_watts,
+        currentPerPhase: override.current_per_phase,
+        pduType: override.pdu_type,
+        customPduType: override.custom_pdu_type,
+        includesHoist: override.includes_hoist,
+        id: Date.now() + index,
+        overrideId: override.id
+      }));
+      setTables(convertedTables);
+    }
+  }, [isTourDateContext, powerOverrides]);
 
   const addRow = () => {
     setCurrentTable((prev) => ({
@@ -135,7 +255,7 @@ const ConsumosTool: React.FC = () => {
 
   const updateInput = (index: number, field: keyof TableRow, value: string) => {
     const newRows = [...currentTable.rows];
-    if (field === 'componentId' && value) {
+    if (field === 'componentId') {
       const component = soundComponentDatabase.find((c) => c.id.toString() === value);
       newRows[index] = {
         ...newRows[index],
@@ -155,7 +275,6 @@ const ConsumosTool: React.FC = () => {
   };
 
   const handleJobSelect = (jobId: string) => {
-    if (!jobId) return;
     setSelectedJobId(jobId);
     const job = jobs?.find((j) => j.id === jobId) || null;
     setSelectedJob(job);
@@ -170,35 +289,50 @@ const ConsumosTool: React.FC = () => {
 
   const recommendPDU = (current: number) => {
     if (current < 32) return PDU_TYPES[0];
-    if (current > 63) return PDU_TYPES[2];
+    if (current < 63) return PDU_TYPES[1];
     return PDU_TYPES[2];
   };
 
   const savePowerRequirementTable = async (table: Table) => {
-    if (isOverrideMode && overrideData) {
-      // Save as override for tour date
-      const overrideSuccess = await saveOverride('power', {
-        table_name: table.name,
-        total_watts: table.totalWatts || 0,
-        current_per_phase: table.currentPerPhase || 0,
-        pdu_type: table.customPduType || table.pduType || '',
-        custom_pdu_type: table.customPduType,
-        includes_hoist: table.includesHoist || false,
-        override_data: {
-          rows: table.rows,
-          safetyMargin: safetyMargin
-        }
-      });
+    // Job-based override mode
+    if (isJobOverrideMode && selectedJob?.tour_date_id) {
+      try {
+        const { error } = await supabase
+          .from('tour_date_power_overrides')
+          .insert({
+            tour_date_id: selectedJob.tour_date_id,
+            table_name: table.name,
+            pdu_type: table.customPduType || table.pduType || '',
+            custom_pdu_type: table.customPduType,
+            total_watts: table.totalWatts || 0,
+            current_per_phase: table.currentPerPhase || 0,
+            includes_hoist: table.includesHoist || false,
+            department: 'sound',
+            override_data: {
+              rows: table.rows,
+              toolType: 'consumos'
+            }
+          });
 
-      if (overrideSuccess) {
+        if (error) throw error;
+
         toast({
-          title: "Success",
-          description: "Override saved for tour date",
+          title: 'Success',
+          description: 'Power override saved for tour date',
         });
+        return;
+      } catch (error: any) {
+        console.error('Error saving power override:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to save power override',
+          variant: 'destructive',
+        });
+        return;
       }
-      return;
     }
 
+    // Regular save logic
     try {
       const { error } = await supabase
         .from('power_requirement_tables')
@@ -208,23 +342,115 @@ const ConsumosTool: React.FC = () => {
           table_name: table.name,
           total_watts: table.totalWatts || 0,
           current_per_phase: table.currentPerPhase || 0,
-          pdu_type: selectedPduType === 'default' ? table.pduType : selectedPduType,
-          custom_pdu_type: customPduType,
-          includes_hoist: includesHoist
+          pdu_type: table.customPduType || table.pduType || '',
+          includes_hoist: table.includesHoist || false,
+          custom_pdu_type: table.customPduType,
         });
 
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Power requirement table saved successfully",
+        title: 'Success',
+        description: 'Power requirement table saved successfully',
       });
     } catch (error: any) {
       console.error('Error saving power requirement table:', error);
       toast({
-        title: "Error",
-        description: "Failed to save power requirement table",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to save power requirement table',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const saveAsDefaultSet = async () => {
+    if (!tourId || !currentSetName || tables.length === 0) {
+      toast({
+        title: 'Missing information',
+        description: 'Please enter a set name and create at least one table',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      // Create the default set
+      const defaultSet = await createSet({
+        tour_id: tourId,
+        name: currentSetName,
+        description: `Power calculation set with ${tables.length} tables`,
+        department: 'sound'
+      });
+
+      // Save each table as a default table
+      for (const table of tables) {
+        await createDefaultTable({
+          set_id: defaultSet.id,
+          table_name: table.name,
+          table_data: {
+            rows: table.rows,
+            toolType: 'consumos'
+          },
+          table_type: 'power',
+          total_value: table.totalWatts || 0,
+          metadata: {
+            currentPerPhase: table.currentPerPhase,
+            pduType: table.pduType,
+            customPduType: table.customPduType,
+            includesHoist: table.includesHoist
+          }
+        });
+      }
+
+      toast({
+        title: 'Success',
+        description: `Default set "${currentSetName}" saved successfully`,
+      });
+
+      // Reset form
+      setCurrentSetName('');
+      setTables([]);
+      resetCurrentTable();
+    } catch (error: any) {
+      console.error('Error saving default set:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save default set',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const saveAsOverride = async (table: Table) => {
+    if (!tourDateId) return;
+
+    try {
+      await createPowerOverride({
+        tour_date_id: tourDateId,
+        default_table_id: table.defaultTableId,
+        table_name: table.name,
+        pdu_type: table.customPduType || table.pduType || '',
+        custom_pdu_type: table.customPduType,
+        total_watts: table.totalWatts || 0,
+        current_per_phase: table.currentPerPhase || 0,
+        includes_hoist: table.includesHoist || false,
+        department: 'sound',
+        override_data: {
+          rows: table.rows,
+          toolType: 'consumos'
+        }
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Override saved for this tour date',
+      });
+    } catch (error: any) {
+      console.error('Error saving override:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save override',
+        variant: 'destructive',
       });
     }
   };
@@ -242,7 +468,7 @@ const ConsumosTool: React.FC = () => {
     const calculatedRows = currentTable.rows.map((row) => {
       const component = soundComponentDatabase.find((c) => c.id.toString() === row.componentId);
       const totalWatts =
-        parseFloat(row.quantity || '0') && parseFloat(row.watts || '0')
+        parseFloat(row.quantity) && parseFloat(row.watts)
           ? parseFloat(row.quantity) * parseFloat(row.watts)
           : 0;
       return {
@@ -256,24 +482,27 @@ const ConsumosTool: React.FC = () => {
     const { currentPerPhase } = calculatePhaseCurrents(totalWatts);
     const pduSuggestion = recommendPDU(currentPerPhase);
 
-    const newTable = {
+    const newTable: Table = {
       name: tableName,
       rows: calculatedRows,
       totalWatts,
       currentPerPhase,
-      pduType: selectedPduType === 'default' ? pduSuggestion : selectedPduType,
-      customPduType: customPduType,
-      includesHoist,
+      pduType: pduSuggestion,
       id: Date.now(),
+      includesHoist: false,
+      customPduType: undefined,
+      isOverride: isJobOverrideMode || isTourDateContext
     };
 
     setTables((prev) => [...prev, newTable]);
-    
-    // Save to database if job is selected
-    if (selectedJobId) {
+
+    // Auto-save logic based on context
+    if (isTourDateContext) {
+      saveAsOverride(newTable);
+    } else if (selectedJobId) {
       savePowerRequirementTable(newTable);
     }
-    
+
     resetCurrentTable();
   };
 
@@ -283,89 +512,102 @@ const ConsumosTool: React.FC = () => {
       rows: [{ quantity: '', componentId: '', watts: '' }],
     });
     setTableName('');
-    setSelectedPduType('default');
-    setCustomPduType('');
-    setIncludesHoist(false);
   };
 
-  const removeTable = (tableId: number | string) => {
-    // Only allow removal of regular tables (numeric IDs), not default tables
-    if (typeof tableId === 'number') {
-      setTables((prev) => prev.filter((table) => table.id !== tableId));
-    }
+  const removeTable = (tableId: number) => {
+    setTables((prev) => prev.filter((table) => table.id !== tableId));
+  };
+
+  const updateTableSettings = (tableId: number, updates: Partial<Table>) => {
+    setTables((prev) =>
+      prev.map((table) => {
+        if (table.id === tableId) {
+          const updatedTable = { ...table, ...updates };
+          if (selectedJobId) {
+            savePowerRequirementTable(updatedTable);
+          }
+          return updatedTable;
+        }
+        return table;
+      })
+    );
   };
 
   const handleExportPDF = async () => {
-    const jobToUse = isOverrideMode && overrideData 
-      ? { id: 'override', title: `${overrideData.tourName} - ${overrideData.locationName}` }
-      : selectedJob;
-
-    if (!jobToUse) {
+    if (!isTourContext && (!selectedJobId || !selectedJob)) {
       toast({
-        title: isOverrideMode ? 'No tour data' : 'No job selected',
-        description: isOverrideMode ? 'Tour data not loaded' : 'Please select a job before exporting.',
+        title: 'No job selected',
+        description: 'Please select a job before exporting.',
         variant: 'destructive',
       });
       return;
     }
 
     try {
-      // Combine defaults and current tables for export
-      const allTables = isOverrideMode 
-        ? [...defaultTables, ...tables]
-        : tables;
-
+      // Fetch the appropriate logo
       let logoUrl: string | undefined = undefined;
       try {
-        if (isOverrideMode && tourId) {
+        if (isTourContext && tourId) {
           const { fetchTourLogo } = await import('@/utils/pdf/logoUtils');
           logoUrl = await fetchTourLogo(tourId);
         } else if (selectedJobId) {
           const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
           logoUrl = await fetchJobLogo(selectedJobId);
         }
+        console.log("Logo URL for PDF:", logoUrl);
       } catch (logoError) {
         console.error("Error fetching logo:", logoError);
+        // Continue without the logo if there's an error
       }
 
-      // Calculate power summary with safety margin applied
-      const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
-      const adjustedTotalWatts = totalSystemWatts * (1 + safetyMargin / 100);
-      const totalSystemAmps = allTables.reduce((sum, table) => {
-        const amps = table.currentPerPhase || 0;
-        return sum + amps;
-      }, 0);
+      // Convert the job date into a proper string (if available)
+      let jobDate: string;
+      let title: string;
       
-      const powerSummary = { 
-        totalSystemWatts: adjustedTotalWatts, 
-        totalSystemAmps 
-      };
+      if (isTourContext) {
+        title = tourInfo?.name || 'Tour Power Report';
+        if (tourInfo?.date) {
+          jobDate = tourInfo.date;
+        } else {
+          jobDate = new Date().toLocaleDateString('en-GB');
+        }
+      } else {
+        title = selectedJob!.title;
+        if (selectedJob && (selectedJob as any).date) {
+          jobDate = new Date((selectedJob as any).date).toLocaleDateString('en-GB');
+        } else {
+          jobDate = new Date().toLocaleDateString('en-GB');
+        }
+      }
 
       const pdfBlob = await exportToPDF(
-        jobToUse.title,
-        allTables.map((table) => ({ ...table, toolType: 'consumos' })),
+        title,
+        tables.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
-        jobToUse.title,
-        new Date().toLocaleDateString('en-GB'),
+        title,
+        jobDate,
         undefined,
-        powerSummary,
+        undefined,
         safetyMargin,
         logoUrl
       );
 
-      const fileName = `Sound Power Report - ${jobToUse.title}.pdf`;
-      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-      const filePath = `sound/${selectedJobId}/${crypto.randomUUID()}.pdf`;
+      const fileName = `Power Report - ${title}.pdf`;
+      
+      if (!isTourContext) {
+        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+        const filePath = `sound/${selectedJobId}/${crypto.randomUUID()}.pdf`;
 
-      const { error: uploadError } = await supabase.storage.from('task_documents').upload(filePath, file);
-      if (uploadError) throw uploadError;
+        const { error: uploadError } = await supabase.storage.from('task_documents').upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+      }
 
       toast({
         title: 'Success',
         description: 'PDF has been generated and uploaded successfully.',
       });
 
-      // Also provide download to user
       const url = window.URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -374,8 +616,8 @@ const ConsumosTool: React.FC = () => {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch (error: any) {
-      console.error('Error exporting PDF:', error);
+    } catch (error) {
+      console.error('PDF Export Error:', error);
       toast({
         title: 'Error',
         description: 'Failed to generate or upload the PDF.',
@@ -384,164 +626,137 @@ const ConsumosTool: React.FC = () => {
     }
   };
 
-  const [defaultTables, setDefaultTables] = useState<Table[]>([]);
-
-  // Load defaults when in override mode
-  useEffect(() => {
-    if (isOverrideMode && overrideData) {
-      const powerDefaults = overrideData.defaults
-        .filter(table => table.table_type === 'power')
-        .map(table => ({
-          name: `${table.table_name} (Default)`,
-          rows: table.table_data.rows || [],
-          totalWatts: table.total_value,
-          currentPerPhase: table.metadata?.currentPerPhase,
-          pduType: table.metadata?.pduType,
-          id: `default-${table.id}`,
-          isDefault: true
-        }));
-      
-      setDefaultTables(powerDefaults);
-    }
-  }, [isOverrideMode, overrideData]);
-
-  if (overrideLoading) {
-    return (
-      <Card className="w-full max-w-4xl mx-auto my-6">
-        <CardContent className="pt-6">
-          <p>Loading tour override data...</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <Card className="w-full max-w-4xl mx-auto my-6">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/sound')}>
+          <Button variant="ghost" size="icon" onClick={handleBackNavigation}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <CardTitle className="text-2xl font-bold">
-            {isOverrideMode ? 'Override Mode - ' : ''}Power Calculator
-          </CardTitle>
+          <div className="text-center">
+            <CardTitle className="text-2xl font-bold">
+              Power Calculator
+            </CardTitle>
+            {isDefaults && tourInfo && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Managing defaults for: <span className="font-medium">{tourInfo.name}</span>
+              </p>
+            )}
+            {isTourDateContext && tourInfo && (
+              <div className="text-sm text-muted-foreground mt-1">
+                <p>Creating overrides for tour date</p>
+                <p className="font-medium">{tourInfo.date} - {tourInfo.location}</p>
+              </div>
+            )}
+            {isTourContext && !isDefaults && !isTourDateContext && tourInfo && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Creating power requirements for tour: <span className="font-medium">{tourInfo.name}</span>
+              </p>
+            )}
+            {isJobOverrideMode && jobTourInfo && (
+              <div className="text-sm text-muted-foreground mt-1 flex items-center justify-center gap-2">
+                <Badge variant="secondary">Override Mode</Badge>
+                <p>Tour: {jobTourInfo.tourName} • {jobTourInfo.date} - {jobTourInfo.location}</p>
+              </div>
+            )}
+          </div>
+          <div></div>
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {isOverrideMode && overrideData && (
-            <TourOverrideModeHeader
-              tourName={overrideData.tourName}
-              tourDate={overrideData.tourDate}
-              locationName={overrideData.locationName}
-              defaultsCount={defaultTables.length}
-              overridesCount={tables.length}
-              department="sound"
-            />
+          {/* Job-based override notification */}
+          {isJobOverrideMode && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                <p className="text-sm font-medium text-blue-900">
+                  Job Override Mode Active
+                </p>
+              </div>
+              <p className="text-sm text-blue-700 mt-1">
+                This job is part of a tour. Any tables you create will be saved as overrides for the specific tour date.
+              </p>
+            </div>
           )}
 
-          {/* Show defaults section when in override mode */}
-          {isOverrideMode && defaultTables.length > 0 && (
-            <div className="border rounded-lg p-4 bg-green-50">
-              <h3 className="font-semibold mb-3 text-green-800">Tour Defaults (Read-Only)</h3>
-              {defaultTables.map((table) => (
-                <div key={table.id} className="border rounded-lg overflow-hidden mt-4 bg-white">
-                  <div className="bg-green-100 px-4 py-3 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-semibold">{table.name}</h4>
-                      <Badge variant="outline" className="bg-green-50 text-green-700">Default</Badge>
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="font-medium">Total Watts:</span> {table.totalWatts?.toFixed(2)} W
-                      </div>
-                      <div>
-                        <span className="font-medium">Current per Phase:</span> {table.currentPerPhase?.toFixed(2)} A
-                      </div>
-                      <div>
-                        <span className="font-medium">PDU Type:</span> {table.pduType}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+          {/* Tour date override notification */}
+          {isTourDateContext && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                <p className="text-sm font-medium text-blue-900">
+                  Override Mode Active
+                </p>
+              </div>
+              <p className="text-sm text-blue-700 mt-1">
+                Any tables you create will be saved as overrides for this specific tour date.
+              </p>
+            </div>
+          )}
+
+          {isDefaults && (
+            <div className="space-y-2">
+              <Label htmlFor="setName">Default Set Name</Label>
+              <Input
+                id="setName"
+                value={currentSetName}
+                onChange={(e) => setCurrentSetName(e.target.value)}
+                placeholder="Enter set name (e.g., 'Main Stage Power Setup')"
+              />
+            </div>
+          )}
+
+          {/* Show safety margin for all tour contexts and non-tour contexts */}
+          {(isTourContext || !isDefaults) && (
+            <div className="space-y-2">
+              <Label htmlFor="safetyMargin">Safety Margin</Label>
+              <Select
+                value={safetyMargin.toString()}
+                onValueChange={(value) => setSafetyMargin(Number(value))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Safety Margin" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[0, 10, 20, 30, 40, 50].map((percentage) => (
+                    <SelectItem key={percentage} value={percentage.toString()}>
+                      {percentage}%
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {!isTourContext && (
+            <div className="space-y-2">
+              <Label htmlFor="jobSelect">Select Job</Label>
+              <Select value={selectedJobId} onValueChange={handleJobSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a job" />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobs?.map((job) => (
+                    <SelectItem key={job.id} value={job.id}>
+                      {job.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="jobSelect">Select Job</Label>
-            <Select value={selectedJobId} onValueChange={handleJobSelect}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a job" />
-              </SelectTrigger>
-              <SelectContent>
-                {jobs?.map((job) => (
-                  <SelectItem key={job.id} value={job.id}>
-                    {job.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="tableName">Table Name</Label>
+            <Label htmlFor="tableName">
+              {isDefaults ? 'Table Name' : 'Table Name'}
+            </Label>
             <Input
               id="tableName"
               value={tableName}
               onChange={(e) => setTableName(e.target.value)}
-              placeholder="Enter table name"
+              placeholder={isDefaults ? "Enter table name (e.g., FoH Rack)" : "Enter table name"}
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="safetyMargin">Safety Margin (%)</Label>
-            <Input
-              id="safetyMargin"
-              type="number"
-              value={safetyMargin}
-              onChange={(e) => setSafetyMargin(parseFloat(e.target.value) || 0)}
-              placeholder="Enter safety margin percentage"
-              min="0"
-              max="100"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>PDU Type Override</Label>
-            <Select value={selectedPduType} onValueChange={setSelectedPduType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Use recommended PDU type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="default">Use recommended PDU type</SelectItem>
-                {PDU_TYPES.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-                <SelectItem value="custom">Custom PDU Type</SelectItem>
-              </SelectContent>
-            </Select>
-            {selectedPduType === 'custom' && (
-              <Input
-                placeholder="Enter custom PDU type"
-                value={customPduType}
-                onChange={(e) => setCustomPduType(e.target.value)}
-                className="mt-2"
-              />
-            )}
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="hoistPower"
-              checked={includesHoist}
-              onCheckedChange={(checked) => setIncludesHoist(checked as boolean)}
-            />
-            <Label htmlFor="hoistPower">Requires additional hoist power (CEE32A 3P+N+G)</Label>
           </div>
 
           <div className="border rounded-lg overflow-hidden">
@@ -568,7 +783,7 @@ const ConsumosTool: React.FC = () => {
                     <td className="p-4">
                       <Select
                         value={row.componentId}
-                        onValueChange={(value) => value && updateInput(index, 'componentId', value)}
+                        onValueChange={(value) => updateInput(index, 'componentId', value)}
                       >
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select component" />
@@ -583,7 +798,12 @@ const ConsumosTool: React.FC = () => {
                       </Select>
                     </td>
                     <td className="p-4">
-                      <Input type="number" value={row.watts} readOnly className="w-full bg-muted" />
+                      <Input
+                        type="number"
+                        value={row.watts}
+                        readOnly
+                        className="w-full bg-muted"
+                      />
                     </td>
                   </tr>
                 ))}
@@ -594,12 +814,18 @@ const ConsumosTool: React.FC = () => {
           <div className="flex gap-2">
             <Button onClick={addRow}>Add Row</Button>
             <Button onClick={generateTable} variant="secondary">
-              Generate Table
+              Add Table
             </Button>
             <Button onClick={resetCurrentTable} variant="destructive">
               Reset
             </Button>
-            {tables.length > 0 && (
+            {isDefaults && tables.length > 0 && (
+              <Button onClick={saveAsDefaultSet} className="ml-auto gap-2">
+                <Save className="h-4 w-4" />
+                Save Default Set
+              </Button>
+            )}
+            {tables.length > 0 && !isDefaults && !isTourContext && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
                 <FileText className="h-4 w-4" />
                 Export & Upload PDF
@@ -607,26 +833,122 @@ const ConsumosTool: React.FC = () => {
             )}
           </div>
 
+          {/* Display existing default sets */}
+          {isDefaults && defaultSets.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Existing Default Sets</h3>
+              {defaultSets.map((set) => {
+                const setTables = defaultTables.filter(dt => dt.set_id === set.id && dt.table_type === 'power');
+                return (
+                  <div key={set.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-medium">{set.name}</h4>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteSet(set.id)}
+                      >
+                        Delete Set
+                      </Button>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      {set.description} • {setTables.length} tables
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {setTables.map((table) => (
+                        <div key={table.id} className="text-sm border rounded p-2">
+                          <div className="font-medium">{table.table_name}</div>
+                          <div className="text-muted-foreground">{table.total_value.toFixed(2)} W</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Display existing overrides for tour dates */}
+          {isTourDateContext && powerOverrides.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Existing Overrides for This Date</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {powerOverrides.map((override) => (
+                  <div key={override.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-medium">{override.table_name}</h4>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteOverride({ id: override.id, table: 'power' })}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {override.total_watts.toFixed(2)} W • {override.current_per_phase.toFixed(2)} A
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {tables.map((table) => (
             <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold">{table.name}</h3>
-                  {isOverrideMode && (
-                    <Badge variant="outline" className="bg-orange-50 text-orange-700">Override</Badge>
-                  )}
-                </div>
-                {typeof table.id === 'number' && (
+                <h3 className="font-semibold">{table.name}</h3>
+                <div className="flex gap-2">
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => removeTable(table.id as number)}
+                    onClick={() => table.id && removeTable(table.id)}
                   >
                     Remove Table
                   </Button>
-                )}
+                </div>
               </div>
-              
+
+              <div className="p-4 bg-muted/50 space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id={`hoist-${table.id}`}
+                      checked={table.includesHoist}
+                      onCheckedChange={(checked) =>
+                        table.id && updateTableSettings(table.id, { includesHoist: !!checked })
+                      }
+                    />
+                    <Label htmlFor={`hoist-${table.id}`}>Include Hoist Power (CEE32A 3P+N+G)</Label>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Label>Override PDU Type:</Label>
+                    <Select
+                      value={table.customPduType || 'default'}
+                      onValueChange={(value) =>
+                        table.id &&
+                        updateTableSettings(table.id, {
+                          customPduType: value === 'default' ? undefined : value,
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Use suggested PDU" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">Use suggested PDU</SelectItem>
+                        {PDU_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
               <table className="w-full">
                 <thead className="bg-muted/50">
                   <tr>
@@ -659,30 +981,24 @@ const ConsumosTool: React.FC = () => {
                   </tr>
                   <tr className="border-t bg-muted/50 font-medium">
                     <td colSpan={3} className="px-4 py-3 text-right">
-                      PDU Type:
+                      Suggested PDU:
                     </td>
-                    <td className="px-4 py-3">
-                      {table.customPduType || table.pduType}
-                    </td>
+                    <td className="px-4 py-3">{table.pduType}</td>
                   </tr>
-                  {table.includesHoist && (
-                    <tr className="border-t bg-muted/50 font-medium">
-                      <td colSpan={4} className="px-4 py-3">
-                        Additional Hoist Power Required: CEE32A 3P+N+G
+                  {table.customPduType && (
+                    <tr className="border-t bg-muted/50 font-medium text-primary">
+                      <td colSpan={3} className="px-4 py-3 text-right">
+                        Selected PDU Override:
                       </td>
+                      <td className="px-4 py-3">{table.customPduType}</td>
                     </tr>
                   )}
                 </tbody>
               </table>
-              {safetyMargin > 0 && (
-                <tr className="border-t bg-blue-50 font-medium">
-                  <td colSpan={3} className="px-4 py-3 text-right">
-                    Total Watts (with {safetyMargin}% safety margin):
-                  </td>
-                  <td className="px-4 py-3">
-                    {((table.totalWatts || 0) * (1 + safetyMargin / 100)).toFixed(2)} W
-                  </td>
-                </tr>
+              {table.includesHoist && (
+                <div className="px-4 py-2 text-sm text-gray-500 bg-muted/30 italic">
+                  Additional Hoist Power Required: CEE32A 3P+N+G
+                </div>
               )}
             </div>
           ))}
