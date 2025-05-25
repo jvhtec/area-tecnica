@@ -88,6 +88,7 @@ interface Table {
   name: string;
   rows: TableRow[];
   totalWatts?: number;
+  adjustedWatts?: number;
   currentPerPhase?: number;
   pduType?: string;
   customPduType?: string;
