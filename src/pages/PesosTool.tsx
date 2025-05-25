@@ -65,7 +65,7 @@ interface Table {
   name: string;
   rows: TableRow[];
   totalWeight?: number;
-  id?: number | string;
+  id?: number;
   dualMotors?: boolean;
   riggingPoints?: string; // Stores the generated SX suffix(es)
   clusterId?: string;     // New property to group tables (e.g. mirrored pair)
@@ -379,20 +379,6 @@ const PesosTool: React.FC = () => {
     // Job-based override mode
     if (isJobOverrideMode && selectedJob?.tour_date_id) {
       try {
-        // Check if override already exists
-        const { data: existingOverride } = await supabase
-          .from('tour_date_weight_overrides')
-          .select('id')
-          .eq('tour_date_id', selectedJob.tour_date_id)
-          .eq('item_name', table.name)
-          .eq('department', 'sound')
-          .single();
-
-        if (existingOverride) {
-          console.log('Override already exists, skipping save');
-          return;
-        }
-
         await createWeightOverride({
           tour_date_id: selectedJob.tour_date_id,
           default_table_id: table.defaultTableId,
@@ -559,7 +545,7 @@ const PesosTool: React.FC = () => {
     setTableName('');
   };
 
-  const removeTable = (tableId: number | string) => {
+  const removeTable = (tableId: number) => {
     setTables((prev) => prev.filter((table) => table.id !== tableId));
   };
 
@@ -605,88 +591,10 @@ const PesosTool: React.FC = () => {
     }
 
     try {
-      let tablesToExport = tables;
-
-      // If in override mode, get defaults and overrides, then replace defaults with overrides
-      if (isJobOverrideMode && selectedJob.tour_date_id) {
-        try {
-          // Get tour defaults
-          const { data: tourData } = await supabase
-            .from('tour_dates')
-            .select('tour_id')
-            .eq('id', selectedJob.tour_date_id)
-            .single();
-
-          let defaultTables: Table[] = [];
-          if (tourData?.tour_id) {
-            const { data: defaults } = await supabase
-              .from('tour_weight_defaults')
-              .select('*')
-              .eq('tour_id', tourData.tour_id)
-              .eq('department', 'sound');
-
-            if (defaults) {
-              defaultTables = defaults.map(d => ({
-                name: d.item_name,
-                rows: [],
-                totalWeight: d.weight_kg * d.quantity,
-                id: `default-${d.id}` as string,
-                clusterId: undefined,
-                riggingPoints: ''
-              }));
-            }
-          }
-
-          // Get overrides for this date
-          const { data: overrides } = await supabase
-            .from('tour_date_weight_overrides')
-            .select('*')
-            .eq('tour_date_id', selectedJob.tour_date_id)
-            .eq('department', 'sound');
-
-          const overrideTables: Table[] = (overrides || []).map(o => ({
-            name: o.item_name,
-            rows: o.override_data?.tableData?.rows || [],
-            totalWeight: o.weight_kg * o.quantity,
-            id: `override-${o.id}` as string,
-            clusterId: o.override_data?.tableData?.clusterId,
-            riggingPoints: o.override_data?.tableData?.riggingPoints || ''
-          }));
-
-          // Create a map of override table names for faster lookup
-          const overrideTableNames = new Set(overrideTables.map(t => t.name));
-
-          // Filter out defaults that have been overridden
-          const filteredDefaults = defaultTables.filter(d => !overrideTableNames.has(d.name));
-
-          // Combine filtered defaults with overrides and current tables
-          tablesToExport = [...filteredDefaults, ...overrideTables, ...tables];
-
-        } catch (error) {
-          console.error('Error loading defaults/overrides for PDF:', error);
-          // Fall back to just current tables
-          tablesToExport = tables;
-        }
-      }
-
       let logoUrl: string | undefined = undefined;
       try {
-        if (isJobOverrideMode && selectedJob.tour_date_id) {
-          // Get tour logo for override mode
-          const { data: tourData } = await supabase
-            .from('tour_dates')
-            .select('tour_id')
-            .eq('id', selectedJob.tour_date_id)
-            .single();
-
-          if (tourData?.tour_id) {
-            const { fetchTourLogo } = await import('@/utils/pdf/logoUtils');
-            logoUrl = await fetchTourLogo(tourData.tour_id);
-          }
-        } else {
-          const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
-          logoUrl = await fetchJobLogo(selectedJobId);
-        }
+        const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
+        logoUrl = await fetchJobLogo(selectedJobId);
         console.log("Logo URL for PDF:", logoUrl);
       } catch (logoError) {
         console.error("Error fetching logo:", logoError);
@@ -695,7 +603,7 @@ const PesosTool: React.FC = () => {
       const jobDateStr = new Date().toLocaleDateString('en-GB');
       const pdfBlob = await exportToPDF(
         selectedJob.title,
-        tablesToExport.map((table) => ({ ...table, toolType: 'pesos' })),
+        tables.map((table) => ({ ...table, toolType: 'pesos' })),
         'weight',
         selectedJob.title,
         jobDateStr,
@@ -1026,12 +934,7 @@ const PesosTool: React.FC = () => {
           {tables.map((table) => (
             <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold">{table.name}</h3>
-                  {isJobOverrideMode && (
-                    <Badge variant="outline" className="bg-orange-50 text-orange-700">Override</Badge>
-                  )}
-                </div>
+                <h3 className="font-semibold">{table.name}</h3>
                 <div className="flex gap-2">
                   {!isDefaults && isTourContext && (
                     <Button
