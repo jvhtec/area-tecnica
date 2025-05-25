@@ -18,6 +18,15 @@ interface TourManagementDialogProps {
   tourDateId?: string; // Add optional tour date ID for override mode
 }
 
+interface TourDateQueryResult {
+  id: string;
+  date: string;
+  location_id: string;
+  locations: {
+    name: string;
+  };
+}
+
 export const TourManagementDialog = ({
   open,
   onOpenChange,
@@ -48,12 +57,12 @@ export const TourManagementDialog = ({
       if (error) throw error;
       
       // Transform the data to match the expected TourDate interface
-      return (data || []).map(item => ({
+      return (data as TourDateQueryResult[] || []).map(item => ({
         id: item.id,
         date: item.date,
         location_id: item.location_id,
         locations: {
-          name: Array.isArray(item.locations) ? item.locations[0]?.name || 'Unknown location' : item.locations?.name || 'Unknown location'
+          name: item.locations?.name || 'Unknown location'
         }
       }));
     },
