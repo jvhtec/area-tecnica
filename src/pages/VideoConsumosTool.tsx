@@ -138,7 +138,8 @@ const VideoConsumosTool: React.FC = () => {
         custom_pdu_type: table.customPduType,
         includes_hoist: table.includesHoist || false,
         override_data: {
-          rows: table.rows
+          rows: table.rows,
+          safetyMargin: safetyMargin
         }
       });
 
@@ -280,15 +281,29 @@ const VideoConsumosTool: React.FC = () => {
         console.error("Error fetching logo:", logoError);
       }
 
+      // Calculate power summary with safety margin applied
+      const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
+      const adjustedTotalWatts = totalSystemWatts * (1 + safetyMargin / 100);
+      const totalSystemAmps = allTables.reduce((sum, table) => {
+        const amps = table.currentPerPhase || 0;
+        return sum + amps;
+      }, 0);
+      
+      const powerSummary = { 
+        totalSystemWatts: adjustedTotalWatts, 
+        totalSystemAmps 
+      };
+
       const pdfBlob = await exportToPDF(
         jobToUse.title,
         allTables.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
         jobToUse.title,
-        'video',
+        new Date().toLocaleDateString('en-GB'),
         undefined,
-        undefined,
-        undefined
+        powerSummary,
+        safetyMargin,
+        logoUrl
       );
 
       const fileName = `Video Power Report - ${jobToUse.title}.pdf`;
@@ -435,6 +450,19 @@ const VideoConsumosTool: React.FC = () => {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="safetyMargin">Safety Margin (%)</Label>
+            <Input
+              id="safetyMargin"
+              type="number"
+              value={safetyMargin}
+              onChange={(e) => setSafetyMargin(parseFloat(e.target.value) || 0)}
+              placeholder="Enter safety margin percentage"
+              min="0"
+              max="100"
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label>PDU Type Override</Label>
             <Select value={selectedPduType} onValueChange={setSelectedPduType}>
               <SelectTrigger>
@@ -532,7 +560,7 @@ const VideoConsumosTool: React.FC = () => {
             )}
           </div>
 
-          {/* Updated tables section to show override badges */}
+          {/* Updated tables section to show override badges and safety margin calculations */}
           {tables.map((table) => (
             <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
