@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,8 +9,11 @@ import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
+import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
+import { Badge } from '@/components/ui/badge';
 
 const lightComponentDatabase = [
   { id: 1, name: 'CAMEO OPUS S5', watts: 650 },
@@ -95,6 +98,19 @@ const LightsConsumosTool: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
+  const [searchParams] = useSearchParams();
+  
+  // Tour override mode detection
+  const tourId = searchParams.get('tourId');
+  const tourDateId = searchParams.get('tourDateId');
+  const mode = searchParams.get('mode');
+  
+  const { 
+    isOverrideMode, 
+    overrideData, 
+    isLoading: overrideLoading,
+    saveOverride 
+  } = useTourOverrideMode(tourId || undefined, tourDateId || undefined, 'lights');
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<JobSelection | null>(null);
@@ -109,6 +125,27 @@ const LightsConsumosTool: React.FC = () => {
     name: '',
     rows: [{ quantity: '', componentId: '', watts: '' }],
   });
+
+  const [defaultTables, setDefaultTables] = useState<Table[]>([]);
+
+  // Load defaults when in override mode
+  useEffect(() => {
+    if (isOverrideMode && overrideData) {
+      const powerDefaults = overrideData.defaults
+        .filter(table => table.table_type === 'power')
+        .map(table => ({
+          name: `${table.table_name} (Default)`,
+          rows: table.table_data.rows || [],
+          totalWatts: table.total_value,
+          currentPerPhase: table.metadata?.currentPerPhase,
+          pduType: table.metadata?.pduType,
+          id: `default-${table.id}`,
+          isDefault: true
+        }));
+      
+      setDefaultTables(powerDefaults);
+    }
+  }, [isOverrideMode, overrideData]);
 
   const addRow = () => {
     setCurrentTable((prev) => ({
@@ -158,6 +195,32 @@ const LightsConsumosTool: React.FC = () => {
   };
 
   const savePowerRequirementTable = async (table: Table) => {
+    if (isOverrideMode && overrideData) {
+      // Save as override for tour date
+      const overrideSuccess = await saveOverride('power', {
+        table_name: table.name,
+        total_watts: table.totalWatts || 0,
+        current_per_phase: table.currentPerPhase || 0,
+        pdu_type: table.customPduType || table.pduType || '',
+        custom_pdu_type: table.customPduType,
+        includes_hoist: table.includesHoist || false,
+        override_data: {
+          rows: table.rows
+        }
+      });
+
+      if (overrideSuccess) {
+        toast({
+          title: "Success",
+          description: "Override saved for tour date",
+        });
+      }
+      return;
+    }
+
+    // Original job-based save logic
+    if (!selectedJobId) return;
+    
     try {
       const { error } = await supabase
         .from('power_requirement_tables')
@@ -263,32 +326,43 @@ const LightsConsumosTool: React.FC = () => {
   };
 
   const handleExportPDF = async () => {
-    if (!selectedJobId || !selectedJob) {
+    const jobToUse = isOverrideMode && overrideData 
+      ? { id: 'override', title: `${overrideData.tourName} - ${overrideData.locationName}` }
+      : selectedJob;
+
+    if (!jobToUse) {
       toast({
-        title: 'No hay trabajo seleccionado',
-        description: 'Por favor seleccione un trabajo antes de exportar.',
+        title: isOverrideMode ? 'No tour data' : 'No hay trabajo seleccionado',
+        description: isOverrideMode ? 'Tour data not loaded' : 'Por favor seleccione un trabajo antes de exportar.',
         variant: 'destructive',
       });
       return;
     }
 
     try {
-      // Fetch the job logo (festival or tour)
+      // Combine defaults and current tables for export
+      const allTables = isOverrideMode 
+        ? [...defaultTables, ...tables]
+        : tables;
+
       let logoUrl: string | undefined = undefined;
       try {
-        const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
-        logoUrl = await fetchJobLogo(selectedJobId);
-        console.log("Logo URL for PDF:", logoUrl);
+        if (isOverrideMode && tourId) {
+          const { fetchTourLogo } = await import('@/utils/pdf/logoUtils');
+          logoUrl = await fetchTourLogo(tourId);
+        } else if (selectedJobId) {
+          const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
+          logoUrl = await fetchJobLogo(selectedJobId);
+        }
       } catch (logoError) {
         console.error("Error fetching logo:", logoError);
-        // Continue without the logo if there's an error
       }
 
       const pdfBlob = await exportToPDF(
-        selectedJob.title,
-        tables.map((table) => ({ ...table, toolType: 'consumos' })),
+        jobToUse.title,
+        allTables.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
-        selectedJob.title,
+        jobToUse.title,
         undefined,
         undefined,
         undefined,
@@ -296,15 +370,18 @@ const LightsConsumosTool: React.FC = () => {
         logoUrl
       );
 
-      const fileName = `Informe de Potencia - ${selectedJob.title}.pdf`;
-      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-      const filePath = `lights/${selectedJobId}/${crypto.randomUUID()}.pdf`;
+      const fileName = `Informe de Potencia - ${jobToUse.title}.pdf`;
+      
+      if (!isOverrideMode && selectedJobId) {
+        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+        const filePath = `lights/${selectedJobId}/${crypto.randomUUID()}.pdf`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('task_documents')
-        .upload(filePath, file);
+        const { error: uploadError } = await supabase.storage
+          .from('task_documents')
+          .upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+        if (uploadError) throw uploadError;
+      }
 
       toast({
         title: 'Éxito',
@@ -329,6 +406,16 @@ const LightsConsumosTool: React.FC = () => {
     }
   };
 
+  if (overrideLoading) {
+    return (
+      <Card className="w-full max-w-4xl mx-auto my-6">
+        <CardContent className="pt-6">
+          <p>Loading tour override data...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="w-full max-w-4xl mx-auto my-6">
       <CardHeader className="space-y-1">
@@ -336,11 +423,59 @@ const LightsConsumosTool: React.FC = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate('/lights')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <CardTitle className="text-2xl font-bold">Calculadora de Potencia</CardTitle>
+          <CardTitle className="text-2xl font-bold">
+            {isOverrideMode ? 'Override Mode - ' : ''}Calculadora de Potencia
+          </CardTitle>
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
+          {isOverrideMode && overrideData && (
+            <TourOverrideModeHeader
+              tourName={overrideData.tourName}
+              tourDate={overrideData.tourDate}
+              locationName={overrideData.locationName}
+              defaultsCount={defaultTables.length}
+              overridesCount={tables.length}
+              department="lights"
+            />
+          )}
+
+          {/* Show defaults section when in override mode */}
+          {isOverrideMode && defaultTables.length > 0 && (
+            <div className="border rounded-lg p-4 bg-green-50">
+              <h3 className="font-semibold mb-3 text-green-800">Tour Defaults (Read-Only)</h3>
+              {defaultTables.map((table) => (
+                <div key={table.id} className="border rounded-lg overflow-hidden mt-4 bg-white">
+                  <div className="bg-green-100 px-4 py-3 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-semibold">{table.name}</h4>
+                      <Badge variant="outline" className="bg-green-50 text-green-700">Default</Badge>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium">Total Watts:</span> {table.totalWatts?.toFixed(2)} W
+                      </div>
+                      <div>
+                        <span className="font-medium">Current per Phase:</span> {table.currentPerPhase?.toFixed(2)} A
+                      </div>
+                      <div>
+                        <span className="font-medium">PDU Type:</span> {table.pduType}
+                      </div>
+                      {table.includesHoist && (
+                        <div className="col-span-2 text-gray-600 italic">
+                          Includes hoist power requirement
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="safetyMargin">Margen de Seguridad</Label>
             <Select
@@ -360,21 +495,23 @@ const LightsConsumosTool: React.FC = () => {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="jobSelect">Seleccionar Trabajo</Label>
-            <Select value={selectedJobId} onValueChange={handleJobSelect}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccione un trabajo" />
-              </SelectTrigger>
-              <SelectContent>
-                {jobs?.map((job) => (
-                  <SelectItem key={job.id} value={job.id}>
-                    {job.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!isOverrideMode && (
+            <div className="space-y-2">
+              <Label htmlFor="jobSelect">Seleccionar Trabajo</Label>
+              <Select value={selectedJobId} onValueChange={handleJobSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccione un trabajo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobs?.map((job) => (
+                    <SelectItem key={job.id} value={job.id}>
+                      {job.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="tableName">Nombre de la Tabla</Label>
@@ -494,7 +631,12 @@ const LightsConsumosTool: React.FC = () => {
           {tables.map((table) => (
             <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
-                <h3 className="font-semibold">{table.name}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">{table.name}</h3>
+                  {isOverrideMode && (
+                    <Badge variant="outline" className="bg-orange-50 text-orange-700">Override</Badge>
+                  )}
+                </div>
                 <Button
                   variant="destructive"
                   size="sm"

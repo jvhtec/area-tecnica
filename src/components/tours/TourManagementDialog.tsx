@@ -14,12 +14,14 @@ interface TourManagementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tour: any;
+  tourDateId?: string; // Add optional tour date ID for override mode
 }
 
 export const TourManagementDialog = ({
   open,
   onOpenChange,
   tour,
+  tourDateId,
 }: TourManagementDialogProps) => {
   const navigate = useNavigate();
   const { handleColorChange, handleNameChange, handleDelete } = useTourManagement(tour, () => onOpenChange(false));
@@ -27,13 +29,31 @@ export const TourManagementDialog = ({
 
   const handlePowerDefaults = () => {
     // Navigate to ConsumosTool with tour context
-    navigate(`/sound/consumos?tourId=${tour.id}&mode=defaults`);
+    const params = new URLSearchParams({
+      tourId: tour.id,
+      mode: tourDateId ? 'override' : 'defaults'
+    });
+    
+    if (tourDateId) {
+      params.append('tourDateId', tourDateId);
+    }
+    
+    navigate(`/sound/consumos?${params.toString()}`);
     onOpenChange(false);
   };
 
   const handleWeightDefaults = () => {
     // Navigate to PesosTool with tour context
-    navigate(`/sound/pesos?tourId=${tour.id}&mode=defaults`);
+    const params = new URLSearchParams({
+      tourId: tour.id,
+      mode: tourDateId ? 'override' : 'defaults'
+    });
+    
+    if (tourDateId) {
+      params.append('tourDateId', tourDateId);
+    }
+    
+    navigate(`/sound/pesos?${params.toString()}`);
     onOpenChange(false);
   };
 
@@ -46,7 +66,10 @@ export const TourManagementDialog = ({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Manage Tour: {tour.name}</DialogTitle>
+            <DialogTitle>
+              Manage Tour: {tour.name}
+              {tourDateId && <span className="text-sm text-muted-foreground ml-2">(Override Mode)</span>}
+            </DialogTitle>
           </DialogHeader>
           
           <div className="space-y-6">
@@ -65,7 +88,9 @@ export const TourManagementDialog = ({
             </div>
 
             <div className="border-b pb-4">
-              <h3 className="text-sm font-medium mb-3">Tour Defaults</h3>
+              <h3 className="text-sm font-medium mb-3">
+                {tourDateId ? 'Tour Date Overrides' : 'Tour Defaults'}
+              </h3>
               <div className="grid grid-cols-1 gap-3">
                 <Button
                   variant="outline"
@@ -82,7 +107,7 @@ export const TourManagementDialog = ({
                     className="flex items-center gap-2"
                   >
                     <Calculator className="h-4 w-4" />
-                    Set Power Defaults
+                    {tourDateId ? 'Override Power' : 'Set Power Defaults'}
                   </Button>
                   <Button
                     variant="outline"
@@ -90,7 +115,7 @@ export const TourManagementDialog = ({
                     className="flex items-center gap-2"
                   >
                     <Weight className="h-4 w-4" />
-                    Set Weight Defaults
+                    {tourDateId ? 'Override Weight' : 'Set Weight Defaults'}
                   </Button>
                 </div>
               </div>
