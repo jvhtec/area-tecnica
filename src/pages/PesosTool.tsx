@@ -10,8 +10,10 @@ import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useNavigate } from 'react-router-dom';
-import { Badge } from '@/components/ui/badge';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTourWeightDefaults } from '@/hooks/useTourWeightDefaults';
+import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
+import { useTourDateOverrides } from '@/hooks/useTourDateOverrides';
 
 // Database for sound components.
 const soundComponentDatabase = [
@@ -66,6 +68,8 @@ interface Table {
   dualMotors?: boolean;
   riggingPoints?: string; // Stores the generated SX suffix(es)
   clusterId?: string;     // New property to group tables (e.g. mirrored pair)
+  defaultTableId?: string;
+  overrideId?: string;
 }
 
 interface SummaryRow {
@@ -78,29 +82,147 @@ const PesosTool: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
+  const [searchParams] = useSearchParams();
   
+  // Tour context detection
+  const tourId = searchParams.get('tourId');
+  const tourDateId = searchParams.get('tourDateId');
+  const mode = searchParams.get('mode'); // 'defaults' or 'override'
+  const isDefaults = mode === 'defaults';
+  const isTourContext = !!tourId;
+  const isTourDateContext = !!tourDateId;
+
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<JobSelection | null>(null);
   const [tableName, setTableName] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
-  const [defaultTables, setDefaultTables] = useState<Table[]>([]);
   const [useDualMotors, setUseDualMotors] = useState(false);
   const [mirroredCluster, setMirroredCluster] = useState(false);
   const [cablePick, setCablePick] = useState(false);
   const [cablePickWeight, setCablePickWeight] = useState('100');
-
-  // Override mode state
-  const [isOverrideMode, setIsOverrideMode] = useState(false);
-  const [tourInfo, setTourInfo] = useState<{
-    tourName: string;
-    tourDate: string;
-    locationName: string;
-  } | null>(null);
+  const [currentSetName, setCurrentSetName] = useState('');
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
     rows: [{ quantity: '', componentId: '', weight: '' }],
   });
+
+  // New hooks for tour defaults
+  const {
+    defaultSets,
+    defaultTables,
+    createSet,
+    createTable: createDefaultTable,
+    deleteSet,
+    deleteTable: deleteDefaultTable,
+    isLoading: defaultsLoading
+  } = useTourDefaultSets(tourId || '', 'sound');
+
+  const {
+    weightOverrides,
+    createWeightOverride,
+    deleteOverride,
+    isLoading: overridesLoading
+  } = useTourDateOverrides(tourDateId || '', 'weight');
+
+  // Get tour name for display
+  const [tourName, setTourName] = useState<string>('');
+  const [tourDateInfo, setTourDateInfo] = useState<{ date: string; location: string } | null>(null);
+
+  useEffect(() => {
+    const fetchTourInfo = async () => {
+      if (tourId) {
+        const { data } = await supabase
+          .from('tours')
+          .select('name')
+          .eq('id', tourId)
+          .single();
+        
+        if (data) {
+          setTourName(data.name);
+        }
+      }
+
+      if (tourDateId) {
+        const { data } = await supabase
+          .from('tour_dates')
+          .select(`
+            date,
+            locations (
+              name
+            )
+          `)
+          .eq('id', tourDateId)
+          .single();
+        
+        if (data) {
+          setTourDateInfo({
+            date: new Date(data.date).toLocaleDateString(),
+            location: (data.locations as any)?.name || 'Unknown location'
+          });
+        }
+      }
+    };
+
+    fetchTourInfo();
+  }, [tourId, tourDateId]);
+
+  const handleBackNavigation = () => {
+    if (isTourContext) {
+      navigate('/tours');
+    } else {
+      navigate('/sound');
+    }
+  };
+
+  // Load existing tour defaults when in defaults mode
+  useEffect(() => {
+    if (isDefaults && defaultTables.length > 0) {
+      // Group tables by set and convert to our local format
+      const convertedTables = defaultTables
+        .filter(dt => dt.table_type === 'weight')
+        .map((dt, index) => ({
+          name: dt.table_name,
+          rows: dt.table_data.rows || [{
+            quantity: '1',
+            componentId: '',
+            weight: dt.total_value.toString(),
+            componentName: dt.table_name,
+            totalWeight: dt.total_value
+          }],
+          totalWeight: dt.total_value,
+          id: Date.now() + index,
+          clusterId: dt.metadata?.clusterId,
+          dualMotors: dt.metadata?.dualMotors,
+          riggingPoints: dt.metadata?.riggingPoints,
+          defaultTableId: dt.id
+        }));
+      setTables(convertedTables);
+    }
+  }, [isDefaults, defaultTables]);
+
+  // Load tour date overrides when in tour date context
+  useEffect(() => {
+    if (isTourDateContext && weightOverrides.length > 0) {
+      const convertedTables = weightOverrides.map((override, index) => ({
+        name: override.item_name,
+        rows: override.override_data?.tableData?.rows || [{
+          quantity: override.quantity.toString(),
+          componentId: '',
+          weight: override.weight_kg.toString(),
+          componentName: override.item_name,
+          totalWeight: override.weight_kg * override.quantity
+        }],
+        totalWeight: override.weight_kg * override.quantity,
+        id: Date.now() + index,
+        clusterId: override.override_data?.tableData?.clusterId,
+        dualMotors: override.override_data?.tableData?.dualMotors,
+        riggingPoints: override.override_data?.tableData?.riggingPoints,
+        overrideId: override.id
+      }));
+      setTables(convertedTables);
+    }
+  }, [isTourDateContext, weightOverrides]);
 
   // Helper to generate an SX suffix.
   // Returns a string such as "SX01" or "SX01, SX02" depending on useDualMotors.
@@ -151,104 +273,83 @@ const PesosTool: React.FC = () => {
     setSelectedJobId(jobId);
     const job = jobs?.find((j) => j.id === jobId) || null;
     setSelectedJob(job);
-    
-    // Check if this job has a tour_date_id to activate override mode
-    if (job?.tour_date_id) {
-      setIsOverrideMode(true);
-      loadTourInfo(job.tour_date_id);
-      loadDefaultTables(job.tour_date_id);
-    } else {
-      setIsOverrideMode(false);
-      setTourInfo(null);
-      setDefaultTables([]);
-    }
   };
 
-  const loadTourInfo = async (tourDateId: string) => {
-    try {
-      const { data: tourDateData, error } = await supabase
-        .from('tour_dates')
-        .select(`
-          date,
-          tour:tours (name),
-          location:locations (name)
-        `)
-        .eq('id', tourDateId)
-        .single();
-
-      if (error) throw error;
-
-      setTourInfo({
-        tourName: (tourDateData.tour as any)?.name || 'Unknown Tour',
-        tourDate: tourDateData.date,
-        locationName: (tourDateData.location as any)?.name || 'Unknown Location'
+  const saveAsDefaultSet = async () => {
+    if (!tourId || !currentSetName || tables.length === 0) {
+      toast({
+        title: 'Missing information',
+        description: 'Please enter a set name and create at least one table',
+        variant: 'destructive',
       });
-    } catch (error) {
-      console.error('Error loading tour info:', error);
+      return;
     }
-  };
 
-  const loadDefaultTables = async (tourDateId: string) => {
     try {
-      // Get tour_id from tour_date
-      const { data: tourDateData, error: tourDateError } = await supabase
-        .from('tour_dates')
-        .select('tour_id')
-        .eq('id', tourDateId)
-        .single();
+      // Create the default set
+      const defaultSet = await createSet({
+        tour_id: tourId,
+        name: currentSetName,
+        description: `Weight calculation set with ${tables.length} tables`,
+        department: 'sound'
+      });
 
-      if (tourDateError) throw tourDateError;
+      // Save each table as a default table
+      for (const table of tables) {
+        await createDefaultTable({
+          set_id: defaultSet.id,
+          table_name: table.name,
+          table_data: {
+            rows: table.rows,
+            toolType: 'pesos'
+          },
+          table_type: 'weight',
+          total_value: table.totalWeight || 0,
+          metadata: {
+            dualMotors: table.dualMotors,
+            riggingPoints: table.riggingPoints,
+            clusterId: table.clusterId
+          }
+        });
+      }
 
-      // Get default weight tables for sound department
-      const { data: defaultTablesData, error: tablesError } = await supabase
-        .from('tour_default_tables')
-        .select(`
-          *,
-          tour_default_sets!inner(tour_id, department)
-        `)
-        .eq('tour_default_sets.tour_id', tourDateData.tour_id)
-        .eq('tour_default_sets.department', 'sound')
-        .eq('table_type', 'weight');
+      toast({
+        title: 'Success',
+        description: `Default set "${currentSetName}" saved successfully`,
+      });
 
-      if (tablesError) throw tablesError;
-
-      const convertedDefaults = defaultTablesData.map((table, index) => ({
-        name: `${table.table_name} (Default)`,
-        rows: table.table_data.rows || [],
-        totalWeight: table.total_value,
-        id: -(index + 1), // Use negative numbers for defaults
-        isDefault: true,
-        clusterId: table.metadata?.clusterId,
-        dualMotors: table.metadata?.dualMotors,
-        riggingPoints: table.metadata?.riggingPoints
-      }));
-
-      setDefaultTables(convertedDefaults);
-    } catch (error) {
-      console.error('Error loading default tables:', error);
+      // Reset form
+      setCurrentSetName('');
+      setTables([]);
+      resetCurrentTable();
+    } catch (error: any) {
+      console.error('Error saving default set:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save default set',
+        variant: 'destructive',
+      });
     }
   };
 
   const saveAsOverride = async (table: Table) => {
-    if (!isOverrideMode || !selectedJob?.tour_date_id) return;
+    if (!tourDateId) return;
 
     try {
-      const { error } = await supabase
-        .from('tour_date_weight_overrides')
-        .insert({
-          tour_date_id: selectedJob.tour_date_id,
-          item_name: table.name,
-          weight_kg: table.totalWeight || 0,
-          quantity: 1,
-          category: null,
-          department: 'sound',
-          override_data: {
-            tableData: table,
-            toolType: 'pesos'
-          }
-        });
-
-      if (error) throw error;
+      // Save the table as an override
+      await createWeightOverride({
+        tour_date_id: tourDateId,
+        default_table_id: table.defaultTableId,
+        item_name: table.name,
+        weight_kg: table.totalWeight || 0,
+        quantity: 1,
+        category: null,
+        department: 'sound',
+        override_data: {
+          tableData: table,
+          toolType: 'pesos'
+        }
+      });
 
       toast({
         title: 'Success',
@@ -293,8 +394,18 @@ const PesosTool: React.FC = () => {
     // For grouping cable pick later, assign a new clusterId for this generation.
     const newClusterId = Date.now().toString();
 
-    if (isOverrideMode) {
-      // In override mode, create table and save as override
+    if (isDefaults) {
+      // In defaults mode, just save a simple table
+      const newTable: Table = {
+        name: tableName,
+        rows: calculatedRows,
+        totalWeight,
+        id: Date.now(),
+        clusterId: newClusterId,
+      };
+      setTables((prev) => [...prev, newTable]);
+    } else if (isTourDateContext) {
+      // For tour date context, create table and save as override
       const newTable: Table = {
         name: tableName,
         rows: calculatedRows,
@@ -344,7 +455,6 @@ const PesosTool: React.FC = () => {
       };
       setTables((prev) => [...prev, newTable]);
     }
-    
     resetCurrentTable();
     setUseDualMotors(false);
     setMirroredCluster(false);
@@ -372,12 +482,7 @@ const PesosTool: React.FC = () => {
       return;
     }
 
-    // Combine defaults and current tables for export in override mode
-    const allTables = isOverrideMode 
-      ? [...defaultTables, ...tables]
-      : tables;
-
-    const summaryRows: SummaryRow[] = allTables.map((table) => {
+    const summaryRows: SummaryRow[] = tables.map((table) => {
       const cleanName = table.name.split('(')[0].trim();
       return {
         clusterName: cleanName,
@@ -387,7 +492,7 @@ const PesosTool: React.FC = () => {
     });
 
     // Group tables by clusterId to handle cable picks
-    const clusters = allTables.reduce((acc, table) => {
+    const clusters = tables.reduce((acc, table) => {
       if (table.clusterId) {
         if (!acc[table.clusterId]) {
           acc[table.clusterId] = [];
@@ -411,22 +516,9 @@ const PesosTool: React.FC = () => {
     try {
       let logoUrl: string | undefined = undefined;
       try {
-        if (isOverrideMode && selectedJob.tour_date_id) {
-          // Get tour_id from tour_date_id
-          const { data: tourDateData } = await supabase
-            .from('tour_dates')
-            .select('tour_id')
-            .eq('id', selectedJob.tour_date_id)
-            .single();
-          
-          if (tourDateData?.tour_id) {
-            const { fetchTourLogo } = await import('@/utils/pdf/logoUtils');
-            logoUrl = await fetchTourLogo(tourDateData.tour_id);
-          }
-        } else {
-          const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
-          logoUrl = await fetchJobLogo(selectedJobId);
-        }
+        const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
+        logoUrl = await fetchJobLogo(selectedJobId);
+        console.log("Logo URL for PDF:", logoUrl);
       } catch (logoError) {
         console.error("Error fetching logo:", logoError);
       }
@@ -434,7 +526,7 @@ const PesosTool: React.FC = () => {
       const jobDateStr = new Date().toLocaleDateString('en-GB');
       const pdfBlob = await exportToPDF(
         selectedJob.title,
-        allTables.map((table) => ({ ...table, toolType: 'pesos' })),
+        tables.map((table) => ({ ...table, toolType: 'pesos' })),
         'weight',
         selectedJob.title,
         jobDateStr,
@@ -481,152 +573,139 @@ const PesosTool: React.FC = () => {
     <Card className="w-full max-w-4xl mx-auto my-6">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/sound')}>
+          <Button variant="ghost" size="icon" onClick={handleBackNavigation}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="text-center">
             <CardTitle className="text-2xl font-bold">
-              {isOverrideMode ? 'Override Mode - ' : ''}Weight Calculator
+              Weight Calculator
             </CardTitle>
+            {isDefaults && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Managing defaults for: <span className="font-medium">{tourName}</span>
+              </p>
+            )}
+            {isTourDateContext && tourDateInfo && (
+              <div className="text-sm text-muted-foreground mt-1">
+                <p>Creating overrides for tour date</p>
+                <p className="font-medium">{tourDateInfo.date} - {tourDateInfo.location}</p>
+              </div>
+            )}
+            {isTourContext && !isDefaults && !isTourDateContext && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Creating weight requirements for tour: <span className="font-medium">{tourName}</span>
+              </p>
+            )}
           </div>
           <div></div>
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {/* Override mode header */}
-          {isOverrideMode && tourInfo && (
-            <div className="border rounded-lg p-4 bg-blue-50">
-              <div className="flex items-center gap-2 mb-3">
-                <h2 className="text-lg font-semibold text-blue-900">
-                  Override Mode - Sound Department
-                </h2>
+          {/* Tour date override notification */}
+          {isTourDateContext && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                <p className="text-sm font-medium text-blue-900">
+                  Override Mode Active
+                </p>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-blue-900">Tour:</span>
-                  <span className="text-blue-700">{tourInfo.tourName}</span>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-blue-900">Date:</span>
-                  <span className="text-blue-700">{new Date(tourInfo.tourDate).toLocaleDateString('en-GB')}</span>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-blue-900">Location:</span>
-                  <span className="text-blue-700">{tourInfo.locationName}</span>
-                </div>
-              </div>
-              
-              <div className="flex gap-4">
-                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                  {defaultTables.length} Default{defaultTables.length !== 1 ? 's' : ''}
-                </Badge>
-                <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-                  {tables.length} Override{tables.length !== 1 ? 's' : ''}
-                </Badge>
-              </div>
-              
-              <p className="text-sm text-blue-600 mt-3">
-                Any tables created here will be saved as overrides for this specific tour date.
-                These will be combined with defaults when exporting PDFs.
+              <p className="text-sm text-blue-700 mt-1">
+                Any tables you create will be saved as overrides for this specific tour date.
               </p>
             </div>
           )}
 
-          {/* Show defaults section when in override mode */}
-          {isOverrideMode && defaultTables.length > 0 && (
-            <div className="border rounded-lg p-4 bg-green-50">
-              <h3 className="font-semibold mb-3 text-green-800">Tour Defaults (Read-Only)</h3>
-              {defaultTables.map((table) => (
-                <div key={table.id} className="border rounded-lg overflow-hidden mt-4 bg-white">
-                  <div className="bg-green-100 px-4 py-3 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-semibold">{table.name}</h4>
-                      <Badge variant="outline" className="bg-green-50 text-green-700">Default</Badge>
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <div className="text-sm">
-                      <span className="font-medium">Total Weight:</span> {table.totalWeight?.toFixed(2)} kg
-                    </div>
-                  </div>
-                </div>
-              ))}
+          {isDefaults && (
+            <div className="space-y-2">
+              <Label htmlFor="setName">Default Set Name</Label>
+              <Input
+                id="setName"
+                value={currentSetName}
+                onChange={(e) => setCurrentSetName(e.target.value)}
+                placeholder="Enter set name (e.g., 'Main Stage Rigging')"
+              />
+            </div>
+          )}
+
+          {!isTourContext && (
+            <div className="space-y-2">
+              <Label htmlFor="jobSelect">Select Job</Label>
+              <Select value={selectedJobId} onValueChange={handleJobSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a job" />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobs?.map((job) => (
+                    <SelectItem key={job.id} value={job.id}>
+                      {job.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="jobSelect">Select Job</Label>
-            <Select value={selectedJobId} onValueChange={handleJobSelect}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a job" />
-              </SelectTrigger>
-              <SelectContent>
-                {jobs?.map((job) => (
-                  <SelectItem key={job.id} value={job.id}>
-                    {job.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="tableName">Table Name</Label>
+            <Label htmlFor="tableName">
+              {isDefaults ? 'Weight Default Name' : 'Table Name'}
+            </Label>
             <Input
               id="tableName"
               value={tableName}
               onChange={(e) => setTableName(e.target.value)}
-              placeholder="Enter table name"
+              placeholder={isDefaults ? "Enter default name (e.g., K2 Array)" : "Enter table name"}
             />
             
-            <div className="flex items-center space-x-2 mt-2">
-              <Checkbox
-                id="dualMotors"
-                checked={useDualMotors}
-                onCheckedChange={(checked) => setUseDualMotors(checked as boolean)}
-              />
-              <Label htmlFor="dualMotors" className="text-sm font-medium">
-                Dual Motors Configuration
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2 mt-2">
-              <Checkbox
-                id="mirroredCluster"
-                checked={mirroredCluster}
-                onCheckedChange={(checked) => setMirroredCluster(checked as boolean)}
-              />
-              <Label htmlFor="mirroredCluster" className="text-sm font-medium">
-                Mirrored Cluster
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2 mt-2">
-              <Checkbox
-                id="cablePick"
-                checked={cablePick}
-                onCheckedChange={(checked) => setCablePick(checked as boolean)}
-              />
-              <Label htmlFor="cablePick" className="text-sm font-medium">
-                Cable Pick
-              </Label>
-              {cablePick && (
-                <Select value={cablePickWeight} onValueChange={(value) => setCablePickWeight(value)}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue placeholder="Select weight" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {['100', '200', '300', '400', '500'].map((w) => (
-                      <SelectItem key={w} value={w}>
-                        {w} kg
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
+            {!isDefaults && (
+              <>
+                <div className="flex items-center space-x-2 mt-2">
+                  <Checkbox
+                    id="dualMotors"
+                    checked={useDualMotors}
+                    onCheckedChange={(checked) => setUseDualMotors(checked as boolean)}
+                  />
+                  <Label htmlFor="dualMotors" className="text-sm font-medium">
+                    Dual Motors Configuration
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 mt-2">
+                  <Checkbox
+                    id="mirroredCluster"
+                    checked={mirroredCluster}
+                    onCheckedChange={(checked) => setMirroredCluster(checked as boolean)}
+                  />
+                  <Label htmlFor="mirroredCluster" className="text-sm font-medium">
+                    Mirrored Cluster
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 mt-2">
+                  <Checkbox
+                    id="cablePick"
+                    checked={cablePick}
+                    onCheckedChange={(checked) => setCablePick(checked as boolean)}
+                  />
+                  <Label htmlFor="cablePick" className="text-sm font-medium">
+                    Cable Pick
+                  </Label>
+                  {cablePick && (
+                    <Select value={cablePickWeight} onValueChange={(value) => setCablePickWeight(value)}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue placeholder="Select weight" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['100', '200', '300', '400', '500'].map((w) => (
+                          <SelectItem key={w} value={w}>
+                            {w} kg
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           <div className="border rounded-lg overflow-hidden">
@@ -679,12 +758,12 @@ const PesosTool: React.FC = () => {
           <div className="flex gap-2">
             <Button onClick={addRow}>Add Row</Button>
             <Button onClick={generateTable} variant="secondary">
-              Generate Table
+              {isDefaults ? 'Save Default' : 'Generate Table'}
             </Button>
             <Button onClick={resetCurrentTable} variant="destructive">
               Reset
             </Button>
-            {tables.length > 0 && (
+            {tables.length > 0 && !isDefaults && !isTourContext && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
                 <FileText className="w-4 h-4" />
                 Export &amp; Upload PDF
@@ -692,22 +771,78 @@ const PesosTool: React.FC = () => {
             )}
           </div>
 
-          {/* Table display with override badges */}
+          {/* Display existing default sets */}
+          {isDefaults && defaultSets.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Existing Default Sets</h3>
+              {defaultSets.map((set) => {
+                const setTables = defaultTables.filter(dt => dt.set_id === set.id && dt.table_type === 'weight');
+                return (
+                  <div key={set.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-medium">{set.name}</h4>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteSet(set.id)}
+                      >
+                        Delete Set
+                      </Button>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      {set.description} • {setTables.length} tables
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {setTables.map((table) => (
+                        <div key={table.id} className="text-sm border rounded p-2">
+                          <div className="font-medium">{table.table_name}</div>
+                          <div className="text-muted-foreground">{table.total_value.toFixed(2)} kg</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Display existing overrides for tour dates */}
+          {isTourDateContext && weightOverrides.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Existing Overrides for This Date</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {weightOverrides.map((override) => (
+                  <div key={override.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-medium">{override.item_name}</h4>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteOverride({ id: override.id, table: 'weight' })}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {(override.weight_kg * override.quantity).toFixed(2)} kg
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Table display with save as default option */}
           {tables.map((table) => (
             <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold">{table.name}</h3>
-                  {isOverrideMode && (
-                    <Badge variant="outline" className="bg-orange-50 text-orange-700">Override</Badge>
-                  )}
-                </div>
+                <h3 className="font-semibold">{table.name}</h3>
                 <div className="flex gap-2">
-                  {!isOverrideMode && (
+                  {!isDefaults && isTourContext && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {/* Save as default logic if needed */}}
+                      onClick={() => saveAsDefaultSet()}
                     >
                       <Save className="h-4 w-4 mr-1" />
                       Save as Default
@@ -718,7 +853,6 @@ const PesosTool: React.FC = () => {
                   </Button>
                 </div>
               </div>
-              
               <table className="w-full">
                 <thead className="bg-muted/50">
                   <tr>
@@ -745,7 +879,7 @@ const PesosTool: React.FC = () => {
                   </tr>
                 </tbody>
               </table>
-              {!isOverrideMode && table.dualMotors && (
+              {!isDefaults && table.dualMotors && (
                 <div className="px-4 py-2 text-sm text-gray-500 bg-muted/30 italic">
                   *This configuration uses dual motors. Load is distributed between two motors for safety and redundancy.
                 </div>
