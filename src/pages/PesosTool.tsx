@@ -559,7 +559,7 @@ const PesosTool: React.FC = () => {
     setTableName('');
   };
 
-  const removeTable = (tableId: number) => {
+  const removeTable = (tableId: number | string) => {
     setTables((prev) => prev.filter((table) => table.id !== tableId));
   };
 

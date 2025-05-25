@@ -302,7 +302,7 @@ const ConsumosTool: React.FC = () => {
     setIncludesHoist(false);
   };
 
-  const removeTable = (tableId: number) => {
+  const removeTable = (tableId: number | string) => {
     setTables((prev) => prev.filter((table) => table.id !== tableId));
   };
 
