@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -369,14 +370,19 @@ const ConsumosTool: React.FC = () => {
             id: `override-${o.id}` as string
           }));
 
+          console.log('Default tables:', defaultTables);
+          console.log('Override tables:', overrideTables);
+
           // Create a map of override table names for faster lookup
           const overrideTableNames = new Set(overrideTables.map(t => t.name));
 
           // Filter out defaults that have been overridden
           const filteredDefaults = defaultTables.filter(d => !overrideTableNames.has(d.name));
 
-          // Combine filtered defaults with overrides and current tables
-          tablesToExport = [...filteredDefaults, ...overrideTables, ...tables];
+          console.log('Filtered defaults (no overrides):', filteredDefaults);
+
+          // In override mode, only combine filtered defaults with overrides (no current session tables)
+          tablesToExport = [...filteredDefaults, ...overrideTables];
 
         } catch (error) {
           console.error('Error loading defaults/overrides for PDF:', error);
@@ -384,6 +390,26 @@ const ConsumosTool: React.FC = () => {
           tablesToExport = tables;
         }
       }
+
+      // Apply safety margin to all tables during export
+      const tablesWithSafetyMargin = tablesToExport.map(table => {
+        if (table.totalWatts && safetyMargin > 0) {
+          const adjustedWatts = table.totalWatts * (1 + safetyMargin / 100);
+          const wattsPerPhase = adjustedWatts / PHASES;
+          const currentPerPhase = wattsPerPhase / (VOLTAGE_3PHASE * POWER_FACTOR);
+          
+          console.log(`Applied ${safetyMargin}% safety margin to ${table.name}: ${table.totalWatts}W -> ${adjustedWatts}W`);
+          
+          return {
+            ...table,
+            totalWatts: adjustedWatts,
+            currentPerPhase: currentPerPhase
+          };
+        }
+        return table;
+      });
+
+      console.log('Final tables for export with safety margin:', tablesWithSafetyMargin);
 
       let logoUrl: string | undefined = undefined;
       try {
@@ -411,7 +437,7 @@ const ConsumosTool: React.FC = () => {
       const jobDateStr = new Date().toLocaleDateString('en-GB');
       const pdfBlob = await exportToPDF(
         selectedJob.title,
-        tablesToExport.map((table) => ({ ...table, toolType: 'consumos' })),
+        tablesWithSafetyMargin.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
         selectedJob.title,
         jobDateStr,

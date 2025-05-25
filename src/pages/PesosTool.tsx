@@ -653,14 +653,33 @@ const PesosTool: React.FC = () => {
             riggingPoints: o.override_data?.tableData?.riggingPoints || ''
           }));
 
+          console.log('Default weight tables:', defaultTables);
+          console.log('Override weight tables:', overrideTables);
+
           // Create a map of override table names for faster lookup
           const overrideTableNames = new Set(overrideTables.map(t => t.name));
 
           // Filter out defaults that have been overridden
           const filteredDefaults = defaultTables.filter(d => !overrideTableNames.has(d.name));
 
-          // Combine filtered defaults with overrides and current tables
-          tablesToExport = [...filteredDefaults, ...overrideTables, ...tables];
+          console.log('Filtered weight defaults (no overrides):', filteredDefaults);
+
+          // In override mode, only combine filtered defaults with overrides (no current session tables)
+          tablesToExport = [...filteredDefaults, ...overrideTables];
+
+          // Update summary rows for override mode
+          const overrideSummaryRows: SummaryRow[] = tablesToExport.map((table) => {
+            const cleanName = table.name.split('(')[0].trim();
+            return {
+              clusterName: cleanName,
+              riggingPoints: table.riggingPoints || '',
+              clusterWeight: table.totalWeight || 0,
+            };
+          });
+
+          // Use override summary rows instead
+          summaryRows.length = 0;
+          summaryRows.push(...overrideSummaryRows);
 
         } catch (error) {
           console.error('Error loading defaults/overrides for PDF:', error);
@@ -668,6 +687,8 @@ const PesosTool: React.FC = () => {
           tablesToExport = tables;
         }
       }
+
+      console.log('Final weight tables for export:', tablesToExport);
 
       let logoUrl: string | undefined = undefined;
       try {
