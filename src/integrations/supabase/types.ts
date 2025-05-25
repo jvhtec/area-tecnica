@@ -3311,6 +3311,10 @@ export type Database = {
         Args: { job_id: string }
         Returns: undefined
       }
+      get_current_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
     }
     Enums: {
       assignment_status: "invited" | "confirmed" | "declined"
