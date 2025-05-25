@@ -600,7 +600,9 @@ const PesosTool: React.FC = () => {
   const removeTable = (tableId: number | string) => {
     if (typeof tableId === 'string' && tableId.startsWith('saved-')) {
       // This is a saved override, delete from database
-      deleteOverride(tableId);
+      const overrideId = tableId.replace('saved-', '');
+      deleteOverride({ id: overrideId, table: 'weight' });
+      setSavedOverrides((prev) => prev.filter((table) => table.id !== tableId));
     } else {
       // This is a current session table, just remove from state
       setTables((prev) => prev.filter((table) => table.id !== tableId));
