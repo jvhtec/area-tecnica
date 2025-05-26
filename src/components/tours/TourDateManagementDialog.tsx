@@ -21,6 +21,7 @@ import {
   Edit,
 } from "lucide-react";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
+import { useTourDateFlexFolders } from "@/hooks/useTourDateFlexFolders";
 
 import {
   FLEX_FOLDER_IDS,
@@ -154,19 +155,16 @@ async function createFoldersForDate(
         const subfolders = [
           {
             definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
-            name: `Documentación Técnica - ${capitalizedDept}`,
             name: `Documentación Técnica - ${locationName} - ${formattedDate} - ${capitalizedDept}`,
             suffix: "DT",
           },
           {
             definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos,
-            name: `Presupuestos Recibidos - ${capitalizedDept}`,
             name: `Presupuestos Recibidos - ${locationName} - ${formattedDate} - ${capitalizedDept}`,
             suffix: "PR",
           },
           {
             definitionId: FLEX_FOLDER_IDS.hojaGastos,
-            name: `Hoja de Gastos - ${capitalizedDept}`,
             name: `Hoja de Gastos - ${locationName} - ${formattedDate} - ${capitalizedDept}`,
             suffix: "HG",
           },
@@ -200,7 +198,6 @@ async function createFoldersForDate(
 
       // Create department-specific hojaInfo elements for sound, lights, and video
       if (["sound", "lights", "video"].includes(dept)) {
-        const job = { title: 'Default Job Title' }; // Define the job variable
         const hojaInfoType = dept === "sound"
           ? FLEX_FOLDER_IDS.hojaInfoSx
           : dept === "lights"
@@ -214,7 +211,6 @@ async function createFoldersForDate(
           parentElementId: mainFolderElementId,
           open: true,
           locked: false,
-          name: `Hoja de Información - ${job.title}`,
           name: `Hoja de Información - ${locationName} - ${formattedDate}`,
           plannedStartDate: formattedStartDate,
           plannedEndDate: formattedEndDate,
@@ -230,8 +226,6 @@ async function createFoldersForDate(
 
       if (dept === "sound") {
         const soundSubfolders = [
-          { name: `${tourData.name} - Tour Pack`, suffix: "TP" },
-          { name: `${tourData.name} - PA`, suffix: "PA" },
           { name: `${tourData.name} - Tour Pack - ${locationName} - ${formattedDate}`, suffix: "TP" },
           { name: `${tourData.name} - PA - ${locationName} - ${formattedDate}`, suffix: "PA" },
         ];
@@ -264,7 +258,6 @@ async function createFoldersForDate(
 
       if (dept === "personnel") {
         const personnelSubfolders = [
-          { name: `Gastos de Personal - ${tourData.name}`, suffix: "GP" },
           { name: `Gastos de Personal - ${locationName} - ${formattedDate}`, suffix: "GP" },
         ];
         for (const sf of personnelSubfolders) {
@@ -293,8 +286,6 @@ async function createFoldersForDate(
           });
         }
         const personnelCrewCall = [
-          { name: `Crew Call Sonido - ${tourData.name}`, suffix: "CCS" },
-          { name: `Crew Call Luces - ${tourData.name}`, suffix: "CCL" },
           { name: `Crew Call Sonido - ${locationName} - ${formattedDate}`, suffix: "CCS" },
           { name: `Crew Call Luces - ${locationName} - ${formattedDate}`, suffix: "CCL" },
         ];
@@ -341,9 +332,7 @@ async function createFoldersForDate(
   }
 }
 
-interface TourDateManagementDialogInternalProps extends TourDateManagementDialogProps {}
-
-export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternalProps> = ({
+export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> = ({
   open,
   onOpenChange,
   tourId,
@@ -352,13 +341,16 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { getOrCreateLocation } = useLocationManagement();
+  const { 
+    createIndividualFolders, 
+    createAllFolders, 
+    isCreatingAll, 
+    isCreatingIndividual 
+  } = useTourDateFlexFolders(tourId || '');
 
   const [editingTourDate, setEditingTourDate] = useState<any>(null);
   const [editDateValue, setEditDateValue] = useState<string>("");
   const [editLocationValue, setEditLocationValue] = useState<string>("");
-
-  const [createdTourDateIds, setCreatedTourDateIds] = useState<string[]>([]);
-  const [isCreatingFolders, setIsCreatingFolders] = useState(false);
   const [isDeletingDate, setIsDeletingDate] = useState<string | null>(null);
 
   const { data: foldersExistenceMap } = useQuery({
@@ -380,87 +372,6 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
     },
     enabled: tourDates.length > 0,
   });
-
-  const handleCreateFoldersForDate = async (dateObj: any) => {
-    if (dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id)) return;
-
-    try {
-      const { data: existingFolders } = await supabase
-        .from("flex_folders")
-        .select("id")
-        .eq("tour_date_id", dateObj.id);
-
-      if (existingFolders?.length > 0) {
-        toast({
-          title: "Folders already exist",
-          description: "Flex folders have already been created for this tour date.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      await createFoldersForDate(dateObj, tourId, true);
-      setCreatedTourDateIds((prev) => [...prev, dateObj.id]);
-
-      queryClient.invalidateQueries({ queryKey: ["flex-folders"] });
-      queryClient.invalidateQueries({ queryKey: ["tours"] });
-
-      toast({
-        title: "Success",
-        description: "Folders created for this tour date."
-      });
-    } catch (error: any) {
-      console.error("Error creating folders for tour date:", error);
-      toast({
-        title: "Error creating folders",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const createAllFolders = async () => {
-    if (isCreatingFolders) return;
-    setIsCreatingFolders(true);
-    try {
-      let successCount = 0;
-      let skipCount = 0;
-      for (const dateObj of tourDates) {
-        if (dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id)) {
-          skipCount++;
-          continue;
-        }
-        try {
-          const created = await createFoldersForDate(dateObj, tourId, true);
-          if (created) {
-            setCreatedTourDateIds((prev) => [...prev, dateObj.id]);
-            successCount++;
-          } else {
-            skipCount++;
-          }
-        } catch (error) {
-          console.error(
-            `Error creating folders for date ${dateObj.date}:`,
-            error
-          );
-          continue;
-        }
-      }
-      toast({
-        title: "Folders Creation Complete",
-        description: `Folders created for ${successCount} dates. ${skipCount} dates were skipped.`,
-      });
-    } catch (error: any) {
-      console.error("Error creating folders for all dates:", error);
-      toast({
-        title: "Error creating folders",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsCreatingFolders(false);
-    }
-  };
 
   const handleAddDate = async (date: string, location: string) => {
     try {
@@ -840,19 +751,21 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
           <div className="space-y-4">
             {tourDates.length > 0 && (
               <Button
-                onClick={createAllFolders}
+                onClick={() => createAllFolders(tourDates)}
                 className="w-full"
                 variant="outline"
-                disabled={isCreatingFolders}
+                disabled={isCreatingAll}
               >
                 <FolderPlus className="h-4 w-4 mr-2" />
-                Create Folders for All Dates
+                {isCreatingAll ? 'Creating Folders...' : 'Create Folders for All Dates'}
               </Button>
             )}
+            
             <div className="space-y-4">
               {tourDates?.map((dateObj) => {
                 const foldersExist = foldersExistenceMap?.[dateObj.id] || false;
                 const isDeleting = isDeletingDate === dateObj.id;
+                const isCreatingFolders = isCreatingIndividual === dateObj.id;
 
                 return (
                   <div key={dateObj.id} className="p-3 border rounded-lg">
@@ -899,17 +812,26 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
                               <span>{dateObj.location.name}</span>
                             </div>
                           )}
+                          {foldersExist && (
+                            <div className="text-xs text-green-600">
+                              ✓ Flex folders created
+                            </div>
+                          )}
                         </div>
                         <div className="flex gap-2">
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleCreateFoldersForDate(dateObj)}
+                            onClick={() => createIndividualFolders(dateObj)}
                             title="Create Flex folders"
-                            disabled={dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id) || foldersExist}
-                            className={(dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id) || foldersExist) ? "opacity-50 cursor-not-allowed" : ""}
+                            disabled={foldersExist || isCreatingFolders}
+                            className={foldersExist ? "opacity-50 cursor-not-allowed" : ""}
                           >
-                            <FolderPlus className="h-4 w-4" />
+                            {isCreatingFolders ? (
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            ) : (
+                              <FolderPlus className="h-4 w-4" />
+                            )}
                           </Button>
                           <Button
                             variant="ghost"
@@ -941,6 +863,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
                 );
               })}
             </div>
+            
             <form
               onSubmit={(e) => {
                 e.preventDefault();
