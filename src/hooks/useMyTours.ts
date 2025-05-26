@@ -50,7 +50,8 @@ export const useMyTours = () => {
       if (error) throw error;
 
       const transformedTours: MyTour[] = data.map(assignment => {
-        const tour = assignment.tours;
+        // Access the tour object correctly - it should be a single object, not an array
+        const tour = assignment.tours as any;
         const tourDates = tour.tour_dates || [];
         const now = new Date();
         const upcomingDates = tourDates.filter(
