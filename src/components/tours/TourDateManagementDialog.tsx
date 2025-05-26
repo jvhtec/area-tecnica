@@ -975,9 +975,3 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
     </Dialog>
   );
 };
-0 commit comments
-Comments
-0
- (0)
-Please sign in to comment.
-Fix: Tour date folder naming · jvhtec/area-tecnica@6a7cc8c · GitHub
