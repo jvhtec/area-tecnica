@@ -154,17 +154,17 @@ async function createFoldersForDate(
         const subfolders = [
           {
             definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
-            name: `Documentación Técnica - ${capitalizedDept}`,
+            name: `Documentación Técnica - ${locationName} - ${formattedDate} - ${capitalizedDept}`,
             suffix: "DT",
           },
           {
             definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos,
-            name: `Presupuestos Recibidos - ${capitalizedDept}`,
+            name: `Presupuestos Recibidos - ${locationName} - ${formattedDate} - ${capitalizedDept}`,
             suffix: "PR",
           },
           {
             definitionId: FLEX_FOLDER_IDS.hojaGastos,
-            name: `Hoja de Gastos - ${capitalizedDept}`,
+            name: `Hoja de Gastos - ${locationName} - ${formattedDate} - ${capitalizedDept}`,
             suffix: "HG",
           },
         ];
@@ -197,7 +197,6 @@ async function createFoldersForDate(
 
       // Create department-specific hojaInfo elements for sound, lights, and video
       if (["sound", "lights", "video"].includes(dept)) {
-        const job = { title: 'Default Job Title' }; // Define the job variable
         const hojaInfoType = dept === "sound"
           ? FLEX_FOLDER_IDS.hojaInfoSx
           : dept === "lights"
@@ -211,7 +210,7 @@ async function createFoldersForDate(
           parentElementId: mainFolderElementId,
           open: true,
           locked: false,
-          name: `Hoja de Información - ${job.title}`,
+          name: `Hoja de Información - ${locationName} - ${formattedDate}`,
           plannedStartDate: formattedStartDate,
           plannedEndDate: formattedEndDate,
           locationId: FLEX_FOLDER_IDS.location,
@@ -226,8 +225,8 @@ async function createFoldersForDate(
 
       if (dept === "sound") {
         const soundSubfolders = [
-          { name: `${tourData.name} - Tour Pack`, suffix: "TP" },
-          { name: `${tourData.name} - PA`, suffix: "PA" },
+          { name: `${tourData.name} - Tour Pack - ${locationName} - ${formattedDate}`, suffix: "TP" },
+          { name: `${tourData.name} - PA - ${locationName} - ${formattedDate}`, suffix: "PA" },
         ];
         for (const sf of soundSubfolders) {
           const subPayload = {
@@ -258,7 +257,7 @@ async function createFoldersForDate(
 
       if (dept === "personnel") {
         const personnelSubfolders = [
-          { name: `Gastos de Personal - ${tourData.name}`, suffix: "GP" },
+          { name: `Gastos de Personal - ${locationName} - ${formattedDate}`, suffix: "GP" },
         ];
         for (const sf of personnelSubfolders) {
           const subPayload = {
@@ -286,8 +285,8 @@ async function createFoldersForDate(
           });
         }
         const personnelCrewCall = [
-          { name: `Crew Call Sonido - ${tourData.name}`, suffix: "CCS" },
-          { name: `Crew Call Luces - ${tourData.name}`, suffix: "CCL" },
+          { name: `Crew Call Sonido - ${locationName} - ${formattedDate}`, suffix: "CCS" },
+          { name: `Crew Call Luces - ${locationName} - ${formattedDate}`, suffix: "CCL" },
         ];
         for (const sf of personnelCrewCall) {
           const subPayload = {
