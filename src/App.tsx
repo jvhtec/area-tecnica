@@ -29,6 +29,7 @@ import FestivalArtistManagement from '@/pages/FestivalArtistManagement';
 import LightsDisponibilidad from '@/pages/LightsDisponibilidad';
 import LightsMemoriaTecnica from '@/pages/LightsMemoriaTecnica';
 import VideoMemoriaTecnica from '@/pages/VideoMemoriaTecnica';
+import TourManagement from '@/pages/TourManagement';
 import { EquipmentManagement } from '@/pages/EquipmentManagement';
 import { ArtistRequirementsForm } from '@/components/festival/ArtistRequirementsForm';
 import { FormSubmitted } from '@/components/festival/FormSubmitted';
@@ -70,6 +71,14 @@ export default function App() {
                     <Route path="/equipment-management" element={<EquipmentManagement />} />
                     <Route path="/festivals" element={<Festivals />} />
                     <Route path="/technician-dashboard" element={<TechnicianDashboard />} />
+                    
+                    {/* Tour Management Routes */}
+                    <Route path="/tour-management/:tourId" element={<TourManagement />} />
+                    <Route path="/tour-management/:tourId/dates" element={<TourManagement />} />
+                    <Route path="/tour-management/:tourId/documents" element={<TourManagement />} />
+                    <Route path="/tour-management/:tourId/technicians" element={<TourManagement />} />
+                    <Route path="/tour-management/:tourId/scheduling" element={<TourManagement />} />
+                    <Route path="/tour-management/:tourId/logistics" element={<TourManagement />} />
                     
                     {/* Tools Routes - Both nested and original paths for compatibility */}
                     <Route path="/sound/pesos" element={<PesosTool />} />
