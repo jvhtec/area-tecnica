@@ -1,332 +1,983 @@
-
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import React, { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { 
-  Calendar, 
-  MapPin, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Eye, 
-  FolderPlus, 
-  Folders,
-  Loader2,
-  CheckCircle
-} from "lucide-react";
-import { useState, useEffect } from "react";
-import { format } from "date-fns";
-import { TourDateForm } from "./TourDateForm";
-import { useTourDates } from "./hooks/useTourDates";
-import { useTourDateFlexFolders } from "@/hooks/useTourDateFlexFolders";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import {
+  Calendar,
+  MapPin,
+  Plus,
+  Trash2,
+  FolderPlus,
+  Edit,
+} from "lucide-react";
+import { useLocationManagement } from "@/hooks/useLocationManagement";
+
+import {
+  FLEX_FOLDER_IDS,
+  DEPARTMENT_IDS,
+  RESPONSIBLE_PERSON_IDS,
+  DEPARTMENT_SUFFIXES,
+} from "@/utils/flex-folders/constants";
+
+import { createFlexFolder } from "@/utils/flex-folders/api";
 
 interface TourDateManagementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tourId: string;
+  tourId: string | null;
   tourDates: any[];
-  readOnly?: boolean;
 }
 
-export const TourDateManagementDialog = ({
+async function createFoldersForDate(
+  dateObj: any,
+  tourId: string | null,
+  skipExistingCheck = false
+) {
+  try {
+    console.log("Creating folders for tour date:", dateObj);
+
+    if (!skipExistingCheck) {
+      const { data: jobs, error: jobsError } = await supabase
+        .from("jobs")
+        .select("flex_folders_created")
+        .eq("tour_date_id", dateObj.id);
+      if (jobsError) {
+        console.error("Error checking existing jobs:", jobsError);
+        throw jobsError;
+      }
+      if (jobs && jobs.some((j) => j.flex_folders_created)) {
+        console.log("Skipping date – folders already exist:", dateObj.date);
+        return false;
+      }
+    }
+
+    const { data: tourData, error: tourError } = await supabase
+      .from("tours")
+      .select(`
+        name,
+        flex_main_folder_id,
+        flex_sound_folder_id,
+        flex_lights_folder_id,
+        flex_video_folder_id,
+        flex_production_folder_id,
+        flex_personnel_folder_id
+      `)
+      .eq("id", tourId)
+      .single();
+    if (tourError) {
+      console.error("Error fetching tour:", tourError);
+      throw tourError;
+    }
+    if (!tourData || !tourData.flex_main_folder_id) {
+      throw new Error(
+        "Parent tour folders not found. Please create tour folders first."
+      );
+    }
+
+    const formattedStartDate =
+      new Date(dateObj.date).toISOString().split(".")[0] + ".000Z";
+    const formattedEndDate = formattedStartDate;
+    const documentNumber = new Date(dateObj.date)
+      .toISOString()
+      .slice(2, 10)
+      .replace(/-/g, "");
+    const formattedDate = format(new Date(dateObj.date), "MMM d, yyyy");
+    const locationName = dateObj.location?.name || "No Location";
+
+    const departments: (keyof typeof DEPARTMENT_IDS)[] = [
+      "sound",
+      "lights",
+      "video",
+      "production",
+      "personnel",
+    ];
+
+    for (const dept of departments) {
+      const parentFolderId = tourData[`flex_${dept}_folder_id`];
+      const capitalizedDept = dept.charAt(0).toUpperCase() + dept.slice(1);
+      if (!parentFolderId) {
+        console.warn(`No parent folder ID found for ${dept} department`);
+        continue;
+      }
+
+      const { data: parentRows, error: parentErr } = await supabase
+        .from("flex_folders")
+        .select("*")
+        .eq("element_id", parentFolderId)
+        .limit(1);
+      if (parentErr) {
+        console.error("Error fetching parent row:", parentErr);
+        continue;
+      }
+      if (!parentRows || parentRows.length === 0) {
+        console.warn(`No local record found for parent element_id=${parentFolderId}`);
+        continue;
+      }
+      const parentRow = parentRows[0];
+
+      const mainFolderPayload = {
+        definitionId: FLEX_FOLDER_IDS.subFolder,
+        parentElementId: parentFolderId,
+        open: true,
+        locked: false,
+        name: `${locationName} - ${formattedDate} - ${capitalizedDept}`,
+        plannedStartDate: formattedStartDate,
+        plannedEndDate: formattedEndDate,
+        locationId: FLEX_FOLDER_IDS.location,
+        departmentId: DEPARTMENT_IDS[dept],
+        documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}`,
+        personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
+      };
+      console.log(`Creating main tour date folder for ${dept}:`, mainFolderPayload);
+      const mainFolderResponse = await createFlexFolder(mainFolderPayload);
+      const mainFolderElementId = mainFolderResponse.elementId;
+
+      await supabase.from("flex_folders").insert({
+        tour_date_id: dateObj.id,
+        parent_id: parentRow.id,
+        element_id: mainFolderElementId,
+        department: dept,
+        folder_type: "tourdate",
+      });
+
+      if (dept !== "personnel") {
+        const subfolders = [
+          {
+            definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
+            name: `Documentación Técnica - ${capitalizedDept}`,
+            name: `Documentación Técnica - ${locationName} - ${formattedDate} - ${capitalizedDept}`,
+            suffix: "DT",
+          },
+          {
+            definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos,
+            name: `Presupuestos Recibidos - ${capitalizedDept}`,
+            name: `Presupuestos Recibidos - ${locationName} - ${formattedDate} - ${capitalizedDept}`,
+            suffix: "PR",
+          },
+          {
+            definitionId: FLEX_FOLDER_IDS.hojaGastos,
+            name: `Hoja de Gastos - ${capitalizedDept}`,
+            name: `Hoja de Gastos - ${locationName} - ${formattedDate} - ${capitalizedDept}`,
+            suffix: "HG",
+          },
+        ];
+        for (const sf of subfolders) {
+          const subPayload = {
+            definitionId: sf.definitionId,
+            parentElementId: mainFolderElementId,
+            open: true,
+            locked: false,
+            name: sf.name,
+            plannedStartDate: formattedStartDate,
+            plannedEndDate: formattedEndDate,
+            locationId: FLEX_FOLDER_IDS.location,
+            departmentId: DEPARTMENT_IDS[dept],
+            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept]
+          };
+          console.log(`Creating subfolder ${sf.name} for ${dept}:`, subPayload);
+          const subResponse = await createFlexFolder(subPayload);
+          const subFolderElementId = subResponse.elementId;
+          await supabase.from("flex_folders").insert({
+            tour_date_id: dateObj.id,
+            parent_id: parentRow.id,
+            element_id: subFolderElementId,
+            department: dept,
+            folder_type: "tourdate_subfolder",
+          });
+        }
+      }
+
+      // Create department-specific hojaInfo elements for sound, lights, and video
+      if (["sound", "lights", "video"].includes(dept)) {
+        const job = { title: 'Default Job Title' }; // Define the job variable
+        const hojaInfoType = dept === "sound"
+          ? FLEX_FOLDER_IDS.hojaInfoSx
+          : dept === "lights"
+            ? FLEX_FOLDER_IDS.hojaInfoLx
+            : FLEX_FOLDER_IDS.hojaInfoVx;
+
+        const hojaInfoSuffix = dept === "sound" ? "SIP" : dept === "lights" ? "LIP" : "VIP";
+
+        const hojaInfoPayload = {
+          definitionId: hojaInfoType,
+          parentElementId: mainFolderElementId,
+          open: true,
+          locked: false,
+          name: `Hoja de Información - ${job.title}`,
+          name: `Hoja de Información - ${locationName} - ${formattedDate}`,
+          plannedStartDate: formattedStartDate,
+          plannedEndDate: formattedEndDate,
+          locationId: FLEX_FOLDER_IDS.location,
+          departmentId: DEPARTMENT_IDS[dept as keyof typeof DEPARTMENT_IDS],
+          documentNumber: `${documentNumber}${hojaInfoSuffix}`,
+          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as keyof typeof RESPONSIBLE_PERSON_IDS],
+        };
+
+        console.log(`Creating hojaInfo element for ${dept}:`, hojaInfoPayload);
+        await createFlexFolder(hojaInfoPayload);
+      }
+
+      if (dept === "sound") {
+        const soundSubfolders = [
+          { name: `${tourData.name} - Tour Pack`, suffix: "TP" },
+          { name: `${tourData.name} - PA`, suffix: "PA" },
+          { name: `${tourData.name} - Tour Pack - ${locationName} - ${formattedDate}`, suffix: "TP" },
+          { name: `${tourData.name} - PA - ${locationName} - ${formattedDate}`, suffix: "PA" },
+        ];
+        for (const sf of soundSubfolders) {
+          const subPayload = {
+            definitionId: FLEX_FOLDER_IDS.pullSheet,
+            parentElementId: mainFolderElementId,
+            open: true,
+            locked: false,
+            name: sf.name,
+            plannedStartDate: formattedStartDate,
+            plannedEndDate: formattedEndDate,
+            locationId: FLEX_FOLDER_IDS.location,
+            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
+            departmentId: DEPARTMENT_IDS[dept],
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
+          };
+          console.log(`Creating sound extra subfolder ${sf.name}:`, subPayload);
+          const subResponse = await createFlexFolder(subPayload);
+          const subFolderElementId = subResponse.elementId;
+          await supabase.from("flex_folders").insert({
+            tour_date_id: dateObj.id,
+            parent_id: parentRow.id,
+            element_id: subFolderElementId,
+            department: dept,
+            folder_type: "tourdate_subfolder",
+          });
+        }
+      }
+
+      if (dept === "personnel") {
+        const personnelSubfolders = [
+          { name: `Gastos de Personal - ${tourData.name}`, suffix: "GP" },
+          { name: `Gastos de Personal - ${locationName} - ${formattedDate}`, suffix: "GP" },
+        ];
+        for (const sf of personnelSubfolders) {
+          const subPayload = {
+            definitionId: FLEX_FOLDER_IDS.hojaGastos,
+            parentElementId: mainFolderElementId,
+            open: true,
+            locked: false,
+            name: sf.name,
+            plannedStartDate: formattedStartDate,
+            plannedEndDate: formattedEndDate,
+            locationId: FLEX_FOLDER_IDS.location,
+            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
+            departmentId: DEPARTMENT_IDS[dept],
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
+          };
+          console.log(`Creating personnel subfolder ${sf.name}:`, subPayload);
+          const subResponse = await createFlexFolder(subPayload);
+          const subFolderElementId = subResponse.elementId;
+          await supabase.from("flex_folders").insert({
+            tour_date_id: dateObj.id,
+            parent_id: parentRow.id,
+            element_id: subFolderElementId,
+            department: dept,
+            folder_type: "tourdate_subfolder",
+          });
+        }
+        const personnelCrewCall = [
+          { name: `Crew Call Sonido - ${tourData.name}`, suffix: "CCS" },
+          { name: `Crew Call Luces - ${tourData.name}`, suffix: "CCL" },
+          { name: `Crew Call Sonido - ${locationName} - ${formattedDate}`, suffix: "CCS" },
+          { name: `Crew Call Luces - ${locationName} - ${formattedDate}`, suffix: "CCL" },
+        ];
+        for (const sf of personnelCrewCall) {
+          const subPayload = {
+            definitionId: FLEX_FOLDER_IDS.crewCall,
+            parentElementId: mainFolderElementId,
+            open: true,
+            locked: false,
+            name: sf.name,
+            plannedStartDate: formattedStartDate,
+            plannedEndDate: formattedEndDate,
+            locationId: FLEX_FOLDER_IDS.location,
+            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
+            departmentId: DEPARTMENT_IDS[dept],
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
+          };
+          console.log(`Creating personnel crew call subfolder ${sf.name}:`, subPayload);
+          const subResponse = await createFlexFolder(subPayload);
+          const subFolderElementId = subResponse.elementId;
+          await supabase.from("flex_folders").insert({
+            tour_date_id: dateObj.id,
+            parent_id: parentRow.id,
+            element_id: subFolderElementId,
+            department: dept,
+            folder_type: "tourdate_subfolder",
+          });
+        }
+      }
+    }
+
+    const { error: updateError } = await supabase
+      .from("tour_dates")
+      .update({ flex_folders_created: true })
+      .eq("id", dateObj.id);
+    if (updateError) {
+      console.error("Error updating tour date:", updateError);
+      throw updateError;
+    }
+    return true;
+  } catch (error: any) {
+    console.error("Error creating folders for tour date:", error);
+    throw error;
+  }
+}
+
+interface TourDateManagementDialogInternalProps extends TourDateManagementDialogProps {}
+
+export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternalProps> = ({
   open,
   onOpenChange,
   tourId,
-  tourDates,
-  readOnly = false,
-}: TourDateManagementDialogProps) => {
-  const [isAddingDate, setIsAddingDate] = useState(false);
-  const [editingDate, setEditingDate] = useState<any>(null);
-  const [jobsWithFolders, setJobsWithFolders] = useState<Set<string>>(new Set());
-  
-  const { deleteTourDate, isDeleting } = useTourDates(tourId);
-  const { 
-    createIndividualFolders, 
-    createAllFolders, 
-    isCreatingAll, 
-    isCreatingIndividual 
-  } = useTourDateFlexFolders(tourId);
+  tourDates = [],
+}) => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { getOrCreateLocation } = useLocationManagement();
 
-  // Fetch folder status for all tour dates
-  useEffect(() => {
-    const fetchFolderStatus = async () => {
-      if (!tourDates.length) return;
-      
-      const tourDateIds = tourDates.map(td => td.id);
-      const { data: jobs } = await supabase
-        .from('jobs')
-        .select('tour_date_id, flex_folders_created')
-        .in('tour_date_id', tourDateIds);
+  const [editingTourDate, setEditingTourDate] = useState<any>(null);
+  const [editDateValue, setEditDateValue] = useState<string>("");
+  const [editLocationValue, setEditLocationValue] = useState<string>("");
 
-      if (jobs) {
-        const foldersCreated = new Set(
-          jobs
-            .filter(job => job.flex_folders_created)
-            .map(job => job.tour_date_id)
-        );
-        setJobsWithFolders(foldersCreated);
+  const [createdTourDateIds, setCreatedTourDateIds] = useState<string[]>([]);
+  const [isCreatingFolders, setIsCreatingFolders] = useState(false);
+  const [isDeletingDate, setIsDeletingDate] = useState<string | null>(null);
+
+  const { data: foldersExistenceMap } = useQuery({
+    queryKey: ["flex-folders-existence", tourDates.map(d => d.id)],
+    queryFn: async () => {
+      if (!tourDates.length) return {};
+
+      const { data, error } = await supabase
+        .from("flex_folders")
+        .select("tour_date_id")
+        .in("tour_date_id", tourDates.map(d => d.id));
+
+      if (error) throw error;
+
+      return data.reduce((acc: Record<string, boolean>, folder) => {
+        acc[folder.tour_date_id] = true;
+        return acc;
+      }, {});
+    },
+    enabled: tourDates.length > 0,
+  });
+
+  const handleCreateFoldersForDate = async (dateObj: any) => {
+    if (dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id)) return;
+
+    try {
+      const { data: existingFolders } = await supabase
+        .from("flex_folders")
+        .select("id")
+        .eq("tour_date_id", dateObj.id);
+
+      if (existingFolders?.length > 0) {
+        toast({
+          title: "Folders already exist",
+          description: "Flex folders have already been created for this tour date.",
+          variant: "destructive"
+        });
+        return;
       }
-    };
 
-    fetchFolderStatus();
-  }, [tourDates]);
+      await createFoldersForDate(dateObj, tourId, true);
+      setCreatedTourDateIds((prev) => [...prev, dateObj.id]);
+
+      queryClient.invalidateQueries({ queryKey: ["flex-folders"] });
+      queryClient.invalidateQueries({ queryKey: ["tours"] });
+
+      toast({
+        title: "Success",
+        description: "Folders created for this tour date."
+      });
+    } catch (error: any) {
+      console.error("Error creating folders for tour date:", error);
+      toast({
+        title: "Error creating folders",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const createAllFolders = async () => {
+    if (isCreatingFolders) return;
+    setIsCreatingFolders(true);
+    try {
+      let successCount = 0;
+      let skipCount = 0;
+      for (const dateObj of tourDates) {
+        if (dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id)) {
+          skipCount++;
+          continue;
+        }
+        try {
+          const created = await createFoldersForDate(dateObj, tourId, true);
+          if (created) {
+            setCreatedTourDateIds((prev) => [...prev, dateObj.id]);
+            successCount++;
+          } else {
+            skipCount++;
+          }
+        } catch (error) {
+          console.error(
+            `Error creating folders for date ${dateObj.date}:`,
+            error
+          );
+          continue;
+        }
+      }
+      toast({
+        title: "Folders Creation Complete",
+        description: `Folders created for ${successCount} dates. ${skipCount} dates were skipped.`,
+      });
+    } catch (error: any) {
+      console.error("Error creating folders for all dates:", error);
+      toast({
+        title: "Error creating folders",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingFolders(false);
+    }
+  };
+
+  const handleAddDate = async (date: string, location: string) => {
+    try {
+      if (!tourId) {
+        throw new Error("Tour ID is required");
+      }
+      console.log("Adding new tour date:", { date, location, tourId });
+      const locationId = await getOrCreateLocation(location);
+      console.log("Location ID:", locationId);
+      const { data: newTourDate, error: tourDateError } = await supabase
+        .from("tour_dates")
+        .insert({
+          tour_id: tourId,
+          date,
+          location_id: locationId,
+        })
+        .select(`
+          id,
+          date,
+          location:locations (
+            id,
+            name
+          )
+        `)
+        .single();
+      if (tourDateError) {
+        console.error("Error creating tour date:", tourDateError);
+        throw tourDateError;
+      }
+      console.log("Tour date created:", newTourDate);
+
+      const { data: tourData, error: tourError } = await supabase
+        .from("tours")
+        .select(`
+          name,
+          color,
+          tour_dates (
+            jobs (
+              job_departments (
+                department
+              )
+            )
+          )
+        `)
+        .eq("id", tourId)
+        .single();
+      if (tourError) {
+        console.error("Error fetching tour:", tourError);
+        throw tourError;
+      }
+
+      const { data: newJob, error: jobError } = await supabase
+        .from("jobs")
+        .insert({
+          title: `${tourData.name} (${location || 'No Location'})`,
+          start_time: `${date}T00:00:00`,
+          end_time: `${date}T23:59:59`,
+          location_id: locationId,
+          tour_date_id: newTourDate.id,
+          tour_id: tourId,
+          color: tourData.color || "#7E69AB",
+          job_type: "tourdate",
+        })
+        .select()
+        .single();
+      if (jobError) {
+        console.error("Error creating job:", jobError);
+        throw jobError;
+      }
+      console.log("Job created:", newJob);
+
+      const departments =
+        tourData.tour_dates?.[0]?.jobs?.[0]?.job_departments?.map(
+          (dept: any) => dept.department
+        ) || ["sound", "lights", "video"];
+      const jobDepartments = departments.map((department) => ({
+        job_id: newJob.id,
+        department,
+      }));
+      const { error: deptError } = await supabase
+        .from("job_departments")
+        .insert(jobDepartments);
+      if (deptError) {
+        console.error("Error creating job departments:", deptError);
+        throw deptError;
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["tours"] });
+      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+
+      toast({
+        title: "Success",
+        description: "Tour date and job created successfully",
+      });
+    } catch (error: any) {
+      console.error("Error adding date:", error);
+      toast({
+        title: "Error adding date",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEditDate = async (
+    dateId: string,
+    newDate: string,
+    newLocation: string
+  ) => {
+    try {
+      if (!tourId) {
+        throw new Error("Tour ID is required");
+      }
+      console.log("Editing tour date:", { dateId, newDate, newLocation });
+      const locationId = await getOrCreateLocation(newLocation);
+
+      const { data: tourData, error: tourError } = await supabase
+        .from("tours")
+        .select("name")
+        .eq("id", tourId)
+        .single();
+
+      if (tourError) {
+        console.error("Error fetching tour:", tourError);
+        throw tourError;
+      }
+
+      const { data: updatedDate, error: dateError } = await supabase
+        .from("tour_dates")
+        .update({
+          date: newDate,
+          location_id: locationId,
+        })
+        .eq("id", dateId)
+        .select(`
+          id,
+          date,
+          location:locations (
+            id,
+            name
+          ),
+          tours (
+            name
+          )
+        `)
+        .single();
+
+      if (dateError) {
+        console.error("Error updating tour date:", dateError);
+        throw dateError;
+      }
+
+      const { data: jobs, error: jobsError } = await supabase
+        .from("jobs")
+        .update({
+          title: `${tourData.name} (${newLocation || 'No Location'})`,
+          start_time: `${newDate}T00:00:00`,
+          end_time: `${newDate}T23:59:59`,
+          location_id: locationId,
+        })
+        .eq("tour_date_id", dateId);
+
+      if (jobsError) {
+        console.error("Error updating job:", jobsError);
+        throw jobsError;
+      }
+
+      toast({
+        title: "Success",
+        description: "Tour date updated successfully",
+      });
+      await queryClient.invalidateQueries({ queryKey: ["tours"] });
+    } catch (error: any) {
+      console.error("Error editing date:", error);
+      toast({
+        title: "Error editing date",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleDeleteDate = async (dateId: string) => {
-    if (readOnly) return;
-    
-    if (confirm('Are you sure you want to delete this tour date?')) {
-      try {
-        await deleteTourDate(dateId);
-      } catch (error) {
-        console.error('Error deleting tour date:', error);
+    if (isDeletingDate) return; // Prevent multiple simultaneous deletions
+
+    setIsDeletingDate(dateId);
+
+    try {
+      console.log("Starting deletion of tour date:", dateId);
+
+      // Step 1: Delete flex folders first
+      console.log("Deleting flex folders...");
+      const { error: flexFoldersError } = await supabase
+        .from("flex_folders")
+        .delete()
+        .eq("tour_date_id", dateId);
+
+      if (flexFoldersError) {
+        console.error("Error deleting flex folders:", flexFoldersError);
+        throw flexFoldersError;
       }
+
+      // Step 2: Get all jobs for this tour date
+      console.log("Fetching jobs for tour date...");
+      const { data: jobs, error: jobsError } = await supabase
+        .from("jobs")
+        .select("id")
+        .eq("tour_date_id", dateId);
+
+      if (jobsError) {
+        console.error("Error fetching jobs:", jobsError);
+        throw jobsError;
+      }
+
+      console.log("Found jobs to delete:", jobs);
+
+      // Step 3: Delete job-related data if jobs exist
+      if (jobs && jobs.length > 0) {
+        const jobIds = jobs.map(j => j.id);
+        console.log("Deleting job-related data for jobs:", jobIds);
+
+        // Delete in the correct order to avoid foreign key constraints
+        const deletionSteps = [
+          // Task documents first
+          { table: "task_documents", condition: "sound_task_id", subquery: "sound_job_tasks" },
+          { table: "task_documents", condition: "lights_task_id", subquery: "lights_job_tasks" },
+          { table: "task_documents", condition: "video_task_id", subquery: "video_job_tasks" },
+
+          // Tasks
+          { table: "sound_job_tasks", condition: "job_id" },
+          { table: "lights_job_tasks", condition: "job_id" },
+          { table: "video_job_tasks", condition: "job_id" },
+
+          // Personnel
+          { table: "sound_job_personnel", condition: "job_id" },
+          { table: "lights_job_personnel", condition: "job_id" },
+          { table: "video_job_personnel", condition: "job_id" },
+
+          // Other job-related tables
+          { table: "job_assignments", condition: "job_id" },
+          { table: "job_departments", condition: "job_id" },
+          { table: "job_documents", condition: "job_id" },
+          { table: "logistics_events", condition: "job_id" },
+          { table: "hoja_de_ruta", condition: "job_id" },
+          { table: "memoria_tecnica_documents", condition: "job_id" },
+          { table: "lights_memoria_tecnica_documents", condition: "job_id" },
+          { table: "video_memoria_tecnica_documents", condition: "job_id" },
+          { table: "job_date_types", condition: "job_id" },
+          { table: "job_milestones", condition: "job_id" },
+          { table: "power_requirement_tables", condition: "job_id" },
+          { table: "festival_artists", condition: "job_id" },
+          { table: "festival_gear_setups", condition: "job_id" },
+          { table: "festival_logos", condition: "job_id" },
+          { table: "festival_shifts", condition: "job_id" },
+          { table: "festival_settings", condition: "job_id" },
+          { table: "festival_stages", condition: "job_id" },
+          { table: "technician_work_records", condition: "job_id" },
+        ];
+
+        for (const step of deletionSteps) {
+          console.log(`Deleting from ${step.table}...`);
+
+          if (step.subquery) {
+            // Handle task documents which reference task IDs
+            const { data: taskIds } = await supabase
+              .from(step.subquery)
+              .select("id")
+              .in("job_id", jobIds);
+
+            if (taskIds && taskIds.length > 0) {
+              const { error } = await supabase
+                .from(step.table)
+                .delete()
+                .in(step.condition, taskIds.map(t => t.id));
+
+              if (error) {
+                console.error(`Error deleting from ${step.table}:`, error);
+                // Continue with other deletions even if one fails
+              }
+            }
+          } else {
+            // Direct deletion by job_id
+            const { error } = await supabase
+              .from(step.table)
+              .delete()
+              .in(step.condition, jobIds);
+
+            if (error) {
+              console.error(`Error deleting from ${step.table}:`, error);
+              // Continue with other deletions even if one fails
+            }
+          }
+        }
+
+        // Finally delete the jobs themselves
+        console.log("Deleting jobs...");
+        const { error: jobsDeleteError } = await supabase
+          .from("jobs")
+          .delete()
+          .in("id", jobIds);
+
+        if (jobsDeleteError) {
+          console.error("Error deleting jobs:", jobsDeleteError);
+          throw jobsDeleteError;
+        }
+      }
+
+      // Step 4: Delete tour date overrides
+      console.log("Deleting tour date overrides...");
+      await Promise.all([
+        supabase.from("tour_date_power_overrides").delete().eq("tour_date_id", dateId),
+        supabase.from("tour_date_weight_overrides").delete().eq("tour_date_id", dateId)
+      ]);
+
+      // Step 5: Finally delete the tour date itself
+      console.log("Deleting tour date...");
+      const { error: dateError } = await supabase
+        .from("tour_dates")
+        .delete()
+        .eq("id", dateId);
+
+      if (dateError) {
+        console.error("Error deleting tour date:", dateError);
+        throw dateError;
+      }
+
+      console.log("Tour date deletion completed successfully");
+
+      // Invalidate queries to refresh the UI
+      await queryClient.invalidateQueries({ queryKey: ["tours"] });
+      await queryClient.invalidateQueries({ queryKey: ["tours-with-dates"] });
+      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      await queryClient.invalidateQueries({ queryKey: ["flex-folders-existence"] });
+
+      toast({
+        title: "Success",
+        description: "Tour date deleted successfully"
+      });
+
+    } catch (error: any) {
+      console.error("Error deleting date:", error);
+      toast({
+        title: "Error deleting date",
+        description: error.message || "An unexpected error occurred while deleting the tour date",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingDate(null);
     }
   };
 
-  const handleEditDate = (date: any) => {
-    if (readOnly) return;
-    setEditingDate(date);
+  const startEditing = (dateObj: any) => {
+    setEditingTourDate(dateObj);
+    setEditDateValue(dateObj.date.split("T")[0]);
+    setEditLocationValue(dateObj.location?.name || "");
   };
 
-  const handleCreateIndividualFolders = async (tourDate: any) => {
-    if (readOnly) return;
-    await createIndividualFolders(tourDate);
+  const cancelEditing = () => {
+    setEditingTourDate(null);
+    setEditDateValue("");
+    setEditLocationValue("");
   };
 
-  const handleCreateAllFolders = async () => {
-    if (readOnly) return;
-    // Only create folders for dates that don't already have them
-    const datesToProcess = tourDates.filter(date => !jobsWithFolders.has(date.id));
-    if (datesToProcess.length === 0) {
-      return;
-    }
-    await createAllFolders(datesToProcess);
+  const submitEditing = async (dateId: string) => {
+    await handleEditDate(dateId, editDateValue, editLocationValue);
+    cancelEditing();
   };
-
-  const upcomingDates = tourDates.filter(
-    (date: any) => new Date(date.date) >= new Date()
-  );
-
-  const pastDates = tourDates.filter(
-    (date: any) => new Date(date.date) < new Date()
-  );
-
-  const hasFoldersCreated = (tourDate: any) => jobsWithFolders.has(tourDate.id);
-  const pendingDatesCount = tourDates.filter(date => !jobsWithFolders.has(date.id)).length;
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              {readOnly ? 'Tour Dates & Locations' : 'Manage Tour Dates'}
-              {readOnly && (
-                <Badge variant="secondary">
-                  <Eye className="h-3 w-3 mr-1" />
-                  View Only
-                </Badge>
-              )}
-            </DialogTitle>
-          </DialogHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Manage Tour Dates</DialogTitle>
+        </DialogHeader>
 
-          <div className="space-y-6">
-            {/* Action Buttons Row */}
-            {!readOnly && !isAddingDate && !editingDate && (
-              <div className="flex justify-between items-center">
-                <div className="flex gap-2">
-                  {pendingDatesCount > 0 && (
-                    <Button 
-                      onClick={handleCreateAllFolders}
-                      disabled={isCreatingAll}
-                      variant="outline"
-                    >
-                      {isCreatingAll ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Folders className="h-4 w-4 mr-2" />
-                      )}
-                      Create All Flex Folders ({pendingDatesCount})
-                    </Button>
-                  )}
-                </div>
-                <Button onClick={() => setIsAddingDate(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Tour Date
-                </Button>
-              </div>
+        <ScrollArea className="h-[60vh] pr-4">
+          <div className="space-y-4">
+            {tourDates.length > 0 && (
+              <Button
+                onClick={createAllFolders}
+                className="w-full"
+                variant="outline"
+                disabled={isCreatingFolders}
+              >
+                <FolderPlus className="h-4 w-4 mr-2" />
+                Create Folders for All Dates
+              </Button>
             )}
+            <div className="space-y-4">
+              {tourDates?.map((dateObj) => {
+                const foldersExist = foldersExistenceMap?.[dateObj.id] || false;
+                const isDeleting = isDeletingDate === dateObj.id;
 
-            {/* Add/Edit Form */}
-            {(isAddingDate || editingDate) && !readOnly && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>
-                    {editingDate ? 'Edit Tour Date' : 'Add New Tour Date'}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <TourDateForm
-                    tourId={tourId}
-                    initialData={editingDate}
-                    onSuccess={() => {
-                      setIsAddingDate(false);
-                      setEditingDate(null);
-                    }}
-                    onCancel={() => {
-                      setIsAddingDate(false);
-                      setEditingDate(null);
-                    }}
-                  />
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Upcoming Dates */}
-            {upcomingDates.length > 0 && (
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Upcoming Dates</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {upcomingDates.map((date: any) => (
-                    <Card key={date.id}>
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">
-                              {format(new Date(date.date), 'EEEE, MMMM d, yyyy')}
-                            </span>
-                            {hasFoldersCreated(date) && (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            )}
-                          </div>
-                          <div className="flex gap-1">
-                            {!readOnly && !hasFoldersCreated(date) && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleCreateIndividualFolders(date)}
-                                disabled={isCreatingIndividual === date.id}
-                                title="Create Flex folders"
-                              >
-                                {isCreatingIndividual === date.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <FolderPlus className="h-4 w-4" />
-                                )}
-                              </Button>
-                            )}
-                            {!readOnly && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEditDate(date)}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteDate(date.id)}
-                                  disabled={isDeleting}
-                                  className="text-destructive hover:text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
+                return (
+                  <div key={dateObj.id} className="p-3 border rounded-lg">
+                    {editingTourDate && editingTourDate.id === dateObj.id ? (
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          <Input
+                            type="date"
+                            value={editDateValue}
+                            onChange={(e) => setEditDateValue(e.target.value)}
+                            required
+                          />
                         </div>
-                      </CardHeader>
-                      <CardContent>
-                        {date.location?.name && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <MapPin className="h-4 w-4" />
-                            <span>{date.location.name}</span>
-                          </div>
-                        )}
-                        {date.location?.formatted_address && (
-                          <p className="text-xs text-muted-foreground mt-1 ml-6">
-                            {date.location.formatted_address}
-                          </p>
-                        )}
-                        {hasFoldersCreated(date) && (
-                          <div className="flex items-center gap-2 mt-2">
-                            <Badge variant="outline" className="text-green-700 border-green-300">
-                              <Folders className="h-3 w-3 mr-1" />
-                              Flex Folders Created
-                            </Badge>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Past Dates */}
-            {pastDates.length > 0 && (
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Past Dates</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {pastDates.map((date: any) => (
-                    <Card key={date.id} className="opacity-75">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">
-                              {format(new Date(date.date), 'EEEE, MMMM d, yyyy')}
-                            </span>
-                            {hasFoldersCreated(date) && (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            )}
-                          </div>
-                          <Badge variant="secondary">Completed</Badge>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          <Input
+                            type="text"
+                            value={editLocationValue}
+                            onChange={(e) => setEditLocationValue(e.target.value)}
+                            placeholder="Location"
+                            required
+                          />
                         </div>
-                      </CardHeader>
-                      <CardContent>
-                        {date.location?.name && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <MapPin className="h-4 w-4" />
-                            <span>{date.location.name}</span>
+                        <div className="flex gap-2">
+                          <Button onClick={() => submitEditing(dateObj.id)}>
+                            Save
+                          </Button>
+                          <Button variant="outline" onClick={cancelEditing}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="h-4 w-4" />
+                            <span>{format(new Date(dateObj.date), "MMM d, yyyy")}</span>
                           </div>
-                        )}
-                        {hasFoldersCreated(date) && (
-                          <div className="flex items-center gap-2 mt-2">
-                            <Badge variant="outline" className="text-green-700 border-green-300">
-                              <Folders className="h-3 w-3 mr-1" />
-                              Flex Folders Created
-                            </Badge>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                          {dateObj.location?.name && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <MapPin className="h-4 w-4" />
+                              <span>{dateObj.location.name}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleCreateFoldersForDate(dateObj)}
+                            title="Create Flex folders"
+                            disabled={dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id) || foldersExist}
+                            className={(dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id) || foldersExist) ? "opacity-50 cursor-not-allowed" : ""}
+                          >
+                            <FolderPlus className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => startEditing(dateObj)}
+                            title="Edit Date"
+                            disabled={isDeleting}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteDate(dateObj.id)}
+                            title="Delete Date"
+                            disabled={isDeleting}
+                            className={isDeleting ? "opacity-50 cursor-not-allowed" : ""}
+                          >
+                            {isDeleting ? (
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                const date = formData.get("date") as string;
+                const location = formData.get("location") as string;
+                if (!date || !location) {
+                  toast({
+                    title: "Error",
+                    description: "Please fill in all fields",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                handleAddDate(date, location);
+                e.currentTarget.reset();
+              }}
+              className="space-y-4"
+            >
+              <div className="grid grid-cols-2 gap-4">
+                <Input type="date" name="date" required />
+                <Input type="text" name="location" placeholder="Location" required />
               </div>
-            )}
-
-            {tourDates.length === 0 && (
-              <div className="text-center py-8">
-                <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No Tour Dates</h3>
-                <p className="text-muted-foreground">
-                  {readOnly 
-                    ? "No dates have been scheduled for this tour yet."
-                    : "Start by adding the first tour date."
-                  }
-                </p>
-              </div>
-            )}
+              <Button type="submit" className="w-full">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Date
+              </Button>
+            </form>
           </div>
-        </DialogContent>
-      </Dialog>
-    </>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
   );
 };
+0 commit comments
+Comments
+0
+ (0)
+Please sign in to comment.
+Fix: Tour date folder naming · jvhtec/area-tecnica@6a7cc8c · GitHub
