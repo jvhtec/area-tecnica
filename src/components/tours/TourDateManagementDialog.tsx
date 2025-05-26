@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
 import { useTourDateFlexFolders } from "@/hooks/useTourDateFlexFolders";
+import { useTourDateRealtime } from "@/hooks/useTourDateRealtime";
 
 import {
   FLEX_FOLDER_IDS,
@@ -350,20 +351,24 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
     isCreatingIndividual 
   } = useTourDateFlexFolders(tourId || '');
 
+  // Add real-time subscriptions
+  const tourDateIds = tourDates.map(d => d.id);
+  useTourDateRealtime(tourId, tourDateIds);
+
   const [editingTourDate, setEditingTourDate] = useState<any>(null);
   const [editDateValue, setEditDateValue] = useState<string>("");
   const [editLocationValue, setEditLocationValue] = useState<string>("");
   const [isDeletingDate, setIsDeletingDate] = useState<string | null>(null);
 
-  const { data: foldersExistenceMap } = useQuery({
-    queryKey: ["flex-folders-existence", tourDates.map(d => d.id)],
+  const { data: foldersExistenceMap, refetch: refetchFoldersExistence } = useQuery({
+    queryKey: ["flex-folders-existence", tourDateIds],
     queryFn: async () => {
       if (!tourDates.length) return {};
 
       const { data, error } = await supabase
         .from("flex_folders")
         .select("tour_date_id")
-        .in("tour_date_id", tourDates.map(d => d.id));
+        .in("tour_date_id", tourDateIds);
 
       if (error) throw error;
 
