@@ -125,7 +125,7 @@ const ConsumosTool: React.FC = () => {
     return { wattsPerPhase, currentPerPhase, adjustedWatts };
   };
 
-  const PDU_TYPES = ['CEE32A 3P+N+G', 'CEE63A 3P+N+G', 'CEE400A 3P+N+G'];
+  const PDU_TYPES = ['CEE32A 3P+N+G', 'CEE63A 3P+N+G', 'CEE125A 3P+N+G'];
 
   const recommendPDU = (current: number) => {
     if (current < 32) return PDU_TYPES[0];
