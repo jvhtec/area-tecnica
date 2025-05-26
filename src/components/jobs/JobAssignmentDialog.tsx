@@ -43,71 +43,38 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
   useTabVisibility(['technicians']);
 
   const { data: technicians, isLoading: isLoadingTechnicians, error: techniciansError, refetch: refetchTechnicians } = useQuery({
-    queryKey: ["technicians", department, jobId],
+    queryKey: ["available-technicians", department],
     queryFn: async () => {
-      console.log("JobAssignmentDialog: Starting technician fetch for department:", department, "jobId:", jobId);
+      console.log("JobAssignmentDialog: Fetching available technicians for department:", department);
       
       if (!department) {
         console.error("JobAssignmentDialog: No department provided");
         throw new Error("Department is required");
       }
 
-      if (!jobId) {
-        console.error("JobAssignmentDialog: No jobId provided");
-        throw new Error("Job ID is required");
-      }
-
       try {
-        // First, get assigned technicians for this job and department
-        console.log("JobAssignmentDialog: Fetching job assignments...");
-        const { data: jobAssignments, error: assignmentsError } = await supabase
-          .from("job_assignments")
-          .select(`
-            technician_id,
-            profiles (
-              id, 
-              first_name, 
-              last_name, 
-              email, 
-              department, 
-              role
-            )
-          `)
-          .eq("job_id", jobId);
+        // Get ALL technicians from the specified department
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name, email, department, role")
+          .eq("department", department);
 
-        if (assignmentsError) {
-          console.error("JobAssignmentDialog: Error fetching job assignments:", assignmentsError);
-          throw assignmentsError;
+        if (error) {
+          console.error("JobAssignmentDialog: Error fetching technicians:", error);
+          throw error;
         }
 
-        console.log("JobAssignmentDialog: Raw job assignments data:", jobAssignments);
+        console.log(`JobAssignmentDialog: Found ${data?.length || 0} technicians in ${department} department`);
+        console.log("JobAssignmentDialog: Technicians data:", data);
 
-        // Filter by department and map to get just the profiles
-        const filteredTechnicians = jobAssignments
-          ?.filter((assignment: any) => {
-            const hasProfile = assignment.profiles;
-            const matchesDepartment = hasProfile && assignment.profiles.department === department;
-            console.log("JobAssignmentDialog: Assignment filter check:", {
-              hasProfile,
-              profileDepartment: hasProfile ? assignment.profiles.department : 'none',
-              targetDepartment: department,
-              matchesDepartment
-            });
-            return hasProfile && matchesDepartment;
-          })
-          .map((assignment: any) => assignment.profiles) || [];
-
-        console.log(`JobAssignmentDialog: Found ${filteredTechnicians.length} technicians assigned to job ${jobId} for department ${department}`);
-        console.log("JobAssignmentDialog: Filtered technicians:", filteredTechnicians);
-
-        return filteredTechnicians as Technician[];
+        return (data || []) as Technician[];
       } catch (error) {
         console.error("JobAssignmentDialog: Query function error:", error);
         throw error;
       }
     },
-    enabled: open && !!department && !!jobId,
-    staleTime: 1000 * 30, // Consider data fresh for 30 seconds (reduced from 5 minutes)
+    enabled: open && !!department,
+    staleTime: 1000 * 30, // Consider data fresh for 30 seconds
     refetchOnMount: true,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
@@ -119,7 +86,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
   const handleManualRefresh = async () => {
     console.log("JobAssignmentDialog: Manual refresh triggered");
     try {
-      await queryClient.invalidateQueries({ queryKey: ["technicians"] });
+      await queryClient.invalidateQueries({ queryKey: ["available-technicians"] });
       await refetchTechnicians();
       toast.success("Technicians list refreshed");
     } catch (error) {
@@ -137,7 +104,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
     } else {
       // Force refresh when dialog opens
       console.log("JobAssignmentDialog: Dialog opened, forcing refresh");
-      await queryClient.invalidateQueries({ queryKey: ["technicians"] });
+      await queryClient.invalidateQueries({ queryKey: ["available-technicians"] });
     }
     onOpenChange(isOpen);
   };
@@ -245,7 +212,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
         <div className="flex items-center justify-center p-4">
           <Loader2 className="h-4 w-4 animate-spin mr-2" />
           <span className="text-sm text-muted-foreground">
-            Loading {department} technicians for this job...
+            Loading {department} technicians...
           </span>
         </div>
       );
@@ -271,9 +238,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
         <div className="flex flex-col items-center p-4 space-y-2">
           <AlertCircle className="h-6 w-6 text-muted-foreground" />
           <span className="text-sm text-muted-foreground text-center">
-            No {department} technicians assigned to this job yet.
-            <br />
-            Assign technicians to this job first to see them here.
+            No {department} technicians found in the system.
           </span>
           <Button variant="outline" size="sm" onClick={handleManualRefresh}>
             <RefreshCw className="h-4 w-4 mr-2" />
