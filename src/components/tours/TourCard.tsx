@@ -7,8 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, MapPin, MoreVertical, Settings, FileText, Printer, FolderPlus, Image } from "lucide-react";
 import { format } from "date-fns";
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { TourManagementDialog } from "./TourManagementDialog";
-import { TourPowerWeightDefaultsDialog } from "./TourPowerWeightDefaultsDialog";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
@@ -16,12 +16,12 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 interface TourCardProps {
   tour: any;
-  onTourClick: () => void;
   onManageDates: () => void;
   onPrint: () => void;
 }
 
-export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCardProps) => {
+export const TourCard = ({ tour, onManageDates, onPrint }: TourCardProps) => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [isManagementOpen, setIsManagementOpen] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -62,6 +62,10 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
   };
 
   const upcomingDates = getUpcomingDates();
+
+  const handleCardClick = () => {
+    navigate(`/tour-management/${tour.id}`);
+  };
 
   const handleCreateFlexFolders = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -199,13 +203,13 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
 
   return (
     <>
-      <Card className="cursor-pointer hover:shadow-md transition-shadow">
+      <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={handleCardClick}>
         <CardHeader 
           className="pb-3 relative"
           style={{ backgroundColor: `${tour.color}20` }}
         >
           <div className="flex justify-between items-start">
-            <div className="flex-1" onClick={onTourClick}>
+            <div className="flex-1">
               <div className="flex items-start gap-3 mb-2">
                 {logoUrl && (
                   <div className="w-12 h-12 flex-shrink-0">
@@ -257,7 +261,12 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
               /* Desktop Dropdown Menu */
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 w-8 p-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -291,7 +300,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
           </div>
         </CardHeader>
         
-        <CardContent className="pt-3" onClick={onTourClick}>
+        <CardContent className="pt-3">
           <div className="space-y-4">
             {/* Tour dates info */}
             <div className="flex items-center justify-between text-sm">
