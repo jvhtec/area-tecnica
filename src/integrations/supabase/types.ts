@@ -3411,6 +3411,10 @@ export type Database = {
       }
     }
     Functions: {
+      can_manage_users: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       convert_to_timezone: {
         Args: { timestamp_val: string; target_timezone?: string }
         Returns: string
