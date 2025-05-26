@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -405,6 +406,19 @@ const ConsumosTool: React.FC = () => {
     overrideId: override.id
   }));
 
+  // Extract tour information from selected job
+  const getTourInfo = () => {
+    if (!selectedJob?.tour_date) return null;
+    
+    return {
+      tourName: selectedJob.tour_date.tour?.name || 'Unknown Tour',
+      tourDate: selectedJob.tour_date.date || selectedJob.start_time,
+      locationName: selectedJob.tour_date.location?.name || selectedJob.location?.name || 'Unknown Location'
+    };
+  };
+
+  const tourInfo = getTourInfo();
+
   return (
     <Card className="w-full max-w-4xl mx-auto my-6">
       <CardHeader className="space-y-1">
@@ -424,11 +438,11 @@ const ConsumosTool: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {isJobOverrideMode && selectedJob?.tour_date && (
+          {isJobOverrideMode && tourInfo && (
             <TourOverrideModeHeader
-              tourName={selectedJob.tour_date.tour?.name || 'Unknown Tour'}
-              tourDate={selectedJob.tour_date?.date || selectedJob.start_time}
-              locationName="Unknown Location"
+              tourName={tourInfo.tourName}
+              tourDate={tourInfo.tourDate}
+              locationName={tourInfo.locationName}
               defaultsCount={tourDefaultTables.length}
               overridesCount={powerOverrides.length}
               department="sound"
