@@ -54,7 +54,7 @@ export const useMyTours = () => {
         const tourDates = tour.tour_dates || [];
         const now = new Date();
         const upcomingDates = tourDates.filter(
-          (date: any) => new Date(date.date) >= now
+          (dateEntry: any) => new Date(dateEntry.date) >= now
         ).length;
 
         return {
