@@ -45,7 +45,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
   const { data: technicians, isLoading: isLoadingTechnicians, error: techniciansError, refetch: refetchTechnicians } = useQuery({
     queryKey: ["available-technicians", department],
     queryFn: async () => {
-      console.log("JobAssignmentDialog: Fetching available technicians for department:", department);
+      console.log("JobAssignmentDialog: Fetching ALL technicians for department:", department);
       
       if (!department) {
         console.error("JobAssignmentDialog: No department provided");
@@ -53,7 +53,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
       }
 
       try {
-        // Get ALL technicians from the specified department
+        // Get ALL technicians from the specified department (not just assigned ones)
         const { data, error } = await supabase
           .from("profiles")
           .select("id, first_name, last_name, email, department, role")
