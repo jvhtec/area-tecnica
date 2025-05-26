@@ -8,6 +8,7 @@ import { Button } from "../ui/button";
 import { toast } from "sonner";
 import { SubscriptionIndicator } from "../ui/subscription-indicator";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
+import { useEffect } from "react";
 
 interface JobAssignmentsProps {
   jobId: string;
@@ -18,6 +19,38 @@ interface JobAssignmentsProps {
 export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsProps) => {
   const queryClient = useQueryClient();
   const { assignments, isLoading, isRefreshing, refetch } = useJobAssignmentsRealtime(jobId);
+
+  // Set up additional real-time subscription to invalidate available technicians
+  useEffect(() => {
+    if (!jobId) return;
+
+    console.log(`Setting up assignments real-time for job ${jobId}`);
+
+    const channel = supabase
+      .channel(`job-assignments-${jobId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'job_assignments',
+          filter: `job_id=eq.${jobId}`
+        },
+        (payload) => {
+          console.log('Assignment changed for job, refreshing available technicians:', payload);
+          // Invalidate available technicians queries when assignments change
+          queryClient.invalidateQueries({
+            queryKey: ["available-technicians"]
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log(`Cleaning up assignments subscription for job ${jobId}`);
+      supabase.removeChannel(channel);
+    };
+  }, [jobId, queryClient]);
 
   const handleDelete = async (technicianId: string) => {
     if (userRole === 'logistics') return;
@@ -34,7 +67,8 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
       // Refresh both assignments and jobs data
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["job-assignments", jobId] }),
-        queryClient.invalidateQueries({ queryKey: ["jobs"] })
+        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["available-technicians"] })
       ]);
 
       toast.success("Assignment deleted successfully");

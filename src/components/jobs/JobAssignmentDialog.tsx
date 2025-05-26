@@ -1,6 +1,6 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Department } from "@/types/department";
 import { JobAssignments } from "./JobAssignments";
@@ -8,8 +8,8 @@ import { Button } from "../ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { Loader2, RefreshCw, AlertCircle } from "lucide-react";
+import { useAvailableTechnicians } from "@/hooks/useAvailableTechnicians";
 
 interface JobAssignmentDialogProps {
   open: boolean;
@@ -18,18 +18,17 @@ interface JobAssignmentDialogProps {
   department: Department;
 }
 
-interface Technician {
+interface JobData {
   id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  role: string;
-  department: Department;
+  start_time: string;
+  end_time: string;
+  title: string;
 }
 
 export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: JobAssignmentDialogProps) => {
   const [selectedTechnician, setSelectedTechnician] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<string>("");
+  const [jobData, setJobData] = useState<JobData | null>(null);
   const queryClient = useQueryClient();
 
   // Reset selections when department changes
@@ -38,58 +37,47 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
     setSelectedRole("");
   }, [department]);
 
-  // Set up tab visibility tracking to refresh data when tab becomes visible
-  useTabVisibility(['technicians']);
-
-  const { data: technicians, isLoading: isLoadingTechnicians, error: techniciansError, refetch: refetchTechnicians } = useQuery({
-    queryKey: ["available-technicians", department, jobId],
-    queryFn: async () => {
-      if (!department) {
-        throw new Error("Department is required");
-      }
+  // Fetch job data to get start and end times
+  useEffect(() => {
+    const fetchJobData = async () => {
+      if (!jobId) return;
 
       try {
-        // Get ALL technicians from the specified department
         const { data, error } = await supabase
-          .from("profiles")
-          .select("id, first_name, last_name, email, department, role")
-          .eq("department", department);
+          .from("jobs")
+          .select("id, start_time, end_time, title")
+          .eq("id", jobId)
+          .single();
 
         if (error) {
           throw error;
         }
 
-        const techniciansData = (data || []) as Technician[];
-        
-        return techniciansData;
+        setJobData(data);
       } catch (error) {
-        throw error;
+        console.error("Error fetching job data:", error);
       }
-    },
-    enabled: open && !!department,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-  });
+    };
 
-  // Manual refresh function
-  const handleManualRefresh = async () => {
-    try {
-      // Clear all related cache
-      await queryClient.invalidateQueries({ queryKey: ["available-technicians"] });
-      await queryClient.removeQueries({ queryKey: ["available-technicians"] });
-      
-      // Force refetch
-      await refetchTechnicians();
-      toast.success("Technicians list refreshed");
-    } catch (error) {
-      console.error("Manual refresh failed:", error);
-      toast.error("Failed to refresh technicians list");
+    if (open && jobId) {
+      fetchJobData();
     }
-  };
+  }, [open, jobId]);
+
+  // Use the new available technicians hook
+  const {
+    technicians,
+    isLoading: isLoadingTechnicians,
+    isError: techniciansError,
+    isRefreshing,
+    refetch: refetchTechnicians
+  } = useAvailableTechnicians({
+    department,
+    jobId,
+    jobStartTime: jobData?.start_time || "",
+    jobEndTime: jobData?.end_time || "",
+    enabled: open && !!jobData
+  });
 
   const handleDialogChange = async (isOpen: boolean) => {
     if (!isOpen) {
@@ -97,19 +85,15 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
       setSelectedTechnician("");
       setSelectedRole("");
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
-    } else {
-      // Force refresh when dialog opens
-      await queryClient.invalidateQueries({ queryKey: ["available-technicians"] });
-      await queryClient.removeQueries({ queryKey: ["available-technicians"] });
     }
     onOpenChange(isOpen);
   };
 
   // Validate assignment before submitting
-  const validateAssignment = (techId: string, role: string, techs: Technician[]) => {
-    const technician = techs.find(t => t.id === techId);
+  const validateAssignment = (techId: string, role: string) => {
+    const technician = technicians.find(t => t.id === techId);
     if (!technician) {
-      throw new Error("Selected technician not found");
+      throw new Error("Selected technician not found or not available");
     }
 
     if (technician.department !== department) {
@@ -132,11 +116,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
 
     try {
       // Validate assignment
-      if (!technicians) {
-        throw new Error("Technician data not available");
-      }
-      
-      validateAssignment(selectedTechnician, selectedRole, technicians);
+      validateAssignment(selectedTechnician, selectedRole);
 
       const roleField = `${department}_role` as const;
       const { error } = await supabase
@@ -196,7 +176,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
   };
 
   // Format technician display name
-  const formatTechnicianName = (technician: Technician) => {
+  const formatTechnicianName = (technician: any) => {
     const isHouseTech = technician.role === 'house_tech';
     const displayName = `${technician.first_name} ${technician.last_name}${isHouseTech ? ' (House Tech)' : ''}`;
     return displayName;
@@ -209,7 +189,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
         <div className="flex items-center justify-center p-4">
           <Loader2 className="h-4 w-4 animate-spin mr-2" />
           <span className="text-sm text-muted-foreground">
-            Loading {department} technicians...
+            Loading available {department} technicians...
           </span>
         </div>
       );
@@ -220,9 +200,9 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
         <div className="flex flex-col items-center p-4 space-y-2">
           <AlertCircle className="h-6 w-6 text-destructive" />
           <span className="text-sm text-destructive text-center">
-            Failed to load technicians: {techniciansError.message}
+            Failed to load available technicians
           </span>
-          <Button variant="outline" size="sm" onClick={handleManualRefresh}>
+          <Button variant="outline" size="sm" onClick={refetchTechnicians}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Retry
           </Button>
@@ -235,9 +215,13 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
         <div className="flex flex-col items-center p-4 space-y-2">
           <AlertCircle className="h-6 w-6 text-muted-foreground" />
           <span className="text-sm text-muted-foreground text-center">
-            No {department} technicians found in the system.
+            No available {department} technicians found.
+            <br />
+            <span className="text-xs">
+              (Technicians already assigned to this job or with conflicting dates are hidden)
+            </span>
           </span>
-          <Button variant="outline" size="sm" onClick={handleManualRefresh}>
+          <Button variant="outline" size="sm" onClick={refetchTechnicians}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -250,7 +234,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
     return (
       <Select value={selectedTechnician} onValueChange={setSelectedTechnician}>
         <SelectTrigger>
-          <SelectValue placeholder={`Select ${department} technician (${sortedTechnicians.length} available)`} />
+          <SelectValue placeholder={`Select available ${department} technician (${sortedTechnicians.length} available)`} />
         </SelectTrigger>
         <SelectContent>
           {sortedTechnicians.map((tech) => (
@@ -269,20 +253,25 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             Assign {department.charAt(0).toUpperCase() + department.slice(1)} Technician
+            {jobData && (
+              <span className="text-sm font-normal text-muted-foreground">
+                {jobData.title}
+              </span>
+            )}
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleManualRefresh}
-              disabled={isLoadingTechnicians}
+              onClick={refetchTechnicians}
+              disabled={isLoadingTechnicians || isRefreshing}
             >
-              <RefreshCw className={`h-4 w-4 ${isLoadingTechnicians ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 ${isLoadingTechnicians || isRefreshing ? 'animate-spin' : ''}`} />
             </Button>
           </DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4 mt-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Technician</label>
+            <label className="text-sm font-medium">Available Technician</label>
             {renderTechnicianSelector()}
           </div>
 
