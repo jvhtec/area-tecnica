@@ -22,13 +22,19 @@ export const useTourDocuments = (tourId: string) => {
   const { data: documents = [], isLoading, error } = useQuery({
     queryKey: ['tour-documents', tourId],
     queryFn: async () => {
+      console.log('Fetching tour documents for tour:', tourId);
       const { data, error } = await supabase
         .from('tour_documents')
         .select('*')
         .eq('tour_id', tourId)
         .order('uploaded_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching tour documents:', error);
+        throw error;
+      }
+      
+      console.log('Fetched documents:', data);
       return data as TourDocument[];
     },
     enabled: !!tourId
@@ -43,12 +49,17 @@ export const useTourDocuments = (tourId: string) => {
       const filePath = `tours/${tourId}/${fileId}.${fileExt}`;
       const finalFileName = fileName || file.name;
 
+      console.log('Uploading file:', finalFileName, 'to path:', filePath);
+
       // Upload file to storage
       const { error: uploadError } = await supabase.storage
         .from('tour-documents')
         .upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        throw uploadError;
+      }
 
       // Save document record
       const { data, error: dbError } = await supabase
@@ -64,7 +75,12 @@ export const useTourDocuments = (tourId: string) => {
         .select()
         .single();
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error('Database insert error:', dbError);
+        throw dbError;
+      }
+      
+      console.log('Document uploaded successfully:', data);
       return data;
     },
     onSuccess: () => {
@@ -79,7 +95,9 @@ export const useTourDocuments = (tourId: string) => {
 
   const deleteDocument = useMutation({
     mutationFn: async (document: TourDocument) => {
-      // Delete from storage
+      console.log('Deleting document:', document.file_name);
+      
+      // Delete from storage first
       const { error: storageError } = await supabase.storage
         .from('tour-documents')
         .remove([document.file_path]);
@@ -95,7 +113,12 @@ export const useTourDocuments = (tourId: string) => {
         .delete()
         .eq('id', document.id);
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error('Database delete error:', dbError);
+        throw dbError;
+      }
+      
+      console.log('Document deleted successfully');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tour-documents', tourId] });
@@ -107,24 +130,36 @@ export const useTourDocuments = (tourId: string) => {
     }
   });
 
-  const getDocumentUrl = async (document: TourDocument) => {
+  const getDocumentUrl = async (document: TourDocument): Promise<string> => {
     try {
-      // First try to get a signed URL
-      const { data, error } = await supabase.storage
+      console.log('Generating URL for document:', document.file_name, 'at path:', document.file_path);
+      
+      // Check if the bucket is public first by trying to get public URL
+      const { data: publicUrlData } = supabase.storage
         .from('tour-documents')
-        .createSignedUrl(document.file_path, 3600); // 1 hour expiry
-
-      if (error) {
-        console.error('Signed URL error:', error);
-        // Fallback to public URL
-        const { data: publicUrlData } = supabase.storage
-          .from('tour-documents')
-          .getPublicUrl(document.file_path);
-        
+        .getPublicUrl(document.file_path);
+      
+      if (publicUrlData?.publicUrl) {
+        console.log('Using public URL:', publicUrlData.publicUrl);
         return publicUrlData.publicUrl;
       }
 
-      return data.signedUrl;
+      // Fallback to signed URL if public URL doesn't work
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from('tour-documents')
+        .createSignedUrl(document.file_path, 3600); // 1 hour expiry
+
+      if (signedUrlError) {
+        console.error('Signed URL error:', signedUrlError);
+        throw signedUrlError;
+      }
+
+      if (signedUrlData?.signedUrl) {
+        console.log('Using signed URL:', signedUrlData.signedUrl);
+        return signedUrlData.signedUrl;
+      }
+
+      throw new Error('Failed to generate any URL for the document');
     } catch (error) {
       console.error('URL generation error:', error);
       throw error;

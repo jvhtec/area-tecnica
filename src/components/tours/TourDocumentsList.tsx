@@ -14,48 +14,69 @@ interface TourDocumentsListProps {
 export const TourDocumentsList = ({ tourId }: TourDocumentsListProps) => {
   const { documents, deleteDocument, getDocumentUrl, canDelete } = useTourDocuments(tourId);
 
-  const handleView = async (document: any) => {
+  const handleView = async (doc: any) => {
     try {
-      const url = await getDocumentUrl(document);
-      window.open(url, '_blank');
+      console.log('Attempting to view document:', doc.file_name);
+      const url = await getDocumentUrl(doc);
+      console.log('Generated URL for viewing:', url);
+      
+      if (url) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+        toast.success('Document opened in new tab');
+      } else {
+        throw new Error('Failed to generate document URL');
+      }
     } catch (error) {
       console.error('Error viewing document:', error);
-      toast.error('Failed to view document');
+      toast.error('Failed to view document. Please try again.');
     }
   };
 
-  const handleDownload = async (document: any) => {
+  const handleDownload = async (doc: any) => {
     try {
-      const url = await getDocumentUrl(document);
+      console.log('Attempting to download document:', doc.file_name);
+      const url = await getDocumentUrl(doc);
+      console.log('Generated URL for download:', url);
       
-      // Create a temporary link to trigger download
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = document.file_name;
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      if (!url) {
+        throw new Error('Failed to generate download URL');
+      }
+
+      // Use the global document object explicitly to avoid naming conflicts
+      const downloadLink = globalThis.document.createElement('a');
+      downloadLink.href = url;
+      downloadLink.download = doc.file_name;
+      downloadLink.target = '_blank';
+      downloadLink.style.display = 'none';
+      
+      // Append to body, click, and remove
+      globalThis.document.body.appendChild(downloadLink);
+      downloadLink.click();
+      globalThis.document.body.removeChild(downloadLink);
       
       toast.success('Download started');
+      console.log('Download initiated successfully');
     } catch (error) {
       console.error('Error downloading document:', error);
-      toast.error('Failed to download document');
+      toast.error('Failed to download document. Please try again.');
     }
   };
 
-  const handleDelete = async (document: any) => {
-    if (!canDelete(document)) {
+  const handleDelete = async (doc: any) => {
+    if (!canDelete(doc)) {
       toast.error('You do not have permission to delete this document');
       return;
     }
 
-    if (confirm('Are you sure you want to delete this document?')) {
+    const confirmDelete = globalThis.confirm(`Are you sure you want to delete "${doc.file_name}"?`);
+    if (confirmDelete) {
       try {
-        await deleteDocument.mutateAsync(document);
+        console.log('Attempting to delete document:', doc.file_name);
+        await deleteDocument.mutateAsync(doc);
+        toast.success('Document deleted successfully');
       } catch (error) {
         console.error('Error deleting document:', error);
-        toast.error('Failed to delete document');
+        toast.error('Failed to delete document. Please try again.');
       }
     }
   };
@@ -99,7 +120,7 @@ export const TourDocumentsList = ({ tourId }: TourDocumentsListProps) => {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleView(document)}
-                  title="View"
+                  title="View document"
                 >
                   <Eye className="h-4 w-4" />
                 </Button>
@@ -107,7 +128,7 @@ export const TourDocumentsList = ({ tourId }: TourDocumentsListProps) => {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleDownload(document)}
-                  title="Download"
+                  title="Download document"
                 >
                   <Download className="h-4 w-4" />
                 </Button>
@@ -116,7 +137,7 @@ export const TourDocumentsList = ({ tourId }: TourDocumentsListProps) => {
                     variant="ghost"
                     size="sm"
                     onClick={() => handleDelete(document)}
-                    title="Delete"
+                    title="Delete document"
                     className="text-destructive hover:text-destructive"
                     disabled={deleteDocument.isPending}
                   >
