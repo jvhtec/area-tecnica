@@ -37,6 +37,7 @@ interface TourDateManagementDialogProps {
   onOpenChange: (open: boolean) => void;
   tourId: string | null;
   tourDates: any[];
+  readOnly?: boolean;
 }
 
 async function createFoldersForDate(
@@ -337,6 +338,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   onOpenChange,
   tourId,
   tourDates = [],
+  readOnly = false,
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -744,12 +746,14 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Manage Tour Dates</DialogTitle>
+          <DialogTitle>
+            {readOnly ? 'Tour Dates' : 'Manage Tour Dates'}
+          </DialogTitle>
         </DialogHeader>
 
         <ScrollArea className="h-[60vh] pr-4">
           <div className="space-y-4">
-            {tourDates.length > 0 && (
+            {!readOnly && tourDates.length > 0 && (
               <Button
                 onClick={() => createAllFolders(tourDates)}
                 className="w-full"
@@ -769,7 +773,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
                 return (
                   <div key={dateObj.id} className="p-3 border rounded-lg">
-                    {editingTourDate && editingTourDate.id === dateObj.id ? (
+                    {editingTourDate && editingTourDate.id === dateObj.id && !readOnly ? (
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4" />
@@ -819,43 +823,47 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                           )}
                         </div>
                         <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => createIndividualFolders(dateObj)}
-                            title="Create Flex folders"
-                            disabled={foldersExist || isCreatingFolders}
-                            className={foldersExist ? "opacity-50 cursor-not-allowed" : ""}
-                          >
-                            {isCreatingFolders ? (
-                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                            ) : (
-                              <FolderPlus className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => startEditing(dateObj)}
-                            title="Edit Date"
-                            disabled={isDeleting}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteDate(dateObj.id)}
-                            title="Delete Date"
-                            disabled={isDeleting}
-                            className={isDeleting ? "opacity-50 cursor-not-allowed" : ""}
-                          >
-                            {isDeleting ? (
-                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </Button>
+                          {!readOnly && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => createIndividualFolders(dateObj)}
+                                title="Create Flex folders"
+                                disabled={foldersExist || isCreatingFolders}
+                                className={foldersExist ? "opacity-50 cursor-not-allowed" : ""}
+                              >
+                                {isCreatingFolders ? (
+                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                ) : (
+                                  <FolderPlus className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => startEditing(dateObj)}
+                                title="Edit Date"
+                                disabled={isDeleting}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteDate(dateObj.id)}
+                                title="Delete Date"
+                                disabled={isDeleting}
+                                className={isDeleting ? "opacity-50 cursor-not-allowed" : ""}
+                              >
+                                {isDeleting ? (
+                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
                     )}
@@ -864,34 +872,36 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
               })}
             </div>
             
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                const date = formData.get("date") as string;
-                const location = formData.get("location") as string;
-                if (!date || !location) {
-                  toast({
-                    title: "Error",
-                    description: "Please fill in all fields",
-                    variant: "destructive",
-                  });
-                  return;
-                }
-                handleAddDate(date, location);
-                e.currentTarget.reset();
-              }}
-              className="space-y-4"
-            >
-              <div className="grid grid-cols-2 gap-4">
-                <Input type="date" name="date" required />
-                <Input type="text" name="location" placeholder="Location" required />
-              </div>
-              <Button type="submit" className="w-full">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Date
-              </Button>
-            </form>
+            {!readOnly && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const date = formData.get("date") as string;
+                  const location = formData.get("location") as string;
+                  if (!date || !location) {
+                    toast({
+                      title: "Error",
+                      description: "Please fill in all fields",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  handleAddDate(date, location);
+                  e.currentTarget.reset();
+                }}
+                className="space-y-4"
+              >
+                <div className="grid grid-cols-2 gap-4">
+                  <Input type="date" name="date" required />
+                  <Input type="text" name="location" placeholder="Location" required />
+                </div>
+                <Button type="submit" className="w-full">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Date
+                </Button>
+              </form>
+            )}
           </div>
         </ScrollArea>
       </DialogContent>
