@@ -1,4 +1,3 @@
-
 import { useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,6 +47,14 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
   const completedDates = tour.tour_dates?.filter(
     (date: any) => new Date(date.date) < new Date()
   ).length || 0;
+
+  const getSortedTourDates = () => {
+    if (!tour?.tour_dates) return [];
+    
+    return [...tour.tour_dates].sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+  };
 
   const quickActions = [
     {
@@ -246,7 +253,8 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
       <TourDateManagementDialog
         open={isDatesOpen}
         onOpenChange={setIsDatesOpen}
-        tour={tour}
+        tourId={tour.id}
+        tourDates={getSortedTourDates()}
       />
     </div>
   );

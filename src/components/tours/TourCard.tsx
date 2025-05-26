@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -16,11 +15,12 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 interface TourCardProps {
   tour: any;
+  onTourClick?: (tourId: string) => void;
   onManageDates: () => void;
   onPrint: () => void;
 }
 
-export const TourCard = ({ tour, onManageDates, onPrint }: TourCardProps) => {
+export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCardProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isManagementOpen, setIsManagementOpen] = useState(false);
@@ -64,7 +64,11 @@ export const TourCard = ({ tour, onManageDates, onPrint }: TourCardProps) => {
   const upcomingDates = getUpcomingDates();
 
   const handleCardClick = () => {
-    navigate(`/tour-management/${tour.id}`);
+    if (onTourClick) {
+      onTourClick(tour.id);
+    } else {
+      navigate(`/tour-management/${tour.id}`);
+    }
   };
 
   const handleCreateFlexFolders = async (e: React.MouseEvent) => {

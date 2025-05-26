@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -146,7 +145,6 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
           >
             <TourCard
               tour={tour}
-              onTourClick={() => onTourClick(tour.id)}
               onManageDates={() => handleManageDates(tour.id)}
               onPrint={() => handlePrint(tour)}
             />
