@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -355,6 +355,14 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   const tourDateIds = tourDates.map(d => d.id);
   useTourDateRealtime(tourId, tourDateIds);
 
+  // Force refresh parent component data when dialog opens
+  useEffect(() => {
+    if (open && tourId) {
+      console.log('Dialog opened, refreshing tour data');
+      queryClient.invalidateQueries({ queryKey: ['tour', tourId] });
+    }
+  }, [open, tourId, queryClient]);
+
   const [editingTourDate, setEditingTourDate] = useState<any>(null);
   const [editDateValue, setEditDateValue] = useState<string>("");
   const [editLocationValue, setEditLocationValue] = useState<string>("");
@@ -386,6 +394,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         throw new Error("Tour ID is required");
       }
       console.log("Adding new tour date:", { date, location, tourId });
+      
       const locationId = await getOrCreateLocation(location);
       console.log("Location ID:", locationId);
       const { data: newTourDate, error: tourDateError } = await supabase
@@ -466,8 +475,13 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         throw deptError;
       }
 
-      await queryClient.invalidateQueries({ queryKey: ["tours"] });
-      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      // Force refresh all related queries after successful creation
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
+        queryClient.invalidateQueries({ queryKey: ["tours"] }),
+        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["flex-folders-existence"] }),
+      ]);
 
       toast({
         title: "Success",
@@ -546,11 +560,17 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         throw jobsError;
       }
 
+      // Force refresh all related queries after successful edit
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
+        queryClient.invalidateQueries({ queryKey: ["tours"] }),
+        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+      ]);
+
       toast({
         title: "Success",
         description: "Tour date updated successfully",
       });
-      await queryClient.invalidateQueries({ queryKey: ["tours"] });
     } catch (error: any) {
       console.error("Error editing date:", error);
       toast({
@@ -707,11 +727,14 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
       console.log("Tour date deletion completed successfully");
 
-      // Invalidate queries to refresh the UI
-      await queryClient.invalidateQueries({ queryKey: ["tours"] });
-      await queryClient.invalidateQueries({ queryKey: ["tours-with-dates"] });
-      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      await queryClient.invalidateQueries({ queryKey: ["flex-folders-existence"] });
+      // Force refresh all related queries after successful deletion
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
+        queryClient.invalidateQueries({ queryKey: ["tours"] }),
+        queryClient.invalidateQueries({ queryKey: ["tours-with-dates"] }),
+        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["flex-folders-existence"] }),
+      ]);
 
       toast({
         title: "Success",
