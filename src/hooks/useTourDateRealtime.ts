@@ -6,10 +6,10 @@ import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
  * Subscribes to changes in tour_dates, flex_folders, and locations tables
  */
 export const useTourDateRealtime = (tourId: string | null, tourDateIds: string[]) => {
-  // Subscribe to tour dates changes
+  // Subscribe to tour dates changes - matches parent component query key
   useRealtimeSubscription({
     table: 'tour_dates',
-    queryKey: ['tours', tourId],
+    queryKey: ['tour', tourId], // Changed from 'tours' to 'tour' to match TourManagementWrapper
     event: '*',
     filter: tourId ? `tour_id=eq.${tourId}` : undefined,
   });
@@ -21,10 +21,10 @@ export const useTourDateRealtime = (tourId: string | null, tourDateIds: string[]
     event: '*',
   });
 
-  // Subscribe to locations changes
+  // Subscribe to locations changes - also matches parent component query key
   useRealtimeSubscription({
     table: 'locations',
-    queryKey: ['tours', tourId],
+    queryKey: ['tour', tourId], // Changed from 'tours' to 'tour' to match TourManagementWrapper
     event: '*',
   });
 };
