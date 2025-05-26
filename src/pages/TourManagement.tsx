@@ -14,14 +14,17 @@ import {
   Weight,
   Upload,
   Clock,
-  BarChart3
+  BarChart3,
+  UserCheck
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { TourManagementDialog } from "@/components/tours/TourManagementDialog";
 import { TourDateManagementDialog } from "@/components/tours/TourDateManagementDialog";
 import { TourDefaultsManager } from "@/components/tours/TourDefaultsManager";
+import { TourAssignmentDialog } from "@/components/tours/TourAssignmentDialog";
 import { format } from "date-fns";
+import { useTourAssignments } from "@/hooks/useTourAssignments";
 
 interface TourManagementProps {
   tour: any;
@@ -32,6 +35,9 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDatesOpen, setIsDatesOpen] = useState(false);
   const [isDefaultsManagerOpen, setIsDefaultsManagerOpen] = useState(false);
+  const [isAssignmentsOpen, setIsAssignmentsOpen] = useState(false);
+
+  const { assignments } = useTourAssignments(tour?.id);
 
   if (!tour) {
     return (
@@ -69,6 +75,9 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
     navigate(`/sound/pesos?tourId=${tour.id}&mode=tour-defaults`);
   };
 
+  const totalAssignments = assignments.length;
+  const assignedDepartments = new Set(assignments.map(a => a.department)).size;
+
   const quickActions = [
     {
       title: "Tour Dates & Locations",
@@ -76,6 +85,13 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
       icon: Calendar,
       onClick: () => setIsDatesOpen(true),
       badge: `${totalDates} dates`
+    },
+    {
+      title: "Technician Assignment",
+      description: "Assign crew members to the entire tour",
+      icon: UserCheck,
+      onClick: () => setIsAssignmentsOpen(true),
+      badge: `${totalAssignments} assigned`
     },
     {
       title: "Tour Configuration",
@@ -102,13 +118,6 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
       title: "Document Management",
       description: "Upload, organize, and share tour documents",
       icon: FileText,
-      onClick: () => {}, // Will implement later
-      badge: "Coming Soon"
-    },
-    {
-      title: "Technician Assignment",
-      description: "Assign crew members to tour dates",
-      icon: Users,
       onClick: () => {}, // Will implement later
       badge: "Coming Soon"
     },
@@ -149,6 +158,11 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
             <Badge variant="outline" style={{ borderColor: tour.color, color: tour.color }}>
               {totalDates} dates
             </Badge>
+            {totalAssignments > 0 && (
+              <Badge variant="outline">
+                {totalAssignments} crew assigned
+              </Badge>
+            )}
           </div>
         </div>
         <div className="flex gap-2">
@@ -190,13 +204,14 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Folders Created</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Assigned Crew</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {tour.flex_folders_created ? "Yes" : "No"}
-            </div>
+            <div className="text-2xl font-bold">{totalAssignments}</div>
+            <p className="text-xs text-muted-foreground">
+              {assignedDepartments} departments
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -274,6 +289,12 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
         open={isDefaultsManagerOpen}
         onOpenChange={setIsDefaultsManagerOpen}
         tour={tour}
+      />
+
+      <TourAssignmentDialog
+        open={isAssignmentsOpen}
+        onOpenChange={setIsAssignmentsOpen}
+        tourId={tour.id}
       />
     </div>
   );

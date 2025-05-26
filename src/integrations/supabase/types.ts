@@ -2697,6 +2697,70 @@ export type Database = {
           },
         ]
       }
+      tour_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          created_at: string
+          department: string
+          external_technician_name: string | null
+          id: string
+          notes: string | null
+          role: string
+          technician_id: string | null
+          tour_id: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          created_at?: string
+          department: string
+          external_technician_name?: string | null
+          id?: string
+          notes?: string | null
+          role: string
+          technician_id?: string | null
+          tour_id: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          created_at?: string
+          department?: string
+          external_technician_name?: string | null
+          id?: string
+          notes?: string | null
+          role?: string
+          technician_id?: string | null
+          tour_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_assignments_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_assignments_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tour_date_power_overrides: {
         Row: {
           created_at: string | null
