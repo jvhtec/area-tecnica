@@ -34,7 +34,6 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
 
   // Reset selections when department changes
   useEffect(() => {
-    console.log("JobAssignmentDialog: Department changed to:", department);
     setSelectedTechnician("");
     setSelectedRole("");
   }, [department]);
@@ -45,66 +44,30 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
   const { data: technicians, isLoading: isLoadingTechnicians, error: techniciansError, refetch: refetchTechnicians } = useQuery({
     queryKey: ["available-technicians", department, jobId],
     queryFn: async () => {
-      console.log("🔍 JobAssignmentDialog: Starting technician fetch for department:", department);
-      
       if (!department) {
-        console.error("❌ JobAssignmentDialog: No department provided");
         throw new Error("Department is required");
       }
 
       try {
-        console.log("📡 JobAssignmentDialog: Executing Supabase query...");
-        
         // Get ALL technicians from the specified department
         const { data, error } = await supabase
           .from("profiles")
           .select("id, first_name, last_name, email, department, role")
           .eq("department", department);
 
-        console.log("📊 JobAssignmentDialog: Raw Supabase response:", {
-          data,
-          error,
-          dataLength: data?.length,
-          department: department
-        });
-
         if (error) {
-          console.error("❌ JobAssignmentDialog: Supabase error:", error);
           throw error;
         }
 
         const techniciansData = (data || []) as Technician[];
         
-        console.log("🔍 JobAssignmentDialog: Processed technicians data:", {
-          totalCount: techniciansData.length,
-          roles: techniciansData.map(t => ({ name: `${t.first_name} ${t.last_name}`, role: t.role })),
-          roleCounts: techniciansData.reduce((acc, t) => {
-            acc[t.role] = (acc[t.role] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>)
-        });
-
-        // Log each technician for debugging
-        techniciansData.forEach((tech, index) => {
-          console.log(`👤 Technician ${index + 1}:`, {
-            id: tech.id,
-            name: `${tech.first_name} ${tech.last_name}`,
-            role: tech.role,
-            department: tech.department,
-            email: tech.email
-          });
-        });
-
-        console.log(`✅ JobAssignmentDialog: Successfully fetched ${techniciansData.length} technicians from ${department} department`);
-        
         return techniciansData;
       } catch (error) {
-        console.error("💥 JobAssignmentDialog: Query function error:", error);
         throw error;
       }
     },
     enabled: open && !!department,
-    staleTime: 0, // Always fetch fresh data for debugging
+    staleTime: 1000 * 60 * 5, // 5 minutes
     refetchOnMount: true,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
@@ -112,23 +75,8 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
-  // Debug the technicians data whenever it changes
-  useEffect(() => {
-    if (technicians) {
-      console.log("🔄 JobAssignmentDialog: Technicians data updated:", {
-        count: technicians.length,
-        technicians: technicians.map(t => ({
-          id: t.id,
-          name: `${t.first_name} ${t.last_name}`,
-          role: t.role
-        }))
-      });
-    }
-  }, [technicians]);
-
   // Manual refresh function
   const handleManualRefresh = async () => {
-    console.log("🔄 JobAssignmentDialog: Manual refresh triggered");
     try {
       // Clear all related cache
       await queryClient.invalidateQueries({ queryKey: ["available-technicians"] });
@@ -137,16 +85,13 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
       // Force refetch
       await refetchTechnicians();
       toast.success("Technicians list refreshed");
-      console.log("✅ JobAssignmentDialog: Manual refresh completed successfully");
     } catch (error) {
-      console.error("❌ JobAssignmentDialog: Manual refresh failed:", error);
+      console.error("Manual refresh failed:", error);
       toast.error("Failed to refresh technicians list");
     }
   };
 
   const handleDialogChange = async (isOpen: boolean) => {
-    console.log("🚪 JobAssignmentDialog: Dialog state changing to:", isOpen);
-    
     if (!isOpen) {
       // Reset form and refresh jobs data when dialog closes
       setSelectedTechnician("");
@@ -154,7 +99,6 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
     } else {
       // Force refresh when dialog opens
-      console.log("🔄 JobAssignmentDialog: Dialog opened, forcing cache clear and refresh");
       await queryClient.invalidateQueries({ queryKey: ["available-technicians"] });
       await queryClient.removeQueries({ queryKey: ["available-technicians"] });
     }
@@ -187,8 +131,6 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
     }
 
     try {
-      console.log("JobAssignmentDialog: Assigning technician:", selectedTechnician, "with role:", selectedRole);
-      
       // Validate assignment
       if (!technicians) {
         throw new Error("Technician data not available");
@@ -206,11 +148,9 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
         });
 
       if (error) {
-        console.error("JobAssignmentDialog: Error assigning technician:", error);
         throw error;
       }
 
-      console.log("JobAssignmentDialog: Technician assigned successfully");
       toast.success("Technician assigned successfully");
       
       // Reset form and close dialog
@@ -219,7 +159,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
       handleDialogChange(false);
       
     } catch (error: any) {
-      console.error("JobAssignmentDialog: Failed to assign technician:", error);
+      console.error("Failed to assign technician:", error);
       toast.error(error.message || "Failed to assign technician");
     }
   };
@@ -240,14 +180,8 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
   // Function to sort technicians - house techs first
   const getSortedTechnicians = () => {
     if (!technicians) {
-      console.log("⚠️ JobAssignmentDialog: No technicians data available for sorting");
       return [];
     }
-    
-    console.log("🔄 JobAssignmentDialog: Sorting technicians:", {
-      inputCount: technicians.length,
-      inputTechnicians: technicians.map(t => ({ name: `${t.first_name} ${t.last_name}`, role: t.role }))
-    });
     
     const sorted = [...technicians].sort((a, b) => {
       // Sort house_tech before technician
@@ -258,11 +192,6 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
       return (a.first_name + a.last_name).localeCompare(b.first_name + b.last_name);
     });
 
-    console.log("✅ JobAssignmentDialog: Technicians sorted:", {
-      outputCount: sorted.length,
-      outputTechnicians: sorted.map(t => ({ name: `${t.first_name} ${t.last_name}`, role: t.role }))
-    });
-
     return sorted;
   };
 
@@ -270,21 +199,11 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
   const formatTechnicianName = (technician: Technician) => {
     const isHouseTech = technician.role === 'house_tech';
     const displayName = `${technician.first_name} ${technician.last_name}${isHouseTech ? ' (House Tech)' : ''}`;
-    console.log("🏷️ JobAssignmentDialog: Formatting technician name:", {
-      technician: technician,
-      displayName: displayName
-    });
     return displayName;
   };
 
   // Enhanced error display
   const renderTechnicianSelector = () => {
-    console.log("🎨 JobAssignmentDialog: Rendering technician selector:", {
-      isLoading: isLoadingTechnicians,
-      hasError: !!techniciansError,
-      technicianCount: technicians?.length || 0
-    });
-
     if (isLoadingTechnicians) {
       return (
         <div className="flex items-center justify-center p-4">
@@ -297,7 +216,6 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
     }
 
     if (techniciansError) {
-      console.error("❌ JobAssignmentDialog: Rendering error state:", techniciansError);
       return (
         <div className="flex flex-col items-center p-4 space-y-2">
           <AlertCircle className="h-6 w-6 text-destructive" />
@@ -313,7 +231,6 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
     }
 
     if (!technicians || technicians.length === 0) {
-      console.warn("⚠️ JobAssignmentDialog: No technicians found, rendering empty state");
       return (
         <div className="flex flex-col items-center p-4 space-y-2">
           <AlertCircle className="h-6 w-6 text-muted-foreground" />
@@ -329,10 +246,6 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
     }
 
     const sortedTechnicians = getSortedTechnicians();
-    console.log("🎛️ JobAssignmentDialog: Rendering select with technicians:", {
-      count: sortedTechnicians.length,
-      technicians: sortedTechnicians.map(t => ({ id: t.id, name: `${t.first_name} ${t.last_name}`, role: t.role }))
-    });
 
     return (
       <Select value={selectedTechnician} onValueChange={setSelectedTechnician}>
@@ -340,18 +253,11 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
           <SelectValue placeholder={`Select ${department} technician (${sortedTechnicians.length} available)`} />
         </SelectTrigger>
         <SelectContent>
-          {sortedTechnicians.map((tech, index) => {
-            console.log(`🎯 JobAssignmentDialog: Rendering option ${index + 1}:`, {
-              id: tech.id,
-              name: `${tech.first_name} ${tech.last_name}`,
-              role: tech.role
-            });
-            return (
-              <SelectItem key={tech.id} value={tech.id}>
-                {formatTechnicianName(tech)}
-              </SelectItem>
-            );
-          })}
+          {sortedTechnicians.map((tech) => (
+            <SelectItem key={tech.id} value={tech.id}>
+              {formatTechnicianName(tech)}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
     );
@@ -378,23 +284,6 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
           <div className="space-y-2">
             <label className="text-sm font-medium">Technician</label>
             {renderTechnicianSelector()}
-            
-            {/* Debug information display */}
-            {technicians && (
-              <div className="text-xs text-muted-foreground bg-muted p-2 rounded">
-                Debug: Found {technicians.length} {department} technicians
-                {technicians.length > 0 && (
-                  <div className="mt-1">
-                    Roles: {Object.entries(
-                      technicians.reduce((acc, t) => {
-                        acc[t.role] = (acc[t.role] || 0) + 1;
-                        return acc;
-                      }, {} as Record<string, number>)
-                    ).map(([role, count]) => `${role}: ${count}`).join(', ')}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           <div className="space-y-2">
