@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -5,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Users, Eye } from "lucide-react";
+import { Trash2, Plus, Users, Eye, Info } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -127,9 +128,11 @@ export const TourAssignmentDialog = ({
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Assignment created successfully');
+      toast.success('Assignment created successfully - automatically applied to all tour jobs');
       refetch();
       resetForm();
+      // Invalidate job assignments as they're automatically synced
+      queryClient.invalidateQueries({ queryKey: ['job-assignments'] });
     },
     onError: (error: any) => {
       toast.error(`Failed to create assignment: ${error.message}`);
@@ -147,8 +150,10 @@ export const TourAssignmentDialog = ({
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Assignment removed successfully');
+      toast.success('Assignment removed successfully - automatically removed from all tour jobs');
       refetch();
+      // Invalidate job assignments as they're automatically synced
+      queryClient.invalidateQueries({ queryKey: ['job-assignments'] });
     },
     onError: (error: any) => {
       toast.error(`Failed to remove assignment: ${error.message}`);
@@ -184,7 +189,7 @@ export const TourAssignmentDialog = ({
   };
 
   const handleDeleteAssignment = (assignmentId: string) => {
-    if (confirm('Are you sure you want to remove this assignment?')) {
+    if (confirm('Are you sure you want to remove this assignment? This will also remove it from all jobs in this tour.')) {
       deleteAssignmentMutation.mutate(assignmentId);
     }
   };
@@ -219,6 +224,19 @@ export const TourAssignmentDialog = ({
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Auto-sync info */}
+          {!readOnly && (
+            <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-start gap-2">
+                <Info className="h-4 w-4 text-blue-600 mt-0.5" />
+                <div className="text-sm text-blue-800 dark:text-blue-200">
+                  <p className="font-medium mb-1">Automatic Job Sync</p>
+                  <p>Tour assignments are automatically applied to all jobs in this tour. When you add or remove team members here, they will be instantly assigned to or removed from all tour jobs.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Current Assignments */}
           <div>
             <h3 className="text-lg font-semibold mb-4">

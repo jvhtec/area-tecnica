@@ -1438,6 +1438,7 @@ export type Database = {
         Row: {
           assigned_at: string
           assigned_by: string | null
+          assignment_source: string | null
           job_id: string
           lights_role: string | null
           response_time: string | null
@@ -1449,6 +1450,7 @@ export type Database = {
         Insert: {
           assigned_at?: string
           assigned_by?: string | null
+          assignment_source?: string | null
           job_id: string
           lights_role?: string | null
           response_time?: string | null
@@ -1460,6 +1462,7 @@ export type Database = {
         Update: {
           assigned_at?: string
           assigned_by?: string | null
+          assignment_source?: string | null
           job_id?: string
           lights_role?: string | null
           response_time?: string | null

@@ -66,8 +66,10 @@ export const useTourAssignments = (tourId: string) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Assignment created successfully');
+      toast.success('Assignment created successfully - automatically applied to all tour jobs');
       queryClient.invalidateQueries({ queryKey: ['tour-assignments', tourId] });
+      // Also invalidate job assignments since they're automatically synced
+      queryClient.invalidateQueries({ queryKey: ['job-assignments'] });
     },
     onError: (error: any) => {
       toast.error(`Failed to create assignment: ${error.message}`);
@@ -84,8 +86,10 @@ export const useTourAssignments = (tourId: string) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Assignment removed successfully');
+      toast.success('Assignment removed successfully - automatically removed from all tour jobs');
       queryClient.invalidateQueries({ queryKey: ['tour-assignments', tourId] });
+      // Also invalidate job assignments since they're automatically synced
+      queryClient.invalidateQueries({ queryKey: ['job-assignments'] });
     },
     onError: (error: any) => {
       toast.error(`Failed to remove assignment: ${error.message}`);

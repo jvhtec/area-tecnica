@@ -17,7 +17,8 @@ import {
   BarChart3,
   UserCheck,
   Eye,
-  ArrowLeft
+  ArrowLeft,
+  Info
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -100,11 +101,14 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
     },
     {
       title: "Team Assignments",
-      description: isTechnicianView ? "View tour team members" : "Assign crew members to the entire tour",
+      description: isTechnicianView 
+        ? "View tour team members (automatically applied to all jobs)" 
+        : "Assign crew members to the entire tour (auto-syncs to all jobs)",
       icon: UserCheck,
       onClick: () => setIsAssignmentsOpen(true),
       badge: `${totalAssignments} assigned`,
-      viewOnly: isTechnicianView
+      viewOnly: isTechnicianView,
+      hasAutoSync: true
     },
     {
       title: "Document Management",
@@ -215,6 +219,19 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
         )}
       </div>
 
+      {/* Auto-sync info for management users */}
+      {!isTechnicianView && (
+        <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="flex items-start gap-2">
+            <Info className="h-4 w-4 text-blue-600 mt-0.5" />
+            <div className="text-sm text-blue-800 dark:text-blue-200">
+              <p className="font-medium mb-1">Automatic Job Synchronization</p>
+              <p>Tour assignments are automatically applied to all jobs in this tour. Team members assigned to the tour will instantly appear on all individual job assignments, and removing them from the tour removes them from all jobs.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -268,7 +285,14 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
             <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer" onClick={action.onClick}>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <action.icon className="h-6 w-6" style={{ color: tour.color }} />
+                  <div className="flex items-center gap-2">
+                    <action.icon className="h-6 w-6" style={{ color: tour.color }} />
+                    {action.hasAutoSync && !isTechnicianView && (
+                      <Badge variant="outline" className="text-xs border-blue-300 text-blue-700">
+                        Auto-sync
+                      </Badge>
+                    )}
+                  </div>
                   <Badge variant={action.badge === "Coming Soon" ? "secondary" : "outline"}>
                     {action.badge}
                   </Badge>
