@@ -1,6 +1,8 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, MapPin, MoreVertical, Settings, FileText, Printer, FolderPlus, Image } from "lucide-react";
 import { format } from "date-fns";
@@ -10,6 +12,7 @@ import { TourPowerWeightDefaultsDialog } from "./TourPowerWeightDefaultsDialog";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface TourCardProps {
   tour: any;
@@ -22,6 +25,8 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
   const { toast } = useToast();
   const [isManagementOpen, setIsManagementOpen] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   // Fetch tour logo
   useEffect(() => {
@@ -60,6 +65,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
 
   const handleCreateFlexFolders = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    setIsMobileMenuOpen(false);
 
     if (tour.flex_folders_created) {
       toast({
@@ -141,6 +147,56 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
     }
   };
 
+  const handleManageTour = () => {
+    setIsManagementOpen(true);
+    setIsMobileMenuOpen(false);
+  };
+
+  const handleManageDatesClick = () => {
+    onManageDates();
+    setIsMobileMenuOpen(false);
+  };
+
+  const handlePrintClick = () => {
+    onPrint();
+    setIsMobileMenuOpen(false);
+  };
+
+  const MenuItems = () => (
+    <>
+      <div 
+        className="flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors"
+        onClick={handleManageTour}
+      >
+        <Settings className="h-4 w-4 mr-3" />
+        <span>Manage Tour</span>
+      </div>
+      <div 
+        className="flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors"
+        onClick={handleManageDatesClick}
+      >
+        <Calendar className="h-4 w-4 mr-3" />
+        <span>Manage Dates</span>
+      </div>
+      <div 
+        className={`flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors ${
+          tour.flex_folders_created ? 'opacity-50 cursor-not-allowed' : ''
+        }`}
+        onClick={!tour.flex_folders_created ? handleCreateFlexFolders : undefined}
+      >
+        <FolderPlus className="h-4 w-4 mr-3" />
+        <span>{tour.flex_folders_created ? "Folders Created" : "Create Flex Folders"}</span>
+      </div>
+      <div 
+        className="flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors"
+        onClick={handlePrintClick}
+      >
+        <Printer className="h-4 w-4 mr-3" />
+        <span>Print Schedule</span>
+      </div>
+    </>
+  );
+
   return (
     <>
       <Card className="cursor-pointer hover:shadow-md transition-shadow">
@@ -174,34 +230,64 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
                 </div>
               </div>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setIsManagementOpen(true)}>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Manage Tour
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onManageDates}>
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Manage Dates
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={handleCreateFlexFolders}
-                  disabled={tour.flex_folders_created}
+            
+            {/* Mobile Sheet Menu */}
+            {isMobile ? (
+              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-10 w-10 p-0 touch-manipulation"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreVertical className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="h-auto max-h-[50vh]">
+                  <SheetHeader>
+                    <SheetTitle>{tour.name} - Options</SheetTitle>
+                  </SheetHeader>
+                  <div className="grid gap-2 pt-4">
+                    <MenuItems />
+                  </div>
+                </SheetContent>
+              </Sheet>
+            ) : (
+              /* Desktop Dropdown Menu */
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent 
+                  align="end" 
+                  className="w-56 z-[9999]"
+                  sideOffset={5}
                 >
-                  <FolderPlus className="h-4 w-4 mr-2" />
-                  {tour.flex_folders_created ? "Folders Created" : "Create Flex Folders"}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onPrint}>
-                  <Printer className="h-4 w-4 mr-2" />
-                  Print Schedule
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuItem onClick={handleManageTour}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Manage Tour
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleManageDatesClick}>
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Manage Dates
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={handleCreateFlexFolders}
+                    disabled={tour.flex_folders_created}
+                  >
+                    <FolderPlus className="h-4 w-4 mr-2" />
+                    {tour.flex_folders_created ? "Folders Created" : "Create Flex Folders"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handlePrintClick}>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print Schedule
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </CardHeader>
         
