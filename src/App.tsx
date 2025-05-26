@@ -1,3 +1,4 @@
+
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -70,6 +71,9 @@ export default function App() {
                     <Route path="/equipment-management" element={<EquipmentManagement />} />
                     <Route path="/festivals" element={<Festivals />} />
                     <Route path="/technician-dashboard" element={<TechnicianDashboard />} />
+                    
+                    {/* Tour Management Route */}
+                    <Route path="/tour-management/:tourId" element={<TourManagementWrapper />} />
                     
                     {/* Tools Routes - Both nested and original paths for compatibility */}
                     <Route path="/sound/pesos" element={<PesosTool />} />
