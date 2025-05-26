@@ -13,31 +13,17 @@ import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
 const soundComponentDatabase = [
-  { id: 1, name: 'LA12X', watts: 1000 },
-  { id: 2, name: 'LA7.16', watts: 800 },
-  { id: 3, name: 'LA4X', watts: 500 },
-  { id: 4, name: 'LA2Xi', watts: 250 },
-  { id: 5, name: 'PLM20000Q', watts: 2000 },
-  { id: 6, name: 'PLM10000Q', watts: 1000 },
-  { id: 7, name: 'PLM5000', watts: 500 },
-  { id: 8, name: 'Power Distribution 32A', watts: 200 },
-  { id: 9, name: 'Power Distribution 63A', watts: 400 },
-  { id: 10, name: 'CEE32A 3P+N+G', watts: 150 },
-  { id: 11, name: 'CEE63A 3P+N+G', watts: 300 },
-  { id: 12, name: 'Powerlock 400A', watts: 800 },
-  { id: 13, name: 'Power Cable 32A', watts: 50 },
-  { id: 14, name: 'Power Cable 63A', watts: 100 },
-  { id: 15, name: 'Splitter Box 32A', watts: 150 },
-  { id: 16, name: 'Splitter Box 63A', watts: 250 },
-  { id: 17, name: 'Dimmer Rack 12Ch', watts: 1200 },
-  { id: 18, name: 'Dimmer Rack 6Ch', watts: 600 },
-  { id: 19, name: 'Distribution Panel', watts: 300 },
-  { id: 20, name: 'UPS System 1000W', watts: 1000 },
-  { id: 21, name: 'UPS System 2000W', watts: 2000 },
-  { id: 22, name: 'Network Switch POE+', watts: 150 },
-  { id: 23, name: 'Lighting Console', watts: 200 },
-  { id: 24, name: 'Media Server', watts: 300 },
-  { id: 25, name: 'Video Processor', watts: 250 },
+  { id: 1, name: 'LA12X', watts: 2900 },
+  { id: 2, name: 'LA8', watts: 2500 },
+  { id: 3, name: 'LA4X', watts: 2000 },
+  { id: 4, name: 'PLM20000D', watts: 2900 },
+  { id: 5, name: 'Control FoH (L)', watts: 3500 },
+  { id: 6, name: 'Control FoH (S)', watts: 1500 },
+  { id: 7, name: 'Control Mon (L)', watts: 3500 },
+  { id: 8, name: 'Control Mon (S)', watts: 1500 },
+  { id: 9, name: 'RF Rack', watts: 2500 },
+  { id: 10, name: 'Backline', watts: 2500 },
+  { id: 11, name: 'Varios', watts: 1500 }
 ];
 
 interface TableRow {
