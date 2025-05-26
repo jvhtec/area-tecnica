@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, MapPin, Settings, FileText, Users } from "lucide-react";
+import { Calendar, MapPin, Settings, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
@@ -47,8 +47,16 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
     return nextDate.location?.name || "Location TBD";
   };
 
+  const handleCardClick = () => {
+    navigate(`/tour-management/${tour.id}`);
+  };
+
   return (
-    <Card className="hover:shadow-lg transition-all duration-200 border-l-4" style={{ borderLeftColor: tour.color }}>
+    <Card 
+      className="hover:shadow-lg transition-all duration-200 border-l-4 cursor-pointer" 
+      style={{ borderLeftColor: tour.color }}
+      onClick={handleCardClick}
+    >
       <CardHeader className="pb-3">
         <CardTitle className="text-lg font-semibold">{tour.name}</CardTitle>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -72,20 +80,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
           <span className="font-medium">{tour.tour_dates?.length || 0}</span> dates scheduled
         </div>
         
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/tour-management/${tour.id}`);
-            }}
-            className="flex items-center gap-1"
-          >
-            <Settings className="h-3 w-3" />
-            Manage
-          </Button>
-          
+        <div className="flex gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -93,7 +88,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
               e.stopPropagation();
               onManageDates();
             }}
-            className="flex items-center gap-1"
+            className="flex items-center gap-1 flex-1"
           >
             <Calendar className="h-3 w-3" />
             Dates
@@ -106,23 +101,10 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
               e.stopPropagation();
               onPrint();
             }}
-            className="flex items-center gap-1"
+            className="flex items-center gap-1 flex-1"
           >
             <FileText className="h-3 w-3" />
             Print
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onTourClick();
-            }}
-            className="flex items-center gap-1"
-          >
-            <Users className="h-3 w-3" />
-            View
           </Button>
         </div>
       </CardContent>
