@@ -1,8 +1,9 @@
-
 import { createBrowserRouter } from "react-router-dom";
 import Layout from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
+import TechnicianDashboard from "@/pages/TechnicianDashboard";
 import { FestivalManagementWrapper } from "@/components/festival/FestivalManagementWrapper";
+import { TourManagementWrapper } from "@/components/tours/TourManagementWrapper";
 import Auth from "@/pages/Auth";
 import { RequireAuth } from "@/components/RequireAuth";
 
@@ -24,9 +25,17 @@ const router = createBrowserRouter([
         path: "/", 
         element: <Dashboard /> 
       },
+      {
+        path: "/technician-dashboard",
+        element: <TechnicianDashboard />
+      },
       { 
         path: "/festival-management/:festivalId", 
         element: <FestivalManagementWrapper /> 
+      },
+      {
+        path: "/tour-management/:tourId",
+        element: <TourManagementWrapper />
       },
       {
         path: "/jobs",

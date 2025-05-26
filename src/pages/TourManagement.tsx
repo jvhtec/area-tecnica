@@ -1,5 +1,4 @@
-
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +14,9 @@ import {
   Upload,
   Clock,
   BarChart3,
-  UserCheck
+  UserCheck,
+  Eye,
+  ArrowLeft
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -25,6 +26,7 @@ import { TourDefaultsManager } from "@/components/tours/TourDefaultsManager";
 import { TourAssignmentDialog } from "@/components/tours/TourAssignmentDialog";
 import { format } from "date-fns";
 import { useTourAssignments } from "@/hooks/useTourAssignments";
+import { useAuth } from "@/hooks/useAuth";
 
 interface TourManagementProps {
   tour: any;
@@ -32,6 +34,11 @@ interface TourManagementProps {
 
 export const TourManagement = ({ tour }: TourManagementProps) => {
   const navigate = useNavigate();
+  const { userRole } = useAuth();
+  const [searchParams] = useSearchParams();
+  const mode = searchParams.get('mode');
+  const isTechnicianView = mode === 'technician' || ['technician', 'house_tech'].includes(userRole || '');
+  
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDatesOpen, setIsDatesOpen] = useState(false);
   const [isDefaultsManagerOpen, setIsDefaultsManagerOpen] = useState(false);
@@ -78,70 +85,100 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
   const totalAssignments = assignments.length;
   const assignedDepartments = new Set(assignments.map(a => a.department)).size;
 
+  // Filter quick actions based on view mode
   const quickActions = [
     {
       title: "Tour Dates & Locations",
-      description: "Manage tour dates, venues, and locations",
+      description: "View tour dates, venues, and locations",
       icon: Calendar,
       onClick: () => setIsDatesOpen(true),
-      badge: `${totalDates} dates`
+      badge: `${totalDates} dates`,
+      viewOnly: true
     },
     {
-      title: "Technician Assignment",
-      description: "Assign crew members to the entire tour",
+      title: "Team Assignments",
+      description: isTechnicianView ? "View tour team members" : "Assign crew members to the entire tour",
       icon: UserCheck,
       onClick: () => setIsAssignmentsOpen(true),
-      badge: `${totalAssignments} assigned`
+      badge: `${totalAssignments} assigned`,
+      viewOnly: isTechnicianView
     },
     {
       title: "Tour Configuration",
       description: "Power & weight defaults, technical settings",
       icon: Settings,
       onClick: () => setIsDefaultsManagerOpen(true),
-      badge: "Settings"
+      badge: "Settings",
+      showForTechnician: false
     },
     {
       title: "Power Requirements",
       description: "Set default power calculations for all dates",
       icon: Calculator,
       onClick: handlePowerDefaults,
-      badge: "Defaults"
+      badge: "Defaults",
+      showForTechnician: false
     },
     {
       title: "Weight Calculations",
       description: "Configure weight defaults and calculations",
       icon: Weight,
       onClick: handleWeightDefaults,
-      badge: "Defaults"
+      badge: "Defaults",
+      showForTechnician: false
     },
     {
       title: "Document Management",
       description: "Upload, organize, and share tour documents",
       icon: FileText,
-      onClick: () => {}, // Will implement later
-      badge: "Coming Soon"
+      onClick: () => {},
+      badge: "Coming Soon",
+      viewOnly: true
     },
     {
       title: "Scheduling & Timeline",
       description: "Tour timeline and scheduling management",
       icon: Clock,
-      onClick: () => {}, // Will implement later
-      badge: "Coming Soon"
+      onClick: () => {},
+      badge: "Coming Soon",
+      viewOnly: true
     },
     {
       title: "Logistics Integration",
       description: "Transport, accommodation, and logistics",
       icon: Truck,
-      onClick: () => {}, // Will implement later
-      badge: "Coming Soon"
+      onClick: () => {},
+      badge: "Coming Soon",
+      showForTechnician: false
     }
-  ];
+  ].filter(action => {
+    if (isTechnicianView && action.showForTechnician === false) {
+      return false;
+    }
+    return true;
+  });
+
+  const handleBackToTechnicianDashboard = () => {
+    navigate('/technician-dashboard');
+  };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header Section */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
+          {isTechnicianView && (
+            <div className="flex items-center gap-2 mb-2">
+              <Button variant="ghost" onClick={handleBackToTechnicianDashboard} className="p-0 h-auto">
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back to Dashboard
+              </Button>
+              <Badge variant="outline" className="ml-2">
+                <Eye className="h-3 w-3 mr-1" />
+                Technician View
+              </Badge>
+            </div>
+          )}
           <h1 className="text-3xl font-bold">{tour.name}</h1>
           {tour.description && (
             <p className="text-muted-foreground mt-1">{tour.description}</p>
@@ -165,12 +202,14 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
             )}
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setIsSettingsOpen(true)}>
-            <Settings className="h-4 w-4 mr-2" />
-            Tour Settings
-          </Button>
-        </div>
+        {!isTechnicianView && (
+          <div className="flex gap-2">
+            <Button onClick={() => setIsSettingsOpen(true)}>
+              <Settings className="h-4 w-4 mr-2" />
+              Tour Settings
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Statistics Cards */}
@@ -218,7 +257,9 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
 
       {/* Quick Actions Grid */}
       <div>
-        <h2 className="text-xl font-semibold mb-4">Management Areas</h2>
+        <h2 className="text-xl font-semibold mb-4">
+          {isTechnicianView ? 'Tour Information' : 'Management Areas'}
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {quickActions.map((action, index) => (
             <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer" onClick={action.onClick}>
@@ -233,6 +274,11 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground">{action.description}</p>
+                {action.viewOnly && isTechnicianView && (
+                  <Badge variant="secondary" className="mt-2 text-xs">
+                    View Only
+                  </Badge>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -271,30 +317,36 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
         </div>
       )}
 
-      {/* Management Dialogs */}
-      <TourManagementDialog
-        open={isSettingsOpen}
-        onOpenChange={setIsSettingsOpen}
-        tour={tour}
-      />
+      {/* Management Dialogs - Modified for technician view */}
+      {!isTechnicianView && (
+        <TourManagementDialog
+          open={isSettingsOpen}
+          onOpenChange={setIsSettingsOpen}
+          tour={tour}
+        />
+      )}
 
       <TourDateManagementDialog
         open={isDatesOpen}
         onOpenChange={setIsDatesOpen}
         tourId={tour.id}
         tourDates={getSortedTourDates()}
+        readOnly={isTechnicianView}
       />
 
-      <TourDefaultsManager
-        open={isDefaultsManagerOpen}
-        onOpenChange={setIsDefaultsManagerOpen}
-        tour={tour}
-      />
+      {!isTechnicianView && (
+        <TourDefaultsManager
+          open={isDefaultsManagerOpen}
+          onOpenChange={setIsDefaultsManagerOpen}
+          tour={tour}
+        />
+      )}
 
       <TourAssignmentDialog
         open={isAssignmentsOpen}
         onOpenChange={setIsAssignmentsOpen}
         tourId={tour.id}
+        readOnly={isTechnicianView}
       />
     </div>
   );

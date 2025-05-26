@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Users } from "lucide-react";
+import { Trash2, Plus, Users, Eye } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -34,6 +33,7 @@ interface TourAssignmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tourId: string;
+  readOnly?: boolean;
 }
 
 const DEPARTMENTS = [
@@ -52,7 +52,12 @@ const ROLES_BY_DEPARTMENT = {
   production: ['Tour Manager', 'Production Manager', 'Stage Manager', 'Backline Technician']
 };
 
-export const TourAssignmentDialog = ({ open, onOpenChange, tourId }: TourAssignmentDialogProps) => {
+export const TourAssignmentDialog = ({ 
+  open, 
+  onOpenChange, 
+  tourId, 
+  readOnly = false 
+}: TourAssignmentDialogProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   
@@ -203,17 +208,26 @@ export const TourAssignmentDialog = ({ open, onOpenChange, tourId }: TourAssignm
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Tour Team Assignments
+            {readOnly ? 'Tour Team Members' : 'Tour Team Assignments'}
+            {readOnly && (
+              <Badge variant="secondary">
+                <Eye className="h-3 w-3 mr-1" />
+                View Only
+              </Badge>
+            )}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
           {/* Current Assignments */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">Current Team</h3>
+            <h3 className="text-lg font-semibold mb-4">
+              {readOnly ? 'Team Members' : 'Current Team'}
+            </h3>
             {Object.keys(groupedAssignments).length === 0 ? (
               <p className="text-muted-foreground text-center py-8">
-                No team members assigned yet. Add assignments below.
+                No team members assigned yet.
+                {!readOnly && " Add assignments below."}
               </p>
             ) : (
               <div className="space-y-4">
@@ -253,14 +267,16 @@ export const TourAssignmentDialog = ({ open, onOpenChange, tourId }: TourAssignm
                                 <p className="text-sm text-muted-foreground italic">{assignment.notes}</p>
                               )}
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteAssignment(assignment.id)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            {!readOnly && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteAssignment(assignment.id)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -271,114 +287,116 @@ export const TourAssignmentDialog = ({ open, onOpenChange, tourId }: TourAssignm
             )}
           </div>
 
-          {/* Add New Assignment */}
-          <div className="border-t pt-6">
-            <h3 className="text-lg font-semibold mb-4">Add Team Member</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>Department</Label>
-                <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DEPARTMENTS.map(dept => (
-                      <SelectItem key={dept.value} value={dept.value}>
-                        {dept.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label>Role</Label>
-                <Select 
-                  value={selectedRole} 
-                  onValueChange={setSelectedRole}
-                  disabled={!selectedDepartment}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getAvailableRoles().map(role => (
-                      <SelectItem key={role} value={role}>
-                        {role}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="md:col-span-2">
-                <Label>Assignment Type</Label>
-                <Select value={assignmentType} onValueChange={(value: 'internal' | 'external') => setAssignmentType(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="internal">Internal Technician</SelectItem>
-                    <SelectItem value="external">External Team/Contractor</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {assignmentType === 'internal' ? (
-                <div className="md:col-span-2">
-                  <Label>Technician</Label>
-                  <Select 
-                    value={selectedTechnician} 
-                    onValueChange={setSelectedTechnician}
-                    disabled={!selectedDepartment}
-                  >
+          {/* Add New Assignment - Only show for management */}
+          {!readOnly && (
+            <div className="border-t pt-6">
+              <h3 className="text-lg font-semibold mb-4">Add Team Member</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Department</Label>
+                  <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select technician" />
+                      <SelectValue placeholder="Select department" />
                     </SelectTrigger>
                     <SelectContent>
-                      {technicians.map(tech => (
-                        <SelectItem key={tech.id} value={tech.id}>
-                          {tech.first_name} {tech.last_name} ({tech.email})
+                      {DEPARTMENTS.map(dept => (
+                        <SelectItem key={dept.value} value={dept.value}>
+                          {dept.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-              ) : (
+
+                <div>
+                  <Label>Role</Label>
+                  <Select 
+                    value={selectedRole} 
+                    onValueChange={setSelectedRole}
+                    disabled={!selectedDepartment}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getAvailableRoles().map(role => (
+                        <SelectItem key={role} value={role}>
+                          {role}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="md:col-span-2">
-                  <Label>External Team/Contractor Name</Label>
-                  <Input
-                    value={externalName}
-                    onChange={(e) => setExternalName(e.target.value)}
-                    placeholder="Enter name or company"
+                  <Label>Assignment Type</Label>
+                  <Select value={assignmentType} onValueChange={(value: 'internal' | 'external') => setAssignmentType(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="internal">Internal Technician</SelectItem>
+                      <SelectItem value="external">External Team/Contractor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {assignmentType === 'internal' ? (
+                  <div className="md:col-span-2">
+                    <Label>Technician</Label>
+                    <Select 
+                      value={selectedTechnician} 
+                      onValueChange={setSelectedTechnician}
+                      disabled={!selectedDepartment}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select technician" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {technicians.map(tech => (
+                          <SelectItem key={tech.id} value={tech.id}>
+                            {tech.first_name} {tech.last_name} ({tech.email})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="md:col-span-2">
+                    <Label>External Team/Contractor Name</Label>
+                    <Input
+                      value={externalName}
+                      onChange={(e) => setExternalName(e.target.value)}
+                      placeholder="Enter name or company"
+                    />
+                  </div>
+                )}
+
+                <div className="md:col-span-2">
+                  <Label>Notes (Optional)</Label>
+                  <Textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Additional notes about this assignment"
+                    rows={2}
                   />
                 </div>
-              )}
+              </div>
 
-              <div className="md:col-span-2">
-                <Label>Notes (Optional)</Label>
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Additional notes about this assignment"
-                  rows={2}
-                />
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={resetForm}>
+                  Clear
+                </Button>
+                <Button 
+                  onClick={handleCreateAssignment}
+                  disabled={createAssignmentMutation.isPending}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Assignment
+                </Button>
               </div>
             </div>
-
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" onClick={resetForm}>
-                Clear
-              </Button>
-              <Button 
-                onClick={handleCreateAssignment}
-                disabled={createAssignmentMutation.isPending}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Assignment
-              </Button>
-            </div>
-          </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
