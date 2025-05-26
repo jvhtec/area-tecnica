@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw, AlertCircle } from "lucide-react";
 
 interface JobAssignmentDialogProps {
   open: boolean;
@@ -34,6 +34,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
 
   // Reset selections when department changes
   useEffect(() => {
+    console.log("JobAssignmentDialog: Department changed to:", department);
     setSelectedTechnician("");
     setSelectedRole("");
   }, [department]);
@@ -41,29 +42,91 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
   // Set up tab visibility tracking to refresh data when tab becomes visible
   useTabVisibility(['technicians']);
 
-  const { data: technicians, isLoading: isLoadingTechnicians } = useQuery({
-    queryKey: ["technicians", department],
+  const { data: technicians, isLoading: isLoadingTechnicians, error: techniciansError, refetch: refetchTechnicians } = useQuery({
+    queryKey: ["technicians", department, jobId],
     queryFn: async () => {
-      console.log("Fetching technicians for department:", department);
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name, email, role, department")
-        .eq("department", department)
-        .in("role", ["technician", "house_tech"]); // Modified to include both technician and house_tech roles
-
-      if (error) {
-        console.error("Error fetching technicians:", error);
-        throw error;
+      console.log("JobAssignmentDialog: Starting technician fetch for department:", department, "jobId:", jobId);
+      
+      if (!department) {
+        console.error("JobAssignmentDialog: No department provided");
+        throw new Error("Department is required");
       }
 
-      console.log("Fetched technicians:", data);
-      return data as Technician[];
+      if (!jobId) {
+        console.error("JobAssignmentDialog: No jobId provided");
+        throw new Error("Job ID is required");
+      }
+
+      try {
+        // First, get assigned technicians for this job and department
+        console.log("JobAssignmentDialog: Fetching job assignments...");
+        const { data: jobAssignments, error: assignmentsError } = await supabase
+          .from("job_assignments")
+          .select(`
+            technician_id,
+            profiles (
+              id, 
+              first_name, 
+              last_name, 
+              email, 
+              department, 
+              role
+            )
+          `)
+          .eq("job_id", jobId);
+
+        if (assignmentsError) {
+          console.error("JobAssignmentDialog: Error fetching job assignments:", assignmentsError);
+          throw assignmentsError;
+        }
+
+        console.log("JobAssignmentDialog: Raw job assignments data:", jobAssignments);
+
+        // Filter by department and map to get just the profiles
+        const filteredTechnicians = jobAssignments
+          ?.filter((assignment: any) => {
+            const hasProfile = assignment.profiles;
+            const matchesDepartment = hasProfile && assignment.profiles.department === department;
+            console.log("JobAssignmentDialog: Assignment filter check:", {
+              hasProfile,
+              profileDepartment: hasProfile ? assignment.profiles.department : 'none',
+              targetDepartment: department,
+              matchesDepartment
+            });
+            return hasProfile && matchesDepartment;
+          })
+          .map((assignment: any) => assignment.profiles) || [];
+
+        console.log(`JobAssignmentDialog: Found ${filteredTechnicians.length} technicians assigned to job ${jobId} for department ${department}`);
+        console.log("JobAssignmentDialog: Filtered technicians:", filteredTechnicians);
+
+        return filteredTechnicians as Technician[];
+      } catch (error) {
+        console.error("JobAssignmentDialog: Query function error:", error);
+        throw error;
+      }
     },
-    staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
+    enabled: open && !!department && !!jobId,
+    staleTime: 1000 * 30, // Consider data fresh for 30 seconds (reduced from 5 minutes)
     refetchOnMount: true,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
+
+  // Manual refresh function
+  const handleManualRefresh = async () => {
+    console.log("JobAssignmentDialog: Manual refresh triggered");
+    try {
+      await queryClient.invalidateQueries({ queryKey: ["technicians"] });
+      await refetchTechnicians();
+      toast.success("Technicians list refreshed");
+    } catch (error) {
+      console.error("JobAssignmentDialog: Manual refresh failed:", error);
+      toast.error("Failed to refresh technicians list");
+    }
+  };
 
   const handleDialogChange = async (isOpen: boolean) => {
     if (!isOpen) {
@@ -71,6 +134,10 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
       setSelectedTechnician("");
       setSelectedRole("");
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    } else {
+      // Force refresh when dialog opens
+      console.log("JobAssignmentDialog: Dialog opened, forcing refresh");
+      await queryClient.invalidateQueries({ queryKey: ["technicians"] });
     }
     onOpenChange(isOpen);
   };
@@ -101,7 +168,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
     }
 
     try {
-      console.log("Assigning technician:", selectedTechnician, "with role:", selectedRole);
+      console.log("JobAssignmentDialog: Assigning technician:", selectedTechnician, "with role:", selectedRole);
       
       // Validate assignment
       if (!technicians) {
@@ -109,8 +176,6 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
       }
       
       validateAssignment(selectedTechnician, selectedRole, technicians);
-
-      // REMOVED: Check for existing assignment with same role - allowing duplicate role assignments
 
       const roleField = `${department}_role` as const;
       const { error } = await supabase
@@ -122,11 +187,11 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
         });
 
       if (error) {
-        console.error("Error assigning technician:", error);
+        console.error("JobAssignmentDialog: Error assigning technician:", error);
         throw error;
       }
 
-      console.log("Technician assigned successfully");
+      console.log("JobAssignmentDialog: Technician assigned successfully");
       toast.success("Technician assigned successfully");
       
       // Reset form and close dialog
@@ -135,7 +200,7 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
       handleDialogChange(false);
       
     } catch (error: any) {
-      console.error("Failed to assign technician:", error);
+      console.error("JobAssignmentDialog: Failed to assign technician:", error);
       toast.error(error.message || "Failed to assign technician");
     }
   };
@@ -153,34 +218,108 @@ export const JobAssignmentDialog = ({ open, onOpenChange, jobId, department }: J
     }
   };
 
+  // Function to sort technicians - house techs first
+  const getSortedTechnicians = () => {
+    if (!technicians) return [];
+    
+    return [...technicians].sort((a, b) => {
+      // Sort house_tech before technician
+      if (a.role === 'house_tech' && b.role !== 'house_tech') return -1;
+      if (a.role !== 'house_tech' && b.role === 'house_tech') return 1;
+      
+      // Then sort by name
+      return (a.first_name + a.last_name).localeCompare(b.first_name + b.last_name);
+    });
+  };
+
+  // Format technician display name
+  const formatTechnicianName = (technician: Technician) => {
+    const isHouseTech = technician.role === 'house_tech';
+    return `${technician.first_name} ${technician.last_name}${isHouseTech ? ' (House Tech)' : ''}`;
+  };
+
+  // Enhanced error display
+  const renderTechnicianSelector = () => {
+    if (isLoadingTechnicians) {
+      return (
+        <div className="flex items-center justify-center p-4">
+          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          <span className="text-sm text-muted-foreground">
+            Loading {department} technicians for this job...
+          </span>
+        </div>
+      );
+    }
+
+    if (techniciansError) {
+      return (
+        <div className="flex flex-col items-center p-4 space-y-2">
+          <AlertCircle className="h-6 w-6 text-destructive" />
+          <span className="text-sm text-destructive text-center">
+            Failed to load technicians: {techniciansError.message}
+          </span>
+          <Button variant="outline" size="sm" onClick={handleManualRefresh}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+      );
+    }
+
+    if (!technicians || technicians.length === 0) {
+      return (
+        <div className="flex flex-col items-center p-4 space-y-2">
+          <AlertCircle className="h-6 w-6 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground text-center">
+            No {department} technicians assigned to this job yet.
+            <br />
+            Assign technicians to this job first to see them here.
+          </span>
+          <Button variant="outline" size="sm" onClick={handleManualRefresh}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
+      );
+    }
+
+    return (
+      <Select value={selectedTechnician} onValueChange={setSelectedTechnician}>
+        <SelectTrigger>
+          <SelectValue placeholder={`Select ${department} technician`} />
+        </SelectTrigger>
+        <SelectContent>
+          {getSortedTechnicians().map((tech) => (
+            <SelectItem key={tech.id} value={tech.id}>
+              {formatTechnicianName(tech)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleDialogChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Assign {department.charAt(0).toUpperCase() + department.slice(1)} Technician</DialogTitle>
+          <DialogTitle className="flex items-center justify-between">
+            Assign {department.charAt(0).toUpperCase() + department.slice(1)} Technician
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleManualRefresh}
+              disabled={isLoadingTechnicians}
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoadingTechnicians ? 'animate-spin' : ''}`} />
+            </Button>
+          </DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4 mt-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Technician</label>
-            {isLoadingTechnicians ? (
-              <div className="flex items-center justify-center p-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-              </div>
-            ) : (
-              <Select value={selectedTechnician} onValueChange={setSelectedTechnician}>
-                <SelectTrigger>
-                  <SelectValue placeholder={`Select ${department} technician`} />
-                </SelectTrigger>
-                <SelectContent>
-                  {technicians?.map((tech) => (
-                    <SelectItem key={tech.id} value={tech.id}>
-                      {tech.first_name} {tech.last_name} {tech.role === 'house_tech' ? '(House Tech)' : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            {renderTechnicianSelector()}
           </div>
 
           <div className="space-y-2">
