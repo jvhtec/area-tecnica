@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { FileText, ArrowLeft } from 'lucide-react';
+import { FileText, ArrowLeft, Edit, Trash2 } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection } from '@/hooks/useJobSelection';
 import { useTourPowerDefaults } from '@/hooks/useTourPowerDefaults';
@@ -49,6 +49,8 @@ interface Table {
   id?: number | string;
   includesHoist?: boolean;
   isDefault?: boolean;
+  isOverride?: boolean;
+  overrideId?: string;
 }
 
 const ConsumosTool: React.FC = () => {
@@ -61,6 +63,7 @@ const ConsumosTool: React.FC = () => {
   const [tableName, setTableName] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
   const [safetyMargin, setSafetyMargin] = useState(0);
+  const [editingOverride, setEditingOverride] = useState<string | null>(null);
 
   // Tour override detection
   const isJobOverrideMode = Boolean(selectedJob?.tour_date_id);
@@ -72,6 +75,7 @@ const ConsumosTool: React.FC = () => {
   const { 
     powerOverrides = [],
     createPowerOverride,
+    deleteOverride,
     isCreatingOverride 
   } = useTourDateOverrides(tourDateId || '', 'power');
 
@@ -193,6 +197,44 @@ const ConsumosTool: React.FC = () => {
     }
   };
 
+  const handleDeleteOverride = async (overrideId: string) => {
+    try {
+      await deleteOverride({ id: overrideId, table: 'power' });
+      
+      toast({
+        title: "Success",
+        description: "Override deleted successfully",
+      });
+    } catch (error: any) {
+      console.error('Error deleting override:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete override",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEditOverride = (override: any) => {
+    // Populate current table form with override data
+    setTableName(override.table_name);
+    setEditingOverride(override.id);
+    
+    // If override has detailed row data, populate that too
+    if (override.override_data?.rows) {
+      setCurrentTable({
+        name: override.table_name,
+        rows: override.override_data.rows
+      });
+    } else {
+      // Create a single row with the total data
+      setCurrentTable({
+        name: override.table_name,
+        rows: [{ quantity: '1', componentId: '', watts: override.total_watts.toString() }]
+      });
+    }
+  };
+
   const generateTable = async () => {
     if (!tableName) {
       toast({
@@ -250,6 +292,7 @@ const ConsumosTool: React.FC = () => {
       rows: [{ quantity: '', componentId: '', watts: '' }],
     });
     setTableName('');
+    setEditingOverride(null);
   };
 
   const removeTable = (tableId: number | string) => {
@@ -345,6 +388,21 @@ const ConsumosTool: React.FC = () => {
     customPduType: def.custom_pdu_type,
     includesHoist: def.includes_hoist,
     isDefault: true
+  }));
+
+  // Convert tour overrides to display format
+  const tourOverrideTables = powerOverrides.map(override => ({
+    id: `override-${override.id}`,
+    name: override.table_name,
+    rows: override.override_data?.rows || [],
+    totalWatts: override.total_watts,
+    adjustedWatts: override.total_watts * (1 + safetyMargin / 100),
+    currentPerPhase: override.current_per_phase,
+    pduType: override.pdu_type,
+    customPduType: override.custom_pdu_type,
+    includesHoist: override.includes_hoist,
+    isOverride: true,
+    overrideId: override.id
   }));
 
   return (
@@ -463,8 +521,66 @@ const ConsumosTool: React.FC = () => {
             </div>
           )}
 
+          {/* Display existing tour overrides when in override mode */}
+          {isJobOverrideMode && tourOverrideTables.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-orange-900">Existing Overrides</h3>
+              {tourOverrideTables.map((table) => (
+                <div key={table.id} className="border rounded-lg overflow-hidden bg-orange-50/30">
+                  <div className="bg-orange-100 px-4 py-3 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-semibold text-orange-900">{table.name}</h4>
+                      <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                        Override
+                      </Badge>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditOverride({ 
+                          id: table.overrideId, 
+                          table_name: table.name,
+                          total_watts: table.totalWatts,
+                          override_data: { rows: table.rows }
+                        })}
+                        className="gap-2"
+                      >
+                        <Edit className="h-4 w-4" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => table.overrideId && handleDeleteOverride(table.overrideId)}
+                        className="gap-2"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-2 text-sm">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>Total Watts: <span className="font-medium">{table.totalWatts?.toFixed(2)} W</span></div>
+                      <div>Current per Phase: <span className="font-medium">{table.currentPerPhase?.toFixed(2)} A</span></div>
+                      <div>PDU Type: <span className="font-medium">{table.customPduType || table.pduType}</span></div>
+                      {table.includesHoist && (
+                        <div className="col-span-2 text-orange-700">
+                          ✓ Includes additional hoist power (CEE32A 3P+N+G)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="space-y-2">
-            <Label htmlFor="tableName">Table Name</Label>
+            <Label htmlFor="tableName">
+              Table Name {editingOverride && <span className="text-orange-600">(Editing Override)</span>}
+            </Label>
             <Input
               id="tableName"
               value={tableName}
@@ -527,10 +643,10 @@ const ConsumosTool: React.FC = () => {
               variant="secondary" 
               disabled={isJobOverrideMode && isCreatingOverride}
             >
-              {isJobOverrideMode ? 'Create Override' : 'Generate Table'}
+              {editingOverride ? 'Update Override' : isJobOverrideMode ? 'Create Override' : 'Generate Table'}
             </Button>
             <Button onClick={resetCurrentTable} variant="destructive">
-              Reset
+              {editingOverride ? 'Cancel Edit' : 'Reset'}
             </Button>
             {tables.length > 0 && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
