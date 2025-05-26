@@ -57,7 +57,8 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
   // Filter assignments based on department if specified
   const filteredAssignments = department
     ? assignments.filter(assignment => {
-        return assignment.profiles.department === department;
+        // Add null check for profiles
+        return assignment.profiles && assignment.profiles.department === department;
       })
     : assignments;
 
@@ -98,6 +99,12 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
       {filteredAssignments.map((assignment) => {
         const role = getRoleForDepartment(assignment);
         if (!role) return null;
+        
+        // Add null check for profiles before rendering
+        if (!assignment.profiles) {
+          console.warn("Assignment missing profiles data:", assignment);
+          return null;
+        }
         
         return (
           <div
