@@ -130,13 +130,13 @@ const ConsumosTool: React.FC = () => {
   const [tableName, setTableName] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
   const [safetyMargin, setSafetyMargin] = useState(0);
-  const [selectedPduType, setSelectedPduType] = useState<string>('default');
-  const [customPduType, setCustomPduType] = useState('');
-  const [includesHoist, setIncludesHoist] = useState(false);
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
     rows: [{ quantity: '', componentId: '', watts: '' }],
+    pduType: 'default',
+    customPduType: '',
+    includesHoist: false,
   });
 
   const addRow = () => {
@@ -202,9 +202,9 @@ const ConsumosTool: React.FC = () => {
           table_name: table.name,
           total_watts: table.totalWatts || 0,
           current_per_phase: table.currentPerPhase || 0,
-          pdu_type: selectedPduType === 'default' ? table.pduType : selectedPduType,
-          custom_pdu_type: customPduType,
-          includes_hoist: includesHoist
+          pdu_type: table.pduType === 'default' ? table.pduType : table.pduType,
+          custom_pdu_type: table.customPduType,
+          includes_hoist: table.includesHoist
         });
 
       if (error) throw error;
@@ -256,9 +256,9 @@ const ConsumosTool: React.FC = () => {
       totalWatts,
       adjustedWatts,
       currentPerPhase,
-      pduType: selectedPduType === 'default' ? pduSuggestion : selectedPduType,
-      customPduType: customPduType,
-      includesHoist,
+      pduType: currentTable.pduType === 'default' ? pduSuggestion : currentTable.pduType,
+      customPduType: currentTable.customPduType,
+      includesHoist: currentTable.includesHoist,
       id: Date.now(),
     };
 
@@ -276,11 +276,11 @@ const ConsumosTool: React.FC = () => {
     setCurrentTable({
       name: '',
       rows: [{ quantity: '', componentId: '', watts: '' }],
+      pduType: 'default',
+      customPduType: '',
+      includesHoist: false,
     });
     setTableName('');
-    setSelectedPduType('default');
-    setCustomPduType('');
-    setIncludesHoist(false);
   };
 
   const removeTable = (tableId: number | string) => {
@@ -406,41 +406,6 @@ const ConsumosTool: React.FC = () => {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>PDU Type Override</Label>
-            <Select value={selectedPduType} onValueChange={setSelectedPduType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Use recommended PDU type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="default">Use recommended PDU type</SelectItem>
-                {PDU_TYPES.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-                <SelectItem value="custom">Custom PDU Type</SelectItem>
-              </SelectContent>
-            </Select>
-            {selectedPduType === 'custom' && (
-              <Input
-                placeholder="Enter custom PDU type"
-                value={customPduType}
-                onChange={(e) => setCustomPduType(e.target.value)}
-                className="mt-2"
-              />
-            )}
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="hoistPower"
-              checked={includesHoist}
-              onCheckedChange={(checked) => setIncludesHoist(checked as boolean)}
-            />
-            <Label htmlFor="hoistPower">Requires additional hoist power (CEE32A 3P+N+G)</Label>
-          </div>
-
           <div className="border rounded-lg overflow-hidden">
             <table className="w-full">
               <thead className="bg-muted">
@@ -486,6 +451,48 @@ const ConsumosTool: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          <div className="space-y-4 border rounded-lg p-4 bg-muted/50">
+            <h3 className="font-semibold">Table Configuration</h3>
+            
+            <div className="space-y-2">
+              <Label>PDU Type Override</Label>
+              <Select 
+                value={currentTable.pduType || 'default'} 
+                onValueChange={(value) => setCurrentTable(prev => ({ ...prev, pduType: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Use recommended PDU type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Use recommended PDU type</SelectItem>
+                  {PDU_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="custom">Custom PDU Type</SelectItem>
+                </SelectContent>
+              </Select>
+              {currentTable.pduType === 'custom' && (
+                <Input
+                  placeholder="Enter custom PDU type"
+                  value={currentTable.customPduType || ''}
+                  onChange={(e) => setCurrentTable(prev => ({ ...prev, customPduType: e.target.value }))}
+                  className="mt-2"
+                />
+              )}
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="hoistPower"
+                checked={currentTable.includesHoist || false}
+                onCheckedChange={(checked) => setCurrentTable(prev => ({ ...prev, includesHoist: checked as boolean }))}
+              />
+              <Label htmlFor="hoistPower">Requires additional hoist power (CEE32A 3P+N+G)</Label>
+            </div>
           </div>
 
           <div className="flex gap-2">
