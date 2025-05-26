@@ -14,82 +14,47 @@ import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
 const soundComponentDatabase = [
-  { id: 1, name: 'Meyer Sound LINA', watts: 480 },
-  { id: 2, name: 'Meyer Sound 900-LFC', watts: 1200 },
-  { id: 3, name: 'Meyer Sound LEOPARD', watts: 600 },
-  { id: 4, name: 'Meyer Sound 1100-LFC', watts: 1600 },
-  { id: 5, name: 'Meyer Sound ULTRA-X40', watts: 240 },
-  { id: 6, name: 'Meyer Sound ULTRA-X42', watts: 240 },
-  { id: 7, name: 'Meyer Sound ULTRA-X20', watts: 240 },
-  { id: 8, name: 'Meyer Sound USW-1P', watts: 600 },
-  { id: 9, name: 'Meyer Sound UPJ-1P', watts: 480 },
-  { id: 10, name: 'Meyer Sound UPA-1P', watts: 480 },
-  { id: 11, name: 'd&b audiotechnik V8', watts: 600 },
-  { id: 12, name: 'd&b audiotechnik V12', watts: 600 },
-  { id: 13, name: 'd&b audiotechnik V-SUB', watts: 800 },
-  { id: 14, name: 'd&b audiotechnik J8', watts: 800 },
-  { id: 15, name: 'd&b audiotechnik J12', watts: 800 },
-  { id: 16, name: 'd&b audiotechnik J-SUB', watts: 1200 },
-  { id: 17, name: 'd&b audiotechnik Q1', watts: 500 },
-  { id: 18, name: 'd&b audiotechnik Q7', watts: 500 },
-  { id: 19, name: 'd&b audiotechnik Q-SUB', watts: 800 },
-  { id: 20, name: 'L-Acoustics KARA', watts: 480 },
-  { id: 21, name: 'L-Acoustics SB18', watts: 800 },
-  { id: 22, name: 'L-Acoustics K2', watts: 600 },
-  { id: 23, name: 'L-Acoustics KS28', watts: 1200 },
-  { id: 24, name: 'L-Acoustics ARCS II', watts: 400 },
-  { id: 25, name: 'L-Acoustics SB28', watts: 1100 },
-  { id: 26, name: 'NEXO STM M46', watts: 400 },
-  { id: 27, name: 'NEXO STM B112', watts: 1200 },
-  { id: 28, name: 'NEXO STM S118', watts: 1200 },
-  { id: 29, name: 'DAS AUDIO AERO-50', watts: 600 },
-  { id: 30, name: 'DAS AUDIO LX-218A', watts: 1200 },
-  { id: 31, name: 'MARTIN AUDIO MLA', watts: 650 },
-  { id: 32, name: 'MARTIN AUDIO MLX', watts: 1600 },
-  { id: 33, name: 'EAW KF740', watts: 750 },
-  { id: 34, name: 'EAW SB2001', watts: 2000 },
-  { id: 35, name: 'Adamson S10', watts: 550 },
-  { id: 36, name: 'Adamson E119', watts: 1800 },
-  { id: 37, name: 'Powersoft X4', watts: 160 },
-  { id: 38, name: 'Powersoft X8', watts: 200 },
-  { id: 39, name: 'Lab Gruppen PLM 20k44', watts: 200 },
-  { id: 40, name: 'Lab Gruppen PLM 12k44', watts: 180 },
-  { id: 41, name: 'Crown I-Tech 12000HD', watts: 190 },
-  { id: 42, name: 'Crown I-Tech 4x3500HD', watts: 210 },
-  { id: 43, name: 'Digico SD12', watts: 200 },
-  { id: 44, name: 'Digico SD5', watts: 300 },
-  { id: 45, name: 'Yamaha CL5', watts: 150 },
-  { id: 46, name: 'Yamaha QL5', watts: 130 },
-  { id: 47, name: 'Midas M32', watts: 180 },
-  { id: 48, name: 'Behringer X32', watts: 150 },
-  { id: 49, name: 'Shure ULXD4Q', watts: 50 },
-  { id: 50, name: 'Sennheiser EM 2050', watts: 40 },
-  { id: 51, name: 'DBX DriveRack PA2', watts: 30 },
-  { id: 52, name: 'Lake LM 44', watts: 40 },
-  { id: 53, name: 'Lexicon PCM92', watts: 60 },
-  { id: 54, name: 'TC Electronic Reverb 4000', watts: 50 },
-  { id: 55, name: 'Drawmer DL441', watts: 20 },
-  { id: 56, name: 'BSS DPR-901', watts: 15 },
-  { id: 57, name: 'Klark Teknik DN370', watts: 25 },
-  { id: 58, name: 'Avalon VT-737SP', watts: 75 },
-  { id: 59, name: 'Neve 1073', watts: 80 },
-  { id: 60, name: 'API 2500', watts: 40 },
-  { id: 61, name: 'Manley Voxbox', watts: 90 },
-  { id: 62, name: 'Millennia Media HV-3D', watts: 60 },
-  { id: 63, name: 'Grace Design m101', watts: 30 },
-  { id: 64, name: 'Focusrite ISA One', watts: 25 },
-  { id: 65, name: 'Rupert Neve Designs Portico 5012', watts: 50 },
-  { id: 66, name: 'Chandler Limited TG2', watts: 70 },
-  { id: 67, name: 'Universal Audio LA-2A', watts: 45 },
-  { id: 68, name: 'Teletronix LA-2A', watts: 50 },
-  { id: 69, name: 'Empirical Labs Distressor', watts: 35 },
-  { id: 70, name: 'SSL G-Master Buss Compressor', watts: 60 },
-  { id: 71, name: 'Tube-Tech CL 1B', watts: 85 },
-  { id: 72, name: 'Summit Audio TLA-100A', watts: 40 },
-  { id: 73, name: 'ADR Compex F760X-RS', watts: 55 },
-  { id: 74, name: 'Fairchild 670', watts: 120 },
-  { id: 75, name: 'UREI 1176', watts: 30 },
-  { id: 76, name: 'dbx 160', watts: 20 }
+  { id: 1, name: 'L-Acoustics K1', watts: 480 },
+  { id: 2, name: 'L-Acoustics K2', watts: 600 },
+  { id: 3, name: 'L-Acoustics KARA', watts: 480 },
+  { id: 4, name: 'L-Acoustics KARA II', watts: 480 },
+  { id: 5, name: 'L-Acoustics ARCS II', watts: 400 },
+  { id: 6, name: 'L-Acoustics SB18', watts: 800 },
+  { id: 7, name: 'L-Acoustics SB28', watts: 1100 },
+  { id: 8, name: 'L-Acoustics KS28', watts: 1200 },
+  { id: 9, name: 'L-Acoustics X8', watts: 300 },
+  { id: 10, name: 'L-Acoustics X12', watts: 400 },
+  { id: 11, name: 'L-Acoustics X15 HiQ', watts: 500 },
+  { id: 12, name: 'L-Acoustics 5XT', watts: 250 },
+  { id: 13, name: 'L-Acoustics 8XT', watts: 350 },
+  { id: 14, name: 'L-Acoustics 12XT', watts: 450 },
+  { id: 15, name: 'L-Acoustics SYVA', watts: 600 },
+  { id: 16, name: 'L-Acoustics SYVA LOW', watts: 800 },
+  { id: 17, name: 'Meyer Sound LEOPARD', watts: 600 },
+  { id: 18, name: 'Meyer Sound LYON', watts: 800 },
+  { id: 19, name: 'Meyer Sound LINA', watts: 480 },
+  { id: 20, name: 'Meyer Sound 900-LFC', watts: 1200 },
+  { id: 21, name: 'Meyer Sound 1100-LFC', watts: 1600 },
+  { id: 22, name: 'Meyer Sound ULTRA-X40', watts: 240 },
+  { id: 23, name: 'Meyer Sound ULTRA-X42', watts: 240 },
+  { id: 24, name: 'Meyer Sound USW-1P', watts: 600 },
+  { id: 25, name: 'Meyer Sound UPJ-1P', watts: 480 },
+  { id: 26, name: 'd&b audiotechnik V8', watts: 600 },
+  { id: 27, name: 'd&b audiotechnik V12', watts: 600 },
+  { id: 28, name: 'd&b audiotechnik V-SUB', watts: 800 },
+  { id: 29, name: 'd&b audiotechnik J8', watts: 800 },
+  { id: 30, name: 'd&b audiotechnik J12', watts: 800 },
+  { id: 31, name: 'd&b audiotechnik J-SUB', watts: 1200 },
+  { id: 32, name: 'd&b audiotechnik Q1', watts: 500 },
+  { id: 33, name: 'd&b audiotechnik Q7', watts: 500 },
+  { id: 34, name: 'd&b audiotechnik Q-SUB', watts: 800 },
+  { id: 35, name: 'NEXO STM M46', watts: 400 },
+  { id: 36, name: 'NEXO STM B112', watts: 1200 },
+  { id: 37, name: 'NEXO STM S118', watts: 1200 },
+  { id: 38, name: 'DAS AUDIO AERO-50', watts: 600 },
+  { id: 39, name: 'DAS AUDIO LX-218A', watts: 1200 },
+  { id: 40, name: 'MARTIN AUDIO MLA', watts: 650 },
+  { id: 41, name: 'MARTIN AUDIO MLX', watts: 1600 },
 ];
 
 interface TableRow {
@@ -113,13 +78,6 @@ interface Table {
   isDefault?: boolean;
 }
 
-interface SummaryRow {
-  quantity: string;
-  componentName: string;
-  watts: string;
-  totalWatts: number;
-}
-
 const ConsumosTool: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -134,9 +92,6 @@ const ConsumosTool: React.FC = () => {
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
     rows: [{ quantity: '', componentId: '', watts: '' }],
-    pduType: 'default',
-    customPduType: '',
-    includesHoist: false,
   });
 
   const addRow = () => {
@@ -256,9 +211,9 @@ const ConsumosTool: React.FC = () => {
       totalWatts,
       adjustedWatts,
       currentPerPhase,
-      pduType: currentTable.pduType === 'default' ? pduSuggestion : currentTable.pduType,
-      customPduType: currentTable.customPduType,
-      includesHoist: currentTable.includesHoist,
+      pduType: pduSuggestion,
+      customPduType: '',
+      includesHoist: false,
       id: Date.now(),
     };
 
@@ -276,15 +231,27 @@ const ConsumosTool: React.FC = () => {
     setCurrentTable({
       name: '',
       rows: [{ quantity: '', componentId: '', watts: '' }],
-      pduType: 'default',
-      customPduType: '',
-      includesHoist: false,
     });
     setTableName('');
   };
 
   const removeTable = (tableId: number | string) => {
     setTables((prev) => prev.filter((table) => table.id !== tableId));
+  };
+
+  const updateTableSettings = (tableId: number | string, updates: Partial<Table>) => {
+    setTables((prev) =>
+      prev.map((table) => {
+        if (table.id === tableId) {
+          const updatedTable = { ...table, ...updates };
+          if (selectedJobId) {
+            savePowerRequirementTable(updatedTable);
+          }
+          return updatedTable;
+        }
+        return table;
+      })
+    );
   };
 
   const handleExportPDF = async () => {
@@ -453,48 +420,6 @@ const ConsumosTool: React.FC = () => {
             </table>
           </div>
 
-          <div className="space-y-4 border rounded-lg p-4 bg-muted/50">
-            <h3 className="font-semibold">Table Configuration</h3>
-            
-            <div className="space-y-2">
-              <Label>PDU Type Override</Label>
-              <Select 
-                value={currentTable.pduType || 'default'} 
-                onValueChange={(value) => setCurrentTable(prev => ({ ...prev, pduType: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Use recommended PDU type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Use recommended PDU type</SelectItem>
-                  {PDU_TYPES.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="custom">Custom PDU Type</SelectItem>
-                </SelectContent>
-              </Select>
-              {currentTable.pduType === 'custom' && (
-                <Input
-                  placeholder="Enter custom PDU type"
-                  value={currentTable.customPduType || ''}
-                  onChange={(e) => setCurrentTable(prev => ({ ...prev, customPduType: e.target.value }))}
-                  className="mt-2"
-                />
-              )}
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="hoistPower"
-                checked={currentTable.includesHoist || false}
-                onCheckedChange={(checked) => setCurrentTable(prev => ({ ...prev, includesHoist: checked as boolean }))}
-              />
-              <Label htmlFor="hoistPower">Requires additional hoist power (CEE32A 3P+N+G)</Label>
-            </div>
-          </div>
-
           <div className="flex gap-2">
             <Button onClick={addRow}>Add Row</Button>
             <Button onClick={generateTable} variant="secondary">
@@ -523,6 +448,55 @@ const ConsumosTool: React.FC = () => {
                   Remove Table
                 </Button>
               </div>
+              
+              <div className="p-4 bg-muted/50 space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id={`hoist-${table.id}`}
+                      checked={table.includesHoist}
+                      onCheckedChange={(checked) => 
+                        updateTableSettings(table.id as number, { includesHoist: !!checked })
+                      }
+                    />
+                    <Label htmlFor={`hoist-${table.id}`}>Requires additional hoist power (CEE32A 3P+N+G)</Label>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Label>PDU Type Override:</Label>
+                    <Select
+                      value={table.customPduType || 'default'}
+                      onValueChange={(value) => 
+                        updateTableSettings(table.id as number, { 
+                          customPduType: value === 'default' ? undefined : value 
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Use recommended PDU type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">Use recommended PDU type</SelectItem>
+                        {PDU_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="custom">Custom PDU Type</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {table.customPduType === 'custom' && (
+                      <Input
+                        placeholder="Enter custom PDU type"
+                        value={table.customPduType || ''}
+                        onChange={(e) => updateTableSettings(table.id as number, { customPduType: e.target.value })}
+                        className="w-[200px]"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <table className="w-full">
                 <thead className="bg-muted/50">
                   <tr>
