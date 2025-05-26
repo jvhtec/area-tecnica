@@ -1,3 +1,4 @@
+
 import { useParams, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ import { TourManagementDialog } from "@/components/tours/TourManagementDialog";
 import { TourDateManagementDialog } from "@/components/tours/TourDateManagementDialog";
 import { TourDefaultsManager } from "@/components/tours/TourDefaultsManager";
 import { TourAssignmentDialog } from "@/components/tours/TourAssignmentDialog";
+import { TourDocumentsDialog } from "@/components/tours/TourDocumentsDialog";
 import { format } from "date-fns";
 import { useTourAssignments } from "@/hooks/useTourAssignments";
 import { useAuth } from "@/hooks/useAuth";
@@ -43,6 +45,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
   const [isDatesOpen, setIsDatesOpen] = useState(false);
   const [isDefaultsManagerOpen, setIsDefaultsManagerOpen] = useState(false);
   const [isAssignmentsOpen, setIsAssignmentsOpen] = useState(false);
+  const [isDocumentsOpen, setIsDocumentsOpen] = useState(false);
 
   const { assignments } = useTourAssignments(tour?.id);
 
@@ -104,6 +107,14 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
       viewOnly: isTechnicianView
     },
     {
+      title: "Document Management",
+      description: "Upload, organize, and share tour documents",
+      icon: FileText,
+      onClick: () => setIsDocumentsOpen(true),
+      badge: "Available",
+      viewOnly: false
+    },
+    {
       title: "Tour Configuration",
       description: "Power & weight defaults, technical settings",
       icon: Settings,
@@ -126,14 +137,6 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
       onClick: handleWeightDefaults,
       badge: "Defaults",
       showForTechnician: false
-    },
-    {
-      title: "Document Management",
-      description: "Upload, organize, and share tour documents",
-      icon: FileText,
-      onClick: () => {},
-      badge: "Coming Soon",
-      viewOnly: true
     },
     {
       title: "Scheduling & Timeline",
@@ -347,6 +350,13 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
         onOpenChange={setIsAssignmentsOpen}
         tourId={tour.id}
         readOnly={isTechnicianView}
+      />
+
+      <TourDocumentsDialog
+        open={isDocumentsOpen}
+        onOpenChange={setIsDocumentsOpen}
+        tourId={tour.id}
+        tourName={tour.name}
       />
     </div>
   );
