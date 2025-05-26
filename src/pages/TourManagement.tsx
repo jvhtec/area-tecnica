@@ -1,3 +1,4 @@
+
 import { useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,8 +17,10 @@ import {
   BarChart3
 } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { TourManagementDialog } from "@/components/tours/TourManagementDialog";
 import { TourDateManagementDialog } from "@/components/tours/TourDateManagementDialog";
+import { TourDefaultsManager } from "@/components/tours/TourDefaultsManager";
 import { format } from "date-fns";
 
 interface TourManagementProps {
@@ -25,8 +28,10 @@ interface TourManagementProps {
 }
 
 export const TourManagement = ({ tour }: TourManagementProps) => {
+  const navigate = useNavigate();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDatesOpen, setIsDatesOpen] = useState(false);
+  const [isDefaultsManagerOpen, setIsDefaultsManagerOpen] = useState(false);
 
   if (!tour) {
     return (
@@ -56,6 +61,14 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
     );
   };
 
+  const handlePowerDefaults = () => {
+    navigate(`/sound/consumos?tourId=${tour.id}&mode=tour-defaults`);
+  };
+
+  const handleWeightDefaults = () => {
+    navigate(`/sound/pesos?tourId=${tour.id}&mode=tour-defaults`);
+  };
+
   const quickActions = [
     {
       title: "Tour Dates & Locations",
@@ -68,21 +81,21 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
       title: "Tour Configuration",
       description: "Power & weight defaults, technical settings",
       icon: Settings,
-      onClick: () => setIsSettingsOpen(true),
+      onClick: () => setIsDefaultsManagerOpen(true),
       badge: "Settings"
     },
     {
       title: "Power Requirements",
       description: "Set default power calculations for all dates",
       icon: Calculator,
-      onClick: () => {}, // Will implement later
+      onClick: handlePowerDefaults,
       badge: "Defaults"
     },
     {
       title: "Weight Calculations",
       description: "Configure weight defaults and calculations",
       icon: Weight,
-      onClick: () => {}, // Will implement later
+      onClick: handleWeightDefaults,
       badge: "Defaults"
     },
     {
@@ -255,6 +268,12 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
         onOpenChange={setIsDatesOpen}
         tourId={tour.id}
         tourDates={getSortedTourDates()}
+      />
+
+      <TourDefaultsManager
+        open={isDefaultsManagerOpen}
+        onOpenChange={setIsDefaultsManagerOpen}
+        tour={tour}
       />
     </div>
   );
