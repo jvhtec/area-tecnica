@@ -5,12 +5,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { FileText, ArrowLeft } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection } from '@/hooks/useJobSelection';
+import { useTourPowerDefaults } from '@/hooks/useTourPowerDefaults';
+import { useTourDateOverrides } from '@/hooks/useTourDateOverrides';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
 
 const soundComponentDatabase = [
   { id: 1, name: 'LA12X', watts: 2900 },
@@ -57,6 +61,19 @@ const ConsumosTool: React.FC = () => {
   const [tableName, setTableName] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
   const [safetyMargin, setSafetyMargin] = useState(0);
+
+  // Tour override detection
+  const isJobOverrideMode = Boolean(selectedJob?.tour_date_id);
+  const tourId = selectedJob?.tour_date?.tour?.id;
+  const tourDateId = selectedJob?.tour_date_id;
+
+  // Tour-specific hooks
+  const { powerDefaults: tourDefaults = [] } = useTourPowerDefaults(tourId || '');
+  const { 
+    powerOverrides = [],
+    createPowerOverride,
+    isCreatingOverride 
+  } = useTourDateOverrides(tourDateId || '', 'power');
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
@@ -147,7 +164,36 @@ const ConsumosTool: React.FC = () => {
     }
   };
 
-  const generateTable = () => {
+  const saveTourOverride = async (table: Table) => {
+    if (!tourDateId) return;
+
+    try {
+      await createPowerOverride({
+        tour_date_id: tourDateId,
+        table_name: table.name,
+        total_watts: table.totalWatts || 0,
+        current_per_phase: table.currentPerPhase || 0,
+        pdu_type: table.customPduType || table.pduType || '',
+        custom_pdu_type: table.customPduType,
+        includes_hoist: table.includesHoist || false,
+        department: 'sound'
+      });
+
+      toast({
+        title: "Success",
+        description: "Tour override saved successfully",
+      });
+    } catch (error: any) {
+      console.error('Error saving tour override:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save tour override",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const generateTable = async () => {
     if (!tableName) {
       toast({
         title: 'Missing table name',
@@ -188,9 +234,11 @@ const ConsumosTool: React.FC = () => {
 
     setTables((prev) => [...prev, newTable]);
 
-    // Save to database if job is selected
-    if (selectedJobId) {
-      savePowerRequirementTable(newTable);
+    // Save based on mode
+    if (isJobOverrideMode) {
+      await saveTourOverride(newTable);
+    } else if (selectedJobId) {
+      await savePowerRequirementTable(newTable);
     }
 
     resetCurrentTable();
@@ -285,6 +333,20 @@ const ConsumosTool: React.FC = () => {
     }
   };
 
+  // Convert tour defaults to display format
+  const tourDefaultTables = tourDefaults.map(def => ({
+    id: `default-${def.id}`,
+    name: def.table_name,
+    rows: [],
+    totalWatts: def.total_watts,
+    adjustedWatts: def.total_watts * (1 + safetyMargin / 100),
+    currentPerPhase: def.current_per_phase,
+    pduType: def.pdu_type,
+    customPduType: def.custom_pdu_type,
+    includesHoist: def.includes_hoist,
+    isDefault: true
+  }));
+
   return (
     <Card className="w-full max-w-4xl mx-auto my-6">
       <CardHeader className="space-y-1">
@@ -292,11 +354,29 @@ const ConsumosTool: React.FC = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate('/sound')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <CardTitle className="text-2xl font-bold">Power Calculator</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-2xl font-bold">Power Calculator</CardTitle>
+            {isJobOverrideMode && (
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                Override
+              </Badge>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
+          {isJobOverrideMode && selectedJob?.tour_date && (
+            <TourOverrideModeHeader
+              tourName={selectedJob.tour_date.tour?.name || 'Unknown Tour'}
+              tourDate={selectedJob.tour_date?.date || selectedJob.start_time}
+              locationName="Unknown Location"
+              defaultsCount={tourDefaultTables.length}
+              overridesCount={powerOverrides.length}
+              department="sound"
+            />
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="safetyMargin">Safety Margin</Label>
             <Select
@@ -316,21 +396,72 @@ const ConsumosTool: React.FC = () => {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="jobSelect">Select Job</Label>
-            <Select value={selectedJobId} onValueChange={handleJobSelect}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a job" />
-              </SelectTrigger>
-              <SelectContent>
-                {jobs?.map((job) => (
-                  <SelectItem key={job.id} value={job.id}>
-                    {job.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!isJobOverrideMode && (
+            <div className="space-y-2">
+              <Label htmlFor="jobSelect">Select Job</Label>
+              <Select value={selectedJobId} onValueChange={handleJobSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a job" />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobs?.map((job) => (
+                    <SelectItem key={job.id} value={job.id}>
+                      {job.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {isJobOverrideMode && (
+            <div className="space-y-2">
+              <Label htmlFor="jobSelect">Select Job</Label>
+              <Select value={selectedJobId} onValueChange={handleJobSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a job" />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobs?.map((job) => (
+                    <SelectItem key={job.id} value={job.id}>
+                      {job.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Display tour default tables when in override mode */}
+          {isJobOverrideMode && tourDefaultTables.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-blue-900">Tour Default Tables</h3>
+              {tourDefaultTables.map((table) => (
+                <div key={table.id} className="border rounded-lg overflow-hidden bg-blue-50/30">
+                  <div className="bg-blue-100 px-4 py-3 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-semibold text-blue-900">{table.name}</h4>
+                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                        Default
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-2 text-sm">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>Total Watts: <span className="font-medium">{table.totalWatts?.toFixed(2)} W</span></div>
+                      <div>Current per Phase: <span className="font-medium">{table.currentPerPhase?.toFixed(2)} A</span></div>
+                      <div>PDU Type: <span className="font-medium">{table.customPduType || table.pduType}</span></div>
+                      {table.includesHoist && (
+                        <div className="col-span-2 text-green-700">
+                          ✓ Includes additional hoist power (CEE32A 3P+N+G)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="tableName">Table Name</Label>
@@ -391,8 +522,12 @@ const ConsumosTool: React.FC = () => {
 
           <div className="flex gap-2">
             <Button onClick={addRow}>Add Row</Button>
-            <Button onClick={generateTable} variant="secondary">
-              Generate Table
+            <Button 
+              onClick={generateTable} 
+              variant="secondary" 
+              disabled={isJobOverrideMode && isCreatingOverride}
+            >
+              {isJobOverrideMode ? 'Create Override' : 'Generate Table'}
             </Button>
             <Button onClick={resetCurrentTable} variant="destructive">
               Reset
