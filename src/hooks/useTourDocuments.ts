@@ -84,7 +84,10 @@ export const useTourDocuments = (tourId: string) => {
         .from('tour-documents')
         .remove([document.file_path]);
 
-      if (storageError) throw storageError;
+      if (storageError) {
+        console.error('Storage delete error:', storageError);
+        // Continue with database deletion even if storage fails
+      }
 
       // Delete from database
       const { error: dbError } = await supabase
@@ -105,15 +108,38 @@ export const useTourDocuments = (tourId: string) => {
   });
 
   const getDocumentUrl = async (document: TourDocument) => {
-    const { data, error } = await supabase.storage
-      .from('tour-documents')
-      .createSignedUrl(document.file_path, 60);
+    try {
+      // First try to get a signed URL
+      const { data, error } = await supabase.storage
+        .from('tour-documents')
+        .createSignedUrl(document.file_path, 3600); // 1 hour expiry
 
-    if (error) throw error;
-    return data.signedUrl;
+      if (error) {
+        console.error('Signed URL error:', error);
+        // Fallback to public URL
+        const { data: publicUrlData } = supabase.storage
+          .from('tour-documents')
+          .getPublicUrl(document.file_path);
+        
+        return publicUrlData.publicUrl;
+      }
+
+      return data.signedUrl;
+    } catch (error) {
+      console.error('URL generation error:', error);
+      throw error;
+    }
   };
 
-  const canDelete = ['admin', 'management'].includes(userRole || '');
+  const canDelete = (document: TourDocument) => {
+    if (!user) return false;
+    
+    // User can delete their own documents
+    if (document.uploaded_by === user.id) return true;
+    
+    // Admins and management can delete any document
+    return ['admin', 'management'].includes(userRole || '');
+  };
 
   return {
     documents,

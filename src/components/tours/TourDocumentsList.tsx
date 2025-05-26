@@ -5,6 +5,7 @@ import { FileText, Download, Trash2, Eye, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { useTourDocuments } from "@/hooks/useTourDocuments";
 import { formatFileSize } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface TourDocumentsListProps {
   tourId: string;
@@ -19,29 +20,42 @@ export const TourDocumentsList = ({ tourId }: TourDocumentsListProps) => {
       window.open(url, '_blank');
     } catch (error) {
       console.error('Error viewing document:', error);
+      toast.error('Failed to view document');
     }
   };
 
   const handleDownload = async (document: any) => {
     try {
       const url = await getDocumentUrl(document);
+      
+      // Create a temporary link to trigger download
       const link = document.createElement('a');
       link.href = url;
       link.download = document.file_name;
+      link.target = '_blank';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      
+      toast.success('Download started');
     } catch (error) {
       console.error('Error downloading document:', error);
+      toast.error('Failed to download document');
     }
   };
 
   const handleDelete = async (document: any) => {
+    if (!canDelete(document)) {
+      toast.error('You do not have permission to delete this document');
+      return;
+    }
+
     if (confirm('Are you sure you want to delete this document?')) {
       try {
         await deleteDocument.mutateAsync(document);
       } catch (error) {
         console.error('Error deleting document:', error);
+        toast.error('Failed to delete document');
       }
     }
   };
@@ -97,13 +111,14 @@ export const TourDocumentsList = ({ tourId }: TourDocumentsListProps) => {
                 >
                   <Download className="h-4 w-4" />
                 </Button>
-                {canDelete && (
+                {canDelete(document) && (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => handleDelete(document)}
                     title="Delete"
                     className="text-destructive hover:text-destructive"
+                    disabled={deleteDocument.isPending}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
