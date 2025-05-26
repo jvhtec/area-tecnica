@@ -15,6 +15,7 @@ import { useTourWeightDefaults } from '@/hooks/useTourWeightDefaults';
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 import { useTourDateOverrides } from '@/hooks/useTourDateOverrides';
 import { Badge } from '@/components/ui/badge';
+import { useTourPowerDefaults } from '@/hooks/useTourPowerDefaults';
 
 // Database for sound components.
 const soundComponentDatabase = [
@@ -86,11 +87,12 @@ const PesosTool: React.FC = () => {
   const { data: jobs } = useJobSelection();
   const [searchParams] = useSearchParams();
   
-  // Tour context detection
+  // Tour context detection - ADD TOUR DEFAULTS MODE DETECTION
   const tourId = searchParams.get('tourId');
   const tourDateId = searchParams.get('tourDateId');
-  const mode = searchParams.get('mode'); // 'defaults' or 'override'
+  const mode = searchParams.get('mode');
   const isDefaults = mode === 'defaults';
+  const isTourDefaults = mode === 'tour-defaults'; // NEW: Tour defaults mode
   const isTourContext = !!tourId;
   const isTourDateContext = !!tourDateId;
 
@@ -375,6 +377,37 @@ const PesosTool: React.FC = () => {
     }
   };
 
+  // NEW: Save as tour defaults for global tour use
+  const saveAsTourDefaults = async (table: Table) => {
+    if (!tourId) return;
+
+    try {
+      // Save the table as a tour default using the tour weight defaults hook
+      const { createDefault } = useTourWeightDefaults(tourId);
+      
+      await createDefault({
+        tour_id: tourId,
+        item_name: table.name,
+        weight_kg: table.totalWeight || 0,
+        quantity: 1,
+        category: 'rigging',
+        department: 'sound'
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Tour default saved successfully',
+      });
+    } catch (error: any) {
+      console.error('Error saving tour default:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save tour default',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const saveAsOverride = async (table: Table) => {
     // Job-based override mode
     if (isJobOverrideMode && selectedJob?.tour_date_id) {
@@ -470,7 +503,18 @@ const PesosTool: React.FC = () => {
     // For grouping cable pick later, assign a new clusterId for this generation.
     const newClusterId = Date.now().toString();
 
-    if (isDefaults) {
+    // NEW: Handle tour defaults mode
+    if (isTourDefaults) {
+      const newTable: Table = {
+        name: tableName,
+        rows: calculatedRows,
+        totalWeight,
+        id: Date.now(),
+        clusterId: newClusterId,
+      };
+      setTables((prev) => [...prev, newTable]);
+      saveAsTourDefaults(newTable);
+    } else if (isDefaults) {
       // In defaults mode, just save a simple table
       const newTable: Table = {
         name: tableName,
@@ -657,7 +701,18 @@ const PesosTool: React.FC = () => {
             <CardTitle className="text-2xl font-bold">
               Weight Calculator
             </CardTitle>
-            {isDefaults && (
+            {/* NEW: Tour defaults mode indicator */}
+            {isTourDefaults && (
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                  Tour Defaults Mode
+                </Badge>
+                <p className="text-sm text-muted-foreground">
+                  Creating defaults for: <span className="font-medium">{tourName}</span>
+                </p>
+              </div>
+            )}
+            {isDefaults && !isTourDefaults && (
               <p className="text-sm text-muted-foreground mt-1">
                 Managing defaults for: <span className="font-medium">{tourName}</span>
               </p>
@@ -668,7 +723,7 @@ const PesosTool: React.FC = () => {
                 <p className="font-medium">{tourDateInfo.date} - {tourDateInfo.location}</p>
               </div>
             )}
-            {isTourContext && !isDefaults && !isTourDateContext && (
+            {isTourContext && !isDefaults && !isTourDateContext && !isTourDefaults && (
               <p className="text-sm text-muted-foreground mt-1">
                 Creating weight requirements for tour: <span className="font-medium">{tourName}</span>
               </p>
@@ -700,6 +755,21 @@ const PesosTool: React.FC = () => {
             </div>
           )}
 
+          {/* NEW: Tour defaults mode notification */}
+          {isTourDefaults && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-green-500 rounded-full"></div>
+                <p className="text-sm font-medium text-green-900">
+                  Tour Defaults Mode Active
+                </p>
+              </div>
+              <p className="text-sm text-green-700 mt-1">
+                Any tables you create will be saved as global defaults for this tour. These defaults will apply to all tour dates unless specifically overridden.
+              </p>
+            </div>
+          )}
+
           {/* Tour date override notification */}
           {isTourDateContext && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -715,7 +785,7 @@ const PesosTool: React.FC = () => {
             </div>
           )}
 
-          {isDefaults && (
+          {isDefaults && !isTourDefaults && (
             <div className="space-y-2">
               <Label htmlFor="setName">Default Set Name</Label>
               <Input
@@ -727,7 +797,8 @@ const PesosTool: React.FC = () => {
             </div>
           )}
 
-          {!isTourContext && (
+          {/* NEW: Don't show job selection in tour defaults mode */}
+          {!isTourContext && !isTourDefaults && (
             <div className="space-y-2">
               <Label htmlFor="jobSelect">Select Job</Label>
               <Select value={selectedJobId} onValueChange={handleJobSelect}>
@@ -747,16 +818,16 @@ const PesosTool: React.FC = () => {
 
           <div className="space-y-2">
             <Label htmlFor="tableName">
-              {isDefaults ? 'Weight Default Name' : 'Table Name'}
+              {isDefaults || isTourDefaults ? 'Weight Default Name' : 'Table Name'}
             </Label>
             <Input
               id="tableName"
               value={tableName}
               onChange={(e) => setTableName(e.target.value)}
-              placeholder={isDefaults ? "Enter default name (e.g., K2 Array)" : "Enter table name"}
+              placeholder={isDefaults || isTourDefaults ? "Enter default name (e.g., K2 Array)" : "Enter table name"}
             />
             
-            {!isDefaults && (
+            {!isDefaults && !isTourDefaults && (
               <>
                 <div className="flex items-center space-x-2 mt-2">
                   <Checkbox
@@ -856,12 +927,12 @@ const PesosTool: React.FC = () => {
           <div className="flex gap-2">
             <Button onClick={addRow}>Add Row</Button>
             <Button onClick={generateTable} variant="secondary">
-              {isDefaults ? 'Save Default' : 'Generate Table'}
+              {isDefaults ? 'Save Default' : isTourDefaults ? 'Save Tour Default' : 'Generate Table'}
             </Button>
             <Button onClick={resetCurrentTable} variant="destructive">
               Reset
             </Button>
-            {tables.length > 0 && !isDefaults && !isTourContext && (
+            {tables.length > 0 && !isDefaults && !isTourContext && !isTourDefaults && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
                 <FileText className="w-4 h-4" />
                 Export &amp; Upload PDF

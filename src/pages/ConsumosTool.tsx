@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +13,7 @@ import { useTourPowerDefaults } from '@/hooks/useTourPowerDefaults';
 import { useTourDateOverrides } from '@/hooks/useTourDateOverrides';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
 
 const soundComponentDatabase = [
@@ -58,6 +57,12 @@ const ConsumosTool: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
+  const [searchParams] = useSearchParams();
+
+  // NEW: Add tour defaults mode detection
+  const tourId = searchParams.get('tourId');
+  const mode = searchParams.get('mode');
+  const isTourDefaults = mode === 'tour-defaults';
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<any>(null);
@@ -68,11 +73,13 @@ const ConsumosTool: React.FC = () => {
 
   // Tour override detection
   const isJobOverrideMode = Boolean(selectedJob?.tour_date_id);
-  const tourId = selectedJob?.tour_date?.tour?.id;
   const tourDateId = selectedJob?.tour_date_id;
 
+  // NEW: Get tour name for tour defaults mode
+  const [tourName, setTourName] = useState<string>('');
+
   // Tour-specific hooks
-  const { powerDefaults: tourDefaults = [] } = useTourPowerDefaults(tourId || '');
+  const { powerDefaults: tourDefaults = [], createDefault: createTourDefault } = useTourPowerDefaults(tourId || '');
   const { 
     powerOverrides = [],
     createPowerOverride,
@@ -164,6 +171,36 @@ const ConsumosTool: React.FC = () => {
       toast({
         title: "Error",
         description: "Failed to save power requirement table",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // NEW: Save as tour defaults
+  const saveTourDefault = async (table: Table) => {
+    if (!tourId) return;
+
+    try {
+      await createTourDefault({
+        tour_id: tourId,
+        table_name: table.name,
+        total_watts: table.totalWatts || 0,
+        current_per_phase: table.currentPerPhase || 0,
+        pdu_type: table.customPduType || table.pduType || '',
+        custom_pdu_type: table.customPduType,
+        includes_hoist: table.includesHoist || false,
+        department: 'sound'
+      });
+
+      toast({
+        title: "Success",
+        description: "Tour default saved successfully",
+      });
+    } catch (error: any) {
+      console.error('Error saving tour default:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save tour default",
         variant: "destructive"
       });
     }
@@ -277,8 +314,10 @@ const ConsumosTool: React.FC = () => {
 
     setTables((prev) => [...prev, newTable]);
 
-    // Save based on mode
-    if (isJobOverrideMode) {
+    // NEW: Save based on mode - tour defaults mode
+    if (isTourDefaults) {
+      await saveTourDefault(newTable);
+    } else if (isJobOverrideMode) {
       await saveTourOverride(newTable);
     } else if (selectedJobId) {
       await savePowerRequirementTable(newTable);
@@ -377,6 +416,25 @@ const ConsumosTool: React.FC = () => {
     }
   };
 
+  // NEW: Load tour name for display
+  useEffect(() => {
+    const fetchTourInfo = async () => {
+      if (tourId) {
+        const { data } = await supabase
+          .from('tours')
+          .select('name')
+          .eq('id', tourId)
+          .single();
+        
+        if (data) {
+          setTourName(data.name);
+        }
+      }
+    };
+
+    fetchTourInfo();
+  }, [tourId]);
+
   // Convert tour defaults to display format
   const tourDefaultTables = tourDefaults.map(def => ({
     id: `default-${def.id}`,
@@ -428,6 +486,12 @@ const ConsumosTool: React.FC = () => {
           </Button>
           <div className="flex items-center gap-2">
             <CardTitle className="text-2xl font-bold">Power Calculator</CardTitle>
+            {/* NEW: Tour defaults mode indicator */}
+            {isTourDefaults && (
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                Tour Defaults
+              </Badge>
+            )}
             {isJobOverrideMode && (
               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                 Override
@@ -435,9 +499,35 @@ const ConsumosTool: React.FC = () => {
             )}
           </div>
         </div>
+        {/* NEW: Tour defaults mode description */}
+        {isTourDefaults && (
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">
+              Creating power defaults for tour: <span className="font-medium">{tourName}</span>
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              These defaults will apply to all tour dates unless specifically overridden
+            </p>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
+          {/* NEW: Tour defaults mode notification */}
+          {isTourDefaults && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-green-500 rounded-full"></div>
+                <p className="text-sm font-medium text-green-900">
+                  Tour Defaults Mode Active
+                </p>
+              </div>
+              <p className="text-sm text-green-700 mt-1">
+                Any tables you create will be saved as global defaults for this tour. These defaults will apply to all tour dates unless specifically overridden.
+              </p>
+            </div>
+          )}
+
           {isJobOverrideMode && tourInfo && (
             <TourOverrideModeHeader
               tourName={tourInfo.tourName}
@@ -468,7 +558,7 @@ const ConsumosTool: React.FC = () => {
             </Select>
           </div>
 
-          {!isJobOverrideMode && (
+          {!isJobOverrideMode && !isTourDefaults && (
             <div className="space-y-2">
               <Label htmlFor="jobSelect">Select Job</Label>
               <Select value={selectedJobId} onValueChange={handleJobSelect}>
@@ -505,9 +595,11 @@ const ConsumosTool: React.FC = () => {
           )}
 
           {/* Display tour default tables when in override mode */}
-          {isJobOverrideMode && tourDefaultTables.length > 0 && (
+          {(isJobOverrideMode || isTourDefaults) && tourDefaultTables.length > 0 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-blue-900">Tour Default Tables</h3>
+              <h3 className="text-lg font-semibold text-blue-900">
+                {isTourDefaults ? 'Existing Tour Defaults' : 'Tour Default Tables'}
+              </h3>
               {tourDefaultTables.map((table) => (
                 <div key={table.id} className="border rounded-lg overflow-hidden bg-blue-50/30">
                   <div className="bg-blue-100 px-4 py-3 flex justify-between items-center">
@@ -593,13 +685,13 @@ const ConsumosTool: React.FC = () => {
 
           <div className="space-y-2">
             <Label htmlFor="tableName">
-              Table Name {editingOverride && <span className="text-orange-600">(Editing Override)</span>}
+              {isTourDefaults ? 'Default Name' : 'Table Name'} {editingOverride && <span className="text-orange-600">(Editing Override)</span>}
             </Label>
             <Input
               id="tableName"
               value={tableName}
               onChange={(e) => setTableName(e.target.value)}
-              placeholder="Enter table name"
+              placeholder={isTourDefaults ? "Enter default name" : "Enter table name"}
             />
           </div>
 
@@ -655,14 +747,14 @@ const ConsumosTool: React.FC = () => {
             <Button 
               onClick={generateTable} 
               variant="secondary" 
-              disabled={isJobOverrideMode && isCreatingOverride}
+              disabled={(!isJobOverrideMode && !isTourDefaults) && isCreatingOverride}
             >
-              {editingOverride ? 'Update Override' : isJobOverrideMode ? 'Create Override' : 'Generate Table'}
+              {editingOverride ? 'Update Override' : isTourDefaults ? 'Save Tour Default' : isJobOverrideMode ? 'Create Override' : 'Generate Table'}
             </Button>
             <Button onClick={resetCurrentTable} variant="destructive">
               {editingOverride ? 'Cancel Edit' : 'Reset'}
             </Button>
-            {tables.length > 0 && (
+            {tables.length > 0 && !isTourDefaults && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
                 <FileText className="h-4 w-4" />
                 Export & Upload PDF
