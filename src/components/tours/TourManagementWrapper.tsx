@@ -36,9 +36,7 @@ export function TourManagementWrapper({ children }: TourManagementWrapperProps) 
     isError, 
     error, 
     refetch,
-    isPaused,
-    retryCount,
-    maxRetries = 3
+    isPaused
   } = useQuery({
     queryKey: ['tour', tourId],
     queryFn: async () => {
@@ -130,7 +128,7 @@ export function TourManagementWrapper({ children }: TourManagementWrapperProps) 
     );
   }
 
-  if (isError || retryCount >= maxRetries) {
+  if (isError) {
     return (
       <div className="flex flex-col items-center justify-center h-[50vh] max-w-md mx-auto text-center p-4">
         <AlertTriangle className="h-12 w-12 text-destructive mb-4" />

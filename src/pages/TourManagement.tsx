@@ -37,6 +37,7 @@ interface TourDate {
   id: string;
   date: string;
   location?: {
+    id: string;
     name: string;
   };
 }
@@ -93,6 +94,7 @@ const TourManagement = () => {
             id,
             date,
             location:locations (
+              id,
               name
             )
           `)
@@ -107,8 +109,15 @@ const TourManagement = () => {
         console.log("Tour data retrieved:", tourData);
         console.log("Tour dates retrieved:", datesData);
 
+        // Transform the data to match our TourDate interface
+        const transformedDates = datesData?.map(item => ({
+          id: item.id,
+          date: item.date,
+          location: Array.isArray(item.location) ? item.location[0] : item.location
+        })) || [];
+
         setTour(tourData);
-        setTourDates(datesData || []);
+        setTourDates(transformedDates);
       } catch (error: any) {
         console.error("Error fetching tour details:", error);
         toast({

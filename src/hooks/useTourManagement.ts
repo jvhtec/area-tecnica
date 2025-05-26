@@ -62,7 +62,15 @@ export function useTourManagement(tourId: string) {
         .order('date', { ascending: true });
 
       if (error) throw error;
-      return data as TourDate[];
+      
+      // Transform the data to match our TourDate interface
+      const transformedData = data?.map(item => ({
+        id: item.id,
+        date: item.date,
+        location: Array.isArray(item.location) ? item.location[0] : item.location
+      })) || [];
+
+      return transformedData as TourDate[];
     },
     enabled: !!tourId,
   });
