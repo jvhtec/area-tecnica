@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import {
   Dialog,
@@ -351,6 +350,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
 
   const [createdTourDateIds, setCreatedTourDateIds] = useState<string[]>([]);
   const [isCreatingFolders, setIsCreatingFolders] = useState(false);
+  const [isDeletingDate, setIsDeletingDate] = useState<string | null>(null);
 
   const { data: foldersExistenceMap } = useQuery({
     queryKey: ["flex-folders-existence", tourDates.map(d => d.id)],
@@ -635,9 +635,15 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
   };
 
   const handleDeleteDate = async (dateId: string) => {
+    if (isDeletingDate) return; // Prevent multiple simultaneous deletions
+    
+    setIsDeletingDate(dateId);
+    
     try {
       console.log("Starting deletion of tour date:", dateId);
 
+      // Step 1: Delete flex folders first
+      console.log("Deleting flex folders...");
       const { error: flexFoldersError } = await supabase
         .from("flex_folders")
         .delete()
@@ -648,57 +654,152 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
         throw flexFoldersError;
       }
 
+      // Step 2: Get all jobs for this tour date
+      console.log("Fetching jobs for tour date...");
       const { data: jobs, error: jobsError } = await supabase
         .from("jobs")
         .select("id")
         .eq("tour_date_id", dateId);
 
-      if (jobsError) throw jobsError;
+      if (jobsError) {
+        console.error("Error fetching jobs:", jobsError);
+        throw jobsError;
+      }
 
+      console.log("Found jobs to delete:", jobs);
+
+      // Step 3: Delete job-related data if jobs exist
       if (jobs && jobs.length > 0) {
         const jobIds = jobs.map(j => j.id);
+        console.log("Deleting job-related data for jobs:", jobIds);
 
-        const { error: assignmentsError } = await supabase
-          .from("job_assignments")
-          .delete()
-          .in("job_id", jobIds);
+        // Delete in the correct order to avoid foreign key constraints
+        const deletionSteps = [
+          // Task documents first
+          { table: "task_documents", condition: "sound_task_id", subquery: "sound_job_tasks" },
+          { table: "task_documents", condition: "lights_task_id", subquery: "lights_job_tasks" },
+          { table: "task_documents", condition: "video_task_id", subquery: "video_job_tasks" },
+          
+          // Tasks
+          { table: "sound_job_tasks", condition: "job_id" },
+          { table: "lights_job_tasks", condition: "job_id" },
+          { table: "video_job_tasks", condition: "job_id" },
+          
+          // Personnel
+          { table: "sound_job_personnel", condition: "job_id" },
+          { table: "lights_job_personnel", condition: "job_id" },
+          { table: "video_job_personnel", condition: "job_id" },
+          
+          // Other job-related tables
+          { table: "job_assignments", condition: "job_id" },
+          { table: "job_departments", condition: "job_id" },
+          { table: "job_documents", condition: "job_id" },
+          { table: "logistics_events", condition: "job_id" },
+          { table: "hoja_de_ruta", condition: "job_id" },
+          { table: "memoria_tecnica_documents", condition: "job_id" },
+          { table: "lights_memoria_tecnica_documents", condition: "job_id" },
+          { table: "video_memoria_tecnica_documents", condition: "job_id" },
+          { table: "job_date_types", condition: "job_id" },
+          { table: "job_milestones", condition: "job_id" },
+          { table: "power_requirement_tables", condition: "job_id" },
+          { table: "festival_artists", condition: "job_id" },
+          { table: "festival_gear_setups", condition: "job_id" },
+          { table: "festival_logos", condition: "job_id" },
+          { table: "festival_shifts", condition: "job_id" },
+          { table: "festival_settings", condition: "job_id" },
+          { table: "festival_stages", condition: "job_id" },
+          { table: "technician_work_records", condition: "job_id" },
+        ];
 
-        if (assignmentsError) throw assignmentsError;
+        for (const step of deletionSteps) {
+          console.log(`Deleting from ${step.table}...`);
+          
+          if (step.subquery) {
+            // Handle task documents which reference task IDs
+            const { data: taskIds } = await supabase
+              .from(step.subquery)
+              .select("id")
+              .in("job_id", jobIds);
+            
+            if (taskIds && taskIds.length > 0) {
+              const { error } = await supabase
+                .from(step.table)
+                .delete()
+                .in(step.condition, taskIds.map(t => t.id));
+              
+              if (error) {
+                console.error(`Error deleting from ${step.table}:`, error);
+                // Continue with other deletions even if one fails
+              }
+            }
+          } else {
+            // Direct deletion by job_id
+            const { error } = await supabase
+              .from(step.table)
+              .delete()
+              .in(step.condition, jobIds);
+            
+            if (error) {
+              console.error(`Error deleting from ${step.table}:`, error);
+              // Continue with other deletions even if one fails
+            }
+          }
+        }
 
-        const { error: departmentsError } = await supabase
-          .from("job_departments")
-          .delete()
-          .in("job_id", jobIds);
-
-        if (departmentsError) throw departmentsError;
-
+        // Finally delete the jobs themselves
+        console.log("Deleting jobs...");
         const { error: jobsDeleteError } = await supabase
           .from("jobs")
           .delete()
           .in("id", jobIds);
 
-        if (jobsDeleteError) throw jobsDeleteError;
+        if (jobsDeleteError) {
+          console.error("Error deleting jobs:", jobsDeleteError);
+          throw jobsDeleteError;
+        }
       }
 
+      // Step 4: Delete tour date overrides
+      console.log("Deleting tour date overrides...");
+      await Promise.all([
+        supabase.from("tour_date_power_overrides").delete().eq("tour_date_id", dateId),
+        supabase.from("tour_date_weight_overrides").delete().eq("tour_date_id", dateId)
+      ]);
+
+      // Step 5: Finally delete the tour date itself
+      console.log("Deleting tour date...");
       const { error: dateError } = await supabase
         .from("tour_dates")
         .delete()
         .eq("id", dateId);
 
-      if (dateError) throw dateError;
+      if (dateError) {
+        console.error("Error deleting tour date:", dateError);
+        throw dateError;
+      }
 
+      console.log("Tour date deletion completed successfully");
+
+      // Invalidate queries to refresh the UI
       await queryClient.invalidateQueries({ queryKey: ["tours"] });
+      await queryClient.invalidateQueries({ queryKey: ["tours-with-dates"] });
+      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      await queryClient.invalidateQueries({ queryKey: ["flex-folders-existence"] });
+
       toast({
         title: "Success",
         description: "Tour date deleted successfully"
       });
+
     } catch (error: any) {
       console.error("Error deleting date:", error);
       toast({
         title: "Error deleting date",
-        description: error.message,
+        description: error.message || "An unexpected error occurred while deleting the tour date",
         variant: "destructive",
       });
+    } finally {
+      setIsDeletingDate(null);
     }
   };
 
@@ -742,6 +843,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
             <div className="space-y-4">
               {tourDates?.map((dateObj) => {
                 const foldersExist = foldersExistenceMap?.[dateObj.id] || false;
+                const isDeleting = isDeletingDate === dateObj.id;
 
                 return (
                   <div key={dateObj.id} className="p-3 border rounded-lg">
@@ -805,6 +907,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
                             size="icon"
                             onClick={() => startEditing(dateObj)}
                             title="Edit Date"
+                            disabled={isDeleting}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -813,8 +916,14 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
                             size="icon"
                             onClick={() => handleDeleteDate(dateObj.id)}
                             title="Delete Date"
+                            disabled={isDeleting}
+                            className={isDeleting ? "opacity-50 cursor-not-allowed" : ""}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            {isDeleting ? (
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
                           </Button>
                         </div>
                       </div>
