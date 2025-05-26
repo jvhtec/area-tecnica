@@ -17,7 +17,7 @@ export const useTourDateRealtime = (tourId: string | null, tourDateIds: string[]
   // Subscribe to flex folders changes for the specific tour dates
   useRealtimeSubscription({
     table: 'flex_folders', 
-    queryKey: ['flex-folders-existence', tourDateIds],
+    queryKey: ['flex-folders-existence', ...tourDateIds],
     event: '*',
   });
 
