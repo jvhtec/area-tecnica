@@ -87,8 +87,7 @@ async function createFoldersForDate(
       );
     }
 
-    const formattedStartDate =
-      new Date(dateObj.date).toISOString().split(".")[0] + ".000Z";
+    const formattedStartDate = new Date(dateObj.date).toISOString().split(".")[0] + ".000Z";
     const formattedEndDate = formattedStartDate;
     const documentNumber = new Date(dateObj.date)
       .toISOString()
