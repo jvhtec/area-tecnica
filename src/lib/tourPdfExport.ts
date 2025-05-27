@@ -111,21 +111,19 @@ export const exportTourPDF = async (tour: any) => {
     footerTextY
   );
 
-  // Add Sector Pro logo and save PDF from within the logo loading promise
-  try {
-    await addSectorProLogo(pdf, pageWidth, pageHeight, tour.name);
-  } catch (error) {
-    console.warn('Error adding Sector Pro logo:', error);
-    // Save PDF even if logo fails to load
-    pdf.save(`${tour.name}_schedule.pdf`);
-  }
-};
-
-// Helper function to handle Sector Pro logo loading with proper async/await
-const addSectorProLogo = (pdf: jsPDF, pageWidth: number, pageHeight: number, tourName: string): Promise<void> => {
-  return new Promise((resolve, reject) => {
+  // Load and add Sector Pro logo, then save PDF
+  return new Promise<void>((resolve, reject) => {
     const logoImg = new Image();
     logoImg.crossOrigin = 'anonymous';
+    
+    const savePDF = () => {
+      try {
+        pdf.save(`${tour.name}_schedule.pdf`);
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    };
     
     logoImg.onload = () => {
       try {
@@ -137,31 +135,21 @@ const addSectorProLogo = (pdf: jsPDF, pageWidth: number, pageHeight: number, tou
         
         pdf.addImage(logoImg, 'PNG', xPosition, yPosition, logoWidth, logoHeight);
         console.log('Sector Pro logo added successfully at bottom center');
-        
-        // Save the PDF after logo is successfully added
-        pdf.save(`${tourName}_schedule.pdf`);
-        resolve();
       } catch (error) {
         console.warn('Error adding Sector Pro logo to PDF:', error);
-        // Save PDF even if there's an error adding the logo
-        pdf.save(`${tourName}_schedule.pdf`);
-        reject(error);
       }
+      savePDF();
     };
     
     logoImg.onerror = () => {
       console.warn('Could not load Sector Pro logo');
-      // Save PDF even if logo fails to load
-      pdf.save(`${tourName}_schedule.pdf`);
-      reject(new Error('Logo failed to load'));
+      savePDF();
     };
     
     // Set a timeout to avoid hanging indefinitely
     setTimeout(() => {
       console.warn('Sector Pro logo loading timed out');
-      // Save PDF even if logo loading times out
-      pdf.save(`${tourName}_schedule.pdf`);
-      reject(new Error('Logo loading timed out'));
+      savePDF();
     }, 5000);
     
     logoImg.src = '/sector pro logo.png';
