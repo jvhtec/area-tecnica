@@ -9,6 +9,7 @@ import CreateTourDialog from "../tours/CreateTourDialog";
 import { toast } from "@/hooks/use-toast";
 import { exportTourPDF } from "@/lib/tourPdfExport";
 import { format } from "date-fns";
+import { BulkTourFolderActions } from "../tours/BulkTourFolderActions";
 
 interface TourChipsProps {
   onTourClick: (tourId: string) => void;
@@ -19,7 +20,7 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
   const [isDatesDialogOpen, setIsDatesDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
-  const { data: tours = [] } = useQuery({
+  const { data: tours = [], refetch: refetchTours } = useQuery({
     queryKey: ["tours"],
     queryFn: async () => {
       console.log("Fetching tours...");
@@ -136,6 +137,11 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
           Create Tour
         </Button>
       </div>
+
+      <BulkTourFolderActions 
+        tours={tours} 
+        onRefresh={() => refetchTours()} 
+      />
 
       <div className="flex flex-wrap gap-4">
         {tours.map((tour: any) => (

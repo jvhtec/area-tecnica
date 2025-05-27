@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { createTourRootFolders, createTourDateFolders } from "@/utils/tourFolders";
 
 interface TourCardProps {
   tour: any;
@@ -71,84 +72,73 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
     }
   };
 
-  const handleCreateFlexFolders = async (e: React.MouseEvent) => {
+  const handleCreateTourRootFolders = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsMobileMenuOpen(false);
 
     if (tour.flex_folders_created) {
       toast({
-        title: "Folders already created",
-        description: "Flex folders have already been created for this tour.",
+        title: "Root folders already exist",
+        description: "Tour root folders have already been created for this tour.",
         variant: "destructive"
       });
       return;
     }
 
     try {
-      console.log("Creating flex folders for tour:", tour.id);
+      console.log("Creating tour root folders for tour:", tour.id);
       
-      // Get tour dates to create folders for each
-      const { data: tourDates, error: tourDatesError } = await supabase
-        .from("tour_dates")
-        .select("*")
-        .eq("tour_id", tour.id)
-        .order("date", { ascending: true });
+      const result = await createTourRootFolders(tour.id);
 
-      if (tourDatesError) {
-        console.error("Error fetching tour dates:", tourDatesError);
-        throw tourDatesError;
-      }
-
-      if (!tourDates || tourDates.length === 0) {
-        toast({
-          title: "No tour dates",
-          description: "Cannot create folders - no tour dates found.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Create folders for each tour date
-      for (const tourDate of tourDates) {
-        // Create a mock job object for the folder creation
-        const mockJob = {
-          id: `tour-${tour.id}-date-${tourDate.id}`,
-          title: `${tour.name} - ${format(new Date(tourDate.date), 'MMM d, yyyy')}`,
-          tour_id: tour.id,
-          tour_date_id: tourDate.id,
-          start_time: tourDate.date,
-          end_time: tourDate.date
-        };
-
-        const documentNumber = new Date(tourDate.date)
-          .toISOString()
-          .slice(2, 10)
-          .replace(/-/g, "");
-
-        const formattedDate = new Date(tourDate.date).toISOString().split(".")[0] + ".000Z";
-        
-        await createAllFoldersForJob(mockJob, formattedDate, formattedDate, documentNumber);
-      }
-
-      // Mark tour as having folders created
-      const { error: updateError } = await supabase
-        .from("tours")
-        .update({ flex_folders_created: true })
-        .eq("id", tour.id);
-
-      if (updateError) {
-        console.error("Error updating tour:", updateError);
-        throw updateError;
+      if (!result.success) {
+        throw new Error(result.error || "Failed to create tour root folders");
       }
 
       toast({
         title: "Success",
-        description: "Flex folders have been created for all tour dates."
+        description: "Tour root folders have been created successfully."
       });
     } catch (error: any) {
-      console.error("Error creating Flex folders:", error);
+      console.error("Error creating tour root folders:", error);
       toast({
-        title: "Error creating folders",
+        title: "Error creating tour root folders",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleCreateFlexFolders = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsMobileMenuOpen(false);
+
+    // Check if root folders exist first
+    if (!tour.flex_folders_created) {
+      toast({
+        title: "Root folders required",
+        description: "Please create tour root folders first before creating date folders.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      console.log("Creating tour date folders for tour:", tour.id);
+      
+      const result = await createTourDateFolders(tour.id);
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to create tour date folders");
+      }
+
+      toast({
+        title: "Success",
+        description: "Tour date folders have been created successfully."
+      });
+    } catch (error: any) {
+      console.error("Error creating tour date folders:", error);
+      toast({
+        title: "Error creating tour date folders",
         description: error.message,
         variant: "destructive"
       });
@@ -186,14 +176,28 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
         <Calendar className="h-4 w-4 mr-3" />
         <span>Manage Dates</span>
       </div>
+      {!tour.flex_folders_created && (
+        <div 
+          className="flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors"
+          onClick={handleCreateTourRootFolders}
+        >
+          <FolderPlus className="h-4 w-4 mr-3" />
+          <span>Create Tour Root Folders</span>
+        </div>
+      )}
       <div 
         className={`flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors ${
-          tour.flex_folders_created ? 'opacity-50 cursor-not-allowed' : ''
+          !tour.flex_folders_created ? 'opacity-50 cursor-not-allowed' : ''
         }`}
-        onClick={!tour.flex_folders_created ? handleCreateFlexFolders : undefined}
+        onClick={tour.flex_folders_created ? handleCreateFlexFolders : undefined}
       >
         <FolderPlus className="h-4 w-4 mr-3" />
-        <span>{tour.flex_folders_created ? "Folders Created" : "Create Flex Folders"}</span>
+        <span>
+          {!tour.flex_folders_created 
+            ? "Create Root Folders First" 
+            : "Create Date Folders"
+          }
+        </span>
       </div>
       <div 
         className="flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors"
@@ -287,12 +291,21 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
                     <Calendar className="h-4 w-4 mr-2" />
                     Manage Dates
                   </DropdownMenuItem>
+                  {!tour.flex_folders_created && (
+                    <DropdownMenuItem onClick={handleCreateTourRootFolders}>
+                      <FolderPlus className="h-4 w-4 mr-2" />
+                      Create Tour Root Folders
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem 
                     onClick={handleCreateFlexFolders}
-                    disabled={tour.flex_folders_created}
+                    disabled={!tour.flex_folders_created}
                   >
                     <FolderPlus className="h-4 w-4 mr-2" />
-                    {tour.flex_folders_created ? "Folders Created" : "Create Flex Folders"}
+                    {!tour.flex_folders_created 
+                      ? "Create Root Folders First" 
+                      : "Create Date Folders"
+                    }
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handlePrintClick}>
                     <Printer className="h-4 w-4 mr-2" />
@@ -342,10 +355,15 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
 
             {/* Status badges */}
             <div className="flex gap-2 flex-wrap">
-              {tour.flex_folders_created && (
+              {tour.flex_folders_created ? (
                 <Badge variant="secondary" className="text-xs">
                   <FileText className="h-3 w-3 mr-1" />
                   Flex Ready
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-xs border-orange-300 text-orange-700">
+                  <FolderPlus className="h-3 w-3 mr-1" />
+                  Needs Root Folders
                 </Badge>
               )}
               {logoUrl && (
