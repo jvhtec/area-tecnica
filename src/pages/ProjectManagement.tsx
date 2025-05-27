@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Plus, FileText, Filter } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Department } from "@/types/department";
-import { startOfMonth, endOfMonth, addMonths, isToday } from "date-fns";
+import { startOfMonth, endOfMonth, addMonths } from "date-fns";
 import { MonthNavigation } from "@/components/project-management/MonthNavigation";
 import { DepartmentTabs } from "@/components/project-management/DepartmentTabs";
 import { useJobManagement } from "@/hooks/useJobManagement";
@@ -21,7 +21,6 @@ const ProjectManagement = () => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [selectedJobType, setSelectedJobType] = useState("All");
   const [allJobTypes, setAllJobTypes] = useState<string[]>([]);
-  const [highlightToday, setHighlightToday] = useState(false);
   const { forceSubscribe } = useSubscriptionContext();
 
   const startDate = startOfMonth(currentDate);
@@ -48,24 +47,6 @@ const ProjectManagement = () => {
     if (selectedJobType === "All") return true;
     return job.job_type?.toLowerCase() === selectedJobType.toLowerCase();
   });
-
-  // Highlight today's jobs when page loads
-  useEffect(() => {
-    if (!loading && jobs.length > 0) {
-      const todayJobs = jobs.filter((job: any) => {
-        const jobStart = new Date(job.start_time);
-        const jobEnd = new Date(job.end_time);
-        const today = new Date();
-        return today >= jobStart && today <= jobEnd;
-      });
-
-      if (todayJobs.length > 0) {
-        setHighlightToday(true);
-        // Remove highlight after 3 seconds
-        setTimeout(() => setHighlightToday(false), 3000);
-      }
-    }
-  }, [loading, jobs]);
 
   // Check user access and fetch profile role.
   useEffect(() => {
@@ -194,7 +175,6 @@ const ProjectManagement = () => {
             jobsLoading={jobsLoading}
             onDeleteDocument={handleDeleteDocument}
             userRole={userRole}
-            highlightToday={highlightToday}
           />
         </CardContent>
       </Card>

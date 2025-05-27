@@ -1,23 +1,22 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Department } from "@/types/department";
 import { useJobs } from "@/hooks/useJobs";
-import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
-import { useUserPreferences } from "@/hooks/useUserPreferences";
-import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
-import { supabase } from "@/lib/supabase";
-import { useDashboardSubscriptions } from "@/hooks/useUnifiedSubscriptions";
-import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { DashboardContent } from "@/components/dashboard/DashboardContent";
+import { format, isWithinInterval, addWeeks, addMonths, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { TourChips } from "@/components/dashboard/TourChips";
 import { MessageSquare, Send, ChevronDown, ChevronUp } from "lucide-react";
 import { MessagesList } from "@/components/messages/MessagesList";
 import { DirectMessagesList } from "@/components/messages/DirectMessagesList";
 import { Button } from "@/components/ui/button";
 import { DirectMessageDialog } from "@/components/messages/DirectMessageDialog";
+import { DashboardContent } from "@/components/dashboard/DashboardContent";
+import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 
 const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
   if (!date || !jobs) return [];
@@ -38,30 +37,24 @@ const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
 };
 
 const Dashboard = () => {
-  // User data & preferences
+  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [timeSpan, setTimeSpan] = useState<string>("1week");
+  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [selectedDepartment, setSelectedDepartment] = useState<Department>("sound");
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [showTours, setShowTours] = useState(true);
   const [showMessages, setShowMessages] = useState(false);
-  
-  // Dashboard state
-  const [date, setDate] = useState<Date | undefined>(new Date());
-  const [timeSpan, setTimeSpan] = useState<string>("1week");
-  const [selectedDepartment, setSelectedDepartment] = useState<Department>("sound");
-  
-  // Modal state
-  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [newMessageDialogOpen, setNewMessageDialogOpen] = useState(false);
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [selectedJob, setSelectedJob] = useState<any>(null);
 
-  // Data fetching
   const { data: jobs, isLoading } = useJobs();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { forceSubscribe } = useSubscriptionContext();
-  useDashboardSubscriptions();
   
-  // Setup subscriptions
   useEffect(() => {
     forceSubscribe([
       'jobs', 
@@ -73,7 +66,6 @@ const Dashboard = () => {
     ]);
   }, [forceSubscribe]);
 
-  // Fetch user data
   useEffect(() => {
     const fetchUserRoleAndPrefs = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -105,7 +97,6 @@ const Dashboard = () => {
     fetchUserRoleAndPrefs();
   }, []);
 
-  // Event handlers
   const handleJobClick = (jobId: string) => {
     if (userRole === "logistics") return;
     setSelectedJobId(jobId);
@@ -119,14 +110,55 @@ const Dashboard = () => {
   };
 
   const handleDeleteClick = async (jobId: string) => {
-    console.log("Delete job called from Dashboard");
-    // This is handled by the JobCardNew component's delete functionality
+    if (userRole === "logistics") return;
+
+    if (!window.confirm("Are you sure you want to delete this job?")) return;
+
+    try {
+      console.log("Starting job deletion process for job:", jobId);
+
+      const { error: assignmentsError } = await supabase
+        .from("job_assignments")
+        .delete()
+        .eq("job_id", jobId);
+
+      if (assignmentsError) throw assignmentsError;
+
+      const { error: departmentsError } = await supabase
+        .from("job_departments")
+        .delete()
+        .eq("job_id", jobId);
+
+      if (departmentsError) throw departmentsError;
+
+      const { error: jobError } = await supabase
+        .from("jobs")
+        .delete()
+        .eq("job_id", jobId);
+
+      if (jobError) throw jobError;
+
+      toast({
+        title: "Job deleted successfully",
+        description: "The job and all related records have been removed.",
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    } catch (error: any) {
+      console.error("Error in deletion process:", error);
+      toast({
+        title: "Error deleting job",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDateTypeChange = () => {
-    console.log("Date type change called from Dashboard");
-    // This is handled by the CalendarSection component
-  };
+  const handleDateTypeChange = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+  }, [queryClient]);
+
+  const selectedDateJobs = getSelectedDateJobs(date, jobs);
 
   const handleToggleTours = async () => {
     const newValue = !showTours;
@@ -141,8 +173,6 @@ const Dashboard = () => {
       }
     }
   };
-
-  const selectedDateJobs = getSelectedDateJobs(date, jobs);
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-8">

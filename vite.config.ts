@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   define: {
-    'import.meta.env.VITE_APP_VERSION': JSON.stringify('1.0RTM'),
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify('0.9b'),
   },
   build: {
     sourcemap: true,

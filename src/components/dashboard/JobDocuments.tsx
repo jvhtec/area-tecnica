@@ -4,11 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Download, Trash2, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/lib/supabase";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Department } from "@/types/department";
 import { SubscriptionIndicator } from "../ui/subscription-indicator";
 import { useEffect, useState } from "react";
-import { useTableSubscription } from "@/hooks/useTableSubscription";
+import { useTableSubscription } from "@/hooks/useSubscription";
 
 interface JobDocument {
   id: string;
@@ -30,6 +30,7 @@ export const JobDocuments = ({
   department,
   onDeleteDocument 
 }: JobDocumentsProps) => {
+  const { toast } = useToast();
   const [localDocuments, setLocalDocuments] = useState<JobDocument[]>(documents);
   
   // Set up real-time subscription
@@ -62,13 +63,16 @@ export const JobDocuments = ({
       window.document.body.removeChild(downloadLink);
       window.URL.revokeObjectURL(url);
 
-      toast.success("Download started", {
-        description: "Your file download has started."
+      toast({
+        title: "Download started",
+        description: "Your file download has started.",
       });
     } catch (error: any) {
       console.error('Download error:', error);
-      toast.error("Download failed", {
-        description: error.message
+      toast({
+        title: "Download failed",
+        description: error.message,
+        variant: "destructive",
       });
     }
   };
@@ -89,8 +93,10 @@ export const JobDocuments = ({
       window.open(signedUrl, '_blank');
     } catch (error: any) {
       console.error('View error:', error);
-      toast.error("View failed", {
-        description: error.message
+      toast({
+        title: "View failed",
+        description: error.message,
+        variant: "destructive",
       });
     }
   };

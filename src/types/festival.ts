@@ -11,7 +11,6 @@ export interface WirelessSetup {
   quantity_bp?: number;
   band?: string;
   notes?: string;
-  provided_by?: 'festival' | 'band';
 }
 
 export interface FestivalGearSetup {

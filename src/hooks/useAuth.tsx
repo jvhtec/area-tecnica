@@ -13,17 +13,11 @@ interface AuthContextType {
   userRole: string | null;
   userDepartment: string | null;
   isLoading: boolean;
-  isInitialized: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
   signUp: (userData: SignUpData) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<Session | null>;
-  setUserRole: (role: string | null) => void;
-  setUserDepartment: (department: string | null) => void;
-  // Expose cache utilities for debugging/monitoring
-  clearCache: () => void;
-  getCacheStatus: () => { hasCache: boolean; cacheAge: number; isValid: boolean };
 }
 
 interface SignUpData {
@@ -56,9 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [idleTime, setIdleTime] = useState(0);
   const tokenManager = TokenManager.getInstance();
 
   // Fetch user profile with proper error handling
@@ -66,7 +58,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('role, department')
+        .select('*')
         .eq('id', userId)
         .maybeSingle();
 
@@ -82,41 +74,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // Memoized session getter to prevent redundant calls using cache
-  const getSessionOnce = useCallback(async () => {
-    if (isInitialized) return session;
-    
-    try {
-      // Use cached session from TokenManager
-      const currentSession = await tokenManager.getCachedSession();
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      
-      // Fetch user role if session exists
-      if (currentSession?.user?.id) {
-        const profileData = await fetchUserProfile(currentSession.user.id);
-        if (profileData) {
-          setUserRole(profileData.role);
-          setUserDepartment(profileData.department);
-        }
-      }
-      
-      setIsInitialized(true);
-      return currentSession;
-    } catch (error) {
-      console.error("Error getting session:", error);
-      setIsInitialized(true);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [session, isInitialized, tokenManager, fetchUserProfile]);
-
   // Advanced and safe session refresh with proper error handling
   const refreshSession = useCallback(async (): Promise<Session | null> => {
     try {
       console.log("Starting session refresh");
-      setIdleTime(0);
       
       // Use the token manager to handle refresh
       const { session: refreshedSession, error } = await tokenManager.refreshToken();
@@ -168,69 +129,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return null;
     }
   }, [fetchUserProfile, navigate, user, tokenManager, toast, refreshSubscriptions, invalidateQueries]);
-
-  // Initialize session on mount
-  useEffect(() => {
-    if (!isInitialized) {
-      getSessionOnce();
-    }
-  }, [getSessionOnce, isInitialized]);
-
-  // Listen for auth changes
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, newSession) => {
-        console.log("Auth state changed:", event);
-        setSession(newSession);
-        setUser(newSession?.user ?? null);
-        
-        // Fetch user role for new session
-        if (newSession?.user?.id) {
-          fetchUserProfile(newSession.user.id).then((profileData) => {
-            if (profileData) {
-              setUserRole(profileData.role);
-              setUserDepartment(profileData.department);
-            }
-          });
-        } else {
-          setUserRole(null);
-          setUserDepartment(null);
-        }
-        
-        setIsLoading(false);
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, [fetchUserProfile]);
-
-  // Idle time management
-  useEffect(() => {
-    const idleInterval = setInterval(() => {
-      setIdleTime((prevIdleTime) => prevIdleTime + 1);
-    }, 60000);
-
-    return () => clearInterval(idleInterval);
-  }, []);
-
-  useEffect(() => {
-    if (idleTime >= 15) {
-      refreshSession();
-      setIdleTime(0);
-    }
-  }, [idleTime, refreshSession]);
-
-  // Periodic session refresh
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      if (session?.user?.id) {
-        console.log("Periodic session refresh");
-        await refreshSession();
-      }
-    }, 4 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [refreshSession, session]);
 
   // Login function
   const login = async (email: string, password: string) => {
@@ -379,6 +277,76 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => clearTimeout(refreshTimer);
   }, [session, refreshSession, tokenManager]);
 
+  // Initial session setup and auth state subscription
+  useEffect(() => {
+    let subscription: { unsubscribe: () => void } | null = null;
+    
+    const setupSession = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Get initial session
+        const initialSession = await tokenManager.getSession();
+        
+        if (initialSession) {
+          setSession(initialSession);
+          setUser(initialSession.user);
+          
+          const profile = await fetchUserProfile(initialSession.user.id);
+          if (profile) {
+            setUserRole(profile.role);
+            setUserDepartment(profile.department);
+          }
+        }
+        
+        // Set up the auth state change listener
+        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+          async (event, authStateSession) => {
+            console.log("Auth state changed:", event);
+            
+            if (authStateSession) {
+              setSession(authStateSession);
+              setUser(authStateSession.user);
+              
+              const profile = await fetchUserProfile(authStateSession.user.id);
+              if (profile) {
+                setUserRole(profile.role);
+                setUserDepartment(profile.department);
+              }
+              
+              // Refresh subscriptions for new user context
+              refreshSubscriptions();
+            } else {
+              setSession(null);
+              setUser(null);
+              setUserRole(null);
+              setUserDepartment(null);
+              
+              if (event === 'SIGNED_OUT') {
+                navigate('/auth');
+              }
+            }
+          }
+        );
+        
+        subscription = authSubscription;
+      } catch (error: any) {
+        console.error("Error in session setup:", error);
+        setError(error.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    setupSession();
+    
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
+  }, [navigate, fetchUserProfile, tokenManager, refreshSubscriptions]);
+
   // Network status monitoring
   useEffect(() => {
     const handleOnline = () => {
@@ -414,18 +382,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     userRole,
     userDepartment,
     isLoading,
-    isInitialized,
     error,
     login,
     signUp,
     logout,
     refreshSession,
-    setUserRole,
-    setUserDepartment,
-    getSessionOnce,
-    // Expose cache utilities for debugging/monitoring
-    clearCache: tokenManager.clearCache.bind(tokenManager),
-    getCacheStatus: tokenManager.getCacheStatus.bind(tokenManager)
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

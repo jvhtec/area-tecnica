@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +9,7 @@ import { format, isValid, parseISO } from "date-fns";
 import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
 import { FestivalScheduling } from "@/components/festival/scheduling/FestivalScheduling";
 import { PrintOptionsDialog, PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuthSession } from "@/hooks/auth/useAuthSession";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 
 interface FestivalJob {
@@ -54,7 +53,7 @@ const FestivalManagement = () => {
   const [jobDates, setJobDates] = useState<Date[]>([]);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
-  const { userRole } = useAuth();
+  const { userRole } = useAuthSession();
   const [maxStages, setMaxStages] = useState(1);
 
   const isSchedulingRoute = location.pathname.includes('/scheduling');

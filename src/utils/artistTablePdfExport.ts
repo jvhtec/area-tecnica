@@ -195,44 +195,13 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
           const wirelessSummary = getWirelessSummary(row.technical.wireless);
           const iemSummary = getIEMSummary(row.technical.iem);
           
-          // Get provider information from each system if available
-          let wirelessProviderInfo = '';
-          if (row.technical.wireless.systems && row.technical.wireless.systems.length > 0) {
-            const providers = new Set<string>();
-            row.technical.wireless.systems.forEach(system => {
-              if (system.provided_by) {
-                providers.add(system.provided_by);
-              } else if (row.technical.wireless.providedBy) {
-                providers.add(row.technical.wireless.providedBy);
-              }
-            });
-            wirelessProviderInfo = Array.from(providers).join('/') || row.technical.wireless.providedBy || 'festival';
-          } else {
-            wirelessProviderInfo = row.technical.wireless.providedBy || 'festival';
-          }
-          
-          let iemProviderInfo = '';
-          if (row.technical.iem.systems && row.technical.iem.systems.length > 0) {
-            const providers = new Set<string>();
-            row.technical.iem.systems.forEach(system => {
-              if (system.provided_by) {
-                providers.add(system.provided_by);
-              } else if (row.technical.iem.providedBy) {
-                providers.add(row.technical.iem.providedBy);
-              }
-            });
-            iemProviderInfo = Array.from(providers).join('/') || row.technical.iem.providedBy || 'festival';
-          } else {
-            iemProviderInfo = row.technical.iem.providedBy || 'festival';
-          }
-          
           return [
             row.name,
             `Stage ${row.stage}`,
             `${row.time.start}-${row.time.end}`,
             `FOH: ${row.technical.fohConsole.model}\n(${row.technical.fohConsole.providedBy})\n\nMON: ${row.technical.monConsole.model}\n(${row.technical.monConsole.providedBy})`,
             `FOH: ${row.technical.fohTech ? 'Y' : 'N'}\nMON: ${row.technical.monTech ? 'Y' : 'N'}`,
-            `Wireless:\nHH: ${wirelessSummary.hh} (${wirelessProviderInfo})\nBP: ${wirelessSummary.bp}\n\nIEM:\nCH: ${iemSummary.channels}\nBP: ${iemSummary.bodypacks} (${iemProviderInfo})`,
+            `Wireless:\nHH: ${wirelessSummary.hh} (${row.technical.wireless.providedBy})\nBP: ${wirelessSummary.bp}\n\nIEM:\nCH: ${iemSummary.channels}\nBP: ${iemSummary.bodypacks} (${row.technical.iem.providedBy})`,
             row.technical.monitors.enabled ? `Monitors: ${row.technical.monitors.quantity}` : '-',
             [
               row.extras.sideFill ? 'SF' : '',

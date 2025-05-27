@@ -1438,7 +1438,6 @@ export type Database = {
         Row: {
           assigned_at: string
           assigned_by: string | null
-          assignment_source: string | null
           job_id: string
           lights_role: string | null
           response_time: string | null
@@ -1450,7 +1449,6 @@ export type Database = {
         Insert: {
           assigned_at?: string
           assigned_by?: string | null
-          assignment_source?: string | null
           job_id: string
           lights_role?: string | null
           response_time?: string | null
@@ -1462,7 +1460,6 @@ export type Database = {
         Update: {
           assigned_at?: string
           assigned_by?: string | null
-          assignment_source?: string | null
           job_id?: string
           lights_role?: string | null
           response_time?: string | null
@@ -2700,190 +2697,6 @@ export type Database = {
           },
         ]
       }
-      tour_assignments: {
-        Row: {
-          assigned_at: string
-          assigned_by: string | null
-          created_at: string
-          department: string
-          external_technician_name: string | null
-          id: string
-          notes: string | null
-          role: string
-          technician_id: string | null
-          tour_id: string
-          updated_at: string
-        }
-        Insert: {
-          assigned_at?: string
-          assigned_by?: string | null
-          created_at?: string
-          department: string
-          external_technician_name?: string | null
-          id?: string
-          notes?: string | null
-          role: string
-          technician_id?: string | null
-          tour_id: string
-          updated_at?: string
-        }
-        Update: {
-          assigned_at?: string
-          assigned_by?: string | null
-          created_at?: string
-          department?: string
-          external_technician_name?: string | null
-          id?: string
-          notes?: string | null
-          role?: string
-          technician_id?: string | null
-          tour_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tour_assignments_assigned_by_fkey"
-            columns: ["assigned_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tour_assignments_technician_id_fkey"
-            columns: ["technician_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tour_assignments_tour_id_fkey"
-            columns: ["tour_id"]
-            isOneToOne: false
-            referencedRelation: "tours"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      tour_date_power_overrides: {
-        Row: {
-          created_at: string | null
-          current_per_phase: number
-          custom_pdu_type: string | null
-          default_table_id: string | null
-          department: string | null
-          id: string
-          includes_hoist: boolean | null
-          override_data: Json | null
-          pdu_type: string
-          table_name: string
-          total_watts: number
-          tour_date_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          current_per_phase: number
-          custom_pdu_type?: string | null
-          default_table_id?: string | null
-          department?: string | null
-          id?: string
-          includes_hoist?: boolean | null
-          override_data?: Json | null
-          pdu_type: string
-          table_name: string
-          total_watts: number
-          tour_date_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          current_per_phase?: number
-          custom_pdu_type?: string | null
-          default_table_id?: string | null
-          department?: string | null
-          id?: string
-          includes_hoist?: boolean | null
-          override_data?: Json | null
-          pdu_type?: string
-          table_name?: string
-          total_watts?: number
-          tour_date_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tour_date_power_overrides_default_table_id_fkey"
-            columns: ["default_table_id"]
-            isOneToOne: false
-            referencedRelation: "tour_default_tables"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tour_date_power_overrides_tour_date_id_fkey"
-            columns: ["tour_date_id"]
-            isOneToOne: false
-            referencedRelation: "tour_dates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      tour_date_weight_overrides: {
-        Row: {
-          category: string | null
-          created_at: string | null
-          default_table_id: string | null
-          department: string | null
-          id: string
-          item_name: string
-          override_data: Json | null
-          quantity: number | null
-          tour_date_id: string
-          updated_at: string | null
-          weight_kg: number
-        }
-        Insert: {
-          category?: string | null
-          created_at?: string | null
-          default_table_id?: string | null
-          department?: string | null
-          id?: string
-          item_name: string
-          override_data?: Json | null
-          quantity?: number | null
-          tour_date_id: string
-          updated_at?: string | null
-          weight_kg: number
-        }
-        Update: {
-          category?: string | null
-          created_at?: string | null
-          default_table_id?: string | null
-          department?: string | null
-          id?: string
-          item_name?: string
-          override_data?: Json | null
-          quantity?: number | null
-          tour_date_id?: string
-          updated_at?: string | null
-          weight_kg?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tour_date_weight_overrides_default_table_id_fkey"
-            columns: ["default_table_id"]
-            isOneToOne: false
-            referencedRelation: "tour_default_tables"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tour_date_weight_overrides_tour_date_id_fkey"
-            columns: ["tour_date_id"]
-            isOneToOne: false
-            referencedRelation: "tour_dates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       tour_dates: {
         Row: {
           created_at: string
@@ -2926,129 +2739,6 @@ export type Database = {
           },
         ]
       }
-      tour_default_sets: {
-        Row: {
-          created_at: string
-          department: string | null
-          description: string | null
-          id: string
-          name: string
-          tour_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          department?: string | null
-          description?: string | null
-          id?: string
-          name: string
-          tour_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          department?: string | null
-          description?: string | null
-          id?: string
-          name?: string
-          tour_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tour_default_sets_tour_id_fkey"
-            columns: ["tour_id"]
-            isOneToOne: false
-            referencedRelation: "tours"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      tour_default_tables: {
-        Row: {
-          created_at: string
-          id: string
-          metadata: Json | null
-          set_id: string
-          table_data: Json
-          table_name: string
-          table_type: string
-          total_value: number
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          metadata?: Json | null
-          set_id: string
-          table_data: Json
-          table_name: string
-          table_type: string
-          total_value?: number
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          metadata?: Json | null
-          set_id?: string
-          table_data?: Json
-          table_name?: string
-          table_type?: string
-          total_value?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tour_default_tables_set_id_fkey"
-            columns: ["set_id"]
-            isOneToOne: false
-            referencedRelation: "tour_default_sets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      tour_documents: {
-        Row: {
-          file_name: string
-          file_path: string
-          file_size: number | null
-          file_type: string | null
-          id: string
-          tour_id: string
-          uploaded_at: string
-          uploaded_by: string | null
-        }
-        Insert: {
-          file_name: string
-          file_path: string
-          file_size?: number | null
-          file_type?: string | null
-          id?: string
-          tour_id: string
-          uploaded_at?: string
-          uploaded_by?: string | null
-        }
-        Update: {
-          file_name?: string
-          file_path?: string
-          file_size?: number | null
-          file_type?: string | null
-          id?: string
-          tour_id?: string
-          uploaded_at?: string
-          uploaded_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tour_documents_tour_id_fkey"
-            columns: ["tour_id"]
-            isOneToOne: false
-            referencedRelation: "tours"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       tour_logos: {
         Row: {
           content_type: string | null
@@ -3083,100 +2773,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "tour_logos_tour_id_fkey"
-            columns: ["tour_id"]
-            isOneToOne: false
-            referencedRelation: "tours"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      tour_power_defaults: {
-        Row: {
-          created_at: string | null
-          current_per_phase: number
-          custom_pdu_type: string | null
-          department: string | null
-          id: string
-          includes_hoist: boolean | null
-          pdu_type: string
-          table_name: string
-          total_watts: number
-          tour_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          current_per_phase: number
-          custom_pdu_type?: string | null
-          department?: string | null
-          id?: string
-          includes_hoist?: boolean | null
-          pdu_type: string
-          table_name: string
-          total_watts: number
-          tour_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          current_per_phase?: number
-          custom_pdu_type?: string | null
-          department?: string | null
-          id?: string
-          includes_hoist?: boolean | null
-          pdu_type?: string
-          table_name?: string
-          total_watts?: number
-          tour_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tour_power_defaults_tour_id_fkey"
-            columns: ["tour_id"]
-            isOneToOne: false
-            referencedRelation: "tours"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      tour_weight_defaults: {
-        Row: {
-          category: string | null
-          created_at: string | null
-          department: string | null
-          id: string
-          item_name: string
-          quantity: number | null
-          tour_id: string
-          updated_at: string | null
-          weight_kg: number
-        }
-        Insert: {
-          category?: string | null
-          created_at?: string | null
-          department?: string | null
-          id?: string
-          item_name: string
-          quantity?: number | null
-          tour_id: string
-          updated_at?: string | null
-          weight_kg: number
-        }
-        Update: {
-          category?: string | null
-          created_at?: string | null
-          department?: string | null
-          id?: string
-          item_name?: string
-          quantity?: number | null
-          tour_id?: string
-          updated_at?: string | null
-          weight_kg?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tour_weight_defaults_tour_id_fkey"
             columns: ["tour_id"]
             isOneToOne: false
             referencedRelation: "tours"
@@ -3411,10 +3007,6 @@ export type Database = {
       }
     }
     Functions: {
-      can_manage_users: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
       convert_to_timezone: {
         Args: { timestamp_val: string; target_timezone?: string }
         Returns: string
@@ -3422,14 +3014,6 @@ export type Database = {
       create_default_logistics_events_for_job: {
         Args: { job_id: string }
         Returns: undefined
-      }
-      get_current_user_role: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      is_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
       }
     }
     Enums: {

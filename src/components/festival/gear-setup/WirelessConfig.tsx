@@ -7,7 +7,6 @@ import { WirelessConfigProps } from "@/types/festival-gear";
 import { WirelessSetup } from "@/types/festival";
 import { EquipmentSelect } from "../form/shared/EquipmentSelect";
 import { WIRELESS_SYSTEMS, IEM_SYSTEMS } from "@/types/festival-equipment";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export const WirelessConfig = ({ 
   systems, 
@@ -22,8 +21,7 @@ export const WirelessConfig = ({
       quantity: 0,
       quantity_hh: 0,
       quantity_bp: 0,
-      band: '',
-      provided_by: 'festival' // Default to festival for new systems
+      band: ''
     };
     onChange([...systems, newSystem]);
   };
@@ -53,9 +51,6 @@ export const WirelessConfig = ({
             // For wireless systems, quantity is the sum of handhelds and bodypacks
             updatedSystem.quantity = (updatedSystem.quantity_hh || 0) + (updatedSystem.quantity_bp || 0);
           }
-        } else if (field === 'provided_by') {
-          // Ensure provided_by is strictly typed as 'festival' | 'band'
-          updatedSystem.provided_by = value as 'festival' | 'band';
         } else {
           // Handle non-numeric fields (model, band)
           updatedSystem[field as 'model' | 'band'] = value as string;
@@ -149,24 +144,6 @@ export const WirelessConfig = ({
               onChange={(e) => updateSystem(index, 'band', e.target.value)}
               placeholder="e.g., G50, H50"
             />
-          </div>
-          
-          <div>
-            <Label>Provided By</Label>
-            <RadioGroup
-              value={system.provided_by || 'festival'}
-              onValueChange={(value: 'festival' | 'band') => updateSystem(index, 'provided_by', value)}
-              className="flex space-x-4 mt-1"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="festival" id={`${index}-festival`} />
-                <Label htmlFor={`${index}-festival`}>Festival</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="band" id={`${index}-band`} />
-                <Label htmlFor={`${index}-band`}>Band</Label>
-              </div>
-            </RadioGroup>
           </div>
         </div>
       ))}

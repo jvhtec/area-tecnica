@@ -1,6 +1,5 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { JobCardNew } from "@/components/jobs/cards/JobCardNew";
+import { JobCardNew } from "@/components/dashboard/JobCardNew";
 
 interface LightsScheduleProps {
   date: Date | undefined;

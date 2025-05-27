@@ -1,19 +1,4 @@
-
-import { WirelessSetup, ConsoleSetup } from "./festival";
-
-export interface WirelessConfigProps {
-  systems: WirelessSetup[];
-  onChange: (systems: WirelessSetup[]) => void;
-  label: string;
-  includeQuantityTypes?: boolean;
-  isIEM?: boolean;
-}
-
-export interface ConsoleConfigProps {
-  consoles: ConsoleSetup[];
-  onChange: (consoles: ConsoleSetup[]) => void;
-  label: string;
-}
+import { ConsoleSetup, WirelessSetup } from "./festival";
 
 export interface GearSetupFormData {
   max_stages: number;
@@ -41,33 +26,50 @@ export interface GearSetupFormData {
 }
 
 export interface StageEquipmentConfigProps {
-  data: {
-    monitors_quantity: number;
-    extras_sf: boolean;
-    extras_df: boolean;
-    extras_djbooth: boolean;
-  };
-  onChange: (changes: Partial<{
-    monitors_quantity: number;
-    extras_sf: boolean;
-    extras_df: boolean;
-    extras_djbooth: boolean;
-  }>) => void;
+  data: Pick<GearSetupFormData,
+    'monitors_enabled' |
+    'monitors_quantity' |
+    'extras_sf' |
+    'extras_df' |
+    'extras_djbooth' |
+    'extras_wired'
+  >;
+  onChange: (changes: Partial<GearSetupFormData>) => void;
 }
 
 export interface InfrastructureConfigProps {
-  data: {
-    infra_cat6_quantity: number;
-    infra_hma_quantity: number;
-    infra_coax_quantity: number;
-    infra_analog: number;
-    infra_opticalcon_duo_quantity: number;
-  };
-  onChange: (changes: Partial<{
-    infra_cat6_quantity: number;
-    infra_hma_quantity: number;
-    infra_coax_quantity: number;
-    infra_analog: number;
-    infra_opticalcon_duo_quantity: number;
-  }>) => void;
+  data: Pick<GearSetupFormData,
+    'infra_cat6' |
+    'infra_cat6_quantity' |
+    'infra_hma' |
+    'infra_hma_quantity' |
+    'infra_coax' |
+    'infra_coax_quantity' |
+    'infra_opticalcon_duo' |
+    'infra_opticalcon_duo_quantity' |
+    'infra_analog' |
+    'other_infrastructure'
+  >;
+  onChange: (changes: Partial<GearSetupFormData>) => void;
+}
+
+export interface ConsoleConfigProps {
+  consoles: ConsoleSetup[];
+  onChange: (consoles: ConsoleSetup[]) => void;
+  label: string;
+}
+
+export interface StageSetup {
+  id: string;
+  name: string;
+  description?: string;
+  gear_setup_id: string;
+}
+
+export interface WirelessConfigProps {
+  systems: WirelessSetup[];
+  onChange: (systems: WirelessSetup[]) => void;
+  label: string;
+  includeQuantityTypes?: boolean;
+  isIEM?: boolean;
 }

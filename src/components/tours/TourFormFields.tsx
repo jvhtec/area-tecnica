@@ -1,9 +1,8 @@
-
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SimplifiedJobColorPicker } from "@/components/jobs/SimplifiedJobColorPicker";
-import { TourDateInputList } from "./TourDateInputList";
+import { TourDateForm } from "./TourDateForm";
 import { TourDepartmentSelector } from "./TourDepartmentSelector";
 import { Department } from "@/types/department";
 
@@ -92,7 +91,7 @@ export const TourFormFields = ({
         </div>
       </div>
 
-      <TourDateInputList
+      <TourDateForm
         dates={dates}
         onDateChange={onDateChange}
         onAddDate={onAddDate}

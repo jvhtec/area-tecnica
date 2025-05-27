@@ -1,9 +1,8 @@
+
 import { supabase } from '@/lib/supabase';
 import { exportArtistPDF, ArtistPdfData } from '../artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from '../artistTablePdfExport';
 import { exportShiftsTablePDF, ShiftsTablePdfData } from '../shiftsTablePdfExport';
-import { exportRfIemTablePDF, RfIemTablePdfData } from '../rfIemTablePdfExport';
-import { exportInfrastructureTablePDF, ArtistInfrastructureData } from '../infrastructureTablePdfExport';
 import { generateStageGearPDF } from '../gearSetupPdfExport';
 import { fetchLogoUrl } from './logoUtils';
 import { generateCoverPage } from './coverPageGenerator';
@@ -25,8 +24,6 @@ export const generateAndMergeFestivalPDFs = async (
   const shiftPdfs: Blob[] = [];
   const artistTablePdfs: Blob[] = [];
   const individualArtistPdfs: Blob[] = [];
-  let rfIemTablePdf: Blob | null = null;
-  let infrastructureTablePdf: Blob | null = null;
   
   try {
     const { data: artists, error: artistError } = await supabase
@@ -420,123 +417,16 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
-    // Generate RF & IEM table if option is selected
-    if (options.includeRfIemTable && artists && artists.length > 0) {
-      const filteredArtists = artists.filter(artist => 
-        options.rfIemTableStages.includes(Number(artist.stage))
-      );
-      
-      const sortedArtists = [...filteredArtists].sort((a, b) => {
-        if (a.stage < b.stage) return -1;
-        if (a.stage > b.stage) return 1;
-        
-        if (a.date < b.date) return -1;
-        if (a.date > b.date) return 1;
-        
-        return (a.name || '').localeCompare(b.name || '');
-      });
-      
-      console.log(`Generating RF & IEM table with ${sortedArtists.length} artists`);
-      
-      if (sortedArtists.length > 0) {
-        const rfIemData: RfIemTablePdfData = {
-          jobTitle,
-          logoUrl,
-          artists: sortedArtists.map(artist => {
-            return {
-              name: artist.name || 'Unnamed Artist',
-              stage: artist.stage || 1,
-              wirelessSystems: artist.wireless_systems || [],
-              iemSystems: artist.iem_systems || [],
-              wirelessProvidedBy: artist.wireless_provided_by || 'festival',
-              iemProvidedBy: artist.iem_provided_by || 'festival'
-            };
-          })
-        };
-        
-        try {
-          rfIemTablePdf = await exportRfIemTablePDF(rfIemData);
-          console.log(`Generated RF & IEM table PDF, size: ${rfIemTablePdf.size} bytes`);
-        } catch (err) {
-          console.error('Error generating RF & IEM table PDF:', err);
-        }
-      }
-    }
-    
-    // Generate Infrastructure table if option is selected
-    if (options.includeInfrastructureTable && artists && artists.length > 0) {
-      const filteredArtists = artists.filter(artist => 
-        options.infrastructureTableStages.includes(Number(artist.stage))
-      );
-      
-      const sortedArtists = [...filteredArtists].sort((a, b) => {
-        if (a.stage < b.stage) return -1;
-        if (a.stage > b.stage) return 1;
-        
-        if (a.date < b.date) return -1;
-        if (a.date > b.date) return 1;
-        
-        return (a.name || '').localeCompare(b.name || '');
-      });
-      
-      console.log(`Generating Infrastructure table with ${sortedArtists.length} artists`);
-      
-      if (sortedArtists.length > 0) {
-        const infrastructureData = {
-          jobTitle,
-          logoUrl,
-          artists: sortedArtists.map(artist => {
-            return {
-              name: artist.name || 'Unnamed Artist',
-              stage: artist.stage || 1,
-              providedBy: artist.infrastructure_provided_by || 'festival',
-              cat6: { 
-                enabled: Boolean(artist.infra_cat6 || false), 
-                quantity: Number(artist.infra_cat6_quantity || 0) 
-              },
-              hma: { 
-                enabled: Boolean(artist.infra_hma || false), 
-                quantity: Number(artist.infra_hma_quantity || 0) 
-              },
-              coax: { 
-                enabled: Boolean(artist.infra_coax || false), 
-                quantity: Number(artist.infra_coax_quantity || 0) 
-              },
-              opticalconDuo: { 
-                enabled: Boolean(artist.infra_opticalcon_duo || false), 
-                quantity: Number(artist.infra_opticalcon_duo_quantity || 0) 
-              },
-              analog: Number(artist.infra_analog || 0),
-              other: String(artist.other_infrastructure || '')
-            } as ArtistInfrastructureData;
-          })
-        };
-        
-        try {
-          infrastructureTablePdf = await exportInfrastructureTablePDF(infrastructureData);
-          console.log(`Generated Infrastructure table PDF, size: ${infrastructureTablePdf.size} bytes`);
-        } catch (err) {
-          console.error('Error generating Infrastructure table PDF:', err);
-        }
-      }
-    }
-    
     const tocSections = [];
     
-    if (options.includeShiftSchedules && shiftPdfs.length > 0) {
-      tocSections.push({ title: "Staff Shift Schedules", pageCount: shiftPdfs.length });
-    }
     if (options.includeGearSetup && gearPdfs.length > 0) {
       tocSections.push({ title: "Stage Equipment Setup", pageCount: gearPdfs.length });
     }
+    if (options.includeShiftSchedules && shiftPdfs.length > 0) {
+      tocSections.push({ title: "Staff Shift Schedules", pageCount: shiftPdfs.length });
+    }
     if (options.includeArtistTables && artistTablePdfs.length > 0) {
       tocSections.push({ title: "Artist Schedule Tables", pageCount: artistTablePdfs.length });
-    }
-    if (options.includeRfIemTable && rfIemTablePdf) {
-      tocSections.push({ title: "Artist RF & IEM Overview", pageCount: 1 });
-    }
-    if (options.includeInfrastructureTable && infrastructureTablePdf) {
-      tocSections.push({ title: "Infrastructure Needs Overview", pageCount: 1 });
     }
     if (options.includeArtistRequirements && individualArtistPdfs.length > 0) {
       tocSections.push({ title: "Individual Artist Requirements", pageCount: individualArtistPdfs.length });
@@ -547,16 +437,13 @@ export const generateAndMergeFestivalPDFs = async (
     const coverPage = await generateCoverPage(jobId, jobTitle, logoUrl);
     const tableOfContents = await generateTableOfContents(tocSections, logoUrl);
     
-    // Updated PDF order according to requirements
     const selectedPdfs = [
       coverPage,
       tableOfContents,
-      ...(options.includeShiftSchedules ? shiftPdfs : []),       // 1. Staff Shifts Schedule
-      ...(options.includeGearSetup ? gearPdfs : []),             // 2. Stage Equipment Setups
-      ...(options.includeArtistTables ? artistTablePdfs : []),   // 3. Artist Schedule Tables
-      ...(options.includeRfIemTable && rfIemTablePdf ? [rfIemTablePdf] : []),  // 4. RF and IEM Overview
-      ...(options.includeInfrastructureTable && infrastructureTablePdf ? [infrastructureTablePdf] : []),  // 5. Infrastructure Needs Overview
-      ...(options.includeArtistRequirements ? individualArtistPdfs : [])  // 6. Individual Artist Requirements
+      ...(options.includeGearSetup ? gearPdfs : []),
+      ...(options.includeShiftSchedules ? shiftPdfs : []),
+      ...(options.includeArtistTables ? artistTablePdfs : []),
+      ...(options.includeArtistRequirements ? individualArtistPdfs : [])
     ];
     
     console.log(`Total PDFs to merge: ${selectedPdfs.length}`);

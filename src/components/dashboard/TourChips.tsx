@@ -6,7 +6,7 @@ import { useState } from "react";
 import { TourDateManagementDialog } from "../tours/TourDateManagementDialog";
 import { TourCard } from "../tours/TourCard";
 import CreateTourDialog from "../tours/CreateTourDialog";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { exportTourPDF } from "@/lib/tourPdfExport";
 import { format } from "date-fns";
 
@@ -18,6 +18,7 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
   const [selectedTourId, setSelectedTourId] = useState<string | null>(null);
   const [isDatesDialogOpen, setIsDatesDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   const { data: tours = [] } = useQuery({
     queryKey: ["tours"],
@@ -62,8 +63,10 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
       console.log("Starting PDF export for tour:", tour.name);
       
       if (!tour.tour_dates || tour.tour_dates.length === 0) {
-        toast.error("Error", {
-          description: "No tour dates available to print"
+        toast({
+          title: "Error",
+          description: "No tour dates available to print",
+          variant: "destructive",
         });
         return;
       }
@@ -83,15 +86,13 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
       console.log("Generating PDF with:", {
         tourName: tour.name,
         dateSpan,
-        rows: rows,
-        tourId: tour.id
+        rows: rows
       });
 
       const pdfBlob = await exportTourPDF(
         tour.name,
         dateSpan,
-        rows,
-        tour.id // Pass the tourId to get the tour logo
+        rows
       );
       
       console.log("PDF generated successfully, creating download URL");
@@ -105,13 +106,16 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      toast.success("Success", {
-        description: "Tour schedule exported successfully"
+      toast({
+        title: "Success",
+        description: "Tour schedule exported successfully",
       });
     } catch (error: any) {
       console.error("Error exporting PDF:", error);
-      toast.error("Error", {
-        description: "Failed to export PDF: " + (error.message || "Unknown error")
+      toast({
+        title: "Error",
+        description: "Failed to export PDF: " + (error.message || "Unknown error"),
+        variant: "destructive",
       });
     }
   };
@@ -145,6 +149,7 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
           >
             <TourCard
               tour={tour}
+              onTourClick={() => onTourClick(tour.id)}
               onManageDates={() => handleManageDates(tour.id)}
               onPrint={() => handlePrint(tour)}
             />

@@ -1,17 +1,11 @@
 
-import { useEffect, useRef } from "react";
-import { checkNetworkConnection, getRealtimeConnectionStatus, ensureRealtimeConnection } from "@/lib/enhanced-supabase-client";
+import { useEffect } from "react";
+import { connectionRecovery } from "@/lib/connection-recovery-service";
 import { useQueryClient } from "@tanstack/react-query";
 import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
 import { useLocation } from "react-router-dom";
 import { useEnhancedRouteSubscriptions } from "@/hooks/useEnhancedRouteSubscriptions";
 import { toast } from "sonner";
-import { TokenManager } from "@/lib/token-manager";
-
-// Exponential backoff helper
-const calculateBackoff = (attempt: number, baseMs: number = 1000, maxMs: number = 30000): number => {
-  return Math.min(baseMs * Math.pow(2, attempt), maxMs);
-};
 
 /**
  * Component that initializes app-wide services when the application starts
@@ -21,91 +15,35 @@ const calculateBackoff = (attempt: number, baseMs: number = 1000, maxMs: number 
 export function AppInit() {
   const queryClient = useQueryClient();
   const location = useLocation();
-  const isInitialized = useRef(false);
-  const lastConnectionCheck = useRef(0);
-  const connectionCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const connectionAttempts = useRef(0);
   
-  // Initialize app services once
+  // Initialize the connection recovery service
   useEffect(() => {
-    if (isInitialized.current) return;
-    isInitialized.current = true;
-    
-    console.log('Initializing core services...');
-    
-    // Initialize token manager
-    const tokenManager = TokenManager.getInstance();
-    
-    // Initialize the subscription manager
+    connectionRecovery.startRecovery();
+    console.log('Connection recovery service initialized');
+  }, []);
+  
+  // Initialize the unified subscription manager
+  useEffect(() => {
     const manager = UnifiedSubscriptionManager.getInstance(queryClient);
     manager.setupVisibilityBasedRefetching();
     manager.setupNetworkStatusRefetching();
+    console.log('Unified subscription manager initialized');
     
-    // Subscribe to token refresh events
-    tokenManager.subscribe(() => {
-      console.log("Token refreshed, updating subscriptions");
-      manager.reestablishSubscriptions();
-    });
-    
-    // Set up periodic connection health check with exponential backoff
-    const checkConnectionHealth = async () => {
-      // Don't check too frequently
-      const now = Date.now();
-      if (now - lastConnectionCheck.current < 30000) return;
-      lastConnectionCheck.current = now;
-      
-      try {
-        // Get current connection status
-        const rtStatus = getRealtimeConnectionStatus();
-        const hasNetworkConnection = await checkNetworkConnection();
-        
-        // If realtime is disconnected but we have network, try to reconnect
-        if (rtStatus === 'DISCONNECTED' && hasNetworkConnection) {
-          console.log('Detected realtime disconnect with active network, attempting recovery');
-          
-          // Increment attempts for backoff calculation
-          connectionAttempts.current += 1;
-          
-          // Apply exponential backoff
-          const backoff = calculateBackoff(connectionAttempts.current - 1);
-          console.log(`Reconnection attempt ${connectionAttempts.current} with backoff: ${backoff}ms`);
-          
-          // Wait for backoff period
-          await new Promise(resolve => setTimeout(resolve, backoff));
-          
-          // Attempt reconnection
-          manager.reestablishSubscriptions();
-          
-          // Also check if token needs refresh
-          tokenManager.getSession(true).catch(err => {
-            console.error('Error refreshing session during recovery:', err);
-          });
-        } else if (rtStatus === 'CONNECTED') {
-          // Reset attempts counter when connected
-          connectionAttempts.current = 0;
-        }
-      } catch (error) {
-        console.error('Error in connection health check:', error);
+    // Set up a periodic health check for subscriptions
+    const healthCheckInterval = setInterval(() => {
+      const connectionStatus = manager.getConnectionStatus();
+      if (connectionStatus !== 'connected') {
+        console.log(`Connection status is ${connectionStatus}, attempting to reconnect`);
+        manager.reestablishSubscriptions();
       }
-    };
-    
-    // Set up health check interval
-    connectionCheckIntervalRef.current = setInterval(() => {
-      checkConnectionHealth().catch(err => {
-        console.error('Error in connection health check:', err);
-      });
     }, 60000); // Check every minute
     
-    // Return cleanup
     return () => {
-      if (connectionCheckIntervalRef.current) {
-        clearInterval(connectionCheckIntervalRef.current);
-        connectionCheckIntervalRef.current = null;
-      }
+      clearInterval(healthCheckInterval);
     };
   }, [queryClient]);
   
-  // Use the enhanced route subscriptions hook to manage subscriptions
+  // Use the enhanced route subscriptions hook to manage subscriptions based on the current route
   const subscriptionStatus = useEnhancedRouteSubscriptions();
   
   // Handle subscription staleness
@@ -128,54 +66,32 @@ export function AppInit() {
       
       // Force a refresh of all queries
       queryClient.invalidateQueries();
+      
+      // Notify the user that data is being refreshed
+      toast.info('Updating after inactivity', {
+        description: 'Refreshing data after returning to the page',
+      });
     }
   }, [subscriptionStatus.wasInactive, queryClient]);
   
-  // Handle route changes with improved subscription management
+  // Handle route changes
   useEffect(() => {
     // When route changes, check if the new route has all required subscriptions
     if (!subscriptionStatus.isFullySubscribed) {
-      console.log('Not fully subscribed to required tables for route:', location.pathname);
+      console.log('Not fully subscribed to required tables, checking what is missing');
       console.log('Missing tables:', subscriptionStatus.unsubscribedTables);
       
-      // Progressive retry with exponential backoff
-      const retrySubscriptions = (attempt: number) => {
-        if (attempt > 3) return; // Maximum 3 retry attempts
-        
-        const delay = calculateBackoff(attempt);
-        setTimeout(() => {
-          if (subscriptionStatus.unsubscribedTables.length > 0) {
-            console.log(`Retry ${attempt + 1}: Re-establishing subscriptions for:`, subscriptionStatus.unsubscribedTables);
-            subscriptionStatus.forceRefresh();
-            retrySubscriptions(attempt + 1);
-          }
-        }, delay);
-      };
+      // If there are missing subscriptions after a short delay, try to reestablish them
+      const delayTimeout = setTimeout(() => {
+        if (subscriptionStatus.unsubscribedTables.length > 0) {
+          console.log('Still missing subscriptions, attempting to resubscribe');
+          subscriptionStatus.forceRefresh();
+        }
+      }, 1000);
       
-      // Start retry process after initial delay
-      retrySubscriptions(0);
+      return () => clearTimeout(delayTimeout);
     }
   }, [location.pathname, subscriptionStatus]);
-  
-  // Listen for network reconnection events
-  useEffect(() => {
-    const handleOnline = () => {
-      console.log('Network connection restored');
-      ensureRealtimeConnection().then(success => {
-        if (success) {
-          queryClient.invalidateQueries();
-          toast.success('Connection restored', {
-            description: 'Network is back online, refreshing data'
-          });
-        }
-      });
-    };
-    
-    window.addEventListener('online', handleOnline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-    };
-  }, [queryClient]);
   
   // This component doesn't render anything
   return null;
