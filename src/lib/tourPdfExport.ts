@@ -64,8 +64,8 @@ export const exportTourPDF = async (tour: any) => {
     date.is_tour_pack_only ? 'Tour Pack Only' : 'Full Setup'
   ]);
 
-  // Calculate available space for table (leave more space for bottom logo)
-  const bottomMargin = 50; // Increased from 30 to 50 for better spacing
+  // Calculate available space for table (leave space for footer)
+  const bottomMargin = 60; // Increased space for footer and logo
   const availableHeight = pageHeight - startY - bottomMargin;
 
   // Add table with improved spacing
@@ -87,7 +87,7 @@ export const exportTourPDF = async (tour: any) => {
     },
     margin: { 
       top: startY, 
-      bottom: bottomMargin, // Ensure proper bottom margin
+      bottom: bottomMargin,
       left: 20, 
       right: 20 
     },
@@ -100,21 +100,21 @@ export const exportTourPDF = async (tour: any) => {
     }
   });
 
-  // Add footer with better positioning
+  // Add footer text
   const finalY = (pdf as any).lastAutoTable.finalY || startY + 100;
-  const footerY = Math.max(finalY + 20, pageHeight - 40); // Ensure footer doesn't overlap
+  const footerTextY = Math.max(finalY + 20, pageHeight - 50);
 
   pdf.setFontSize(10);
   pdf.setTextColor(128, 128, 128);
   pdf.text(
     `Generated on ${format(new Date(), 'dd/MM/yyyy HH:mm')}`,
     20,
-    footerY
+    footerTextY
   );
 
-  // Add Sector Pro logo at bottom right with proper async handling
+  // Add Sector Pro logo at bottom center
   try {
-    await addSectorProLogo(pdf, pageWidth, footerY);
+    await addSectorProLogo(pdf, pageWidth, pageHeight);
   } catch (error) {
     console.warn('Error adding Sector Pro logo:', error);
   }
@@ -124,15 +124,21 @@ export const exportTourPDF = async (tour: any) => {
 };
 
 // Helper function to handle Sector Pro logo loading with proper async/await
-const addSectorProLogo = (pdf: jsPDF, pageWidth: number, footerY: number): Promise<void> => {
-  return new Promise((resolve, reject) => {
+const addSectorProLogo = (pdf: jsPDF, pageWidth: number, pageHeight: number): Promise<void> => {
+  return new Promise((resolve) => {
     const logoImg = new Image();
     logoImg.crossOrigin = 'anonymous';
     
     logoImg.onload = () => {
       try {
-        pdf.addImage(logoImg, 'PNG', pageWidth - 60, footerY - 15, 40, 15);
-        console.log('Sector Pro logo added successfully');
+        // Position logo at bottom center
+        const logoWidth = 40;
+        const logoHeight = 15;
+        const xPosition = (pageWidth - logoWidth) / 2; // Center horizontally
+        const yPosition = pageHeight - 25; // 25 units from bottom
+        
+        pdf.addImage(logoImg, 'PNG', xPosition, yPosition, logoWidth, logoHeight);
+        console.log('Sector Pro logo added successfully at bottom center');
         resolve();
       } catch (error) {
         console.warn('Error adding Sector Pro logo to PDF:', error);
