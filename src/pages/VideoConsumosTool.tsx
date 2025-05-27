@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,8 +10,11 @@ import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
+import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
+import { Badge } from '@/components/ui/badge';
 
 const videoComponentDatabase = [
   { id: 1, name: 'Pantalla Central', watts: 700 },
@@ -37,17 +41,31 @@ interface Table {
   name: string;
   rows: TableRow[];
   totalWatts?: number;
+  adjustedWatts?: number;
   currentPerPhase?: number;
   pduType?: string;
   customPduType?: string;
-  id?: number;
+  id?: number | string;
   includesHoist?: boolean;
+  isDefault?: boolean;
 }
 
 const VideoConsumosTool: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
+  const [searchParams] = useSearchParams();
+  
+  // Tour override mode detection
+  const tourId = searchParams.get('tourId');
+  const tourDateId = searchParams.get('tourDateId');
+  
+  const { 
+    isOverrideMode, 
+    overrideData, 
+    isLoading: overrideLoading,
+    saveOverride 
+  } = useTourOverrideMode(tourId || undefined, tourDateId || undefined, 'video');
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<any>(null);
@@ -102,7 +120,7 @@ const VideoConsumosTool: React.FC = () => {
     const adjustedWatts = totalWatts * (1 + safetyMargin / 100);
     const wattsPerPhase = adjustedWatts / PHASES;
     const currentPerPhase = wattsPerPhase / (VOLTAGE_3PHASE * POWER_FACTOR);
-    return { wattsPerPhase, currentPerPhase };
+    return { wattsPerPhase, currentPerPhase, adjustedWatts };
   };
 
   const recommendPDU = (current: number) => {
@@ -112,6 +130,29 @@ const VideoConsumosTool: React.FC = () => {
   };
 
   const savePowerRequirementTable = async (table: Table) => {
+    if (isOverrideMode && overrideData) {
+      // Save as override for tour date
+      const overrideSuccess = await saveOverride('power', {
+        table_name: table.name,
+        total_watts: table.totalWatts || 0,
+        current_per_phase: table.currentPerPhase || 0,
+        pdu_type: table.customPduType || table.pduType || '',
+        custom_pdu_type: table.customPduType,
+        includes_hoist: table.includesHoist || false,
+        override_data: {
+          rows: table.rows
+        }
+      });
+
+      if (overrideSuccess) {
+        toast({
+          title: "Success",
+          description: "Override saved for tour date",
+        });
+      }
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('power_requirement_tables')
@@ -166,13 +207,14 @@ const VideoConsumosTool: React.FC = () => {
     });
 
     const totalWatts = calculatedRows.reduce((sum, row) => sum + (row.totalWatts || 0), 0);
-    const { currentPerPhase } = calculatePhaseCurrents(totalWatts);
+    const { currentPerPhase, adjustedWatts } = calculatePhaseCurrents(totalWatts);
     const pduSuggestion = recommendPDU(currentPerPhase);
 
     const newTable = {
       name: tableName,
       rows: calculatedRows,
       totalWatts,
+      adjustedWatts,
       currentPerPhase,
       pduType: selectedPduType === 'default' ? pduSuggestion : selectedPduType,
       customPduType: customPduType,
@@ -201,33 +243,59 @@ const VideoConsumosTool: React.FC = () => {
     setIncludesHoist(false);
   };
 
-  const removeTable = (tableId: number) => {
-    setTables((prev) => prev.filter((table) => table.id !== tableId));
+  const removeTable = (tableId: number | string) => {
+    // Only allow removal of regular tables (numeric IDs), not default tables
+    if (typeof tableId === 'number') {
+      setTables((prev) => prev.filter((table) => table.id !== tableId));
+    }
   };
 
   const handleExportPDF = async () => {
-    if (!selectedJobId || !selectedJob) {
+    const jobToUse = isOverrideMode && overrideData 
+      ? { id: 'override', title: `${overrideData.tourName} - ${overrideData.locationName}` }
+      : selectedJob;
+
+    if (!jobToUse) {
       toast({
-        title: 'No job selected',
-        description: 'Please select a job before exporting.',
+        title: isOverrideMode ? 'No tour data' : 'No job selected',
+        description: isOverrideMode ? 'Tour data not loaded' : 'Please select a job before exporting.',
         variant: 'destructive',
       });
       return;
     }
 
     try {
+      // Combine defaults and current tables for export
+      const allTables = isOverrideMode 
+        ? [...defaultTables, ...tables]
+        : tables;
+
+      let logoUrl: string | undefined = undefined;
+      try {
+        if (isOverrideMode && tourId) {
+          const { fetchTourLogo } = await import('@/utils/pdf/logoUtils');
+          logoUrl = await fetchTourLogo(tourId);
+        } else if (selectedJobId) {
+          const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
+          logoUrl = await fetchJobLogo(selectedJobId);
+        }
+      } catch (logoError) {
+        console.error("Error fetching logo:", logoError);
+      }
+
       const pdfBlob = await exportToPDF(
-        selectedJob.title,
-        tables.map((table) => ({ ...table, toolType: 'consumos' })),
+        jobToUse.title,
+        allTables.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
-        selectedJob.title,
+        jobToUse.title,
         'video',
         undefined,
         undefined,
-        undefined
+        safetyMargin,
+        logoUrl
       );
 
-      const fileName = `Video Power Report - ${selectedJob.title}.pdf`;
+      const fileName = `Video Power Report - ${jobToUse.title}.pdf`;
       const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
       const filePath = `video/${selectedJobId}/${crypto.randomUUID()}.pdf`;
 
@@ -258,6 +326,37 @@ const VideoConsumosTool: React.FC = () => {
     }
   };
 
+  const [defaultTables, setDefaultTables] = useState<Table[]>([]);
+
+  // Load defaults when in override mode
+  useEffect(() => {
+    if (isOverrideMode && overrideData) {
+      const powerDefaults = overrideData.defaults
+        .filter(table => table.table_type === 'power')
+        .map(table => ({
+          name: `${table.table_name} (Default)`,
+          rows: table.table_data.rows || [],
+          totalWatts: table.total_value,
+          currentPerPhase: table.metadata?.currentPerPhase,
+          pduType: table.metadata?.pduType,
+          id: `default-${table.id}`,
+          isDefault: true
+        }));
+      
+      setDefaultTables(powerDefaults);
+    }
+  }, [isOverrideMode, overrideData]);
+
+  if (overrideLoading) {
+    return (
+      <Card className="w-full max-w-4xl mx-auto my-6">
+        <CardContent className="pt-6">
+          <p>Loading tour override data...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="w-full max-w-4xl mx-auto my-6">
       <CardHeader className="space-y-1">
@@ -265,11 +364,73 @@ const VideoConsumosTool: React.FC = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate('/video')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <CardTitle className="text-2xl font-bold">Power Calculator</CardTitle>
+          <CardTitle className="text-2xl font-bold">
+            {isOverrideMode ? 'Override Mode - ' : ''}Power Calculator
+          </CardTitle>
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
+          {isOverrideMode && overrideData && (
+            <TourOverrideModeHeader
+              tourName={overrideData.tourName}
+              tourDate={overrideData.tourDate}
+              locationName={overrideData.locationName}
+              defaultsCount={defaultTables.length}
+              overridesCount={tables.length}
+              department="video"
+            />
+          )}
+
+          {/* Show defaults section when in override mode */}
+          {isOverrideMode && defaultTables.length > 0 && (
+            <div className="border rounded-lg p-4 bg-green-50">
+              <h3 className="font-semibold mb-3 text-green-800">Tour Defaults (Read-Only)</h3>
+              {defaultTables.map((table) => (
+                <div key={table.id} className="border rounded-lg overflow-hidden mt-4 bg-white">
+                  <div className="bg-green-100 px-4 py-3 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-semibold">{table.name}</h4>
+                      <Badge variant="outline" className="bg-green-50 text-green-700">Default</Badge>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium">Total Watts:</span> {table.totalWatts?.toFixed(2)} W
+                      </div>
+                      <div>
+                        <span className="font-medium">Current per Phase:</span> {table.currentPerPhase?.toFixed(2)} A
+                      </div>
+                      <div>
+                        <span className="font-medium">PDU Type:</span> {table.pduType}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="safetyMargin">Safety Margin</Label>
+            <Select
+              value={safetyMargin.toString()}
+              onValueChange={(value) => setSafetyMargin(Number(value))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select Safety Margin" />
+              </SelectTrigger>
+              <SelectContent>
+                {[0, 10, 20, 30, 40, 50].map((percentage) => (
+                  <SelectItem key={percentage} value={percentage.toString()}>
+                    {percentage}%
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="jobSelect">Select Job</Label>
             <Select value={selectedJobId} onValueChange={handleJobSelect}>
@@ -394,18 +555,27 @@ const VideoConsumosTool: React.FC = () => {
             )}
           </div>
 
+          {/* Updated tables section to show safety margin adjusted watts */}
           {tables.map((table) => (
             <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
-                <h3 className="font-semibold">{table.name}</h3>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => table.id && removeTable(table.id)}
-                >
-                  Remove Table
-                </Button>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">{table.name}</h3>
+                  {isOverrideMode && (
+                    <Badge variant="outline" className="bg-orange-50 text-orange-700">Override</Badge>
+                  )}
+                </div>
+                {typeof table.id === 'number' && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => removeTable(table.id as number)}
+                  >
+                    Remove Table
+                  </Button>
+                )}
               </div>
+              
               <table className="w-full">
                 <thead className="bg-muted/50">
                   <tr>
@@ -430,6 +600,14 @@ const VideoConsumosTool: React.FC = () => {
                     </td>
                     <td className="px-4 py-3">{table.totalWatts?.toFixed(2)} W</td>
                   </tr>
+                  {safetyMargin > 0 && (
+                    <tr className="border-t bg-muted/50 font-medium">
+                      <td colSpan={3} className="px-4 py-3 text-right">
+                        Adjusted Watts ({safetyMargin}% safety margin):
+                      </td>
+                      <td className="px-4 py-3">{table.adjustedWatts?.toFixed(2)} W</td>
+                    </tr>
+                  )}
                   <tr className="border-t bg-muted/50 font-medium">
                     <td colSpan={3} className="px-4 py-3 text-right">
                       Current per Phase:

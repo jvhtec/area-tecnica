@@ -13,20 +13,19 @@ import {
 import { LogOut } from "lucide-react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { UserInfo } from "@/components/layout/UserInfo";
 import { SidebarNavigation } from "@/components/layout/SidebarNavigation";
 import { AboutCard } from "@/components/layout/AboutCard";
 import { NotificationBadge } from "@/components/layout/NotificationBadge";
 import { useToast } from "@/hooks/use-toast";
-import { useSessionManager } from "@/hooks/useSessionManager";
 import { useQueryClient } from "@tanstack/react-query";
 import { ReloadButton } from "@/components/ui/reload-button";
 import { useKonamiCode } from "@/hooks/useKonamiCode";
 import { WolfensteinDialog } from "@/components/doom/WolfensteinDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { HeaderStatus } from "@/components/ui/header-status";
+import { useAuth } from "@/hooks/useAuth";
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -42,10 +41,8 @@ const Layout = () => {
     userRole,
     userDepartment,
     isLoading,
-    setSession,
-    setUserRole,
-    setUserDepartment
-  } = useSessionManager();
+    logout
+  } = useAuth();
 
   // Redirect technicians to technician dashboard if they somehow get to the regular dashboard
   useEffect(() => {
@@ -62,23 +59,9 @@ const Layout = () => {
     console.log("Starting sign out process");
 
     try {
-      setSession(null);
-      setUserRole(null);
-      setUserDepartment(null);
-      localStorage.clear();
-      await supabase.auth.signOut();
-      console.log("Sign out successful");
-      navigate('/auth');
-      toast({
-        title: "Success",
-        description: "You have been logged out successfully",
-      });
+      await logout();
     } catch (error) {
       console.error("Error during sign out:", error);
-      toast({
-        title: "Notice",
-        description: "You have been logged out",
-      });
     } finally {
       setIsLoggingOut(false);
     }

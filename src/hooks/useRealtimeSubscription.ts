@@ -62,11 +62,20 @@ export function useRealtimeSubscription(options: SubscriptionOptions | Subscript
         (payload) => {
           console.log(`Received ${payload.eventType} for ${table}:`, payload);
           
-          // Invalidate related queries
+          // Invalidate related queries immediately for faster UI updates
           if (Array.isArray(queryKey)) {
             queryClient.invalidateQueries({ queryKey });
           } else {
             queryClient.invalidateQueries({ queryKey: [queryKey] });
+          }
+          
+          // For artist table specifically, also refetch immediately
+          if (table === 'festival_artists') {
+            if (Array.isArray(queryKey)) {
+              queryClient.refetchQueries({ queryKey });
+            } else {
+              queryClient.refetchQueries({ queryKey: [queryKey] });
+            }
           }
         }
       );
@@ -121,8 +130,10 @@ export function useRealtimeSubscription(options: SubscriptionOptions | Subscript
             
             if (Array.isArray(queryKey)) {
               queryClient.invalidateQueries({ queryKey });
+              queryClient.refetchQueries({ queryKey });
             } else {
               queryClient.invalidateQueries({ queryKey: [queryKey] });
+              queryClient.refetchQueries({ queryKey: [queryKey] });
             }
           });
         });

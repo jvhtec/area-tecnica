@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,8 +10,11 @@ import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
+import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
+import { Badge } from '@/components/ui/badge';
 
 const lightComponentDatabase = [
   { id: 1, name: 'CAMEO OPUS S5', watts: 650 },
@@ -84,31 +88,67 @@ interface Table {
   name: string;
   rows: TableRow[];
   totalWatts?: number;
+  adjustedWatts?: number;
   currentPerPhase?: number;
   pduType?: string;
   customPduType?: string;
   includesHoist?: boolean;
-  id?: number;
+  id?: number | string;
+  isDefault?: boolean;
 }
 
 const LightsConsumosTool: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
+  const [searchParams] = useSearchParams();
+  
+  // Tour override mode detection
+  const tourId = searchParams.get('tourId');
+  const tourDateId = searchParams.get('tourDateId');
+  const mode = searchParams.get('mode');
+  
+  const { 
+    isOverrideMode, 
+    overrideData, 
+    isLoading: overrideLoading,
+    saveOverride 
+  } = useTourOverrideMode(tourId || undefined, tourDateId || undefined, 'lights');
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<JobSelection | null>(null);
-  const [tableName, setTableName] = useState(''); // nombre sin formato ingresado por el usuario
+  const [tableName, setTableName] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
   const [safetyMargin, setSafetyMargin] = useState(0);
   const [includesHoist, setIncludesHoist] = useState(false);
-  const [selectedPduType, setSelectedPduType] = useState<string>(''); // selección de anulación
-  const [customPduType, setCustomPduType] = useState<string>(''); // si es personalizado
+  const [selectedPduType, setSelectedPduType] = useState<string>('');
+  const [customPduType, setCustomPduType] = useState<string>('');
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
     rows: [{ quantity: '', componentId: '', watts: '' }],
   });
+
+  const [defaultTables, setDefaultTables] = useState<Table[]>([]);
+
+  // Load defaults when in override mode
+  useEffect(() => {
+    if (isOverrideMode && overrideData) {
+      const powerDefaults = overrideData.defaults
+        .filter(table => table.table_type === 'power')
+        .map(table => ({
+          name: `${table.table_name} (Default)`,
+          rows: table.table_data.rows || [],
+          totalWatts: table.total_value,
+          currentPerPhase: table.metadata?.currentPerPhase,
+          pduType: table.metadata?.pduType,
+          id: `default-${table.id}`,
+          isDefault: true
+        }));
+      
+      setDefaultTables(powerDefaults);
+    }
+  }, [isOverrideMode, overrideData]);
 
   const addRow = () => {
     setCurrentTable((prev) => ({
@@ -148,7 +188,7 @@ const LightsConsumosTool: React.FC = () => {
     const adjustedWatts = totalWatts * (1 + safetyMargin / 100);
     const wattsPerPhase = adjustedWatts / PHASES;
     const currentPerPhase = wattsPerPhase / (VOLTAGE_3PHASE * POWER_FACTOR);
-    return { wattsPerPhase, currentPerPhase };
+    return { wattsPerPhase, currentPerPhase, adjustedWatts };
   };
 
   const recommendPDU = (current: number) => {
@@ -158,6 +198,32 @@ const LightsConsumosTool: React.FC = () => {
   };
 
   const savePowerRequirementTable = async (table: Table) => {
+    if (isOverrideMode && overrideData) {
+      // Save as override for tour date
+      const overrideSuccess = await saveOverride('power', {
+        table_name: table.name,
+        total_watts: table.totalWatts || 0,
+        current_per_phase: table.currentPerPhase || 0,
+        pdu_type: table.customPduType || table.pduType || '',
+        custom_pdu_type: table.customPduType,
+        includes_hoist: table.includesHoist || false,
+        override_data: {
+          rows: table.rows
+        }
+      });
+
+      if (overrideSuccess) {
+        toast({
+          title: "Success",
+          description: "Override saved for tour date",
+        });
+      }
+      return;
+    }
+
+    // Original job-based save logic
+    if (!selectedJobId) return;
+    
     try {
       const { error } = await supabase
         .from('power_requirement_tables')
@@ -212,13 +278,14 @@ const LightsConsumosTool: React.FC = () => {
     });
 
     const totalWatts = calculatedRows.reduce((sum, row) => sum + (row.totalWatts || 0), 0);
-    const { currentPerPhase } = calculatePhaseCurrents(totalWatts);
+    const { currentPerPhase, adjustedWatts } = calculatePhaseCurrents(totalWatts);
     const pduSuggestion = recommendPDU(currentPerPhase);
 
     const newTable: Table = {
       name: tableName,
       rows: calculatedRows,
       totalWatts,
+      adjustedWatts,
       currentPerPhase,
       pduType: selectedPduType === 'Custom' ? customPduType : pduSuggestion,
       customPduType: selectedPduType === 'Custom' ? customPduType : undefined,
@@ -243,56 +310,88 @@ const LightsConsumosTool: React.FC = () => {
     setTableName('');
   };
 
-  const removeTable = (tableId: number) => {
-    setTables((prev) => prev.filter((table) => table.id !== tableId));
+  const removeTable = (tableId: number | string) => {
+    // Only allow removal of regular tables (numeric IDs), not default tables
+    if (typeof tableId === 'number') {
+      setTables((prev) => prev.filter((table) => table.id !== tableId));
+    }
   };
 
-  const updateTableSettings = (tableId: number, updates: Partial<Table>) => {
-    setTables((prev) =>
-      prev.map((table) => {
-        if (table.id === tableId) {
-          const updatedTable = { ...table, ...updates };
-          if (selectedJobId) {
-            savePowerRequirementTable(updatedTable);
+  const updateTableSettings = (tableId: number | string, updates: Partial<Table>) => {
+    // Only allow updates to regular tables (numeric IDs), not default tables
+    if (typeof tableId === 'number') {
+      setTables((prev) =>
+        prev.map((table) => {
+          if (table.id === tableId) {
+            const updatedTable = { ...table, ...updates };
+            if (selectedJobId) {
+              savePowerRequirementTable(updatedTable);
+            }
+            return updatedTable;
           }
-          return updatedTable;
-        }
-        return table;
-      })
-    );
+          return table;
+        })
+      );
+    }
   };
 
   const handleExportPDF = async () => {
-    if (!selectedJobId || !selectedJob) {
+    const jobToUse = isOverrideMode && overrideData 
+      ? { id: 'override', title: `${overrideData.tourName} - ${overrideData.locationName}` }
+      : selectedJob;
+
+    if (!jobToUse) {
       toast({
-        title: 'No hay trabajo seleccionado',
-        description: 'Por favor seleccione un trabajo antes de exportar.',
+        title: isOverrideMode ? 'No tour data' : 'No hay trabajo seleccionado',
+        description: isOverrideMode ? 'Tour data not loaded' : 'Por favor seleccione un trabajo antes de exportar.',
         variant: 'destructive',
       });
       return;
     }
 
     try {
+      // Combine defaults and current tables for export
+      const allTables = isOverrideMode 
+        ? [...defaultTables, ...tables]
+        : tables;
+
+      let logoUrl: string | undefined = undefined;
+      try {
+        if (isOverrideMode && tourId) {
+          const { fetchTourLogo } = await import('@/utils/pdf/logoUtils');
+          logoUrl = await fetchTourLogo(tourId);
+        } else if (selectedJobId) {
+          const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
+          logoUrl = await fetchJobLogo(selectedJobId);
+        }
+      } catch (logoError) {
+        console.error("Error fetching logo:", logoError);
+      }
+
       const pdfBlob = await exportToPDF(
-        selectedJob.title,
-        tables.map((table) => ({ ...table, toolType: 'consumos' })),
+        jobToUse.title,
+        allTables.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
-        selectedJob.title,
+        jobToUse.title,
+        'lights',
         undefined,
         undefined,
-        undefined,
-        safetyMargin
+        safetyMargin,
+        logoUrl
       );
 
-      const fileName = `Informe de Potencia - ${selectedJob.title}.pdf`;
-      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-      const filePath = `lights/${selectedJobId}/${crypto.randomUUID()}.pdf`;
+      const fileName = `Informe de Potencia - ${jobToUse.title}.pdf`;
+      
+      if (!isOverrideMode && selectedJobId) {
+        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+        const filePath = `lights/${selectedJobId}/${crypto.randomUUID()}.pdf`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('task_documents')
-        .upload(filePath, file);
+        const { error: uploadError } = await supabase.storage
+          .from('task_documents')
+          .upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+        if (uploadError) throw uploadError;
+      }
 
       toast({
         title: 'Éxito',
@@ -317,6 +416,16 @@ const LightsConsumosTool: React.FC = () => {
     }
   };
 
+  if (overrideLoading) {
+    return (
+      <Card className="w-full max-w-4xl mx-auto my-6">
+        <CardContent className="pt-6">
+          <p>Loading tour override data...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="w-full max-w-4xl mx-auto my-6">
       <CardHeader className="space-y-1">
@@ -324,11 +433,59 @@ const LightsConsumosTool: React.FC = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate('/lights')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <CardTitle className="text-2xl font-bold">Calculadora de Potencia</CardTitle>
+          <CardTitle className="text-2xl font-bold">
+            {isOverrideMode ? 'Override Mode - ' : ''}Calculadora de Potencia
+          </CardTitle>
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
+          {isOverrideMode && overrideData && (
+            <TourOverrideModeHeader
+              tourName={overrideData.tourName}
+              tourDate={overrideData.tourDate}
+              locationName={overrideData.locationName}
+              defaultsCount={defaultTables.length}
+              overridesCount={tables.length}
+              department="lights"
+            />
+          )}
+
+          {/* Show defaults section when in override mode */}
+          {isOverrideMode && defaultTables.length > 0 && (
+            <div className="border rounded-lg p-4 bg-green-50">
+              <h3 className="font-semibold mb-3 text-green-800">Tour Defaults (Read-Only)</h3>
+              {defaultTables.map((table) => (
+                <div key={table.id} className="border rounded-lg overflow-hidden mt-4 bg-white">
+                  <div className="bg-green-100 px-4 py-3 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-semibold">{table.name}</h4>
+                      <Badge variant="outline" className="bg-green-50 text-green-700">Default</Badge>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium">Total Watts:</span> {table.totalWatts?.toFixed(2)} W
+                      </div>
+                      <div>
+                        <span className="font-medium">Current per Phase:</span> {table.currentPerPhase?.toFixed(2)} A
+                      </div>
+                      <div>
+                        <span className="font-medium">PDU Type:</span> {table.pduType}
+                      </div>
+                      {table.includesHoist && (
+                        <div className="col-span-2 text-gray-600 italic">
+                          Includes hoist power requirement
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="safetyMargin">Margen de Seguridad</Label>
             <Select
@@ -348,21 +505,23 @@ const LightsConsumosTool: React.FC = () => {
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="jobSelect">Seleccionar Trabajo</Label>
-            <Select value={selectedJobId} onValueChange={handleJobSelect}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccione un trabajo" />
-              </SelectTrigger>
-              <SelectContent>
-                {jobs?.map((job) => (
-                  <SelectItem key={job.id} value={job.id}>
-                    {job.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!isOverrideMode && (
+            <div className="space-y-2">
+              <Label htmlFor="jobSelect">Seleccionar Trabajo</Label>
+              <Select value={selectedJobId} onValueChange={handleJobSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccione un trabajo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobs?.map((job) => (
+                    <SelectItem key={job.id} value={job.id}>
+                      {job.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="tableName">Nombre de la Tabla</Label>
@@ -482,54 +641,63 @@ const LightsConsumosTool: React.FC = () => {
           {tables.map((table) => (
             <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
-                <h3 className="font-semibold">{table.name}</h3>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => table.id && removeTable(table.id)}
-                >
-                  Eliminar Tabla
-                </Button>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">{table.name}</h3>
+                  {isOverrideMode && (
+                    <Badge variant="outline" className="bg-orange-50 text-orange-700">Override</Badge>
+                  )}
+                </div>
+                {typeof table.id === 'number' && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => removeTable(table.id as number)}
+                  >
+                    Eliminar Tabla
+                  </Button>
+                )}
               </div>
               
-              <div className="p-4 bg-muted/50 space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id={`hoist-${table.id}`}
-                      checked={table.includesHoist}
-                      onCheckedChange={(checked) => 
-                        table.id && updateTableSettings(table.id, { includesHoist: !!checked })
-                      }
-                    />
-                    <Label htmlFor={`hoist-${table.id}`}>Incluir Potencia para Polipasto (CEE32A 3P+N+G)</Label>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Label>Anulación de Tipo de PDU:</Label>
-                    <Select
-                      value={table.customPduType || 'default'}
-                      onValueChange={(value) => 
-                        table.id && updateTableSettings(table.id, { 
-                          customPduType: value === 'default' ? undefined : value 
-                        })
-                      }
-                    >
-                      <SelectTrigger className="w-[200px]">
-                        <SelectValue placeholder="Usar PDU sugerido" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="default">Usar PDU sugerido</SelectItem>
-                        {PDU_TYPES.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {type}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+              {typeof table.id === 'number' && (
+                <div className="p-4 bg-muted/50 space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id={`hoist-${table.id}`}
+                        checked={table.includesHoist}
+                        onCheckedChange={(checked) => 
+                          updateTableSettings(table.id as number, { includesHoist: !!checked })
+                        }
+                      />
+                      <Label htmlFor={`hoist-${table.id}`}>Incluir Potencia para Polipasto (CEE32A 3P+N+G)</Label>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <Label>Anulación de Tipo de PDU:</Label>
+                      <Select
+                        value={table.customPduType || 'default'}
+                        onValueChange={(value) => 
+                          updateTableSettings(table.id as number, { 
+                            customPduType: value === 'default' ? undefined : value 
+                          })
+                        }
+                      >
+                        <SelectTrigger className="w-[200px]">
+                          <SelectValue placeholder="Usar PDU sugerido" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="default">Usar PDU sugerido</SelectItem>
+                          {PDU_TYPES.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               <table className="w-full">
                 <thead className="bg-muted/50">
@@ -555,6 +723,14 @@ const LightsConsumosTool: React.FC = () => {
                     </td>
                     <td className="px-4 py-3">{table.totalWatts?.toFixed(2)} W</td>
                   </tr>
+                  {safetyMargin > 0 && (
+                    <tr className="border-t bg-muted/50 font-medium">
+                      <td colSpan={3} className="px-4 py-3 text-right">
+                        Vatios Ajustados ({safetyMargin}% margen de seguridad):
+                      </td>
+                      <td className="px-4 py-3">{table.adjustedWatts?.toFixed(2)} W</td>
+                    </tr>
+                  )}
                   <tr className="border-t bg-muted/50 font-medium">
                     <td colSpan={3} className="px-4 py-3 text-right">
                       Corriente por Fase:
