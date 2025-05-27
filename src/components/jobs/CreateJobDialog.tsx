@@ -1,3 +1,4 @@
+
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -15,6 +16,7 @@ import { Department } from "@/types/department";
 import { JobType } from "@/types/job";
 import { SimplifiedJobColorPicker } from "./SimplifiedJobColorPicker";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
+import { localInputToUTC } from "@/utils/timezoneUtils";
 
 // Schema for validation
 const formSchema = z.object({
@@ -26,6 +28,7 @@ const formSchema = z.object({
   job_type: z.enum(["single", "tour", "festival", "dryhire", "tourdate"] as const),
   departments: z.array(z.string()).min(1, "At least one department is required"),
   color: z.string().min(1, "Color is required"),
+  timezone: z.string().min(1, "Timezone is required"),
 }).refine((data) => {
   const start = new Date(data.start_time);
   const end = new Date(data.end_time);
@@ -65,6 +68,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
       job_type: "single" as JobType,
       departments: currentDepartment ? [currentDepartment] : [],
       color: "#7E69AB",
+      timezone: "Europe/Madrid",
     },
   });
 
@@ -76,6 +80,10 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
       // Get or create location
       const locationId = await getOrCreateLocation(values.location_id);
 
+      // Convert local datetime-local input values to UTC using the job's timezone
+      const startTimeUTC = localInputToUTC(values.start_time, values.timezone);
+      const endTimeUTC = localInputToUTC(values.end_time, values.timezone);
+
       // Insert the job
       const { data: job, error: jobError } = await supabase
         .from("jobs")
@@ -84,10 +92,11 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
             title: values.title,
             description: values.description,
             location_id: locationId,
-            start_time: new Date(values.start_time).toISOString(),
-            end_time: new Date(values.end_time).toISOString(),
+            start_time: startTimeUTC.toISOString(),
+            end_time: endTimeUTC.toISOString(),
             job_type: values.job_type,
             color: values.color,
+            timezone: values.timezone,
           },
         ])
         .select()
@@ -165,6 +174,30 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
             {errors.location_id && (
               <p className="text-sm text-destructive">
                 {errors.location_id.message as string}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Timezone</Label>
+            <Select
+              onValueChange={(value) => setValue("timezone", value)}
+              defaultValue={watch("timezone")}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select timezone" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Europe/Madrid">Europe/Madrid</SelectItem>
+                <SelectItem value="Europe/London">Europe/London</SelectItem>
+                <SelectItem value="Europe/Paris">Europe/Paris</SelectItem>
+                <SelectItem value="America/New_York">America/New_York</SelectItem>
+                <SelectItem value="America/Los_Angeles">America/Los_Angeles</SelectItem>
+              </SelectContent>
+            </Select>
+            {errors.timezone && (
+              <p className="text-sm text-destructive">
+                {errors.timezone.message as string}
               </p>
             )}
           </div>

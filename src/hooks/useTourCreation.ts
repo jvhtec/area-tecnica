@@ -1,8 +1,10 @@
+
 import { useState } from "react";
 import { Department } from "@/types/department";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
+import { localInputToUTC } from "@/utils/timezoneUtils";
 
 export const useTourCreation = (
   currentDepartment: Department,
@@ -15,6 +17,9 @@ export const useTourCreation = (
   ]);
   const [color, setColor] = useState("#7E69AB");
   const [departments, setDepartments] = useState<Department[]>([currentDepartment]);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [timezone] = useState("Europe/Madrid"); // Default timezone for tours
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -47,6 +52,14 @@ export const useTourCreation = (
     }
   };
 
+  const handleStartDateChange = (date: string) => {
+    setStartDate(date);
+  };
+
+  const handleEndDateChange = (date: string) => {
+    setEndDate(date);
+  };
+
   const createTourWithDates = async () => {
     const validDates = dates.filter(date => date.date);
     
@@ -69,16 +82,21 @@ export const useTourCreation = (
 
     if (tourError) throw tourError;
 
+    // Convert local dates to UTC using the tour's timezone
+    const startTimeUTC = localInputToUTC(`${validDates[0].date}T00:00`, timezone);
+    const endTimeUTC = localInputToUTC(`${validDates[validDates.length - 1].date}T23:59`, timezone);
+
     // Create the main tour job
     const { data: mainTourJob, error: mainJobError } = await supabase
       .from("jobs")
       .insert({
         title,
         description,
-        start_time: `${validDates[0].date}T00:00:00`,
-        end_time: `${validDates[validDates.length - 1].date}T23:59:59`,
+        start_time: startTimeUTC.toISOString(),
+        end_time: endTimeUTC.toISOString(),
         job_type: "tour",
         color,
+        timezone,
       })
       .select()
       .single();
@@ -127,18 +145,23 @@ export const useTourCreation = (
 
       if (tourDateError) throw tourDateError;
 
+      // Convert date to UTC for job times
+      const dayStartUTC = localInputToUTC(`${dateInfo.date}T00:00`, timezone);
+      const dayEndUTC = localInputToUTC(`${dateInfo.date}T23:59`, timezone);
+
       // Create job for this tour date
       const { data: dateJob, error: dateJobError } = await supabase
         .from("jobs")
         .insert({
           title: `${title} (Tour Date)`,
           description,
-          start_time: `${dateInfo.date}T00:00:00`,
-          end_time: `${dateInfo.date}T23:59:59`,
+          start_time: dayStartUTC.toISOString(),
+          end_time: dayEndUTC.toISOString(),
           location_id: locationId,
           job_type: "single",
           tour_date_id: tourDate.id,
           color,
+          timezone,
         })
         .select()
         .single();
@@ -203,6 +226,8 @@ export const useTourCreation = (
       setDates([{ date: "", location: "" }]);
       setColor("#7E69AB");
       setDepartments([currentDepartment]);
+      setStartDate("");
+      setEndDate("");
     } catch (error: any) {
       console.error("Error creating tour:", error);
       toast({
@@ -227,5 +252,9 @@ export const useTourCreation = (
     handleDateChange,
     handleDepartmentChange,
     handleSubmit,
+    startDate,
+    endDate,
+    handleStartDateChange,
+    handleEndDateChange,
   };
 };
