@@ -18,9 +18,10 @@ import {
   UserCheck,
   Eye,
   ArrowLeft,
-  Info
+  Info,
+  Printer
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { TourManagementDialog } from "@/components/tours/TourManagementDialog";
 import { TourDateManagementDialog } from "@/components/tours/TourDateManagementDialog";
@@ -30,6 +31,9 @@ import { TourDocumentsDialog } from "@/components/tours/TourDocumentsDialog";
 import { format } from "date-fns";
 import { useTourAssignments } from "@/hooks/useTourAssignments";
 import { useAuth } from "@/hooks/useAuth";
+import { fetchTourLogo } from "@/utils/pdf/tourLogoUtils";
+import { exportTourPDF } from "@/lib/tourPdfExport";
+import { useToast } from "@/hooks/use-toast";
 
 interface TourManagementProps {
   tour: any;
@@ -37,6 +41,7 @@ interface TourManagementProps {
 
 export const TourManagement = ({ tour }: TourManagementProps) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { userRole } = useAuth();
   const [searchParams] = useSearchParams();
   const mode = searchParams.get('mode');
@@ -47,8 +52,17 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
   const [isDefaultsManagerOpen, setIsDefaultsManagerOpen] = useState(false);
   const [isAssignmentsOpen, setIsAssignmentsOpen] = useState(false);
   const [isDocumentsOpen, setIsDocumentsOpen] = useState(false);
+  const [tourLogoUrl, setTourLogoUrl] = useState<string | undefined>();
+  const [isPrintingSchedule, setIsPrintingSchedule] = useState(false);
 
   const { assignments } = useTourAssignments(tour?.id);
+
+  // Load tour logo
+  useEffect(() => {
+    if (tour?.id) {
+      fetchTourLogo(tour.id).then(setTourLogoUrl);
+    }
+  }, [tour?.id]);
 
   if (!tour) {
     return (
@@ -84,6 +98,26 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
 
   const handleWeightDefaults = () => {
     navigate(`/sound/pesos?tourId=${tour.id}&mode=tour-defaults`);
+  };
+
+  const handlePrintSchedule = async () => {
+    setIsPrintingSchedule(true);
+    try {
+      await exportTourPDF(tour);
+      toast({
+        title: "Success",
+        description: "Tour schedule exported successfully",
+      });
+    } catch (error: any) {
+      console.error("Error exporting tour schedule:", error);
+      toast({
+        title: "Error",
+        description: "Failed to export tour schedule",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPrintingSchedule(false);
+    }
   };
 
   const totalAssignments = assignments.length;
@@ -173,44 +207,70 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
     <div className="container mx-auto p-6 space-y-6">
       {/* Header Section */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-          {isTechnicianView && (
-            <div className="flex items-center gap-2 mb-2">
-              <Button variant="ghost" onClick={handleBackToTechnicianDashboard} className="p-0 h-auto">
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back to Dashboard
-              </Button>
-              <Badge variant="outline" className="ml-2">
-                <Eye className="h-3 w-3 mr-1" />
-                Technician View
-              </Badge>
+        <div className="flex items-start gap-4">
+          {/* Tour Logo */}
+          {tourLogoUrl && (
+            <div className="flex-shrink-0">
+              <img 
+                src={tourLogoUrl} 
+                alt={`${tour.name} logo`}
+                className="w-16 h-16 object-contain rounded-lg border border-border"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                }}
+              />
             </div>
           )}
-          <h1 className="text-3xl font-bold">{tour.name}</h1>
-          {tour.description && (
-            <p className="text-muted-foreground mt-1">{tour.description}</p>
-          )}
-          <div className="flex items-center gap-4 mt-2">
-            {tour.start_date && tour.end_date && (
-              <div className="flex items-center gap-2 text-sm">
-                <Calendar className="h-4 w-4" />
-                <span>
-                  {format(new Date(tour.start_date), 'MMM d')} - {format(new Date(tour.end_date), 'MMM d, yyyy')}
-                </span>
+          
+          <div className="flex-1">
+            {isTechnicianView && (
+              <div className="flex items-center gap-2 mb-2">
+                <Button variant="ghost" onClick={handleBackToTechnicianDashboard} className="p-0 h-auto">
+                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  Back to Dashboard
+                </Button>
+                <Badge variant="outline" className="ml-2">
+                  <Eye className="h-3 w-3 mr-1" />
+                  Technician View
+                </Badge>
               </div>
             )}
-            <Badge variant="outline" style={{ borderColor: tour.color, color: tour.color }}>
-              {totalDates} dates
-            </Badge>
-            {totalAssignments > 0 && (
-              <Badge variant="outline">
-                {totalAssignments} crew assigned
-              </Badge>
+            <h1 className="text-3xl font-bold">{tour.name}</h1>
+            {tour.description && (
+              <p className="text-muted-foreground mt-1">{tour.description}</p>
             )}
+            <div className="flex items-center gap-4 mt-2">
+              {tour.start_date && tour.end_date && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-4 w-4" />
+                  <span>
+                    {format(new Date(tour.start_date), 'MMM d')} - {format(new Date(tour.end_date), 'MMM d, yyyy')}
+                  </span>
+                </div>
+              )}
+              <Badge variant="outline" style={{ borderColor: tour.color, color: tour.color }}>
+                {totalDates} dates
+              </Badge>
+              {totalAssignments > 0 && (
+                <Badge variant="outline">
+                  {totalAssignments} crew assigned
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
+        
         {!isTechnicianView && (
           <div className="flex gap-2">
+            <Button 
+              onClick={handlePrintSchedule}
+              variant="outline"
+              disabled={isPrintingSchedule}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              {isPrintingSchedule ? 'Printing...' : 'Print Schedule'}
+            </Button>
             <Button onClick={() => setIsSettingsOpen(true)}>
               <Settings className="h-4 w-4 mr-2" />
               Tour Settings

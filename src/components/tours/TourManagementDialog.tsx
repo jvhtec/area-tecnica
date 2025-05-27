@@ -1,14 +1,19 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { TourColorSection } from "./TourColorSection";
 import { TourDeleteSection } from "./TourDeleteSection";
 import { TourDefaultsManager } from "./TourDefaultsManager";
 import { useTourManagement } from "./hooks/useTourManagement";
 import { TourLogoManager } from "./TourLogoManager";
 import { useNavigate } from "react-router-dom";
-import { Calculator, Weight, Settings } from "lucide-react";
+import { Calculator, Weight, Settings, Package } from "lucide-react";
 import { useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface TourManagementDialogProps {
   open: boolean;
@@ -24,8 +29,11 @@ export const TourManagementDialog = ({
   tourDateId,
 }: TourManagementDialogProps) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { handleColorChange, handleNameChange, handleDelete } = useTourManagement(tour, () => onOpenChange(false));
   const [defaultsManagerOpen, setDefaultsManagerOpen] = useState(false);
+  const [isUpdatingTourPack, setIsUpdatingTourPack] = useState(false);
 
   const handlePowerDefaults = () => {
     // Navigate to ConsumosTool with tour context
@@ -61,6 +69,36 @@ export const TourManagementDialog = ({
     setDefaultsManagerOpen(true);
   };
 
+  const handleBulkTourPackUpdate = async (tourPackOnly: boolean) => {
+    setIsUpdatingTourPack(true);
+    try {
+      const { error } = await supabase
+        .from("tour_dates")
+        .update({ is_tour_pack_only: tourPackOnly })
+        .eq("tour_id", tour.id);
+
+      if (error) throw error;
+
+      // Refresh tour data
+      await queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
+      await queryClient.invalidateQueries({ queryKey: ["tours"] });
+
+      toast({
+        title: "Success",
+        description: `All tour dates ${tourPackOnly ? 'set to' : 'removed from'} Tour Pack Only mode.`,
+      });
+    } catch (error: any) {
+      console.error("Error updating tour dates:", error);
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingTourPack(false);
+    }
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -85,6 +123,39 @@ export const TourManagementDialog = ({
                 onColorChange={handleColorChange}
                 onNameChange={handleNameChange}
               />
+            </div>
+
+            <div className="border-b pb-4">
+              <h3 className="text-sm font-medium mb-3">Tour Pack Settings</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Package className="h-4 w-4 text-blue-600" />
+                    <div>
+                      <p className="text-sm font-medium">Bulk Tour Pack Mode</p>
+                      <p className="text-xs text-muted-foreground">Set all dates in this tour to Tour Pack Only</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleBulkTourPackUpdate(true)}
+                      disabled={isUpdatingTourPack}
+                    >
+                      Enable All
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleBulkTourPackUpdate(false)}
+                      disabled={isUpdatingTourPack}
+                    >
+                      Disable All
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="border-b pb-4">
