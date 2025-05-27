@@ -2890,6 +2890,7 @@ export type Database = {
           date: string
           flex_folders_created: boolean | null
           id: string
+          is_tour_pack_only: boolean | null
           location_id: string | null
           tour_id: string | null
         }
@@ -2898,6 +2899,7 @@ export type Database = {
           date: string
           flex_folders_created?: boolean | null
           id?: string
+          is_tour_pack_only?: boolean | null
           location_id?: string | null
           tour_id?: string | null
         }
@@ -2906,6 +2908,7 @@ export type Database = {
           date?: string
           flex_folders_created?: boolean | null
           id?: string
+          is_tour_pack_only?: boolean | null
           location_id?: string | null
           tour_id?: string | null
         }

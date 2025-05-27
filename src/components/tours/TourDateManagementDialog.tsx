@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import {
   Dialog,
@@ -20,6 +19,7 @@ import {
   Trash2,
   FolderPlus,
   Edit,
+  Package,
 } from "lucide-react";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
 import { useTourDateRealtime } from "@/hooks/useTourDateRealtime";
@@ -30,6 +30,8 @@ import {
   DEPARTMENT_SUFFIXES,
 } from "@/utils/flex-folders/constants";
 import { createFlexFolder } from "@/utils/flex-folders/api";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 interface TourDateManagementDialogProps {
   open: boolean;
@@ -226,10 +228,19 @@ async function createFoldersForDate(
       }
 
       if (dept === "sound") {
+        // Check if this is a tour pack only date
+        const isTourPackOnly = dateObj.is_tour_pack_only;
+        console.log(`Tour pack only setting for ${dateObj.date}:`, isTourPackOnly);
+
         const soundSubfolders = [
           { name: `${tourData.name} - Tour Pack`, suffix: "TP" },
-          { name: `${tourData.name} - PA`, suffix: "PA" },
         ];
+
+        // Only add PA if not tour pack only
+        if (!isTourPackOnly) {
+          soundSubfolders.push({ name: `${tourData.name} - PA`, suffix: "PA" });
+        }
+
         for (const sf of soundSubfolders) {
           const subPayload = {
             definitionId: FLEX_FOLDER_IDS.pullSheet,
@@ -258,6 +269,7 @@ async function createFoldersForDate(
       }
 
       if (dept === "personnel") {
+        // ... keep existing code (personnel subfolder creation)
         const personnelSubfolders = [
           { name: `Gastos de Personal - ${tourData.name}`, suffix: "GP" },
         ];
@@ -359,6 +371,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   const [editingTourDate, setEditingTourDate] = useState<any>(null);
   const [editDateValue, setEditDateValue] = useState<string>("");
   const [editLocationValue, setEditLocationValue] = useState<string>("");
+  const [editTourPackOnly, setEditTourPackOnly] = useState<boolean>(false);
   const [isDeletingDate, setIsDeletingDate] = useState<string | null>(null);
   const [createdTourDateIds, setCreatedTourDateIds] = useState<string[]>([]);
   const [isCreatingFolders, setIsCreatingFolders] = useState(false);
@@ -464,14 +477,12 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
     }
   };
 
-  // ... keep existing code (handleAddDate, handleEditDate, handleDeleteDate, startEditing, cancelEditing, submitEditing functions)
-
-  const handleAddDate = async (date: string, location: string) => {
+  const handleAddDate = async (date: string, location: string, isTourPackOnly: boolean = false) => {
     try {
       if (!tourId) {
         throw new Error("Tour ID is required");
       }
-      console.log("Adding new tour date:", { date, location, tourId });
+      console.log("Adding new tour date:", { date, location, tourId, isTourPackOnly });
       
       const locationId = await getOrCreateLocation(location);
       console.log("Location ID:", locationId);
@@ -481,10 +492,12 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
           tour_id: tourId,
           date,
           location_id: locationId,
+          is_tour_pack_only: isTourPackOnly,
         })
         .select(`
           id,
           date,
+          is_tour_pack_only,
           location:locations (
             id,
             name
@@ -497,6 +510,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       }
       console.log("Tour date created:", newTourDate);
 
+      // ... keep existing code (job creation and department assignment)
       const { data: tourData, error: tourError } = await supabase
         .from("tours")
         .select(`
@@ -578,13 +592,14 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   const handleEditDate = async (
     dateId: string,
     newDate: string,
-    newLocation: string
+    newLocation: string,
+    isTourPackOnly: boolean
   ) => {
     try {
       if (!tourId) {
         throw new Error("Tour ID is required");
       }
-      console.log("Editing tour date:", { dateId, newDate, newLocation });
+      console.log("Editing tour date:", { dateId, newDate, newLocation, isTourPackOnly });
       const locationId = await getOrCreateLocation(newLocation);
 
       const { data: tourData, error: tourError } = await supabase
@@ -603,11 +618,13 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         .update({
           date: newDate,
           location_id: locationId,
+          is_tour_pack_only: isTourPackOnly,
         })
         .eq("id", dateId)
         .select(`
           id,
           date,
+          is_tour_pack_only,
           location:locations (
             id,
             name
@@ -660,6 +677,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   };
 
   const handleDeleteDate = async (dateId: string) => {
+    // ... keep existing code (deletion logic remains the same)
     if (isDeletingDate) return; // Prevent multiple simultaneous deletions
 
     setIsDeletingDate(dateId);
@@ -835,20 +853,20 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
     setEditingTourDate(dateObj);
     setEditDateValue(dateObj.date.split("T")[0]);
     setEditLocationValue(dateObj.location?.name || "");
+    setEditTourPackOnly(dateObj.is_tour_pack_only || false);
   };
 
   const cancelEditing = () => {
     setEditingTourDate(null);
     setEditDateValue("");
     setEditLocationValue("");
+    setEditTourPackOnly(false);
   };
 
   const submitEditing = async (dateId: string) => {
-    await handleEditDate(dateId, editDateValue, editLocationValue);
+    await handleEditDate(dateId, editDateValue, editLocationValue, editTourPackOnly);
     cancelEditing();
   };
-
-  // ... keep existing code (JSX return statement for the dialog)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -902,6 +920,16 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                             required
                           />
                         </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="tour-pack-only-edit"
+                            checked={editTourPackOnly}
+                            onCheckedChange={(checked) => setEditTourPackOnly(checked as boolean)}
+                          />
+                          <Label htmlFor="tour-pack-only-edit" className="text-sm">
+                            Tour Pack Only (skip PA pullsheet)
+                          </Label>
+                        </div>
                         <div className="flex gap-2">
                           <Button onClick={() => submitEditing(dateObj.id)}>
                             Save
@@ -917,6 +945,12 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                           <div className="flex items-center gap-2 text-sm">
                             <Calendar className="h-4 w-4" />
                             <span>{format(new Date(dateObj.date), "MMM d, yyyy")}</span>
+                            {dateObj.is_tour_pack_only && (
+                              <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
+                                <Package className="h-3 w-3" />
+                                Tour Pack Only
+                              </div>
+                            )}
                           </div>
                           {dateObj.location?.name && (
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -987,6 +1021,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                   const formData = new FormData(e.currentTarget);
                   const date = formData.get("date") as string;
                   const location = formData.get("location") as string;
+                  const isTourPackOnly = formData.get("is_tour_pack_only") === "on";
                   if (!date || !location) {
                     toast({
                       title: "Error",
@@ -995,7 +1030,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                     });
                     return;
                   }
-                  handleAddDate(date, location);
+                  handleAddDate(date, location, isTourPackOnly);
                   e.currentTarget.reset();
                 }}
                 className="space-y-4"
@@ -1003,6 +1038,15 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                 <div className="grid grid-cols-2 gap-4">
                   <Input type="date" name="date" required />
                   <Input type="text" name="location" placeholder="Location" required />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="tour-pack-only"
+                    name="is_tour_pack_only"
+                  />
+                  <Label htmlFor="tour-pack-only" className="text-sm">
+                    Tour Pack Only (skip PA pullsheet)
+                  </Label>
                 </div>
                 <Button type="submit" className="w-full">
                   <Plus className="h-4 w-4 mr-2" />

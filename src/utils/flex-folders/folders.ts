@@ -1,4 +1,3 @@
-
 import { format } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { Department } from "@/types/department";
@@ -164,7 +163,22 @@ export async function createAllFoldersForJob(
       throw new Error("Tour folders have not been created yet. Please create tour folders first.");
     }
 
+    // Get tour date info to check if it's tour pack only
+    let tourDateInfo = null;
+    if (job.tour_date_id) {
+      const { data: tourDateData, error: tourDateError } = await supabase
+        .from("tour_dates")
+        .select("is_tour_pack_only")
+        .eq("id", job.tour_date_id)
+        .single();
+      
+      if (!tourDateError && tourDateData) {
+        tourDateInfo = tourDateData;
+      }
+    }
+
     console.log("Using tour folders:", tourData);
+    console.log("Tour date info:", tourDateInfo);
 
     const allDepartments = ["sound", "lights", "video", "production", "personnel", "comercial"];
     const locationName = job.location?.name || "No Location";
@@ -297,10 +311,18 @@ export async function createAllFoldersForJob(
         }
       }
       if (dept === "sound") {
+        // Check if this is a tour pack only date
+        const isTourPackOnly = tourDateInfo?.is_tour_pack_only || false;
+        console.log(`Tour pack only setting for sound folder:`, isTourPackOnly);
+
         const soundSubfolders = [
           { name: `${job.title} - Tour Pack`, suffix: "TP" },
-          { name: `${job.title} - PA`, suffix: "PA" },
         ];
+
+        // Only add PA if not tour pack only
+        if (!isTourPackOnly) {
+          soundSubfolders.push({ name: `${job.title} - PA`, suffix: "PA" });
+        }
 
         for (const sf of soundSubfolders) {
           const subPayload = {
