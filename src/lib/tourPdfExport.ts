@@ -3,7 +3,37 @@ import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { fetchTourLogo } from '@/utils/pdf/tourLogoUtils';
 
+// Helper function to load Sector Pro logo
+const loadSectorProLogo = (): Promise<HTMLImageElement | null> => {
+  return new Promise((resolve) => {
+    const logoImg = new Image();
+    logoImg.crossOrigin = 'anonymous';
+    
+    const timeout = setTimeout(() => {
+      console.warn('Sector Pro logo loading timed out');
+      resolve(null);
+    }, 5000);
+    
+    logoImg.onload = () => {
+      clearTimeout(timeout);
+      console.log('Sector Pro logo loaded successfully');
+      resolve(logoImg);
+    };
+    
+    logoImg.onerror = () => {
+      clearTimeout(timeout);
+      console.warn('Could not load Sector Pro logo');
+      resolve(null);
+    };
+    
+    logoImg.src = '/sector pro logo.png';
+  });
+};
+
 export const exportTourPDF = async (tour: any) => {
+  // Load Sector Pro logo first
+  const sectorProLogo = await loadSectorProLogo();
+  
   const pdf = new jsPDF();
   const pageWidth = pdf.internal.pageSize.width;
   const pageHeight = pdf.internal.pageSize.height;
@@ -111,47 +141,22 @@ export const exportTourPDF = async (tour: any) => {
     footerTextY
   );
 
-  // Load and add Sector Pro logo, then save PDF
-  return new Promise<void>((resolve, reject) => {
-    const logoImg = new Image();
-    logoImg.crossOrigin = 'anonymous';
-    
-    const savePDF = () => {
-      try {
-        pdf.save(`${tour.name}_schedule.pdf`);
-        resolve();
-      } catch (error) {
-        reject(error);
-      }
-    };
-    
-    logoImg.onload = () => {
-      try {
-        // Position logo at bottom center
-        const logoWidth = 40;
-        const logoHeight = 15;
-        const xPosition = (pageWidth - logoWidth) / 2; // Center horizontally
-        const yPosition = pageHeight - 25; // 25 units from bottom
-        
-        pdf.addImage(logoImg, 'PNG', xPosition, yPosition, logoWidth, logoHeight);
-        console.log('Sector Pro logo added successfully at bottom center');
-      } catch (error) {
-        console.warn('Error adding Sector Pro logo to PDF:', error);
-      }
-      savePDF();
-    };
-    
-    logoImg.onerror = () => {
-      console.warn('Could not load Sector Pro logo');
-      savePDF();
-    };
-    
-    // Set a timeout to avoid hanging indefinitely
-    setTimeout(() => {
-      console.warn('Sector Pro logo loading timed out');
-      savePDF();
-    }, 5000);
-    
-    logoImg.src = '/sector pro logo.png';
-  });
+  // Add Sector Pro logo if it loaded successfully
+  if (sectorProLogo) {
+    try {
+      // Position logo at bottom center
+      const logoWidth = 40;
+      const logoHeight = 15;
+      const xPosition = (pageWidth - logoWidth) / 2; // Center horizontally
+      const yPosition = pageHeight - 25; // 25 units from bottom
+      
+      pdf.addImage(sectorProLogo, 'PNG', xPosition, yPosition, logoWidth, logoHeight);
+      console.log('Sector Pro logo added successfully at bottom center');
+    } catch (error) {
+      console.warn('Error adding Sector Pro logo to PDF:', error);
+    }
+  }
+
+  // Now save the PDF - everything is loaded and added
+  pdf.save(`${tour.name}_schedule.pdf`);
 };
