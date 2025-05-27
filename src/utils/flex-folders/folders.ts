@@ -1,3 +1,4 @@
+
 import { format } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import { Department } from "@/types/department";
@@ -10,6 +11,64 @@ import {
   RESPONSIBLE_PERSON_IDS,
   DEPARTMENT_SUFFIXES
 } from "./constants";
+
+/**
+ * Helper function to fetch selected departments for a job
+ */
+async function getJobDepartments(jobId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("job_departments")
+    .select("department")
+    .eq("job_id", jobId);
+
+  if (error) {
+    console.error("Error fetching job departments:", error);
+    return [];
+  }
+
+  return data.map(d => d.department);
+}
+
+/**
+ * Helper function to get departments for a tour job
+ */
+async function getTourJobDepartments(tourId: string): Promise<string[]> {
+  // Get departments from any job in the tour
+  const { data, error } = await supabase
+    .from("jobs")
+    .select(`
+      job_departments (department)
+    `)
+    .eq("tour_id", tourId)
+    .limit(1);
+
+  if (error || !data || data.length === 0) {
+    console.error("Error fetching tour job departments:", error);
+    return [];
+  }
+
+  return data[0].job_departments?.map((jd: any) => jd.department) || [];
+}
+
+/**
+ * Determines which departments should have folders created
+ */
+function shouldCreateDepartmentFolder(department: string, selectedDepartments: string[]): boolean {
+  // Always create these administrative departments
+  const alwaysCreateDepartments = ["production", "personnel", "comercial"];
+  
+  if (alwaysCreateDepartments.includes(department)) {
+    return true;
+  }
+
+  // For technical departments (sound, lights, video), only create if selected
+  const technicalDepartments = ["sound", "lights", "video"];
+  if (technicalDepartments.includes(department)) {
+    return selectedDepartments.includes(department);
+  }
+
+  return false;
+}
 
 /**
  * Creates all necessary folders in Flex for a job
@@ -77,6 +136,10 @@ export async function createAllFoldersForJob(
       throw new Error("Tour ID is missing for tourdate job");
     }
 
+    // Get selected departments for the tour
+    const selectedDepartments = await getTourJobDepartments(job.tour_id);
+    console.log("Selected departments for tour:", selectedDepartments);
+
     const { data: tourData, error: tourError } = await supabase
       .from("tours")
       .select(`
@@ -103,11 +166,17 @@ export async function createAllFoldersForJob(
 
     console.log("Using tour folders:", tourData);
 
-    const departments = ["sound", "lights", "video", "production", "personnel", "comercial"];
+    const allDepartments = ["sound", "lights", "video", "production", "personnel", "comercial"];
     const locationName = job.location?.name || "No Location";
     const formattedDate = format(new Date(job.start_time), "MMM d, yyyy");
 
-    for (const dept of departments) {
+    for (const dept of allDepartments) {
+      // Check if this department should have a folder created
+      if (!shouldCreateDepartmentFolder(dept, selectedDepartments)) {
+        console.log(`Skipping ${dept} folder - department not selected`);
+        continue;
+      }
+
       const parentFolderId = tourData[`flex_${dept}_folder_id`];
       if (!parentFolderId) {
         console.warn(`No parent folder ID found for ${dept} department`);
@@ -303,6 +372,10 @@ export async function createAllFoldersForJob(
 
   console.log("Default job type detected. Creating full folder structure.");
 
+  // Get selected departments for regular jobs
+  const selectedDepartments = await getJobDepartments(job.id);
+  console.log("Selected departments for job:", selectedDepartments);
+
   const topPayload = {
     definitionId: FLEX_FOLDER_IDS.mainFolder,
     open: true,
@@ -326,10 +399,14 @@ export async function createAllFoldersForJob(
       folder_type: "main_event",
     });
 
-  // Removed generic hojaInfo since we'll add department-specific ones
+  const allDepartments = ["sound", "lights", "video", "production", "personnel", "comercial"];
+  for (const dept of allDepartments) {
+    // Check if this department should have a folder created
+    if (!shouldCreateDepartmentFolder(dept, selectedDepartments)) {
+      console.log(`Skipping ${dept} folder - department not selected`);
+      continue;
+    }
 
-  const departments = ["sound", "lights", "video", "production", "personnel", "comercial"];
-  for (const dept of departments) {
     const deptPayload = {
       definitionId: FLEX_FOLDER_IDS.subFolder,
       parentElementId: topFolderId,
@@ -347,8 +424,6 @@ export async function createAllFoldersForJob(
     console.log(`Creating department folder for ${dept}:`, deptPayload);
     const deptFolder = await createFlexFolder(deptPayload);
 
-    // IMPORTANT: capture the inserted row so we get its internal (local DB) ID,
-    // similar to what we do in the tourdate branch.
     const { data: [childRow], error: childErr } = await supabase
       .from("flex_folders")
       .insert({

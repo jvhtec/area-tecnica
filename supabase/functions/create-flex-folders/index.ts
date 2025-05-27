@@ -47,6 +47,48 @@ async function createFlexFolder(payload: FlexFolderPayload, authToken: string): 
   }
 }
 
+/**
+ * Gets the selected departments for a tour by checking its jobs
+ */
+async function getTourDepartments(supabase: any, tourId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('jobs')
+    .select(`
+      job_departments (department)
+    `)
+    .eq('tour_id', tourId)
+    .limit(1);
+
+  if (error || !data || data.length === 0) {
+    console.log("No departments found for tour, defaulting to all departments");
+    return ['sound', 'lights', 'video', 'production', 'personnel', 'comercial'];
+  }
+
+  const departments = data[0].job_departments?.map((jd: any) => jd.department) || [];
+  console.log("Found departments for tour:", departments);
+  return departments;
+}
+
+/**
+ * Determines which departments should have folders created
+ */
+function shouldCreateDepartmentFolder(department: string, selectedDepartments: string[]): boolean {
+  // Always create these administrative departments
+  const alwaysCreateDepartments = ['production', 'personnel', 'comercial'];
+  
+  if (alwaysCreateDepartments.includes(department)) {
+    return true;
+  }
+
+  // For technical departments (sound, lights, video), only create if selected
+  const technicalDepartments = ['sound', 'lights', 'video'];
+  if (technicalDepartments.includes(department)) {
+    return selectedDepartments.includes(department);
+  }
+
+  return false;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -86,17 +128,27 @@ serve(async (req) => {
     if (createRootFolders) {
       console.log("Creating root folders for tour:", tour.name)
       
+      // Get selected departments for this tour
+      const selectedDepartments = await getTourDepartments(supabase, tourId);
+      console.log("Selected departments for root folder creation:", selectedDepartments);
+      
       // Create main tour folder
       const mainFolder = await createFlexFolder({
         name: tour.name,
         description: `Tour folder for ${tour.name}`
       }, authToken)
 
-      // Create department folders
-      const departments = ['sound', 'lights', 'video', 'production', 'personnel', 'comercial']
+      // Create department folders (conditional for technical departments)
+      const allDepartments = ['sound', 'lights', 'video', 'production', 'personnel', 'comercial']
       const folderIds: Record<string, string> = { main: mainFolder.id }
 
-      for (const dept of departments) {
+      for (const dept of allDepartments) {
+        // Check if this department should have a folder created
+        if (!shouldCreateDepartmentFolder(dept, selectedDepartments)) {
+          console.log(`Skipping ${dept} folder - department not selected`);
+          continue;
+        }
+
         const deptFolder = await createFlexFolder({
           parent_id: mainFolder.id,
           name: dept.charAt(0).toUpperCase() + dept.slice(1),
@@ -105,19 +157,23 @@ serve(async (req) => {
         folderIds[dept] = deptFolder.id
       }
 
-      // Update tour with folder IDs
+      // Update tour with folder IDs (only for created folders)
+      const updateData: any = {
+        flex_folders_created: true,
+        flex_main_folder_id: folderIds.main,
+      }
+
+      // Only set folder IDs for departments that were actually created
+      if (folderIds.sound) updateData.flex_sound_folder_id = folderIds.sound
+      if (folderIds.lights) updateData.flex_lights_folder_id = folderIds.lights
+      if (folderIds.video) updateData.flex_video_folder_id = folderIds.video
+      if (folderIds.production) updateData.flex_production_folder_id = folderIds.production
+      if (folderIds.personnel) updateData.flex_personnel_folder_id = folderIds.personnel
+      if (folderIds.comercial) updateData.flex_comercial_folder_id = folderIds.comercial
+
       const { error: updateError } = await supabase
         .from('tours')
-        .update({
-          flex_folders_created: true,
-          flex_main_folder_id: folderIds.main,
-          flex_sound_folder_id: folderIds.sound,
-          flex_lights_folder_id: folderIds.lights,
-          flex_video_folder_id: folderIds.video,
-          flex_production_folder_id: folderIds.production,
-          flex_personnel_folder_id: folderIds.personnel,
-          flex_comercial_folder_id: folderIds.comercial
-        })
+        .update(updateData)
         .eq('id', tourId)
 
       if (updateError) throw updateError
@@ -147,6 +203,10 @@ serve(async (req) => {
         throw new Error('Tour root folders must be created before date folders')
       }
 
+      // Get selected departments for date folder creation
+      const selectedDepartments = await getTourDepartments(supabase, tourId);
+      console.log("Selected departments for date folder creation:", selectedDepartments);
+
       // Create folders for each tour date
       for (const tourDate of tourDates) {
         const dateStr = new Date(tourDate.date).toISOString().split('T')[0]
@@ -159,9 +219,15 @@ serve(async (req) => {
           description: `Date folder for ${tour.name} on ${dateStr}`
         }, authToken)
 
-        // Create department subfolders for this date
-        const departments = ['sound', 'lights', 'video', 'production']
-        for (const dept of departments) {
+        // Create department subfolders for this date (only for selected departments)
+        const allDepartments = ['sound', 'lights', 'video', 'production', 'personnel', 'comercial']
+        for (const dept of allDepartments) {
+          // Check if this department should have a folder created
+          if (!shouldCreateDepartmentFolder(dept, selectedDepartments)) {
+            console.log(`Skipping ${dept} date folder - department not selected`);
+            continue;
+          }
+
           await createFlexFolder({
             parent_id: dateFolder.id,
             name: dept.charAt(0).toUpperCase() + dept.slice(1),
