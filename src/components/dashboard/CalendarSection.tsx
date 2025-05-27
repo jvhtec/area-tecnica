@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,6 +50,7 @@ import {
   Printer,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatInJobTimezone, isJobOnDate } from "@/utils/timezoneUtils";
 
 interface CalendarSectionProps {
   date: Date | undefined;
@@ -230,19 +230,14 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     if (!jobs) return [];
     return jobs.filter((job) => {
       try {
-        const startDate = job.start_time ? parseISO(job.start_time) : null;
-        const endDate = job.end_time ? parseISO(job.end_time) : null;
-        if (!startDate || !endDate) {
+        if (!job.start_time || !job.end_time) {
           console.warn("Invalid date found for job:", job);
           return false;
         }
-        const compareDate = format(date, "yyyy-MM-dd");
-        const jobStartDate = format(startDate, "yyyy-MM-dd");
-        const jobEndDate = format(endDate, "yyyy-MM-dd");
-        const isSingleDayJob = jobStartDate === jobEndDate;
-        const isWithinDuration = isSingleDayJob
-          ? compareDate === jobStartDate
-          : compareDate >= jobStartDate && compareDate <= jobEndDate;
+
+        const jobTimezone = job.timezone || 'Europe/Madrid';
+        const isWithinDuration = isJobOnDate(job.start_time, job.end_time, date, jobTimezone);
+        
         const matchesDepartment = department
           ? isWithinDuration && job.job_departments.some((d: any) => d.department === department)
           : isWithinDuration;
@@ -786,6 +781,7 @@ const JobCard: React.FC<JobCardProps> = ({
 
   const totalRequired = getTotalRequiredPersonnel(job);
   const currentlyAssigned = job.job_assignments?.length || 0;
+  const jobTimezone = job.timezone || 'Europe/Madrid';
   const dateTypeIcon = getDateTypeIcon(job.id, date);
 
   return (
@@ -825,8 +821,8 @@ const JobCard: React.FC<JobCardProps> = ({
               <div className="flex items-center gap-2 text-sm">
                 <Clock className="h-4 w-4" />
                 <span>
-                  {format(new Date(job.start_time), "MMM d, HH:mm")} -{" "}
-                  {format(new Date(job.end_time), "MMM d, HH:mm")}
+                  {formatInJobTimezone(job.start_time, "MMM d, HH:mm", jobTimezone)} -{" "}
+                  {formatInJobTimezone(job.end_time, "MMM d, HH:mm", jobTimezone)}
                 </span>
               </div>
               {job.location?.name && (

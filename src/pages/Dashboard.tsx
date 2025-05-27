@@ -1,8 +1,7 @@
-
 import { useState, useEffect } from "react";
 import { Department } from "@/types/department";
 import { useJobs } from "@/hooks/useJobs";
-import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { format } from "date-fns";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { supabase } from "@/lib/supabase";
@@ -18,22 +17,17 @@ import { MessagesList } from "@/components/messages/MessagesList";
 import { DirectMessagesList } from "@/components/messages/DirectMessagesList";
 import { Button } from "@/components/ui/button";
 import { DirectMessageDialog } from "@/components/messages/DirectMessageDialog";
+import { isJobOnDate } from "@/utils/timezoneUtils";
 
 const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
   if (!date || !jobs) return [];
   
-  const selectedDate = startOfDay(date);
-  
   return jobs.filter(job => {
     if (job.job_type === 'tour') return false;
     
-    const jobStartDate = startOfDay(new Date(job.start_time));
-    const jobEndDate = endOfDay(new Date(job.end_time));
-    
-    return isWithinInterval(selectedDate, {
-      start: jobStartDate,
-      end: jobEndDate
-    });
+    // Use timezone-aware date comparison
+    const jobTimezone = job.timezone || 'Europe/Madrid';
+    return isJobOnDate(job.start_time, job.end_time, date, jobTimezone);
   });
 };
 
