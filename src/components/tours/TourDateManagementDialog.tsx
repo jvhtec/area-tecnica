@@ -535,8 +535,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         .from("jobs")
         .insert({
           title: `${tourData.name} (${location || 'No Location'})`,
-          start_time: `${date}T00:00:00`,
-          end_time: `${date}T23:59:59`,
+          start_time: `${date}T06:00:00`,
+          end_time: `${date}T21:59:59`,
           location_id: locationId,
           tour_date_id: newTourDate.id,
           tour_id: tourId,
@@ -644,7 +644,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         .from("jobs")
         .update({
           title: `${tourData.name} (${newLocation || 'No Location'})`,
-          start_time: `${newDate}T00:00:00`,
+          start_: `${newDate}T00:00:00`,
           end_time: `${newDate}T23:59:59`,
           location_id: locationId,
         })
