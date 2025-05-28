@@ -266,6 +266,8 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
 
  // Replace your PDF generation logic with this optimized version
 
+// Replace your PDF generation logic with this optimized version
+
 const generatePDF = async (range: "month" | "quarter" | "year") => {
   const filteredJobs = jobs.filter((job) => {
     const jobType = job.job_type?.toLowerCase();
@@ -378,7 +380,7 @@ const generatePDF = async (range: "month" | "quarter" | "year") => {
   };
 
   for (const [pageIndex, monthStart] of months.entries()) {
-    if (pageIndex > 0) doc.addPage({ format: "a3", orientation: "landscape" });
+    if (pageIndex > 0) doc.addPage("a3", "landscape");
     
     // Add logo
     const logoX = logo ? (pageWidth - logoWidth) / 2 : 0;
@@ -426,7 +428,7 @@ const generatePDF = async (range: "month" | "quarter" | "year") => {
       
       // Check if we need a new page
       if (currentY + weekHeight > pageHeight - footerSpace) {
-        doc.addPage({ format: "a3", orientation: "landscape" });
+        doc.addPage("a3", "landscape");
         currentY = calendarStartY + 12;
       }
       
