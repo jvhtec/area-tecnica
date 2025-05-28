@@ -26,7 +26,10 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
       try {
         // Get current user's department
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user) {
+          console.log('No user found');
+          return;
+        }
 
         const { data: profile } = await supabase
           .from('profiles')
@@ -34,7 +37,12 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
           .eq('id', user.id)
           .single();
 
-        if (!profile?.department) return;
+        if (!profile?.department) {
+          console.log('No user department found');
+          return;
+        }
+
+        console.log('User department:', profile.department);
 
         // Get job details to determine job type
         const { data: job } = await supabase
@@ -43,7 +51,12 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
           .eq('id', jobId)
           .single();
 
-        if (!job) return;
+        if (!job) {
+          console.log('No job found');
+          return;
+        }
+
+        console.log('Job type:', job.job_type);
 
         let uuid: string | null = null;
 
@@ -58,36 +71,59 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
           };
 
           const mappedDepartment = departmentMapping[profile.department];
-          if (!mappedDepartment) return;
+          console.log('Mapped department for tourdate:', mappedDepartment);
+          
+          if (!mappedDepartment) {
+            console.log('No department mapping found');
+            return;
+          }
 
-          const { data: flexFolder } = await supabase
+          const { data: flexFolder, error } = await supabase
             .from('flex_folders')
             .select('element_id')
             .eq('folder_type', 'tour_department')
             .eq('department', mappedDepartment)
             .single();
 
+          if (error) {
+            console.log('Error fetching tourdate flex folder:', error);
+          }
+
           uuid = flexFolder?.element_id || null;
+          console.log('Tourdate UUID found:', uuid);
         } else {
           // For non-tourdate jobs: prefer parent_id, fallback to element_id by department
-          const { data: flexFolders } = await supabase
+          console.log('Fetching non-tourdate flex folders for department:', profile.department);
+          
+          const { data: flexFolders, error } = await supabase
             .from('flex_folders')
             .select('parent_id, element_id, department')
             .eq('department', profile.department);
 
+          if (error) {
+            console.log('Error fetching non-tourdate flex folders:', error);
+          }
+
+          console.log('Non-tourdate flex folders found:', flexFolders);
+
           if (flexFolders && flexFolders.length > 0) {
             // First try to find a parent_id that's not null
-            const folderWithParent = flexFolders.find(f => f.parent_id);
+            const folderWithParent = flexFolders.find(f => f.parent_id !== null && f.parent_id !== undefined);
             if (folderWithParent) {
               uuid = folderWithParent.parent_id;
+              console.log('Using parent_id:', uuid);
             } else {
               // Fallback to element_id from department match
               const departmentFolder = flexFolders.find(f => f.department === profile.department);
               uuid = departmentFolder?.element_id || null;
+              console.log('Using fallback element_id:', uuid);
             }
+          } else {
+            console.log('No flex folders found for department');
           }
         }
 
+        console.log('Final UUID set:', uuid);
         setFlexUuid(uuid);
       } catch (error) {
         console.error('Error fetching flex UUID:', error);
