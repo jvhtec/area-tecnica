@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -268,7 +269,9 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       const jobType = job.job_type?.toLowerCase();
       return jobType && printSettings.jobTypes[jobType] === true;
     });
-    const doc = new jsPDF("landscape");
+    
+    // Change to A3 format for better layout
+    const doc = new jsPDF("landscape", "mm", "a3");
     const currentDate = date || new Date();
     let startDate: Date, endDate: Date;
 
@@ -280,15 +283,19 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       img.onerror = (err) => reject(err);
     }).catch(() => null);
 
-    const logoWidth = 50;
-    const logoHeight = logo ? logoWidth * (logo.height / logo.width) : 0;
+    // A3 landscape dimensions: 420mm x 297mm
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     
-    // Define standard vertical spacing values
-    const logoTopY = 10;
-    const monthTitleY = logo ? logoTopY + logoHeight + 5 : 20;
-    const calendarStartY = monthTitleY + 10;
-    const footerSpace = 40; // Space reserved for logo and created date
+    // Optimized dimensions for A3 format
+    const logoWidth = 60; // Increased from 50
+    const logoHeight = logo ? logoWidth * (logo.height / logo.width) : 0;
+    
+    // Improved vertical spacing for A3
+    const logoTopY = 15;
+    const monthTitleY = logo ? logoTopY + logoHeight + 8 : 25;
+    const calendarStartY = monthTitleY + 15;
+    const footerSpace = 50;
 
     switch (range) {
       case "month":
@@ -309,9 +316,12 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     }
 
     const months = eachMonthOfInterval({ start: startDate, end: endDate });
-    const cellWidth = 40;
-    const cellHeight = 30;
-    const startX = 10;
+    
+    // Optimized cell dimensions for A3 format
+    const cellWidth = 57; // Increased from 40 to better utilize A3 width
+    const cellHeight = 40; // Increased from 30 for more content space
+    const startX = 15; // Slightly more margin
+    
     const daysOfWeek = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
     const dateTypeLabels: Record<string, string> = {
       travel: "V",
@@ -322,53 +332,61 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     };
 
     for (const [pageIndex, monthStart] of months.entries()) {
-      if (pageIndex > 0) doc.addPage("landscape");
+      if (pageIndex > 0) doc.addPage("landscape", "a3");
 
-      // Add logo if available
+      // Add logo if available with better positioning for A3
       const logoX = logo ? (pageWidth - logoWidth) / 2 : 0;
       if (logo) {
         doc.addImage(logo, "PNG", logoX, logoTopY, logoWidth, logoHeight);
       }
 
-      // Month title - set consistent styling and positioning
-      doc.setFontSize(16);
-      doc.setTextColor(51, 51, 51); // Reset to standard text color
+      // Month title with larger font for A3
+      doc.setFontSize(20); // Increased from 16
+      doc.setTextColor(51, 51, 51);
       doc.text(format(monthStart, "MMMM yyyy"), pageWidth / 2, monthTitleY, { align: "center" });
 
-      // Days of week header
+      // Days of week header with improved sizing
       daysOfWeek.forEach((day, index) => {
         doc.setFillColor(41, 128, 185);
-        doc.rect(startX + index * cellWidth, calendarStartY, cellWidth, 10, "F");
+        doc.rect(startX + index * cellWidth, calendarStartY, cellWidth, 12, "F"); // Increased header height
         doc.setTextColor(255);
-        doc.setFontSize(10);
-        doc.text(day, startX + index * cellWidth + 15, calendarStartY + 7);
+        doc.setFontSize(12); // Increased from 10
+        const textX = startX + index * cellWidth + cellWidth / 2;
+        doc.text(day, textX, calendarStartY + 8, { align: "center" });
       });
 
       const monthEnd = endOfMonth(monthStart);
       const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
       const firstDayOfWeek = 1;
+      
       function getDayIndex(d: Date) {
         return firstDayOfWeek === 1 ? (d.getDay() + 6) % 7 : d.getDay();
       }
+      
       const offset = getDayIndex(monthStart);
       const offsetDays = Array.from({ length: offset }, () => null);
       const allMonthDays = [...offsetDays, ...monthDays];
       const weeks: Array<Array<Date | null>> = [];
+      
       while (allMonthDays.length > 0) {
         weeks.push(allMonthDays.splice(0, 7));
       }
       
-      let currentY = calendarStartY + 10;
+      let currentY = calendarStartY + 12; // Adjusted for new header height
       
       for (const week of weeks) {
         for (const [dayIndex, day] of week.entries()) {
           const x = startX + dayIndex * cellWidth;
           doc.setDrawColor(200);
           doc.rect(x, currentY, cellWidth, cellHeight);
+          
           if (!day) continue;
-          doc.setTextColor(isSameMonth(day, monthStart) ? 0 : 200);
-          doc.setFontSize(12);
-          doc.text(format(day, "d"), x + 2, currentY + 5);
+          
+          // Day number with better positioning and size
+          doc.setTextColor(isSameMonth(day, monthStart) ? 0 : 150);
+          doc.setFontSize(14); // Increased from 12
+          doc.text(format(day, "d"), x + 3, currentY + 7);
+          
           const dayJobs = filteredJobs.filter((job) => {
             try {
               const startDate = job.start_time ? parseISO(job.start_time) : null;
@@ -386,37 +404,62 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
               return false;
             }
           });
-          let eventY = currentY + 8;
-          for (const [index, job] of dayJobs.slice(0, 8).entries()) {
+          
+          let eventY = currentY + 12; // Better spacing from day number
+          const maxEvents = 10; // Increased from 8 to show more events
+          const eventHeight = 3.5; // Slightly increased event height
+          
+          for (const [index, job] of dayJobs.slice(0, maxEvents).entries()) {
             const key = `${job.id}-${format(day, "yyyy-MM-dd")}`;
             const dateType = dateTypes[key]?.type;
             const typeLabel = dateType ? dateTypeLabels[dateType] : "";
             const baseColor = job.color || "#cccccc";
             const [r, g, b] = hexToRgb(baseColor);
             const textColor = getContrastColor(baseColor);
+            
+            // Event background with better dimensions
             doc.setFillColor(r, g, b);
-            doc.rect(x + 1, eventY + index * 5, cellWidth - 2, 4, "F");
+            doc.rect(x + 1, eventY + index * (eventHeight + 0.5), cellWidth - 2, eventHeight, "F");
+            
+            // Date type label
             if (typeLabel) {
               doc.setFontSize(8);
               doc.setTextColor(textColor);
-              doc.text(typeLabel, x + 3, eventY + index * 5 + 3);
+              doc.text(typeLabel, x + 2, eventY + index * (eventHeight + 0.5) + 2.5);
             }
+            
+            // Job title with better sizing and positioning
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(7);
+            doc.setFontSize(7.5); // Slightly increased
             doc.setTextColor(textColor);
-            const titleX = typeLabel ? x + 8 : x + 3;
-            doc.text(job.title.substring(0, 18), titleX, eventY + index * 5 + 3);
+            const titleX = typeLabel ? x + 8 : x + 2;
+            const maxTitleLength = 24; // Increased from 18
+            doc.text(job.title.substring(0, maxTitleLength), titleX, eventY + index * (eventHeight + 0.5) + 2.5);
+          }
+          
+          // "More events" indicator with better styling
+          if (dayJobs.length > maxEvents) {
+            const moreY = eventY + maxEvents * (eventHeight + 0.5);
+            doc.setFillColor(240, 240, 240);
+            doc.rect(x + 1, moreY, cellWidth - 2, eventHeight, "F");
+            doc.setFontSize(7);
+            doc.setTextColor(100);
+            doc.text(`+${dayJobs.length - maxEvents} more`, x + 2, moreY + 2.5);
           }
         }
         currentY += cellHeight;
       }
       
+      // Enhanced legend with better positioning for A3
       if (pageIndex === 0) {
-        const legendY = currentY + 10;
-        doc.setFontSize(8);
+        const legendY = currentY + 15;
+        doc.setFontSize(10); // Increased legend font size
         doc.setTextColor(0);
+        doc.text("Date Types:", startX, legendY);
+        
         Object.entries(dateTypeLabels).forEach(([type, label], index) => {
-          doc.text(`${label} = ${type}`, 10 + index * 40, legendY);
+          const legendX = startX + 80 + (index * 60); // Better spacing
+          doc.text(`${label} = ${type}`, legendX, legendY);
         });
       }
     }
