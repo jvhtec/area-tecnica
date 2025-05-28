@@ -112,103 +112,93 @@ export const exportTourPDF = async (tour: any) => {
     footerTextY
   );
 
-  // Function to add Sector Pro logo and save PDF
-  const addSectorProLogoAndSave = () => {
-    return new Promise<void>((resolve) => {
-      try {
-        const sectorLogoPath = '/sector pro logo.png';
-        console.log("Attempting to add Sector Pro logo from:", sectorLogoPath);
-        
-        const sectorImg = new Image();
-        
-        sectorImg.onload = () => {
-          try {
-            const logoWidth = 40;
-            const logoHeight = 15;
-            const xPosition = (pageWidth - logoWidth) / 2; // Center horizontally
-            const yPosition = pageHeight - 30; // 30 units from bottom
-            
-            console.log(`Adding Sector Pro logo at position: x=${xPosition}, y=${yPosition}`);
-            
-            pdf.addImage(
-              sectorImg, 
-              'PNG', 
-              xPosition,
-              yPosition,
-              logoWidth,
-              logoHeight
-            );
-            
-            console.log('Sector Pro logo added successfully');
-          } catch (err) {
-            console.error('Error adding Sector Pro logo to PDF:', err);
-          }
-          
-          // Save PDF after logo is added (or failed)
-          console.log('Saving PDF...');
-          pdf.save(`${tour.name}_schedule.pdf`);
-          resolve();
-        };
-        
-        sectorImg.onerror = (err) => {
-          console.error('Failed to load Sector Pro logo:', err);
-          // Save PDF even if logo fails
-          console.log('Saving PDF without logo...');
-          pdf.save(`${tour.name}_schedule.pdf`);
-          resolve();
-        };
-        
-        // Set timeout fallback
-        const timeout = setTimeout(() => {
-          console.warn('Sector Pro logo loading timed out');
-          // Save PDF if timeout occurs
-          console.log('Saving PDF after timeout...');
-          pdf.save(`${tour.name}_schedule.pdf`);
-          resolve();
-        }, 3000); // Reduced timeout to 3 seconds
-        
-        // Clear timeout if image loads successfully
-        sectorImg.onload = () => {
-          clearTimeout(timeout);
-          try {
-            const logoWidth = 40;
-            const logoHeight = 15;
-            const xPosition = (pageWidth - logoWidth) / 2;
-            const yPosition = pageHeight - 30;
-            
-            console.log(`Adding Sector Pro logo at position: x=${xPosition}, y=${yPosition}`);
-            
-            pdf.addImage(
-              sectorImg, 
-              'PNG', 
-              xPosition,
-              yPosition,
-              logoWidth,
-              logoHeight
-            );
-            
-            console.log('Sector Pro logo added successfully');
-          } catch (err) {
-            console.error('Error adding Sector Pro logo to PDF:', err);
-          }
-          
-          console.log('Saving PDF with logo...');
-          pdf.save(`${tour.name}_schedule.pdf`);
-          resolve();
-        };
-        
-        // Start loading the image
-        sectorImg.src = sectorLogoPath;
-        console.log('Started loading Sector Pro logo...');
-        
-      } catch (logoErr) {
-        console.error('Error in logo loading setup:', logoErr);
-        // Save PDF if there's an exception
-        console.log('Saving PDF after exception...');
-        pdf.save(`${tour.name}_schedule.pdf`);
-        resolve();
+  // Function to load image as base64
+  const loadImageAsBase64 = async (imagePath: string): Promise<string | null> => {
+    try {
+      console.log("Attempting to fetch image:", imagePath);
+      
+      const response = await fetch(imagePath);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
       }
-    });
+      
+      const blob = await response.blob();
+      
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64String = reader.result as string;
+          console.log("Successfully converted image to base64");
+          resolve(base64String);
+        };
+        reader.onerror = () => {
+          console.error("Error reading image as base64");
+          reject(new Error("Failed to convert image to base64"));
+        };
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error("Error loading image:", error);
+      return null;
+    }
+  };
+
+  // Function to add Sector Pro logo and save PDF
+  const addSectorProLogoAndSave = async () => {
+    try {
+      console.log("Starting Sector Pro logo loading process");
+      
+      // Try multiple possible paths for the logo
+      const possiblePaths = [
+        '/sector pro logo.png',
+        './sector pro logo.png',
+        'sector pro logo.png'
+      ];
+      
+      let logoBase64: string | null = null;
+      
+      for (const path of possiblePaths) {
+        console.log(`Trying logo path: ${path}`);
+        logoBase64 = await loadImageAsBase64(path);
+        if (logoBase64) {
+          console.log(`Successfully loaded logo from: ${path}`);
+          break;
+        }
+      }
+      
+      if (logoBase64) {
+        try {
+          const logoWidth = 40;
+          const logoHeight = 15;
+          const xPosition = (pageWidth - logoWidth) / 2; // Center horizontally
+          const yPosition = pageHeight - 30; // 30 units from bottom
+          
+          console.log(`Adding Sector Pro logo at position: x=${xPosition}, y=${yPosition}`);
+          
+          pdf.addImage(
+            logoBase64,
+            'PNG',
+            xPosition,
+            yPosition,
+            logoWidth,
+            logoHeight
+          );
+          
+          console.log('Sector Pro logo added successfully to PDF');
+        } catch (addError) {
+          console.error('Error adding logo to PDF:', addError);
+        }
+      } else {
+        console.warn('Could not load Sector Pro logo from any path');
+      }
+      
+    } catch (error) {
+      console.error('Error in logo loading process:', error);
+    }
+    
+    // Always save the PDF, regardless of logo success/failure
+    console.log('Saving PDF...');
+    pdf.save(`${tour.name}_schedule.pdf`);
   };
 
   // Execute logo loading and save
