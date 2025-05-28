@@ -331,9 +331,9 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       rehearsal: "E",
     };
 
-    for (const [pageIndex, monthStart] of months.entries()) {
-      if (pageIndex > 0) doc.addPage("landscape", "a3");
-
+ for (const [pageIndex, monthStart] of months.entries()) {
+  if (pageIndex > 0) doc.addPage({ format: "a3", orientation: "landscape" });
+  // ... rest of your code
       // Add logo if available with better positioning for A3
       const logoX = logo ? (pageWidth - logoWidth) / 2 : 0;
       if (logo) {
