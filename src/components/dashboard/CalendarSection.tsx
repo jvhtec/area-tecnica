@@ -358,7 +358,7 @@ const generatePDF = async (range: "month" | "quarter" | "year") => {
   // Helper function to calculate optimal cell height for all weeks (must fit on one page)
   const calculateOptimalWeekHeights = (weeks: Array<Array<Date | null>>) => {
     // Calculate the available space for calendar content
-    const availableHeight = pageHeight - calendarStartY - 12 - footerSpace - 30; // 30 for legend space
+    const availableHeight = pageHeight - calendarStartY - 8 - footerSpace - 30; // 30 for legend space
     
     // Get max events for each week
     const weekEventCounts = weeks.map(week => {
@@ -415,7 +415,7 @@ const generatePDF = async (range: "month" | "quarter" | "year") => {
     // Days of week header
     daysOfWeek.forEach((day, index) => {
       doc.setFillColor(41, 128, 185);
-      doc.rect(startX + index * cellWidth, calendarStartY, cellWidth, 12, "F");
+      doc.rect(startX + index * cellWidth, calendarStartY, cellWidth, 8, "F");
       doc.setTextColor(255);
       doc.setFontSize(12);
       const textX = startX + index * cellWidth + cellWidth / 2;
@@ -464,7 +464,7 @@ const generatePDF = async (range: "month" | "quarter" | "year") => {
         let eventY = currentY + 12;
         
         // Calculate how many events we can actually fit in this cell height
-        const availableEventSpace = weekHeight - 16; // 12 for day number + 4 padding
+        const availableEventSpace = weekHeight - 10; // 12 for day number + 4 padding
         const maxFittableEvents = Math.floor(availableEventSpace / (eventHeight + eventSpacing));
         const maxEvents = Math.min(dayJobs.length, Math.max(maxFittableEvents, 1)); // At least 1
         
