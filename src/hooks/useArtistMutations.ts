@@ -1,19 +1,7 @@
+
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-
-// Helper function to format artist time data
-const formatArtistTimeData = (artistData: any) => {
-  const formattedData = { ...artistData };
-  const timeFields = ['show_start', 'show_end', 'soundcheck_start', 'soundcheck_end'];
-
-  timeFields.forEach(field => {
-    if (formattedData[field] === '') {
-      formattedData[field] = null;
-    }
-  });
-  return formattedData;
-};
 
 export const useArtistMutations = (jobId: string | undefined, selectedDate: string) => {
   const queryClient = useQueryClient();
@@ -21,10 +9,9 @@ export const useArtistMutations = (jobId: string | undefined, selectedDate: stri
 
   const createArtistMutation = useMutation({
     mutationFn: async (artistData: any) => {
-      const dataToInsert = formatArtistTimeData(artistData);
       const { data, error } = await supabase
         .from("festival_artists")
-        .insert([dataToInsert])
+        .insert([artistData])
         .select()
         .single();
 
@@ -50,10 +37,9 @@ export const useArtistMutations = (jobId: string | undefined, selectedDate: stri
 
   const updateArtistMutation = useMutation({
     mutationFn: async ({ id, ...updateData }: any) => {
-      const dataToUpdate = formatArtistTimeData(updateData);
       const { data, error } = await supabase
         .from("festival_artists")
-        .update(dataToUpdate)
+        .update(updateData)
         .eq("id", id)
         .select()
         .single();
