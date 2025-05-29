@@ -45,9 +45,9 @@ export const ArtistManagementDialog = ({
           foh_tech: false,
           mon_tech: false,
           foh_console: "",
-          foh_console_provided_by: "festival",
+          foh_console_provided_by: "band", // Changed from "festival" to "band" as per user request
           mon_console: "",
-          mon_console_provided_by: "festival",
+          mon_console_provided_by: "band", // Changed from "festival" to "band" as per user request
           wireless_systems: [],
           iem_systems: [],
           monitors_enabled: false,

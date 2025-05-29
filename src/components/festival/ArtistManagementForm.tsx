@@ -165,8 +165,7 @@ export const ArtistManagementForm = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="festival">Festival</SelectItem>
-                <SelectItem value="artist">Artist</SelectItem>
-                <SelectItem value="production">Production</SelectItem>
+                <SelectItem value="band">Band</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -211,8 +210,7 @@ export const ArtistManagementForm = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="festival">Festival</SelectItem>
-                <SelectItem value="artist">Artist</SelectItem>
-                <SelectItem value="production">Production</SelectItem>
+                <SelectItem value="band">Band</SelectItem>
               </SelectContent>
             </Select>
           </div>
