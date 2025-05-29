@@ -34,6 +34,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { fetchTourLogo } from "@/utils/pdf/tourLogoUtils";
 import { exportTourPDF } from "@/lib/tourPdfExport";
 import { useToast } from "@/hooks/use-toast";
+import { useFlexUuid } from "@/hooks/useFlexUuid";
+import createFolderIcon from "@/assets/icons/icon.png";
+import { TourDateFlexButton } from "@/components/tours/TourDateFlexButton";
 
 interface TourManagementProps {
   tour: any;
@@ -56,6 +59,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
   const [isPrintingSchedule, setIsPrintingSchedule] = useState(false);
 
   const { assignments } = useTourAssignments(tour?.id);
+  const { flexUuid, isLoading: isFlexLoading, error: flexError } = useFlexUuid(tour?.id || '');
 
   // Load tour logo
   useEffect(() => {
@@ -271,6 +275,29 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
               <Printer className="h-4 w-4 mr-2" />
               {isPrintingSchedule ? 'Printing...' : 'Print Schedule'}
             </Button>
+            <Button 
+              onClick={handlePrintSchedule}
+              variant="outline"
+              disabled={isPrintingSchedule}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              {isPrintingSchedule ? 'Printing...' : 'Print Schedule'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+              onClick={() => {
+                if (flexUuid) {
+                  const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+                  window.open(flexUrl, '_blank', 'noopener');
+                }
+              }}
+              disabled={!flexUuid || isFlexLoading}
+            >
+              <img src={createFolderIcon} alt="Flex" className="h-4 w-4" />
+              Flex
+            </Button>
             <Button onClick={() => setIsSettingsOpen(true)}>
               <Settings className="h-4 w-4 mr-2" />
               Tour Settings
@@ -397,6 +424,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
                       <span>{date.location.name}</span>
                     </div>
                   )}
+                  <TourDateFlexButton tourDateId={date.id} />
                 </CardContent>
               </Card>
             ))}
