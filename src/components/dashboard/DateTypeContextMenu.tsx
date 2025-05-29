@@ -44,10 +44,10 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
 
         console.log('User department:', profile.department);
 
-        // Get job details to determine job type
+        // Get job details to determine job type and tour_date_id
         const { data: job } = await supabase
           .from('jobs')
-          .select('job_type')
+          .select('job_type, tour_date_id')
           .eq('id', jobId)
           .single();
 
@@ -56,74 +56,122 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
           return;
         }
 
-        console.log('Job type:', job.job_type);
+        console.log('Job details:', job);
 
         let uuid: string | null = null;
 
         if (job.job_type === 'tourdate') {
-          // For tourdate jobs: use element_id with folder_type = 'tour_department'
-          const departmentMapping: { [key: string]: string } = {
-            sound: 'sound',
-            lights: 'lights',
-            video: 'video',
-            production: 'production',
-            logistics: 'production'
-          };
-
-          const mappedDepartment = departmentMapping[profile.department];
-          console.log('Mapped department for tourdate:', mappedDepartment);
+          // For tourdate jobs: prioritize job-specific, then tour_date-specific, then fallback to generic
+          console.log('Processing tourdate job...');
           
-          if (!mappedDepartment) {
-            console.log('No department mapping found');
-            return;
-          }
-
-          const { data: flexFolder, error } = await supabase
+          // First try: job-specific folders
+          const { data: jobSpecificFolders } = await supabase
             .from('flex_folders')
-            .select('element_id')
-            .eq('folder_type', 'tour_department')
-            .eq('department', mappedDepartment)
-            .single();
-
-          if (error) {
-            console.log('Error fetching tourdate flex folder:', error);
-          }
-
-          uuid = flexFolder?.element_id || null;
-          console.log('Tourdate UUID found:', uuid);
-        } else {
-          // For non-tourdate jobs: prefer parent_id, fallback to element_id by department
-          console.log('Fetching non-tourdate flex folders for department:', profile.department);
-          
-          const { data: flexFolders, error } = await supabase
-            .from('flex_folders')
-            .select('parent_id, element_id, department')
+            .select('element_id, parent_id')
+            .eq('job_id', jobId)
             .eq('department', profile.department);
 
-          if (error) {
-            console.log('Error fetching non-tourdate flex folders:', error);
-          }
+          if (jobSpecificFolders && jobSpecificFolders.length > 0) {
+            const folder = jobSpecificFolders.find(f => f.parent_id) || jobSpecificFolders[0];
+            uuid = folder.parent_id || folder.element_id;
+            console.log('Found job-specific tourdate folder:', uuid);
+          } else if (job.tour_date_id) {
+            // Second try: tour_date-specific folders
+            const { data: tourDateFolders } = await supabase
+              .from('flex_folders')
+              .select('element_id, parent_id')
+              .eq('tour_date_id', job.tour_date_id)
+              .eq('department', profile.department);
 
-          console.log('Non-tourdate flex folders found:', flexFolders);
-
-          if (flexFolders && flexFolders.length > 0) {
-            // First try to find a parent_id that's not null
-            const folderWithParent = flexFolders.find(f => f.parent_id !== null && f.parent_id !== undefined);
-            if (folderWithParent) {
-              uuid = folderWithParent.parent_id;
-              console.log('Using parent_id:', uuid);
+            if (tourDateFolders && tourDateFolders.length > 0) {
+              const folder = tourDateFolders.find(f => f.parent_id) || tourDateFolders[0];
+              uuid = folder.parent_id || folder.element_id;
+              console.log('Found tour_date-specific folder:', uuid);
             } else {
-              // Fallback to element_id from department match
-              const departmentFolder = flexFolders.find(f => f.department === profile.department);
-              uuid = departmentFolder?.element_id || null;
-              console.log('Using fallback element_id:', uuid);
+              // Fallback: generic department mapping for tourdates
+              const departmentMapping: { [key: string]: string } = {
+                sound: 'sound',
+                lights: 'lights',
+                video: 'video',
+                production: 'production',
+                logistics: 'production'
+              };
+
+              const mappedDepartment = departmentMapping[profile.department];
+              console.log('Falling back to generic tourdate mapping for department:', mappedDepartment);
+              
+              if (mappedDepartment) {
+                const { data: flexFolder, error } = await supabase
+                  .from('flex_folders')
+                  .select('element_id')
+                  .eq('folder_type', 'tour_department')
+                  .eq('department', mappedDepartment)
+                  .single();
+
+                if (error) {
+                  console.log('Error fetching generic tourdate flex folder:', error);
+                } else {
+                  uuid = flexFolder?.element_id || null;
+                  console.log('Generic tourdate UUID found:', uuid);
+                }
+              }
+            }
+          }
+        } else {
+          // For non-tourdate jobs: prioritize job-specific, then fallback to generic
+          console.log('Processing non-tourdate job...');
+          
+          // First try: job-specific folders
+          const { data: jobSpecificFolders } = await supabase
+            .from('flex_folders')
+            .select('element_id, parent_id')
+            .eq('job_id', jobId)
+            .eq('department', profile.department);
+
+          if (jobSpecificFolders && jobSpecificFolders.length > 0) {
+            // Prefer parent_id over element_id for job-specific folders
+            const folder = jobSpecificFolders.find(f => f.parent_id !== null && f.parent_id !== undefined);
+            if (folder) {
+              uuid = folder.parent_id;
+              console.log('Found job-specific folder with parent_id:', uuid);
+            } else {
+              uuid = jobSpecificFolders[0].element_id;
+              console.log('Found job-specific folder with element_id:', uuid);
             }
           } else {
-            console.log('No flex folders found for department');
+            // Fallback: generic department lookup
+            console.log('No job-specific folders found, falling back to generic department lookup');
+            
+            const { data: flexFolders, error } = await supabase
+              .from('flex_folders')
+              .select('parent_id, element_id, department')
+              .eq('department', profile.department);
+
+            if (error) {
+              console.log('Error fetching generic flex folders:', error);
+            } else {
+              console.log('Generic flex folders found:', flexFolders);
+
+              if (flexFolders && flexFolders.length > 0) {
+                // First try to find a parent_id that's not null
+                const folderWithParent = flexFolders.find(f => f.parent_id !== null && f.parent_id !== undefined);
+                if (folderWithParent) {
+                  uuid = folderWithParent.parent_id;
+                  console.log('Using generic parent_id:', uuid);
+                } else {
+                  // Fallback to element_id from department match
+                  const departmentFolder = flexFolders.find(f => f.department === profile.department);
+                  uuid = departmentFolder?.element_id || null;
+                  console.log('Using generic fallback element_id:', uuid);
+                }
+              } else {
+                console.log('No generic flex folders found for department');
+              }
+            }
           }
         }
 
-        console.log('Final UUID set:', uuid);
+        console.log('Final UUID set for job', jobId, ':', uuid);
         setFlexUuid(uuid);
       } catch (error) {
         console.error('Error fetching flex UUID:', error);
