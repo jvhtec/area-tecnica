@@ -1,9 +1,9 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, Music2, Layout, Calendar, Printer, Loader2 } from "lucide-react";
+import createFolderIcon from "@/assets/icons/icon.png";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { format, isValid, parseISO } from "date-fns";
@@ -12,6 +12,7 @@ import { FestivalScheduling } from "@/components/festival/scheduling/FestivalSch
 import { PrintOptionsDialog, PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
+import { useFlexUuid } from "@/hooks/useFlexUuid";
 
 interface FestivalJob {
   id: string;
@@ -56,6 +57,7 @@ const FestivalManagement = () => {
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const { userRole } = useAuth();
   const [maxStages, setMaxStages] = useState(1);
+  const { flexUuid, isLoading: isFlexLoading, error: flexError } = useFlexUuid(jobId || '');
 
   const isSchedulingRoute = location.pathname.includes('/scheduling');
   
@@ -259,8 +261,8 @@ const FestivalManagement = () => {
             </div>
             <div className="flex gap-2 items-center">
               {canEdit && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   className="flex items-center gap-2"
                   onClick={handlePrintButtonClick}
@@ -272,6 +274,23 @@ const FestivalManagement = () => {
                     <Printer className="h-4 w-4" />
                   )}
                   {isPrinting ? 'Generating...' : 'Print Documentation'}
+                </Button>
+              )}
+              {canEdit && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                  onClick={() => {
+                    if (flexUuid) {
+                      const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+                      window.open(flexUrl, '_blank', 'noopener');
+                    }
+                  }}
+                  disabled={!flexUuid}
+                >
+                  <img src={createFolderIcon} alt="Flex" className="h-4 w-4" />
+                  Flex
                 </Button>
               )}
               {canEdit && <FestivalLogoManager jobId={jobId} />}
