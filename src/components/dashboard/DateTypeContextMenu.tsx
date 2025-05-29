@@ -44,7 +44,7 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
 
         console.log('User department:', profile.department);
 
-        // Get job details to determine job type
+        // Get job details to determine job type and tour_date_id
         const { data: job } = await supabase
           .from('jobs')
           .select('job_type, tour_date_id')
@@ -61,21 +61,61 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         let uuid: string | null = null;
 
         if (job.job_type === 'tourdate') {
-          // For tourdate jobs: use tour_department folder matching user's department
-          console.log('Processing tourdate job - looking for tour_department folder...');
+          // For tourdate jobs: prioritize job-specific, then tour_date-specific, then fallback to generic
+          console.log('Processing tourdate job...');
           
-          const { data: tourDeptFolder, error } = await supabase
+          // First try: job-specific folders
+          const { data: jobSpecificFolders } = await supabase
             .from('flex_folders')
-            .select('element_id')
-            .eq('folder_type', 'tour_department')
-            .eq('department', profile.department)
-            .single();
+            .select('element_id, parent_id')
+            .eq('job_id', jobId)
+            .eq('department', profile.department);
 
-          if (error) {
-            console.log('Error fetching tour_department folder:', error);
-          } else {
-            uuid = tourDeptFolder?.element_id || null;
-            console.log('Tour department folder UUID found:', uuid);
+          if (jobSpecificFolders && jobSpecificFolders.length > 0) {
+            const folder = jobSpecificFolders.find(f => f.parent_id) || jobSpecificFolders[0];
+            uuid = folder.parent_id || folder.element_id;
+            console.log('Found job-specific tourdate folder:', uuid);
+          } else if (job.tour_date_id) {
+            // Second try: tour_date-specific folders
+            const { data: tourDateFolders } = await supabase
+              .from('flex_folders')
+              .select('element_id, parent_id')
+              .eq('tour_date_id', job.tour_date_id)
+              .eq('department', profile.department);
+
+            if (tourDateFolders && tourDateFolders.length > 0) {
+              const folder = tourDateFolders.find(f => f.parent_id) || tourDateFolders[0];
+              uuid = folder.parent_id || folder.element_id;
+              console.log('Found tour_date-specific folder:', uuid);
+            } else {
+              // Fallback: generic department mapping for tourdates
+              const departmentMapping: { [key: string]: string } = {
+                sound: 'sound',
+                lights: 'lights',
+                video: 'video',
+                production: 'production',
+                logistics: 'production'
+              };
+
+              const mappedDepartment = departmentMapping[profile.department];
+              console.log('Falling back to generic tourdate mapping for department:', mappedDepartment);
+              
+              if (mappedDepartment) {
+                const { data: flexFolder, error } = await supabase
+                  .from('flex_folders')
+                  .select('element_id')
+                  .eq('folder_type', 'tour_department')
+                  .eq('department', mappedDepartment)
+                  .single();
+
+                if (error) {
+                  console.log('Error fetching generic tourdate flex folder:', error);
+                } else {
+                  uuid = flexFolder?.element_id || null;
+                  console.log('Generic tourdate UUID found:', uuid);
+                }
+              }
+            }
           }
         } else {
           // For non-tourdate jobs: prioritize job-specific, then fallback to generic
