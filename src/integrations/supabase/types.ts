@@ -2355,6 +2355,7 @@ export type Database = {
           dni: string | null
           email: string
           first_name: string | null
+          flex_user_id: string | null
           id: string
           last_activity: string | null
           last_name: string | null
@@ -2373,6 +2374,7 @@ export type Database = {
           dni?: string | null
           email: string
           first_name?: string | null
+          flex_user_id?: string | null
           id: string
           last_activity?: string | null
           last_name?: string | null
@@ -2391,6 +2393,7 @@ export type Database = {
           dni?: string | null
           email?: string
           first_name?: string | null
+          flex_user_id?: string | null
           id?: string
           last_activity?: string | null
           last_name?: string | null
