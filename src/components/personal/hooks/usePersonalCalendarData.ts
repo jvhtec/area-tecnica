@@ -110,7 +110,9 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
               start_time: jobData.start_time,
               end_time: jobData.end_time,
               status: jobData.status,
-              location: jobData.locations ? { name: jobData.locations.name } : null,
+              location: jobData.locations && Array.isArray(jobData.locations) && jobData.locations.length > 0 
+                ? { name: jobData.locations[0].name } 
+                : null,
             },
           };
         }).filter(Boolean) as Assignment[]; // Filter out null values
