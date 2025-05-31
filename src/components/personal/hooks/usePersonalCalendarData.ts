@@ -37,9 +37,11 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
+      console.log('PersonalCalendar: Starting data fetch for month:', currentMonth);
       
       try {
         // Fetch house technicians
+        console.log('PersonalCalendar: Fetching house technicians...');
         const { data: techsData, error: techsError } = await supabase
           .from('profiles')
           .select('id, first_name, last_name, department, phone')
@@ -47,17 +49,22 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
           .order('first_name');
 
         if (techsError) {
-          console.error('Error fetching house techs:', techsError);
+          console.error('PersonalCalendar: Error fetching house techs:', techsError);
+          setIsLoading(false);
           return;
         }
 
+        console.log('PersonalCalendar: House techs fetched:', techsData?.length || 0);
         setHouseTechs(techsData || []);
 
         // Calculate date range (current month ± 1 week for better performance)
         const startDate = subDays(startOfMonth(currentMonth), 7);
         const endDate = addDays(endOfMonth(currentMonth), 7);
 
+        console.log('PersonalCalendar: Date range:', startDate, 'to', endDate);
+
         // Fetch job assignments for house techs within date range
+        console.log('PersonalCalendar: Fetching job assignments...');
         const { data: assignmentsData, error: assignmentsError } = await supabase
           .from('job_assignments')
           .select(`
@@ -82,11 +89,12 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
           .lte('jobs.end_time', endDate.toISOString());
 
         if (assignmentsError) {
-          console.error('Error fetching assignments:', assignmentsError);
+          console.error('PersonalCalendar: Error fetching assignments:', assignmentsError);
+          setIsLoading(false);
           return;
         }
 
-        console.log('Raw assignments data:', assignmentsData);
+        console.log('PersonalCalendar: Raw assignments data:', assignmentsData);
 
         // Transform the data to match our interface
         const transformedAssignments: Assignment[] = (assignmentsData || []).map(assignment => {
@@ -94,11 +102,11 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
           const jobData = Array.isArray(assignment.jobs) ? assignment.jobs[0] : assignment.jobs;
           
           if (!jobData) {
-            console.warn('No job data found for assignment:', assignment);
+            console.warn('PersonalCalendar: No job data found for assignment:', assignment);
             return null;
           }
 
-          return {
+          const transformedAssignment = {
             technician_id: assignment.technician_id,
             sound_role: assignment.sound_role,
             lights_role: assignment.lights_role,
@@ -115,14 +123,18 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
                 : null,
             },
           };
+
+          console.log('PersonalCalendar: Transformed assignment:', transformedAssignment);
+          return transformedAssignment;
         }).filter(Boolean) as Assignment[]; // Filter out null values
 
-        console.log('Transformed assignments:', transformedAssignments);
+        console.log('PersonalCalendar: Final transformed assignments:', transformedAssignments.length);
         setAssignments(transformedAssignments);
       } catch (error) {
-        console.error('Error in fetchData:', error);
+        console.error('PersonalCalendar: Error in fetchData:', error);
       } finally {
         setIsLoading(false);
+        console.log('PersonalCalendar: Data fetch completed');
       }
     };
 
@@ -139,6 +151,7 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
           table: 'job_assignments'
         },
         () => {
+          console.log('PersonalCalendar: Real-time update received, refetching data');
           // Refetch data when assignments change
           fetchData();
         }

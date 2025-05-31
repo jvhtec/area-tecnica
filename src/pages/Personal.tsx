@@ -5,6 +5,8 @@ import { PersonalCalendar } from '@/components/personal/PersonalCalendar';
 const Personal = () => {
   const [date, setDate] = useState<Date>(new Date());
 
+  console.log('Personal page: Rendering with date:', date);
+
   return (
     <div className="container mx-auto p-4 space-y-6">
       <div className="flex items-center justify-between">

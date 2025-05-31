@@ -50,6 +50,12 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   
   const { houseTechs, assignments, isLoading } = usePersonalCalendarData(currentMonth);
 
+  console.log('PersonalCalendar: Render state', { 
+    isLoading, 
+    houseTechsCount: houseTechs.length, 
+    assignmentsCount: assignments.length 
+  });
+
   const handlePreviousMonth = () => {
     const newDate = new Date(currentMonth);
     newDate.setMonth(newDate.getMonth() - 1);
@@ -84,6 +90,34 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
       <Card className="h-full flex flex-col">
         <CardContent className="flex-grow p-4 flex items-center justify-center">
           <div className="text-muted-foreground">Loading calendar...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show message if no house techs are found
+  if (houseTechs.length === 0) {
+    return (
+      <Card className="h-full flex flex-col">
+        <CardContent className="flex-grow p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">{format(currentMonth, "MMMM yyyy")}</h2>
+            <div className="flex items-center space-x-2">
+              <Button variant="ghost" size="icon" onClick={handlePreviousMonth}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={handleNextMonth}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleTodayClick}>
+                Today
+              </Button>
+            </div>
+          </div>
+          <div className="text-center text-muted-foreground">
+            <p>No house technicians found.</p>
+            <p className="text-sm mt-2">Make sure there are users with the 'house_tech' role in the system.</p>
+          </div>
         </CardContent>
       </Card>
     );
