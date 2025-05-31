@@ -86,23 +86,36 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
           return;
         }
 
-        // Transform the data to match our interface
-        const transformedAssignments: Assignment[] = (assignmentsData || []).map(assignment => ({
-          technician_id: assignment.technician_id,
-          sound_role: assignment.sound_role,
-          lights_role: assignment.lights_role,
-          video_role: assignment.video_role,
-          job: {
-            id: assignment.jobs.id,
-            title: assignment.jobs.title,
-            color: assignment.jobs.color,
-            start_time: assignment.jobs.start_time,
-            end_time: assignment.jobs.end_time,
-            status: assignment.jobs.status,
-            location: assignment.jobs.locations ? { name: assignment.jobs.locations.name } : null,
-          },
-        }));
+        console.log('Raw assignments data:', assignmentsData);
 
+        // Transform the data to match our interface
+        const transformedAssignments: Assignment[] = (assignmentsData || []).map(assignment => {
+          // Handle the case where jobs might be an array or object
+          const jobData = Array.isArray(assignment.jobs) ? assignment.jobs[0] : assignment.jobs;
+          
+          if (!jobData) {
+            console.warn('No job data found for assignment:', assignment);
+            return null;
+          }
+
+          return {
+            technician_id: assignment.technician_id,
+            sound_role: assignment.sound_role,
+            lights_role: assignment.lights_role,
+            video_role: assignment.video_role,
+            job: {
+              id: jobData.id,
+              title: jobData.title,
+              color: jobData.color,
+              start_time: jobData.start_time,
+              end_time: jobData.end_time,
+              status: jobData.status,
+              location: jobData.locations ? { name: jobData.locations.name } : null,
+            },
+          };
+        }).filter(Boolean) as Assignment[]; // Filter out null values
+
+        console.log('Transformed assignments:', transformedAssignments);
         setAssignments(transformedAssignments);
       } catch (error) {
         console.error('Error in fetchData:', error);

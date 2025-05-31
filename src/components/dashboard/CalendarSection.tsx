@@ -247,8 +247,9 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
         async (payload) => {
           console.log("Date type change detected:", payload);
 
-          const changedJobId = payload.new?.job_id || payload.old?.job_id;
-          const changedDate = payload.new?.date || payload.old?.date; // This is a 'yyyy-MM-dd' string from DB
+          // Use optional chaining and type guards to safely access properties
+          const changedJobId = (payload.new as any)?.job_id || (payload.old as any)?.job_id;
+          const changedDate = (payload.new as any)?.date || (payload.old as any)?.date;
 
           // Get current visible jobs and dates to check relevance
           const jobIdsInView = new Set(allDays.flatMap(day => getJobsForDate(day).map(job => job.id)));
@@ -366,7 +367,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
           const jobTimezone = job.timezone || 'Europe/Madrid';
           return isJobOnDate(job.start_time, job.end_time, day, jobTimezone);
         } catch (error) {
-          console.error("Error processing job dates for PDF:", error, job);
+          console.error("Error processing job dates:", error, job);
           return false;
         }
       });
@@ -781,7 +782,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     setShowPrintDialog(false);
   };
   // --- End XLS Generation Logic ---
-
 
   const handlePreviousMonth = () => {
     const newDate = new Date(currentMonth);
