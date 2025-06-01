@@ -155,12 +155,12 @@ export const AboutCard = ({ userRole, userName }: AboutCardProps) => {
           )}
         </Button>
       </HoverCardTrigger>
-      <HoverCardContent className="w-96 max-h-[500px] overflow-y-auto">
+      <HoverCardContent className="w-96 max-h-96 overflow-y-auto">
         <div className="flex flex-col gap-4">
           <img
             src={currentImage}
             alt="About Image"
-            className="rounded-lg w-full h-32 object-cover flex-shrink-0"
+            className="rounded-lg w-full h-auto"
           />
           <div className="space-y-2">
             <p className="text-sm text-center text-muted-foreground">
@@ -182,9 +182,9 @@ export const AboutCard = ({ userRole, userName }: AboutCardProps) => {
               )}
             </div>
             
-            <div className="space-y-3 max-h-40 overflow-y-auto pr-2">
+            <div className="space-y-3 max-h-48 overflow-y-auto">
               {changelog.map((entry) => (
-                <div key={entry.id} className="border-l-2 border-muted pl-3 pb-2 last:pb-0">
+                <div key={entry.id} className="border-l-2 border-muted pl-3 pb-2">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-medium">v{entry.version}</span>
