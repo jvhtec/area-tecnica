@@ -73,10 +73,10 @@ export const AboutCard = ({ userRole }: AboutCardProps) => {
   // Allow editing for management users
   const canEditChangelog = userRole === "management"
 
-  // Only hide the entire component for management users - this seems backwards, keeping original logic
-  if (userRole === "management") {
-    return null;
-  }
+  // REMOVED: The early return that was hiding the component for management users
+  // if (userRole === "management") {
+  //   return null;
+  // }
 
   // Check for recent updates (within last 24 hours)
   useEffect(() => {
