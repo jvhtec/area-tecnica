@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -110,8 +109,8 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
         className={cn(
           "cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center shrink-0 relative",
           compact 
-            ? "text-xs px-1 py-0.5 h-5 min-w-[20px] text-center font-medium" 
-            : "text-xs gap-1 max-w-full font-medium",
+            ? "text-xs px-1 py-0.5 h-5 w-8 text-center font-medium" 
+            : "text-xs gap-0.5 w-16 font-medium px-1.5 py-0.5",
           assignment && !isUnavailable ? "font-medium" : "font-normal",
           isUnavailable && "opacity-75"
         )}
@@ -133,14 +132,14 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
           </>
         ) : (
           <>
-            <span className="flex-shrink-0">{getInitials()}</span>
+            <span className="flex-shrink-0 text-xs">{getInitials()}</span>
             {assignment && getRole() && !isUnavailable && (
-              <span className="truncate text-xs opacity-75">
-                {getRole()}
+              <span className="truncate text-[10px] opacity-75 max-w-[24px]">
+                {getRole().slice(0, 3)}
               </span>
             )}
             {getAvailabilityIcon() && (
-              <span className="text-xs ml-1">
+              <span className="text-[10px]">
                 {getAvailabilityIcon()}
               </span>
             )}
