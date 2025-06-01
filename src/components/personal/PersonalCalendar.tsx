@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Users, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   format,
   startOfMonth,
@@ -17,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { HouseTechBadge } from "./HouseTechBadge";
 import { usePersonalCalendarData } from "./hooks/usePersonalCalendarData";
+import { useTechnicianAvailability } from "./hooks/useTechnicianAvailability";
 
 interface PersonalCalendarProps {
   date: Date;
@@ -29,53 +31,12 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [availabilityOverrides, setAvailabilityOverrides] = useState<Record<string, 'vacation' | 'travel' | 'sick' | 'day_off'>>({});
   const { toast } = useToast();
-
+  
   const currentMonth = date;
   const firstDayOfMonth = startOfMonth(currentMonth);
   const lastDayOfMonth = endOfMonth(currentMonth);
   const daysInMonth = eachDayOfInterval({ start: firstDayOfMonth, end: lastDayOfMonth });
-
-  const { houseTechs, assignments, isLoading, supabase } = usePersonalCalendarData(currentMonth);
-
-  // Load availability data for the current month
-  React.useEffect(() => {
-    const loadAvailabilityData = async () => {
-      if (!supabase) return;
-      
-      try {
-        const startDate = format(firstDayOfMonth, 'yyyy-MM-dd');
-        const endDate = format(lastDayOfMonth, 'yyyy-MM-dd');
-        
-        const { data, error } = await supabase
-          .from('technician_availability')
-          .select('technician_id, date, status')
-          .gte('date', startDate)
-          .lte('date', endDate);
-
-        if (error) throw error;
-        
-        // Convert to the format expected by the component
-        const overrides: Record<string, 'vacation' | 'travel' | 'sick' | 'day_off'> = {};
-        data?.forEach((item) => {
-          const dateKey = `${item.technician_id}-${item.date}`;
-          overrides[dateKey] = item.status;
-        });
-        
-        setAvailabilityOverrides(overrides);
-      } catch (error) {
-        console.error('Failed to load availability data:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load availability data",
-          variant: "destructive",
-        });
-      }
-    };
-
-    loadAvailabilityData();
-  }, [firstDayOfMonth, lastDayOfMonth, toast, supabase]);
   
   // Get calendar padding for full weeks
   const startDay = firstDayOfMonth.getDay();
@@ -92,9 +53,22 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   });
   
   const allDays = [...prefixDays, ...daysInMonth, ...suffixDays];
+  
+  // Hooks for data
+  const { houseTechs, assignments, isLoading: calendarLoading } = usePersonalCalendarData(currentMonth);
+  const { 
+    setTechnicianAvailability,
+    removeTechnicianAvailability,
+    getAvailabilityStatus,
+    isLoading: availabilityLoading,
+    error: availabilityError
+  } = useTechnicianAvailability(currentMonth);
+
+  const isLoading = calendarLoading || availabilityLoading;
 
   console.log('PersonalCalendar: Render state', { 
-    isLoading, 
+    calendarLoading, 
+    availabilityLoading,
     houseTechsCount: houseTechs.length, 
     assignmentsCount: assignments.length 
   });
@@ -135,73 +109,47 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     });
   };
 
-  const handleAvailabilityChange = async (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off', date: Date) => {
-    if (!supabase) {
-      toast({
-        title: "Error",
-        description: "Database connection not available",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const dateKey = `${techId}-${format(date, 'yyyy-MM-dd')}`;
-    const dateStr = format(date, 'yyyy-MM-dd');
-    
+  const handleAvailabilityChange = async (
+    techId: string, 
+    status: 'vacation' | 'travel' | 'sick' | 'day_off', 
+    date: Date
+  ) => {
     try {
-      // Optimistically update the UI
-      setAvailabilityOverrides(prev => ({
-        ...prev,
-        [dateKey]: status
-      }));
-
-      // Save to Supabase
-      const { error } = await supabase
-        .from('technician_availability')
-        .upsert({
-          technician_id: techId,
-          date: dateStr,
-          status: status,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'technician_id,date'
-        });
-
-      if (error) throw error;
+      await setTechnicianAvailability(techId, date, status);
 
       // Show success toast
-      const statusText = {
-        vacation: 'vacation',
-        travel: 'travel',
-        sick: 'sick day',
-        day_off: 'day off'
-      }[status];
-      
+      const statusText = status === 'vacation' ? 'vacation' : 
+                        status === 'travel' ? 'travel' : 
+                        status === 'day_off' ? 'day off' : 'sick day';
       toast({
         title: "Availability Updated",
         description: `Technician marked as ${statusText} for ${format(date, 'MMM d, yyyy')}`,
       });
     } catch (error) {
-      // Revert optimistic update on error
-      setAvailabilityOverrides(prev => {
-        const updated = { ...prev };
-        delete updated[dateKey];
-        return updated;
-      });
-
+      // Show error toast
       toast({
         title: "Error",
-        description: "Failed to update availability status. Please try again.",
+        description: "Failed to update availability. Please try again.",
         variant: "destructive",
       });
-      
-      console.error('Failed to update availability:', error);
     }
   };
 
-  const getAvailabilityStatus = (techId: string, date: Date): 'vacation' | 'travel' | 'sick' | 'day_off' | null => {
-    const dateKey = `${techId}-${format(date, 'yyyy-MM-dd')}`;
-    return availabilityOverrides[dateKey] || null;
+  const handleAvailabilityRemove = async (techId: string, date: Date) => {
+    try {
+      await removeTechnicianAvailability(techId, date);
+      
+      toast({
+        title: "Availability Cleared",
+        description: `Availability status cleared for ${format(date, 'MMM d, yyyy')}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to clear availability. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Personnel summary for selected date
@@ -282,6 +230,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                   compact={true}
                   availabilityStatus={availabilityStatus}
                   onAvailabilityChange={handleAvailabilityChange}
+                  onAvailabilityRemove={handleAvailabilityRemove}
                 />
               );
             })}
@@ -337,6 +286,16 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* Error Alert */}
+      {availabilityError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Error loading availability data: {availabilityError}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Personnel Summary Section - now date-aware */}
       <Card>
         <CardContent className="p-4">
