@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -164,6 +163,53 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     return true;
   };
 
+  // Helper function to render badges in rows
+  const renderBadgesInRows = (techs: any[], day: Date, maxPerRow: number = 2) => {
+    const visibleTechs = techs.filter(tech => shouldShowTechOnDay(tech, day));
+    const dayAssignments = getAssignmentsForDate(day);
+    const maxDisplay = 10;
+    const techsToShow = visibleTechs.slice(0, maxDisplay);
+    
+    // Group techs into rows
+    const rows = [];
+    for (let i = 0; i < techsToShow.length; i += maxPerRow) {
+      rows.push(techsToShow.slice(i, i + maxPerRow));
+    }
+    
+    return (
+      <>
+        {rows.map((row, rowIndex) => (
+          <div key={rowIndex} className="flex gap-1 mb-1">
+            {row.map((tech) => {
+              const techAssignment = dayAssignments.find(
+                assignment => assignment.technician_id === tech.id
+              );
+              const availabilityStatus = getAvailabilityStatus(tech.id, day);
+              
+              return (
+                <HouseTechBadge
+                  key={tech.id}
+                  technician={tech}
+                  assignment={techAssignment}
+                  date={day}
+                  compact={true}
+                  availabilityStatus={availabilityStatus}
+                  onAvailabilityChange={handleAvailabilityChange}
+                />
+              );
+            })}
+          </div>
+        ))}
+        
+        {visibleTechs.length > maxDisplay && (
+          <div className="text-xs text-muted-foreground bg-accent/30 p-0.5 rounded text-center mt-1">
+            +{visibleTechs.length - maxDisplay}
+          </div>
+        )}
+      </>
+    );
+  };
+
   if (isLoading) {
     return (
       <Card className="h-full flex flex-col">
@@ -281,7 +327,6 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                 {/* Calendar days */}
                 {allDays.map((day, i) => {
                   const isCurrentMonth = isSameMonth(day, currentMonth);
-                  const dayAssignments = getAssignmentsForDate(day);
                   const weekend = isWeekend(day);
                   const today = isToday(day);
                   const isSelected = isSameDay(day, selectedDate);
@@ -306,32 +351,9 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                         {format(day, "d")}
                       </span>
                       
-                      {/* House tech badges - with weekend filtering */}
-                      <div className="mt-1 space-y-0.5">
-                        {houseTechs.slice(0, 10).filter(tech => shouldShowTechOnDay(tech, day)).map((tech) => {
-                          const techAssignment = dayAssignments.find(
-                            assignment => assignment.technician_id === tech.id
-                          );
-                          const availabilityStatus = getAvailabilityStatus(tech.id, day);
-                          
-                          return (
-                            <HouseTechBadge
-                              key={tech.id}
-                              technician={tech}
-                              assignment={techAssignment}
-                              date={day}
-                              compact={true}
-                              availabilityStatus={availabilityStatus}
-                              onAvailabilityChange={handleAvailabilityChange}
-                            />
-                          );
-                        })}
-                        
-                        {houseTechs.filter(tech => shouldShowTechOnDay(tech, day)).length > 10 && (
-                          <div className="text-xs text-muted-foreground bg-accent/30 p-0.5 rounded text-center">
-                            +{houseTechs.filter(tech => shouldShowTechOnDay(tech, day)).length - 10}
-                          </div>
-                        )}
+                      {/* House tech badges - now in rows */}
+                      <div className="mt-1">
+                        {renderBadgesInRows(houseTechs, day, 2)}
                       </div>
                     </div>
                   );
