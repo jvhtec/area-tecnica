@@ -32,9 +32,18 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   const [availabilityOverrides, setAvailabilityOverrides] = useState<Record<string, 'vacation' | 'travel' | 'sick' | 'day_off'>>({});
   const { toast } = useToast();
 
+  const currentMonth = date;
+  const firstDayOfMonth = startOfMonth(currentMonth);
+  const lastDayOfMonth = endOfMonth(currentMonth);
+  const daysInMonth = eachDayOfInterval({ start: firstDayOfMonth, end: lastDayOfMonth });
+
+  const { houseTechs, assignments, isLoading, supabase } = usePersonalCalendarData(currentMonth);
+
   // Load availability data for the current month
   React.useEffect(() => {
     const loadAvailabilityData = async () => {
+      if (!supabase) return;
+      
       try {
         const startDate = format(firstDayOfMonth, 'yyyy-MM-dd');
         const endDate = format(lastDayOfMonth, 'yyyy-MM-dd');
@@ -66,12 +75,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     };
 
     loadAvailabilityData();
-  }, [firstDayOfMonth, lastDayOfMonth, toast]);
-  
-  const currentMonth = date;
-  const firstDayOfMonth = startOfMonth(currentMonth);
-  const lastDayOfMonth = endOfMonth(currentMonth);
-  const daysInMonth = eachDayOfInterval({ start: firstDayOfMonth, end: lastDayOfMonth });
+  }, [firstDayOfMonth, lastDayOfMonth, toast, supabase]);
   
   // Get calendar padding for full weeks
   const startDay = firstDayOfMonth.getDay();
@@ -88,8 +92,6 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   });
   
   const allDays = [...prefixDays, ...daysInMonth, ...suffixDays];
-  
-  const { houseTechs, assignments, isLoading, supabase } = usePersonalCalendarData(currentMonth);
 
   console.log('PersonalCalendar: Render state', { 
     isLoading, 
@@ -134,6 +136,15 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   };
 
   const handleAvailabilityChange = async (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off', date: Date) => {
+    if (!supabase) {
+      toast({
+        title: "Error",
+        description: "Database connection not available",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const dateKey = `${techId}-${format(date, 'yyyy-MM-dd')}`;
     const dateStr = format(date, 'yyyy-MM-dd');
     
@@ -166,50 +177,6 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
         day_off: 'day off'
       }[status];
       
-      toast({
-        title: "Availability Updated",
-        description: `Technician marked as ${statusText} for ${format(date, 'MMM d, yyyy')}`,
-      });
-    } catch (error) {
-      // Revert optimistic update on error
-      setAvailabilityOverrides(prev => {
-        const updated = { ...prev };
-        delete updated[dateKey];
-        return updated;
-      });
-
-      toast({
-        title: "Error",
-        description: "Failed to update availability status. Please try again.",
-        variant: "destructive",
-      });
-      
-      console.error('Failed to update availability:', error);
-    }
-  };AvailabilityOverrides(prev => ({
-        ...prev,
-        [dateKey]: status
-      }));
-
-      // Save to database
-      const response = await fetch('/api/technician-availability', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          technician_id: techId,
-          date: dateStr,
-          status: status
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save availability status');
-      }
-
-      // Show success toast
-      const statusText = status === 'vacation' ? 'vacation' : status === 'travel' ? 'travel' : 'sick day';
       toast({
         title: "Availability Updated",
         description: `Technician marked as ${statusText} for ${format(date, 'MMM d, yyyy')}`,
