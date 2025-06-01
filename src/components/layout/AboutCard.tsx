@@ -7,6 +7,13 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Info, Edit3, Save, X, Clock } from "lucide-react"
+import { createClient } from "@supabase/supabase-js"
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.REACT_APP_SUPABASE_URL || "",
+  process.env.REACT_APP_SUPABASE_ANON_KEY || ""
+)
 
 // Get the version from Vite's env variables
 const version = import.meta.env.VITE_APP_VERSION || "dev"
