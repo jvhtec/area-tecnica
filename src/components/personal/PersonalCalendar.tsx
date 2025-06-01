@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Users } from "lucide-react";
@@ -23,13 +23,23 @@ interface PersonalCalendarProps {
   onDateSelect: (date: Date) => void;
 }
 
+interface TechnicianAvailability {
+  id: number;
+  technician_id: string;
+  date: string;
+  status: 'vacation' | 'travel' | 'sick' | 'day_off';
+  created_at: string;
+  updated_at: string;
+}
+
 export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   date,
   onDateSelect,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [availabilityOverrides, setAvailabilityOverrides] = useState<Record<string, 'vacation' | 'travel' | 'sick'>>({});
+  const [availabilityData, setAvailabilityData] = useState<TechnicianAvailability[]>([]);
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const { toast } = useToast();
   
   const currentMonth = date;
@@ -55,10 +65,36 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   
   const { houseTechs, assignments, isLoading } = usePersonalCalendarData(currentMonth);
 
+  // Load availability data for the current month
+  useEffect(() => {
+    const loadAvailabilityData = async () => {
+      setIsLoadingAvailability(true);
+      try {
+        const startDate = format(firstDayOfMonth, 'yyyy-MM-dd');
+        const endDate = format(lastDayOfMonth, 'yyyy-MM-dd');
+        
+        const response = await fetch(`/api/technician-availability?start_date=${startDate}&end_date=${endDate}`);
+        if (response.ok) {
+          const data = await response.json();
+          setAvailabilityData(data);
+        } else {
+          console.error('Failed to load availability data');
+        }
+      } catch (error) {
+        console.error('Error loading availability data:', error);
+      } finally {
+        setIsLoadingAvailability(false);
+      }
+    };
+
+    loadAvailabilityData();
+  }, [firstDayOfMonth, lastDayOfMonth]);
+
   console.log('PersonalCalendar: Render state', { 
     isLoading, 
     houseTechsCount: houseTechs.length, 
-    assignmentsCount: assignments.length 
+    assignmentsCount: assignments.length,
+    availabilityRecords: availabilityData.length
   });
 
   const handlePreviousMonth = () => {
@@ -97,24 +133,119 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     });
   };
 
-  const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick', date: Date) => {
-    const dateKey = `${techId}-${format(date, 'yyyy-MM-dd')}`;
-    setAvailabilityOverrides(prev => ({
-      ...prev,
-      [dateKey]: status
-    }));
+  const handleAvailabilityChange = async (techId: string, status: 'vacation' | 'travel' | 'sick', date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    
+    try {
+      // Check if availability record already exists
+      const existingRecord = availabilityData.find(
+        record => record.technician_id === techId && record.date === dateStr
+      );
 
-    // Show toast notification
-    const statusText = status === 'vacation' ? 'vacation' : status === 'travel' ? 'travel' : 'sick day';
-    toast({
-      title: "Availability Updated",
-      description: `Technician marked as ${statusText} for ${format(date, 'MMM d, yyyy')}`,
-    });
+      if (existingRecord) {
+        // Update existing record
+        const response = await fetch(`/api/technician-availability/${existingRecord.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            status,
+            updated_at: new Date().toISOString(),
+          }),
+        });
+
+        if (response.ok) {
+          const updatedRecord = await response.json();
+          setAvailabilityData(prev => 
+            prev.map(record => 
+              record.id === existingRecord.id ? updatedRecord : record
+            )
+          );
+        } else {
+          throw new Error('Failed to update availability');
+        }
+      } else {
+        // Create new record
+        const response = await fetch('/api/technician-availability', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            technician_id: techId,
+            date: dateStr,
+            status,
+          }),
+        });
+
+        if (response.ok) {
+          const newRecord = await response.json();
+          setAvailabilityData(prev => [...prev, newRecord]);
+        } else {
+          throw new Error('Failed to create availability record');
+        }
+      }
+
+      // Show success toast
+      const statusText = status === 'vacation' ? 'vacation' : status === 'travel' ? 'travel' : 'sick day';
+      toast({
+        title: "Availability Updated",
+        description: `Technician marked as ${statusText} for ${format(date, 'MMM d, yyyy')}`,
+      });
+
+    } catch (error) {
+      console.error('Error updating availability:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update technician availability. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const getAvailabilityStatus = (techId: string, date: Date): 'vacation' | 'travel' | 'sick' | null => {
-    const dateKey = `${techId}-${format(date, 'yyyy-MM-dd')}`;
-    return availabilityOverrides[dateKey] || null;
+  const removeAvailabilityStatus = async (techId: string, date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    
+    try {
+      const existingRecord = availabilityData.find(
+        record => record.technician_id === techId && record.date === dateStr
+      );
+
+      if (existingRecord) {
+        const response = await fetch(`/api/technician-availability/${existingRecord.id}`, {
+          method: 'DELETE',
+        });
+
+        if (response.ok) {
+          setAvailabilityData(prev => 
+            prev.filter(record => record.id !== existingRecord.id)
+          );
+          
+          toast({
+            title: "Availability Cleared",
+            description: `Technician availability cleared for ${format(date, 'MMM d, yyyy')}`,
+          });
+        } else {
+          throw new Error('Failed to remove availability record');
+        }
+      }
+    } catch (error) {
+      console.error('Error removing availability:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear technician availability. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getAvailabilityStatus = (techId: string, date: Date): 'vacation' | 'travel' | 'sick' | 'day_off' | null => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const record = availabilityData.find(
+      record => record.technician_id === techId && record.date === dateStr
+    );
+    return record?.status || null;
   };
 
   // Personnel summary for selected date
@@ -125,22 +256,27 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     const departmentSummary = houseTechs.reduce((acc, tech) => {
       const dept = tech.department || 'Unknown';
       if (!acc[dept]) {
-        acc[dept] = { total: 0, assigned: 0 };
+        acc[dept] = { total: 0, assigned: 0, unavailable: 0 };
       }
       acc[dept].total++;
       
-      // Check if tech has assignment on target date or is unavailable
+      // Check if tech has assignment on target date
       const hasAssignment = targetAssignments.some(
         assignment => assignment.technician_id === tech.id
       );
-      const isUnavailable = getAvailabilityStatus(tech.id, targetDate);
+      
+      // Check if tech is unavailable
+      const availabilityStatus = getAvailabilityStatus(tech.id, targetDate);
+      const isUnavailable = availabilityStatus && ['vacation', 'travel', 'sick', 'day_off'].includes(availabilityStatus);
       
       if (hasAssignment && !isUnavailable) {
         acc[dept].assigned++;
+      } else if (isUnavailable) {
+        acc[dept].unavailable++;
       }
       
       return acc;
-    }, {} as Record<string, { total: number; assigned: number }>);
+    }, {} as Record<string, { total: number; assigned: number; unavailable: number }>);
 
     return departmentSummary;
   };
@@ -195,6 +331,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                   compact={true}
                   availabilityStatus={availabilityStatus}
                   onAvailabilityChange={handleAvailabilityChange}
+                  onAvailabilityRemove={removeAvailabilityStatus}
                 />
               );
             })}
@@ -210,7 +347,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     );
   };
 
-  if (isLoading) {
+  if (isLoading || isLoadingAvailability) {
     return (
       <Card className="h-full flex flex-col">
         <CardContent className="flex-grow p-4 flex items-center justify-center">
@@ -250,7 +387,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Personnel Summary Section - now date-aware */}
+      {/* Personnel Summary Section - now includes unavailable count */}
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center gap-2 mb-3">
@@ -267,15 +404,24 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                 <div className="text-sm font-medium capitalize mb-1">
                   {department}
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-green-600 font-medium">
-                    Techs out: {stats.assigned}
-                  </span>
-                  <span className="text-muted-foreground">
-                    Techs in warehouse: {stats.total - stats.assigned}
-                  </span>
+                <div className="space-y-1 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-green-600 font-medium">
+                      Techs out: {stats.assigned}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-red-600 font-medium">
+                      Unavailable: {stats.unavailable}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">
+                      Available: {stats.total - stats.assigned - stats.unavailable}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">
+                <div className="text-xs text-muted-foreground mt-1 pt-1 border-t">
                   Total: {stats.total}
                 </div>
               </div>
