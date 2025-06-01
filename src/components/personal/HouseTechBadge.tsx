@@ -29,12 +29,14 @@ interface HouseTechBadgeProps {
     };
   };
   date: Date;
+  compact?: boolean;
 }
 
 export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
   technician,
   assignment,
   date,
+  compact = false,
 }) => {
   const getInitials = () => {
     const first = technician.first_name?.[0] || '';
@@ -54,17 +56,7 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
     return '#6b7280'; // Gray for unassigned
   };
 
-  const getContrastColor = (hex: string): string => {
-    // Simple contrast calculation
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    return luminance > 0.6 ? "#000000" : "#ffffff";
-  };
-
   const badgeColor = getBadgeColor();
-  const textColor = getContrastColor(badgeColor);
 
   return (
     <TechnicianTooltip
@@ -75,20 +67,29 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
       <Badge
         variant="secondary"
         className={cn(
-          "text-xs cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1 max-w-full",
+          "cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center shrink-0",
+          compact 
+            ? "text-xs px-1 py-0.5 h-5 min-w-[20px] text-center font-medium" 
+            : "text-xs gap-1 max-w-full font-medium",
           assignment ? "font-medium" : "font-normal"
         )}
         style={{
-          backgroundColor: `${badgeColor}20`,
-          borderColor: badgeColor,
+          backgroundColor: assignment ? `${badgeColor}20` : '#f3f4f6',
+          borderColor: assignment ? badgeColor : '#d1d5db',
           color: assignment ? badgeColor : '#6b7280',
         }}
       >
-        <span className="flex-shrink-0">{getInitials()}</span>
-        {assignment && getRole() && (
-          <span className="truncate text-xs opacity-75">
-            {getRole()}
-          </span>
+        {compact ? (
+          <span className="text-xs leading-none">{getInitials()}</span>
+        ) : (
+          <>
+            <span className="flex-shrink-0">{getInitials()}</span>
+            {assignment && getRole() && (
+              <span className="truncate text-xs opacity-75">
+                {getRole()}
+              </span>
+            )}
+          </>
         )}
       </Badge>
     </TechnicianTooltip>

@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { formatInJobTimezone } from '@/utils/timezoneUtils';
-import { MapPin, Clock, User, Phone } from 'lucide-react';
+import { MapPin, Clock, User, Phone, Briefcase } from 'lucide-react';
 
 interface TechnicianTooltipProps {
   technician: {
@@ -56,60 +56,97 @@ export const TechnicianTooltip: React.FC<TechnicianTooltipProps> = ({
 
   return (
     <TooltipProvider>
-      <Tooltip>
+      <Tooltip delayDuration={300}>
         <TooltipTrigger asChild>
           {children}
         </TooltipTrigger>
-        <TooltipContent className="w-64 p-3">
+        <TooltipContent 
+          className="w-72 p-4 bg-white dark:bg-gray-800 border shadow-lg"
+          side="top"
+          align="center"
+        >
           <div className="space-y-3">
-            {/* Technician Info */}
-            <div className="space-y-2">
-              <h4 className="font-semibold flex items-center gap-2">
-                <User className="h-4 w-4" />
-                {getFullName()}
-              </h4>
-              <p className="text-sm text-muted-foreground">{getDepartmentRole()}</p>
-              {technician.phone && (
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="h-3 w-3" />
-                  <span>{technician.phone}</span>
-                </div>
-              )}
+            {/* Technician Header */}
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <h4 className="font-semibold text-base flex items-center gap-2">
+                  <User className="h-4 w-4 text-primary" />
+                  {getFullName()}
+                </h4>
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Briefcase className="h-3 w-3" />
+                  {getDepartmentRole()}
+                </p>
+              </div>
+              
+              {/* Status indicator */}
+              <div className="flex flex-col items-end gap-1">
+                <Badge 
+                  variant={assignment ? "default" : "secondary"}
+                  className="text-xs"
+                >
+                  {assignment ? "Assigned" : "Available"}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {format(date, 'MMM d')}
+                </span>
+              </div>
             </div>
 
-            {/* Assignment Info */}
+            {/* Contact Info */}
+            {technician.phone && (
+              <div className="flex items-center gap-2 text-sm">
+                <Phone className="h-3 w-3 text-muted-foreground" />
+                <span>{technician.phone}</span>
+              </div>
+            )}
+
+            {/* Assignment Details */}
             {assignment ? (
               <div className="space-y-2 border-t pt-2">
-                <h5 className="font-medium text-sm">Assignment Details</h5>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">{assignment.job.title}</p>
-                  
-                  {getRole() && (
-                    <Badge variant="outline" className="text-xs">
-                      {getRole()}
-                    </Badge>
-                  )}
-                  
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    <span>
-                      {formatInJobTimezone(assignment.job.start_time, "HH:mm", 'Europe/Madrid')} - {formatInJobTimezone(assignment.job.end_time, "HH:mm", 'Europe/Madrid')}
-                    </span>
+                <h5 className="font-medium text-sm text-primary">Today's Assignment</h5>
+                <div className="space-y-2">
+                  <div className="bg-muted/50 rounded-lg p-2">
+                    <p className="text-sm font-medium">{assignment.job.title}</p>
+                    
+                    {getRole() && (
+                      <div className="mt-1">
+                        <Badge 
+                          variant="outline" 
+                          className="text-xs"
+                          style={{
+                            borderColor: assignment.job.color || '#d1d5db',
+                            color: assignment.job.color || '#6b7280',
+                          }}
+                        >
+                          {getRole()}
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                   
-                  {assignment.job.location && (
+                  <div className="space-y-1">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <MapPin className="h-3 w-3" />
-                      <span>{assignment.job.location.name}</span>
+                      <Clock className="h-3 w-3" />
+                      <span>
+                        {formatInJobTimezone(assignment.job.start_time, "HH:mm", 'Europe/Madrid')} - {formatInJobTimezone(assignment.job.end_time, "HH:mm", 'Europe/Madrid')}
+                      </span>
                     </div>
-                  )}
-                  
-                  {assignment.job.status && (
-                    <div className="text-xs">
-                      <span className="text-muted-foreground">Status: </span>
-                      <span className="capitalize">{assignment.job.status}</span>
-                    </div>
-                  )}
+                    
+                    {assignment.job.location && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <MapPin className="h-3 w-3" />
+                        <span>{assignment.job.location.name}</span>
+                      </div>
+                    )}
+                    
+                    {assignment.job.status && (
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Status: </span>
+                        <span className="capitalize font-medium">{assignment.job.status}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : (
@@ -117,6 +154,7 @@ export const TechnicianTooltip: React.FC<TechnicianTooltipProps> = ({
                 <p className="text-sm text-muted-foreground">
                   No assignment for {format(date, 'MMM d, yyyy')}
                 </p>
+                <p className="text-xs text-green-600 mt-1">Available for assignment</p>
               </div>
             )}
           </div>
