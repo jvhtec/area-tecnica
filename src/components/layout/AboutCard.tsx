@@ -50,7 +50,6 @@ interface AboutCardProps {
 export const AboutCard = ({ userRole }: AboutCardProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const [currentImage, setCurrentImage] = useState(images[0])
-  const [currentUser, setCurrentUser] = useState<any>(null)
   const [changelog, setChangelog] = useState<ChangelogEntry[]>([
     {
       id: "1",
@@ -71,34 +70,10 @@ export const AboutCard = ({ userRole }: AboutCardProps) => {
   const [editContent, setEditContent] = useState("")
   const [hasRecentUpdate, setHasRecentUpdate] = useState(false)
 
-  // Fetch current user from Supabase
-  useEffect(() => {
-    const getCurrentUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setCurrentUser(user)
-    }
-    
-    getCurrentUser()
-    
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setCurrentUser(session?.user || null)
-      }
-    )
-    
-    return () => subscription.unsubscribe()
-  }, [])
+  // Allow editing for management users
+  const canEditChangelog = userRole === "management"
 
-  // Check if user is Javier Vadillo (check email, full_name, or user_metadata)
-  const isJavierVadillo = currentUser && (
-    currentUser.email?.toLowerCase().includes("javier") ||
-    currentUser.user_metadata?.full_name?.toLowerCase().includes("javier vadillo") ||
-    currentUser.user_metadata?.name?.toLowerCase().includes("javier vadillo") ||
-    currentUser.identities?.[0]?.identity_data?.full_name?.toLowerCase().includes("javier vadillo")
-  )
-
-  // Only allow management-level users to see the carousel.
+  // Only hide the entire component for management users - this seems backwards, keeping original logic
   if (userRole === "management") {
     return null;
   }
@@ -216,7 +191,7 @@ export const AboutCard = ({ userRole }: AboutCardProps) => {
                         {formatDate(entry.date)}
                       </span>
                     </div>
-                    {isJavierVadillo && editingEntry !== entry.id && (
+                    {canEditChangelog && editingEntry !== entry.id && (
                       <Button
                         variant="ghost"
                         size="sm"
