@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Users } from "lucide-react";
@@ -38,8 +38,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [availabilityData, setAvailabilityData] = useState<TechnicianAvailability[]>([]);
-  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
+  const [availabilityOverrides, setAvailabilityOverrides] = useState<Record<string, 'vacation' | 'travel' | 'sick' | 'day_off'>>({});
   const { toast } = useToast();
   
   const currentMonth = date;
@@ -63,32 +62,13 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   
   const allDays = [...prefixDays, ...daysInMonth, ...suffixDays];
   
-  const { houseTechs, assignments, isLoading } = usePersonalCalendarData(currentMonth);
+  const { houseTechs, assignments, availabilityData, isLoading, updateAvailability, removeAvailability } = usePersonalCalendarData(currentMonth);
 
   // Load availability data for the current month
-  useEffect(() => {
-    const loadAvailabilityData = async () => {
-      setIsLoadingAvailability(true);
-      try {
-        const startDate = format(firstDayOfMonth, 'yyyy-MM-dd');
-        const endDate = format(lastDayOfMonth, 'yyyy-MM-dd');
-        
-        const response = await fetch(`/api/technician-availability?start_date=${startDate}&end_date=${endDate}`);
-        if (response.ok) {
-          const data = await response.json();
-          setAvailabilityData(data);
-        } else {
-          console.error('Failed to load availability data');
-        }
-      } catch (error) {
-        console.error('Error loading availability data:', error);
-      } finally {
-        setIsLoadingAvailability(false);
-      }
-    };
-
-    loadAvailabilityData();
-  }, [firstDayOfMonth, lastDayOfMonth]);
+  console.log('PersonalCalendar: Availability data loaded', { 
+    availabilityCount: availabilityData?.length || 0,
+    sampleData: availabilityData?.slice(0, 2)
+  });
 
   console.log('PersonalCalendar: Render state', { 
     isLoading, 
@@ -134,66 +114,30 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   };
 
   const handleAvailabilityChange = async (techId: string, status: 'vacation' | 'travel' | 'sick', date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
+    console.log('Handling availability change:', { techId, status, date: format(date, 'yyyy-MM-dd') });
     
     try {
-      // Check if availability record already exists
-      const existingRecord = availabilityData.find(
-        record => record.technician_id === techId && record.date === dateStr
-      );
-
-      if (existingRecord) {
-        // Update existing record
-        const response = await fetch(`/api/technician-availability/${existingRecord.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            status,
-            updated_at: new Date().toISOString(),
-          }),
+      if (updateAvailability) {
+        await updateAvailability(techId, status, date);
+        
+        const statusText = status === 'vacation' ? 'vacation' : status === 'travel' ? 'travel' : 'sick day';
+        toast({
+          title: "Availability Updated",
+          description: `Technician marked as ${statusText} for ${format(date, 'MMM d, yyyy')}`,
         });
-
-        if (response.ok) {
-          const updatedRecord = await response.json();
-          setAvailabilityData(prev => 
-            prev.map(record => 
-              record.id === existingRecord.id ? updatedRecord : record
-            )
-          );
-        } else {
-          throw new Error('Failed to update availability');
-        }
       } else {
-        // Create new record
-        const response = await fetch('/api/technician-availability', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            technician_id: techId,
-            date: dateStr,
-            status,
-          }),
+        // Fallback to local state if hook doesn't provide update function
+        const dateKey = `${techId}-${format(date, 'yyyy-MM-dd')}`;
+        setAvailabilityOverrides(prev => ({
+          ...prev,
+          [dateKey]: status
+        }));
+        
+        toast({
+          title: "Local Update",
+          description: `Availability updated locally for ${format(date, 'MMM d, yyyy')}`,
         });
-
-        if (response.ok) {
-          const newRecord = await response.json();
-          setAvailabilityData(prev => [...prev, newRecord]);
-        } else {
-          throw new Error('Failed to create availability record');
-        }
       }
-
-      // Show success toast
-      const statusText = status === 'vacation' ? 'vacation' : status === 'travel' ? 'travel' : 'sick day';
-      toast({
-        title: "Availability Updated",
-        description: `Technician marked as ${statusText} for ${format(date, 'MMM d, yyyy')}`,
-      });
-
     } catch (error) {
       console.error('Error updating availability:', error);
       toast({
@@ -205,30 +149,29 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   };
 
   const removeAvailabilityStatus = async (techId: string, date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
+    console.log('Removing availability status:', { techId, date: format(date, 'yyyy-MM-dd') });
     
     try {
-      const existingRecord = availabilityData.find(
-        record => record.technician_id === techId && record.date === dateStr
-      );
-
-      if (existingRecord) {
-        const response = await fetch(`/api/technician-availability/${existingRecord.id}`, {
-          method: 'DELETE',
+      if (removeAvailability) {
+        await removeAvailability(techId, date);
+        
+        toast({
+          title: "Availability Cleared",
+          description: `Technician availability cleared for ${format(date, 'MMM d, yyyy')}`,
         });
-
-        if (response.ok) {
-          setAvailabilityData(prev => 
-            prev.filter(record => record.id !== existingRecord.id)
-          );
-          
-          toast({
-            title: "Availability Cleared",
-            description: `Technician availability cleared for ${format(date, 'MMM d, yyyy')}`,
-          });
-        } else {
-          throw new Error('Failed to remove availability record');
-        }
+      } else {
+        // Fallback to local state removal
+        const dateKey = `${techId}-${format(date, 'yyyy-MM-dd')}`;
+        setAvailabilityOverrides(prev => {
+          const newState = { ...prev };
+          delete newState[dateKey];
+          return newState;
+        });
+        
+        toast({
+          title: "Local Clear",
+          description: `Availability cleared locally for ${format(date, 'MMM d, yyyy')}`,
+        });
       }
     } catch (error) {
       console.error('Error removing availability:', error);
@@ -242,10 +185,20 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
 
   const getAvailabilityStatus = (techId: string, date: Date): 'vacation' | 'travel' | 'sick' | 'day_off' | null => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    const record = availabilityData.find(
-      record => record.technician_id === techId && record.date === dateStr
-    );
-    return record?.status || null;
+    
+    // First check database data
+    if (availabilityData) {
+      const record = availabilityData.find(
+        record => record.technician_id === techId && record.date === dateStr
+      );
+      if (record) {
+        return record.status;
+      }
+    }
+    
+    // Fallback to local overrides
+    const localKey = `${techId}-${dateStr}`;
+    return availabilityOverrides[localKey] || null;
   };
 
   // Personnel summary for selected date
@@ -347,7 +300,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     );
   };
 
-  if (isLoading || isLoadingAvailability) {
+  if (isLoading) {
     return (
       <Card className="h-full flex flex-col">
         <CardContent className="flex-grow p-4 flex items-center justify-center">
