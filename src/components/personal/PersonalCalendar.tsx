@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import {
   addDays,
   subDays,
   isToday,
+  isSameDay,
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import { HouseTechBadge } from "./HouseTechBadge";
@@ -27,6 +29,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   onDateSelect,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [availabilityOverrides, setAvailabilityOverrides] = useState<Record<string, 'vacation' | 'travel' | 'sick'>>({});
   const { toast } = useToast();
   
@@ -72,7 +75,14 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   };
 
   const handleTodayClick = () => {
-    onDateSelect(new Date());
+    const today = new Date();
+    onDateSelect(today);
+    setSelectedDate(today);
+  };
+
+  const handleDateClick = (day: Date) => {
+    onDateSelect(day);
+    setSelectedDate(day);
   };
 
   const isWeekend = (day: Date) => {
@@ -108,10 +118,10 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     return availabilityOverrides[dateKey] || null;
   };
 
-  // Personnel for Today section logic
-  const getTodayPersonnelSummary = () => {
-    const today = new Date();
-    const todayAssignments = getAssignmentsForDate(today);
+  // Personnel summary for selected date
+  const getPersonnelSummary = () => {
+    const targetDate = selectedDate;
+    const targetAssignments = getAssignmentsForDate(targetDate);
     
     const departmentSummary = houseTechs.reduce((acc, tech) => {
       const dept = tech.department || 'Unknown';
@@ -120,11 +130,11 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
       }
       acc[dept].total++;
       
-      // Check if tech has assignment today or is unavailable
-      const hasAssignment = todayAssignments.some(
+      // Check if tech has assignment on target date or is unavailable
+      const hasAssignment = targetAssignments.some(
         assignment => assignment.technician_id === tech.id
       );
-      const isUnavailable = getAvailabilityStatus(tech.id, today);
+      const isUnavailable = getAvailabilityStatus(tech.id, targetDate);
       
       if (hasAssignment && !isUnavailable) {
         acc[dept].assigned++;
@@ -136,7 +146,23 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     return departmentSummary;
   };
 
-  const personnelSummary = getTodayPersonnelSummary();
+  const personnelSummary = getPersonnelSummary();
+
+  // Helper function to determine if tech should be shown on a given day
+  const shouldShowTechOnDay = (tech: any, day: Date) => {
+    const dayAssignments = getAssignmentsForDate(day);
+    const hasAssignment = dayAssignments.some(
+      assignment => assignment.technician_id === tech.id
+    );
+    const availabilityStatus = getAvailabilityStatus(tech.id, day);
+    
+    // If it's a weekend and no assignment and not marked unavailable, don't show
+    if (isWeekend(day) && !hasAssignment && !availabilityStatus) {
+      return false;
+    }
+    
+    return true;
+  };
 
   if (isLoading) {
     return (
@@ -178,14 +204,14 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Personnel for Today Section */}
+      {/* Personnel Summary Section - now date-aware */}
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center gap-2 mb-3">
             <Users className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-semibold">Personnel for Today</h3>
+            <h3 className="text-lg font-semibold">Personnel Summary</h3>
             <span className="text-sm text-muted-foreground">
-              ({format(new Date(), 'MMM d, yyyy')})
+              ({format(selectedDate, 'MMM d, yyyy')})
             </span>
           </div>
           
@@ -258,6 +284,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                   const dayAssignments = getAssignmentsForDate(day);
                   const weekend = isWeekend(day);
                   const today = isToday(day);
+                  const isSelected = isSameDay(day, selectedDate);
                   
                   return (
                     <div
@@ -266,20 +293,22 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                         "p-2 min-h-[140px] border-t relative cursor-pointer hover:bg-accent/50 transition-colors",
                         weekend ? "bg-slate-50 dark:bg-slate-800/50" : "bg-background",
                         today && "ring-2 ring-primary ring-inset",
+                        isSelected && "bg-accent/30",
                         !isCurrentMonth && "text-muted-foreground/50"
                       )}
-                      onClick={() => onDateSelect(day)}
+                      onClick={() => handleDateClick(day)}
                     >
                       <span className={cn(
                         "text-sm font-medium",
-                        today && "text-primary font-bold"
+                        today && "text-primary font-bold",
+                        isSelected && "text-primary"
                       )}>
                         {format(day, "d")}
                       </span>
                       
-                      {/* House tech badges - smaller and more compact */}
+                      {/* House tech badges - with weekend filtering */}
                       <div className="mt-1 space-y-0.5">
-                        {houseTechs.slice(0, 10).map((tech) => {
+                        {houseTechs.slice(0, 10).filter(tech => shouldShowTechOnDay(tech, day)).map((tech) => {
                           const techAssignment = dayAssignments.find(
                             assignment => assignment.technician_id === tech.id
                           );
@@ -298,9 +327,9 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                           );
                         })}
                         
-                        {houseTechs.length > 10 && (
+                        {houseTechs.filter(tech => shouldShowTechOnDay(tech, day)).length > 10 && (
                           <div className="text-xs text-muted-foreground bg-accent/30 p-0.5 rounded text-center">
-                            +{houseTechs.length - 10}
+                            +{houseTechs.filter(tech => shouldShowTechOnDay(tech, day)).length - 10}
                           </div>
                         )}
                       </div>

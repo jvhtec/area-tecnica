@@ -2,9 +2,10 @@
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { formatInJobTimezone } from '@/utils/timezoneUtils';
-import { MapPin, Clock, User, Phone, Briefcase } from 'lucide-react';
+import { MapPin, Clock, User, Phone, Briefcase, Calendar, Plane, Stethoscope } from 'lucide-react';
 
 interface TechDetailModalProps {
   open: boolean;
@@ -33,6 +34,8 @@ interface TechDetailModalProps {
     };
   };
   date: Date;
+  availabilityStatus?: 'vacation' | 'travel' | 'sick' | null;
+  onAvailabilityChange?: (techId: string, status: 'vacation' | 'travel' | 'sick', date: Date) => void;
 }
 
 export const TechDetailModal: React.FC<TechDetailModalProps> = ({
@@ -41,6 +44,8 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
   technician,
   assignment,
   date,
+  availabilityStatus = null,
+  onAvailabilityChange,
 }) => {
   const getFullName = () => {
     return `${technician.first_name || ''} ${technician.last_name || ''}`.trim() || 'Unknown';
@@ -54,6 +59,27 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
   const getDepartmentRole = () => {
     const dept = technician.department?.charAt(0).toUpperCase() + technician.department?.slice(1) || 'Unknown';
     return `${dept} House Tech`;
+  };
+
+  const getAvailabilityStatusText = () => {
+    if (!availabilityStatus) return null;
+    switch (availabilityStatus) {
+      case 'vacation':
+        return 'On Vacation';
+      case 'travel':
+        return 'Traveling';
+      case 'sick':
+        return 'Sick Day';
+      default:
+        return null;
+    }
+  };
+
+  const handleUnavailableClick = (status: 'vacation' | 'travel' | 'sick') => {
+    if (onAvailabilityChange) {
+      onAvailabilityChange(technician.id, status, date);
+      onOpenChange(false);
+    }
   };
 
   return (
@@ -73,10 +99,10 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
               {getDepartmentRole()}
             </p>
             <Badge 
-              variant={assignment ? "default" : "secondary"}
+              variant={availabilityStatus ? "destructive" : assignment ? "default" : "secondary"}
               className="text-xs"
             >
-              {assignment ? "Assigned" : "Available"}
+              {availabilityStatus ? getAvailabilityStatusText() : assignment ? "Assigned" : "Available"}
             </Badge>
           </div>
 
@@ -91,9 +117,16 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
             </div>
           )}
 
-          {assignment ? (
+          {availabilityStatus ? (
+            <div className="border-t pt-2">
+              <p className="text-sm text-muted-foreground">
+                {getAvailabilityStatusText()} on {format(date, 'MMM d, yyyy')}
+              </p>
+              <p className="text-xs text-orange-600 mt-1">Not available for assignment</p>
+            </div>
+          ) : assignment ? (
             <div className="space-y-2 border-t pt-2">
-              <h5 className="font-medium text-sm text-primary">Today's Assignment</h5>
+              <h5 className="font-medium text-sm text-primary">Assignment Details</h5>
               <div className="space-y-2">
                 <div className="bg-muted/50 rounded-lg p-2">
                   <p className="text-sm font-medium">{assignment.job.title}</p>
@@ -144,6 +177,42 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
                 No assignment for {format(date, 'MMM d, yyyy')}
               </p>
               <p className="text-xs text-green-600 mt-1">Available for assignment</p>
+            </div>
+          )}
+
+          {/* Mark as Unavailable Section - only show if not already unavailable and no assignment */}
+          {!availabilityStatus && !assignment && (
+            <div className="border-t pt-3">
+              <h5 className="font-medium text-sm mb-2">Mark as Unavailable</h5>
+              <div className="grid grid-cols-1 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleUnavailableClick('vacation')}
+                  className="justify-start"
+                >
+                  <Calendar className="mr-2 h-3 w-3" />
+                  Vacation
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleUnavailableClick('travel')}
+                  className="justify-start"
+                >
+                  <Plane className="mr-2 h-3 w-3" />
+                  Travel
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleUnavailableClick('sick')}
+                  className="justify-start"
+                >
+                  <Stethoscope className="mr-2 h-3 w-3" />
+                  Sick Day
+                </Button>
+              </div>
             </div>
           )}
         </div>
