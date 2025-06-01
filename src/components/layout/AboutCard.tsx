@@ -1,12 +1,11 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Info, Edit3, Save, X, Clock } from "lucide-react"
+import { Info } from "lucide-react"
 
 // Get the version from Vite's env variables
 const version = import.meta.env.VITE_APP_VERSION || "dev"
@@ -33,62 +32,19 @@ const images = [
   "/lovable-uploads/c582372d-4e74-45db-833e-29b8f557a4ba.png",
 ]
 
-// Define changelog entry interface
-interface ChangelogEntry {
-  id: string
-  version: string
-  date: string
-  content: string
-  lastUpdated: string
-}
-
 // Define an interface that includes the userRole prop.
 interface AboutCardProps {
-  userRole?: string
-  userName?: string // Add userName to identify Javier Vadillo
+  userRole?: string; // e.g. "management", "admin", etc.
 }
 
-export const AboutCard = ({ userRole, userName }: AboutCardProps) => {
+export const AboutCard = ({ userRole }: AboutCardProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const [currentImage, setCurrentImage] = useState(images[0])
-  const [changelog, setChangelog] = useState<ChangelogEntry[]>([
-    {
-      id: "1",
-      version: "1.2.0",
-      date: "2024-12-01",
-      content: "Added changelog functionality with editing capabilities for authorized users",
-      lastUpdated: new Date().toISOString()
-    },
-    {
-      id: "2", 
-      version: "1.1.0",
-      date: "2024-11-15",
-      content: "Improved UI with random image selection and better hover interactions",
-      lastUpdated: "2024-11-15T10:00:00Z"
-    }
-  ])
-  const [editingEntry, setEditingEntry] = useState<string | null>(null)
-  const [editContent, setEditContent] = useState("")
-  const [hasRecentUpdate, setHasRecentUpdate] = useState(false)
-
-  // Check if user is Javier Vadillo (case insensitive)
-  const isJavierVadillo = userName?.toLowerCase().includes("javier vadillo") || false
 
   // Only allow management-level users to see the carousel.
   if (userRole === "management") {
     return null;
   }
-
-  // Check for recent updates (within last 24 hours)
-  useEffect(() => {
-    const now = new Date()
-    const hasRecent = changelog.some(entry => {
-      const lastUpdate = new Date(entry.lastUpdated)
-      const timeDiff = now.getTime() - lastUpdate.getTime()
-      return timeDiff < 24 * 60 * 60 * 1000 // 24 hours in milliseconds
-    })
-    setHasRecentUpdate(hasRecent)
-  }, [changelog])
 
   // Selects a random image from the images array.
   const selectRandomImage = () => {
@@ -104,63 +60,24 @@ export const AboutCard = ({ userRole, userName }: AboutCardProps) => {
     }
   }
 
-  // Start editing a changelog entry
-  const startEditing = (entryId: string, currentContent: string) => {
-    setEditingEntry(entryId)
-    setEditContent(currentContent)
-  }
-
-  // Save changelog entry
-  const saveEntry = () => {
-    if (editingEntry) {
-      setChangelog(prev => prev.map(entry => 
-        entry.id === editingEntry 
-          ? { ...entry, content: editContent, lastUpdated: new Date().toISOString() }
-          : entry
-      ))
-      setEditingEntry(null)
-      setEditContent("")
-    }
-  }
-
-  // Cancel editing
-  const cancelEditing = () => {
-    setEditingEntry(null)
-    setEditContent("")
-  }
-
-  // Format date for display
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
-  }
-
   return (
     <HoverCard open={isOpen} onOpenChange={handleOpenChange}>
       <HoverCardTrigger asChild>
         <Button
           variant="ghost"
-          className="w-full justify-start gap-2 relative"
+          className="w-full justify-start gap-2"
           onClick={() => setIsOpen(true)}
         >
           <Info className="h-4 w-4" />
           <span>About</span>
-          {hasRecentUpdate && (
-            <Badge variant="secondary" className="ml-auto h-5 w-5 p-0 flex items-center justify-center">
-              <Clock className="h-3 w-3" />
-            </Badge>
-          )}
         </Button>
       </HoverCardTrigger>
-      <HoverCardContent className="w-96 max-h-[500px] overflow-y-auto">
+      <HoverCardContent className="w-80">
         <div className="flex flex-col gap-4">
           <img
             src={currentImage}
             alt="About Image"
-            className="rounded-lg w-full h-32 object-cover flex-shrink-0"
+            className="rounded-lg w-full h-auto"
           />
           <div className="space-y-2">
             <p className="text-sm text-center text-muted-foreground">
@@ -169,79 +86,6 @@ export const AboutCard = ({ userRole, userName }: AboutCardProps) => {
             <p className="text-xs text-center text-muted-foreground">
               v{version}
             </p>
-          </div>
-          
-          {/* Changelog Section */}
-          <div className="border-t pt-4">
-            <div className="flex items-center gap-2 mb-3">
-              <h3 className="text-sm font-semibold">Changelog</h3>
-              {hasRecentUpdate && (
-                <Badge variant="outline" className="text-xs">
-                  Updated
-                </Badge>
-              )}
-            </div>
-            
-            <div className="space-y-3 max-h-40 overflow-y-auto pr-2">
-              {changelog.map((entry) => (
-                <div key={entry.id} className="border-l-2 border-muted pl-3 pb-2 last:pb-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium">v{entry.version}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDate(entry.date)}
-                      </span>
-                    </div>
-                    {isJavierVadillo && editingEntry !== entry.id && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0"
-                        onClick={() => startEditing(entry.id, entry.content)}
-                      >
-                        <Edit3 className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                  
-                  {editingEntry === entry.id ? (
-                    <div className="space-y-2">
-                      <textarea
-                        value={editContent}
-                        onChange={(e) => setEditContent(e.target.value)}
-                        className="w-full text-xs p-2 border rounded resize-none"
-                        rows={3}
-                        placeholder="Enter changelog content..."
-                      />
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 px-2"
-                          onClick={saveEntry}
-                        >
-                          <Save className="h-3 w-3 mr-1" />
-                          Save
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 px-2"
-                          onClick={cancelEditing}
-                        >
-                          <X className="h-3 w-3 mr-1" />
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      {entry.content}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </HoverCardContent>
