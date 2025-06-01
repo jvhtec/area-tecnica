@@ -45,12 +45,12 @@ interface ChangelogEntry {
 // Define an interface that includes the userRole prop.
 interface AboutCardProps {
   userRole?: string
-  userName?: string // Add userName to identify Javier Vadillo
 }
 
-export const AboutCard = ({ userRole, userName }: AboutCardProps) => {
+export const AboutCard = ({ userRole }: AboutCardProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const [currentImage, setCurrentImage] = useState(images[0])
+  const [currentUser, setCurrentUser] = useState<any>(null)
   const [changelog, setChangelog] = useState<ChangelogEntry[]>([
     {
       id: "1",
@@ -71,8 +71,32 @@ export const AboutCard = ({ userRole, userName }: AboutCardProps) => {
   const [editContent, setEditContent] = useState("")
   const [hasRecentUpdate, setHasRecentUpdate] = useState(false)
 
-  // Check if user is Javier Vadillo (case insensitive)
-  const isJavierVadillo = userName?.toLowerCase().includes("javier vadillo") || false
+  // Fetch current user from Supabase
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setCurrentUser(user)
+    }
+    
+    getCurrentUser()
+    
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setCurrentUser(session?.user || null)
+      }
+    )
+    
+    return () => subscription.unsubscribe()
+  }, [])
+
+  // Check if user is Javier Vadillo (check email, full_name, or user_metadata)
+  const isJavierVadillo = currentUser && (
+    currentUser.email?.toLowerCase().includes("javier") ||
+    currentUser.user_metadata?.full_name?.toLowerCase().includes("javier vadillo") ||
+    currentUser.user_metadata?.name?.toLowerCase().includes("javier vadillo") ||
+    currentUser.identities?.[0]?.identity_data?.full_name?.toLowerCase().includes("javier vadillo")
+  )
 
   // Only allow management-level users to see the carousel.
   if (userRole === "management") {
