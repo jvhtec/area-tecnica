@@ -29,8 +29,44 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [availabilityOverrides, setAvailabilityOverrides] = useState<Record<string, 'vacation' | 'travel' | 'sick'>>({});
+  const [availabilityOverrides, setAvailabilityOverrides] = useState<Record<string, 'vacation' | 'travel' | 'sick' | 'day_off'>>({});
   const { toast } = useToast();
+
+  // Load availability data for the current month
+  React.useEffect(() => {
+    const loadAvailabilityData = async () => {
+      try {
+        const startDate = format(firstDayOfMonth, 'yyyy-MM-dd');
+        const endDate = format(lastDayOfMonth, 'yyyy-MM-dd');
+        
+        const { data, error } = await supabase
+          .from('technician_availability')
+          .select('technician_id, date, status')
+          .gte('date', startDate)
+          .lte('date', endDate);
+
+        if (error) throw error;
+        
+        // Convert to the format expected by the component
+        const overrides: Record<string, 'vacation' | 'travel' | 'sick' | 'day_off'> = {};
+        data?.forEach((item) => {
+          const dateKey = `${item.technician_id}-${item.date}`;
+          overrides[dateKey] = item.status;
+        });
+        
+        setAvailabilityOverrides(overrides);
+      } catch (error) {
+        console.error('Failed to load availability data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load availability data",
+          variant: "destructive",
+        });
+      }
+    };
+
+    loadAvailabilityData();
+  }, [firstDayOfMonth, lastDayOfMonth, toast]);
   
   const currentMonth = date;
   const firstDayOfMonth = startOfMonth(currentMonth);
@@ -53,7 +89,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   
   const allDays = [...prefixDays, ...daysInMonth, ...suffixDays];
   
-  const { houseTechs, assignments, isLoading } = usePersonalCalendarData(currentMonth);
+  const { houseTechs, assignments, isLoading, supabase } = usePersonalCalendarData(currentMonth);
 
   console.log('PersonalCalendar: Render state', { 
     isLoading, 
@@ -97,22 +133,106 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     });
   };
 
-  const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick', date: Date) => {
+  const handleAvailabilityChange = async (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off', date: Date) => {
     const dateKey = `${techId}-${format(date, 'yyyy-MM-dd')}`;
-    setAvailabilityOverrides(prev => ({
-      ...prev,
-      [dateKey]: status
-    }));
+    const dateStr = format(date, 'yyyy-MM-dd');
+    
+    try {
+      // Optimistically update the UI
+      setAvailabilityOverrides(prev => ({
+        ...prev,
+        [dateKey]: status
+      }));
 
-    // Show toast notification
-    const statusText = status === 'vacation' ? 'vacation' : status === 'travel' ? 'travel' : 'sick day';
-    toast({
-      title: "Availability Updated",
-      description: `Technician marked as ${statusText} for ${format(date, 'MMM d, yyyy')}`,
-    });
+      // Save to Supabase
+      const { error } = await supabase
+        .from('technician_availability')
+        .upsert({
+          technician_id: techId,
+          date: dateStr,
+          status: status,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'technician_id,date'
+        });
+
+      if (error) throw error;
+
+      // Show success toast
+      const statusText = {
+        vacation: 'vacation',
+        travel: 'travel',
+        sick: 'sick day',
+        day_off: 'day off'
+      }[status];
+      
+      toast({
+        title: "Availability Updated",
+        description: `Technician marked as ${statusText} for ${format(date, 'MMM d, yyyy')}`,
+      });
+    } catch (error) {
+      // Revert optimistic update on error
+      setAvailabilityOverrides(prev => {
+        const updated = { ...prev };
+        delete updated[dateKey];
+        return updated;
+      });
+
+      toast({
+        title: "Error",
+        description: "Failed to update availability status. Please try again.",
+        variant: "destructive",
+      });
+      
+      console.error('Failed to update availability:', error);
+    }
+  };AvailabilityOverrides(prev => ({
+        ...prev,
+        [dateKey]: status
+      }));
+
+      // Save to database
+      const response = await fetch('/api/technician-availability', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          technician_id: techId,
+          date: dateStr,
+          status: status
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save availability status');
+      }
+
+      // Show success toast
+      const statusText = status === 'vacation' ? 'vacation' : status === 'travel' ? 'travel' : 'sick day';
+      toast({
+        title: "Availability Updated",
+        description: `Technician marked as ${statusText} for ${format(date, 'MMM d, yyyy')}`,
+      });
+    } catch (error) {
+      // Revert optimistic update on error
+      setAvailabilityOverrides(prev => {
+        const updated = { ...prev };
+        delete updated[dateKey];
+        return updated;
+      });
+
+      toast({
+        title: "Error",
+        description: "Failed to update availability status. Please try again.",
+        variant: "destructive",
+      });
+      
+      console.error('Failed to update availability:', error);
+    }
   };
 
-  const getAvailabilityStatus = (techId: string, date: Date): 'vacation' | 'travel' | 'sick' | null => {
+  const getAvailabilityStatus = (techId: string, date: Date): 'vacation' | 'travel' | 'sick' | 'day_off' | null => {
     const dateKey = `${techId}-${format(date, 'yyyy-MM-dd')}`;
     return availabilityOverrides[dateKey] || null;
   };
@@ -269,10 +389,10 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-green-600 font-medium">
-                    Techs out: {stats.assigned}
+                    In: {stats.assigned}
                   </span>
                   <span className="text-muted-foreground">
-                    Techs in warehouse: {stats.total - stats.assigned}
+                    Out: {stats.total - stats.assigned}
                   </span>
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
