@@ -269,10 +269,10 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-green-600 font-medium">
-                    In: {stats.assigned}
+                    Techs out: {stats.assigned}
                   </span>
                   <span className="text-muted-foreground">
-                    Out: {stats.total - stats.assigned}
+                    Techs in warehouse: {stats.total - stats.assigned}
                   </span>
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
