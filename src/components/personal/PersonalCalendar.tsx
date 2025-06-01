@@ -353,7 +353,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                       
                       {/* House tech badges - now in rows */}
                       <div className="mt-1">
-                        {renderBadgesInRows(houseTechs, day, 2)}
+                        {renderBadgesInRows(houseTechs, day, 3)}
                       </div>
                     </div>
                   );
