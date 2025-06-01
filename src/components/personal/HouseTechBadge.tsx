@@ -1,8 +1,11 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { TechnicianTooltip } from './TechnicianTooltip';
+import { TechDetailModal } from './TechDetailModal';
+import { TechContextMenu } from './TechContextMenu';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface HouseTechBadgeProps {
   technician: {
@@ -30,6 +33,8 @@ interface HouseTechBadgeProps {
   };
   date: Date;
   compact?: boolean;
+  availabilityStatus?: 'vacation' | 'travel' | 'sick' | null;
+  onAvailabilityChange?: (techId: string, status: 'vacation' | 'travel' | 'sick', date: Date) => void;
 }
 
 export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
@@ -37,7 +42,12 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
   assignment,
   date,
   compact = false,
+  availabilityStatus = null,
+  onAvailabilityChange,
 }) => {
+  const [modalOpen, setModalOpen] = useState(false);
+  const isMobile = useIsMobile();
+
   const getInitials = () => {
     const first = technician.first_name?.[0] || '';
     const last = technician.last_name?.[0] || '';
@@ -50,48 +60,131 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
   };
 
   const getBadgeColor = () => {
+    // Handle unavailable status first
+    if (availabilityStatus) {
+      switch (availabilityStatus) {
+        case 'vacation':
+          return '#fbbf24'; // amber
+        case 'travel':
+          return '#3b82f6'; // blue
+        case 'sick':
+          return '#ef4444'; // red
+      }
+    }
+    
     if (assignment && assignment.job.color) {
       return assignment.job.color;
     }
     return '#6b7280'; // Gray for unassigned
   };
 
-  const badgeColor = getBadgeColor();
+  const getAvailabilityIcon = () => {
+    if (!availabilityStatus) return null;
+    switch (availabilityStatus) {
+      case 'vacation':
+        return '🏖️';
+      case 'travel':
+        return '✈️';
+      case 'sick':
+        return '🤒';
+      default:
+        return null;
+    }
+  };
 
-  return (
-    <TechnicianTooltip
-      technician={technician}
-      assignment={assignment}
-      date={date}
+  const badgeColor = getBadgeColor();
+  const isUnavailable = !!availabilityStatus;
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (isMobile) {
+      e.preventDefault();
+      e.stopPropagation();
+      setModalOpen(true);
+    }
+  };
+
+  const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick', date: Date) => {
+    if (onAvailabilityChange) {
+      onAvailabilityChange(techId, status, date);
+    }
+  };
+
+  const badgeContent = (
+    <Badge
+      variant="secondary"
+      className={cn(
+        "cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center shrink-0 relative",
+        compact 
+          ? "text-xs px-1 py-0.5 h-5 min-w-[20px] text-center font-medium" 
+          : "text-xs gap-1 max-w-full font-medium",
+        assignment && !isUnavailable ? "font-medium" : "font-normal",
+        isUnavailable && "opacity-75"
+      )}
+      style={{
+        backgroundColor: (assignment && !isUnavailable) ? `${badgeColor}20` : isUnavailable ? `${badgeColor}20` : '#f3f4f6',
+        borderColor: badgeColor,
+        color: badgeColor,
+      }}
+      onClick={handleClick}
     >
-      <Badge
-        variant="secondary"
-        className={cn(
-          "cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center shrink-0",
-          compact 
-            ? "text-xs px-1 py-0.5 h-5 min-w-[20px] text-center font-medium" 
-            : "text-xs gap-1 max-w-full font-medium",
-          assignment ? "font-medium" : "font-normal"
-        )}
-        style={{
-          backgroundColor: assignment ? `${badgeColor}20` : '#f3f4f6',
-          borderColor: assignment ? badgeColor : '#d1d5db',
-          color: assignment ? badgeColor : '#6b7280',
-        }}
-      >
-        {compact ? (
+      {compact ? (
+        <>
           <span className="text-xs leading-none">{getInitials()}</span>
-        ) : (
-          <>
-            <span className="flex-shrink-0">{getInitials()}</span>
-            {assignment && getRole() && (
-              <span className="truncate text-xs opacity-75">
-                {getRole()}
-              </span>
-            )}
-          </>
-        )}
-      </Badge>
-    </TechnicianTooltip>
+          {getAvailabilityIcon() && (
+            <span className="absolute -top-1 -right-1 text-[8px]">
+              {getAvailabilityIcon()}
+            </span>
+          )}
+        </>
+      ) : (
+        <>
+          <span className="flex-shrink-0">{getInitials()}</span>
+          {assignment && getRole() && !isUnavailable && (
+            <span className="truncate text-xs opacity-75">
+              {getRole()}
+            </span>
+          )}
+          {getAvailabilityIcon() && (
+            <span className="text-xs ml-1">
+              {getAvailabilityIcon()}
+            </span>
+          )}
+        </>
+      )}
+    </Badge>
+  );
+
+  // Mobile: wrap with modal trigger
+  if (isMobile) {
+    return (
+      <>
+        {badgeContent}
+        <TechDetailModal
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          technician={technician}
+          assignment={assignment}
+          date={date}
+        />
+      </>
+    );
+  }
+
+  // Desktop: wrap with context menu and tooltip
+  return (
+    <TechContextMenu
+      technician={technician}
+      date={date}
+      onAvailabilityChange={handleAvailabilityChange}
+    >
+      <TechnicianTooltip
+        technician={technician}
+        assignment={assignment}
+        date={date}
+        availabilityStatus={availabilityStatus}
+      >
+        {badgeContent}
+      </TechnicianTooltip>
+    </TechContextMenu>
   );
 };

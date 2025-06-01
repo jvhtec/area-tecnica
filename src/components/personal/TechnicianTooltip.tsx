@@ -31,6 +31,7 @@ interface TechnicianTooltipProps {
     };
   };
   date: Date;
+  availabilityStatus?: 'vacation' | 'travel' | 'sick' | null;
   children: React.ReactNode;
 }
 
@@ -38,6 +39,7 @@ export const TechnicianTooltip: React.FC<TechnicianTooltipProps> = ({
   technician,
   assignment,
   date,
+  availabilityStatus = null,
   children,
 }) => {
   const getFullName = () => {
@@ -52,6 +54,20 @@ export const TechnicianTooltip: React.FC<TechnicianTooltipProps> = ({
   const getDepartmentRole = () => {
     const dept = technician.department?.charAt(0).toUpperCase() + technician.department?.slice(1) || 'Unknown';
     return `${dept} House Tech`;
+  };
+
+  const getAvailabilityStatusText = () => {
+    if (!availabilityStatus) return null;
+    switch (availabilityStatus) {
+      case 'vacation':
+        return 'On Vacation';
+      case 'travel':
+        return 'Traveling';
+      case 'sick':
+        return 'Sick Day';
+      default:
+        return null;
+    }
   };
 
   return (
@@ -82,10 +98,10 @@ export const TechnicianTooltip: React.FC<TechnicianTooltipProps> = ({
               {/* Status indicator */}
               <div className="flex flex-col items-end gap-1">
                 <Badge 
-                  variant={assignment ? "default" : "secondary"}
+                  variant={availabilityStatus ? "destructive" : assignment ? "default" : "secondary"}
                   className="text-xs"
                 >
-                  {assignment ? "Assigned" : "Available"}
+                  {availabilityStatus ? getAvailabilityStatusText() : assignment ? "Assigned" : "Available"}
                 </Badge>
                 <span className="text-xs text-muted-foreground">
                   {format(date, 'MMM d')}
@@ -101,8 +117,15 @@ export const TechnicianTooltip: React.FC<TechnicianTooltipProps> = ({
               </div>
             )}
 
-            {/* Assignment Details */}
-            {assignment ? (
+            {/* Assignment Details or Unavailable Status */}
+            {availabilityStatus ? (
+              <div className="border-t pt-2">
+                <p className="text-sm text-muted-foreground">
+                  {getAvailabilityStatusText()} on {format(date, 'MMM d, yyyy')}
+                </p>
+                <p className="text-xs text-orange-600 mt-1">Not available for assignment</p>
+              </div>
+            ) : assignment ? (
               <div className="space-y-2 border-t pt-2">
                 <h5 className="font-medium text-sm text-primary">Today's Assignment</h5>
                 <div className="space-y-2">
