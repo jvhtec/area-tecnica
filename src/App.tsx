@@ -14,6 +14,7 @@ import Profile from '@/pages/Profile';
 import Settings from '@/pages/Settings';
 import ProjectManagement from '@/pages/ProjectManagement';
 import TechnicianDashboard from '@/pages/TechnicianDashboard';
+import Personal from '@/pages/Personal';
 import PesosTool from '@/pages/PesosTool';
 import LightsPesosTool from '@/pages/LightsPesosTool';
 import VideoPesosTool from '@/pages/VideoPesosTool';
@@ -61,6 +62,8 @@ export default function App() {
                   {/* Protected Routes */}
                   <Route element={<Layout />}>
                     <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/technician-dashboard" element={<TechnicianDashboard />} />
+                    <Route path="/personal" element={<Personal />} />
                     <Route path="/sound" element={<Sound />} />
                     <Route path="/lights" element={<Lights />} />
                     <Route path="/video" element={<Video />} />
@@ -70,7 +73,6 @@ export default function App() {
                     <Route path="/project-management" element={<ProjectManagement />} />
                     <Route path="/equipment-management" element={<EquipmentManagement />} />
                     <Route path="/festivals" element={<Festivals />} />
-                    <Route path="/technician-dashboard" element={<TechnicianDashboard />} />
                     
                     {/* Tour Management Route */}
                     <Route path="/tour-management/:tourId" element={<TourManagementWrapper />} />
