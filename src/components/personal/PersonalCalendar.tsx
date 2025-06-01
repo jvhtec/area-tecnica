@@ -164,7 +164,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   };
 
   // Helper function to render badges in rows
-  const renderBadgesInRows = (techs: any[], day: Date, maxPerRow: number = 2) => {
+  const renderBadgesInRows = (techs: any[], day: Date, maxPerRow: number = 3) => {
     const visibleTechs = techs.filter(tech => shouldShowTechOnDay(tech, day));
     const dayAssignments = getAssignmentsForDate(day);
     const maxDisplay = 10;
