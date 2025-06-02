@@ -118,22 +118,25 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     const departmentSummary = houseTechs.reduce((acc, tech) => {
       const dept = tech.department || 'Unknown';
       if (!acc[dept]) {
-        acc[dept] = { total: 0, assigned: 0 };
+        acc[dept] = { total: 0, assigned: 0, unavailable: 0 }; // Add 'unavailable' count
       }
       acc[dept].total++;
-      
-      // Check if tech has assignment on target date or is unavailable
+
       const hasAssignment = targetAssignments.some(
         assignment => assignment.technician_id === tech.id
       );
       const isUnavailable = getAvailabilityStatus(tech.id, targetDate);
-      
+
       if (hasAssignment && !isUnavailable) {
         acc[dept].assigned++;
       }
-      
+
+      if (isUnavailable) { // Count unavailable technicians
+        acc[dept].unavailable++;
+      }
+
       return acc;
-    }, {} as Record<string, { total: number; assigned: number }>);
+    }, {} as Record<string, { total: number; assigned: number; unavailable: number }>); // Update type
 
     return departmentSummary;
   };
@@ -266,7 +269,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                     Techs out: {stats.assigned}
                   </span>
                   <span className="text-muted-foreground">
-                    Techs in warehouse: {stats.total - stats.assigned}
+                    Techs in warehouse: {stats.total - stats.assigned - stats.unavailable} {/* Updated calculation */}
                   </span>
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
