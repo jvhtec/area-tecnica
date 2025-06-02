@@ -1,8 +1,8 @@
+
 import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Users } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import {
   format,
   startOfMonth,
@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { HouseTechBadge } from "./HouseTechBadge";
 import { usePersonalCalendarData } from "./hooks/usePersonalCalendarData";
+import { useTechnicianAvailability } from "./hooks/useTechnicianAvailability";
 
 interface PersonalCalendarProps {
   date: Date;
@@ -29,8 +30,6 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [availabilityOverrides, setAvailabilityOverrides] = useState<Record<string, 'vacation' | 'travel' | 'sick'>>({});
-  const { toast } = useToast();
   
   const currentMonth = date;
   const firstDayOfMonth = startOfMonth(currentMonth);
@@ -54,9 +53,15 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   const allDays = [...prefixDays, ...daysInMonth, ...suffixDays];
   
   const { houseTechs, assignments, isLoading } = usePersonalCalendarData(currentMonth);
+  const { 
+    updateAvailability, 
+    getAvailabilityStatus,
+    isLoading: isAvailabilityLoading 
+  } = useTechnicianAvailability(currentMonth);
 
   console.log('PersonalCalendar: Render state', { 
     isLoading, 
+    isAvailabilityLoading,
     houseTechsCount: houseTechs.length, 
     assignmentsCount: assignments.length 
   });
@@ -98,23 +103,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   };
 
   const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick', date: Date) => {
-    const dateKey = `${techId}-${format(date, 'yyyy-MM-dd')}`;
-    setAvailabilityOverrides(prev => ({
-      ...prev,
-      [dateKey]: status
-    }));
-
-    // Show toast notification
-    const statusText = status === 'vacation' ? 'vacation' : status === 'travel' ? 'travel' : 'sick day';
-    toast({
-      title: "Availability Updated",
-      description: `Technician marked as ${statusText} for ${format(date, 'MMM d, yyyy')}`,
-    });
-  };
-
-  const getAvailabilityStatus = (techId: string, date: Date): 'vacation' | 'travel' | 'sick' | null => {
-    const dateKey = `${techId}-${format(date, 'yyyy-MM-dd')}`;
-    return availabilityOverrides[dateKey] || null;
+    updateAvailability(techId, status, date);
   };
 
   // Personnel summary for selected date
@@ -210,7 +199,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     );
   };
 
-  if (isLoading) {
+  if (isLoading || isAvailabilityLoading) {
     return (
       <Card className="h-full flex flex-col">
         <CardContent className="flex-grow p-4 flex items-center justify-center">

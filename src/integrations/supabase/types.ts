@@ -2618,6 +2618,33 @@ export type Database = {
           },
         ]
       }
+      technician_availability: {
+        Row: {
+          created_at: string | null
+          date: string
+          id: number
+          status: string
+          technician_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          id?: number
+          status: string
+          technician_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          id?: number
+          status?: string
+          technician_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       technician_departments: {
         Row: {
           technician_id: string
