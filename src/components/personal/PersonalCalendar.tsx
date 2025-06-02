@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,6 +54,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   const { houseTechs, assignments, isLoading } = usePersonalCalendarData(currentMonth);
   const { 
     updateAvailability, 
+    removeAvailability,
     getAvailabilityStatus,
     isLoading: isAvailabilityLoading 
   } = useTechnicianAvailability(currentMonth);
@@ -102,8 +102,12 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     });
   };
 
-  const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick', date: Date) => {
+  const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off', date: Date) => {
     updateAvailability(techId, status, date);
+  };
+
+  const handleAvailabilityRemove = (techId: string, date: Date) => {
+    removeAvailability(techId, date);
   };
 
   // Personnel summary for selected date
@@ -184,6 +188,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                   compact={true}
                   availabilityStatus={availabilityStatus}
                   onAvailabilityChange={handleAvailabilityChange}
+                  onAvailabilityRemove={handleAvailabilityRemove}
                 />
               );
             })}

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -29,8 +30,9 @@ interface HouseTechBadgeProps {
   };
   date: Date;
   compact?: boolean;
-  availabilityStatus?: 'vacation' | 'travel' | 'sick' | null;
-  onAvailabilityChange?: (techId: string, status: 'vacation' | 'travel' | 'sick', date: Date) => void;
+  availabilityStatus?: 'vacation' | 'travel' | 'sick' | 'day_off' | null;
+  onAvailabilityChange?: (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off', date: Date) => void;
+  onAvailabilityRemove?: (techId: string, date: Date) => void;
 }
 
 export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
@@ -40,6 +42,7 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
   compact = false,
   availabilityStatus = null,
   onAvailabilityChange,
+  onAvailabilityRemove,
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -64,6 +67,8 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
           return '#3b82f6'; // blue
         case 'sick':
           return '#ef4444'; // red
+        case 'day_off':
+          return '#8b5cf6'; // violet
       }
     }
     
@@ -82,6 +87,8 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
         return '✈️';
       case 'sick':
         return '🤒';
+      case 'day_off':
+        return '🏠';
       default:
         return null;
     }
@@ -96,9 +103,15 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
     setModalOpen(true);
   };
 
-  const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick', date: Date) => {
+  const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off', date: Date) => {
     if (onAvailabilityChange) {
       onAvailabilityChange(techId, status, date);
+    }
+  };
+
+  const handleAvailabilityRemove = (techId: string, date: Date) => {
+    if (onAvailabilityRemove) {
+      onAvailabilityRemove(techId, date);
     }
   };
 
@@ -155,6 +168,7 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
         date={date}
         availabilityStatus={availabilityStatus}
         onAvailabilityChange={handleAvailabilityChange}
+        onAvailabilityRemove={handleAvailabilityRemove}
       />
     </>
   );

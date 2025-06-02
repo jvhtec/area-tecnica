@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { formatInJobTimezone } from '@/utils/timezoneUtils';
-import { MapPin, Clock, User, Phone, Briefcase, Calendar, Plane, Stethoscope } from 'lucide-react';
+import { MapPin, Clock, User, Phone, Briefcase, Calendar, Plane, Stethoscope, Home, X } from 'lucide-react';
 
 interface TechDetailModalProps {
   open: boolean;
@@ -34,8 +34,9 @@ interface TechDetailModalProps {
     };
   };
   date: Date;
-  availabilityStatus?: 'vacation' | 'travel' | 'sick' | null;
-  onAvailabilityChange?: (techId: string, status: 'vacation' | 'travel' | 'sick', date: Date) => void;
+  availabilityStatus?: 'vacation' | 'travel' | 'sick' | 'day_off' | null;
+  onAvailabilityChange?: (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off', date: Date) => void;
+  onAvailabilityRemove?: (techId: string, date: Date) => void;
 }
 
 export const TechDetailModal: React.FC<TechDetailModalProps> = ({
@@ -46,6 +47,7 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
   date,
   availabilityStatus = null,
   onAvailabilityChange,
+  onAvailabilityRemove,
 }) => {
   const getFullName = () => {
     return `${technician.first_name || ''} ${technician.last_name || ''}`.trim() || 'Unknown';
@@ -70,14 +72,23 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
         return 'Traveling';
       case 'sick':
         return 'Sick Day';
+      case 'day_off':
+        return 'Day Off';
       default:
         return null;
     }
   };
 
-  const handleUnavailableClick = (status: 'vacation' | 'travel' | 'sick') => {
+  const handleUnavailableClick = (status: 'vacation' | 'travel' | 'sick' | 'day_off') => {
     if (onAvailabilityChange) {
       onAvailabilityChange(technician.id, status, date);
+      onOpenChange(false);
+    }
+  };
+
+  const handleRemoveAvailability = () => {
+    if (onAvailabilityRemove) {
+      onAvailabilityRemove(technician.id, date);
       onOpenChange(false);
     }
   };
@@ -119,10 +130,20 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
 
           {availabilityStatus ? (
             <div className="border-t pt-2">
-              <p className="text-sm text-muted-foreground">
-                {getAvailabilityStatusText()} on {format(date, 'MMM d, yyyy')}
-              </p>
-              <p className="text-xs text-orange-600 mt-1">Not available for assignment</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm text-muted-foreground">
+                  {getAvailabilityStatusText()} on {format(date, 'MMM d, yyyy')}
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRemoveAvailability}
+                  className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+              <p className="text-xs text-orange-600">Not available for assignment</p>
             </div>
           ) : assignment ? (
             <div className="space-y-2 border-t pt-2">
@@ -211,6 +232,15 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
                 >
                   <Stethoscope className="mr-2 h-3 w-3" />
                   Sick Day
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleUnavailableClick('day_off')}
+                  className="justify-start"
+                >
+                  <Home className="mr-2 h-3 w-3" />
+                  Day Off
                 </Button>
               </div>
             </div>

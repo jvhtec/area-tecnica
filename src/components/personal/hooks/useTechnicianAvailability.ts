@@ -8,7 +8,7 @@ interface TechnicianAvailability {
   id: string;
   technician_id: string;
   date: string;
-  status: 'vacation' | 'travel' | 'sick';
+  status: 'vacation' | 'travel' | 'sick' | 'day_off';
   notes?: string;
   created_at: string;
   updated_at: string;
@@ -16,7 +16,7 @@ interface TechnicianAvailability {
 }
 
 export const useTechnicianAvailability = (currentMonth: Date) => {
-  const [availabilityData, setAvailabilityData] = useState<Record<string, 'vacation' | 'travel' | 'sick'>>({});
+  const [availabilityData, setAvailabilityData] = useState<Record<string, 'vacation' | 'travel' | 'sick' | 'day_off'>>({});
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
@@ -44,7 +44,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
         console.log('TechnicianAvailability: Fetched data:', data);
 
         // Transform data to match the expected format
-        const availabilityMap: Record<string, 'vacation' | 'travel' | 'sick'> = {};
+        const availabilityMap: Record<string, 'vacation' | 'travel' | 'sick' | 'day_off'> = {};
         data?.forEach((item: TechnicianAvailability) => {
           const key = `${item.technician_id}-${item.date}`;
           availabilityMap[key] = item.status;
@@ -82,7 +82,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
     };
   }, [currentMonth]);
 
-  const updateAvailability = async (techId: string, status: 'vacation' | 'travel' | 'sick', date: Date) => {
+  const updateAvailability = async (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off', date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const key = `${techId}-${dateStr}`;
 
@@ -122,7 +122,9 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
       }
 
       // Show success toast
-      const statusText = status === 'vacation' ? 'vacation' : status === 'travel' ? 'travel' : 'sick day';
+      const statusText = status === 'vacation' ? 'vacation' : 
+                        status === 'travel' ? 'travel' : 
+                        status === 'sick' ? 'sick day' : 'day off';
       toast({
         title: "Availability Updated",
         description: `Technician marked as ${statusText} for ${format(date, 'MMM d, yyyy')}`,
@@ -144,7 +146,49 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
     }
   };
 
-  const getAvailabilityStatus = (techId: string, date: Date): 'vacation' | 'travel' | 'sick' | null => {
+  const removeAvailability = async (techId: string, date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const key = `${techId}-${dateStr}`;
+
+    try {
+      // Optimistic update
+      setAvailabilityData(prev => {
+        const newState = { ...prev };
+        delete newState[key];
+        return newState;
+      });
+
+      const { error } = await supabase
+        .from('technician_availability')
+        .delete()
+        .eq('technician_id', techId)
+        .eq('date', dateStr);
+
+      if (error) {
+        console.error('TechnicianAvailability: Error removing availability:', error);
+        toast({
+          title: "Error",
+          description: "Failed to remove availability status",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Availability Removed",
+        description: `Availability status removed for ${format(date, 'MMM d, yyyy')}`,
+      });
+    } catch (error) {
+      console.error('TechnicianAvailability: Error in removeAvailability:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove availability status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getAvailabilityStatus = (techId: string, date: Date): 'vacation' | 'travel' | 'sick' | 'day_off' | null => {
     const key = `${techId}-${format(date, 'yyyy-MM-dd')}`;
     return availabilityData[key] || null;
   };
@@ -153,6 +197,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
     availabilityData,
     isLoading,
     updateAvailability,
+    removeAvailability,
     getAvailabilityStatus
   };
 };
