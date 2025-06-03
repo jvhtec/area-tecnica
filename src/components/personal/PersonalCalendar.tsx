@@ -20,19 +20,18 @@ import { usePersonalCalendarData } from "./hooks/usePersonalCalendarData";
 import { useTechnicianAvailability } from "./hooks/useTechnicianAvailability";
 
 interface PersonalCalendarProps {
-  date: Date;
-  onDateSelect: (date: Date) => void;
+  initialDate?: Date;
+  onDateSelect?: (date: Date) => void;
 }
 
 export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
-  date,
+  initialDate = new Date(),
   onDateSelect,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [currentMonth, setCurrentMonth] = useState<Date>(initialDate);
   const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
-
-  const currentMonth = date;
   
   // Memoize calendar days calculation
   const allDays = useMemo(() => {
@@ -186,25 +185,32 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   const handlePreviousMonth = useCallback(() => {
     const newDate = new Date(currentMonth);
     newDate.setMonth(newDate.getMonth() - 1);
-    onDateSelect(newDate);
+    setCurrentMonth(newDate);
+    onDateSelect?.(newDate);
   }, [currentMonth, onDateSelect]);
 
   const handleNextMonth = useCallback(() => {
     const newDate = new Date(currentMonth);
     newDate.setMonth(newDate.getMonth() + 1);
-    onDateSelect(newDate);
+    setCurrentMonth(newDate);
+    onDateSelect?.(newDate);
   }, [currentMonth, onDateSelect]);
 
   const handleTodayClick = useCallback(() => {
     const today = new Date();
-    onDateSelect(today);
+    setCurrentMonth(today);
     setSelectedDate(today);
+    onDateSelect?.(today);
   }, [onDateSelect]);
 
   const handleDateClick = useCallback((day: Date) => {
-    onDateSelect(day);
     setSelectedDate(day);
-  }, [onDateSelect]);
+    // Only change month if clicking on a day from different month
+    if (!isSameMonth(day, currentMonth)) {
+      setCurrentMonth(day);
+    }
+    onDateSelect?.(day);
+  }, [currentMonth, onDateSelect]);
 
   const handleToggleCollapse = useCallback(() => {
     setIsCollapsed(prev => !prev);
