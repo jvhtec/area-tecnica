@@ -1,11 +1,11 @@
 
 import { useEffect, useState } from 'react';
-import { FlexUuidService } from '@/services/flexUuidService';
 import { supabase } from '@/lib/supabase';
+import { FlexUuidService } from '@/services/flexUuidService';
 
-export const useFlexUuid = (jobId: string) => {
+export const useOptimizedFlexUuid = (jobId: string) => {
   const [flexUuid, setFlexUuid] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -19,14 +19,13 @@ export const useFlexUuid = (jobId: string) => {
         return;
       }
 
-      try {
-        setIsLoading(true);
-        setError(null);
+      setIsLoading(true);
+      setError(null);
 
+      try {
         // Get current user's department
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          console.log('No user found');
           if (!isCancelled) {
             setIsLoading(false);
             setError('User not authenticated');
@@ -41,21 +40,17 @@ export const useFlexUuid = (jobId: string) => {
           .single();
 
         if (profileError || !profile?.department) {
-          console.error('Error fetching user department:', profileError);
           if (!isCancelled) {
             setIsLoading(false);
-            setError('Could not determine user department.');
+            setError('Could not determine user department');
           }
           return;
         }
-
-        console.log('User department:', profile.department);
 
         // Use the optimized service to get the UUID
         const result = await FlexUuidService.getFlexUuid(jobId, profile.department);
 
         if (!isCancelled) {
-          console.log('Final UUID set for ID', jobId, ':', result.uuid);
           setFlexUuid(result.uuid);
           setError(result.error);
           setIsLoading(false);
