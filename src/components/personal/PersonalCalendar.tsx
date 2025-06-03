@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Users, Warehouse, Briefcase, Sun, CalendarOff, Car, Thermometer } from "lucide-react";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Users, Volume2, Lightbulb } from "lucide-react";
 import {
   format,
@@ -457,23 +456,23 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
             <div className="bg-muted/30 rounded-lg p-3 col-span-1">
               <h4 className="text-sm font-medium mb-1">Totales</h4>
               <div className="flex flex-col text-sm space-y-1">
-                <span className="text-muted-foreground flex items-center gap-1">
-                  <Warehouse className="h-4 w-4" /> Tecnicos en Almacen: {personnelTotals.techsInWarehouse}
+                <span className="text-muted-foreground">
+                  Tecnicos en Almacen: {personnelTotals.techsInWarehouse}
                 </span>
-                <span className="text-green-600 font-medium flex items-center gap-1">
-                  <Briefcase className="h-4 w-4" /> Tecnicos en bolos: {personnelTotals.techsOnJobs}
+                <span className="text-green-600 font-medium">
+                  Tecnicos en bolos: {personnelTotals.techsOnJobs}
                 </span>
-                <span className="text-red-600 font-medium flex items-center gap-1">
-                  <Sun className="h-4 w-4" /> Tecnicos de Vacaciones: {personnelTotals.techsOnVacation}
+                <span className="text-red-600 font-medium">
+                  Tecnicos de Vacaciones: {personnelTotals.techsOnVacation}
                 </span>
-                <span className="text-red-600 font-medium flex items-center gap-1">
-                  <CalendarOff className="h-4 w-4" /> Tecnicos de Dias Libres: {personnelTotals.techsOnDaysOff}
+                <span className="text-red-600 font-medium">
+                  Tecnicos de Dias Libres: {personnelTotals.techsOnDaysOff}
                 </span>
-                <span className="text-red-600 font-medium flex items-center gap-1">
-                  <Car className="h-4 w-4" /> Tecnicos en Viaje: {personnelTotals.techsTravelling}
+                <span className="text-red-600 font-medium">
+                  Tecnicos en Viaje: {personnelTotals.techsTravelling}
                 </span>
-                <span className="text-red-600 font-medium flex items-center gap-1">
-                  <Thermometer className="h-4 w-4" /> Tecnicos Enfermos: {personnelTotals.techsSick}
+                <span className="text-red-600 font-medium">
+                  Tecnicos Enfermos: {personnelTotals.techsSick}
                 </span>
               </div>
               <div className="text-xs text-muted-foreground mt-2">

@@ -27,56 +27,27 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
       
       try {
         // Get start and end of month to fetch relevant data
-        const startOfMonthFormatted = format(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1), 'yyyy-MM-dd');
-        const endOfMonthFormatted = format(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0), 'yyyy-MM-dd');
+        const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+        const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
 
-        // Fetch technician_availability
-        const { data: availabilityDataRaw, error: availabilityError } = await supabase
+        const { data, error } = await supabase
           .from('technician_availability')
           .select('*')
-          .gte('date', startOfMonthFormatted)
-          .lte('date', endOfMonthFormatted);
+          .gte('date', format(startOfMonth, 'yyyy-MM-dd'))
+          .lte('date', format(endOfMonth, 'yyyy-MM-dd'));
 
-        if (availabilityError) {
-          console.error('TechnicianAvailability: Error fetching availability data:', availabilityError);
+        if (error) {
+          console.error('TechnicianAvailability: Error fetching data:', error);
           return;
         }
 
-        // Fetch approved vacation_requests
-        const { data: vacationRequestsRaw, error: vacationError } = await supabase
-          .from('vacation_requests')
-          .select('*')
-          .eq('status', 'approved')
-          .gte('start_date', startOfMonthFormatted)
-          .lte('end_date', endOfMonthFormatted);
+        console.log('TechnicianAvailability: Fetched data:', data);
 
-        if (vacationError) {
-          console.error('TechnicianAvailability: Error fetching vacation requests:', vacationError);
-          return;
-        }
-
-        console.log('TechnicianAvailability: Fetched availability data:', availabilityDataRaw);
-        console.log('TechnicianAvailability: Fetched vacation requests:', vacationRequestsRaw);
-
+        // Transform data to match the expected format
         const availabilityMap: Record<string, 'vacation' | 'travel' | 'sick' | 'day_off'> = {};
-
-        // Process technician_availability data
-        availabilityDataRaw?.forEach((item: TechnicianAvailability) => {
+        data?.forEach((item: TechnicianAvailability) => {
           const key = `${item.technician_id}-${item.date}`;
           availabilityMap[key] = item.status;
-        });
-
-        // Process approved vacation_requests data
-        vacationRequestsRaw?.forEach((request: any) => { // Using 'any' for now, can define a type later if needed
-          let currentDate = new Date(request.start_date);
-          const endDate = new Date(request.end_date);
-
-          while (currentDate <= endDate) {
-            const dateStr = format(currentDate, 'yyyy-MM-dd');
-            const key = `${request.technician_id}-${dateStr}`;
-            availabilityMap[key] = 'vacation'; // Mark as vacation
-            currentDate = new Date(currentDate.setDate(currentDate.getDate() + 1));
-          }
         });
 
         setAvailabilityData(availabilityMap);
@@ -89,8 +60,8 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
 
     fetchAvailability();
 
-    // Set up real-time subscription for both tables
-    const availabilityChannel = supabase
+    // Set up real-time subscription
+    const channel = supabase
       .channel('technician-availability-updates')
       .on(
         'postgres_changes',
@@ -100,31 +71,14 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
           table: 'technician_availability'
         },
         () => {
-          console.log('TechnicianAvailability: Real-time update received from technician_availability, refetching data');
-          fetchAvailability();
-        }
-      )
-      .subscribe();
-
-    const vacationRequestsChannel = supabase
-      .channel('vacation-requests-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'vacation_requests'
-        },
-        () => {
-          console.log('TechnicianAvailability: Real-time update received from vacation_requests, refetching data');
+          console.log('TechnicianAvailability: Real-time update received, refetching data');
           fetchAvailability();
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(availabilityChannel);
-      supabase.removeChannel(vacationRequestsChannel);
+      supabase.removeChannel(channel);
     };
   }, [currentMonth]);
 
