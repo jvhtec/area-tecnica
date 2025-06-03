@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Users, Volume2, Lightbulb } from "lucide-react";
@@ -32,8 +32,56 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentMonth, setCurrentMonth] = useState<Date>(initialDate);
   const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
+  const [badgesPerRow, setBadgesPerRow] = useState(5);
+  
+  const calendarRef = useRef<HTMLDivElement>(null);
 
   console.log('PersonalCalendar render:', { currentMonth, selectedDate });
+
+  // Hook to calculate responsive badges per row
+  useEffect(() => {
+    const calculateBadgesPerRow = () => {
+      if (!calendarRef.current) return;
+      
+      const containerWidth = calendarRef.current.offsetWidth;
+      const cellWidth = containerWidth / 7; // 7 days in a week
+      
+      // Estimate badge width (you may need to adjust these values)
+      const badgeWidth = 24; // approximate width of a badge including margins
+      const padding = 16; // cell padding
+      const availableWidth = cellWidth - padding;
+      
+      const maxBadges = Math.floor(availableWidth / badgeWidth);
+      
+      // Set minimum and maximum constraints
+      const newBadgesPerRow = Math.min(Math.max(maxBadges, 1), 5);
+      setBadgesPerRow(newBadgesPerRow);
+    };
+
+    // Initial calculation
+    calculateBadgesPerRow();
+
+    // Recalculate on window resize
+    const handleResize = () => {
+      setTimeout(calculateBadgesPerRow, 100); // Small delay to ensure DOM is updated
+    };
+
+    window.addEventListener('resize', handleResize);
+    
+    // Use ResizeObserver if available for more accurate container size detection
+    let resizeObserver: ResizeObserver | null = null;
+    if (window.ResizeObserver && calendarRef.current) {
+      resizeObserver = new ResizeObserver(handleResize);
+      resizeObserver.observe(calendarRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+    };
+  }, [isCollapsed]); // Recalculate when calendar expands/collapses
   
   // Memoize calendar days calculation
   const allDays = useMemo(() => {
@@ -261,8 +309,8 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     return true;
   }, [selectedDepartment, getAssignmentsForDate, getAvailabilityStatus, isWeekend]);
 
-  // Memoized badge rendering function
-  const renderBadgesInRows = useCallback((techs: any[], day: Date, maxPerRow: number = 5) => {
+  // Updated badge rendering function with responsive maxPerRow
+  const renderBadgesInRows = useCallback((techs: any[], day: Date) => {
     const visibleTechs = techs.filter(tech => shouldShowTechOnDay(tech, day));
     const dayAssignments = getAssignmentsForDate(day);
     const maxDisplay = 10;
@@ -274,14 +322,14 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     const renderTechGroup = (techGroup: any[], groupKey: string) => {
       const techsToShow = techGroup.slice(0, maxDisplay);
       const rows = [];
-      for (let i = 0; i < techsToShow.length; i += maxPerRow) {
-        rows.push(techsToShow.slice(i, i + maxPerRow));
+      for (let i = 0; i < techsToShow.length; i += badgesPerRow) {
+        rows.push(techsToShow.slice(i, i + badgesPerRow));
       }
 
       return (
         <div key={groupKey}>
           {rows.map((row, rowIndex) => (
-            <div key={rowIndex} className="flex gap-1 mb-1">
+            <div key={rowIndex} className="flex gap-1 mb-1 flex-wrap">
               {row.map((tech) => {
                 const techAssignment = dayAssignments.find(
                   assignment => assignment.technician_id === tech.id
@@ -320,7 +368,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
         )}
       </>
     );
-  }, [shouldShowTechOnDay, getAssignmentsForDate, getAvailabilityStatus, handleAvailabilityChange, handleAvailabilityRemove]);
+  }, [shouldShowTechOnDay, getAssignmentsForDate, getAvailabilityStatus, handleAvailabilityChange, handleAvailabilityRemove, badgesPerRow]);
 
   if (isLoading || isAvailabilityLoading) {
     return (
@@ -459,7 +507,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
           </div>
 
           {!isCollapsed && (
-            <div className="border rounded-lg overflow-x-auto">
+            <div className="border rounded-lg overflow-x-auto" ref={calendarRef}>
               <div className="grid grid-cols-7 gap-px bg-muted" style={{ minWidth: "980px" }}>
                 {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
                   <div key={day} className="bg-background p-2 text-center text-sm text-muted-foreground font-medium">
