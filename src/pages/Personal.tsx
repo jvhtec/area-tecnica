@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React from 'react';
 import { PersonalCalendar } from '@/components/personal/PersonalCalendar';
 import { VacationRequestForm } from '@/components/personal/VacationRequestForm';
 import { supabase } from '@/lib/supabase';
@@ -53,8 +52,8 @@ const Personal = () => {
       </div>
       
       <PersonalCalendar 
-        date={date}
-        onDateSelect={setDate}
+        initialDate={new Date()}
+        onDateSelect={handleDateSelect} // Optional callback
       />
 
       {/* Vacation Request Form */}
