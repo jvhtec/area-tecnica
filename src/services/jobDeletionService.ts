@@ -66,15 +66,22 @@ const cleanupStorageForJob = async (jobId: string) => {
       .select('file_path')
       .eq('job_id', jobId);
 
-    // Get all festival artist files for storage cleanup
-    const { data: artistFiles } = await supabase
-      .from('festival_artist_files')
-      .select('file_path')
-      .in('artist_id', supabase
-        .from('festival_artists')
-        .select('id')
-        .eq('job_id', jobId)
-      );
+    // Get festival artists first, then their files
+    const { data: festivalArtists } = await supabase
+      .from('festival_artists')
+      .select('id')
+      .eq('job_id', jobId);
+
+    const artistIds = festivalArtists?.map(artist => artist.id) || [];
+
+    let artistFiles: any[] = [];
+    if (artistIds.length > 0) {
+      const { data: files } = await supabase
+        .from('festival_artist_files')
+        .select('file_path')
+        .in('artist_id', artistIds);
+      artistFiles = files || [];
+    }
 
     // Get festival logos
     const { data: festivalLogos } = await supabase
@@ -85,7 +92,7 @@ const cleanupStorageForJob = async (jobId: string) => {
     // Collect all file paths
     const filePaths = [
       ...(jobDocs || []).map(doc => doc.file_path),
-      ...(artistFiles || []).map(file => file.file_path),
+      ...artistFiles.map(file => file.file_path),
       ...(festivalLogos || []).map(logo => logo.file_path)
     ].filter(Boolean);
 
