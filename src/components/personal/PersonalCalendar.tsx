@@ -12,6 +12,7 @@ import {
   subDays,
   isToday,
   isSameDay,
+  isWithinInterval,
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import { HouseTechBadge } from "./HouseTechBadge";
@@ -95,10 +96,11 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   };
 
   const getAssignmentsForDate = (day: Date) => {
-    const dateStr = format(day, 'yyyy-MM-dd');
     return assignments.filter(assignment => {
-      const jobDate = format(new Date(assignment.job.start_time), 'yyyy-MM-dd');
-      return jobDate === dateStr;
+      const startDate = new Date(assignment.job.start_time);
+      const endDate = new Date(assignment.job.end_time);
+      // Check if the current day is the start date or within the job's span
+      return isSameDay(day, startDate) || isWithinInterval(day, { start: startDate, end: endDate });
     });
   };
 
