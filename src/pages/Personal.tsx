@@ -52,13 +52,8 @@ const Personal = () => {
       </div>
       
       <PersonalCalendar 
-        initialDate={new Date()}
-        onDateSelect={handleDateSelect} // Optional callback
-      />
-
-      {/* Vacation Request Form */}
-      <VacationRequestForm
-        onSubmit={handleVacationRequestSubmit}
+        date={date}
+        onDateSelect={setDate}
       />
     </div>
   );
