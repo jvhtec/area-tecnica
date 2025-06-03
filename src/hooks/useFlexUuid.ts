@@ -20,15 +20,17 @@ export const useFlexUuid = (jobId: string) => {
           return;
         }
 
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('department')
           .eq('id', user.id)
           .single();
 
-        if (!profile?.department) {
+        if (profileError || !profile?.department) {
+          console.error('Error fetching user department:', profileError);
           console.log('No user department found');
           setIsLoading(false);
+          setError('Could not determine user department.');
           return;
         }
 
@@ -36,104 +38,117 @@ export const useFlexUuid = (jobId: string) => {
 
         let uuid: string | null = null;
 
-        // First check if this is a direct tour ID (from TourManagement context)
-        const { data: tourData } = await supabase
+        // 1. Check if this is a tour ID and get department-specific flex folder ID
+        const { data: tourData, error: tourError } = await supabase
           .from('tours')
-          .select('flex_main_folder_id')
+          .select(`
+            flex_main_folder_id,
+            flex_sound_folder_id,
+            flex_lights_folder_id,
+            flex_video_folder_id,
+            flex_production_folder_id,
+            flex_personnel_folder_id,
+            flex_comercial_folder_id
+          `)
           .eq('id', jobId)
           .single();
 
-        if (tourData?.flex_main_folder_id) {
-          uuid = tourData.flex_main_folder_id;
-          console.log('Found flex_main_folder_id in tours table:', uuid);
-        } else {
-          // Check if this is a tour_date ID
-          const { data: tourDateData } = await supabase
-            .from('tour_dates')
-            .select('id')
-            .eq('id', jobId)
-            .single();
-
-          if (tourDateData) {
-            // This is a tour_date - look for specific folder
-            console.log('Processing tour_date ID:', jobId);
-            
-            const { data: flexFolder } = await supabase
-              .from('flex_folders')
-              .select('element_id')
-              .eq('tour_date_id', jobId)
-              .eq('folder_type', 'tourdate')
-              .eq('department', profile.department)
-              .single();
-
-            uuid = flexFolder?.element_id || null;
-            console.log('Tour_date specific UUID found:', uuid);
-          } else {
-            // This is a regular job - get job details
-            const { data: job } = await supabase
-              .from('jobs')
-              .select('job_type')
-              .eq('id', jobId)
-              .single();
-
-            if (!job) {
-              console.log('No job found with ID:', jobId);
-              setIsLoading(false);
-              return;
-            }
-
-            console.log('Job type:', job.job_type);
-
-            if (job.job_type === 'tourdate') {
-              // For tourdate jobs: use element_id with folder_type = 'tour_department'
-              const departmentMapping: { [key: string]: string } = {
-                sound: 'sound',
-                lights: 'lights',
-                video: 'video',
-                production: 'production',
-                logistics: 'production'
-              };
-
-              const mappedDepartment = departmentMapping[profile.department];
-              console.log('Mapped department for tourdate:', mappedDepartment);
-
-              if (mappedDepartment) {
-                const { data: flexFolder } = await supabase
-                  .from('flex_folders')
-                  .select('element_id')
-                  .eq('folder_type', 'tour_department')
-                  .eq('department', mappedDepartment)
-                  .single();
-
-                uuid = flexFolder?.element_id || null;
-                console.log('Tourdate UUID found:', uuid);
-              }
-            } else {
-              // For non-tourdate jobs: prefer parent_id, fallback to element_id
-              console.log('Processing non-tourdate job for department:', profile.department);
-
-              const { data: flexFolders } = await supabase
-                .from('flex_folders')
-                .select('parent_id, element_id')
-                .eq('department', profile.department);
-
-              console.log('Flex folders found:', flexFolders);
-
-              if (flexFolders && flexFolders.length > 0) {
-                // First try to find a parent_id that's not null
-                const folderWithParent = flexFolders.find(f => f.parent_id !== null && f.parent_id !== undefined);
-                if (folderWithParent) {
-                  uuid = folderWithParent.parent_id;
-                  console.log('Using parent_id:', uuid);
-                } else {
-                  // Fallback to element_id
-                  uuid = flexFolders[0].element_id;
-                  console.log('Using fallback element_id:', uuid);
-                }
-              }
-            }
+        if (tourError && tourError.code !== 'PGRST116') { // PGRST116 means no rows found
+           console.error('Error fetching tour data:', tourError);
+           // Continue to next check
+        } else if (tourData) {
+          const department = profile.department?.toLowerCase();
+          switch (department) {
+            case 'sound':
+              uuid = tourData.flex_sound_folder_id;
+              break;
+            case 'lights':
+              uuid = tourData.flex_lights_folder_id;
+              break;
+            case 'video':
+              uuid = tourData.flex_video_folder_id;
+              break;
+            case 'production':
+              uuid = tourData.flex_production_folder_id;
+              break;
+            case 'personnel': // Assuming 'personnel' department exists
+              uuid = tourData.flex_personnel_folder_id;
+              break;
+            case 'comercial': // Assuming 'comercial' department exists
+              uuid = tourData.flex_comercial_folder_id;
+              break;
+            default:
+              // Fallback to main folder if department is not specifically handled or is null
+              uuid = tourData.flex_main_folder_id;
+              break;
+          }
+          if (uuid) {
+              console.log(`Found department-specific (${department}) or main flex folder ID in tours table:`, uuid);
+          } else if (tourData.flex_main_folder_id) {
+              uuid = tourData.flex_main_folder_id;
+              console.log('Using fallback flex_main_folder_id from tours table:', uuid);
           }
         }
+
+        // 2. If not a tour, check if it's a tour_date ID by querying flex_folders directly
+        if (!uuid) {
+          const { data: tourDateFlexFolder, error: tourDateFlexError } = await supabase
+            .from('flex_folders')
+            .select('element_id')
+            .eq('tour_date_id', jobId)
+            .eq('folder_type', 'tourdate')
+            .eq('department', profile.department)
+            .single();
+
+          if (tourDateFlexError && tourDateFlexError.code !== 'PGRST116') {
+             console.error('Error fetching tour_date flex folder:', tourDateFlexError);
+             // Continue to next check
+          } else if (tourDateFlexFolder?.element_id) {
+            uuid = tourDateFlexFolder.element_id;
+            console.log('Tour_date specific UUID found in flex_folders:', uuid);
+          }
+        }
+
+        // 3. If not a tour or tour_date flex folder, check if it's a regular job ID by querying flex_folders
+        if (!uuid) {
+           // First, get the job type
+           const { data: jobData, error: jobDataError } = await supabase
+             .from('jobs')
+             .select('job_type')
+             .eq('id', jobId)
+             .single();
+
+           if (jobDataError && jobDataError.code !== 'PGRST116') {
+              console.error('Error fetching job data:', jobDataError);
+              // Continue, uuid remains null
+           } else if (jobData) {
+              console.log('Job type for ID', jobId, ':', jobData.job_type);
+
+              // Then, query flex_folders for this job and department
+              const { data: jobFlexFolder, error: jobFlexError } = await supabase
+                .from('flex_folders')
+                .select('parent_id, element_id')
+                .eq('job_id', jobId)
+                .eq('department', profile.department)
+                .single(); // Assuming a job has a single relevant flex folder per department
+
+              if (jobFlexError && jobFlexError.code !== 'PGRST116') {
+                 console.error('Error fetching job flex folder:', jobFlexError);
+                 // Continue, uuid remains null
+              } else if (jobFlexFolder) {
+                 // Determine which UUID to use based on job type
+                 if (jobData.job_type === 'dryhire') { // Corrected enum value
+                    uuid = jobFlexFolder.element_id || null;
+                    console.log('Dry hire job: Using element_id:', uuid);
+                 } else {
+                    // For other job types, prefer parent_id, fallback to element_id
+                    uuid = jobFlexFolder.parent_id || jobFlexFolder.element_id || null;
+                    console.log('Non-dry hire job: Using parent_id or element_id:', uuid);
+                 }
+              }
+           }
+        }
+
 
         console.log('Final UUID set for ID', jobId, ':', uuid);
         setFlexUuid(uuid);
@@ -149,8 +164,13 @@ export const useFlexUuid = (jobId: string) => {
 
     if (jobId) {
       fetchFlexUuid();
+    } else {
+      // If jobId is null or undefined, reset state
+      setFlexUuid(null);
+      setIsLoading(false);
+      setError(null);
     }
-  }, [jobId]);
+  }, [jobId]); // Added jobId to dependency array
 
   return { flexUuid, isLoading, error };
 };
