@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -7,6 +8,7 @@ import { useFolderExistence } from "@/hooks/useFolderExistence";
 import { useJobCard } from '@/hooks/useJobCard';
 import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { supabase } from "@/lib/supabase";
+import { deleteJobComprehensively } from "@/services/jobDeletionService";
 import { JobCardHeader } from './JobCardHeader';
 import { JobCardActions } from './JobCardActions';
 import { JobCardAssignments } from './JobCardAssignments';
@@ -81,7 +83,6 @@ export function JobCardNew({
     // Event handlers
     toggleCollapse,
     handleEditButtonClick,
-    handleDeleteClick,
     handleFileUpload,
     handleDeleteDocument,
     refreshData,
@@ -100,6 +101,40 @@ export function JobCardNew({
   // Check folder existence
   const { data: foldersExist } = useFolderExistence(job.id);
   const foldersAreCreated = job.flex_folders_created || foldersExist || job.flex_folders_exist;
+
+  // Updated delete handler using the centralized service
+  const handleDeleteClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!window.confirm('Are you sure you want to delete this job? This action cannot be undone and will remove all related data.')) {
+      return;
+    }
+
+    try {
+      console.log("Starting job deletion from JobCardNew:", job.id);
+      
+      const result = await deleteJobComprehensively(job.id);
+      
+      if (result.success) {
+        toast({
+          title: "Job deleted successfully",
+          description: result.details || "The job and all related records have been removed."
+        });
+        
+        // Call the parent's onDeleteClick to handle any additional UI updates
+        onDeleteClick(job.id);
+      } else {
+        throw new Error(result.error || "Unknown deletion error");
+      }
+    } catch (error: any) {
+      console.error("Error deleting job:", error);
+      toast({
+        title: "Error deleting job",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
 
   const createFlexFoldersHandler = async (e: React.MouseEvent) => {
     e.stopPropagation();
