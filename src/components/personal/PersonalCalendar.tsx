@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Users, Volume2, Lightbulb } from "lucide-react";
 import {
   format,
   startOfMonth,
@@ -32,6 +32,8 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentMonth, setCurrentMonth] = useState<Date>(initialDate);
   const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
+
+  console.log('PersonalCalendar render:', { currentMonth, selectedDate });
   
   // Memoize calendar days calculation
   const allDays = useMemo(() => {
@@ -62,6 +64,13 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     getAvailabilityStatus,
     isLoading: isAvailabilityLoading
   } = useTechnicianAvailability(currentMonth);
+
+  console.log('PersonalCalendar data:', { 
+    houseTechsCount: houseTechs?.length || 0, 
+    assignmentsCount: assignments?.length || 0, 
+    isLoading, 
+    isAvailabilityLoading 
+  });
 
   // Memoize assignments lookup for performance
   const assignmentsByDate = useMemo(() => {
@@ -484,7 +493,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                         {format(day, "d")}
                       </span>
 
-                      <div className="mt-1">
+                      <div className="mt-1 overflow-hidden">
                         {renderBadgesInRows(houseTechs, day)}
                       </div>
                     </div>
