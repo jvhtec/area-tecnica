@@ -30,7 +30,8 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  
+  const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null); // State for selected department
+
   const currentMonth = date;
   const firstDayOfMonth = startOfMonth(currentMonth);
   const lastDayOfMonth = endOfMonth(currentMonth);
@@ -147,6 +148,11 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
 
   // Helper function to determine if tech should be shown on a given day
   const shouldShowTechOnDay = (tech: any, day: Date) => {
+    // Apply department filter
+    if (selectedDepartment && tech.department !== selectedDepartment) {
+      return false;
+    }
+
     const dayAssignments = getAssignmentsForDate(day);
     const hasAssignment = dayAssignments.some(
       assignment => assignment.technician_id === tech.id
@@ -162,44 +168,60 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
   };
 
   // Helper function to render badges in rows
-  const renderBadgesInRows = (techs: any[], day: Date, maxPerRow: number = 3) => {
+  const renderBadgesInRows = (techs: any[], day: Date, maxPerRow: number = 5) => { // Changed maxPerRow to 5
     const visibleTechs = techs.filter(tech => shouldShowTechOnDay(tech, day));
     const dayAssignments = getAssignmentsForDate(day);
-    const maxDisplay = 10;
-    const techsToShow = visibleTechs.slice(0, maxDisplay);
-    
-    // Group techs into rows
-    const rows = [];
-    for (let i = 0; i < techsToShow.length; i += maxPerRow) {
-      rows.push(techsToShow.slice(i, i + maxPerRow));
-    }
-    
+    const maxDisplay = 10; // Still limit total display for performance/UI
+
+    // Separate technicians by department (case-insensitive and trimmed)
+    const lightsTechs = visibleTechs.filter(tech => tech.department && tech.department.trim().toLowerCase() === 'lights');
+    const soundTechs = visibleTechs.filter(tech => tech.department && tech.department.trim().toLowerCase() === 'sound');
+    const otherTechs = visibleTechs.filter(tech => tech.department && tech.department.trim().toLowerCase() !== 'lights' && tech.department.trim().toLowerCase() !== 'sound' || !tech.department); // Include techs with no department
+
+    // Helper to render a group of techs in rows
+    const renderTechGroup = (techGroup: any[], groupKey: string) => {
+      const techsToShow = techGroup.slice(0, maxDisplay); // Apply maxDisplay per group if needed, or globally
+
+      const rows = [];
+      for (let i = 0; i < techsToShow.length; i += maxPerRow) {
+        rows.push(techsToShow.slice(i, i + maxPerRow));
+      }
+
+      return (
+        <div key={groupKey}>
+          {rows.map((row, rowIndex) => (
+            <div key={rowIndex} className="flex gap-1 mb-1">
+              {row.map((tech) => {
+                const techAssignment = dayAssignments.find(
+                  assignment => assignment.technician_id === tech.id
+                );
+                const availabilityStatus = getAvailabilityStatus(tech.id, day);
+
+                return (
+                  <HouseTechBadge
+                    key={tech.id}
+                    technician={tech}
+                    assignment={techAssignment}
+                    date={day}
+                    compact={true}
+                    availabilityStatus={availabilityStatus}
+                    onAvailabilityChange={handleAvailabilityChange}
+                    onAvailabilityRemove={handleAvailabilityRemove}
+                  />
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      );
+    };
+
     return (
       <>
-        {rows.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex gap-1 mb-1">
-            {row.map((tech) => {
-              const techAssignment = dayAssignments.find(
-                assignment => assignment.technician_id === tech.id
-              );
-              const availabilityStatus = getAvailabilityStatus(tech.id, day);
-              
-              return (
-                <HouseTechBadge
-                  key={tech.id}
-                  technician={tech}
-                  assignment={techAssignment}
-                  date={day}
-                  compact={true}
-                  availabilityStatus={availabilityStatus}
-                  onAvailabilityChange={handleAvailabilityChange}
-                  onAvailabilityRemove={handleAvailabilityRemove}
-                />
-              );
-            })}
-          </div>
-        ))}
-        
+        {renderTechGroup(soundTechs, 'sound')} {/* Render Sound first */}
+        {renderTechGroup(lightsTechs, 'lights')} {/* Then render Lights */}
+        {renderTechGroup(otherTechs, 'other')}
+
         {visibleTechs.length > maxDisplay && (
           <div className="text-xs text-muted-foreground bg-accent/30 p-0.5 rounded text-center mt-1">
             +{visibleTechs.length - maxDisplay}
@@ -262,7 +284,16 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {Object.entries(personnelSummary).map(([department, stats]) => (
-              <div key={department} className="bg-muted/30 rounded-lg p-3">
+              <div
+                key={department}
+                className={cn(
+                  "bg-muted/30 rounded-lg p-3 cursor-pointer transition-colors hover:bg-muted",
+                  selectedDepartment === department && "ring-2 ring-primary ring-inset bg-muted" // Highlight selected
+                )}
+                onClick={() => {
+                  setSelectedDepartment(prev => prev === department ? null : department); // Toggle filter
+                }}
+              >
                 <div className="text-sm font-medium capitalize mb-1">
                   {department}
                 </div>
@@ -352,7 +383,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                       
                       {/* House tech badges - now in rows */}
                       <div className="mt-1">
-                        {renderBadgesInRows(houseTechs, day, 3)}
+                        {renderBadgesInRows(houseTechs, day)} {/* Removed hardcoded 3 */}
                       </div>
                     </div>
                   );
