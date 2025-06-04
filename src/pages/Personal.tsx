@@ -1,11 +1,11 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { PersonalCalendar } from '@/components/personal/PersonalCalendar';
 
 const Personal = () => {
-  const handleDateSelect = (newDate: Date) => {
-    console.log('Date selected:', newDate);
-    // Do any additional logic here if needed
-  };
+  const [date, setDate] = useState<Date>(new Date());
+
+  console.log('Personal page: Rendering with date:', date);
 
   return (
     <div className="container mx-auto p-4 space-y-6">
@@ -15,8 +15,8 @@ const Personal = () => {
       </div>
       
       <PersonalCalendar 
-        initialDate={new Date()}
-        onDateSelect={handleDateSelect} // Optional callback
+        date={date}
+        onDateSelect={setDate}
       />
     </div>
   );
