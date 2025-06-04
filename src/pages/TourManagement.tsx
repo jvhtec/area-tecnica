@@ -59,6 +59,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
   const [isPrintingSchedule, setIsPrintingSchedule] = useState(false);
 
   const { assignments } = useTourAssignments(tour?.id);
+  // Use tour.id directly - the service now handles tours properly
   const { flexUuid, isLoading: isFlexLoading, error: flexError, folderExists } = useFlexUuid(tour?.id || '');
 
   // Load tour logo

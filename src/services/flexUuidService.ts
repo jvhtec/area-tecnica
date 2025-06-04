@@ -1,4 +1,3 @@
-
 import { supabase } from "@/lib/supabase";
 
 interface FlexUuidResult {
@@ -83,65 +82,93 @@ export class FlexUuidService {
   }
 
   /**
-   * Get flex UUID for tour-level folders
+   * Get flex UUID for tour-level folders by finding jobs within the tour
    */
   private static async getTourFlexUuid(tourId: string, userDepartment: string): Promise<FlexUuidResult> {
     console.log(`[FlexUuidService] Fetching tour-level UUID for tour ${tourId}, department ${userDepartment}`);
     
-    // Try tour department folder first
-    let { data, error } = await supabase
-      .from('flex_folders')
-      .select('element_id')
+    // Get all jobs in this tour, ordered by start time to get the first chronologically
+    const { data: tourJobs, error: jobsError } = await supabase
+      .from('jobs')
+      .select('id, start_time')
       .eq('tour_id', tourId)
-      .eq('department', userDepartment)
-      .eq('folder_type', 'tour_department')
-      .maybeSingle();
+      .order('start_time', { ascending: true });
 
-    if (error) {
-      console.error('[FlexUuidService] Error fetching tour department folder:', error);
+    if (jobsError) {
+      console.error('[FlexUuidService] Error fetching tour jobs:', jobsError);
+      return { uuid: null, error: 'Failed to fetch tour jobs' };
     }
 
-    if (data) {
-      console.log(`[FlexUuidService] Found tour department UUID: ${data.element_id}`);
-      return { uuid: data.element_id, error: null };
+    if (!tourJobs || tourJobs.length === 0) {
+      console.log(`[FlexUuidService] No jobs found for tour ${tourId}`);
+      return { uuid: null, error: 'No jobs found in this tour' };
     }
 
-    // Try main tour folder as fallback
-    ({ data, error } = await supabase
-      .from('flex_folders')
-      .select('element_id')
-      .eq('tour_id', tourId)
-      .eq('folder_type', 'main')
-      .maybeSingle());
+    console.log(`[FlexUuidService] Found ${tourJobs.length} jobs in tour, checking for flex folders...`);
 
-    if (error) {
-      console.error('[FlexUuidService] Error fetching main tour folder:', error);
+    // Try to find a flex folder for any job in the tour
+    for (const job of tourJobs) {
+      console.log(`[FlexUuidService] Checking job ${job.id} for flex folders...`);
+      
+      // Try department-specific tourdate folder first
+      let { data, error } = await supabase
+        .from('flex_folders')
+        .select('element_id')
+        .eq('job_id', job.id)
+        .eq('department', userDepartment)
+        .eq('folder_type', 'tourdate')
+        .maybeSingle();
+
+      if (error) {
+        console.error(`[FlexUuidService] Error checking tourdate folder for job ${job.id}:`, error);
+        continue;
+      }
+
+      if (data) {
+        console.log(`[FlexUuidService] Found tourdate folder for job ${job.id}: ${data.element_id}`);
+        return { uuid: data.element_id, error: null };
+      }
+
+      // Try department-specific folder
+      ({ data, error } = await supabase
+        .from('flex_folders')
+        .select('element_id')
+        .eq('job_id', job.id)
+        .eq('department', userDepartment)
+        .eq('folder_type', 'department')
+        .maybeSingle());
+
+      if (error) {
+        console.error(`[FlexUuidService] Error checking department folder for job ${job.id}:`, error);
+        continue;
+      }
+
+      if (data) {
+        console.log(`[FlexUuidService] Found department folder for job ${job.id}: ${data.element_id}`);
+        return { uuid: data.element_id, error: null };
+      }
+
+      // Try general job folder as final fallback
+      ({ data, error } = await supabase
+        .from('flex_folders')
+        .select('element_id')
+        .eq('job_id', job.id)
+        .eq('folder_type', 'job')
+        .maybeSingle());
+
+      if (error) {
+        console.error(`[FlexUuidService] Error checking job folder for job ${job.id}:`, error);
+        continue;
+      }
+
+      if (data) {
+        console.log(`[FlexUuidService] Found job folder for job ${job.id}: ${data.element_id}`);
+        return { uuid: data.element_id, error: null };
+      }
     }
 
-    if (data) {
-      console.log(`[FlexUuidService] Found main tour UUID: ${data.element_id}`);
-      return { uuid: data.element_id, error: null };
-    }
-
-    // Try main_event folder as final fallback
-    ({ data, error } = await supabase
-      .from('flex_folders')
-      .select('element_id')
-      .eq('tour_id', tourId)
-      .eq('folder_type', 'main_event')
-      .maybeSingle());
-
-    if (error) {
-      console.error('[FlexUuidService] Error fetching main_event folder:', error);
-    }
-
-    if (data) {
-      console.log(`[FlexUuidService] Found main_event UUID: ${data.element_id}`);
-      return { uuid: data.element_id, error: null };
-    }
-
-    console.log(`[FlexUuidService] No tour folder found for tour ${tourId}, department ${userDepartment}`);
-    return { uuid: null, error: 'Tour folder not found for this department' };
+    console.log(`[FlexUuidService] No flex folders found for any job in tour ${tourId}, department ${userDepartment}`);
+    return { uuid: null, error: 'No flex folders found for this tour' };
   }
 
   /**
