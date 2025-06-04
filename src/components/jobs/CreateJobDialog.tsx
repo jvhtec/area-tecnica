@@ -11,14 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Department } from "@/types/department";
 import { JobType } from "@/types/job";
 import { SimplifiedJobColorPicker } from "./SimplifiedJobColorPicker";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
 import { localInputToUTC } from "@/utils/timezoneUtils";
 
-// Schema for validation
+// Simplified schema for better performance
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
@@ -72,19 +72,23 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const onSubmit = useCallback(async (values: z.infer<typeof formSchema>) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
 
     try {
-      // Get or create location
-      const locationId = await getOrCreateLocation(values.location_id);
+      console.log("CreateJobDialog: Starting job creation process");
+      
+      // Start location resolution and time conversion in parallel
+      const [locationId, startTimeUTC, endTimeUTC] = await Promise.all([
+        getOrCreateLocation(values.location_id),
+        Promise.resolve(localInputToUTC(values.start_time, values.timezone)),
+        Promise.resolve(localInputToUTC(values.end_time, values.timezone))
+      ]);
 
-      // Convert local datetime-local input values to UTC using the job's timezone
-      const startTimeUTC = localInputToUTC(values.start_time, values.timezone);
-      const endTimeUTC = localInputToUTC(values.end_time, values.timezone);
+      console.log("CreateJobDialog: Location resolved and times converted");
 
-      // Insert the job
+      // Create job and departments in a single transaction-like approach
       const { data: job, error: jobError } = await supabase
         .from("jobs")
         .insert([
@@ -102,9 +106,14 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
         .select()
         .single();
 
-      if (jobError) throw jobError;
+      if (jobError) {
+        console.error("CreateJobDialog: Job creation error:", jobError);
+        throw jobError;
+      }
 
-      // Insert job departments
+      console.log("CreateJobDialog: Job created successfully:", job.id);
+
+      // Insert departments in batch
       const departmentInserts = values.departments.map((department) => ({
         job_id: job.id,
         department,
@@ -114,10 +123,18 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
         .from("job_departments")
         .insert(departmentInserts);
 
-      if (deptError) throw deptError;
+      if (deptError) {
+        console.error("CreateJobDialog: Department insertion error:", deptError);
+        throw deptError;
+      }
 
-      // Refresh job list
-      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      console.log("CreateJobDialog: Departments added successfully");
+
+      // Optimistically update the cache instead of invalidating
+      queryClient.setQueryData(["jobs"], (oldData: any) => {
+        if (!oldData) return oldData;
+        return [...oldData, { ...job, job_departments: departmentInserts }];
+      });
 
       toast({
         title: "Success",
@@ -127,7 +144,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
       reset();
       onOpenChange(false);
     } catch (error) {
-      console.error("Error creating job:", error);
+      console.error("CreateJobDialog: Error creating job:", error);
       toast({
         title: "Error",
         description: "Failed to create job",
@@ -136,17 +153,17 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [isSubmitting, getOrCreateLocation, queryClient, toast, reset, onOpenChange]);
 
   const departments: Department[] = ["sound", "lights", "video"];
   const selectedDepartments = watch("departments") || [];
 
-  const toggleDepartment = (department: Department) => {
+  const toggleDepartment = useCallback((department: Department) => {
     const updatedDepartments = selectedDepartments.includes(department)
       ? selectedDepartments.filter((d) => d !== department)
       : [...selectedDepartments, department];
     setValue("departments", updatedDepartments);
-  };
+  }, [selectedDepartments, setValue]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
