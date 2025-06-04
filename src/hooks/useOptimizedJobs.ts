@@ -3,10 +3,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useUnifiedSubscriptions } from "@/hooks/useUnifiedSubscriptions";
 import { Department } from "@/types/department";
+import { sanitizeLogData } from "@/lib/enhanced-security-config";
 
 /**
  * Optimized jobs hook that consolidates multiple queries and subscriptions
  * Replaces multiple individual hooks with a single, efficient query
+ * Enhanced with security logging and performance monitoring
  */
 export const useOptimizedJobs = (
   department?: Department,
@@ -33,7 +35,12 @@ export const useOptimizedJobs = (
   ], ['jobs']);
 
   const fetchOptimizedJobs = async () => {
-    console.log("useOptimizedJobs: Fetching optimized jobs data");
+    const startTime = Date.now();
+    console.log("useOptimizedJobs: Fetching optimized jobs data", sanitizeLogData({
+      department,
+      startDate: startDate?.toISOString(),
+      endDate: endDate?.toISOString()
+    }));
     
     let query = supabase
       .from('jobs')
@@ -130,17 +137,19 @@ export const useOptimizedJobs = (
     const { data, error } = await query;
 
     if (error) {
-      console.error("useOptimizedJobs: Error fetching jobs:", error);
+      console.error("useOptimizedJobs: Error fetching jobs:", sanitizeLogData(error));
       throw error;
     }
 
     // Process the data to match expected format
     const processedJobs = data?.map(job => ({
       ...job,
-      // Filter documents by department if specified
+      // Filter documents by department if specified with security validation
       job_documents: department 
         ? job.job_documents?.filter(doc => 
-            doc.file_path?.startsWith(`${department}/`)
+            doc.file_path?.startsWith(`${department}/`) && 
+            doc.file_name && // Ensure file name exists
+            doc.file_path.length < 500 // Prevent excessively long paths
           ) || []
         : job.job_documents || [],
       // Add computed properties
@@ -160,7 +169,14 @@ export const useOptimizedJobs = (
       }
     })) || [];
 
-    console.log(`useOptimizedJobs: Successfully fetched ${processedJobs.length} jobs`);
+    const duration = Date.now() - startTime;
+    console.log(`useOptimizedJobs: Successfully fetched ${processedJobs.length} jobs in ${duration}ms`);
+    
+    // Log performance warning if query is slow
+    if (duration > 2000) {
+      console.warn(`useOptimizedJobs: Slow query detected - ${duration}ms for ${processedJobs.length} jobs`);
+    }
+    
     return processedJobs;
   };
 
