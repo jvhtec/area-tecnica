@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -501,43 +500,13 @@ const PesosTool: React.FC = () => {
 
     const totalWeight = calculatedRows.reduce((sum, row) => sum + (row.totalWeight || 0), 0);
 
-    // For grouping cable pick later, assign a new clusterId for this generation.
+    // For grouping, assign a new clusterId for this generation.
     const newClusterId = Date.now().toString();
 
-    // NEW: Handle tour defaults mode
-    if (isTourDefaults) {
-      const newTable: Table = {
-        name: tableName,
-        rows: calculatedRows,
-        totalWeight,
-        id: Date.now(),
-        clusterId: newClusterId,
-      };
-      setTables((prev) => [...prev, newTable]);
-      saveAsTourDefaults(newTable);
-    } else if (isDefaults) {
-      // In defaults mode, just save a simple table
-      const newTable: Table = {
-        name: tableName,
-        rows: calculatedRows,
-        totalWeight,
-        id: Date.now(),
-        clusterId: newClusterId,
-      };
-      setTables((prev) => [...prev, newTable]);
-    } else if (isTourDateContext || isJobOverrideMode) {
-      // For tour date context or job override mode, create table and save as override
-      const newTable: Table = {
-        name: tableName,
-        rows: calculatedRows,
-        totalWeight,
-        id: Date.now(),
-        clusterId: newClusterId,
-        isOverride: true
-      };
-      setTables((prev) => [...prev, newTable]);
-      saveAsOverride(newTable);
-    } else if (mirroredCluster) {
+    // ALWAYS apply advanced table generation features first (regardless of mode)
+    let tablesToCreate: Table[] = [];
+
+    if (!isDefaults && !isTourDefaults && mirroredCluster) {
       // For mirrored clusters, generate two tables sharing the same clusterId.
       const leftSuffix = getSuffix();
       const rightSuffix = getSuffix();
@@ -562,9 +531,9 @@ const PesosTool: React.FC = () => {
         clusterId: newClusterId,
       };
 
-      setTables((prev) => [...prev, leftTable, rightTable]);
-    } else {
-      // Single table: assign the newClusterId to it and generate suffix.
+      tablesToCreate = [leftTable, rightTable];
+    } else if (!isDefaults && !isTourDefaults) {
+      // Single table with suffix generation
       const suffix = getSuffix();
       const newTable: Table = {
         name: `${tableName} (${suffix})`,
@@ -575,8 +544,35 @@ const PesosTool: React.FC = () => {
         dualMotors: useDualMotors,
         clusterId: newClusterId,
       };
-      setTables((prev) => [...prev, newTable]);
+
+      tablesToCreate = [newTable];
+    } else {
+      // For defaults modes, create simple table without suffixes
+      const newTable: Table = {
+        name: tableName,
+        rows: calculatedRows,
+        totalWeight,
+        id: Date.now(),
+        clusterId: newClusterId,
+      };
+
+      tablesToCreate = [newTable];
     }
+
+    // Add all tables to state
+    setTables((prev) => [...prev, ...tablesToCreate]);
+
+    // Handle saving based on mode
+    tablesToCreate.forEach(table => {
+      if (isTourDefaults) {
+        saveAsTourDefaults(table);
+      } else if (isTourDateContext || isJobOverrideMode) {
+        table.isOverride = true;
+        saveAsOverride(table);
+      }
+      // For regular defaults mode, tables are just saved to local state
+    });
+
     resetCurrentTable();
     setUseDualMotors(false);
     setMirroredCluster(false);
