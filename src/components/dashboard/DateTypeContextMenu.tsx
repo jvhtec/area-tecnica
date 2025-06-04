@@ -71,6 +71,14 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
   };
 
   const handleFlexClick = () => {
+    if (isLoadingFlexUuid) {
+      toast({
+        title: "Loading",
+        description: "Please wait while we load the Flex folder...",
+      });
+      return;
+    }
+
     if (flexUuid) {
       const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
       window.open(flexUrl, '_blank', 'noopener');
@@ -111,13 +119,16 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         </ContextMenuItem>
         {jobId && (
           <ContextMenuItem onClick={handleFlexClick} className="flex items-center gap-2" disabled={isLoadingFlexUuid}>
-            <ExternalLink className="h-4 w-4" />
             {isLoadingFlexUuid ? (
               <>
-                Loading Flex... <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading Flex...
               </>
             ) : (
-              'Flex'
+              <>
+                <ExternalLink className="h-4 w-4" />
+                Flex
+              </>
             )}
           </ContextMenuItem>
         )}

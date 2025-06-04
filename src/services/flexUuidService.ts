@@ -7,10 +7,8 @@ interface FlexUuidResult {
 }
 
 /**
- * Definitive service for retrieving flex folder UUIDs based on job type and department
- * - Dryhire: Uses flex_folders table with folder_type 'dryhire' -> element_id
- * - Tourdate: Uses tour department columns from tours table -> department-specific column
- * - Single: Uses flex_folders table with folder_type 'department' -> element_id
+ * Service for retrieving flex folder UUIDs based on job type and department
+ * Uses the flex_folders table with correct folder_type conditions
  */
 export class FlexUuidService {
   /**
@@ -23,20 +21,7 @@ export class FlexUuidService {
       // First, get job information to determine job type
       const { data: jobData, error: jobError } = await supabase
         .from('jobs')
-        .select(`
-          id,
-          job_type,
-          tour_id,
-          tours (
-            flex_main_folder_id,
-            flex_sound_folder_id,
-            flex_lights_folder_id,
-            flex_video_folder_id,
-            flex_production_folder_id,
-            flex_personnel_folder_id,
-            flex_comercial_folder_id
-          )
-        `)
+        .select('id, job_type, tour_id')
         .eq('id', jobId)
         .single();
 
@@ -52,13 +37,13 @@ export class FlexUuidService {
 
       console.log(`[FlexUuidService] Job type: ${jobData.job_type}, Tour ID: ${jobData.tour_id}`);
 
-      // Handle each job type according to specifications
+      // Handle each job type with correct folder_type logic
       switch (jobData.job_type) {
         case 'dryhire':
           return await this.getDryhireFlexUuid(jobId, userDepartment);
         
         case 'tourdate':
-          return await this.getTourDateFlexUuid(jobData, userDepartment);
+          return await this.getTourDateFlexUuid(jobId, userDepartment);
         
         default: // 'single' and other types
           return await this.getSingleJobFlexUuid(jobId, userDepartment);
@@ -71,7 +56,7 @@ export class FlexUuidService {
 
   /**
    * Get flex UUID for dryhire jobs
-   * Uses flex_folders table with folder_type 'dryhire' -> element_id
+   * Uses flex_folders table with folder_type 'dryhire'
    */
   private static async getDryhireFlexUuid(jobId: string, userDepartment: string): Promise<FlexUuidResult> {
     console.log(`[FlexUuidService] Fetching dryhire UUID for job ${jobId}, department ${userDepartment}`);
@@ -100,52 +85,56 @@ export class FlexUuidService {
 
   /**
    * Get flex UUID for tourdate jobs
-   * Uses tour department columns from tours table
+   * Uses flex_folders table with folder_type 'tourdate' or 'tourdate_subfolder'
    */
-  private static async getTourDateFlexUuid(jobData: any, userDepartment: string): Promise<FlexUuidResult> {
-    console.log(`[FlexUuidService] Fetching tourdate UUID for department ${userDepartment}`);
+  private static async getTourDateFlexUuid(jobId: string, userDepartment: string): Promise<FlexUuidResult> {
+    console.log(`[FlexUuidService] Fetching tourdate UUID for job ${jobId}, department ${userDepartment}`);
     
-    if (!jobData.tours) {
-      console.error('[FlexUuidService] No tour data found for tourdate job');
-      return { uuid: null, error: 'Tour data not found' };
+    // Try main tourdate folder first
+    let { data, error } = await supabase
+      .from('flex_folders')
+      .select('element_id')
+      .eq('job_id', jobId)
+      .eq('department', userDepartment)
+      .eq('folder_type', 'tourdate')
+      .maybeSingle();
+
+    if (error) {
+      console.error('[FlexUuidService] Error fetching tourdate flex folder:', error);
+      return { uuid: null, error: 'Failed to fetch tourdate folder' };
     }
 
-    const tourData = jobData.tours;
-    
-    // Map user department to tour flex folder column
-    const departmentMapping: { [key: string]: string } = {
-      'sound': 'flex_sound_folder_id',
-      'lights': 'flex_lights_folder_id',
-      'video': 'flex_video_folder_id',
-      'production': 'flex_production_folder_id',
-      'logistics': 'flex_production_folder_id', // logistics maps to production
-      'personnel': 'flex_personnel_folder_id',
-      'comercial': 'flex_comercial_folder_id'
-    };
-
-    const departmentColumn = departmentMapping[userDepartment.toLowerCase()];
-    
-    if (!departmentColumn) {
-      console.log(`[FlexUuidService] Unknown department ${userDepartment}, using main folder`);
-      const uuid = tourData.flex_main_folder_id;
-      return { uuid, error: uuid ? null : 'No main folder found for tour' };
+    if (data) {
+      console.log(`[FlexUuidService] Found tourdate UUID: ${data.element_id}`);
+      return { uuid: data.element_id, error: null };
     }
 
-    // Get department-specific folder, fallback to main folder
-    const uuid = tourData[departmentColumn] || tourData.flex_main_folder_id;
-    
-    if (!uuid) {
-      console.log(`[FlexUuidService] No folder found for department ${userDepartment} or main folder`);
-      return { uuid: null, error: 'No folder found for this department' };
+    // Try tourdate subfolder as fallback
+    ({ data, error } = await supabase
+      .from('flex_folders')
+      .select('element_id')
+      .eq('job_id', jobId)
+      .eq('department', userDepartment)
+      .eq('folder_type', 'tourdate_subfolder')
+      .maybeSingle());
+
+    if (error) {
+      console.error('[FlexUuidService] Error fetching tourdate subfolder:', error);
+      return { uuid: null, error: 'Failed to fetch tourdate subfolder' };
     }
 
-    console.log(`[FlexUuidService] Found tourdate UUID: ${uuid}`);
-    return { uuid, error: null };
+    if (!data) {
+      console.log(`[FlexUuidService] No tourdate folder found for job ${jobId}, department ${userDepartment}`);
+      return { uuid: null, error: 'Tourdate folder not found for this department' };
+    }
+
+    console.log(`[FlexUuidService] Found tourdate subfolder UUID: ${data.element_id}`);
+    return { uuid: data.element_id, error: null };
   }
 
   /**
    * Get flex UUID for single jobs
-   * Uses flex_folders table with folder_type 'department' -> element_id
+   * Uses flex_folders table with folder_type 'department'
    */
   private static async getSingleJobFlexUuid(jobId: string, userDepartment: string): Promise<FlexUuidResult> {
     console.log(`[FlexUuidService] Fetching single job UUID for job ${jobId}, department ${userDepartment}`);
