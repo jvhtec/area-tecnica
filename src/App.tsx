@@ -15,6 +15,7 @@ import Settings from '@/pages/Settings';
 import ProjectManagement from '@/pages/ProjectManagement';
 import TechnicianDashboard from '@/pages/TechnicianDashboard';
 import Personal from '@/pages/Personal';
+import Tours from '@/pages/Tours';
 import PesosTool from '@/pages/PesosTool';
 import LightsPesosTool from '@/pages/LightsPesosTool';
 import VideoPesosTool from '@/pages/VideoPesosTool';
@@ -72,6 +73,7 @@ export default function App() {
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/project-management" element={<ProjectManagement />} />
                     <Route path="/equipment-management" element={<EquipmentManagement />} />
+                    <Route path="/tours" element={<Tours />} />
                     <Route path="/festivals" element={<Festivals />} />
                     
                     {/* Tour Management Route */}
