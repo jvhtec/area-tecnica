@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -563,7 +564,7 @@ const PesosTool: React.FC = () => {
 
       setTables((prev) => [...prev, leftTable, rightTable]);
     } else {
-      // Single table: assign the newClusterId to it.
+      // Single table: assign the newClusterId to it and generate suffix.
       const suffix = getSuffix();
       const newTable: Table = {
         name: `${tableName} (${suffix})`,
@@ -1036,8 +1037,8 @@ const PesosTool: React.FC = () => {
                     <tr key={index} className="border-t">
                       <td className="px-4 py-3">{row.quantity}</td>
                       <td className="px-4 py-3">{row.componentName}</td>
-                      <td className="px-4 py-3">{row.weight}</td>
-                      <td className="px-4 py-3">{row.totalWeight?.toFixed(2)}</td>
+                      <td className="px-4 py-3">{row.weight} kg</td>
+                      <td className="px-4 py-3">{row.totalWeight?.toFixed(2)} kg</td>
                     </tr>
                   ))}
                   <tr className="border-t bg-muted/50 font-medium">
@@ -1051,6 +1052,11 @@ const PesosTool: React.FC = () => {
               {!isDefaults && table.dualMotors && (
                 <div className="px-4 py-2 text-sm text-gray-500 bg-muted/30 italic">
                   *This configuration uses dual motors. Load is distributed between two motors for safety and redundancy.
+                </div>
+              )}
+              {!isDefaults && table.riggingPoints && (
+                <div className="px-4 py-2 text-sm text-blue-600 bg-blue-50 border-t">
+                  <strong>Rigging Points:</strong> {table.riggingPoints}
                 </div>
               )}
             </div>
