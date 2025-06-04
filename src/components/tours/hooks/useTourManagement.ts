@@ -133,6 +133,18 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
           }
         }
 
+        // Delete flex folders that reference tour dates (before deleting tour dates)
+        console.log("Deleting flex folders linked to tour dates...");
+        const { error: flexFoldersError } = await supabase
+          .from("flex_folders")
+          .delete()
+          .in("tour_date_id", tourDateIds);
+
+        if (flexFoldersError) {
+          console.error("Error deleting flex folders:", flexFoldersError);
+          throw flexFoldersError;
+        }
+
         // Delete tour date overrides
         console.log("Deleting tour date overrides...");
         await Promise.all([
