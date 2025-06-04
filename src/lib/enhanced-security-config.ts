@@ -71,7 +71,7 @@ const SENSITIVE_PATTERNS = [
 /**
  * Enhanced input sanitization with XSS protection
  */
-export function enhancedSanitizeInput(input: string): string {
+function enhancedSanitizeInput(input: string): string {
   if (!input || typeof input !== 'string') return '';
   
   return input
@@ -87,7 +87,7 @@ export function enhancedSanitizeInput(input: string): string {
 /**
  * Validate email with enhanced security checks
  */
-export function validateSecureEmail(email: string): boolean {
+function validateSecureEmail(email: string): boolean {
   if (!email || email.length > 254) return false;
   
   // Check for common attack patterns
