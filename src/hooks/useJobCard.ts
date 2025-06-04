@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
@@ -42,54 +41,64 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
   // Check if this job is being deleted to prevent queries
   const isJobBeingDeleted = isDeletingJob(job.id);
 
-  // Fetch date types
+  // Optimized date types fetch - only if not already loaded
   useEffect(() => {
-    async function fetchDateTypes() {
-      if (isJobBeingDeleted) return; // Prevent queries during deletion
-      
-      const { data, error } = await supabase
-        .from("job_date_types")
-        .select("*")
-        .eq("job_id", job.id);
-      if (!error && data && data.length > 0) {
-        const key = `${job.id}-${new Date(job.start_time).toISOString().split('T')[0]}`;
-        setDateTypes({ [key]: data[0] });
+    if (!job.job_date_types && !isJobBeingDeleted) {
+      async function fetchDateTypes() {
+        const { data, error } = await supabase
+          .from("job_date_types")
+          .select("*")
+          .eq("job_id", job.id);
+        if (!error && data && data.length > 0) {
+          const key = `${job.id}-${new Date(job.start_time).toISOString().split('T')[0]}`;
+          setDateTypes({ [key]: data[0] });
+        }
       }
+      fetchDateTypes();
+    } else if (job.job_date_types) {
+      // Use pre-loaded data
+      const processedDateTypes = job.job_date_types.reduce((acc: any, dt: any) => {
+        const key = `${job.id}-${dt.date}`;
+        acc[key] = dt;
+        return acc;
+      }, {});
+      setDateTypes(processedDateTypes);
     }
-    fetchDateTypes();
-  }, [job.id, job.start_time, isJobBeingDeleted]);
+  }, [job.id, job.start_time, job.job_date_types, isJobBeingDeleted]);
 
-  // Fetch sound tasks if in sound department
-  const { data: soundTasks } = useQuery({
+  // Use pre-loaded data when available
+  const soundTasks = job.tasks?.sound || job.sound_job_tasks;
+  const personnel = job.personnel?.sound || job.sound_job_personnel?.[0];
+
+  // Fallback queries only when data not pre-loaded
+  const shouldFetchSoundData = department === "sound" && !job.tasks?.sound && !isJobBeingDeleted;
+  
+  const { data: fallbackSoundTasks } = useQuery({
     queryKey: ["sound-tasks", job.id],
     queryFn: async () => {
-      if (department !== "sound" || isJobBeingDeleted) return null;
       const { data, error } = await supabase
         .from("sound_job_tasks")
-        .select(
-          `
-            *,
-            assigned_to (
-              first_name,
-              last_name
-            ),
-            task_documents(*)
-          `
-        )
+        .select(`
+          *,
+          assigned_to (
+            first_name,
+            last_name
+          ),
+          task_documents(*)
+        `)
         .eq("job_id", job.id);
       if (error) throw error;
       return data;
     },
-    enabled: department === "sound" && !isJobBeingDeleted,
-    retry: 3,
-    retryDelay: 1000
+    enabled: shouldFetchSoundData,
+    retry: 2,
+    retryDelay: 1000,
+    staleTime: 1000 * 60 * 5 // 5 minutes
   });
 
-  // Fetch personnel for sound department
-  const { data: personnel } = useQuery({
+  const { data: fallbackPersonnel } = useQuery({
     queryKey: ["sound-personnel", job.id],
     queryFn: async () => {
-      if (department !== "sound" || isJobBeingDeleted) return null;
       const { data: existingData, error: fetchError } = await supabase
         .from("sound_job_personnel")
         .select("*")
@@ -113,7 +122,8 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
       }
       return existingData;
     },
-    enabled: department === "sound" && !isJobBeingDeleted
+    enabled: shouldFetchSoundData,
+    staleTime: 1000 * 60 * 5 // 5 minutes
   });
 
   // Update folder status mutation
@@ -260,9 +270,9 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
     assignmentDialogOpen,
     isJobBeingDeleted,
     
-    // Data
-    soundTasks,
-    personnel,
+    // Data - use pre-loaded or fallback
+    soundTasks: soundTasks || fallbackSoundTasks,
+    personnel: personnel || fallbackPersonnel,
     
     // Permissions
     isHouseTech,
