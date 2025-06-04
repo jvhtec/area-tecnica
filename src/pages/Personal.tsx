@@ -2,47 +2,100 @@
 import React, { useState } from 'react';
 import { PersonalCalendar } from '@/components/personal/PersonalCalendar';
 import { VacationRequestForm } from '@/components/personal/VacationRequestForm';
-import { supabase } from '@/lib/supabase';
-import { submitVacationRequest } from '../../supabase-server/src/api/vacation-requests';
+import { VacationManagement } from '@/components/personal/VacationManagement';
+import { VacationRequestHistory } from '@/components/personal/VacationRequestHistory';
 import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
+import { useVacationRequests } from '@/hooks/useVacationRequests';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CalendarDays, Settings, History } from 'lucide-react';
 
 const Personal = () => {
   const [date, setDate] = useState<Date>(new Date());
   const { user } = useAuth();
-  const { toast } = useToast();
+  const { submitRequest, isSubmitting } = useVacationRequests();
 
   console.log('Personal page: Rendering with date:', date);
 
   const handleVacationRequestSubmit = async (request: { startDate: string; endDate: string; reason: string }) => {
     if (!user?.id) {
-      toast({
-        title: "Error",
-        description: "User not authenticated. Cannot submit vacation request.",
-        variant: "destructive",
-      });
+      console.error('User not authenticated');
       return;
     }
 
-    const { error } = await submitVacationRequest(supabase, {
-      technician_id: user.id,
+    submitRequest({
       start_date: request.startDate,
       end_date: request.endDate,
       reason: request.reason,
     });
+  };
 
-    if (error) {
-      toast({
-        title: "Error submitting request",
-        description: error.message || "An unexpected error occurred.",
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Request submitted!",
-        description: "Your vacation request has been submitted for approval.",
-      });
+  // Show appropriate content based on user role
+  const renderVacationContent = () => {
+    if (!user) {
+      return (
+        <Card>
+          <CardContent className="text-center py-8">
+            <p className="text-muted-foreground">Please log in to access vacation features.</p>
+          </CardContent>
+        </Card>
+      );
     }
+
+    const isHouseTech = user.role === 'house_tech';
+    const isAdminOrManagement = user.role === 'admin' || user.role === 'management';
+
+    if (isHouseTech) {
+      return (
+        <Tabs defaultValue="request" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="request" className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4" />
+              Request Vacation
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              My Requests
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="request">
+            <VacationRequestForm
+              onSubmit={handleVacationRequestSubmit}
+              isSubmitting={isSubmitting}
+            />
+          </TabsContent>
+          <TabsContent value="history">
+            <VacationRequestHistory />
+          </TabsContent>
+        </Tabs>
+      );
+    }
+
+    if (isAdminOrManagement) {
+      return (
+        <Tabs defaultValue="manage" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="manage" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Manage Requests
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="manage">
+            <VacationManagement />
+          </TabsContent>
+        </Tabs>
+      );
+    }
+
+    return (
+      <Card>
+        <CardContent className="text-center py-8">
+          <p className="text-muted-foreground">
+            Vacation request features are available for house technicians, admins, and management only.
+          </p>
+        </CardContent>
+      </Card>
+    );
   };
 
   return (
@@ -57,10 +110,11 @@ const Personal = () => {
         onDateSelect={setDate}
       />
 
-      {/* Vacation Request Form */}
-      <VacationRequestForm
-        onSubmit={handleVacationRequestSubmit}
-      />
+      {/* Vacation Management Section */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-semibold">Vacation Requests</h2>
+        {renderVacationContent()}
+      </div>
     </div>
   );
 };
