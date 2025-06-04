@@ -10,13 +10,36 @@ import { fetchTourLogo } from "@/utils/pdf/logoUtils";
 import { supabase } from "@/lib/supabase";
 import { useTourPowerDefaults } from "@/hooks/useTourPowerDefaults";
 import { useTourWeightDefaults } from "@/hooks/useTourWeightDefaults";
-import { useTourDefaultSets } from "@/hooks/useTourDefaultSets";
+import { useTourDefaultSets, TourDefaultTable } from "@/hooks/useTourDefaultSets";
 
 interface TourDefaultsManagerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tour: any;
 }
+
+// Legacy types for backward compatibility
+interface TourPowerDefault {
+  id: string;
+  table_name?: string;
+  item_name?: string;
+  total_watts: number;
+  current_per_phase?: number;
+  pdu_type?: string;
+  custom_pdu_type?: string;
+  department?: string;
+}
+
+interface TourWeightDefault {
+  id: string;
+  table_name?: string;
+  item_name?: string;
+  weight_kg: number;
+  quantity?: number;
+  department?: string;
+}
+
+type CombinedDefaultType = TourDefaultTable | TourPowerDefault | TourWeightDefault;
 
 export const TourDefaultsManager = ({
   open,
@@ -80,20 +103,20 @@ export const TourDefaultsManager = ({
   }, [tour?.id]);
 
   // Type guards to check data format
-  const isNewFormatTable = (item: any): item is any => {
+  const isNewFormatTable = (item: CombinedDefaultType): item is TourDefaultTable => {
     return 'set_id' in item || 'table_data' in item;
   };
 
-  const isLegacyPowerDefault = (item: any): item is any => {
+  const isLegacyPowerDefault = (item: CombinedDefaultType): item is TourPowerDefault => {
     return 'total_watts' in item && !('set_id' in item);
   };
 
-  const isLegacyWeightDefault = (item: any): item is any => {
+  const isLegacyWeightDefault = (item: CombinedDefaultType): item is TourWeightDefault => {
     return 'weight_kg' in item && !('set_id' in item);
   };
 
   // Get defaults by department - prioritize new system, fallback to legacy
-  const getDepartmentDefaults = (department: string, type: 'power' | 'weight') => {
+  const getDepartmentDefaults = (department: string, type: 'power' | 'weight'): CombinedDefaultType[] => {
     // First check if we have new format defaults
     const departmentSets = defaultSets.filter(set => set.department === department);
     const departmentTables = defaultTables.filter(table => 
@@ -113,7 +136,7 @@ export const TourDefaultsManager = ({
   };
 
   // Handle deletion based on format type
-  const handleDeleteTable = async (table: any, type: 'power' | 'weight') => {
+  const handleDeleteTable = async (table: CombinedDefaultType, type: 'power' | 'weight') => {
     try {
       // Check if this is new format (has table_data or set_id)
       if (isNewFormatTable(table)) {
@@ -121,9 +144,9 @@ export const TourDefaultsManager = ({
         await deleteTable(table.id);
       } else {
         // Legacy format - use the old delete functions
-        if (type === 'power') {
+        if (type === 'power' && isLegacyPowerDefault(table)) {
           await deleteSoundPowerDefault(table.id);
-        } else {
+        } else if (type === 'weight' && isLegacyWeightDefault(table)) {
           await deleteSoundWeightDefault(table.id);
         }
       }
@@ -152,35 +175,50 @@ export const TourDefaultsManager = ({
   };
 
   // Helper function to get table name based on format
-  const getTableName = (table: any): string => {
+  const getTableName = (table: CombinedDefaultType): string => {
     if (isNewFormatTable(table)) {
       return table.table_name || 'Unnamed';
     }
-    return table.table_name || table.item_name || 'Unnamed';
+    if (isLegacyPowerDefault(table)) {
+      return table.table_name || table.item_name || 'Unnamed';
+    }
+    if (isLegacyWeightDefault(table)) {
+      return table.table_name || table.item_name || 'Unnamed';
+    }
+    return 'Unnamed';
   };
 
   // Helper function to get power value based on format
-  const getPowerValue = (table: any): number => {
+  const getPowerValue = (table: CombinedDefaultType): number => {
     if (isNewFormatTable(table)) {
       return table.total_value || 0;
     }
-    return table.total_watts || 0;
+    if (isLegacyPowerDefault(table)) {
+      return table.total_watts || 0;
+    }
+    return 0;
   };
 
   // Helper function to get weight value based on format
-  const getWeightValue = (table: any): number => {
+  const getWeightValue = (table: CombinedDefaultType): number => {
     if (isNewFormatTable(table)) {
       return table.total_value || 0;
     }
-    return ((table.weight_kg || 0) * (table.quantity || 1));
+    if (isLegacyWeightDefault(table)) {
+      return ((table.weight_kg || 0) * (table.quantity || 1));
+    }
+    return 0;
   };
 
   // Helper function to get current per phase based on format
-  const getCurrentPerPhase = (table: any): number | undefined => {
+  const getCurrentPerPhase = (table: CombinedDefaultType): number | undefined => {
     if (isNewFormatTable(table)) {
       return table.metadata?.current_per_phase;
     }
-    return table.current_per_phase;
+    if (isLegacyPowerDefault(table)) {
+      return table.current_per_phase;
+    }
+    return undefined;
   };
 
   const handleBulkPDFExport = async (department: string, type: 'power' | 'weight') => {
@@ -225,15 +263,15 @@ export const TourDefaultsManager = ({
             rows: [{
               quantity: '1',
               componentName: getTableName(defaultItem),
-              weight: type === 'weight' ? (defaultItem as any).weight_kg?.toString() : undefined,
-              watts: type === 'power' ? (defaultItem as any).total_watts?.toString() : undefined,
+              weight: type === 'weight' && isLegacyWeightDefault(defaultItem) ? defaultItem.weight_kg?.toString() : undefined,
+              watts: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.total_watts?.toString() : undefined,
               totalWeight: type === 'weight' ? getWeightValue(defaultItem) : undefined,
               totalWatts: type === 'power' ? getPowerValue(defaultItem) : undefined,
             }],
             totalWeight: type === 'weight' ? getWeightValue(defaultItem) : undefined,
             totalWatts: type === 'power' ? getPowerValue(defaultItem) : undefined,
             currentPerPhase: type === 'power' ? getCurrentPerPhase(defaultItem) : undefined,
-            pduType: type === 'power' ? (defaultItem as any).pdu_type || (defaultItem as any).custom_pdu_type : undefined,
+            pduType: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.pdu_type || defaultItem.custom_pdu_type : undefined,
             toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
             id: Date.now() + Math.random()
           };
@@ -386,15 +424,15 @@ export const TourDefaultsManager = ({
             rows: [{
               quantity: '1',
               componentName: getTableName(defaultItem),
-              weight: type === 'weight' ? (defaultItem as any).weight_kg?.toString() : undefined,
-              watts: type === 'power' ? (defaultItem as any).total_watts?.toString() : undefined,
+              weight: type === 'weight' && isLegacyWeightDefault(defaultItem) ? defaultItem.weight_kg?.toString() : undefined,
+              watts: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.total_watts?.toString() : undefined,
               totalWeight: type === 'weight' ? getWeightValue(defaultItem) : undefined,
               totalWatts: type === 'power' ? getPowerValue(defaultItem) : undefined,
             }],
             totalWeight: type === 'weight' ? getWeightValue(defaultItem) : undefined,
             totalWatts: type === 'power' ? getPowerValue(defaultItem) : undefined,
             currentPerPhase: type === 'power' ? getCurrentPerPhase(defaultItem) : undefined,
-            pduType: type === 'power' ? (defaultItem as any).pdu_type || (defaultItem as any).custom_pdu_type : undefined,
+            pduType: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.pdu_type || defaultItem.custom_pdu_type : undefined,
             toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
             id: Date.now() + Math.random()
           };
