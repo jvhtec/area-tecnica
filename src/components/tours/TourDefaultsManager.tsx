@@ -30,7 +30,11 @@ export const TourDefaultsManager = ({
   const {
     defaultSets,
     defaultTables,
-    isLoading: defaultSetsLoading
+    isLoading: defaultSetsLoading,
+    deleteSet,
+    deleteTable,
+    isDeletingSet,
+    isDeletingTable
   } = useTourDefaultSets(tour?.id || '');
 
   // Keep the old hooks for backward compatibility but prioritize new system
@@ -91,6 +95,45 @@ export const TourDefaultsManager = ({
       return legacyPowerDefaults.filter(d => d.department === department || (!d.department && department === 'sound'));
     } else {
       return legacyWeightDefaults.filter(d => d.department === department || (!d.department && department === 'sound'));
+    }
+  };
+
+  // Handle deletion based on format type
+  const handleDeleteTable = async (table: any, type: 'power' | 'weight') => {
+    try {
+      // Check if this is new format (has table_data or set_id)
+      if ('set_id' in table || 'table_data' in table) {
+        // New format - use deleteTable from useTourDefaultSets
+        await deleteTable(table.id);
+      } else {
+        // Legacy format - use the old delete functions
+        if (type === 'power') {
+          await deleteSoundPowerDefault(table.id);
+        } else {
+          await deleteSoundWeightDefault(table.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting table:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete table',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Handle set deletion
+  const handleDeleteSet = async (setId: string) => {
+    try {
+      await deleteSet(setId);
+    } catch (error) {
+      console.error('Error deleting set:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete set',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -356,6 +399,15 @@ export const TourDefaultsManager = ({
     const powerTables = getDepartmentDefaults(department, 'power');
     const weightTables = getDepartmentDefaults(department, 'weight');
 
+    // Group new format tables by sets
+    const departmentSets = defaultSets.filter(set => set.department === department);
+    const powerSets = departmentSets.filter(set => 
+      defaultTables.some(table => table.set_id === set.id && table.table_type === 'power')
+    );
+    const weightSets = departmentSets.filter(set => 
+      defaultTables.some(table => table.set_id === set.id && table.table_type === 'weight')
+    );
+
     return (
       <div className="space-y-6">
         {/* Power Defaults */}
@@ -386,37 +438,93 @@ export const TourDefaultsManager = ({
               </Button>
             </div>
           </div>
-          {powerTables.length > 0 ? (
+
+          {/* New Format Sets */}
+          {powerSets.map((set) => {
+            const setTables = defaultTables.filter(table => 
+              table.set_id === set.id && table.table_type === 'power'
+            );
+            
+            return (
+              <div key={set.id} className="mb-6 border rounded-lg p-4 bg-gray-50">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h5 className="font-medium text-lg">{set.name}</h5>
+                    {set.description && (
+                      <p className="text-sm text-muted-foreground">{set.description}</p>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteSet(set.id)}
+                    disabled={isDeletingSet}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {setTables.map((table) => (
+                    <div key={table.id} className="border rounded-lg p-4 bg-white">
+                      <div className="flex justify-between items-start mb-2">
+                        <h6 className="font-medium">{table.table_name}</h6>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteTable(table, 'power')}
+                          disabled={isDeletingTable}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {table.total_value.toFixed(2)} W
+                      </p>
+                      {table.metadata?.current_per_phase && (
+                        <p className="text-xs text-muted-foreground">
+                          {table.metadata.current_per_phase.toFixed(2)} A per phase
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Legacy Format Tables */}
+          {powerTables.filter(table => !('set_id' in table)).length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {powerTables.map((table) => (
+              {powerTables.filter(table => !('set_id' in table)).map((table) => (
                 <div key={table.id} className="border rounded-lg p-4">
                   <div className="flex justify-between items-start mb-2">
                     <h5 className="font-medium">{table.table_name || table.item_name}</h5>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
-                        if ('total_watts' in table) {
-                          deleteSoundPowerDefault(table.id);
-                        }
-                      }}
+                      onClick={() => handleDeleteTable(table, 'power')}
                       className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {('total_value' in table ? table.total_value : table.total_watts || 0).toFixed(2)} W
+                    {(table.total_watts || 0).toFixed(2)} W
                   </p>
-                  {(table.metadata?.current_per_phase || table.current_per_phase) && (
+                  {table.current_per_phase && (
                     <p className="text-xs text-muted-foreground">
-                      {(table.metadata?.current_per_phase || table.current_per_phase).toFixed(2)} A per phase
+                      {table.current_per_phase.toFixed(2)} A per phase
                     </p>
                   )}
                 </div>
               ))}
             </div>
-          ) : (
+          )}
+
+          {powerTables.length === 0 && (
             <p className="text-muted-foreground">No power defaults configured</p>
           )}
         </div>
@@ -449,29 +557,78 @@ export const TourDefaultsManager = ({
               </Button>
             </div>
           </div>
-          {weightTables.length > 0 ? (
+
+          {/* New Format Sets */}
+          {weightSets.map((set) => {
+            const setTables = defaultTables.filter(table => 
+              table.set_id === set.id && table.table_type === 'weight'
+            );
+            
+            return (
+              <div key={set.id} className="mb-6 border rounded-lg p-4 bg-gray-50">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h5 className="font-medium text-lg">{set.name}</h5>
+                    {set.description && (
+                      <p className="text-sm text-muted-foreground">{set.description}</p>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteSet(set.id)}
+                    disabled={isDeletingSet}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {setTables.map((table) => (
+                    <div key={table.id} className="border rounded-lg p-4 bg-white">
+                      <div className="flex justify-between items-start mb-2">
+                        <h6 className="font-medium">{table.table_name}</h6>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteTable(table, 'weight')}
+                          disabled={isDeletingTable}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {table.total_value.toFixed(2)} kg
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Legacy Format Tables */}
+          {weightTables.filter(table => !('set_id' in table)).length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {weightTables.map((table) => (
+              {weightTables.filter(table => !('set_id' in table)).map((table) => (
                 <div key={table.id} className="border rounded-lg p-4">
                   <div className="flex justify-between items-start mb-2">
                     <h5 className="font-medium">{table.table_name || table.item_name}</h5>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
-                        if ('weight_kg' in table) {
-                          deleteSoundWeightDefault(table.id);
-                        }
-                      }}
+                      onClick={() => handleDeleteTable(table, 'weight')}
                       className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {('total_value' in table ? table.total_value : ((table.weight_kg || 0) * (table.quantity || 1))).toFixed(2)} kg
+                    {((table.weight_kg || 0) * (table.quantity || 1)).toFixed(2)} kg
                   </p>
-                  {('quantity' in table && table.quantity && table.weight_kg) && (
+                  {table.quantity && table.weight_kg && (
                     <p className="text-xs text-muted-foreground">
                       {table.quantity} × {table.weight_kg.toFixed(2)} kg
                     </p>
@@ -479,7 +636,9 @@ export const TourDefaultsManager = ({
                 </div>
               ))}
             </div>
-          ) : (
+          )}
+
+          {weightTables.length === 0 && (
             <p className="text-muted-foreground">No weight defaults configured</p>
           )}
         </div>
