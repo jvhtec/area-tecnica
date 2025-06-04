@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,13 @@ interface TourWeightDefaultsSectionProps {
 
 export const TourWeightDefaultsSection: React.FC<TourWeightDefaultsSectionProps> = ({ tourId }) => {
   const { weightDefaults, createDefault, deleteDefault, isLoading } = useTourWeightDefaults(tourId);
-  const [newDefault, setNewDefault] = useState({
+  const [newDefault, setNewDefault] = useState<{
+    item_name: string;
+    weight_kg: string;
+    quantity: string;
+    category: 'rigging';
+    department: 'sound' | 'lights' | 'video';
+  }>({
     item_name: '',
     weight_kg: '',
     quantity: '1',
