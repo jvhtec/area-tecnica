@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 export const usePerformanceMonitor = () => {
   const queryClient = useQueryClient();
   const performanceMetrics = useRef<Map<string, number[]>>(new Map());
+  const activeQueries = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     const trackQueryPerformance = (queryKey: string, duration: number) => {
@@ -35,21 +36,22 @@ export const usePerformanceMonitor = () => {
     // Monitor React Query cache using the observer pattern
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
       if (event.type === 'observerAdded') {
-        const startTime = Date.now();
         const queryKey = JSON.stringify(event.query.queryKey);
+        const startTime = Date.now();
         
-        // Track query state changes to detect completion
-        const unsubscribeQuery = event.query.subscribe((query) => {
-          // Check if query just completed (either success or error)
-          if ((query.state.status === 'success' || query.state.status === 'error') && 
-              query.state.fetchStatus === 'idle') {
-            const duration = Date.now() - startTime;
-            trackQueryPerformance(queryKey, duration);
-            
-            // Unsubscribe from this specific query to avoid memory leaks
-            unsubscribeQuery();
-          }
-        });
+        // Store start time for this query
+        activeQueries.current.set(queryKey, startTime);
+      }
+      
+      if (event.type === 'observerRemoved') {
+        const queryKey = JSON.stringify(event.query.queryKey);
+        const startTime = activeQueries.current.get(queryKey);
+        
+        if (startTime) {
+          const duration = Date.now() - startTime;
+          trackQueryPerformance(queryKey, duration);
+          activeQueries.current.delete(queryKey);
+        }
       }
     });
 
