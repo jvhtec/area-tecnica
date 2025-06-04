@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,7 @@ import { fetchTourLogo } from "@/utils/pdf/logoUtils";
 import { supabase } from "@/lib/supabase";
 import { useTourPowerDefaults } from "@/hooks/useTourPowerDefaults";
 import { useTourWeightDefaults } from "@/hooks/useTourWeightDefaults";
+import { useTourDefaultSets } from "@/hooks/useTourDefaultSets";
 
 interface TourDefaultsManagerProps {
   open: boolean;
@@ -26,28 +26,25 @@ export const TourDefaultsManager = ({
   const [activeTab, setActiveTab] = useState('sound');
   const [tourDates, setTourDates] = useState<any[]>([]);
 
-  // Fetch defaults for each department using the correct hooks
+  // Use the new tour default sets hook
   const {
-    powerDefaults: soundPowerDefaults,
+    defaultSets,
+    defaultTables,
+    isLoading: defaultSetsLoading
+  } = useTourDefaultSets(tour?.id || '');
+
+  // Keep the old hooks for backward compatibility but prioritize new system
+  const {
+    powerDefaults: legacyPowerDefaults,
     isLoading: soundPowerLoading,
     deleteDefault: deleteSoundPowerDefault
   } = useTourPowerDefaults(tour?.id || '');
 
   const {
-    weightDefaults: soundWeightDefaults,
+    weightDefaults: legacyWeightDefaults,
     isLoading: soundWeightLoading,
     deleteDefault: deleteSoundWeightDefault
   } = useTourWeightDefaults(tour?.id || '');
-
-  // Filter by department
-  const soundPowerTables = soundPowerDefaults.filter(d => d.department === 'sound' || !d.department);
-  const soundWeightTables = soundWeightDefaults.filter(d => d.department === 'sound' || !d.department);
-  
-  const lightsPowerTables = soundPowerDefaults.filter(d => d.department === 'lights');
-  const lightsWeightTables = soundWeightDefaults.filter(d => d.department === 'lights');
-  
-  const videoPowerTables = soundPowerDefaults.filter(d => d.department === 'video');
-  const videoWeightTables = soundWeightDefaults.filter(d => d.department === 'video');
 
   // Fetch tour dates
   React.useEffect(() => {
@@ -77,17 +74,29 @@ export const TourDefaultsManager = ({
     fetchTourDates();
   }, [tour?.id]);
 
+  // Get defaults by department - prioritize new system, fallback to legacy
+  const getDepartmentDefaults = (department: string, type: 'power' | 'weight') => {
+    // First check if we have new format defaults
+    const departmentSets = defaultSets.filter(set => set.department === department);
+    const departmentTables = defaultTables.filter(table => 
+      departmentSets.some(set => set.id === table.set_id) && table.table_type === type
+    );
+
+    if (departmentTables.length > 0) {
+      return departmentTables;
+    }
+
+    // Fallback to legacy system
+    if (type === 'power') {
+      return legacyPowerDefaults.filter(d => d.department === department || (!d.department && department === 'sound'));
+    } else {
+      return legacyWeightDefaults.filter(d => d.department === department || (!d.department && department === 'sound'));
+    }
+  };
+
   const handleBulkPDFExport = async (department: string, type: 'power' | 'weight') => {
     try {
-      let relevantDefaults;
-      
-      if (type === 'power') {
-        relevantDefaults = department === 'sound' ? soundPowerTables : 
-                          department === 'lights' ? lightsPowerTables : videoPowerTables;
-      } else {
-        relevantDefaults = department === 'sound' ? soundWeightTables : 
-                          department === 'lights' ? lightsWeightTables : videoWeightTables;
-      }
+      const relevantDefaults = getDepartmentDefaults(department, type);
 
       if (relevantDefaults.length === 0) {
         toast({
@@ -106,17 +115,41 @@ export const TourDefaultsManager = ({
         console.error('Error fetching tour logo:', error);
       }
 
-      // Convert to the format expected by exportToPDF
-      const tables = relevantDefaults.map(defaultItem => ({
-        name: defaultItem.table_name || defaultItem.item_name || 'Unnamed',
-        rows: [], // Power and weight defaults don't have detailed rows in this context
-        totalWeight: type === 'weight' ? (defaultItem.weight_kg || 0) * (defaultItem.quantity || 1) : undefined,
-        totalWatts: type === 'power' ? defaultItem.total_watts || 0 : undefined,
-        currentPerPhase: type === 'power' ? defaultItem.current_per_phase : undefined,
-        pduType: type === 'power' ? defaultItem.pdu_type || defaultItem.custom_pdu_type : undefined,
-        toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
-        id: Date.now() + Math.random()
-      }));
+      // Convert defaults to the format expected by exportToPDF
+      const tables = relevantDefaults.map(defaultItem => {
+        // Check if this is new format with table_data
+        if ('table_data' in defaultItem && defaultItem.table_data?.rows) {
+          return {
+            name: defaultItem.table_name || 'Unnamed',
+            rows: defaultItem.table_data.rows || [],
+            totalWeight: type === 'weight' ? defaultItem.total_value : undefined,
+            totalWatts: type === 'power' ? defaultItem.total_value : undefined,
+            currentPerPhase: type === 'power' ? defaultItem.metadata?.current_per_phase : undefined,
+            pduType: type === 'power' ? defaultItem.metadata?.pdu_type || defaultItem.metadata?.custom_pdu_type : undefined,
+            toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+            id: Date.now() + Math.random()
+          };
+        } else {
+          // Legacy format - create a summary row
+          return {
+            name: defaultItem.table_name || defaultItem.item_name || 'Unnamed',
+            rows: [{
+              quantity: '1',
+              componentName: defaultItem.table_name || defaultItem.item_name || 'Total',
+              weight: type === 'weight' ? defaultItem.weight_kg?.toString() : undefined,
+              watts: type === 'power' ? defaultItem.total_watts?.toString() : undefined,
+              totalWeight: type === 'weight' ? (defaultItem.weight_kg || 0) * (defaultItem.quantity || 1) : undefined,
+              totalWatts: type === 'power' ? defaultItem.total_watts || 0 : undefined,
+            }],
+            totalWeight: type === 'weight' ? (defaultItem.weight_kg || 0) * (defaultItem.quantity || 1) : undefined,
+            totalWatts: type === 'power' ? defaultItem.total_watts || 0 : undefined,
+            currentPerPhase: type === 'power' ? defaultItem.current_per_phase : undefined,
+            pduType: type === 'power' ? defaultItem.pdu_type || defaultItem.custom_pdu_type : undefined,
+            toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+            id: Date.now() + Math.random()
+          };
+        }
+      });
 
       // Calculate power summary for power exports
       let powerSummary;
@@ -207,14 +240,7 @@ export const TourDefaultsManager = ({
 
   const exportTourDatePDF = async (tourDate: any, department: string, type: 'power' | 'weight', logoUrl?: string) => {
     // Get defaults for this department and type
-    let defaultsData;
-    if (type === 'power') {
-      defaultsData = department === 'sound' ? soundPowerTables : 
-                    department === 'lights' ? lightsPowerTables : videoPowerTables;
-    } else {
-      defaultsData = department === 'sound' ? soundWeightTables : 
-                    department === 'lights' ? lightsWeightTables : videoWeightTables;
-    }
+    let defaultsData = getDepartmentDefaults(department, type);
 
     // Check for any overrides for this tour date
     const overrideTable = type === 'power' ? 'tour_date_power_overrides' : 'tour_date_weight_overrides';
@@ -241,16 +267,40 @@ export const TourDefaultsManager = ({
       }));
       safetyMargin = overrides[0]?.override_data?.safetyMargin || 0;
     } else {
-      combinedTables = defaultsData.map(defaultItem => ({
-        name: defaultItem.table_name || defaultItem.item_name || 'Default',
-        rows: [],
-        totalWeight: type === 'weight' ? (defaultItem.weight_kg || 0) * (defaultItem.quantity || 1) : undefined,
-        totalWatts: type === 'power' ? defaultItem.total_watts || 0 : undefined,
-        currentPerPhase: type === 'power' ? defaultItem.current_per_phase : undefined,
-        pduType: type === 'power' ? defaultItem.pdu_type || defaultItem.custom_pdu_type : undefined,
-        toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
-        id: Date.now() + Math.random()
-      }));
+      combinedTables = defaultsData.map(defaultItem => {
+        // Check if this is new format with table_data
+        if ('table_data' in defaultItem && defaultItem.table_data?.rows) {
+          return {
+            name: defaultItem.table_name || 'Default',
+            rows: defaultItem.table_data.rows || [],
+            totalWeight: type === 'weight' ? defaultItem.total_value : undefined,
+            totalWatts: type === 'power' ? defaultItem.total_value : undefined,
+            currentPerPhase: type === 'power' ? defaultItem.metadata?.current_per_phase : undefined,
+            pduType: type === 'power' ? defaultItem.metadata?.pdu_type || defaultItem.metadata?.custom_pdu_type : undefined,
+            toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+            id: Date.now() + Math.random()
+          };
+        } else {
+          // Legacy format
+          return {
+            name: defaultItem.table_name || defaultItem.item_name || 'Default',
+            rows: [{
+              quantity: '1',
+              componentName: defaultItem.table_name || defaultItem.item_name || 'Total',
+              weight: type === 'weight' ? defaultItem.weight_kg?.toString() : undefined,
+              watts: type === 'power' ? defaultItem.total_watts?.toString() : undefined,
+              totalWeight: type === 'weight' ? (defaultItem.weight_kg || 0) * (defaultItem.quantity || 1) : undefined,
+              totalWatts: type === 'power' ? defaultItem.total_watts || 0 : undefined,
+            }],
+            totalWeight: type === 'weight' ? (defaultItem.weight_kg || 0) * (defaultItem.quantity || 1) : undefined,
+            totalWatts: type === 'power' ? defaultItem.total_watts || 0 : undefined,
+            currentPerPhase: type === 'power' ? defaultItem.current_per_phase : undefined,
+            pduType: type === 'power' ? defaultItem.pdu_type || defaultItem.custom_pdu_type : undefined,
+            toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+            id: Date.now() + Math.random()
+          };
+        }
+      });
     }
 
     if (combinedTables.length === 0) return;
@@ -292,7 +342,10 @@ export const TourDefaultsManager = ({
     document.body.removeChild(a);
   };
 
-  const renderDepartmentDefaults = (department: string, powerTables: any[], weightTables: any[]) => {
+  const renderDepartmentDefaults = (department: string) => {
+    const powerTables = getDepartmentDefaults(department, 'power');
+    const weightTables = getDepartmentDefaults(department, 'weight');
+
     return (
       <div className="space-y-6">
         {/* Power Defaults */}
@@ -328,22 +381,26 @@ export const TourDefaultsManager = ({
               {powerTables.map((table) => (
                 <div key={table.id} className="border rounded-lg p-4">
                   <div className="flex justify-between items-start mb-2">
-                    <h5 className="font-medium">{table.table_name}</h5>
+                    <h5 className="font-medium">{table.table_name || table.item_name}</h5>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => deleteSoundPowerDefault(table.id)}
+                      onClick={() => {
+                        if ('total_watts' in table) {
+                          deleteSoundPowerDefault(table.id);
+                        }
+                      }}
                       className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {table.total_watts.toFixed(2)} W
+                    {('total_value' in table ? table.total_value : table.total_watts || 0).toFixed(2)} W
                   </p>
-                  {table.current_per_phase && (
+                  {(table.metadata?.current_per_phase || table.current_per_phase) && (
                     <p className="text-xs text-muted-foreground">
-                      {table.current_per_phase.toFixed(2)} A per phase
+                      {(table.metadata?.current_per_phase || table.current_per_phase).toFixed(2)} A per phase
                     </p>
                   )}
                 </div>
@@ -387,22 +444,28 @@ export const TourDefaultsManager = ({
               {weightTables.map((table) => (
                 <div key={table.id} className="border rounded-lg p-4">
                   <div className="flex justify-between items-start mb-2">
-                    <h5 className="font-medium">{table.item_name}</h5>
+                    <h5 className="font-medium">{table.table_name || table.item_name}</h5>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => deleteSoundWeightDefault(table.id)}
+                      onClick={() => {
+                        if ('weight_kg' in table) {
+                          deleteSoundWeightDefault(table.id);
+                        }
+                      }}
                       className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {((table.weight_kg || 0) * (table.quantity || 1)).toFixed(2)} kg
+                    {('total_value' in table ? table.total_value : ((table.weight_kg || 0) * (table.quantity || 1))).toFixed(2)} kg
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {table.quantity || 1} × {(table.weight_kg || 0).toFixed(2)} kg
-                  </p>
+                  {('quantity' in table && table.quantity && table.weight_kg) && (
+                    <p className="text-xs text-muted-foreground">
+                      {table.quantity} × {table.weight_kg.toFixed(2)} kg
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
@@ -493,26 +556,26 @@ export const TourDefaultsManager = ({
           </TabsList>
           
           <TabsContent value="sound" className="mt-6">
-            {soundPowerLoading || soundWeightLoading ? (
+            {defaultSetsLoading || soundPowerLoading || soundWeightLoading ? (
               <p>Loading sound defaults...</p>
             ) : (
-              renderDepartmentDefaults('sound', soundPowerTables, soundWeightTables)
+              renderDepartmentDefaults('sound')
             )}
           </TabsContent>
           
           <TabsContent value="lights" className="mt-6">
-            {soundPowerLoading || soundWeightLoading ? (
+            {defaultSetsLoading || soundPowerLoading || soundWeightLoading ? (
               <p>Loading lights defaults...</p>
             ) : (
-              renderDepartmentDefaults('lights', lightsPowerTables, lightsWeightTables)
+              renderDepartmentDefaults('lights')
             )}
           </TabsContent>
           
           <TabsContent value="video" className="mt-6">
-            {soundPowerLoading || soundWeightLoading ? (
+            {defaultSetsLoading || soundPowerLoading || soundWeightLoading ? (
               <p>Loading video defaults...</p>
             ) : (
-              renderDepartmentDefaults('video', videoPowerTables, videoWeightTables)
+              renderDepartmentDefaults('video')
             )}
           </TabsContent>
 
