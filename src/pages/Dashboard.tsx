@@ -8,7 +8,6 @@ import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { supabase } from "@/lib/supabase";
 import { useDashboardSubscriptions } from "@/hooks/useUnifiedSubscriptions";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { DashboardContent } from "@/components/dashboard/DashboardContent";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +16,8 @@ import { MessagesList } from "@/components/messages/MessagesList";
 import { DirectMessagesList } from "@/components/messages/DirectMessagesList";
 import { Button } from "@/components/ui/button";
 import { DirectMessageDialog } from "@/components/messages/DirectMessageDialog";
+import { CalendarSection } from "@/components/dashboard/CalendarSection";
+import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { isJobOnDate } from "@/utils/timezoneUtils";
 
 const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
@@ -164,17 +165,29 @@ const Dashboard = () => {
         </Card>
       )}
 
-      <DashboardContent
-        date={date}
-        setDate={setDate}
-        jobs={jobs}
-        selectedDateJobs={selectedDateJobs}
-        onEditClick={handleEditClick}
-        onDeleteClick={handleDeleteClick}
-        onJobClick={handleJobClick}
-        userRole={userRole}
-        onDateTypeChange={handleDateTypeChange}
-      />
+      <div className="space-y-8">
+        {/* Calendar section - full width */}
+        <div className="w-full">
+          <CalendarSection 
+            date={date} 
+            onDateSelect={setDate} 
+            jobs={jobs} 
+            onDateTypeChange={handleDateTypeChange}
+          />
+        </div>
+        
+        {/* Today's Schedule below the calendar */}
+        <div className="w-full">
+          <TodaySchedule
+            jobs={selectedDateJobs}
+            onEditClick={handleEditClick}
+            onDeleteClick={handleDeleteClick}
+            onJobClick={handleJobClick}
+            userRole={userRole}
+            selectedDate={date}
+          />
+        </div>
+      </div>
 
       {selectedJobId && (
         <JobAssignmentDialog
