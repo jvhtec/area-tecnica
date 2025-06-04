@@ -1,3 +1,4 @@
+
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -41,15 +42,15 @@ export const useEnhancedPerformanceMonitor = () => {
       }
     };
 
-    // Monitor query lifecycle with proper event handling
+    // Monitor query lifecycle with proper event handling using correct React Query event types
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
       const queryKey = JSON.stringify(event.query.queryKey);
       
-      if (event.type === 'queryAdded') {
+      if (event.type === 'added') {
         queryStartTimes.current.set(queryKey, Date.now());
       }
       
-      if (event.type === 'queryUpdated' && event.query.state.fetchStatus === 'idle') {
+      if (event.type === 'updated' && event.query.state.fetchStatus === 'idle') {
         const startTime = queryStartTimes.current.get(queryKey);
         if (startTime) {
           const duration = Date.now() - startTime;
@@ -58,7 +59,7 @@ export const useEnhancedPerformanceMonitor = () => {
         }
       }
       
-      if (event.type === 'queryRemoved') {
+      if (event.type === 'removed') {
         queryStartTimes.current.delete(queryKey);
       }
     });

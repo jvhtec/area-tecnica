@@ -283,10 +283,10 @@ export function validateEnvironmentSecurity(): {
   };
 }
 
+// Export functions with unique names to avoid conflicts
 export {
   sanitizeInput,
   validateFolderName,
-  // Re-export enhanced versions
-  enhancedSanitizeInput as sanitizeInput,
-  validateSecureEmail as validateEmail,
+  enhancedSanitizeInput,
+  validateSecureEmail,
 };
