@@ -1,23 +1,33 @@
 
-import { ApiService } from "@/lib/api-service";
-import { FLEX_API_BASE_URL } from "@/lib/api-config";
+import { supabase } from "@/lib/supabase";
 import { FlexFolderPayload, FlexFolderResponse } from "./types";
 
 /**
- * Creates a folder in the Flex system
+ * Creates a folder in the Flex system using secure edge function
  */
 export async function createFlexFolder(payload: FlexFolderPayload): Promise<FlexFolderResponse> {
-  const apiService = ApiService.getInstance();
   console.log("Creating Flex folder with payload:", payload);
   
   try {
-    const response = await apiService.post<FlexFolderResponse>(
-      `${FLEX_API_BASE_URL}/element`,
-      payload
-    );
-    
-    console.log("Created Flex folder:", response);
-    return response;
+    const { data, error } = await supabase.functions.invoke('secure-flex-api', {
+      body: {
+        endpoint: '/element',
+        method: 'POST',
+        payload
+      }
+    });
+
+    if (error) {
+      console.error("Secure Flex API error:", error);
+      throw new Error(error.message || "Failed to create folder in Flex");
+    }
+
+    if (!data.success) {
+      throw new Error(data.error || "Failed to create folder in Flex");
+    }
+
+    console.log("Created Flex folder:", data.data);
+    return data.data;
   } catch (error) {
     console.error("Flex folder creation error:", error);
     throw error;
