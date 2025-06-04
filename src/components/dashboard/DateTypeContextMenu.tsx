@@ -18,6 +18,7 @@ interface DateTypeContextMenuProps {
 
 export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: DateTypeContextMenuProps) => {
   const queryClient = useQueryClient();
+  // Use jobId as the identifier - the service will determine if it's a job or tour date
   const { flexUuid, isLoading: isLoadingFlexUuid, error: flexError } = useFlexUuid(jobId);
 
   // Use the improved subscription hook with correct parameters

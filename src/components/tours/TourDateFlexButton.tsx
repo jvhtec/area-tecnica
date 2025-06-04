@@ -10,6 +10,7 @@ interface TourDateFlexButtonProps {
 }
 
 export const TourDateFlexButton = ({ tourDateId }: TourDateFlexButtonProps) => {
+  // Pass the tour date ID directly to the hook
   const { flexUuid, isLoading: isFlexLoading, error } = useFlexUuid(tourDateId);
   const { toast } = useToast();
 

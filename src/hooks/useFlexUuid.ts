@@ -3,13 +3,13 @@ import { useEffect, useState, useCallback } from 'react';
 import { FlexUuidService } from '@/services/flexUuidService';
 import { supabase } from '@/lib/supabase';
 
-export const useFlexUuid = (jobId: string) => {
+export const useFlexUuid = (identifier: string) => {
   const [flexUuid, setFlexUuid] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchFlexUuid = useCallback(async () => {
-    if (!jobId) {
+    if (!identifier) {
       setFlexUuid(null);
       setIsLoading(false);
       setError(null);
@@ -19,7 +19,7 @@ export const useFlexUuid = (jobId: string) => {
     try {
       setIsLoading(true);
       setError(null);
-      console.log(`[useFlexUuid] Starting fetch for job ID: ${jobId}`);
+      console.log(`[useFlexUuid] Starting fetch for identifier: ${identifier}`);
 
       // Get current user's department
       const { data: { user } } = await supabase.auth.getUser();
@@ -52,10 +52,10 @@ export const useFlexUuid = (jobId: string) => {
 
       console.log(`[useFlexUuid] User department: ${profile.department}`);
 
-      // Use the corrected service to get the UUID
-      const result = await FlexUuidService.getFlexUuid(jobId, profile.department);
+      // Use the updated service to get the UUID
+      const result = await FlexUuidService.getFlexUuid(identifier, profile.department);
 
-      console.log(`[useFlexUuid] Result for job ${jobId}:`, result);
+      console.log(`[useFlexUuid] Result for identifier ${identifier}:`, result);
       setFlexUuid(result.uuid);
       setError(result.error);
       setIsLoading(false);
@@ -65,7 +65,7 @@ export const useFlexUuid = (jobId: string) => {
       setFlexUuid(null);
       setIsLoading(false);
     }
-  }, [jobId]);
+  }, [identifier]);
 
   useEffect(() => {
     fetchFlexUuid();
