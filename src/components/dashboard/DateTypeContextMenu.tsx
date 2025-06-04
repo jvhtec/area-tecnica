@@ -7,7 +7,7 @@ import { toast } from "@/hooks/use-toast";
 import { format, startOfDay } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTableSubscription } from "@/hooks/useTableSubscription";
-import { FlexUuidService } from "@/services/flexUuidService";
+import { useFlexUuid } from "@/hooks/useFlexUuid";
 
 interface DateTypeContextMenuProps {
   children: React.ReactNode;
@@ -18,8 +18,7 @@ interface DateTypeContextMenuProps {
 
 export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: DateTypeContextMenuProps) => {
   const queryClient = useQueryClient();
-  const [flexUuid, setFlexUuid] = useState<string | null>(null);
-  const [isLoadingFlexUuid, setIsLoadingFlexUuid] = useState(false);
+  const { flexUuid, isLoading: isLoadingFlexUuid, error: flexError } = useFlexUuid(jobId);
 
   // Use the improved subscription hook with correct parameters
   useTableSubscription('job_date_types', ['job-date-types', jobId]);
@@ -55,51 +54,19 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
 
       if (error) throw error;
 
-      toast.success(`Date type set to ${type}`);
+      toast({
+        title: "Success",
+        description: `Date type set to ${type}`,
+      });
       onTypeChange();
     } catch (error: any) {
       console.error('Error setting date type:', error);
-      toast.error('Failed to set date type');
+      toast({
+        title: "Error",
+        description: "Failed to set date type",
+        variant: "destructive",
+      });
       queryClient.invalidateQueries({ queryKey: ['job-date-types', jobId] });
-    }
-  };
-
-  const fetchFlexUuid = async () => {
-    if (flexUuid || isLoadingFlexUuid || !jobId) return;
-
-    setIsLoadingFlexUuid(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error('User not authenticated.');
-        return;
-      }
-
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('department')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError || !profile?.department) {
-        console.error('Error fetching user department:', profileError);
-        toast.error('Could not determine user department.');
-        return;
-      }
-
-      // Use the optimized service
-      const result = await FlexUuidService.getFlexUuid(jobId, profile.department);
-      
-      if (result.error) {
-        toast.error(result.error);
-      } else {
-        setFlexUuid(result.uuid);
-      }
-    } catch (error) {
-      console.error('Error fetching flex UUID:', error);
-      toast.error('Failed to get Flex link.');
-    } finally {
-      setIsLoadingFlexUuid(false);
     }
   };
 
@@ -107,23 +74,23 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
     if (flexUuid) {
       const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
       window.open(flexUrl, '_blank', 'noopener');
-    } else if (!isLoadingFlexUuid) {
-      fetchFlexUuid();
+    } else if (flexError) {
+      toast({
+        title: "Error",
+        description: flexError,
+        variant: "destructive",
+      });
     } else {
-      toast.info('Fetching Flex link...');
+      toast({
+        title: "Info",
+        description: "Flex folder not available for this job",
+      });
     }
   };
 
   return (
     <ContextMenu>
-      <ContextMenuTrigger
-        onContextMenu={() => {
-          fetchFlexUuid();
-        }}
-        onClick={() => {
-          fetchFlexUuid();
-        }}
-      >
+      <ContextMenuTrigger>
         {children}
       </ContextMenuTrigger>
       <ContextMenuContent className="w-48">

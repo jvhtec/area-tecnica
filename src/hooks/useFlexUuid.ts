@@ -22,11 +22,12 @@ export const useFlexUuid = (jobId: string) => {
       try {
         setIsLoading(true);
         setError(null);
+        console.log(`[useFlexUuid] Starting fetch for job ID: ${jobId}`);
 
         // Get current user's department
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          console.log('No user found');
+          console.log('[useFlexUuid] No authenticated user found');
           if (!isCancelled) {
             setIsLoading(false);
             setError('User not authenticated');
@@ -40,28 +41,37 @@ export const useFlexUuid = (jobId: string) => {
           .eq('id', user.id)
           .single();
 
-        if (profileError || !profile?.department) {
-          console.error('Error fetching user department:', profileError);
+        if (profileError) {
+          console.error('[useFlexUuid] Error fetching user profile:', profileError);
           if (!isCancelled) {
             setIsLoading(false);
-            setError('Could not determine user department.');
+            setError('Could not determine user department');
           }
           return;
         }
 
-        console.log('User department:', profile.department);
+        if (!profile?.department) {
+          console.error('[useFlexUuid] No department found in user profile');
+          if (!isCancelled) {
+            setIsLoading(false);
+            setError('User department not set');
+          }
+          return;
+        }
 
-        // Use the optimized service to get the UUID
+        console.log(`[useFlexUuid] User department: ${profile.department}`);
+
+        // Use the corrected service to get the UUID
         const result = await FlexUuidService.getFlexUuid(jobId, profile.department);
 
         if (!isCancelled) {
-          console.log('Final UUID set for ID', jobId, ':', result.uuid);
+          console.log(`[useFlexUuid] Result for job ${jobId}:`, result);
           setFlexUuid(result.uuid);
           setError(result.error);
           setIsLoading(false);
         }
       } catch (error) {
-        console.error('Error fetching flex UUID:', error);
+        console.error('[useFlexUuid] Unexpected error:', error);
         if (!isCancelled) {
           setError('Failed to fetch flex UUID');
           setFlexUuid(null);

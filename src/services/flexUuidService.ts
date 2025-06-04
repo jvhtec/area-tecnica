@@ -7,7 +7,10 @@ interface FlexUuidResult {
 }
 
 /**
- * Optimized service for retrieving flex folder UUIDs based on job type and department
+ * Definitive service for retrieving flex folder UUIDs based on job type and department
+ * - Dryhire: Uses flex_folders table with folder_type 'dryhire' -> element_id
+ * - Tourdate: Uses tour department columns from tours table -> department-specific column
+ * - Single: Uses flex_folders table with folder_type 'department' -> element_id
  */
 export class FlexUuidService {
   /**
@@ -15,16 +18,15 @@ export class FlexUuidService {
    */
   static async getFlexUuid(jobId: string, userDepartment: string): Promise<FlexUuidResult> {
     try {
-      console.log(`Getting flex UUID for job ${jobId}, department: ${userDepartment}`);
+      console.log(`[FlexUuidService] Getting flex UUID for job ${jobId}, department: ${userDepartment}`);
 
-      // First, get job information with a single query
+      // First, get job information to determine job type
       const { data: jobData, error: jobError } = await supabase
         .from('jobs')
         .select(`
           id,
           job_type,
           tour_id,
-          tour_date_id,
           tours (
             flex_main_folder_id,
             flex_sound_folder_id,
@@ -38,12 +40,19 @@ export class FlexUuidService {
         .eq('id', jobId)
         .single();
 
-      if (jobError || !jobData) {
-        console.error('Error fetching job data:', jobError);
+      if (jobError) {
+        console.error('[FlexUuidService] Error fetching job data:', jobError);
         return { uuid: null, error: 'Job not found' };
       }
 
-      // Handle different job types with optimized logic
+      if (!jobData) {
+        console.error('[FlexUuidService] No job data found for ID:', jobId);
+        return { uuid: null, error: 'Job not found' };
+      }
+
+      console.log(`[FlexUuidService] Job type: ${jobData.job_type}, Tour ID: ${jobData.tour_id}`);
+
+      // Handle each job type according to specifications
       switch (jobData.job_type) {
         case 'dryhire':
           return await this.getDryhireFlexUuid(jobId, userDepartment);
@@ -55,40 +64,55 @@ export class FlexUuidService {
           return await this.getSingleJobFlexUuid(jobId, userDepartment);
       }
     } catch (error) {
-      console.error('Error in getFlexUuid:', error);
+      console.error('[FlexUuidService] Unexpected error in getFlexUuid:', error);
       return { uuid: null, error: 'Failed to fetch flex UUID' };
     }
   }
 
   /**
-   * Get flex UUID for dryhire jobs (uses element_id from flex_folders)
+   * Get flex UUID for dryhire jobs
+   * Uses flex_folders table with folder_type 'dryhire' -> element_id
    */
   private static async getDryhireFlexUuid(jobId: string, userDepartment: string): Promise<FlexUuidResult> {
+    console.log(`[FlexUuidService] Fetching dryhire UUID for job ${jobId}, department ${userDepartment}`);
+    
     const { data, error } = await supabase
       .from('flex_folders')
       .select('element_id')
       .eq('job_id', jobId)
       .eq('department', userDepartment)
       .eq('folder_type', 'dryhire')
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching dryhire flex folder:', error);
+    if (error) {
+      console.error('[FlexUuidService] Error fetching dryhire flex folder:', error);
       return { uuid: null, error: 'Failed to fetch dryhire folder' };
     }
 
-    return { uuid: data?.element_id || null, error: null };
+    if (!data) {
+      console.log(`[FlexUuidService] No dryhire folder found for job ${jobId}, department ${userDepartment}`);
+      return { uuid: null, error: 'Dryhire folder not found for this department' };
+    }
+
+    console.log(`[FlexUuidService] Found dryhire UUID: ${data.element_id}`);
+    return { uuid: data.element_id, error: null };
   }
 
   /**
-   * Get flex UUID for tourdate jobs (uses department-specific column from tours table)
+   * Get flex UUID for tourdate jobs
+   * Uses tour department columns from tours table
    */
   private static async getTourDateFlexUuid(jobData: any, userDepartment: string): Promise<FlexUuidResult> {
+    console.log(`[FlexUuidService] Fetching tourdate UUID for department ${userDepartment}`);
+    
     if (!jobData.tours) {
+      console.error('[FlexUuidService] No tour data found for tourdate job');
       return { uuid: null, error: 'Tour data not found' };
     }
 
     const tourData = jobData.tours;
+    
+    // Map user department to tour flex folder column
     const departmentMapping: { [key: string]: string } = {
       'sound': 'flex_sound_folder_id',
       'lights': 'flex_lights_folder_id',
@@ -100,39 +124,51 @@ export class FlexUuidService {
     };
 
     const departmentColumn = departmentMapping[userDepartment.toLowerCase()];
+    
     if (!departmentColumn) {
-      // Default to production if department not found
-      const uuid = tourData.flex_production_folder_id || tourData.flex_main_folder_id;
-      return { uuid, error: null };
+      console.log(`[FlexUuidService] Unknown department ${userDepartment}, using main folder`);
+      const uuid = tourData.flex_main_folder_id;
+      return { uuid, error: uuid ? null : 'No main folder found for tour' };
     }
 
+    // Get department-specific folder, fallback to main folder
     const uuid = tourData[departmentColumn] || tourData.flex_main_folder_id;
+    
+    if (!uuid) {
+      console.log(`[FlexUuidService] No folder found for department ${userDepartment} or main folder`);
+      return { uuid: null, error: 'No folder found for this department' };
+    }
+
+    console.log(`[FlexUuidService] Found tourdate UUID: ${uuid}`);
     return { uuid, error: null };
   }
 
   /**
-   * Get flex UUID for single jobs (uses parent_id or element_id from flex_folders)
+   * Get flex UUID for single jobs
+   * Uses flex_folders table with folder_type 'department' -> element_id
    */
   private static async getSingleJobFlexUuid(jobId: string, userDepartment: string): Promise<FlexUuidResult> {
+    console.log(`[FlexUuidService] Fetching single job UUID for job ${jobId}, department ${userDepartment}`);
+    
     const { data, error } = await supabase
       .from('flex_folders')
-      .select('parent_id, element_id')
+      .select('element_id')
       .eq('job_id', jobId)
       .eq('department', userDepartment)
       .eq('folder_type', 'department')
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching single job flex folder:', error);
+    if (error) {
+      console.error('[FlexUuidService] Error fetching single job flex folder:', error);
       return { uuid: null, error: 'Failed to fetch job folder' };
     }
 
     if (!data) {
-      return { uuid: null, error: null };
+      console.log(`[FlexUuidService] No department folder found for job ${jobId}, department ${userDepartment}`);
+      return { uuid: null, error: 'Department folder not found' };
     }
 
-    // For single jobs, prefer parent_id, fallback to element_id
-    const uuid = data.parent_id || data.element_id;
-    return { uuid, error: null };
+    console.log(`[FlexUuidService] Found single job UUID: ${data.element_id}`);
+    return { uuid: data.element_id, error: null };
   }
 }
