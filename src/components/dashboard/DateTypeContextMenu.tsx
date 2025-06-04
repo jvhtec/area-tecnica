@@ -7,7 +7,7 @@ import { toast } from "@/hooks/use-toast";
 import { format, startOfDay } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTableSubscription } from "@/hooks/useTableSubscription";
-import { useFlexUuid } from "@/hooks/useFlexUuid";
+import { useFlexUuidLazy } from "@/hooks/useFlexUuidLazy";
 
 interface DateTypeContextMenuProps {
   children: React.ReactNode;
@@ -18,8 +18,7 @@ interface DateTypeContextMenuProps {
 
 export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: DateTypeContextMenuProps) => {
   const queryClient = useQueryClient();
-  // Use jobId as the identifier - the service will determine if it's a job or tour date
-  const { flexUuid, isLoading: isLoadingFlexUuid, error: flexError } = useFlexUuid(jobId);
+  const { uuid: flexUuid, isLoading: isLoadingFlexUuid, error: flexError, hasChecked, fetchFlexUuid } = useFlexUuidLazy();
 
   // Use the improved subscription hook with correct parameters
   useTableSubscription('job_date_types', ['job-date-types', jobId]);
@@ -71,7 +70,13 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
     }
   };
 
-  const handleFlexClick = () => {
+  const handleFlexClick = async () => {
+    // If we haven't checked yet, fetch the UUID first
+    if (!hasChecked) {
+      await fetchFlexUuid(jobId);
+      return;
+    }
+
     if (isLoadingFlexUuid) {
       toast({
         title: "Loading",
@@ -97,6 +102,20 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
     }
   };
 
+  const getFlexMenuText = () => {
+    if (!hasChecked) return "Check Flex";
+    if (isLoadingFlexUuid) return "Loading Flex...";
+    if (flexUuid) return "Open Flex";
+    return "Flex";
+  };
+
+  const getFlexIcon = () => {
+    if (isLoadingFlexUuid) {
+      return <Loader2 className="h-4 w-4 animate-spin" />;
+    }
+    return <ExternalLink className="h-4 w-4" />;
+  };
+
   return (
     <ContextMenu>
       <ContextMenuTrigger>
@@ -119,18 +138,13 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
           <Moon className="h-4 w-4" /> Off
         </ContextMenuItem>
         {jobId && (
-          <ContextMenuItem onClick={handleFlexClick} className="flex items-center gap-2" disabled={isLoadingFlexUuid}>
-            {isLoadingFlexUuid ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading Flex...
-              </>
-            ) : (
-              <>
-                <ExternalLink className="h-4 w-4" />
-                Flex
-              </>
-            )}
+          <ContextMenuItem 
+            onClick={handleFlexClick} 
+            className="flex items-center gap-2"
+            disabled={isLoadingFlexUuid}
+          >
+            {getFlexIcon()}
+            {getFlexMenuText()}
           </ContextMenuItem>
         )}
       </ContextMenuContent>
