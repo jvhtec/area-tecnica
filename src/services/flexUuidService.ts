@@ -7,51 +7,34 @@ interface FlexUuidResult {
 }
 
 /**
- * Service for retrieving flex folder UUIDs based on job type and department
- * Handles both job IDs and tour date IDs
+ * Service for retrieving flex folder UUIDs based on job type, tour, and department
+ * Handles job IDs, tour date IDs, and tour IDs
  */
 export class FlexUuidService {
   /**
-   * Get flex UUID for a job or tour date based on context
+   * Get flex UUID for a job, tour date, or tour based on context
    */
   static async getFlexUuid(identifier: string, userDepartment: string): Promise<FlexUuidResult> {
     try {
       console.log(`[FlexUuidService] Getting flex UUID for identifier ${identifier}, department: ${userDepartment}`);
 
-      // First, determine if this is a tour date ID or job ID
-      const tourDateData = await this.getTourDateData(identifier);
-      
-      if (tourDateData) {
-        // It's a tour date ID - query flex folders directly
-        console.log(`[FlexUuidService] Identifier is a tour date ID`);
-        return await this.getTourDateFlexUuidDirect(identifier, userDepartment);
-      }
+      // First, determine the type of identifier by checking each table
+      const identifierType = await this.determineIdentifierType(identifier);
+      console.log(`[FlexUuidService] Identifier type determined: ${identifierType}`);
 
-      // Not a tour date, try as job ID
-      const jobData = await this.getJobData(identifier);
-      
-      if (!jobData) {
-        console.error('[FlexUuidService] No job or tour date found for identifier:', identifier);
-        return { uuid: null, error: 'Job or tour date not found' };
-      }
-
-      console.log(`[FlexUuidService] Job type: ${jobData.job_type}, Tour Date ID: ${jobData.tour_date_id}`);
-
-      // Handle each job type
-      switch (jobData.job_type) {
-        case 'dryhire':
-          return await this.getDryhireFlexUuid(jobData.id, userDepartment);
+      switch (identifierType) {
+        case 'tour_date':
+          return await this.getTourDateFlexUuidDirect(identifier, userDepartment);
         
-        case 'tourdate':
-          // For tour date jobs, use the tour_date_id if available
-          if (jobData.tour_date_id) {
-            return await this.getTourDateFlexUuidDirect(jobData.tour_date_id, userDepartment);
-          }
-          // Fallback to job-based lookup for legacy data
-          return await this.getTourDateFlexUuidByJob(jobData.id, userDepartment);
+        case 'tour':
+          return await this.getTourFlexUuid(identifier, userDepartment);
         
-        default: // 'single' and other types
-          return await this.getSingleJobFlexUuid(jobData.id, userDepartment);
+        case 'job':
+          return await this.getJobFlexUuid(identifier, userDepartment);
+        
+        default:
+          console.error('[FlexUuidService] Unknown identifier type for:', identifier);
+          return { uuid: null, error: 'Unknown identifier type' };
       }
     } catch (error) {
       console.error('[FlexUuidService] Unexpected error in getFlexUuid:', error);
@@ -59,19 +42,137 @@ export class FlexUuidService {
     }
   }
 
-  private static async getTourDateData(tourDateId: string) {
-    const { data, error } = await supabase
+  /**
+   * Determine what type of identifier we're dealing with
+   */
+  private static async determineIdentifierType(identifier: string): Promise<'tour_date' | 'tour' | 'job' | 'unknown'> {
+    // Check if it's a tour date ID
+    const { data: tourDateData } = await supabase
       .from('tour_dates')
       .select('id')
-      .eq('id', tourDateId)
+      .eq('id', identifier)
+      .maybeSingle();
+
+    if (tourDateData) {
+      return 'tour_date';
+    }
+
+    // Check if it's a tour ID
+    const { data: tourData } = await supabase
+      .from('tours')
+      .select('id')
+      .eq('id', identifier)
+      .maybeSingle();
+
+    if (tourData) {
+      return 'tour';
+    }
+
+    // Check if it's a job ID
+    const { data: jobData } = await supabase
+      .from('jobs')
+      .select('id')
+      .eq('id', identifier)
+      .maybeSingle();
+
+    if (jobData) {
+      return 'job';
+    }
+
+    return 'unknown';
+  }
+
+  /**
+   * Get flex UUID for tour-level folders
+   */
+  private static async getTourFlexUuid(tourId: string, userDepartment: string): Promise<FlexUuidResult> {
+    console.log(`[FlexUuidService] Fetching tour-level UUID for tour ${tourId}, department ${userDepartment}`);
+    
+    // Try tour department folder first
+    let { data, error } = await supabase
+      .from('flex_folders')
+      .select('element_id')
+      .eq('tour_id', tourId)
+      .eq('department', userDepartment)
+      .eq('folder_type', 'tour_department')
       .maybeSingle();
 
     if (error) {
-      console.error('[FlexUuidService] Error checking tour date:', error);
-      return null;
+      console.error('[FlexUuidService] Error fetching tour department folder:', error);
     }
 
-    return data;
+    if (data) {
+      console.log(`[FlexUuidService] Found tour department UUID: ${data.element_id}`);
+      return { uuid: data.element_id, error: null };
+    }
+
+    // Try main tour folder as fallback
+    ({ data, error } = await supabase
+      .from('flex_folders')
+      .select('element_id')
+      .eq('tour_id', tourId)
+      .eq('folder_type', 'main')
+      .maybeSingle());
+
+    if (error) {
+      console.error('[FlexUuidService] Error fetching main tour folder:', error);
+    }
+
+    if (data) {
+      console.log(`[FlexUuidService] Found main tour UUID: ${data.element_id}`);
+      return { uuid: data.element_id, error: null };
+    }
+
+    // Try main_event folder as final fallback
+    ({ data, error } = await supabase
+      .from('flex_folders')
+      .select('element_id')
+      .eq('tour_id', tourId)
+      .eq('folder_type', 'main_event')
+      .maybeSingle());
+
+    if (error) {
+      console.error('[FlexUuidService] Error fetching main_event folder:', error);
+    }
+
+    if (data) {
+      console.log(`[FlexUuidService] Found main_event UUID: ${data.element_id}`);
+      return { uuid: data.element_id, error: null };
+    }
+
+    console.log(`[FlexUuidService] No tour folder found for tour ${tourId}, department ${userDepartment}`);
+    return { uuid: null, error: 'Tour folder not found for this department' };
+  }
+
+  /**
+   * Handle job-based flex UUID requests
+   */
+  private static async getJobFlexUuid(jobId: string, userDepartment: string): Promise<FlexUuidResult> {
+    const jobData = await this.getJobData(jobId);
+    
+    if (!jobData) {
+      console.error('[FlexUuidService] No job found for identifier:', jobId);
+      return { uuid: null, error: 'Job not found' };
+    }
+
+    console.log(`[FlexUuidService] Job type: ${jobData.job_type}, Tour Date ID: ${jobData.tour_date_id}`);
+
+    // Handle each job type
+    switch (jobData.job_type) {
+      case 'dryhire':
+        return await this.getDryhireFlexUuid(jobData.id, userDepartment);
+      
+      case 'tourdate':
+        // For tour date jobs, use the tour_date_id if available
+        if (jobData.tour_date_id) {
+          return await this.getTourDateFlexUuidDirect(jobData.tour_date_id, userDepartment);
+        }
+        // Fallback to job-based lookup for legacy data
+        return await this.getTourDateFlexUuidByJob(jobData.id, userDepartment);
+      
+      default: // 'single' and other types including festivals
+        return await this.getSingleJobFlexUuid(jobData.id, userDepartment);
+    }
   }
 
   private static async getJobData(jobId: string) {
@@ -214,12 +315,13 @@ export class FlexUuidService {
   }
 
   /**
-   * Get flex UUID for single jobs
+   * Get flex UUID for single jobs (including festivals)
    */
   private static async getSingleJobFlexUuid(jobId: string, userDepartment: string): Promise<FlexUuidResult> {
     console.log(`[FlexUuidService] Fetching single job UUID for job ${jobId}, department ${userDepartment}`);
     
-    const { data, error } = await supabase
+    // Try department-specific folder first
+    let { data, error } = await supabase
       .from('flex_folders')
       .select('element_id')
       .eq('job_id', jobId)
@@ -228,16 +330,32 @@ export class FlexUuidService {
       .maybeSingle();
 
     if (error) {
-      console.error('[FlexUuidService] Error fetching single job flex folder:', error);
-      return { uuid: null, error: 'Failed to fetch job folder' };
+      console.error('[FlexUuidService] Error fetching department flex folder:', error);
     }
 
-    if (!data) {
-      console.log(`[FlexUuidService] No department folder found for job ${jobId}, department ${userDepartment}`);
-      return { uuid: null, error: 'Department folder not found' };
+    if (data) {
+      console.log(`[FlexUuidService] Found department UUID: ${data.element_id}`);
+      return { uuid: data.element_id, error: null };
     }
 
-    console.log(`[FlexUuidService] Found single job UUID: ${data.element_id}`);
-    return { uuid: data.element_id, error: null };
+    // Try general job folder as fallback
+    ({ data, error } = await supabase
+      .from('flex_folders')
+      .select('element_id')
+      .eq('job_id', jobId)
+      .eq('folder_type', 'job')
+      .maybeSingle());
+
+    if (error) {
+      console.error('[FlexUuidService] Error fetching job flex folder:', error);
+    }
+
+    if (data) {
+      console.log(`[FlexUuidService] Found job UUID: ${data.element_id}`);
+      return { uuid: data.element_id, error: null };
+    }
+
+    console.log(`[FlexUuidService] No folder found for job ${jobId}, department ${userDepartment}`);
+    return { uuid: null, error: 'Job folder not found for this department' };
   }
 }

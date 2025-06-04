@@ -1,4 +1,3 @@
-
 import { useParams, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +18,8 @@ import {
   Eye,
   ArrowLeft,
   Info,
-  Printer
+  Printer,
+  Loader2
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -59,7 +59,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
   const [isPrintingSchedule, setIsPrintingSchedule] = useState(false);
 
   const { assignments } = useTourAssignments(tour?.id);
-  const { flexUuid, isLoading: isFlexLoading, error: flexError } = useFlexUuid(tour?.id || '');
+  const { flexUuid, isLoading: isFlexLoading, error: flexError, folderExists } = useFlexUuid(tour?.id || '');
 
   // Load tour logo
   useEffect(() => {
@@ -207,6 +207,32 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
     navigate('/technician-dashboard');
   };
 
+  const handleFlexClick = () => {
+    if (isFlexLoading) {
+      toast({
+        title: "Loading",
+        description: "Please wait while we load the Flex folder...",
+      });
+      return;
+    }
+
+    if (flexUuid) {
+      const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+      window.open(flexUrl, '_blank', 'noopener');
+    } else if (flexError) {
+      toast({
+        title: "Error",
+        description: flexError,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Info",
+        description: "Flex folder not available for this tour",
+      });
+    }
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header Section */}
@@ -275,29 +301,23 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
               <Printer className="h-4 w-4 mr-2" />
               {isPrintingSchedule ? 'Printing...' : 'Print Schedule'}
             </Button>
-            <Button 
-              onClick={handlePrintSchedule}
-              variant="outline"
-              disabled={isPrintingSchedule}
-            >
-              <Printer className="h-4 w-4 mr-2" />
-              {isPrintingSchedule ? 'Printing...' : 'Print Schedule'}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-              onClick={() => {
-                if (flexUuid) {
-                  const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
-                  window.open(flexUrl, '_blank', 'noopener');
-                }
-              }}
-              disabled={!flexUuid || isFlexLoading}
-            >
-              <img src={createFolderIcon} alt="Flex" className="h-4 w-4" />
-              Flex
-            </Button>
+            {/* Only show Flex button if folder exists or is loading */}
+            {(folderExists || isFlexLoading) && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+                onClick={handleFlexClick}
+                disabled={!flexUuid || isFlexLoading}
+              >
+                {isFlexLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <img src={createFolderIcon} alt="Flex" className="h-4 w-4" />
+                )}
+                {isFlexLoading ? 'Loading...' : 'Flex'}
+              </Button>
+            )}
             <Button onClick={() => setIsSettingsOpen(true)}>
               <Settings className="h-4 w-4 mr-2" />
               Tour Settings

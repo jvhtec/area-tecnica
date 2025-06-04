@@ -57,7 +57,7 @@ const FestivalManagement = () => {
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const { userRole } = useAuth();
   const [maxStages, setMaxStages] = useState(1);
-  const { flexUuid, isLoading: isFlexLoading, error: flexError } = useFlexUuid(jobId || '');
+  const { flexUuid, isLoading: isFlexLoading, error: flexError, folderExists } = useFlexUuid(jobId || '');
 
   const isSchedulingRoute = location.pathname.includes('/scheduling');
   
@@ -233,6 +233,32 @@ const FestivalManagement = () => {
     setIsPrintDialogOpen(true);
   };
 
+  const handleFlexClick = () => {
+    if (isFlexLoading) {
+      toast({
+        title: "Loading",
+        description: "Please wait while we load the Flex folder...",
+      });
+      return;
+    }
+
+    if (flexUuid) {
+      const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+      window.open(flexUrl, '_blank', 'noopener');
+    } else if (flexError) {
+      toast({
+        title: "Error",
+        description: flexError,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Info",
+        description: "Flex folder not available for this festival",
+      });
+    }
+  };
+
   if (!jobId) {
     return <div>Job ID is required</div>;
   }
@@ -276,21 +302,21 @@ const FestivalManagement = () => {
                   {isPrinting ? 'Generating...' : 'Print Documentation'}
                 </Button>
               )}
-              {canEdit && (
+              {/* Only show Flex button if folder exists or is loading */}
+              {canEdit && (folderExists || isFlexLoading) && (
                 <Button
                   variant="outline"
                   size="sm"
                   className="flex items-center gap-2"
-                  onClick={() => {
-                    if (flexUuid) {
-                      const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
-                      window.open(flexUrl, '_blank', 'noopener');
-                    }
-                  }}
-                  disabled={!flexUuid}
+                  onClick={handleFlexClick}
+                  disabled={!flexUuid || isFlexLoading}
                 >
-                  <img src={createFolderIcon} alt="Flex" className="h-4 w-4" />
-                  Flex
+                  {isFlexLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <img src={createFolderIcon} alt="Flex" className="h-4 w-4" />
+                  )}
+                  {isFlexLoading ? 'Loading...' : 'Flex'}
                 </Button>
               )}
               {canEdit && <FestivalLogoManager jobId={jobId} />}

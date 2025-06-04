@@ -7,12 +7,14 @@ export const useFlexUuid = (identifier: string) => {
   const [flexUuid, setFlexUuid] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [folderExists, setFolderExists] = useState<boolean | null>(null);
 
   const fetchFlexUuid = useCallback(async () => {
     if (!identifier) {
       setFlexUuid(null);
       setIsLoading(false);
       setError(null);
+      setFolderExists(null);
       return;
     }
 
@@ -27,6 +29,7 @@ export const useFlexUuid = (identifier: string) => {
         console.log('[useFlexUuid] No authenticated user found');
         setIsLoading(false);
         setError('User not authenticated');
+        setFolderExists(false);
         return;
       }
 
@@ -40,6 +43,7 @@ export const useFlexUuid = (identifier: string) => {
         console.error('[useFlexUuid] Error fetching user profile:', profileError);
         setIsLoading(false);
         setError('Could not determine user department');
+        setFolderExists(false);
         return;
       }
 
@@ -47,6 +51,7 @@ export const useFlexUuid = (identifier: string) => {
         console.error('[useFlexUuid] No department found in user profile');
         setIsLoading(false);
         setError('User department not set');
+        setFolderExists(false);
         return;
       }
 
@@ -58,11 +63,13 @@ export const useFlexUuid = (identifier: string) => {
       console.log(`[useFlexUuid] Result for identifier ${identifier}:`, result);
       setFlexUuid(result.uuid);
       setError(result.error);
+      setFolderExists(result.uuid !== null);
       setIsLoading(false);
     } catch (error) {
       console.error('[useFlexUuid] Unexpected error:', error);
       setError('Failed to fetch flex UUID');
       setFlexUuid(null);
+      setFolderExists(false);
       setIsLoading(false);
     }
   }, [identifier]);
@@ -71,5 +78,5 @@ export const useFlexUuid = (identifier: string) => {
     fetchFlexUuid();
   }, [fetchFlexUuid]);
 
-  return { flexUuid, isLoading, error, refetch: fetchFlexUuid };
+  return { flexUuid, isLoading, error, folderExists, refetch: fetchFlexUuid };
 };
