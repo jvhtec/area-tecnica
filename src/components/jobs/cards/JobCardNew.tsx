@@ -102,16 +102,26 @@ export function JobCardNew({
   const { data: foldersExist } = useFolderExistence(job.id);
   const foldersAreCreated = job.flex_folders_created || foldersExist || job.flex_folders_exist;
 
-  // Updated delete handler using the centralized service
+  // Centralized delete handler using the service
   const handleDeleteClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
     
+    // Check permissions
+    if (!["admin", "management"].includes(userRole || "")) {
+      toast({
+        title: "Permission denied",
+        description: "Only admin and management users can delete jobs",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!window.confirm('Are you sure you want to delete this job? This action cannot be undone and will remove all related data.')) {
       return;
     }
 
     try {
-      console.log("Starting job deletion from JobCardNew:", job.id);
+      console.log("JobCardNew: Starting job deletion for:", job.id);
       
       const result = await deleteJobComprehensively(job.id);
       
@@ -127,7 +137,7 @@ export function JobCardNew({
         throw new Error(result.error || "Unknown deletion error");
       }
     } catch (error: any) {
-      console.error("Error deleting job:", error);
+      console.error("JobCardNew: Error deleting job:", error);
       toast({
         title: "Error deleting job",
         description: error.message,
@@ -139,7 +149,7 @@ export function JobCardNew({
   const createFlexFoldersHandler = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    console.log("Folder existence check:", {
+    console.log("JobCardNew: Folder existence check:", {
       jobId: job.id,
       flexFoldersCreated: job.flex_folders_created,
       foldersExist,
@@ -148,7 +158,7 @@ export function JobCardNew({
     });
 
     if (foldersAreCreated) {
-      console.log("Folders already exist, preventing creation");
+      console.log("JobCardNew: Folders already exist, preventing creation");
       toast({
         title: "Folders already created",
         description: "Flex folders have already been created for this job.",
@@ -158,7 +168,7 @@ export function JobCardNew({
     }
 
     try {
-      console.log("Starting folder creation for job:", job.id);
+      console.log("JobCardNew: Starting folder creation for job:", job.id);
 
       const { data: existingFolders } = await supabase
         .from("flex_folders")
@@ -167,7 +177,7 @@ export function JobCardNew({
         .limit(1);
 
       if (existingFolders && existingFolders.length > 0) {
-        console.log("Found existing folders in final check:", existingFolders);
+        console.log("JobCardNew: Found existing folders in final check:", existingFolders);
         toast({
           title: "Folders already exist",
           description: "Flex folders have already been created for this job.",
@@ -188,13 +198,13 @@ export function JobCardNew({
       await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber);
       await updateFolderStatus.mutateAsync();
 
-      console.log("Successfully created folders for job:", job.id);
+      console.log("JobCardNew: Successfully created folders for job:", job.id);
       toast({
         title: "Success",
         description: "Flex folders have been created successfully."
       });
     } catch (error: any) {
-      console.error("Error creating Flex folders:", error);
+      console.error("JobCardNew: Error creating Flex folders:", error);
       toast({
         title: "Error creating folders",
         description: error.message,
@@ -225,7 +235,7 @@ export function JobCardNew({
 
   const handleFestivalArtistsClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log("Navigating to festival management:", job.id);
+    console.log("JobCardNew: Navigating to festival management:", job.id);
     navigate(`/festival-management/${job.id}`);
   };
 

@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { JobDocument } from '@/components/jobs/cards/JobCardDocuments';
 import { Department } from '@/types/department';
+import { deleteJobComprehensively } from '@/services/jobDeletionService';
 
 export const useJobCard = (job: any, department: Department, userRole: string | null, onEditClick?: (job: any) => void, onDeleteClick?: (jobId: string) => void, onJobClick?: (jobId: string) => void) => {
   const { toast } = useToast();
@@ -150,114 +151,34 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
       return;
     }
 
-    if (!window.confirm("Are you sure you want to delete this job?")) {
+    if (!window.confirm("Are you sure you want to delete this job? This action cannot be undone and will remove all related data.")) {
       return;
     }
 
     try {
-      console.log("Deleting job:", job.id);
+      console.log("useJobCard: Starting job deletion for:", job.id);
       
-      // Delete task documents
-      const { data: soundTaskIds } = await supabase
-        .from("sound_job_tasks")
-        .select("id")
-        .eq("job_id", job.id);
-      const { data: lightsTaskIds } = await supabase
-        .from("lights_job_tasks")
-        .select("id")
-        .eq("job_id", job.id);
-      const { data: videoTaskIds } = await supabase
-        .from("video_job_tasks")
-        .select("id")
-        .eq("job_id", job.id);
-
-      if (soundTaskIds?.length) {
-        const { error: soundDocsError } = await supabase
-          .from("task_documents")
-          .delete()
-          .in("sound_task_id", soundTaskIds.map((t) => t.id));
-        if (soundDocsError) throw soundDocsError;
-      }
-      if (lightsTaskIds?.length) {
-        const { error: lightsDocsError } = await supabase
-          .from("task_documents")
-          .delete()
-          .in("lights_task_id", lightsTaskIds.map((t) => t.id));
-        if (lightsDocsError) throw lightsDocsError;
-      }
-      if (videoTaskIds?.length) {
-        const { error: videoDocsError } = await supabase
-          .from("task_documents")
-          .delete()
-          .in("video_task_id", videoTaskIds.map((t) => t.id));
-        if (videoDocsError) throw videoDocsError;
-      }
-
-      // Delete tasks
-      await Promise.all([
-        supabase.from("sound_job_tasks").delete().eq("job_id", job.id),
-        supabase.from("lights_job_tasks").delete().eq("job_id", job.id),
-        supabase.from("video_job_tasks").delete().eq("job_id", job.id)
-      ]);
-
-      // Delete personnel
-      await Promise.all([
-        supabase.from("sound_job_personnel").delete().eq("job_id", job.id),
-        supabase.from("lights_job_personnel").delete().eq("job_id", job.id),
-        supabase.from("video_job_personnel").delete().eq("job_id", job.id)
-      ]);
-
-      // Delete documents from storage
-      if (job.job_documents?.length > 0) {
-        const { error: storageError } = await supabase.storage
-          .from("job_documents")
-          .remove(job.job_documents.map((doc: JobDocument) => doc.file_path));
-        if (storageError) throw storageError;
-      }
-
-      // Delete job documents from database
-      const { error: jobDocsError } = await supabase
-        .from("job_documents")
-        .delete()
-        .eq("job_id", job.id);
-      if (jobDocsError) throw jobDocsError;
-
-      // Delete assignments
-      const { error: assignmentsError } = await supabase
-        .from("job_assignments")
-        .delete()
-        .eq("job_id", job.id);
-      if (assignmentsError) throw assignmentsError;
-
-      // Delete departments
-      const { error: departmentsError } = await supabase
-        .from("job_departments")
-        .delete()
-        .eq("job_id", job.id);
-      if (departmentsError) throw departmentsError;
-
-      // Delete the job itself
-      const { error: jobError } = await supabase
-        .from("jobs")
-        .delete()
-        .eq("id", job.id);
-      if (jobError) throw jobError;
-
-      if (onDeleteClick) {
-        onDeleteClick(job.id);
-      }
+      const result = await deleteJobComprehensively(job.id);
       
-      toast({
-        title: "Success",
-        description: "Job deleted successfully"
-      });
-
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      if (result.success) {
+        toast({
+          title: "Job deleted successfully",
+          description: result.details || "The job and all related records have been removed."
+        });
+        
+        if (onDeleteClick) {
+          onDeleteClick(job.id);
+        }
+        
+        queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      } else {
+        throw new Error(result.error || "Unknown deletion error");
+      }
     } catch (error: any) {
-      console.error("Error deleting job:", error);
+      console.error("useJobCard: Error deleting job:", error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete job",
+        title: "Error deleting job",
+        description: error.message,
         variant: "destructive"
       });
     }
@@ -306,7 +227,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
   const handleDeleteDocument = async (doc: JobDocument) => {
     if (!window.confirm("Are you sure you want to delete this document?")) return;
     try {
-      console.log("Starting document deletion:", doc);
+      console.log("useJobCard: Starting document deletion:", doc);
       const { error: storageError } = await supabase.storage
         .from("job_documents")
         .remove([doc.file_path]);

@@ -12,7 +12,23 @@ export const deleteJobComprehensively = async (jobId: string): Promise<JobDeleti
   try {
     console.log(`Starting comprehensive deletion for job: ${jobId}`);
     
-    // Step 1: Get job info for potential cleanup
+    // Step 1: Verify user permissions
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+
+    if (!userProfile || !['admin', 'management'].includes(userProfile.role)) {
+      return { success: false, error: 'Insufficient permissions to delete jobs' };
+    }
+
+    // Step 2: Get job info for potential cleanup
     const { data: jobData, error: jobFetchError } = await supabase
       .from('jobs')
       .select('*')
@@ -24,13 +40,15 @@ export const deleteJobComprehensively = async (jobId: string): Promise<JobDeleti
       return { success: false, error: 'Job not found' };
     }
 
-    // Step 2: Delete from storage buckets (job documents, artist files, etc.)
+    console.log('Job found, proceeding with deletion:', jobData);
+
+    // Step 3: Delete from storage buckets (job documents, artist files, etc.)
     await cleanupStorageForJob(jobId);
 
-    // Step 3: Delete related data in dependency order
+    // Step 4: Delete related data in dependency order
     await deleteJobRelatedData(jobId);
 
-    // Step 4: Delete the job itself
+    // Step 5: Delete the job itself
     const { error: jobDeleteError } = await supabase
       .from('jobs')
       .delete()
@@ -60,6 +78,8 @@ export const deleteJobComprehensively = async (jobId: string): Promise<JobDeleti
 
 const cleanupStorageForJob = async (jobId: string) => {
   try {
+    console.log(`Starting storage cleanup for job: ${jobId}`);
+    
     // Get all job documents for storage cleanup
     const { data: jobDocs } = await supabase
       .from('job_documents')
@@ -96,6 +116,8 @@ const cleanupStorageForJob = async (jobId: string) => {
       ...(festivalLogos || []).map(logo => logo.file_path)
     ].filter(Boolean);
 
+    console.log(`Found ${filePaths.length} files to delete from storage`);
+
     // Delete files from storage
     if (filePaths.length > 0) {
       const { error: storageError } = await supabase.storage
@@ -104,6 +126,8 @@ const cleanupStorageForJob = async (jobId: string) => {
       
       if (storageError) {
         console.warn('Storage cleanup warning:', storageError);
+      } else {
+        console.log('Storage cleanup completed successfully');
       }
     }
   } catch (error) {
@@ -112,6 +136,8 @@ const cleanupStorageForJob = async (jobId: string) => {
 };
 
 const deleteJobRelatedData = async (jobId: string) => {
+  console.log(`Starting related data deletion for job: ${jobId}`);
+  
   // Delete in reverse dependency order to avoid foreign key violations
   
   // 1. Delete task documents first (they reference tasks)
@@ -134,10 +160,14 @@ const deleteJobRelatedData = async (jobId: string) => {
   
   // 7. Delete flexible folders
   await deleteFlexFolders(jobId);
+  
+  console.log(`Completed related data deletion for job: ${jobId}`);
 };
 
 const deleteTaskDocuments = async (jobId: string) => {
   try {
+    console.log(`Deleting task documents for job: ${jobId}`);
+    
     // Get all task IDs for this job across all departments
     const [soundTasks, lightsTasks, videoTasks] = await Promise.all([
       supabase.from('sound_job_tasks').select('id').eq('job_id', jobId),
@@ -171,6 +201,7 @@ const deleteTaskDocuments = async (jobId: string) => {
     }
 
     await Promise.all(deletePromises);
+    console.log('Task documents deleted successfully');
   } catch (error) {
     console.warn('Task documents deletion failed:', error);
   }
@@ -178,6 +209,8 @@ const deleteTaskDocuments = async (jobId: string) => {
 
 const deleteDepartmentData = async (jobId: string) => {
   try {
+    console.log(`Deleting department data for job: ${jobId}`);
+    
     await Promise.all([
       // Department tasks
       supabase.from('sound_job_tasks').delete().eq('job_id', jobId),
@@ -194,6 +227,8 @@ const deleteDepartmentData = async (jobId: string) => {
       supabase.from('lights_memoria_tecnica_documents').delete().eq('job_id', jobId),
       supabase.from('video_memoria_tecnica_documents').delete().eq('job_id', jobId)
     ]);
+    
+    console.log('Department data deleted successfully');
   } catch (error) {
     console.warn('Department data deletion failed:', error);
   }
@@ -201,6 +236,8 @@ const deleteDepartmentData = async (jobId: string) => {
 
 const deleteJobSpecificData = async (jobId: string) => {
   try {
+    console.log(`Deleting job specific data for job: ${jobId}`);
+    
     await Promise.all([
       // Job documents
       supabase.from('job_documents').delete().eq('job_id', jobId),
@@ -221,6 +258,8 @@ const deleteJobSpecificData = async (jobId: string) => {
       // Hoja de ruta and related data
       deleteHojaDeRutaData(jobId)
     ]);
+    
+    console.log('Job specific data deleted successfully');
   } catch (error) {
     console.warn('Job specific data deletion failed:', error);
   }
@@ -228,6 +267,8 @@ const deleteJobSpecificData = async (jobId: string) => {
 
 const deleteHojaDeRutaData = async (jobId: string) => {
   try {
+    console.log(`Deleting hoja de ruta data for job: ${jobId}`);
+    
     // Get hoja de ruta ID first
     const { data: hojaData } = await supabase
       .from('hoja_de_ruta')
@@ -250,6 +291,7 @@ const deleteHojaDeRutaData = async (jobId: string) => {
       
       // Delete the main hoja de ruta record
       await supabase.from('hoja_de_ruta').delete().eq('id', hojaId);
+      console.log('Hoja de ruta data deleted successfully');
     }
   } catch (error) {
     console.warn('Hoja de ruta deletion failed:', error);
@@ -258,6 +300,8 @@ const deleteHojaDeRutaData = async (jobId: string) => {
 
 const deleteFestivalData = async (jobId: string) => {
   try {
+    console.log(`Deleting festival data for job: ${jobId}`);
+    
     // Get all festival artists for this job
     const { data: artists } = await supabase
       .from('festival_artists')
@@ -275,17 +319,7 @@ const deleteFestivalData = async (jobId: string) => {
       ]);
     }
 
-    // Delete festival-specific data
-    await Promise.all([
-      supabase.from('festival_artists').delete().eq('job_id', jobId),
-      supabase.from('festival_gear_setups').delete().eq('job_id', jobId),
-      supabase.from('festival_logos').delete().eq('job_id', jobId),
-      supabase.from('festival_settings').delete().eq('job_id', jobId),
-      supabase.from('festival_shifts').delete().eq('job_id', jobId),
-      supabase.from('festival_stages').delete().eq('job_id', jobId)
-    ]);
-
-    // Delete shift assignments (they reference shifts)
+    // Get festival shifts for this job before deleting
     const { data: shifts } = await supabase
       .from('festival_shifts')
       .select('id')
@@ -300,7 +334,7 @@ const deleteFestivalData = async (jobId: string) => {
         .in('shift_id', shiftIds);
     }
 
-    // Delete gear setup related data
+    // Get gear setup related data
     const { data: gearSetups } = await supabase
       .from('festival_gear_setups')
       .select('id')
@@ -314,6 +348,18 @@ const deleteFestivalData = async (jobId: string) => {
         .delete()
         .in('gear_setup_id', gearSetupIds);
     }
+
+    // Delete festival-specific data
+    await Promise.all([
+      supabase.from('festival_artists').delete().eq('job_id', jobId),
+      supabase.from('festival_gear_setups').delete().eq('job_id', jobId),
+      supabase.from('festival_logos').delete().eq('job_id', jobId),
+      supabase.from('festival_settings').delete().eq('job_id', jobId),
+      supabase.from('festival_shifts').delete().eq('job_id', jobId),
+      supabase.from('festival_stages').delete().eq('job_id', jobId)
+    ]);
+
+    console.log('Festival data deleted successfully');
   } catch (error) {
     console.warn('Festival data deletion failed:', error);
   }
@@ -321,6 +367,8 @@ const deleteFestivalData = async (jobId: string) => {
 
 const deleteLogisticsData = async (jobId: string) => {
   try {
+    console.log(`Deleting logistics data for job: ${jobId}`);
+    
     // Get logistics events for this job
     const { data: events } = await supabase
       .from('logistics_events')
@@ -342,6 +390,8 @@ const deleteLogisticsData = async (jobId: string) => {
       .from('logistics_events')
       .delete()
       .eq('job_id', jobId);
+
+    console.log('Logistics data deleted successfully');
   } catch (error) {
     console.warn('Logistics data deletion failed:', error);
   }
@@ -349,6 +399,8 @@ const deleteLogisticsData = async (jobId: string) => {
 
 const deleteAssignmentData = async (jobId: string) => {
   try {
+    console.log(`Deleting assignment data for job: ${jobId}`);
+    
     await Promise.all([
       // Job assignments
       supabase.from('job_assignments').delete().eq('job_id', jobId),
@@ -359,6 +411,8 @@ const deleteAssignmentData = async (jobId: string) => {
       // Availability conflicts
       supabase.from('availability_conflicts').delete().eq('job_id', jobId)
     ]);
+    
+    console.log('Assignment data deleted successfully');
   } catch (error) {
     console.warn('Assignment data deletion failed:', error);
   }
@@ -366,10 +420,14 @@ const deleteAssignmentData = async (jobId: string) => {
 
 const deleteFlexFolders = async (jobId: string) => {
   try {
+    console.log(`Deleting flex folders for job: ${jobId}`);
+    
     await supabase
       .from('flex_folders')
       .delete()
       .eq('job_id', jobId);
+      
+    console.log('Flex folders deleted successfully');
   } catch (error) {
     console.warn('Flex folders deletion failed:', error);
   }

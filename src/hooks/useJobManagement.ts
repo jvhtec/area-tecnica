@@ -83,6 +83,8 @@ export const useJobManagement = (
 
   const handleDeleteDocument = async (jobId: string, document: JobDocument) => {
     try {
+      console.log("useJobManagement: Deleting document:", document);
+      
       // Delete from storage
       const { error: storageError } = await supabase.storage
         .from("job_documents")
@@ -114,7 +116,7 @@ export const useJobManagement = (
 
   const deleteJob = async (jobId: string) => {
     try {
-      console.log("Starting comprehensive job deletion for job:", jobId);
+      console.log("useJobManagement: Starting job deletion for:", jobId);
       
       const result = await deleteJobComprehensively(jobId);
       
@@ -127,7 +129,7 @@ export const useJobManagement = (
         throw new Error(result.error || "Unknown deletion error");
       }
     } catch (error: any) {
-      console.error("Error in job deletion:", error);
+      console.error("useJobManagement: Error in job deletion:", error);
       toast({
         title: "Error deleting job",
         description: error.message,
