@@ -19,6 +19,9 @@ import { DirectMessageDialog } from "@/components/messages/DirectMessageDialog";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { isJobOnDate } from "@/utils/timezoneUtils";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 
 const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
   if (!date || !jobs) return [];
@@ -53,6 +56,8 @@ const Dashboard = () => {
   // Data fetching
   const { data: jobs, isLoading } = useJobs();
   const { forceSubscribe } = useSubscriptionContext();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   useDashboardSubscriptions();
   
   // Setup subscriptions
@@ -111,8 +116,43 @@ const Dashboard = () => {
   };
 
   const handleDeleteClick = async (jobId: string) => {
-    console.log("Delete job called from Dashboard");
-    // This is handled by the JobCardNew component's delete functionality
+    // Check permissions
+    if (!["admin", "management"].includes(userRole || "")) {
+      toast({
+        title: "Permission denied",
+        description: "Only admin and management users can delete jobs",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!window.confirm("Are you sure you want to delete this job? This action cannot be undone and will remove all related data.")) return;
+
+    try {
+      console.log("Dashboard: Starting optimistic job deletion for:", jobId);
+      
+      // Call optimistic deletion service
+      const result = await deleteJobOptimistically(jobId);
+      
+      if (result.success) {
+        toast({
+          title: "Job deleted",
+          description: result.details || "The job has been removed and cleanup is running in background."
+        });
+        
+        // Invalidate queries to refresh the list
+        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      } else {
+        throw new Error(result.error || "Unknown deletion error");
+      }
+    } catch (error: any) {
+      console.error("Dashboard: Error in optimistic job deletion:", error);
+      toast({
+        title: "Error deleting job",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   };
 
   const handleDateTypeChange = () => {

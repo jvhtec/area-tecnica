@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Department } from "@/types/department";
 import { JobDocument } from "@/types/job";
 import { useCallback } from "react";
-import { deleteJobComprehensively } from "@/services/jobDeletionService";
+import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 
 export const useJobManagement = (
   selectedDepartment: Department,
@@ -116,20 +116,20 @@ export const useJobManagement = (
 
   const deleteJob = async (jobId: string) => {
     try {
-      console.log("useJobManagement: Starting job deletion for:", jobId);
+      console.log("useJobManagement: Starting optimistic job deletion for:", jobId);
       
-      const result = await deleteJobComprehensively(jobId);
+      const result = await deleteJobOptimistically(jobId);
       
       if (result.success) {
         toast({
           title: "Job deleted successfully",
-          description: result.details || "The job and all related records have been removed."
+          description: result.details || "The job has been removed and cleanup is running in background."
         });
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }
     } catch (error: any) {
-      console.error("useJobManagement: Error in job deletion:", error);
+      console.error("useJobManagement: Error in optimistic job deletion:", error);
       toast({
         title: "Error deleting job",
         description: error.message,
