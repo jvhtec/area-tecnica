@@ -3,7 +3,8 @@ import Layout from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
 import TechnicianDashboard from "@/pages/TechnicianDashboard";
 import Personal from "@/pages/Personal";
-import VacationManagement from "@/pages/VacationManagement"; // Import the new page
+import VacationManagement from "@/pages/VacationManagement";
+import Tours from "@/pages/Tours";
 import { FestivalManagementWrapper } from "@/components/festival/FestivalManagementWrapper";
 import { TourManagementWrapper } from "@/components/tours/TourManagementWrapper";
 import Auth from "@/pages/Auth";
@@ -35,6 +36,10 @@ const router = createBrowserRouter([
         path: "/personal",
         element: <Personal />
       },
+      {
+        path: "/tours",
+        element: <Tours />
+      },
       { 
         path: "/festival-management/:festivalId", 
         element: <FestivalManagementWrapper /> 
@@ -44,7 +49,7 @@ const router = createBrowserRouter([
         element: <TourManagementWrapper />
       },
       {
-        path: "/vacation-management", // New route for vacation management
+        path: "/vacation-management",
         element: <VacationManagement />,
       },
       {

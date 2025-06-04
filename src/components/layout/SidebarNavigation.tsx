@@ -11,7 +11,8 @@ import {
   UserCircle,
   ClipboardList,
   Tent,
-  Calendar
+  Calendar,
+  MapPin
 } from "lucide-react";
 
 interface SidebarNavigationProps {
@@ -142,6 +143,21 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
                 <span>Video</span>
               </Button>
             </Link>
+
+            {/* Tours - Only show for management users and house techs from sound department */}
+            {(isManagementUser || isSoundHouseTech) && (
+              <Link to="/tours">
+                <Button
+                  variant="ghost"
+                  className={`w-full justify-start gap-2 ${
+                    location.pathname === "/tours" ? "bg-accent" : ""
+                  }`}
+                >
+                  <MapPin className="h-4 w-4" />
+                  <span>Tours</span>
+                </Button>
+              </Link>
+            )}
             
             {/* Festivals - Only show for management users and house techs from sound department */}
             {(isManagementUser || isSoundHouseTech) && (

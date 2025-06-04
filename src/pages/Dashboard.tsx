@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Department } from "@/types/department";
 import { useJobs } from "@/hooks/useJobs";
@@ -11,8 +12,7 @@ import { DashboardContent } from "@/components/dashboard/DashboardContent";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TourChips } from "@/components/dashboard/TourChips";
-import { MessageSquare, Send, ChevronDown, ChevronUp } from "lucide-react";
+import { MessageSquare, Send } from "lucide-react";
 import { MessagesList } from "@/components/messages/MessagesList";
 import { DirectMessagesList } from "@/components/messages/DirectMessagesList";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,6 @@ const Dashboard = () => {
   // User data & preferences
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [showTours, setShowTours] = useState(true);
   const [showMessages, setShowMessages] = useState(false);
   
   // Dashboard state
@@ -62,8 +61,7 @@ const Dashboard = () => {
       'job_assignments', 
       'job_date_types', 
       'messages', 
-      'direct_messages',
-      'tours'
+      'direct_messages'
     ]);
   }, [forceSubscribe]);
 
@@ -75,18 +73,17 @@ const Dashboard = () => {
         setUserId(session.user.id);
         const { data, error } = await supabase
           .from("profiles")
-          .select("role, tours_expanded")
+          .select("role")
           .eq("id", session.user.id)
           .single();
 
         if (error) {
-          console.error("Error fetching user role and preferences:", error);
+          console.error("Error fetching user role:", error);
           return;
         }
 
         if (data) {
           setUserRole(data.role);
-          setShowTours(data.tours_expanded !== null && data.tours_expanded !== undefined ? data.tours_expanded : true);
 
           const params = new URLSearchParams(window.location.search);
           if (params.get("showMessages") === "true") {
@@ -120,20 +117,6 @@ const Dashboard = () => {
   const handleDateTypeChange = () => {
     console.log("Date type change called from Dashboard");
     // This is handled by the CalendarSection component
-  };
-
-  const handleToggleTours = async () => {
-    const newValue = !showTours;
-    setShowTours(newValue);
-    if (userId) {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ tours_expanded: newValue })
-        .eq("id", userId);
-      if (error) {
-        console.error("Error updating tours preference:", error);
-      }
-    }
   };
 
   const selectedDateJobs = getSelectedDateJobs(date, jobs);
@@ -180,33 +163,6 @@ const Dashboard = () => {
           )}
         </Card>
       )}
-
-      <Card className="w-full bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            Tours {new Date().getFullYear()}
-          </CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleToggleTours}
-            className="h-8 w-8 p-0"
-          >
-            {showTours ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </Button>
-        </CardHeader>
-        {showTours && (
-          <CardContent>
-            <TourChips
-              onTourClick={(tourId) => {
-                if (userRole === "logistics") return;
-                const tour = jobs?.find((job) => job.id === tourId);
-                if (tour) handleEditClick(tour);
-              }}
-            />
-          </CardContent>
-        )}
-      </Card>
 
       <DashboardContent
         date={date}
