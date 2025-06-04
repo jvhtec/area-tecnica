@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,19 @@ export const TourDefaultsManager = ({
     fetchTourDates();
   }, [tour?.id]);
 
+  // Type guards to check data format
+  const isNewFormatTable = (item: any): item is any => {
+    return 'set_id' in item || 'table_data' in item;
+  };
+
+  const isLegacyPowerDefault = (item: any): item is any => {
+    return 'total_watts' in item && !('set_id' in item);
+  };
+
+  const isLegacyWeightDefault = (item: any): item is any => {
+    return 'weight_kg' in item && !('set_id' in item);
+  };
+
   // Get defaults by department - prioritize new system, fallback to legacy
   const getDepartmentDefaults = (department: string, type: 'power' | 'weight') => {
     // First check if we have new format defaults
@@ -102,7 +116,7 @@ export const TourDefaultsManager = ({
   const handleDeleteTable = async (table: any, type: 'power' | 'weight') => {
     try {
       // Check if this is new format (has table_data or set_id)
-      if ('set_id' in table || 'table_data' in table) {
+      if (isNewFormatTable(table)) {
         // New format - use deleteTable from useTourDefaultSets
         await deleteTable(table.id);
       } else {
@@ -137,6 +151,38 @@ export const TourDefaultsManager = ({
     }
   };
 
+  // Helper function to get table name based on format
+  const getTableName = (table: any): string => {
+    if (isNewFormatTable(table)) {
+      return table.table_name || 'Unnamed';
+    }
+    return table.table_name || table.item_name || 'Unnamed';
+  };
+
+  // Helper function to get power value based on format
+  const getPowerValue = (table: any): number => {
+    if (isNewFormatTable(table)) {
+      return table.total_value || 0;
+    }
+    return table.total_watts || 0;
+  };
+
+  // Helper function to get weight value based on format
+  const getWeightValue = (table: any): number => {
+    if (isNewFormatTable(table)) {
+      return table.total_value || 0;
+    }
+    return ((table.weight_kg || 0) * (table.quantity || 1));
+  };
+
+  // Helper function to get current per phase based on format
+  const getCurrentPerPhase = (table: any): number | undefined => {
+    if (isNewFormatTable(table)) {
+      return table.metadata?.current_per_phase;
+    }
+    return table.current_per_phase;
+  };
+
   const handleBulkPDFExport = async (department: string, type: 'power' | 'weight') => {
     try {
       const relevantDefaults = getDepartmentDefaults(department, type);
@@ -161,9 +207,9 @@ export const TourDefaultsManager = ({
       // Convert defaults to the format expected by exportToPDF
       const tables = relevantDefaults.map(defaultItem => {
         // Check if this is new format with table_data
-        if ('table_data' in defaultItem && defaultItem.table_data?.rows) {
+        if (isNewFormatTable(defaultItem) && defaultItem.table_data?.rows) {
           return {
-            name: defaultItem.table_name || 'Unnamed',
+            name: getTableName(defaultItem),
             rows: defaultItem.table_data.rows || [],
             totalWeight: type === 'weight' ? defaultItem.total_value : undefined,
             totalWatts: type === 'power' ? defaultItem.total_value : undefined,
@@ -175,18 +221,18 @@ export const TourDefaultsManager = ({
         } else {
           // Legacy format - create a summary row
           return {
-            name: defaultItem.table_name || (defaultItem as any).item_name || 'Unnamed',
+            name: getTableName(defaultItem),
             rows: [{
               quantity: '1',
-              componentName: defaultItem.table_name || (defaultItem as any).item_name || 'Total',
+              componentName: getTableName(defaultItem),
               weight: type === 'weight' ? (defaultItem as any).weight_kg?.toString() : undefined,
               watts: type === 'power' ? (defaultItem as any).total_watts?.toString() : undefined,
-              totalWeight: type === 'weight' ? ((defaultItem as any).weight_kg || 0) * ((defaultItem as any).quantity || 1) : undefined,
-              totalWatts: type === 'power' ? (defaultItem as any).total_watts || 0 : undefined,
+              totalWeight: type === 'weight' ? getWeightValue(defaultItem) : undefined,
+              totalWatts: type === 'power' ? getPowerValue(defaultItem) : undefined,
             }],
-            totalWeight: type === 'weight' ? ((defaultItem as any).weight_kg || 0) * ((defaultItem as any).quantity || 1) : undefined,
-            totalWatts: type === 'power' ? (defaultItem as any).total_watts || 0 : undefined,
-            currentPerPhase: type === 'power' ? (defaultItem as any).current_per_phase : undefined,
+            totalWeight: type === 'weight' ? getWeightValue(defaultItem) : undefined,
+            totalWatts: type === 'power' ? getPowerValue(defaultItem) : undefined,
+            currentPerPhase: type === 'power' ? getCurrentPerPhase(defaultItem) : undefined,
             pduType: type === 'power' ? (defaultItem as any).pdu_type || (defaultItem as any).custom_pdu_type : undefined,
             toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
             id: Date.now() + Math.random()
@@ -208,10 +254,10 @@ export const TourDefaultsManager = ({
       // Get safety margin from the first default's metadata, fallback to 0
       const safetyMargin = (() => {
         const firstDefault = relevantDefaults[0];
-        if ('metadata' in firstDefault && firstDefault.metadata?.safetyMargin) {
+        if (isNewFormatTable(firstDefault) && firstDefault.metadata?.safetyMargin) {
           return firstDefault.metadata.safetyMargin;
         }
-        if ('table_data' in firstDefault && firstDefault.table_data?.safetyMargin) {
+        if (isNewFormatTable(firstDefault) && firstDefault.table_data?.safetyMargin) {
           return firstDefault.table_data.safetyMargin;
         }
         return 0;
@@ -322,9 +368,9 @@ export const TourDefaultsManager = ({
     } else {
       combinedTables = defaultsData.map(defaultItem => {
         // Check if this is new format with table_data
-        if ('table_data' in defaultItem && defaultItem.table_data?.rows) {
+        if (isNewFormatTable(defaultItem) && defaultItem.table_data?.rows) {
           return {
-            name: defaultItem.table_name || 'Default',
+            name: getTableName(defaultItem),
             rows: defaultItem.table_data.rows || [],
             totalWeight: type === 'weight' ? defaultItem.total_value : undefined,
             totalWatts: type === 'power' ? defaultItem.total_value : undefined,
@@ -336,19 +382,19 @@ export const TourDefaultsManager = ({
         } else {
           // Legacy format
           return {
-            name: defaultItem.table_name || defaultItem.item_name || 'Default',
+            name: getTableName(defaultItem),
             rows: [{
               quantity: '1',
-              componentName: defaultItem.table_name || defaultItem.item_name || 'Total',
-              weight: type === 'weight' ? defaultItem.weight_kg?.toString() : undefined,
-              watts: type === 'power' ? defaultItem.total_watts?.toString() : undefined,
-              totalWeight: type === 'weight' ? (defaultItem.weight_kg || 0) * (defaultItem.quantity || 1) : undefined,
-              totalWatts: type === 'power' ? defaultItem.total_watts || 0 : undefined,
+              componentName: getTableName(defaultItem),
+              weight: type === 'weight' ? (defaultItem as any).weight_kg?.toString() : undefined,
+              watts: type === 'power' ? (defaultItem as any).total_watts?.toString() : undefined,
+              totalWeight: type === 'weight' ? getWeightValue(defaultItem) : undefined,
+              totalWatts: type === 'power' ? getPowerValue(defaultItem) : undefined,
             }],
-            totalWeight: type === 'weight' ? (defaultItem.weight_kg || 0) * (defaultItem.quantity || 1) : undefined,
-            totalWatts: type === 'power' ? defaultItem.total_watts || 0 : undefined,
-            currentPerPhase: type === 'power' ? defaultItem.current_per_phase : undefined,
-            pduType: type === 'power' ? defaultItem.pdu_type || defaultItem.custom_pdu_type : undefined,
+            totalWeight: type === 'weight' ? getWeightValue(defaultItem) : undefined,
+            totalWatts: type === 'power' ? getPowerValue(defaultItem) : undefined,
+            currentPerPhase: type === 'power' ? getCurrentPerPhase(defaultItem) : undefined,
+            pduType: type === 'power' ? (defaultItem as any).pdu_type || (defaultItem as any).custom_pdu_type : undefined,
             toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
             id: Date.now() + Math.random()
           };
@@ -496,12 +542,12 @@ export const TourDefaultsManager = ({
           })}
 
           {/* Legacy Format Tables */}
-          {powerTables.filter(table => !('set_id' in table)).length > 0 && (
+          {powerTables.filter(table => !isNewFormatTable(table)).length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {powerTables.filter(table => !('set_id' in table)).map((table) => (
+              {powerTables.filter(table => !isNewFormatTable(table)).map((table) => (
                 <div key={table.id} className="border rounded-lg p-4">
                   <div className="flex justify-between items-start mb-2">
-                    <h5 className="font-medium">{table.table_name || table.item_name}</h5>
+                    <h5 className="font-medium">{getTableName(table)}</h5>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -512,11 +558,11 @@ export const TourDefaultsManager = ({
                     </Button>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {(table.total_watts || 0).toFixed(2)} W
+                    {getPowerValue(table).toFixed(2)} W
                   </p>
-                  {table.current_per_phase && (
+                  {getCurrentPerPhase(table) && (
                     <p className="text-xs text-muted-foreground">
-                      {table.current_per_phase.toFixed(2)} A per phase
+                      {getCurrentPerPhase(table)!.toFixed(2)} A per phase
                     </p>
                   )}
                 </div>
@@ -610,12 +656,12 @@ export const TourDefaultsManager = ({
           })}
 
           {/* Legacy Format Tables */}
-          {weightTables.filter(table => !('set_id' in table)).length > 0 && (
+          {weightTables.filter(table => !isNewFormatTable(table)).length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {weightTables.filter(table => !('set_id' in table)).map((table) => (
+              {weightTables.filter(table => !isNewFormatTable(table)).map((table) => (
                 <div key={table.id} className="border rounded-lg p-4">
                   <div className="flex justify-between items-start mb-2">
-                    <h5 className="font-medium">{table.table_name || table.item_name}</h5>
+                    <h5 className="font-medium">{getTableName(table)}</h5>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -626,9 +672,9 @@ export const TourDefaultsManager = ({
                     </Button>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {((table.weight_kg || 0) * (table.quantity || 1)).toFixed(2)} kg
+                    {getWeightValue(table).toFixed(2)} kg
                   </p>
-                  {table.quantity && table.weight_kg && (
+                  {isLegacyWeightDefault(table) && table.quantity && table.weight_kg && (
                     <p className="text-xs text-muted-foreground">
                       {table.quantity} × {table.weight_kg.toFixed(2)} kg
                     </p>
