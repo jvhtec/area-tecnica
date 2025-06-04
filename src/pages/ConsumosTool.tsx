@@ -81,6 +81,8 @@ const ConsumosTool: React.FC = () => {
 
   // Tour-specific hooks - use the new defaults system for tour mode
   const { 
+    defaultSets,
+    createSet,
     createTable: createTourDefaultTable 
   } = useTourDefaultSets(tourId || '');
   
@@ -96,6 +98,26 @@ const ConsumosTool: React.FC = () => {
     name: '',
     rows: [{ quantity: '', componentId: '', watts: '' }],
   });
+
+  // Helper function to get or create the set ID for sound department
+  const getOrCreateSoundSetId = async (): Promise<string> => {
+    // Check if a sound set already exists
+    const existingSoundSet = defaultSets.find(set => set.department === 'sound');
+    
+    if (existingSoundSet) {
+      return existingSoundSet.id;
+    }
+
+    // Create a new sound set
+    const newSet = await createSet({
+      tour_id: tourId!,
+      name: `${tourName} Sound Defaults`,
+      department: 'sound',
+      description: 'Sound department power defaults'
+    });
+    
+    return newSet.id;
+  };
 
   const addRow = () => {
     setCurrentTable((prev) => ({
@@ -186,29 +208,8 @@ const ConsumosTool: React.FC = () => {
     if (!tourId) return;
 
     try {
-      // First ensure we have a default set for this department
-      const { createSet } = useTourDefaultSets(tourId);
-      
-      // Try to create the set (will be ignored if it already exists due to unique constraints)
-      let setId;
-      try {
-        const newSet = await createSet({
-          tour_id: tourId,
-          name: `${tourName} Sound Defaults`,
-          department: 'sound',
-          description: 'Sound department power defaults'
-        });
-        setId = newSet.id;
-      } catch (error) {
-        // Set might already exist, fetch it
-        const { defaultSets } = useTourDefaultSets(tourId);
-        const existingSet = defaultSets.find(set => set.department === 'sound');
-        if (existingSet) {
-          setId = existingSet.id;
-        } else {
-          throw new Error('Could not create or find default set');
-        }
-      }
+      // Get or create the sound set ID
+      const setId = await getOrCreateSoundSetId();
 
       // Now create the table with the detailed data
       await createTourDefaultTable({
