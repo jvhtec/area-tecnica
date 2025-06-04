@@ -1,6 +1,7 @@
+
 import { useEffect, useState } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
-import { Plane, Wrench, Star, Moon, Mic, ExternalLink } from "lucide-react";
+import { Plane, Wrench, Star, Moon, Mic, ExternalLink, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/hooks/use-toast";
 import { format, startOfDay } from "date-fns";
@@ -17,7 +18,7 @@ interface DateTypeContextMenuProps {
 
 export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: DateTypeContextMenuProps) => {
   const queryClient = useQueryClient();
-  const { flexUuid, isLoading, error } = useFlexUuid(jobId);
+  const { flexUuid, isLoading: isLoadingFlexUuid, error: flexError } = useFlexUuid(jobId);
 
   // Use the improved subscription hook with correct parameters
   useTableSubscription('job_date_types', ['job-date-types', jobId]);
@@ -53,27 +54,53 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
 
       if (error) throw error;
 
-      // Updated to use proper toast API
-      toast.success(`Date type set to ${type}`);
+      toast({
+        title: "Success",
+        description: `Date type set to ${type}`,
+      });
       onTypeChange();
     } catch (error: any) {
       console.error('Error setting date type:', error);
-      toast.error('Failed to set date type');
-      // Invalidate the query to revert to the correct state
+      toast({
+        title: "Error",
+        description: "Failed to set date type",
+        variant: "destructive",
+      });
       queryClient.invalidateQueries({ queryKey: ['job-date-types', jobId] });
     }
   };
 
   const handleFlexClick = () => {
+    if (isLoadingFlexUuid) {
+      toast({
+        title: "Loading",
+        description: "Please wait while we load the Flex folder...",
+      });
+      return;
+    }
+
     if (flexUuid) {
       const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
       window.open(flexUrl, '_blank', 'noopener');
+    } else if (flexError) {
+      toast({
+        title: "Error",
+        description: flexError,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Info",
+        description: "Flex folder not available for this job",
+      });
     }
   };
 
   return (
     <ContextMenu>
-      <ContextMenuTrigger>{children}</ContextMenuTrigger>
+      <ContextMenuTrigger>
+        {children}
+      </ContextMenuTrigger>
       <ContextMenuContent className="w-48">
         <ContextMenuItem onClick={() => handleSetDateType('travel')} className="flex items-center gap-2">
           <Plane className="h-4 w-4" /> Travel
@@ -90,9 +117,19 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         <ContextMenuItem onClick={() => handleSetDateType('off')} className="flex items-center gap-2">
           <Moon className="h-4 w-4" /> Off
         </ContextMenuItem>
-        {flexUuid && (
-          <ContextMenuItem onClick={handleFlexClick} className="flex items-center gap-2">
-            <ExternalLink className="h-4 w-4" /> Flex
+        {jobId && (
+          <ContextMenuItem onClick={handleFlexClick} className="flex items-center gap-2" disabled={isLoadingFlexUuid}>
+            {isLoadingFlexUuid ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading Flex...
+              </>
+            ) : (
+              <>
+                <ExternalLink className="h-4 w-4" />
+                Flex
+              </>
+            )}
           </ContextMenuItem>
         )}
       </ContextMenuContent>
