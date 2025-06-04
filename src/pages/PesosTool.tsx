@@ -536,7 +536,7 @@ const PesosTool: React.FC = () => {
     // For grouping, assign a new clusterId for this generation.
     const newClusterId = Date.now().toString();
 
-    // UPDATED: Apply advanced table generation features (including in tour defaults mode)
+    // FIXED: Always generate rigging points/suffixes for pesos tool, regardless of mode
     let tablesToCreate: Table[] = [];
 
     if (mirroredCluster) {
@@ -545,8 +545,8 @@ const PesosTool: React.FC = () => {
       const rightSuffix = getSuffix();
 
       const leftTable: Table = {
-        name: `${tableName} L${!isTourDefaults ? ` (${leftSuffix})` : ''}`,
-        riggingPoints: !isTourDefaults ? leftSuffix : undefined,
+        name: `${tableName} L (${leftSuffix})`,
+        riggingPoints: leftSuffix,
         rows: calculatedRows,
         totalWeight,
         id: Date.now(),
@@ -555,8 +555,8 @@ const PesosTool: React.FC = () => {
       };
 
       const rightTable: Table = {
-        name: `${tableName} R${!isTourDefaults ? ` (${rightSuffix})` : ''}`,
-        riggingPoints: !isTourDefaults ? rightSuffix : undefined,
+        name: `${tableName} R (${rightSuffix})`,
+        riggingPoints: rightSuffix,
         rows: calculatedRows,
         totalWeight,
         id: Date.now() + 1,
@@ -566,11 +566,11 @@ const PesosTool: React.FC = () => {
 
       tablesToCreate = [leftTable, rightTable];
     } else {
-      // Single table with suffix generation (except in tour defaults mode)
-      const suffix = !isTourDefaults ? getSuffix() : undefined;
+      // Single table with suffix generation
+      const suffix = getSuffix();
       const newTable: Table = {
-        name: `${tableName}${!isTourDefaults && suffix ? ` (${suffix})` : ''}`,
-        riggingPoints: !isTourDefaults ? suffix : undefined,
+        name: `${tableName} (${suffix})`,
+        riggingPoints: suffix,
         rows: calculatedRows,
         totalWeight,
         id: Date.now(),
@@ -672,7 +672,7 @@ const PesosTool: React.FC = () => {
         jobDateStr,
         summaryRows,
         undefined,
-        undefined,
+        undefined, // FIXED: Remove safety margin for weight reports
         logoUrl
       );
 
