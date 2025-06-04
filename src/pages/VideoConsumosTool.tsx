@@ -140,7 +140,8 @@ const VideoConsumosTool: React.FC = () => {
         custom_pdu_type: table.customPduType,
         includes_hoist: table.includesHoist || false,
         override_data: {
-          rows: table.rows
+          rows: table.rows,
+          safetyMargin: safetyMargin
         }
       });
 

@@ -162,7 +162,9 @@ export const TourDefaultsManager = ({
         powerSummary = { totalSystemWatts, totalSystemAmps };
       }
 
-      const safetyMargin = 0; // Default safety margin
+      // Get safety margin from the first default's metadata, fallback to 0
+      const safetyMargin = relevantDefaults[0]?.metadata?.safetyMargin || 
+                          relevantDefaults[0]?.table_data?.safetyMargin || 0;
 
       const pdfBlob = await exportToPDF(
         `${tour.name} - ${department.toUpperCase()} ${type.toUpperCase()} Defaults`,

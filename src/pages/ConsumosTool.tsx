@@ -189,7 +189,18 @@ const ConsumosTool: React.FC = () => {
         pdu_type: table.customPduType || table.pduType || '',
         custom_pdu_type: table.customPduType,
         includes_hoist: table.includesHoist || false,
-        department: 'sound'
+        department: 'sound',
+        // Store detailed table data and safety margin
+        table_data: {
+          rows: table.rows,
+          safetyMargin: safetyMargin
+        },
+        metadata: {
+          current_per_phase: table.currentPerPhase,
+          pdu_type: table.customPduType || table.pduType,
+          custom_pdu_type: table.customPduType,
+          safetyMargin: safetyMargin
+        }
       });
 
       toast({
