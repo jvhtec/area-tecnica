@@ -132,19 +132,19 @@ export const TourDefaultsManager = ({
         } else {
           // Legacy format - create a summary row
           return {
-            name: defaultItem.table_name || defaultItem.item_name || 'Unnamed',
+            name: defaultItem.table_name || (defaultItem as any).item_name || 'Unnamed',
             rows: [{
               quantity: '1',
-              componentName: defaultItem.table_name || defaultItem.item_name || 'Total',
-              weight: type === 'weight' ? defaultItem.weight_kg?.toString() : undefined,
-              watts: type === 'power' ? defaultItem.total_watts?.toString() : undefined,
-              totalWeight: type === 'weight' ? (defaultItem.weight_kg || 0) * (defaultItem.quantity || 1) : undefined,
-              totalWatts: type === 'power' ? defaultItem.total_watts || 0 : undefined,
+              componentName: defaultItem.table_name || (defaultItem as any).item_name || 'Total',
+              weight: type === 'weight' ? (defaultItem as any).weight_kg?.toString() : undefined,
+              watts: type === 'power' ? (defaultItem as any).total_watts?.toString() : undefined,
+              totalWeight: type === 'weight' ? ((defaultItem as any).weight_kg || 0) * ((defaultItem as any).quantity || 1) : undefined,
+              totalWatts: type === 'power' ? (defaultItem as any).total_watts || 0 : undefined,
             }],
-            totalWeight: type === 'weight' ? (defaultItem.weight_kg || 0) * (defaultItem.quantity || 1) : undefined,
-            totalWatts: type === 'power' ? defaultItem.total_watts || 0 : undefined,
-            currentPerPhase: type === 'power' ? defaultItem.current_per_phase : undefined,
-            pduType: type === 'power' ? defaultItem.pdu_type || defaultItem.custom_pdu_type : undefined,
+            totalWeight: type === 'weight' ? ((defaultItem as any).weight_kg || 0) * ((defaultItem as any).quantity || 1) : undefined,
+            totalWatts: type === 'power' ? (defaultItem as any).total_watts || 0 : undefined,
+            currentPerPhase: type === 'power' ? (defaultItem as any).current_per_phase : undefined,
+            pduType: type === 'power' ? (defaultItem as any).pdu_type || (defaultItem as any).custom_pdu_type : undefined,
             toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
             id: Date.now() + Math.random()
           };
@@ -163,8 +163,16 @@ export const TourDefaultsManager = ({
       }
 
       // Get safety margin from the first default's metadata, fallback to 0
-      const safetyMargin = relevantDefaults[0]?.metadata?.safetyMargin || 
-                          relevantDefaults[0]?.table_data?.safetyMargin || 0;
+      const safetyMargin = (() => {
+        const firstDefault = relevantDefaults[0];
+        if ('metadata' in firstDefault && firstDefault.metadata?.safetyMargin) {
+          return firstDefault.metadata.safetyMargin;
+        }
+        if ('table_data' in firstDefault && firstDefault.table_data?.safetyMargin) {
+          return firstDefault.table_data.safetyMargin;
+        }
+        return 0;
+      })();
 
       const pdfBlob = await exportToPDF(
         `${tour.name} - ${department.toUpperCase()} ${type.toUpperCase()} Defaults`,

@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
+import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 
 const soundComponentDatabase = [
   { id: 1, name: 'LA12X', watts: 2900 },
@@ -78,8 +79,12 @@ const ConsumosTool: React.FC = () => {
   // NEW: Get tour name for tour defaults mode
   const [tourName, setTourName] = useState<string>('');
 
-  // Tour-specific hooks
-  const { powerDefaults: tourDefaults = [], createDefault: createTourDefault } = useTourPowerDefaults(tourId || '');
+  // Tour-specific hooks - use the new defaults system for tour mode
+  const { 
+    createTable: createTourDefaultTable 
+  } = useTourDefaultSets(tourId || '');
+  
+  const { powerDefaults: legacyTourDefaults = [], createDefault: createLegacyTourDefault } = useTourPowerDefaults(tourId || '');
   const { 
     powerOverrides = [],
     createPowerOverride,
@@ -176,25 +181,45 @@ const ConsumosTool: React.FC = () => {
     }
   };
 
-  // NEW: Save as tour defaults
+  // NEW: Save as tour defaults using the new system
   const saveTourDefault = async (table: Table) => {
     if (!tourId) return;
 
     try {
-      await createTourDefault({
-        tour_id: tourId,
+      // First ensure we have a default set for this department
+      const { createSet } = useTourDefaultSets(tourId);
+      
+      // Try to create the set (will be ignored if it already exists due to unique constraints)
+      let setId;
+      try {
+        const newSet = await createSet({
+          tour_id: tourId,
+          name: `${tourName} Sound Defaults`,
+          department: 'sound',
+          description: 'Sound department power defaults'
+        });
+        setId = newSet.id;
+      } catch (error) {
+        // Set might already exist, fetch it
+        const { defaultSets } = useTourDefaultSets(tourId);
+        const existingSet = defaultSets.find(set => set.department === 'sound');
+        if (existingSet) {
+          setId = existingSet.id;
+        } else {
+          throw new Error('Could not create or find default set');
+        }
+      }
+
+      // Now create the table with the detailed data
+      await createTourDefaultTable({
+        set_id: setId,
         table_name: table.name,
-        total_watts: table.totalWatts || 0,
-        current_per_phase: table.currentPerPhase || 0,
-        pdu_type: table.customPduType || table.pduType || '',
-        custom_pdu_type: table.customPduType,
-        includes_hoist: table.includesHoist || false,
-        department: 'sound',
-        // Store detailed table data and safety margin
         table_data: {
           rows: table.rows,
           safetyMargin: safetyMargin
         },
+        table_type: 'power',
+        total_value: table.totalWatts || 0,
         metadata: {
           current_per_phase: table.currentPerPhase,
           pdu_type: table.customPduType || table.pduType,
@@ -447,7 +472,7 @@ const ConsumosTool: React.FC = () => {
   }, [tourId]);
 
   // Convert tour defaults to display format
-  const tourDefaultTables = tourDefaults.map(def => ({
+  const tourDefaultTables = legacyTourDefaults.map(def => ({
     id: `default-${def.id}`,
     name: def.table_name,
     rows: [],
