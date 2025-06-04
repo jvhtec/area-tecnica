@@ -32,30 +32,24 @@ export const usePerformanceMonitor = () => {
       }
     };
 
-    // Monitor React Query cache
+    // Monitor React Query cache using the observer pattern
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
       if (event.type === 'observerAdded') {
         const startTime = Date.now();
         const queryKey = JSON.stringify(event.query.queryKey);
         
-        // Track when query completes
-        const originalOnSuccess = event.query.options.onSuccess;
-        const originalOnError = event.query.options.onError;
-        
-        const trackCompletion = () => {
-          const duration = Date.now() - startTime;
-          trackQueryPerformance(queryKey, duration);
-        };
-
-        event.query.options.onSuccess = (...args) => {
-          trackCompletion();
-          if (originalOnSuccess) originalOnSuccess(...args);
-        };
-
-        event.query.options.onError = (...args) => {
-          trackCompletion();
-          if (originalOnError) originalOnError(...args);
-        };
+        // Track query state changes to detect completion
+        const unsubscribeQuery = event.query.subscribe((query) => {
+          // Check if query just completed (either success or error)
+          if ((query.state.status === 'success' || query.state.status === 'error') && 
+              query.state.fetchStatus === 'idle') {
+            const duration = Date.now() - startTime;
+            trackQueryPerformance(queryKey, duration);
+            
+            // Unsubscribe from this specific query to avoid memory leaks
+            unsubscribeQuery();
+          }
+        });
       }
     });
 
