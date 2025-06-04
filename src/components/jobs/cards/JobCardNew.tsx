@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Department } from "@/types/department";
@@ -55,6 +55,9 @@ export function JobCardNew({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { addDeletingJob, removeDeletingJob, isDeletingJob } = useDeletionState();
+  
+  // Add local loading state for folder creation
+  const [isCreatingFolders, setIsCreatingFolders] = useState(false);
   
   const {
     // Styling
@@ -170,6 +173,12 @@ export function JobCardNew({
   const createFlexFoldersHandler = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
+    // Prevent multiple clicks
+    if (isCreatingFolders) {
+      console.log("JobCardNew: Folder creation already in progress");
+      return;
+    }
+
     console.log("JobCardNew: Folder existence check:", {
       jobId: job.id,
       flexFoldersCreated: job.flex_folders_created,
@@ -189,6 +198,7 @@ export function JobCardNew({
     }
 
     try {
+      setIsCreatingFolders(true);
       console.log("JobCardNew: Starting folder creation for job:", job.id);
 
       const { data: existingFolders } = await supabase
@@ -231,6 +241,8 @@ export function JobCardNew({
         description: error.message,
         variant: "destructive"
       });
+    } finally {
+      setIsCreatingFolders(false);
     }
   };
 
@@ -311,6 +323,7 @@ export function JobCardNew({
             canCreateFlexFolders={canCreateFlexFolders}
             canUploadDocuments={canUploadDocuments}
             canManageArtists={canManageArtists}
+            isCreatingFolders={isCreatingFolders}
             onRefreshData={refreshData}
             onEditButtonClick={handleEditButtonClick}
             onDeleteClick={handleDeleteClick}

@@ -7,18 +7,20 @@ import { useToast } from "@/hooks/use-toast";
 
 interface TourDateFlexButtonProps {
   tourDateId: string;
+  isCreatingFolders?: boolean;
 }
 
-export const TourDateFlexButton = ({ tourDateId }: TourDateFlexButtonProps) => {
-  // Pass the tour date ID directly to the hook
+export const TourDateFlexButton = ({ tourDateId, isCreatingFolders = false }: TourDateFlexButtonProps) => {
   const { flexUuid, isLoading: isFlexLoading, error } = useFlexUuid(tourDateId);
   const { toast } = useToast();
 
   const handleFlexClick = () => {
-    if (isFlexLoading) {
+    if (isFlexLoading || isCreatingFolders) {
       toast({
         title: "Loading",
-        description: "Please wait while we load the Flex folder...",
+        description: isCreatingFolders 
+          ? "Creating Flex folders, please wait..." 
+          : "Please wait while we load the Flex folder...",
       });
       return;
     }
@@ -46,14 +48,14 @@ export const TourDateFlexButton = ({ tourDateId }: TourDateFlexButtonProps) => {
       size="sm"
       className="flex items-center gap-2 mt-4 w-full"
       onClick={handleFlexClick}
-      disabled={isFlexLoading}
+      disabled={isFlexLoading || isCreatingFolders}
     >
-      {isFlexLoading ? (
+      {isFlexLoading || isCreatingFolders ? (
         <Loader2 className="h-4 w-4 animate-spin" />
       ) : (
         <img src={createFolderIcon} alt="Flex" className="h-4 w-4" />
       )}
-      Flex Folder
+      {isCreatingFolders ? "Creating Folders..." : "Flex Folder"}
     </Button>
   );
 };

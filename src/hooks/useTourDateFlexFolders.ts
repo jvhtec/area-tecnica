@@ -8,14 +8,13 @@ import { toast } from "sonner";
 
 export const useTourDateFlexFolders = (tourId: string) => {
   const [creatingAll, setCreatingAll] = useState(false);
-  const [creatingIndividual, setCreatingIndividual] = useState<string | null>(null);
+  const [creatingIndividual, setCreatingIndividual] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
 
   const createFoldersForTourDate = useMutation({
     mutationFn: async (tourDate: any) => {
       console.log('Creating Flex folders for tour date:', tourDate);
       
-      // Get the associated job for this tour date
       const { data: job, error: jobError } = await supabase
         .from('jobs')
         .select('*')
@@ -26,21 +25,17 @@ export const useTourDateFlexFolders = (tourId: string) => {
         throw new Error(`No job found for tour date ${tourDate.id}`);
       }
 
-      // Format dates for Flex API
       const formattedStartDate = format(new Date(job.start_time), 'yyyy-MM-dd');
       const formattedEndDate = format(new Date(job.end_time), 'yyyy-MM-dd');
       
-      // Generate document number
       const jobDate = new Date(job.start_time);
       const year = jobDate.getFullYear().toString().slice(-2);
       const month = String(jobDate.getMonth() + 1).padStart(2, '0');
       const day = String(jobDate.getDate()).padStart(2, '0');
       const documentNumber = `${year}${month}${day}`;
 
-      // Create folders using existing utility
       await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber);
 
-      // Mark job as having folders created
       const { error: updateError } = await supabase
         .from('jobs')
         .update({ flex_folders_created: true })
@@ -75,7 +70,6 @@ export const useTourDateFlexFolders = (tourId: string) => {
 
       for (const tourDate of tourDates) {
         try {
-          // Check if folders already exist for this date
           const { data: job } = await supabase
             .from('jobs')
             .select('flex_folders_created')
@@ -87,6 +81,9 @@ export const useTourDateFlexFolders = (tourId: string) => {
             continue;
           }
 
+          // Add to individual creating state during bulk operation
+          setCreatingIndividual(prev => new Set([...prev, tourDate.id]));
+          
           await createFoldersForTourDate.mutateAsync(tourDate);
           successCount++;
           results.push({ tourDate, success: true });
@@ -94,6 +91,13 @@ export const useTourDateFlexFolders = (tourId: string) => {
           console.error(`Error creating folders for ${tourDate.id}:`, error);
           errorCount++;
           results.push({ tourDate, success: false, error });
+        } finally {
+          // Remove from individual creating state
+          setCreatingIndividual(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(tourDate.id);
+            return newSet;
+          });
         }
       }
 
@@ -116,23 +120,41 @@ export const useTourDateFlexFolders = (tourId: string) => {
   });
 
   const createIndividualFolders = async (tourDate: any) => {
-    setCreatingIndividual(tourDate.id);
+    // Prevent multiple clicks for the same tour date
+    if (creatingIndividual.has(tourDate.id)) {
+      console.log('Folder creation already in progress for tour date:', tourDate.id);
+      return;
+    }
+    
+    setCreatingIndividual(prev => new Set([...prev, tourDate.id]));
     try {
       await createFoldersForTourDate.mutateAsync(tourDate);
     } finally {
-      setCreatingIndividual(null);
+      setCreatingIndividual(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(tourDate.id);
+        return newSet;
+      });
     }
   };
 
   const createAllFolders = async (tourDates: any[]) => {
+    if (creatingAll) {
+      console.log('Bulk folder creation already in progress');
+      return;
+    }
     await createFoldersForAllTourDates.mutateAsync(tourDates);
+  };
+
+  const isCreatingIndividual = (tourDateId: string) => {
+    return creatingIndividual.has(tourDateId);
   };
 
   return {
     createIndividualFolders,
     createAllFolders,
     isCreatingAll: creatingAll,
-    isCreatingIndividual: creatingIndividual,
+    isCreatingIndividual,
     isLoading: createFoldersForTourDate.isPending || createFoldersForAllTourDates.isPending
   };
 };
