@@ -6,13 +6,14 @@ import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { JobDocument } from '@/components/jobs/cards/JobCardDocuments';
 import { Department } from '@/types/department';
-import { deleteJobComprehensively } from '@/services/jobDeletionService';
+import { useDeletionState } from './useDeletionState';
 
 export const useJobCard = (job: any, department: Department, userRole: string | null, onEditClick?: (job: any) => void, onDeleteClick?: (jobId: string) => void, onJobClick?: (jobId: string) => void) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const { isDeletingJob } = useDeletionState();
 
   // Card styling
   const borderColor = job.color ? job.color : "#7E69AB";
@@ -38,9 +39,14 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
   const canUploadDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
   const canCreateFlexFolders = ['admin', 'management', 'logistics'].includes(userRole || '');
 
+  // Check if this job is being deleted to prevent queries
+  const isJobBeingDeleted = isDeletingJob(job.id);
+
   // Fetch date types
   useEffect(() => {
     async function fetchDateTypes() {
+      if (isJobBeingDeleted) return; // Prevent queries during deletion
+      
       const { data, error } = await supabase
         .from("job_date_types")
         .select("*")
@@ -51,13 +57,13 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
       }
     }
     fetchDateTypes();
-  }, [job.id, job.start_time]);
+  }, [job.id, job.start_time, isJobBeingDeleted]);
 
   // Fetch sound tasks if in sound department
   const { data: soundTasks } = useQuery({
     queryKey: ["sound-tasks", job.id],
     queryFn: async () => {
-      if (department !== "sound") return null;
+      if (department !== "sound" || isJobBeingDeleted) return null;
       const { data, error } = await supabase
         .from("sound_job_tasks")
         .select(
@@ -74,7 +80,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
       if (error) throw error;
       return data;
     },
-    enabled: department === "sound",
+    enabled: department === "sound" && !isJobBeingDeleted,
     retry: 3,
     retryDelay: 1000
   });
@@ -83,7 +89,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
   const { data: personnel } = useQuery({
     queryKey: ["sound-personnel", job.id],
     queryFn: async () => {
-      if (department !== "sound") return null;
+      if (department !== "sound" || isJobBeingDeleted) return null;
       const { data: existingData, error: fetchError } = await supabase
         .from("sound_job_personnel")
         .select("*")
@@ -107,7 +113,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
       }
       return existingData;
     },
-    enabled: department === "sound"
+    enabled: department === "sound" && !isJobBeingDeleted
   });
 
   // Update folder status mutation
@@ -139,50 +145,8 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
     }
   };
 
-  const handleDeleteClick = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (!["admin", "management"].includes(userRole || "")) {
-      toast({
-        title: "Permission denied",
-        description: "Only management users can delete jobs",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!window.confirm("Are you sure you want to delete this job? This action cannot be undone and will remove all related data.")) {
-      return;
-    }
-
-    try {
-      console.log("useJobCard: Starting job deletion for:", job.id);
-      
-      const result = await deleteJobComprehensively(job.id);
-      
-      if (result.success) {
-        toast({
-          title: "Job deleted successfully",
-          description: result.details || "The job and all related records have been removed."
-        });
-        
-        if (onDeleteClick) {
-          onDeleteClick(job.id);
-        }
-        
-        queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      } else {
-        throw new Error(result.error || "Unknown deletion error");
-      }
-    } catch (error: any) {
-      console.error("useJobCard: Error deleting job:", error);
-      toast({
-        title: "Error deleting job",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  };
+  // Remove the duplicate deletion handler - use only the centralized one from JobCardNew
+  // This prevents race conditions and ensures consistency
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
@@ -265,6 +229,8 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
 
   const refreshData = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isJobBeingDeleted) return; // Don't refresh if job is being deleted
+    
     await queryClient.invalidateQueries({ queryKey: ["jobs"] });
     await queryClient.invalidateQueries({ queryKey: ["sound-tasks", job.id] });
     await queryClient.invalidateQueries({ queryKey: ["sound-personnel", job.id] });
@@ -292,6 +258,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
     videoTaskDialogOpen,
     editJobDialogOpen,
     assignmentDialogOpen,
+    isJobBeingDeleted,
     
     // Data
     soundTasks,
@@ -307,7 +274,6 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
     // Event handlers
     toggleCollapse,
     handleEditButtonClick,
-    handleDeleteClick,
     handleFileUpload,
     handleDeleteDocument,
     refreshData,

@@ -6,6 +6,7 @@ import { Department } from "@/types/department";
 import { useNavigate } from "react-router-dom";
 import { useFolderExistence } from "@/hooks/useFolderExistence";
 import { useJobCard } from '@/hooks/useJobCard';
+import { useDeletionState } from '@/hooks/useDeletionState';
 import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { supabase } from "@/lib/supabase";
 import { deleteJobComprehensively } from "@/services/jobDeletionService";
@@ -20,6 +21,7 @@ import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 export interface JobCardNewProps {
   job: any;
@@ -52,6 +54,8 @@ export function JobCardNew({
 }: JobCardNewProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { addDeletingJob, removeDeletingJob, isDeletingJob } = useDeletionState();
   
   const {
     // Styling
@@ -68,6 +72,7 @@ export function JobCardNew({
     videoTaskDialogOpen,
     editJobDialogOpen,
     assignmentDialogOpen,
+    isJobBeingDeleted,
     
     // Data
     soundTasks,
@@ -102,9 +107,15 @@ export function JobCardNew({
   const { data: foldersExist } = useFolderExistence(job.id);
   const foldersAreCreated = job.flex_folders_created || foldersExist || job.flex_folders_exist;
 
-  // Centralized delete handler using the service
+  // Centralized delete handler with proper state management
   const handleDeleteClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    
+    // Check if already being deleted
+    if (isJobBeingDeleted) {
+      console.log("JobCardNew: Job deletion already in progress");
+      return;
+    }
     
     // Check permissions
     if (!["admin", "management"].includes(userRole || "")) {
@@ -123,6 +134,15 @@ export function JobCardNew({
     try {
       console.log("JobCardNew: Starting job deletion for:", job.id);
       
+      // Mark job as being deleted to prevent race conditions
+      addDeletingJob(job.id);
+      
+      // Cancel any ongoing queries for this job to prevent race conditions
+      await queryClient.cancelQueries({ queryKey: ["sound-tasks", job.id] });
+      await queryClient.cancelQueries({ queryKey: ["sound-personnel", job.id] });
+      await queryClient.cancelQueries({ queryKey: ["lights-tasks", job.id] });
+      await queryClient.cancelQueries({ queryKey: ["video-tasks", job.id] });
+      
       const result = await deleteJobComprehensively(job.id);
       
       if (result.success) {
@@ -133,6 +153,9 @@ export function JobCardNew({
         
         // Call the parent's onDeleteClick to handle any additional UI updates
         onDeleteClick(job.id);
+        
+        // Invalidate queries after successful deletion
+        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }
@@ -143,6 +166,9 @@ export function JobCardNew({
         description: error.message,
         variant: "destructive"
       });
+    } finally {
+      // Always remove from deletion state, even on error
+      removeDeletingJob(job.id);
     }
   };
 
@@ -214,8 +240,8 @@ export function JobCardNew({
   };
 
   const handleJobCardClick = () => {
-    if (isHouseTech) {
-      return; // Block job card clicks for house techs
+    if (isHouseTech || isJobBeingDeleted) {
+      return; // Block job card clicks for house techs or jobs being deleted
     }
     
     if (isProjectManagementPage) {
@@ -235,16 +261,23 @@ export function JobCardNew({
 
   const handleFestivalArtistsClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isJobBeingDeleted) return;
     console.log("JobCardNew: Navigating to festival management:", job.id);
     navigate(`/festival-management/${job.id}`);
   };
+
+  // Show loading state if job is being deleted
+  const cardOpacity = isJobBeingDeleted ? "opacity-50" : "";
+  const pointerEvents = isJobBeingDeleted ? "pointer-events-none" : "";
 
   return (
     <div className="p-4 bg-gray-50 dark:bg-gray-900">
       <Card
         className={cn(
           "mb-4 hover:shadow-md transition-all duration-200",
-          !isHouseTech && "cursor-pointer"
+          !isHouseTech && !isJobBeingDeleted && "cursor-pointer",
+          cardOpacity,
+          pointerEvents
         )}
         onClick={handleJobCardClick}
         style={{
@@ -252,6 +285,14 @@ export function JobCardNew({
           backgroundColor: appliedBgColor
         }}
       >
+        {isJobBeingDeleted && (
+          <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10 rounded">
+            <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-md shadow-lg">
+              <span className="text-sm font-medium">Deleting job...</span>
+            </div>
+          </div>
+        )}
+
         <JobCardHeader 
           job={job}
           collapsed={collapsed}
@@ -282,7 +323,9 @@ export function JobCardNew({
             onFestivalArtistsClick={handleFestivalArtistsClick}
             onAssignmentDialogOpen={(e) => {
               e.stopPropagation();
-              setAssignmentDialogOpen(true);
+              if (!isJobBeingDeleted) {
+                setAssignmentDialogOpen(true);
+              }
             }}
             handleFileUpload={handleFileUpload}
           />
@@ -319,7 +362,7 @@ export function JobCardNew({
         </div>
       </Card>
 
-      {!isHouseTech && (
+      {!isHouseTech && !isJobBeingDeleted && (
         <>
           {soundTaskDialogOpen && (
             <SoundTaskDialog
