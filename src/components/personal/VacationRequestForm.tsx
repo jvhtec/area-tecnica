@@ -94,4 +94,3 @@ export const VacationRequestForm: React.FC<VacationRequestFormProps> = ({ onSubm
     </Card>
   );
 };
-</lov-code>
