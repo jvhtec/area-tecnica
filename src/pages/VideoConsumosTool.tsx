@@ -140,8 +140,7 @@ const VideoConsumosTool: React.FC = () => {
         custom_pdu_type: table.customPduType,
         includes_hoist: table.includesHoist || false,
         override_data: {
-          rows: table.rows,
-          safetyMargin: safetyMargin
+          rows: table.rows
         }
       });
 
@@ -149,52 +148,6 @@ const VideoConsumosTool: React.FC = () => {
         toast({
           title: "Success",
           description: "Override saved for tour date",
-        });
-      }
-      return;
-    }
-
-    // Check if we're in tour defaults mode
-    const tourId = searchParams.get('tourId');
-    const mode = searchParams.get('mode');
-    const department = searchParams.get('department') || 'video';
-
-    if (tourId && mode === 'defaults') {
-      // Save as tour default with new structure
-      try {
-        const { error } = await supabase
-          .from('tour_default_tables')
-          .insert({
-            set_id: 'default-set', // We'll need to create a proper set management system
-            table_name: table.name,
-            table_data: {
-              rows: table.rows,
-              safetyMargin: safetyMargin
-            },
-            table_type: 'power',
-            total_value: table.totalWatts || 0,
-            metadata: {
-              safetyMargin: safetyMargin,
-              current_per_phase: table.currentPerPhase,
-              pdu_type: table.customPduType || table.pduType,
-              custom_pdu_type: table.customPduType,
-              includes_hoist: table.includesHoist,
-              department: department
-            }
-          });
-
-        if (error) throw error;
-
-        toast({
-          title: "Success",
-          description: "Power default saved successfully",
-        });
-      } catch (error: any) {
-        console.error('Error saving power default:', error);
-        toast({
-          title: "Error",
-          description: "Failed to save power default",
-          variant: "destructive"
         });
       }
       return;

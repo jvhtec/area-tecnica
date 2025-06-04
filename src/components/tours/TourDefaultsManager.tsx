@@ -162,16 +162,7 @@ export const TourDefaultsManager = ({
         powerSummary = { totalSystemWatts, totalSystemAmps };
       }
 
-      // Extract safety margin from the first default item's metadata or table_data
-      let safetyMargin = 0;
-      const firstDefault = relevantDefaults[0];
-      if (firstDefault) {
-        if ('metadata' in firstDefault && firstDefault.metadata?.safetyMargin !== undefined) {
-          safetyMargin = firstDefault.metadata.safetyMargin;
-        } else if ('table_data' in firstDefault && firstDefault.table_data?.safetyMargin !== undefined) {
-          safetyMargin = firstDefault.table_data.safetyMargin;
-        }
-      }
+      const safetyMargin = 0; // Default safety margin
 
       const pdfBlob = await exportToPDF(
         `${tour.name} - ${department.toUpperCase()} ${type.toUpperCase()} Defaults`,
@@ -310,16 +301,6 @@ export const TourDefaultsManager = ({
           };
         }
       });
-
-      // Extract safety margin from the first default item
-      const firstDefault = defaultsData[0];
-      if (firstDefault) {
-        if ('metadata' in firstDefault && firstDefault.metadata?.safetyMargin !== undefined) {
-          safetyMargin = firstDefault.metadata.safetyMargin;
-        } else if ('table_data' in firstDefault && firstDefault.table_data?.safetyMargin !== undefined) {
-          safetyMargin = firstDefault.table_data.safetyMargin;
-        }
-      }
     }
 
     if (combinedTables.length === 0) return;
