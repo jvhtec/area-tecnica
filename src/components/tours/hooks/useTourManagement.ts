@@ -2,7 +2,7 @@
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { deleteJobComprehensively } from "@/services/jobDeletionService";
+import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 
 export const useTourManagement = (tour: any, onClose: () => void) => {
   const { toast } = useToast();
@@ -91,7 +91,7 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
 
   const handleDelete = async () => {
     try {
-      console.log("Starting tour deletion process for tour:", tour.id);
+      console.log("Starting optimistic tour deletion process for tour:", tour.id);
 
       // Get all tour dates for this tour
       const { data: tourDates, error: tourDatesError } = await supabase
@@ -122,10 +122,10 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
 
         console.log("Found jobs:", jobs);
 
-        // Delete all jobs using the centralized service
+        // Delete all jobs using optimistic deletion
         if (jobs && jobs.length > 0) {
           for (const job of jobs) {
-            const result = await deleteJobComprehensively(job.id);
+            const result = await deleteJobOptimistically(job.id);
             if (!result.success) {
               console.error("Failed to delete job:", job.id, result.error);
               throw new Error(`Failed to delete job ${job.id}: ${result.error}`);

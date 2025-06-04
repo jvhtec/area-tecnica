@@ -1,15 +1,14 @@
-
 import React from 'react';
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Department } from "@/types/department";
 import { useNavigate } from "react-router-dom";
 import { useFolderExistence } from "@/hooks/useFolderExistence";
-import { useJobCard } from '@/hooks/useJobCard';
+import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
 import { useDeletionState } from '@/hooks/useDeletionState';
 import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { supabase } from "@/lib/supabase";
-import { deleteJobComprehensively } from "@/services/jobDeletionService";
+import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { JobCardHeader } from './JobCardHeader';
 import { JobCardActions } from './JobCardActions';
 import { JobCardAssignments } from './JobCardAssignments';
@@ -101,13 +100,13 @@ export function JobCardNew({
     
     // Folder handling
     updateFolderStatus
-  } = useJobCard(job, department, userRole, onEditClick, onDeleteClick, onJobClick);
+  } = useOptimizedJobCard(job, department, userRole, onEditClick, onDeleteClick, onJobClick);
 
   // Check folder existence
   const { data: foldersExist } = useFolderExistence(job.id);
   const foldersAreCreated = job.flex_folders_created || foldersExist || job.flex_folders_exist;
 
-  // Centralized delete handler with proper state management
+  // Optimistic delete handler with instant UI feedback
   const handleDeleteClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
     
@@ -132,35 +131,31 @@ export function JobCardNew({
     }
 
     try {
-      console.log("JobCardNew: Starting job deletion for:", job.id);
+      console.log("JobCardNew: Starting optimistic job deletion for:", job.id);
       
-      // Mark job as being deleted to prevent race conditions
+      // Mark job as being deleted for immediate visual feedback
       addDeletingJob(job.id);
       
-      // Cancel any ongoing queries for this job to prevent race conditions
-      await queryClient.cancelQueries({ queryKey: ["sound-tasks", job.id] });
-      await queryClient.cancelQueries({ queryKey: ["sound-personnel", job.id] });
-      await queryClient.cancelQueries({ queryKey: ["lights-tasks", job.id] });
-      await queryClient.cancelQueries({ queryKey: ["video-tasks", job.id] });
-      
-      const result = await deleteJobComprehensively(job.id);
+      // Call optimistic deletion service
+      const result = await deleteJobOptimistically(job.id);
       
       if (result.success) {
         toast({
-          title: "Job deleted successfully",
-          description: result.details || "The job and all related records have been removed."
+          title: "Job deleted",
+          description: result.details || "The job has been removed and cleanup is running in background."
         });
         
         // Call the parent's onDeleteClick to handle any additional UI updates
         onDeleteClick(job.id);
         
-        // Invalidate queries after successful deletion
+        // Invalidate queries to refresh the list
         await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }
     } catch (error: any) {
-      console.error("JobCardNew: Error deleting job:", error);
+      console.error("JobCardNew: Error in optimistic job deletion:", error);
       toast({
         title: "Error deleting job",
         description: error.message,
