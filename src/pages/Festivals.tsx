@@ -165,7 +165,8 @@ const Festivals = () => {
         includeRfIemTable: true,
         rfIemTableStages: [1],
         includeInfrastructureTable: true,
-        infrastructureTableStages: [1]
+        infrastructureTableStages: [1],
+        includeMissingRiderReport: true
       };
       
       const mergedPdf = await generateAndMergeFestivalPDFs(jobId, jobTitle, defaultOptions);
