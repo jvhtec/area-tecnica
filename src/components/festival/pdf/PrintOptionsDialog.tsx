@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,15 +24,17 @@ export interface PrintOptions {
 interface PrintOptionsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (options: PrintOptions) => void;
+  onConfirm: (options: PrintOptions, filename: string) => void;
   maxStages: number;
+  jobTitle: string;
 }
 
 export const PrintOptionsDialog = ({ 
   open, 
   onOpenChange, 
   onConfirm,
-  maxStages
+  maxStages,
+  jobTitle
 }: PrintOptionsDialogProps) => {
   const [options, setOptions] = useState<PrintOptions>({
     includeGearSetup: true,
@@ -62,6 +65,91 @@ export const PrintOptionsDialog = ({
     }
   };
 
+  const handleSelectAllStages = () => {
+    const allStages = Array.from({ length: maxStages }, (_, i) => i + 1);
+    setOptions(prev => ({
+      ...prev,
+      gearSetupStages: allStages,
+      shiftScheduleStages: allStages,
+      artistTableStages: allStages,
+      artistRequirementStages: allStages,
+      rfIemTableStages: allStages,
+      infrastructureTableStages: allStages
+    }));
+  };
+
+  const handleDeselectAllStages = () => {
+    setOptions(prev => ({
+      ...prev,
+      gearSetupStages: [],
+      shiftScheduleStages: [],
+      artistTableStages: [],
+      artistRequirementStages: [],
+      rfIemTableStages: [],
+      infrastructureTableStages: []
+    }));
+  };
+
+  const generateFilename = (): string => {
+    const baseTitle = jobTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+    
+    const selectedSections = [];
+    if (options.includeShiftSchedules) selectedSections.push('Shifts');
+    if (options.includeGearSetup) selectedSections.push('Equipment');
+    if (options.includeArtistTables) selectedSections.push('Artist_Tables');
+    if (options.includeRfIemTable) selectedSections.push('RF_IEM');
+    if (options.includeInfrastructureTable) selectedSections.push('Infrastructure');
+    if (options.includeMissingRiderReport) selectedSections.push('Missing_Riders');
+    if (options.includeArtistRequirements) selectedSections.push('Artist_Requirements');
+
+    // If only one section is selected, make it more specific
+    if (selectedSections.length === 1) {
+      const section = selectedSections[0];
+      
+      // Get unique stages across all selected sections
+      const allSelectedStages = new Set([
+        ...(options.includeGearSetup ? options.gearSetupStages : []),
+        ...(options.includeShiftSchedules ? options.shiftScheduleStages : []),
+        ...(options.includeArtistTables ? options.artistTableStages : []),
+        ...(options.includeArtistRequirements ? options.artistRequirementStages : []),
+        ...(options.includeRfIemTable ? options.rfIemTableStages : []),
+        ...(options.includeInfrastructureTable ? options.infrastructureTableStages : [])
+      ]);
+      
+      const sortedStages = Array.from(allSelectedStages).sort((a, b) => a - b);
+      
+      if (sortedStages.length < maxStages && sortedStages.length > 0) {
+        const stageString = sortedStages.length === 1 
+          ? `Stage${sortedStages[0]}`
+          : `Stages${sortedStages.join('_')}`;
+        return `${baseTitle}_${stageString}_${section}.pdf`;
+      }
+      
+      return `${baseTitle}_${section}.pdf`;
+    }
+
+    // If multiple sections or all sections, check if specific stages are selected
+    const allSelectedStages = new Set([
+      ...(options.includeGearSetup ? options.gearSetupStages : []),
+      ...(options.includeShiftSchedules ? options.shiftScheduleStages : []),
+      ...(options.includeArtistTables ? options.artistTableStages : []),
+      ...(options.includeArtistRequirements ? options.artistRequirementStages : []),
+      ...(options.includeRfIemTable ? options.rfIemTableStages : []),
+      ...(options.includeInfrastructureTable ? options.infrastructureTableStages : [])
+    ]);
+    
+    const sortedStages = Array.from(allSelectedStages).sort((a, b) => a - b);
+    
+    if (sortedStages.length < maxStages && sortedStages.length > 0) {
+      const stageString = sortedStages.length === 1 
+        ? `Stage${sortedStages[0]}`
+        : `Stages${sortedStages.join('_')}`;
+      return `${baseTitle}_${stageString}_Documentation.pdf`;
+    }
+
+    return `${baseTitle}_Complete_Documentation.pdf`;
+  };
+
   const renderStageSelections = (section: 'gearSetupStages' | 'shiftScheduleStages' | 'artistTableStages' | 'artistRequirementStages' | 'rfIemTableStages' | 'infrastructureTableStages') => {
     return (
       <div className="pl-6 space-y-2">
@@ -85,17 +173,43 @@ export const PrintOptionsDialog = ({
   };
 
   const handleConfirm = () => {
-    onConfirm(options);
+    const filename = generateFilename();
+    onConfirm(options, filename);
     onOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Select Documents to Print</DialogTitle>
         </DialogHeader>
         <div className="space-y-6 py-4">
+          {maxStages > 1 && (
+            <div className="border-b pb-4">
+              <h3 className="text-sm font-medium mb-3">Global Stage Controls</h3>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleSelectAllStages}
+                >
+                  Select All Stages
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleDeselectAllStages}
+                >
+                  Deselect All Stages
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                These controls apply to all sections that have stage selections.
+              </p>
+            </div>
+          )}
+
           <div className="space-y-4">
             <div>
               <div className="flex items-center space-x-2">
@@ -195,6 +309,13 @@ export const PrintOptionsDialog = ({
               <div className="pl-6 text-sm text-muted-foreground">
                 Summary of all artists with missing technical riders
               </div>
+            </div>
+          </div>
+
+          <div className="border-t pt-4">
+            <div className="bg-muted/50 p-3 rounded-md">
+              <h4 className="text-sm font-medium mb-1">Generated filename:</h4>
+              <p className="text-sm text-muted-foreground font-mono">{generateFilename()}</p>
             </div>
           </div>
         </div>

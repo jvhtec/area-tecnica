@@ -15,8 +15,9 @@ import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 export const generateAndMergeFestivalPDFs = async (
   jobId: string,
   jobTitle: string,
-  options: PrintOptions
-): Promise<Blob> => {
+  options: PrintOptions,
+  customFilename?: string
+): Promise<{ blob: Blob; filename: string }> => {
   console.log("Starting comprehensive PDF generation with options:", options);
 
   const logoUrl = await fetchLogoUrl(jobId);
@@ -611,7 +612,12 @@ export const generateAndMergeFestivalPDFs = async (
       throw new Error('No documents were selected for generation');
     }
     
-    return await mergePDFs(selectedPdfs);
+    const mergedBlob = await mergePDFs(selectedPdfs);
+    
+    // Generate filename if not provided
+    const filename = customFilename || `${jobTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}_Complete_Documentation.pdf`;
+    
+    return { blob: mergedBlob, filename };
   } catch (error) {
     console.error('Error generating festival PDFs:', error);
     throw error;
