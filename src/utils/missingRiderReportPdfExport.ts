@@ -76,7 +76,7 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
   doc.setFontSize(12);
   doc.setTextColor(warningColor);
   doc.setFont('helvetica', 'bold');
-  doc.text('⚠️ The following artists have missing technical riders:', 20, yPosition);
+  doc.text('The following artists have missing technical riders:', 20, yPosition);
   
   yPosition += 15;
   
@@ -84,7 +84,7 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
     doc.setFontSize(12);
     doc.setTextColor('#059669');
     doc.setFont('helvetica', 'normal');
-    doc.text('✅ All artists have complete technical riders!', 20, yPosition);
+    doc.text('All artists have complete technical riders!', 20, yPosition);
   } else {
     // Create table data
     const tableData = data.artists.map(artist => [
@@ -101,7 +101,7 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
       body: tableData,
       theme: 'grid',
       headStyles: {
-        fillColor: [220, 38, 38], // Red color for missing riders
+        fillColor: [215, 1, 1], // Red color for missing riders
         textColor: [255, 255, 255],
         fontStyle: 'bold',
         fontSize: 11
