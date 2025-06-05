@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +43,7 @@ const FestivalArtistManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [stageFilter, setStageFilter] = useState("");
   const [equipmentFilter, setEquipmentFilter] = useState("");
+  const [riderFilter, setRiderFilter] = useState("all");
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [printDate, setPrintDate] = useState("");
@@ -420,6 +422,8 @@ const FestivalArtistManagement = () => {
                 onStageFilterChange={setStageFilter}
                 equipmentFilter={equipmentFilter}
                 onEquipmentFilterChange={setEquipmentFilter}
+                riderFilter={riderFilter}
+                onRiderFilterChange={setRiderFilter}
               />
             )}
             
@@ -476,6 +480,7 @@ const FestivalArtistManagement = () => {
                         searchTerm={searchTerm}
                         stageFilter={stageFilter}
                         equipmentFilter={equipmentFilter}
+                        riderFilter={riderFilter}
                         dayStartTime={dayStartTime}
                       />
                     ) : (
@@ -497,6 +502,7 @@ const FestivalArtistManagement = () => {
                 searchTerm={searchTerm}
                 stageFilter={stageFilter}
                 equipmentFilter={equipmentFilter}
+                riderFilter={riderFilter}
                 dayStartTime={dayStartTime}
               />
             )}
