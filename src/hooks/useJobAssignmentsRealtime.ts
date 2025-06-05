@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Assignment } from "@/types/assignment";
@@ -7,6 +8,7 @@ import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
 
 export const useJobAssignmentsRealtime = (jobId: string) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isRemoving, setIsRemoving] = useState<Record<string, boolean>>({});
   
   // Use our enhanced real-time query hook for better reliability
   const { 
@@ -95,6 +97,41 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
 
   const { manageFlexCrewAssignment } = useFlexCrewAssignments();
 
+  const addAssignment = async (technicianId: string, soundRole: string, lightsRole: string) => {
+    try {
+      const { error } = await supabase
+        .from('job_assignments')
+        .insert({
+          job_id: jobId,
+          technician_id: technicianId,
+          sound_role: soundRole !== 'none' ? soundRole : null,
+          lights_role: lightsRole !== 'none' ? lightsRole : null,
+          assigned_by: (await supabase.auth.getUser()).data.user?.id,
+          assigned_at: new Date().toISOString(),
+        });
+
+      if (error) {
+        console.error('Error adding assignment:', error);
+        toast.error("Failed to add assignment");
+        return;
+      }
+
+      // Add to Flex crew calls if applicable
+      if (soundRole && soundRole !== 'none') {
+        await manageFlexCrewAssignment(jobId, technicianId, 'sound', 'add');
+      }
+      
+      if (lightsRole && lightsRole !== 'none') {
+        await manageFlexCrewAssignment(jobId, technicianId, 'lights', 'add');
+      }
+
+      toast.success("Assignment added successfully");
+    } catch (error: any) {
+      console.error('Error in addAssignment:', error);
+      toast.error("Failed to add assignment");
+    }
+  };
+
   const removeAssignment = async (technicianId: string) => {
     try {
       setIsRemoving(prev => ({ ...prev, [technicianId]: true }));
@@ -111,11 +148,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
 
       if (error) {
         console.error('Error removing assignment:', error);
-        toast({
-          title: "Error",
-          description: "Failed to remove assignment",
-          variant: "destructive",
-        });
+        toast.error("Failed to remove assignment");
         return;
       }
 
@@ -130,17 +163,10 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
         }
       }
 
-      toast({
-        title: "Success",
-        description: "Assignment removed successfully",
-      });
+      toast.success("Assignment removed successfully");
     } catch (error: any) {
       console.error('Error in removeAssignment:', error);
-      toast({
-        title: "Error",
-        description: "Failed to remove assignment",
-        variant: "destructive",
-      });
+      toast.error("Failed to remove assignment");
     } finally {
       setIsRemoving(prev => ({ ...prev, [technicianId]: false }));
     }
@@ -164,6 +190,8 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
     isLoading,
     isRefreshing: isRefreshing || isQueryRefreshing,
     refetch: handleRefresh,
-    removeAssignment
+    addAssignment,
+    removeAssignment,
+    isRemoving
   };
-}
+};

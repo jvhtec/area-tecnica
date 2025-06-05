@@ -39,10 +39,11 @@ import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
 
 interface JobAssignmentDialogProps {
-  job: Job;
   isOpen: boolean;
   onClose: () => void;
   onAssignmentChange: () => void;
+  jobId: string;
+  department?: string;
 }
 
 interface Assignment {
@@ -51,7 +52,7 @@ interface Assignment {
   lights_role: string;
 }
 
-export const JobAssignmentDialog = ({ job, isOpen, onClose, onAssignmentChange }: JobAssignmentDialogProps) => {
+export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId, department }: JobAssignmentDialogProps) => {
   const { toast } = useToast();
   const [availableTechnicians, setAvailableTechnicians] = useState<User[]>([]);
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
@@ -59,7 +60,7 @@ export const JobAssignmentDialog = ({ job, isOpen, onClose, onAssignmentChange }
   const [lightsRole, setLightsRole] = useState<string>("none");
   const [isAdding, setIsAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { assignments, addAssignment, removeAssignment, isRemoving } = useJobAssignmentsRealtime(job.id);
+  const { assignments, addAssignment, removeAssignment, isRemoving } = useJobAssignmentsRealtime(jobId);
   const { manageFlexCrewAssignment } = useFlexCrewAssignments();
 
   useEffect(() => {
@@ -164,11 +165,11 @@ export const JobAssignmentDialog = ({ job, isOpen, onClose, onAssignmentChange }
         
         // Add to Flex crew calls for sound and lights departments
         if (assignment.sound_role && assignment.sound_role !== 'none') {
-          await manageFlexCrewAssignment(job.id, technicianId, 'sound', 'add');
+          await manageFlexCrewAssignment(jobId, technicianId, 'sound', 'add');
         }
         
         if (assignment.lights_role && assignment.lights_role !== 'none') {
-          await manageFlexCrewAssignment(job.id, technicianId, 'lights', 'add');
+          await manageFlexCrewAssignment(jobId, technicianId, 'lights', 'add');
         }
       }
 
