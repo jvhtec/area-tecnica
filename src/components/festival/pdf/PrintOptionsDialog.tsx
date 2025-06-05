@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,6 +17,7 @@ export interface PrintOptions {
   rfIemTableStages: number[];
   includeInfrastructureTable: boolean;
   infrastructureTableStages: number[];
+  includeMissingRiderReport: boolean;
 }
 
 interface PrintOptionsDialogProps {
@@ -45,7 +45,8 @@ export const PrintOptionsDialog = ({
     includeRfIemTable: true,
     rfIemTableStages: Array.from({ length: maxStages }, (_, i) => i + 1),
     includeInfrastructureTable: true,
-    infrastructureTableStages: Array.from({ length: maxStages }, (_, i) => i + 1)
+    infrastructureTableStages: Array.from({ length: maxStages }, (_, i) => i + 1),
+    includeMissingRiderReport: true
   });
 
   const handleStageChange = (section: keyof PrintOptions, stageNumber: number, checked: boolean) => {
@@ -179,13 +180,29 @@ export const PrintOptionsDialog = ({
               </div>
               {options.includeInfrastructureTable && maxStages > 1 && renderStageSelections('infrastructureTableStages')}
             </div>
+
+            <div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="missing-rider-report"
+                  checked={options.includeMissingRiderReport}
+                  onCheckedChange={(checked) => 
+                    setOptions(prev => ({ ...prev, includeMissingRiderReport: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="missing-rider-report">Missing Rider Report</Label>
+              </div>
+              <div className="pl-6 text-sm text-muted-foreground">
+                Summary of all artists with missing technical riders
+              </div>
+            </div>
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={() => onConfirm(options)}>
+          <Button onClick={handleConfirm}>
             Generate PDF
           </Button>
         </DialogFooter>
