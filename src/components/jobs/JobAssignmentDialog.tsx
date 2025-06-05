@@ -37,6 +37,7 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
+import { ExternalLink } from "lucide-react";
 
 interface JobAssignmentDialogProps {
   isOpen: boolean;
@@ -61,7 +62,10 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   const [isAdding, setIsAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { assignments, addAssignment, removeAssignment, isRemoving } = useJobAssignmentsRealtime(jobId);
-  const { manageFlexCrewAssignment } = useFlexCrewAssignments();
+  const { manageFlexCrewAssignment, useCrewCallData } = useFlexCrewAssignments();
+
+  // Fetch crew call data for the current job and department
+  const { data: crewCallData, isLoading: isLoadingCrewCall } = useCrewCallData(jobId, department || 'sound');
 
   useEffect(() => {
     const fetchTechnicians = async () => {
@@ -191,13 +195,38 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     }
   };
 
+  const handleViewCrewCall = () => {
+    if (crewCallData?.flex_element_id) {
+      const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#contact-list/${crewCallData.flex_element_id}/detail`;
+      window.open(flexUrl, '_blank');
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[625px]">
         <DialogHeader>
-          <DialogTitle>Manage Job Assignments</DialogTitle>
+          <DialogTitle className="flex items-center justify-between">
+            <span>Manage Job Assignments</span>
+            {crewCallData?.flex_element_id && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleViewCrewCall}
+                className="gap-2"
+              >
+                <ExternalLink className="h-4 w-4" />
+                View Crew Call in Flex
+              </Button>
+            )}
+          </DialogTitle>
           <DialogDescription>
             Assign technicians to this job and specify their roles.
+            {department && crewCallData?.flex_element_id && (
+              <span className="block text-sm text-muted-foreground mt-1">
+                Crew call available for {department} department.
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
 

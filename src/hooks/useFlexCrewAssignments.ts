@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 
 export const useFlexCrewAssignments = () => {
   const { toast } = useToast();
@@ -65,7 +66,32 @@ export const useFlexCrewAssignments = () => {
     }
   };
 
+  const useCrewCallData = (jobId: string, department: string) => {
+    return useQuery({
+      queryKey: ['crew-call-data', jobId, department],
+      queryFn: async () => {
+        if (!jobId || !department) return null;
+        
+        const { data, error } = await supabase
+          .from('flex_crew_calls')
+          .select('flex_element_id')
+          .eq('job_id', jobId)
+          .eq('department', department)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error fetching crew call data:', error);
+          return null;
+        }
+
+        return data;
+      },
+      enabled: !!jobId && !!department
+    });
+  };
+
   return {
-    manageFlexCrewAssignment
+    manageFlexCrewAssignment,
+    useCrewCallData
   };
 };
