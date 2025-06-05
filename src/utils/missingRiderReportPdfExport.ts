@@ -41,7 +41,7 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
           reader.readAsDataURL(logoBlob);
         });
         
-        doc.addImage(logoDataUrl, 'JPEG', 20, 10, 30, 20);
+        doc.addImage(logoDataUrl, 'JPEG', 20, 10, 30, 15);
         yPosition = 40;
       }
     } catch (error) {
