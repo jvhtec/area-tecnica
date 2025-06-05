@@ -1,3 +1,4 @@
+
 export interface ConsoleSetup {
   model: string;
   quantity: number;
@@ -77,6 +78,7 @@ export interface ArtistFormData {
   isaftermidnight?: boolean;
   foh_tech?: boolean;
   mon_tech?: boolean;
+  rider_missing?: boolean;
 }
 
 export interface FestivalSettings {

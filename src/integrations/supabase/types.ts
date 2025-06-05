@@ -516,6 +516,7 @@ export type Database = {
           rf_festival_mics: number | null
           rf_festival_url: string | null
           rf_festival_wireless: number | null
+          rider_missing: boolean | null
           show_end: string | null
           show_start: string | null
           soundcheck: boolean | null
@@ -574,6 +575,7 @@ export type Database = {
           rf_festival_mics?: number | null
           rf_festival_url?: string | null
           rf_festival_wireless?: number | null
+          rider_missing?: boolean | null
           show_end?: string | null
           show_start?: string | null
           soundcheck?: boolean | null
@@ -632,6 +634,7 @@ export type Database = {
           rf_festival_mics?: number | null
           rf_festival_url?: string | null
           rf_festival_wireless?: number | null
+          rider_missing?: boolean | null
           show_end?: string | null
           show_start?: string | null
           soundcheck?: boolean | null

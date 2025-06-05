@@ -26,6 +26,7 @@ interface ArtistTableProps {
   searchTerm: string;
   stageFilter: string;
   equipmentFilter: string;
+  riderFilter: string;
   dayStartTime?: string;
 }
 
@@ -57,6 +58,7 @@ export const ArtistTable = ({
   searchTerm,
   stageFilter,
   equipmentFilter,
+  riderFilter,
   dayStartTime = "07:00"
 }: ArtistTableProps) => {
   const { toast } = useToast();
@@ -428,13 +430,17 @@ export const ArtistTable = ({
 
   const filteredArtists = artists.filter(artist => {
     const matchesSearch = artist.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStage = !stageFilter || artist.stage?.toString() === stageFilter;
-    const matchesEquipment = !equipmentFilter || (
+    const matchesStage = !stageFilter || stageFilter === 'all' || artist.stage?.toString() === stageFilter;
+    const matchesEquipment = !equipmentFilter || equipmentFilter === 'all' || (
       (equipmentFilter === 'wireless' && getWirelessSummary(artist).hh + getWirelessSummary(artist).bp > 0) ||
       (equipmentFilter === 'iem' && getIEMSummary(artist).channels + getIEMSummary(artist).bodypacks > 0) ||
       (equipmentFilter === 'monitors' && artist.monitors_enabled)
     );
-    return matchesSearch && matchesStage && matchesEquipment;
+    const matchesRider = !riderFilter || riderFilter === 'all' || (
+      (riderFilter === 'complete' && !artist.rider_missing) ||
+      (riderFilter === 'missing' && artist.rider_missing)
+    );
+    return matchesSearch && matchesStage && matchesEquipment && matchesRider;
   });
 
   const sortedArtists = [...filteredArtists].sort((a, b) => {
@@ -507,14 +513,16 @@ export const ArtistTable = ({
             const issues = checkGearRequirements(artist);
             const hasIssues = Object.keys(issues).length > 0;
             const formStatus = formStatuses[artist.id];
-            const isAfterMidnight = artist.isAfterMidnight;
+            const isAfterMidnight = artist.isaftermidnight;
+            const hasRiderMissing = artist.rider_missing;
             
             return (
               <>
                 <TableRow key={artist.id} className={cn(
                   expandedRows.includes(artist.id) && "bg-muted/50",
                   hasIssues && "bg-red-50/50 dark:bg-red-950/20",
-                  isAfterMidnight && "bg-blue-50/30 dark:bg-blue-950/20"
+                  isAfterMidnight && "bg-blue-50/30 dark:bg-blue-950/20",
+                  hasRiderMissing && "border-l-4 border-l-red-500"
                 )}>
                   <TableCell>
                     <Button
@@ -530,19 +538,35 @@ export const ArtistTable = ({
                     </Button>
                   </TableCell>
                   <TableCell className="font-medium">
-                    {artist.name}
-                    {isAfterMidnight && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge className="ml-2 bg-blue-500 hover:bg-blue-600">AM</Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>After midnight performance (early morning)</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <span>{artist.name}</span>
+                      {hasRiderMissing && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge className="bg-red-500 hover:bg-red-600 text-white">
+                                RIDER MISSING
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Technical rider/requirements are missing for this artist</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                      {isAfterMidnight && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge className="ml-2 bg-blue-500 hover:bg-blue-600">AM</Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>After midnight performance (early morning)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>{artist.stage}</TableCell>
                   <TableCell>

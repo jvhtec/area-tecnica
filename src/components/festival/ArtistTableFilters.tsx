@@ -10,6 +10,8 @@ interface ArtistTableFiltersProps {
   onStageFilterChange: (value: string) => void;
   equipmentFilter: string;
   onEquipmentFilterChange: (value: string) => void;
+  riderFilter: string;
+  onRiderFilterChange: (value: string) => void;
 }
 
 export const ArtistTableFilters = ({
@@ -19,10 +21,12 @@ export const ArtistTableFilters = ({
   onStageFilterChange,
   equipmentFilter,
   onEquipmentFilterChange,
+  riderFilter,
+  onRiderFilterChange,
 }: ArtistTableFiltersProps) => {
   return (
     <div className="space-y-4 mb-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <Label htmlFor="search">Search Artist</Label>
           <Input
@@ -62,8 +66,21 @@ export const ArtistTableFilters = ({
             </SelectContent>
           </Select>
         </div>
+
+        <div>
+          <Label htmlFor="rider">Rider Status</Label>
+          <Select value={riderFilter} onValueChange={onRiderFilterChange}>
+            <SelectTrigger id="rider">
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="complete">Rider Complete</SelectItem>
+              <SelectItem value="missing">Rider Missing</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
     </div>
   );
 };
-
