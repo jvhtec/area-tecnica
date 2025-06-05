@@ -101,7 +101,7 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
       body: tableData,
       theme: 'grid',
       headStyles: {
-        fillColor: [215, 1, 1], // Red color for missing riders
+        fillColor: [125, 1, 1], // Red color for missing riders
         textColor: [255, 255, 255],
         fontStyle: 'bold',
         fontSize: 11
