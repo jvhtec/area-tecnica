@@ -6,8 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { WirelessConfig } from "./gear-setup/WirelessConfig";
-import { AlertTriangle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const consoleOptions = [
   'Yamaha CL5', 'Yamaha PMx', 'Yamaha DM7','Yamaha DM3', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
@@ -75,29 +73,6 @@ export const ArtistManagementForm = ({
             </SelectContent>
           </Select>
         </div>
-      </div>
-
-      {/* Rider Status */}
-      <div className="space-y-4">
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="rider_missing"
-            checked={formData.rider_missing || false}
-            onCheckedChange={(checked) => updateFormData("rider_missing", checked)}
-          />
-          <Label htmlFor="rider_missing" className={formData.rider_missing ? "text-red-600 font-medium" : ""}>
-            Rider Missing
-          </Label>
-        </div>
-        
-        {formData.rider_missing && (
-          <Alert className="border-red-200 bg-red-50 dark:bg-red-950/20">
-            <AlertTriangle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-700 dark:text-red-400">
-              <strong>Warning:</strong> This artist's rider is missing. Please ensure technical requirements are obtained before the event.
-            </AlertDescription>
-          </Alert>
-        )}
       </div>
 
       {/* Show Times */}

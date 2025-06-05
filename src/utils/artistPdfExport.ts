@@ -1,74 +1,69 @@
-
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
+import { WirelessSystem, IEMSystem } from '@/types/festival-equipment';
+
+export interface ArtistTechnicalInfo {
+  fohTech: boolean;
+  monTech: boolean;
+  fohConsole: { model: string; providedBy: string };
+  monConsole: { model: string; providedBy: string };
+  wireless: {
+    systems?: WirelessSystem[];
+    model?: string;
+    providedBy: string;
+    handhelds?: number;
+    bodypacks?: number;
+    band?: string;
+    hh?: number;
+    bp?: number;
+  };
+  iem: {
+    systems?: IEMSystem[];
+    model?: string;
+    providedBy: string;
+    quantity?: number;
+    band?: string;
+  };
+  monitors: {
+    enabled: boolean;
+    quantity: number;
+  };
+}
+
+// Local interfaces for internal PDF generation use
+interface WirelessSystemDetail {
+  quantity_hh?: number;
+  quantity_bp?: number;
+  model: string;
+  band?: string;
+}
+
+interface IEMSystemDetail {
+  quantity: number;
+  model: string;
+  band?: string;
+}
+
+export interface ArtistInfrastructure {
+  providedBy: string;
+  cat6: { enabled: boolean; quantity: number };
+  hma: { enabled: boolean; quantity: number };
+  coax: { enabled: boolean; quantity: number };
+  opticalconDuo: { enabled: boolean; quantity: number };
+  analog: number;
+  other: string;
+}
 
 export interface ArtistPdfData {
   name: string;
   stage: number;
   date: string;
-  riderMissing?: boolean;
   schedule: {
-    show: {
-      start: string;
-      end: string;
-    };
-    soundcheck?: {
-      start: string;
-      end: string;
-    };
+    show: { start: string; end: string };
+    soundcheck?: { start: string; end: string };
   };
-  technical: {
-    fohTech: boolean;
-    monTech: boolean;
-    fohConsole: {
-      model: string;
-      providedBy: string;
-    };
-    monConsole: {
-      model: string;
-      providedBy: string;
-    };
-    wireless: {
-      systems: any[];
-      providedBy: string;
-      model?: string;
-      handhelds?: number;
-      bodypacks?: number;
-      band?: string;
-    };
-    iem: {
-      systems: any[];
-      providedBy: string;
-      model?: string;
-      quantity?: number;
-      band?: string;
-    };
-    monitors: {
-      enabled: boolean;
-      quantity: number;
-    };
-  };
-  infrastructure: {
-    providedBy: string;
-    cat6: {
-      enabled: boolean;
-      quantity: number;
-    };
-    hma: {
-      enabled: boolean;
-      quantity: number;
-    };
-    coax: {
-      enabled: boolean;
-      quantity: number;
-    };
-    opticalconDuo: {
-      enabled: boolean;
-      quantity: number;
-    };
-    analog: number;
-    other: string;
-  };
+  technical: ArtistTechnicalInfo;
+  infrastructure: ArtistInfrastructure;
   extras: {
     sideFill: boolean;
     drumFill: boolean;
@@ -76,201 +71,398 @@ export interface ArtistPdfData {
     wired: string;
   };
   notes?: string;
+  logoUrl?: string;
 }
 
-export const exportArtistPDF = async (artistData: ArtistPdfData): Promise<Blob> => {
-  const doc = new jsPDF();
+// Helper functions to process wireless and IEM data
+const getWirelessSummary = (systems: WirelessSystem[] = []) => {
+  const totalHH = systems.reduce((sum, system) => sum + (system.quantity_hh || 0), 0);
+  const totalBP = systems.reduce((sum, system) => sum + (system.quantity_bp || 0), 0);
+  return { hh: totalHH, bp: totalBP };
+};
 
-  // Title
-  doc.setFontSize(20);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Technical Requirements', 20, 30);
+const getIEMSummary = (systems: IEMSystem[] = []) => {
+  const totalChannels = systems.reduce((sum, system) => sum + (system.quantity_hh || 0), 0);
+  const totalBodpacks = systems.reduce((sum, system) => sum + (system.quantity_bp || 0), 0);
+  return { 
+    channels: totalChannels, 
+    bodypacks: totalBodpacks,
+    total: totalChannels // For backward compatibility
+  };
+};
 
-  // Artist info
-  doc.setFontSize(16);
-  doc.text(`${artistData.name} - Stage ${artistData.stage}`, 20, 45);
-  doc.setFontSize(12);
-  doc.text(`Date: ${artistData.date}`, 20, 55);
-
-  // Rider Missing Warning
-  if (artistData.riderMissing) {
-    doc.setTextColor(255, 0, 0);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('⚠️ RIDER MISSING - TECHNICAL REQUIREMENTS MAY BE INCOMPLETE', 20, 70);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(12);
-  }
-
-  let yPosition = artistData.riderMissing ? 85 : 70;
-
-  // Schedule section
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Schedule', 20, yPosition);
-  yPosition += 10;
-
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Show: ${artistData.schedule.show.start} - ${artistData.schedule.show.end}`, 20, yPosition);
-  yPosition += 8;
-
-  if (artistData.schedule.soundcheck) {
-    doc.text(`Soundcheck: ${artistData.schedule.soundcheck.start} - ${artistData.schedule.soundcheck.end}`, 20, yPosition);
-    yPosition += 8;
-  }
-
-  yPosition += 10;
-
-  // Technical Requirements section
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Technical Requirements', 20, yPosition);
-  yPosition += 15;
-
-  // Create table data
-  const tableData = [];
-
-  // Console information
-  if (artistData.technical.fohConsole.model) {
-    tableData.push(['FOH Console', artistData.technical.fohConsole.model, `Provided by: ${artistData.technical.fohConsole.providedBy}`]);
-  }
-  if (artistData.technical.monConsole.model) {
-    tableData.push(['Monitor Console', artistData.technical.monConsole.model, `Provided by: ${artistData.technical.monConsole.providedBy}`]);
-  }
-
-  // Technician requirements
-  if (artistData.technical.fohTech) {
-    tableData.push(['FOH Technician', 'Required', '']);
-  }
-  if (artistData.technical.monTech) {
-    tableData.push(['Monitor Technician', 'Required', '']);
-  }
-
-  // Wireless systems
-  if (artistData.technical.wireless.systems.length > 0) {
-    artistData.technical.wireless.systems.forEach(system => {
-      const details = [];
-      if (system.quantity_hh) details.push(`HH: ${system.quantity_hh}`);
-      if (system.quantity_bp) details.push(`BP: ${system.quantity_bp}`);
-      if (system.band) details.push(`Band: ${system.band}`);
-      
-      tableData.push([
-        'Wireless',
-        system.model || 'Not specified',
-        details.join(', ') + (system.provided_by ? ` (${system.provided_by})` : '')
-      ]);
-    });
-  }
-
-  // IEM systems
-  if (artistData.technical.iem.systems.length > 0) {
-    artistData.technical.iem.systems.forEach(system => {
-      const details = [];
-      if (system.quantity_hh) details.push(`CH: ${system.quantity_hh}`);
-      if (system.quantity_bp) details.push(`BP: ${system.quantity_bp}`);
-      if (system.band) details.push(`Band: ${system.band}`);
-      
-      tableData.push([
-        'IEM',
-        system.model || 'Not specified',
-        details.join(', ') + (system.provided_by ? ` (${system.provided_by})` : '')
-      ]);
-    });
-  }
-
-  // Monitors
-  if (artistData.technical.monitors.enabled) {
-    tableData.push(['Stage Monitors', `${artistData.technical.monitors.quantity} units`, '']);
-  }
-
-  // Infrastructure
-  if (artistData.infrastructure.cat6.enabled) {
-    tableData.push(['CAT6 Lines', `${artistData.infrastructure.cat6.quantity}`, `Provided by: ${artistData.infrastructure.providedBy}`]);
-  }
-  if (artistData.infrastructure.hma.enabled) {
-    tableData.push(['HMA Lines', `${artistData.infrastructure.hma.quantity}`, `Provided by: ${artistData.infrastructure.providedBy}`]);
-  }
-  if (artistData.infrastructure.coax.enabled) {
-    tableData.push(['Coax Lines', `${artistData.infrastructure.coax.quantity}`, `Provided by: ${artistData.infrastructure.providedBy}`]);
-  }
-  if (artistData.infrastructure.opticalconDuo.enabled) {
-    tableData.push(['OpticalCON DUO', `${artistData.infrastructure.opticalconDuo.quantity}`, `Provided by: ${artistData.infrastructure.providedBy}`]);
-  }
-  if (artistData.infrastructure.analog > 0) {
-    tableData.push(['Analog Lines', `${artistData.infrastructure.analog}`, `Provided by: ${artistData.infrastructure.providedBy}`]);
-  }
-
-  // Extra requirements
-  if (artistData.extras.sideFill) {
-    tableData.push(['Side Fill', 'Required', '']);
-  }
-  if (artistData.extras.drumFill) {
-    tableData.push(['Drum Fill', 'Required', '']);
-  }
-  if (artistData.extras.djBooth) {
-    tableData.push(['DJ Booth', 'Required', '']);
-  }
-  if (artistData.extras.wired) {
-    tableData.push(['Additional Wired', artistData.extras.wired, '']);
-  }
-  if (artistData.infrastructure.other) {
-    tableData.push(['Other Infrastructure', artistData.infrastructure.other, '']);
-  }
-
-  // Generate table
-  if (tableData.length > 0) {
-    (doc as any).autoTable({
-      head: [['Category', 'Specification', 'Notes']],
-      body: tableData,
-      startY: yPosition,
-      styles: {
-        fontSize: 10,
-        cellPadding: 3,
-      },
-      headStyles: {
-        fillColor: [64, 64, 64],
-        textColor: 255,
-        fontSize: 11,
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: {
-        fillColor: [245, 245, 245],
-      },
-      margin: { left: 20, right: 20 },
-    });
-
-    yPosition = (doc as any).lastAutoTable.finalY + 15;
-  }
-
-  // Notes section
-  if (artistData.notes) {
-    if (yPosition > 250) {
-      doc.addPage();
-      yPosition = 30;
-    }
-
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Additional Notes', 20, yPosition);
-    yPosition += 10;
-
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    const splitText = doc.splitTextToSize(artistData.notes, 170);
-    doc.text(splitText, 20, yPosition);
-  }
-
-  // Add rider missing warning at bottom if applicable
-  if (artistData.riderMissing) {
+export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
+  return new Promise((resolve) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
-    doc.setTextColor(255, 0, 0);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('WARNING: This document may be incomplete due to missing rider information.', 20, pageHeight - 20);
-    doc.setTextColor(0, 0, 0);
-  }
+    const createdDate = new Date().toLocaleDateString('en-GB');
 
-  return doc.output('blob');
+    // === HEADER SECTION ===
+    doc.setFillColor(125, 1, 1);
+    doc.rect(0, 0, pageWidth, 30, 'F');
+
+    // Load logo if provided
+    const loadLogoPromise = data.logoUrl 
+      ? new Promise<void>((resolveLogoLoad) => {
+          console.log("Attempting to load logo from URL:", data.logoUrl);
+          const img = new Image();
+          img.crossOrigin = 'Anonymous';
+          img.onload = () => {
+            try {
+              console.log("Logo loaded successfully, dimensions:", img.width, "x", img.height);
+              // Calculate logo dimensions (max height 18px in header)
+              const maxHeight = 18;
+              const ratio = img.width / img.height;
+              const logoHeight = Math.min(maxHeight, img.height);
+              const logoWidth = logoHeight * ratio;
+              
+              // Add logo to top left corner
+              doc.addImage(
+                img, 
+                'JPEG', 
+                5, // X position (left margin)
+                5, // Y position (top margin)
+                logoWidth,
+                logoHeight
+              );
+              resolveLogoLoad();
+            } catch (err) {
+              console.error('Error adding logo to PDF:', err);
+              resolveLogoLoad(); // Resolve anyway to continue PDF generation
+            }
+          };
+          img.onerror = (e) => {
+            console.error('Error loading logo image:', e);
+            resolveLogoLoad(); // Resolve anyway to continue PDF generation
+          };
+          img.src = data.logoUrl;
+        })
+      : Promise.resolve();
+
+    loadLogoPromise.then(() => {
+      doc.setFontSize(18);
+      doc.setTextColor(255, 255, 255);
+      doc.text(`${data.name} - Stage ${data.stage}`, pageWidth / 2, 15, { align: 'center' });
+      doc.setFontSize(12);
+      doc.text(new Date(data.date).toLocaleDateString('en-GB'), pageWidth / 2, 25, { align: 'center' });
+
+      let yPosition = 40;
+
+      // === SCHEDULE SECTION ===
+      doc.setFontSize(12);
+      doc.setTextColor(125, 1, 1);
+      doc.text("Schedule", 14, yPosition);
+      yPosition += 8;
+
+      doc.setFontSize(9);
+      doc.setTextColor(51, 51, 51);
+      doc.text(`Show Time: ${data.schedule.show.start} - ${data.schedule.show.end}`, 14, yPosition);
+      yPosition += 6;
+      if (data.schedule.soundcheck) {
+        doc.text(`Soundcheck: ${data.schedule.soundcheck.start} - ${data.schedule.soundcheck.end}`, 14, yPosition);
+        yPosition += 6;
+      }
+      yPosition += 4;
+
+      // === TECHNICAL STAFF ===
+      const technicalStaffRows = [
+        ['FOH Tech', data.technical.fohTech ? 'Yes' : 'No'],
+        ['MON Tech', data.technical.monTech ? 'Yes' : 'No']
+      ];
+
+      autoTable(doc, {
+        head: [['Position', 'Artist Provided']],
+        body: technicalStaffRows,
+        startY: yPosition,
+        theme: 'grid',
+        styles: {
+          fontSize: 9,
+          cellPadding: 3,
+        },
+        headStyles: {
+          fillColor: [125, 1, 1],
+          textColor: [255, 255, 255],
+        },
+        columnStyles: {
+          0: { cellWidth: 80 },
+          1: { cellWidth: 40 }
+        },
+      });
+
+      yPosition = (doc as any).lastAutoTable.finalY + 8;
+
+      // === CONSOLE REQUIREMENTS ===
+      const consoleRows = [
+        ['FOH Console', data.technical.fohConsole.model, data.technical.fohConsole.providedBy],
+        ['MON Console', data.technical.monConsole.model, data.technical.monConsole.providedBy]
+      ];
+
+      autoTable(doc, {
+        head: [['Position', 'Model', 'Provided By']],
+        body: consoleRows,
+        startY: yPosition,
+        theme: 'grid',
+        styles: {
+          fontSize: 9,
+          cellPadding: 3,
+        },
+        headStyles: {
+          fillColor: [125, 1, 1],
+          textColor: [255, 255, 255],
+        },
+      });
+
+      yPosition = (doc as any).lastAutoTable.finalY + 8;
+
+      // === RF & WIRELESS ===
+      const wirelessRows: any[] = [];
+      
+      // Process wireless systems
+      if (data.technical.wireless.systems && data.technical.wireless.systems.length > 0) {
+        data.technical.wireless.systems.forEach(system => {
+          if (system.quantity_hh && system.quantity_hh > 0) {
+            wirelessRows.push([
+              'Handheld',
+              system.quantity_hh,
+              system.model,
+              system.band || '-',
+              system.provided_by || data.technical.wireless.providedBy || 'festival' 
+            ]);
+          }
+          if (system.quantity_bp && system.quantity_bp > 0) {
+            wirelessRows.push([
+              'Bodypack',
+              system.quantity_bp,
+              system.model,
+              system.band || '-',
+              system.provided_by || data.technical.wireless.providedBy || 'festival'
+            ]);
+          }
+        });
+      } else if (data.technical.wireless.handhelds || data.technical.wireless.bodypacks) {
+        // Handle legacy format
+        if (data.technical.wireless.handhelds) {
+          wirelessRows.push([
+            'Handheld',
+            data.technical.wireless.handhelds,
+            data.technical.wireless.model || '-',
+            data.technical.wireless.band || '-',
+            data.technical.wireless.providedBy
+          ]);
+        }
+        if (data.technical.wireless.bodypacks) {
+          wirelessRows.push([
+            'Bodypack',
+            data.technical.wireless.bodypacks,
+            data.technical.wireless.model || '-',
+            data.technical.wireless.band || '-',
+            data.technical.wireless.providedBy
+          ]);
+        }
+      }
+
+      // Process IEM systems
+      if (data.technical.iem.systems && data.technical.iem.systems.length > 0) {
+        data.technical.iem.systems.forEach(system => {
+          if (system.quantity_hh && system.quantity_hh > 0) {
+            wirelessRows.push([
+              'IEM Channels',
+              system.quantity_hh,
+              system.model,
+              system.band || '-',
+              system.provided_by || data.technical.iem.providedBy || 'festival'
+            ]);
+          }
+          if (system.quantity_bp && system.quantity_bp > 0) {
+            wirelessRows.push([
+              'IEM Bodypacks',
+              system.quantity_bp,
+              system.model,
+              system.band || '-',
+              system.provided_by || data.technical.iem.providedBy || 'festival'
+            ]);
+          }
+        });
+      } else if (data.technical.iem.quantity) {
+        // Handle legacy format
+        wirelessRows.push([
+          'IEM System',
+          data.technical.iem.quantity,
+          data.technical.iem.model || '-',
+          data.technical.iem.band || '-',
+          data.technical.iem.providedBy
+        ]);
+      }
+
+      if (wirelessRows.length > 0) {
+        autoTable(doc, {
+          head: [['Type', 'Qty', 'Model', 'Band', 'Provided By']],
+          body: wirelessRows,
+          startY: yPosition,
+          theme: 'grid',
+          styles: {
+            fontSize: 9,
+            cellPadding: 3,
+          },
+          headStyles: {
+            fillColor: [125, 1, 1],
+            textColor: [255, 255, 255],
+          },
+        });
+
+        yPosition = (doc as any).lastAutoTable.finalY + 8;
+      }
+
+      // === MONITORS ===
+      if (data.technical.monitors.enabled) {
+        const monitorRows = [
+          ['Monitors', data.technical.monitors.quantity]
+        ];
+
+        autoTable(doc, {
+          head: [['Type', 'Quantity']],
+          body: monitorRows,
+          startY: yPosition,
+          theme: 'grid',
+          styles: {
+            fontSize: 9,
+            cellPadding: 3,
+          },
+          headStyles: {
+            fillColor: [125, 1, 1],
+            textColor: [255, 255, 255],
+          },
+        });
+
+        yPosition = (doc as any).lastAutoTable.finalY + 8;
+      }
+
+      // === INFRASTRUCTURE ===
+      const infrastructureRows = [
+        data.infrastructure.cat6.enabled && ['CAT6', data.infrastructure.cat6.quantity],
+        data.infrastructure.hma.enabled && ['HMA', data.infrastructure.hma.quantity],
+        data.infrastructure.coax.enabled && ['Coax', data.infrastructure.coax.quantity],
+        data.infrastructure.opticalconDuo.enabled && ['OpticalCon Duo', data.infrastructure.opticalconDuo.quantity],
+        data.infrastructure.analog > 0 && ['Analog Lines', data.infrastructure.analog]
+      ].filter(Boolean);
+
+      if (infrastructureRows.length > 0) {
+        autoTable(doc, {
+          head: [['Type', 'Quantity']],
+          body: infrastructureRows,
+          startY: yPosition,
+          theme: 'grid',
+          styles: {
+            fontSize: 9,
+            cellPadding: 3,
+          },
+          headStyles: {
+            fillColor: [125, 1, 1],
+            textColor: [255, 255, 255],
+          },
+        });
+
+        yPosition = (doc as any).lastAutoTable.finalY + 8;
+      }
+
+      // === EXTRAS ===
+      const extraRows = [
+        data.extras.sideFill && ['Side Fill', 'Yes'],
+        data.extras.drumFill && ['Drum Fill', 'Yes'],
+        data.extras.djBooth && ['DJ Booth', 'Yes'],
+        data.extras.wired && ['Additional Wired', data.extras.wired]
+      ].filter(Boolean);
+
+      if (extraRows.length > 0) {
+        autoTable(doc, {
+          head: [['Extra Requirements', 'Details']],
+          body: extraRows,
+          startY: yPosition,
+          theme: 'grid',
+          styles: {
+            fontSize: 9,
+            cellPadding: 3,
+          },
+          headStyles: {
+            fillColor: [125, 1, 1],
+            textColor: [255, 255, 255],
+          },
+        });
+
+        yPosition = (doc as any).lastAutoTable.finalY + 8;
+      }
+
+      // === NOTES ===
+      if (data.notes) {
+        doc.setFontSize(12);
+        doc.setTextColor(125, 1, 1);
+        doc.text("Notes", 14, yPosition);
+        yPosition += 8;
+
+        doc.setFontSize(9);
+        doc.setTextColor(51, 51, 51);
+        const splitNotes = doc.splitTextToSize(data.notes, pageWidth - 28);
+        doc.text(splitNotes, 14, yPosition);
+        yPosition += splitNotes.length * 5 + 10;
+      }
+
+      // === COMPANY LOGO ===
+      try {
+        // Add a small company logo at the bottom right
+        const companyLogoUrl = 'public/sector pro logo.png';
+        const companyImg = new Image();
+        companyImg.onload = () => {
+          try {
+            // Logo at bottom right
+            const logoWidth = 20;
+            const ratio = companyImg.width / companyImg.height;
+            const logoHeight = logoWidth / ratio;
+            
+            doc.addImage(
+              companyImg, 
+              'PNG', 
+              pageWidth - logoWidth - 10, // X position (right aligned)
+              pageHeight - logoHeight - 10, // Y position (bottom aligned)
+              logoWidth,
+              logoHeight
+            );
+            
+            // Footer with date
+            doc.setFontSize(8);
+            doc.setTextColor(51, 51, 51);
+            doc.text(`Generated: ${createdDate}`, pageWidth - 35, pageHeight - 10, { align: 'right' });
+            
+            // Resolve with the PDF blob
+            const blob = doc.output('blob');
+            resolve(blob);
+          } catch (err) {
+            console.error('Error adding company logo to PDF:', err);
+            // Continue without company logo
+            doc.setFontSize(8);
+            doc.setTextColor(51, 51, 51);
+            doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
+            const blob = doc.output('blob');
+            resolve(blob);
+          }
+        };
+        companyImg.onerror = () => {
+          // If company logo fails to load, just add the footer text
+          doc.setFontSize(8);
+          doc.setTextColor(51, 51, 51);
+          doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
+          const blob = doc.output('blob');
+          resolve(blob);
+        };
+        companyImg.src = companyLogoUrl;
+      } catch (logoErr) {
+        // If any error occurs, just add the footer text
+        doc.setFontSize(8);
+        doc.setTextColor(51, 51, 51);
+        doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
+        const blob = doc.output('blob');
+        resolve(blob);
+      }
+    });
+  });
 };
