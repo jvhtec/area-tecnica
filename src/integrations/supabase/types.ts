@@ -1030,6 +1030,80 @@ export type Database = {
           },
         ]
       }
+      flex_crew_assignments: {
+        Row: {
+          created_at: string | null
+          crew_call_id: string
+          flex_line_item_id: string
+          id: string
+          technician_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          crew_call_id: string
+          flex_line_item_id: string
+          id?: string
+          technician_id: string
+        }
+        Update: {
+          created_at?: string | null
+          crew_call_id?: string
+          flex_line_item_id?: string
+          id?: string
+          technician_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flex_crew_assignments_crew_call_id_fkey"
+            columns: ["crew_call_id"]
+            isOneToOne: false
+            referencedRelation: "flex_crew_calls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flex_crew_assignments_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flex_crew_calls: {
+        Row: {
+          created_at: string | null
+          department: string
+          flex_element_id: string
+          id: string
+          job_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          department: string
+          flex_element_id: string
+          id?: string
+          job_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          department?: string
+          flex_element_id?: string
+          id?: string
+          job_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flex_crew_calls_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       flex_folders: {
         Row: {
           created_at: string
@@ -2358,6 +2432,8 @@ export type Database = {
           dni: string | null
           email: string
           first_name: string | null
+          flex_id: string | null
+          flex_resource_id: string | null
           flex_user_id: string | null
           id: string
           last_activity: string | null
@@ -2377,6 +2453,8 @@ export type Database = {
           dni?: string | null
           email: string
           first_name?: string | null
+          flex_id?: string | null
+          flex_resource_id?: string | null
           flex_user_id?: string | null
           id: string
           last_activity?: string | null
@@ -2396,6 +2474,8 @@ export type Database = {
           dni?: string | null
           email?: string
           first_name?: string | null
+          flex_id?: string | null
+          flex_resource_id?: string | null
           flex_user_id?: string | null
           id?: string
           last_activity?: string | null
