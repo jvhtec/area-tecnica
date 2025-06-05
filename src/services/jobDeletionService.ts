@@ -115,3 +115,6 @@ export const deleteMultipleJobsWithCleanup = async (jobIds: string[]): Promise<v
     throw error;
   }
 };
+
+// Add the missing export alias
+export const deleteJobComprehensively = deleteJobWithCleanup;

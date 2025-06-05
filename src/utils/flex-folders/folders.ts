@@ -1,3 +1,4 @@
+
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { FlexFolderType } from "@/types/flex";
@@ -159,5 +160,27 @@ export const createJobCrewCalls = async (jobId: string, departments: string[]): 
         console.error(`Error processing ${department} crew call:`, error);
       }
     }
+  }
+};
+
+// Add the missing createAllFoldersForJob function
+export const createAllFoldersForJob = async (
+  job: any, 
+  formattedStartDate: string, 
+  formattedEndDate: string, 
+  documentNumber: string
+): Promise<void> => {
+  try {
+    // Create job folders
+    await createJobFolders(job.id, job.title);
+    
+    // Create crew call folders for departments in the job
+    const departments = job.job_departments?.map((dept: any) => dept.department) || [];
+    await createJobCrewCalls(job.id, departments);
+    
+    console.log(`All folders created for job ${job.id}`);
+  } catch (error) {
+    console.error(`Error creating all folders for job ${job.id}:`, error);
+    throw error;
   }
 };
