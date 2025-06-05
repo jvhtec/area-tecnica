@@ -9,7 +9,7 @@ import { Department } from "@/types/department";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { useNavigate } from "react-router-dom";
 import { useDeletionState } from "@/hooks/useDeletionState";
-import { deleteJobComprehensively } from "@/services/jobDeletionService";
+import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 
 import { 
   createAllFoldersForJob
@@ -268,7 +268,7 @@ export function JobCardNew({
       await queryClient.cancelQueries({ queryKey: ["sound-tasks", job.id] });
       await queryClient.cancelQueries({ queryKey: ["sound-personnel", job.id] });
       
-      const result = await deleteJobComprehensively(job.id);
+      const result = await deleteJobOptimistically(job.id);
       
       if (result.success) {
         onDeleteClick(job.id);
@@ -911,8 +911,9 @@ export function JobCardNew({
           )}
           {assignmentDialogOpen && job.job_type !== "dryhire" && (
             <JobAssignmentDialog
-              open={assignmentDialogOpen}
-              onOpenChange={setAssignmentDialogOpen}
+              isOpen={assignmentDialogOpen}
+              onClose={() => setAssignmentDialogOpen(false)}
+              onAssignmentChange={() => {}}
               jobId={job.id}
               department={department as Department}
             />

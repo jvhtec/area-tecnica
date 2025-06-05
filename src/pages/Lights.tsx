@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
@@ -208,8 +207,9 @@ const Lights = () => {
 
       {selectedJobId && (
         <JobAssignmentDialog
-          open={isAssignmentDialogOpen}
-          onOpenChange={setIsAssignmentDialogOpen}
+          isOpen={isAssignmentDialogOpen}
+          onClose={() => setIsAssignmentDialogOpen(false)}
+          onAssignmentChange={() => {}}
           jobId={selectedJobId}
           department={currentDepartment}
         />
