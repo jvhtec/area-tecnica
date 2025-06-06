@@ -4,7 +4,6 @@ import { exportArtistTablePDF, ArtistTablePdfData } from '../artistTablePdfExpor
 import { exportShiftsTablePDF, ShiftsTablePdfData } from '../shiftsTablePdfExport';
 import { exportRfIemTablePDF, RfIemTablePdfData } from '../rfIemTablePdfExport';
 import { exportInfrastructureTablePDF, ArtistInfrastructureData } from '../infrastructureTablePdfExport';
-import { exportMissingRiderReportPDF, MissingRiderReportData } from '../missingRiderReportPdfExport';
 import { generateStageGearPDF } from '../gearSetupPdfExport';
 import { fetchLogoUrl } from './logoUtils';
 import { generateCoverPage } from './coverPageGenerator';
@@ -15,9 +14,8 @@ import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 export const generateAndMergeFestivalPDFs = async (
   jobId: string,
   jobTitle: string,
-  options: PrintOptions,
-  customFilename?: string
-): Promise<{ blob: Blob; filename: string }> => {
+  options: PrintOptions
+): Promise<Blob> => {
   console.log("Starting comprehensive PDF generation with options:", options);
 
   const logoUrl = await fetchLogoUrl(jobId);
@@ -29,7 +27,6 @@ export const generateAndMergeFestivalPDFs = async (
   const individualArtistPdfs: Blob[] = [];
   let rfIemTablePdf: Blob | null = null;
   let infrastructureTablePdf: Blob | null = null;
-  let missingRiderReportPdf: Blob | null = null;
   
   try {
     const { data: artists, error: artistError } = await supabase
@@ -232,9 +229,9 @@ export const generateAndMergeFestivalPDFs = async (
                 
                 const iemSystems = (artist.iem_systems || []).map((system: any) => ({
                   model: system.model || '',
-                  quantity_hh: system.quantity_hh || 0,
-                  quantity_bp: system.quantity_bp || 0,
-                  quantity: system.quantity || 0,
+                  quantity_hh: system.quantity_hh || 0, // Ensure we explicitly map channels
+                  quantity_bp: system.quantity_bp || 0, // Ensure we explicitly map bodypacks
+                  quantity: system.quantity || 0, // Keep the legacy field for backward compatibility
                   band: system.band || ''
                 }));
                 
@@ -524,46 +521,6 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
-    // Generate Missing Rider Report if option is selected
-    if (options.includeMissingRiderReport && artists && artists.length > 0) {
-      const missingRiderArtists = artists.filter(artist => 
-        Boolean(artist.rider_missing)
-      );
-      
-      console.log(`Generating Missing Rider Report with ${missingRiderArtists.length} artists`);
-      
-      const sortedMissingRiderArtists = [...missingRiderArtists].sort((a, b) => {
-        if (a.stage < b.stage) return -1;
-        if (a.stage > b.stage) return 1;
-        
-        if (a.date < b.date) return -1;
-        if (a.date > b.date) return 1;
-        
-        return (a.name || '').localeCompare(b.name || '');
-      });
-      
-      const missingRiderData: MissingRiderReportData = {
-        jobTitle,
-        logoUrl,
-        artists: sortedMissingRiderArtists.map(artist => ({
-          name: artist.name || 'Unnamed Artist',
-          stage: artist.stage || 1,
-          date: artist.date || '',
-          showTime: {
-            start: artist.show_start || '',
-            end: artist.show_end || ''
-          }
-        }))
-      };
-      
-      try {
-        missingRiderReportPdf = await exportMissingRiderReportPDF(missingRiderData);
-        console.log(`Generated Missing Rider Report PDF, size: ${missingRiderReportPdf.size} bytes`);
-      } catch (err) {
-        console.error('Error generating Missing Rider Report PDF:', err);
-      }
-    }
-    
     const tocSections = [];
     
     if (options.includeShiftSchedules && shiftPdfs.length > 0) {
@@ -580,9 +537,6 @@ export const generateAndMergeFestivalPDFs = async (
     }
     if (options.includeInfrastructureTable && infrastructureTablePdf) {
       tocSections.push({ title: "Infrastructure Needs Overview", pageCount: 1 });
-    }
-    if (options.includeMissingRiderReport && missingRiderReportPdf) {
-      tocSections.push({ title: "Missing Rider Report", pageCount: 1 });
     }
     if (options.includeArtistRequirements && individualArtistPdfs.length > 0) {
       tocSections.push({ title: "Individual Artist Requirements", pageCount: individualArtistPdfs.length });
@@ -602,8 +556,7 @@ export const generateAndMergeFestivalPDFs = async (
       ...(options.includeArtistTables ? artistTablePdfs : []),   // 3. Artist Schedule Tables
       ...(options.includeRfIemTable && rfIemTablePdf ? [rfIemTablePdf] : []),  // 4. RF and IEM Overview
       ...(options.includeInfrastructureTable && infrastructureTablePdf ? [infrastructureTablePdf] : []),  // 5. Infrastructure Needs Overview
-      ...(options.includeMissingRiderReport && missingRiderReportPdf ? [missingRiderReportPdf] : []),  // 6. Missing Rider Report
-      ...(options.includeArtistRequirements ? individualArtistPdfs : [])  // 7. Individual Artist Requirements
+      ...(options.includeArtistRequirements ? individualArtistPdfs : [])  // 6. Individual Artist Requirements
     ];
     
     console.log(`Total PDFs to merge: ${selectedPdfs.length}`);
@@ -612,12 +565,7 @@ export const generateAndMergeFestivalPDFs = async (
       throw new Error('No documents were selected for generation');
     }
     
-    const mergedBlob = await mergePDFs(selectedPdfs);
-    
-    // Generate filename if not provided
-    const filename = customFilename || `${jobTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}_Complete_Documentation.pdf`;
-    
-    return { blob: mergedBlob, filename };
+    return await mergePDFs(selectedPdfs);
   } catch (error) {
     console.error('Error generating festival PDFs:', error);
     throw error;

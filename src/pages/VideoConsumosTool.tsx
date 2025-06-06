@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
 import { Badge } from '@/components/ui/badge';
-import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 
 const videoComponentDatabase = [
   { id: 1, name: 'Pantalla Central', watts: 700 },
@@ -59,8 +59,6 @@ const VideoConsumosTool: React.FC = () => {
   // Tour override mode detection
   const tourId = searchParams.get('tourId');
   const tourDateId = searchParams.get('tourDateId');
-  const mode = searchParams.get('mode');
-  const isTourDefaults = mode === 'tour-defaults';
   
   const { 
     isOverrideMode, 
@@ -68,13 +66,6 @@ const VideoConsumosTool: React.FC = () => {
     isLoading: overrideLoading,
     saveOverride 
   } = useTourOverrideMode(tourId || undefined, tourDateId || undefined, 'video');
-
-  // Tour defaults hooks
-  const { 
-    defaultSets,
-    createSet,
-    createTable: createTourDefaultTable 
-  } = useTourDefaultSets(tourId || '');
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<any>(null);
@@ -84,72 +75,11 @@ const VideoConsumosTool: React.FC = () => {
   const [selectedPduType, setSelectedPduType] = useState<string>('default');
   const [customPduType, setCustomPduType] = useState('');
   const [includesHoist, setIncludesHoist] = useState(false);
-  const [tourName, setTourName] = useState<string>('');
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
     rows: [{ quantity: '', componentId: '', watts: '' }],
   });
-
-  // Helper function to get or create the set ID for video department
-  const getOrCreateVideoSetId = async (): Promise<string> => {
-    // Check if a video set already exists
-    const existingVideoSet = defaultSets.find(set => set.department === 'video');
-    
-    if (existingVideoSet) {
-      return existingVideoSet.id;
-    }
-
-    // Create a new video set
-    const newSet = await createSet({
-      tour_id: tourId!,
-      name: `${tourName} Video Defaults`,
-      department: 'video',
-      description: 'Video department power defaults'
-    });
-    
-    return newSet.id;
-  };
-
-  // NEW: Save as tour defaults using the new system
-  const saveTourDefault = async (table: Table) => {
-    if (!tourId) return;
-
-    try {
-      // Get or create the video set ID
-      const setId = await getOrCreateVideoSetId();
-
-      // Now create the table with the detailed data
-      await createTourDefaultTable({
-        set_id: setId,
-        table_name: table.name,
-        table_data: {
-          rows: table.rows,
-          safetyMargin: safetyMargin
-        },
-        table_type: 'power',
-        total_value: table.totalWatts || 0,
-        metadata: {
-          current_per_phase: table.currentPerPhase,
-          pdu_type: table.customPduType || table.pduType,
-          custom_pdu_type: table.customPduType,
-          safetyMargin: safetyMargin
-        }
-      });
-
-      toast({
-        title: "Success",
-        description: "Tour default saved successfully",
-      });
-    } catch (error: any) {
-      console.error('Error saving tour default:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save tour default",
-        variant: "destructive"
-      });
-    }
-  };
 
   const addRow = () => {
     setCurrentTable((prev) => ({
@@ -254,7 +184,7 @@ const VideoConsumosTool: React.FC = () => {
     }
   };
 
-  const generateTable = async () => {
+  const generateTable = () => {
     if (!tableName) {
       toast({
         title: 'Missing table name',
@@ -295,11 +225,9 @@ const VideoConsumosTool: React.FC = () => {
 
     setTables((prev) => [...prev, newTable]);
     
-    // Save based on mode
-    if (isTourDefaults) {
-      await saveTourDefault(newTable);
-    } else if (selectedJobId) {
-      await savePowerRequirementTable(newTable);
+    // Save to database if job is selected
+    if (selectedJobId) {
+      savePowerRequirementTable(newTable);
     }
     
     resetCurrentTable();
@@ -343,11 +271,6 @@ const VideoConsumosTool: React.FC = () => {
         ? [...defaultTables, ...tables]
         : tables;
 
-      // Generate power summary for consumos reports
-      const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
-      const totalSystemAmps = allTables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
-      const powerSummary = { totalSystemWatts, totalSystemAmps };
-
       let logoUrl: string | undefined = undefined;
       try {
         if (isOverrideMode && tourId) {
@@ -368,30 +291,22 @@ const VideoConsumosTool: React.FC = () => {
         jobToUse.title,
         'video',
         undefined,
-        powerSummary,
+        undefined,
         safetyMargin,
         logoUrl
       );
 
       const fileName = `Video Power Report - ${jobToUse.title}.pdf`;
-      
-      if (!isTourDefaults && selectedJobId) {
-        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-        const filePath = `video/${selectedJobId}/${crypto.randomUUID()}.pdf`;
+      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+      const filePath = `video/${selectedJobId}/${crypto.randomUUID()}.pdf`;
 
-        const { error: uploadError } = await supabase.storage.from('task_documents').upload(filePath, file);
-        if (uploadError) throw uploadError;
+      const { error: uploadError } = await supabase.storage.from('task_documents').upload(filePath, file);
+      if (uploadError) throw uploadError;
 
-        toast({
-          title: 'Success',
-          description: 'PDF has been generated and uploaded successfully.',
-        });
-      } else {
-        toast({
-          title: 'Success',
-          description: 'PDF has been generated successfully.',
-        });
-      }
+      toast({
+        title: 'Success',
+        description: 'PDF has been generated and uploaded successfully.',
+      });
 
       // Also provide download to user
       const url = window.URL.createObjectURL(pdfBlob);
@@ -433,25 +348,6 @@ const VideoConsumosTool: React.FC = () => {
     }
   }, [isOverrideMode, overrideData]);
 
-  // Load tour name for display
-  useEffect(() => {
-    const fetchTourInfo = async () => {
-      if (tourId) {
-        const { data } = await supabase
-          .from('tours')
-          .select('name')
-          .eq('id', tourId)
-          .single();
-        
-        if (data) {
-          setTourName(data.name);
-        }
-      }
-    };
-
-    fetchTourInfo();
-  }, [tourId]);
-
   if (overrideLoading) {
     return (
       <Card className="w-full max-w-4xl mx-auto my-6">
@@ -469,44 +365,13 @@ const VideoConsumosTool: React.FC = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate('/video')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div className="flex items-center gap-2">
-            <CardTitle className="text-2xl font-bold">
-              {isOverrideMode ? 'Override Mode - ' : ''}Power Calculator
-            </CardTitle>
-            {isTourDefaults && (
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                Tour Defaults
-              </Badge>
-            )}
-          </div>
+          <CardTitle className="text-2xl font-bold">
+            {isOverrideMode ? 'Override Mode - ' : ''}Power Calculator
+          </CardTitle>
         </div>
-        {isTourDefaults && (
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground">
-              Creating power defaults for tour: <span className="font-medium">{tourName}</span>
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              These defaults will apply to all tour dates unless specifically overridden
-            </p>
-          </div>
-        )}
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {isTourDefaults && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 bg-green-500 rounded-full"></div>
-                <p className="text-sm font-medium text-green-900">
-                  Tour Defaults Mode Active
-                </p>
-              </div>
-              <p className="text-sm text-green-700 mt-1">
-                Any tables you create will be saved as global defaults for this tour. These defaults will apply to all tour dates unless specifically overridden.
-              </p>
-            </div>
-          )}
-
           {isOverrideMode && overrideData && (
             <TourOverrideModeHeader
               tourName={overrideData.tourName}
@@ -584,14 +449,12 @@ const VideoConsumosTool: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tableName">
-              {isTourDefaults ? 'Default Name' : 'Table Name'}
-            </Label>
+            <Label htmlFor="tableName">Table Name</Label>
             <Input
               id="tableName"
               value={tableName}
               onChange={(e) => setTableName(e.target.value)}
-              placeholder={isTourDefaults ? "Enter default name" : "Enter table name"}
+              placeholder="Enter table name"
             />
           </div>
 
@@ -680,12 +543,12 @@ const VideoConsumosTool: React.FC = () => {
           <div className="flex gap-2">
             <Button onClick={addRow}>Add Row</Button>
             <Button onClick={generateTable} variant="secondary">
-              {isTourDefaults ? 'Save Tour Default' : 'Generate Table'}
+              Generate Table
             </Button>
             <Button onClick={resetCurrentTable} variant="destructive">
               Reset
             </Button>
-            {tables.length > 0 && !isTourDefaults && (
+            {tables.length > 0 && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
                 <FileText className="h-4 w-4" />
                 Export & Upload PDF

@@ -16,7 +16,6 @@ interface ShiftsListProps {
   isViewOnly?: boolean;
   jobDates: Date[];
   selectedDate: string;
-  onShiftsCopied: () => void;
 }
 
 export const ShiftsList = ({ 
@@ -26,8 +25,7 @@ export const ShiftsList = ({
   jobId, 
   isViewOnly = false,
   jobDates,
-  selectedDate,
-  onShiftsCopied
+  selectedDate
 }: ShiftsListProps) => {
   const [editShiftOpen, setEditShiftOpen] = useState(false);
   const [manageAssignmentsOpen, setManageAssignmentsOpen] = useState(false);
@@ -137,7 +135,7 @@ export const ShiftsList = ({
           sourceDate={selectedDate}
           jobDates={jobDates}
           jobId={jobId}
-          onShiftsCopied={onShiftsCopied}
+          onShiftsCopied={onShiftUpdated}
         />
       )}
     </div>

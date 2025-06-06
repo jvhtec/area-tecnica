@@ -54,8 +54,7 @@ export const useOptimizedJobCard = (
   }), [userRole]);
 
   // Use pre-loaded data from optimized query instead of separate queries
-  // Fixed: Use job.job_assignments instead of job.assignments
-  const assignments = job.job_assignments || [];
+  const assignments = job.assignments || [];
   const documents = job.job_documents || [];
   const soundTasks = job.tasks?.sound || [];
   const personnel = job.personnel?.sound;

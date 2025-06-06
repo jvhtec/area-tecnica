@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { useTableSubscription } from "@/hooks/useTableSubscription";
 import { useToast } from "@/hooks/use-toast";
 import { ShiftWithAssignments } from "@/types/festival-scheduling";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 interface UseFestivalShiftsParams {
   jobId: string;
@@ -13,10 +13,9 @@ interface UseFestivalShiftsParams {
 
 export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsParams) {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(true);
   
-  // Set up real-time subscriptions for both tables
+  // Set up real-time subscriptions for both tables - fixed parameter counts
   useTableSubscription('festival_shifts', ['festival_shifts', jobId, selectedDate]);
   useTableSubscription('festival_shift_assignments', ['festival_shift_assignments', jobId, selectedDate]);
 
@@ -128,25 +127,9 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
     retry: 2
   });
 
-  // Enhanced refetch function that also invalidates related queries
-  const enhancedRefetch = useCallback(async () => {
-    console.log("Enhanced refetch triggered - invalidating queries and refetching");
-    
-    // Invalidate all related queries
-    await queryClient.invalidateQueries({ 
-      queryKey: ['festival_shifts'] 
-    });
-    await queryClient.invalidateQueries({ 
-      queryKey: ['festival_shift_assignments'] 
-    });
-    
-    // Force refetch
-    return await refetch();
-  }, [queryClient, refetch]);
-
   return {
     shifts: shifts as ShiftWithAssignments[],
     isLoading: queryLoading,
-    refetch: enhancedRefetch,
+    refetch,
   };
 }

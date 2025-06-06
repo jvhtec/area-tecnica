@@ -81,8 +81,6 @@ const ConsumosTool: React.FC = () => {
 
   // Tour-specific hooks - use the new defaults system for tour mode
   const { 
-    defaultSets,
-    createSet,
     createTable: createTourDefaultTable 
   } = useTourDefaultSets(tourId || '');
   
@@ -98,26 +96,6 @@ const ConsumosTool: React.FC = () => {
     name: '',
     rows: [{ quantity: '', componentId: '', watts: '' }],
   });
-
-  // Helper function to get or create the set ID for sound department
-  const getOrCreateSoundSetId = async (): Promise<string> => {
-    // Check if a sound set already exists
-    const existingSoundSet = defaultSets.find(set => set.department === 'sound');
-    
-    if (existingSoundSet) {
-      return existingSoundSet.id;
-    }
-
-    // Create a new sound set
-    const newSet = await createSet({
-      tour_id: tourId!,
-      name: `${tourName} Sound Defaults`,
-      department: 'sound',
-      description: 'Sound department power defaults'
-    });
-    
-    return newSet.id;
-  };
 
   const addRow = () => {
     setCurrentTable((prev) => ({
@@ -208,8 +186,29 @@ const ConsumosTool: React.FC = () => {
     if (!tourId) return;
 
     try {
-      // Get or create the sound set ID
-      const setId = await getOrCreateSoundSetId();
+      // First ensure we have a default set for this department
+      const { createSet } = useTourDefaultSets(tourId);
+      
+      // Try to create the set (will be ignored if it already exists due to unique constraints)
+      let setId;
+      try {
+        const newSet = await createSet({
+          tour_id: tourId,
+          name: `${tourName} Sound Defaults`,
+          department: 'sound',
+          description: 'Sound department power defaults'
+        });
+        setId = newSet.id;
+      } catch (error) {
+        // Set might already exist, fetch it
+        const { defaultSets } = useTourDefaultSets(tourId);
+        const existingSet = defaultSets.find(set => set.department === 'sound');
+        if (existingSet) {
+          setId = existingSet.id;
+        } else {
+          throw new Error('Could not create or find default set');
+        }
+      }
 
       // Now create the table with the detailed data
       await createTourDefaultTable({
@@ -392,7 +391,7 @@ const ConsumosTool: React.FC = () => {
   };
 
   const handleExportPDF = async () => {
-    if (!selectedJobId) {
+    if (!selectedJobId || !selectedJob) {
       toast({
         title: 'No job selected',
         description: 'Please select a job before exporting.',
@@ -402,11 +401,6 @@ const ConsumosTool: React.FC = () => {
     }
 
     try {
-      // Generate power summary for consumos reports
-      const totalSystemWatts = tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
-      const totalSystemAmps = tables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
-      const powerSummary = { totalSystemWatts, totalSystemAmps };
-
       let logoUrl: string | undefined = undefined;
       try {
         const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
@@ -416,18 +410,18 @@ const ConsumosTool: React.FC = () => {
       }
 
       const pdfBlob = await exportToPDF(
-        selectedJob?.title || 'Power Report',
+        selectedJob.title,
         tables.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
-        selectedJob?.title || 'Power Report',
-        selectedJob?.date || new Date().toISOString(),
-        undefined, // summaryRows - undefined for power reports (auto-generated)
-        powerSummary,
+        selectedJob.title,
+        'sound',
+        undefined,
+        undefined,
         safetyMargin,
         logoUrl
       );
 
-      const fileName = `Sound Power Report - ${selectedJob?.title || 'Report'}.pdf`;
+      const fileName = `Sound Power Report - ${selectedJob.title}.pdf`;
       const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
       const filePath = `sound/${selectedJobId}/${crypto.randomUUID()}.pdf`;
 

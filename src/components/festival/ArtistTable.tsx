@@ -1,6 +1,6 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Edit2, Loader2, Mic, Headphones, FileText, Trash2, ChevronDown, ChevronUp, Printer, Link2, Clock, AlertTriangle } from "lucide-react";
+import { Edit2, Loader2, Mic, Headphones, FileText, Trash2, ChevronDown, ChevronUp, Printer, Link2, Clock } from "lucide-react";
 import { format, parseISO, isBefore, addDays, set } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
@@ -26,7 +26,6 @@ interface ArtistTableProps {
   searchTerm: string;
   stageFilter: string;
   equipmentFilter: string;
-  riderFilter?: string;
   dayStartTime?: string;
 }
 
@@ -58,7 +57,6 @@ export const ArtistTable = ({
   searchTerm,
   stageFilter,
   equipmentFilter,
-  riderFilter = "all",
   dayStartTime = "07:00"
 }: ArtistTableProps) => {
   const { toast } = useToast();
@@ -436,11 +434,7 @@ export const ArtistTable = ({
       (equipmentFilter === 'iem' && getIEMSummary(artist).channels + getIEMSummary(artist).bodypacks > 0) ||
       (equipmentFilter === 'monitors' && artist.monitors_enabled)
     );
-    const matchesRider = !riderFilter || riderFilter === 'all' || (
-      (riderFilter === 'missing' && artist.rider_missing) ||
-      (riderFilter === 'complete' && !artist.rider_missing)
-    );
-    return matchesSearch && matchesStage && matchesEquipment && matchesRider;
+    return matchesSearch && matchesStage && matchesEquipment;
   });
 
   const sortedArtists = [...filteredArtists].sort((a, b) => {
@@ -465,7 +459,7 @@ export const ArtistTable = ({
     );
   }
 
-  if (!filteredArtists.length) {
+  if (!sortedArtists.length) {
     return (
       <div className="text-center p-4 text-muted-foreground">
         No artists found matching the current filters.
@@ -509,20 +503,18 @@ export const ArtistTable = ({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredArtists.map((artist) => {
+          {sortedArtists.map((artist) => {
             const issues = checkGearRequirements(artist);
             const hasIssues = Object.keys(issues).length > 0;
             const formStatus = formStatuses[artist.id];
-            const isAfterMidnight = artist.isaftermidnight;
-            const hasRiderMissing = artist.rider_missing;
+            const isAfterMidnight = artist.isAfterMidnight;
             
             return (
               <>
                 <TableRow key={artist.id} className={cn(
                   expandedRows.includes(artist.id) && "bg-muted/50",
                   hasIssues && "bg-red-50/50 dark:bg-red-950/20",
-                  isAfterMidnight && "bg-blue-50/30 dark:bg-blue-950/20",
-                  hasRiderMissing && "border-l-4 border-l-red-500"
+                  isAfterMidnight && "bg-blue-50/30 dark:bg-blue-950/20"
                 )}>
                   <TableCell>
                     <Button
@@ -538,36 +530,19 @@ export const ArtistTable = ({
                     </Button>
                   </TableCell>
                   <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      {artist.name}
-                      {hasRiderMissing && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Badge variant="destructive" className="text-xs">
-                                <AlertTriangle className="h-3 w-3 mr-1" />
-                                Rider Missing
-                              </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Technical rider is missing for this artist</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                      {isAfterMidnight && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Badge className="ml-2 bg-blue-500 hover:bg-blue-600">AM</Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>After midnight performance (early morning)</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                    </div>
+                    {artist.name}
+                    {isAfterMidnight && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge className="ml-2 bg-blue-500 hover:bg-blue-600">AM</Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>After midnight performance (early morning)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
                   </TableCell>
                   <TableCell>{artist.stage}</TableCell>
                   <TableCell>
@@ -698,18 +673,6 @@ export const ArtistTable = ({
                   <TableRow>
                     <TableCell colSpan={9} className="bg-muted/50">
                       <div className="p-4 space-y-4">
-                        {hasRiderMissing && (
-                          <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-md p-3">
-                            <div className="flex items-center text-red-800 dark:text-red-200">
-                              <AlertTriangle className="h-4 w-4 mr-2" />
-                              <span className="font-medium">Rider Missing</span>
-                            </div>
-                            <p className="text-sm text-red-700 dark:text-red-300 mt-1">
-                              This artist's technical rider is missing. Please follow up to obtain the rider document.
-                            </p>
-                          </div>
-                        )}
-                        
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <h4 className="font-medium mb-2">Infrastructure</h4>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
 import CreateTourDialog from "@/components/tours/CreateTourDialog";
@@ -268,9 +269,8 @@ const Sound = () => {
       )}
       {selectedJobId && (
         <JobAssignmentDialog
-          isOpen={isAssignmentDialogOpen}
-          onClose={() => setIsAssignmentDialogOpen(false)}
-          onAssignmentChange={() => {}}
+          open={isAssignmentDialogOpen}
+          onOpenChange={setIsAssignmentDialogOpen}
           jobId={selectedJobId}
           department={currentDepartment}
         />

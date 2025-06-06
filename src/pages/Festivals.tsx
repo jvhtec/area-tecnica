@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useJobsRealtime } from "@/hooks/useJobsRealtime";
@@ -11,7 +12,7 @@ import { toast } from "sonner";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { useAuth } from "@/hooks/useAuth";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
-import { PrintOptions, PrintOptionsDialog } from "@/components/festival/pdf/PrintOptionsDialog";
+import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { useConnectionStatus } from "@/hooks/useConnectionStatus";
 import { FestivalsPagination } from "@/components/ui/festivals-pagination";
 import { findClosestFestival, calculatePageForFestival } from "@/utils/dateUtils";
@@ -38,8 +39,6 @@ const Festivals = () => {
   const [isPrinting, setIsPrinting] = useState<Record<string, boolean>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [highlightedFestivalId, setHighlightedFestivalId] = useState<string | null>(null);
-  const [printDialogOpen, setPrintDialogOpen] = useState(false);
-  const [selectedJobForPrint, setSelectedJobForPrint] = useState<{ id: string; title: string } | null>(null);
   const { userRole } = useAuth();
   const { status: connectionStatus, recoverConnection } = useConnectionStatus();
   const festivalRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -147,36 +146,38 @@ const Festivals = () => {
     navigate(`/festival-management/${jobId}`);
   };
 
-  // Handle opening print dialog
-  const handleOpenPrintDialog = (jobId: string, jobTitle: string) => {
-    setSelectedJobForPrint({ id: jobId, title: jobTitle });
-    setPrintDialogOpen(true);
-  };
-
   // Handle printing all documentation for a festival
-  const handlePrintConfirm = async (options: PrintOptions, filename: string) => {
-    if (!selectedJobForPrint) return;
-    
-    setIsPrinting(prev => ({ ...prev, [selectedJobForPrint.id]: true }));
+  const handlePrintAllDocumentation = async (jobId: string, jobTitle: string) => {
+    setIsPrinting(prev => ({ ...prev, [jobId]: true }));
     
     try {
-      console.log("Starting document generation for festival:", selectedJobForPrint.title);
+      console.log("Starting document generation for festival:", jobTitle);
       
-      const result = await generateAndMergeFestivalPDFs(
-        selectedJobForPrint.id, 
-        selectedJobForPrint.title, 
-        options,
-        filename
-      );
+      const defaultOptions: PrintOptions = {
+        includeGearSetup: true,
+        gearSetupStages: [1], // Default to stage 1
+        includeShiftSchedules: true,
+        shiftScheduleStages: [1], // Default to stage 1
+        includeArtistTables: true,
+        artistTableStages: [1], // Default to stage 1
+        includeArtistRequirements: true,
+        artistRequirementStages: [1], // Default to stage 1
+        includeRfIemTable: true,
+        rfIemTableStages: [1],
+        includeInfrastructureTable: true,
+        infrastructureTableStages: [1]
+      };
       
-      if (!result.blob || result.blob.size === 0) {
+      const mergedPdf = await generateAndMergeFestivalPDFs(jobId, jobTitle, defaultOptions);
+      
+      if (!mergedPdf || mergedPdf.size === 0) {
         throw new Error('Generated PDF is empty');
       }
       
-      const url = URL.createObjectURL(result.blob);
+      const url = URL.createObjectURL(mergedPdf);
       const a = document.createElement('a');
       a.href = url;
-      a.download = result.filename;
+      a.download = `${jobTitle}_Complete_Documentation.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -187,7 +188,7 @@ const Festivals = () => {
       console.error('Error generating documentation:', error);
       toast.error(`Failed to generate documentation: ${error.message}`);
     } finally {
-      setIsPrinting(prev => ({ ...prev, [selectedJobForPrint.id]: false }));
+      setIsPrinting(prev => ({ ...prev, [jobId]: false }));
     }
   };
 
@@ -311,7 +312,7 @@ const Festivals = () => {
                         className="absolute top-2 right-2 z-10"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleOpenPrintDialog(job.id, job.title);
+                          handlePrintAllDocumentation(job.id, job.title);
                         }}
                         disabled={isPrinting[job.id]}
                       >
@@ -340,14 +341,6 @@ const Festivals = () => {
           )}
         </CardContent>
       </Card>
-
-      <PrintOptionsDialog
-        open={printDialogOpen}
-        onOpenChange={setPrintDialogOpen}
-        onConfirm={handlePrintConfirm}
-        maxStages={3} // You might want to make this dynamic based on festival data
-        jobTitle={selectedJobForPrint?.title || ''}
-      />
     </div>
   );
 };
