@@ -32,7 +32,16 @@ const CreateTourDialog = ({
     handleDateChange,
     handleDepartmentChange,
     handleSubmit,
+    startDate,
+    endDate,
+    handleStartDateChange,
+    handleEndDateChange,
   } = useTourCreation(currentDepartment, () => onOpenChange(false));
+
+  // Mock available departments for now - you might want to fetch these from a hook
+  const availableDepartments: Department[] = [
+    "sound", "lights", "video", "production", "logistics", "administrative", "personnel", "comercial"
+  ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -48,13 +57,19 @@ const CreateTourDialog = ({
             description={description}
             setDescription={setDescription}
             dates={dates}
+            onDateChange={handleDateChange}
+            onAddDate={handleAddDate}
+            onRemoveDate={handleRemoveDate}
             color={color}
             setColor={setColor}
             departments={departments}
-            handleAddDate={handleAddDate}
-            handleRemoveDate={handleRemoveDate}
-            handleDateChange={handleDateChange}
-            handleDepartmentChange={handleDepartmentChange}
+            availableDepartments={availableDepartments}
+            currentDepartment={currentDepartment}
+            onDepartmentChange={handleDepartmentChange}
+            startDate={startDate}
+            endDate={endDate}
+            onStartDateChange={handleStartDateChange}
+            onEndDateChange={handleEndDateChange}
           />
 
           <div className="flex justify-end gap-3">
