@@ -313,6 +313,13 @@ const LightsPesosTool: React.FC = () => {
     }
 
     try {
+      // Generate summary rows for weight reports
+      const summaryRows = tables.map((table) => ({
+        clusterName: table.name,
+        riggingPoints: table.riggingPoint || 'N/A',
+        clusterWeight: table.totalWeight || 0
+      }));
+
       let logoUrl: string | undefined = undefined;
       try {
         if (isTourDefaults && tourId) {
@@ -334,7 +341,7 @@ const LightsPesosTool: React.FC = () => {
         'weight',
         jobTitle,
         'lights',
-        undefined,
+        summaryRows,
         undefined,
         0,
         logoUrl

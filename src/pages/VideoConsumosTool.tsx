@@ -343,6 +343,11 @@ const VideoConsumosTool: React.FC = () => {
         ? [...defaultTables, ...tables]
         : tables;
 
+      // Generate power summary for consumos reports
+      const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
+      const totalSystemAmps = allTables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
+      const powerSummary = { totalSystemWatts, totalSystemAmps };
+
       let logoUrl: string | undefined = undefined;
       try {
         if (isOverrideMode && tourId) {
@@ -363,22 +368,30 @@ const VideoConsumosTool: React.FC = () => {
         jobToUse.title,
         'video',
         undefined,
-        undefined,
+        powerSummary,
         safetyMargin,
         logoUrl
       );
 
       const fileName = `Video Power Report - ${jobToUse.title}.pdf`;
-      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-      const filePath = `video/${selectedJobId}/${crypto.randomUUID()}.pdf`;
+      
+      if (!isTourDefaults && selectedJobId) {
+        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+        const filePath = `video/${selectedJobId}/${crypto.randomUUID()}.pdf`;
 
-      const { error: uploadError } = await supabase.storage.from('task_documents').upload(filePath, file);
-      if (uploadError) throw uploadError;
+        const { error: uploadError } = await supabase.storage.from('task_documents').upload(filePath, file);
+        if (uploadError) throw uploadError;
 
-      toast({
-        title: 'Success',
-        description: 'PDF has been generated and uploaded successfully.',
-      });
+        toast({
+          title: 'Success',
+          description: 'PDF has been generated and uploaded successfully.',
+        });
+      } else {
+        toast({
+          title: 'Success',
+          description: 'PDF has been generated successfully.',
+        });
+      }
 
       // Also provide download to user
       const url = window.URL.createObjectURL(pdfBlob);

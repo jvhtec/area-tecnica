@@ -392,7 +392,7 @@ const ConsumosTool: React.FC = () => {
   };
 
   const handleExportPDF = async () => {
-    if (!selectedJobId || !selectedJob) {
+    if (!selectedJobId) {
       toast({
         title: 'No job selected',
         description: 'Please select a job before exporting.',
@@ -402,6 +402,11 @@ const ConsumosTool: React.FC = () => {
     }
 
     try {
+      // Generate power summary for consumos reports
+      const totalSystemWatts = tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
+      const totalSystemAmps = tables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
+      const powerSummary = { totalSystemWatts, totalSystemAmps };
+
       let logoUrl: string | undefined = undefined;
       try {
         const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
@@ -411,18 +416,18 @@ const ConsumosTool: React.FC = () => {
       }
 
       const pdfBlob = await exportToPDF(
-        selectedJob.title,
+        selectedJob?.title || 'Power Report',
         tables.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
-        selectedJob.title,
-        'sound',
-        undefined,
-        undefined,
+        selectedJob?.title || 'Power Report',
+        selectedJob?.date || new Date().toISOString(),
+        undefined, // summaryRows - undefined for power reports (auto-generated)
+        powerSummary,
         safetyMargin,
         logoUrl
       );
 
-      const fileName = `Sound Power Report - ${selectedJob.title}.pdf`;
+      const fileName = `Sound Power Report - ${selectedJob?.title || 'Report'}.pdf`;
       const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
       const filePath = `sound/${selectedJobId}/${crypto.randomUUID()}.pdf`;
 

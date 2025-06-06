@@ -402,8 +402,9 @@ export function JobCardNew({
           )}
           {assignmentDialogOpen && job.job_type !== "dryhire" && (
             <JobAssignmentDialog
-              open={assignmentDialogOpen}
-              onOpenChange={setAssignmentDialogOpen}
+              isOpen={assignmentDialogOpen}
+              onClose={() => setAssignmentDialogOpen(false)}
+              onAssignmentChange={() => {}}
               jobId={job.id}
               department={department as Department}
             />

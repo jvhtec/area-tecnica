@@ -231,8 +231,9 @@ const Dashboard = () => {
 
       {selectedJobId && (
         <JobAssignmentDialog
-          open={isAssignmentDialogOpen}
-          onOpenChange={setIsAssignmentDialogOpen}
+          isOpen={isAssignmentDialogOpen}
+          onClose={() => setIsAssignmentDialogOpen(false)}
+          onAssignmentChange={() => {}}
           jobId={selectedJobId}
           department={selectedDepartment}
         />

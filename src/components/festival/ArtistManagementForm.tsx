@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { WirelessConfig } from "./gear-setup/WirelessConfig";
+import { AlertTriangle } from "lucide-react";
 
 const consoleOptions = [
   'Yamaha CL5', 'Yamaha PMx', 'Yamaha DM7','Yamaha DM3', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
@@ -73,6 +75,30 @@ export const ArtistManagementForm = ({
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      {/* Rider Status */}
+      <div className="space-y-4">
+        <div className={`flex items-center space-x-2 p-3 rounded-md border ${
+          formData.rider_missing ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20" : "border-gray-200"
+        }`}>
+          <Checkbox
+            id="rider_missing"
+            checked={formData.rider_missing || false}
+            onCheckedChange={(checked) => updateFormData("rider_missing", checked)}
+          />
+          <div className="flex items-center space-x-2">
+            {formData.rider_missing && <AlertTriangle className="h-4 w-4 text-red-500" />}
+            <Label htmlFor="rider_missing" className={formData.rider_missing ? "text-red-700 dark:text-red-300" : ""}>
+              Rider Missing
+            </Label>
+          </div>
+        </div>
+        {formData.rider_missing && (
+          <div className="text-sm text-red-600 dark:text-red-400 ml-6">
+            ⚠️ This artist is missing their technical rider. Follow up required.
+          </div>
+        )}
       </div>
 
       {/* Show Times */}

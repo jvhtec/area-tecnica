@@ -267,24 +267,24 @@ const FestivalGearManagement = () => {
     }
   };
 
-  const handlePrintAllDocumentation = async (options: PrintOptions) => {
+  const handlePrintAllDocumentation = async (options: PrintOptions, filename: string) => {
     if (!jobId) return;
     
     setIsPrinting(true);
     try {
       console.log("Starting documentation print process with options:", options);
       
-      const mergedPdf = await generateAndMergeFestivalPDFs(jobId, jobTitle || 'Festival', options);
+      const result = await generateAndMergeFestivalPDFs(jobId, jobTitle || 'Festival', options, filename);
       
-      console.log(`Merged PDF created, size: ${mergedPdf.size} bytes`);
-      if (!mergedPdf || mergedPdf.size === 0) {
+      console.log(`Merged PDF created, size: ${result.blob.size} bytes`);
+      if (!result.blob || result.blob.size === 0) {
         throw new Error('Generated PDF is empty');
       }
       
-      const url = URL.createObjectURL(mergedPdf);
+      const url = URL.createObjectURL(result.blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${jobTitle || 'Festival'}_Documentation.pdf`;
+      a.download = result.filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -472,6 +472,7 @@ const FestivalGearManagement = () => {
           onOpenChange={setIsPrintOptionsDialogOpen}
           onConfirm={handlePrintAllDocumentation}
           maxStages={maxStages}
+          jobTitle={jobTitle}
         />
       )}
     </div>

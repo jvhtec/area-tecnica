@@ -35,6 +35,7 @@ export const CopyShiftsDialog = ({
 
     try {
       setIsLoading(true);
+      console.log(`Starting copy operation from ${sourceDate} to ${targetDate} for job ${jobId}`);
 
       // Fetch source shifts and their assignments
       const { data: shifts, error: shiftsError } = await supabase
@@ -51,22 +52,43 @@ export const CopyShiftsDialog = ({
         .eq("job_id", jobId)
         .eq("date", sourceDate);
 
-      if (shiftsError) throw shiftsError;
+      if (shiftsError) {
+        console.error("Error fetching source shifts:", shiftsError);
+        throw shiftsError;
+      }
+
+      if (!shifts || shifts.length === 0) {
+        toast.error("No shifts found for the selected source date");
+        return;
+      }
+
+      console.log(`Found ${shifts.length} shifts to copy:`, shifts);
 
       // For each shift, create a new one and copy its assignments
-      for (const shift of shifts || []) {
+      for (const shift of shifts) {
+        console.log(`Copying shift: ${shift.name} (ID: ${shift.id})`);
+        
         const { data: newShift, error: newShiftError } = await supabase
           .from("festival_shifts")
           .insert({
-            ...shift,
-            id: undefined,
+            name: shift.name,
+            start_time: shift.start_time,
+            end_time: shift.end_time,
+            department: shift.department,
+            stage: shift.stage,
+            notes: shift.notes,
             date: targetDate,
             job_id: jobId
           })
           .select()
           .single();
 
-        if (newShiftError) throw newShiftError;
+        if (newShiftError) {
+          console.error("Error creating new shift:", newShiftError);
+          throw newShiftError;
+        }
+
+        console.log(`Created new shift with ID: ${newShift.id}`);
 
         // Get assignments for the source shift
         const { data: assignments, error: assignmentsError } = await supabase
@@ -74,30 +96,47 @@ export const CopyShiftsDialog = ({
           .select("*")
           .eq("shift_id", shift.id);
 
-        if (assignmentsError) throw assignmentsError;
+        if (assignmentsError) {
+          console.error("Error fetching assignments:", assignmentsError);
+          throw assignmentsError;
+        }
+
+        console.log(`Found ${assignments?.length || 0} assignments for shift ${shift.id}:`, assignments);
 
         // Create new assignments for the new shift
         if (assignments && assignments.length > 0) {
           const newAssignments = assignments.map(assignment => ({
-            ...assignment,
-            id: undefined,
-            shift_id: newShift.id
+            shift_id: newShift.id,
+            technician_id: assignment.technician_id,
+            external_technician_name: assignment.external_technician_name,
+            role: assignment.role
           }));
+
+          console.log("Creating new assignments:", newAssignments);
 
           const { error: insertError } = await supabase
             .from("festival_shift_assignments")
             .insert(newAssignments);
 
-          if (insertError) throw insertError;
+          if (insertError) {
+            console.error("Error creating assignments:", insertError);
+            throw insertError;
+          }
+
+          console.log(`Successfully created ${newAssignments.length} assignments for new shift`);
         }
       }
 
-      toast.success("Shifts copied successfully");
+      console.log("Copy operation completed successfully");
+      toast.success(`Successfully copied ${shifts.length} shifts with all assignments to ${format(new Date(targetDate), 'MMM d, yyyy')}`);
+      
+      // Call the callback to refresh data
       onShiftsCopied();
       onOpenChange(false);
-    } catch (error) {
+      
+    } catch (error: any) {
       console.error("Error copying shifts:", error);
-      toast.error("Failed to copy shifts");
+      toast.error(`Failed to copy shifts: ${error.message || 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -113,6 +152,9 @@ export const CopyShiftsDialog = ({
           <div>
             <p className="text-sm text-muted-foreground mb-2">
               Source date: {format(new Date(sourceDate), 'MMM d, yyyy')}
+            </p>
+            <p className="text-xs text-muted-foreground mb-4">
+              This will copy all shifts and their assigned technicians to the target date.
             </p>
             <Select
               value={targetDate}
@@ -138,6 +180,7 @@ export const CopyShiftsDialog = ({
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
+              disabled={isLoading}
             >
               Cancel
             </Button>
@@ -145,7 +188,7 @@ export const CopyShiftsDialog = ({
               onClick={handleCopy}
               disabled={!targetDate || isLoading}
             >
-              {isLoading ? "Copying..." : "Copy Shifts"}
+              {isLoading ? "Copying..." : "Copy Shifts & Assignments"}
             </Button>
           </div>
         </div>

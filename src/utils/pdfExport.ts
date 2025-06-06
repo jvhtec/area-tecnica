@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -21,6 +22,7 @@ interface ExportTable {
   pduType?: string;
   customPduType?: string;
   includesHoist?: boolean;
+  riggingPoint?: string;
 }
 
 export interface SummaryRow {
@@ -221,9 +223,37 @@ export const exportToPDF = (
         }
       });
 
+      // === GENERATE SUMMARY DATA ===
+      let generatedSummaryRows: SummaryRow[] = [];
+      let generatedPowerSummary: { totalSystemWatts: number; totalSystemAmps: number } | undefined;
+
+      // Generate summary for weight reports (pesos)
+      if (type === 'weight') {
+        generatedSummaryRows = tables.map((table) => ({
+          clusterName: table.name,
+          riggingPoints: table.riggingPoint || 'N/A',
+          clusterWeight: table.totalWeight || 0
+        }));
+      }
+
+      // Generate summary for power reports (consumos)
+      if (type === 'power') {
+        const totalSystemWatts = tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
+        const totalSystemAmps = tables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
+        generatedPowerSummary = { totalSystemWatts, totalSystemAmps };
+      }
+
+      // Use provided summaries or generated ones
+      const finalSummaryRows = summaryRows && summaryRows.length > 0 ? summaryRows : generatedSummaryRows;
+      const finalPowerSummary = powerSummary || generatedPowerSummary;
+
       // === SUMMARY PAGE ===
-      // FIXED: Always add summary page when we have summary rows for weight reports
-      if (summaryRows && summaryRows.length > 0) {
+      // Generate summary for weight reports OR power reports with consumos toolType
+      const shouldGenerateSummary = 
+        (type === 'weight' && finalSummaryRows.length > 0) ||
+        (type === 'power' && tables.length > 0 && tables[0]?.toolType === 'consumos');
+
+      if (shouldGenerateSummary) {
         // Always add a new page for the summary.
         doc.addPage();
 
@@ -263,7 +293,7 @@ export const exportToPDF = (
         yPosition = 70;
 
         // For "consumos" tool, print summary as text lines.
-        if (tables[0]?.toolType === 'consumos') {
+        if (type === 'power' && tables[0]?.toolType === 'consumos') {
           doc.setFontSize(16);
           doc.setTextColor(125, 1, 1);
           // Translate "Summary" to "Resumen"
@@ -347,14 +377,30 @@ export const exportToPDF = (
           // Translate "16A Schuko Power required at FoH position" to Spanish.
           doc.text("Se requiere potencia de 16A Schuko en posición FoH", 14, yPosition);
           yPosition += 7;
-        } else {
+
+          // Add power summary if available
+          if (finalPowerSummary) {
+            checkPageBreak(30);
+            doc.setFontSize(14);
+            doc.setTextColor(125, 1, 1);
+            doc.text("Resumen de Potencia Total", 14, yPosition);
+            yPosition += 10;
+            
+            doc.setFontSize(12);
+            doc.setTextColor(0, 0, 0);
+            doc.text(`Potencia Total del Sistema: ${finalPowerSummary.totalSystemWatts.toFixed(2)} W`, 14, yPosition);
+            yPosition += 7;
+            doc.text(`Corriente Total del Sistema: ${finalPowerSummary.totalSystemAmps.toFixed(2)} A`, 14, yPosition);
+            yPosition += 7;
+          }
+        } else if (type === 'weight' && finalSummaryRows.length > 0) {
           doc.setFontSize(16);
           doc.setTextColor(125, 1, 1);
           // Translate "Summary" to "Resumen"
           doc.text("Resumen", 14, yPosition);
           yPosition += 6;
 
-          const summaryData = summaryRows.map((row) => [
+          const summaryData = finalSummaryRows.map((row) => [
             row.clusterName,
             row.riggingPoints,
             row.clusterWeight.toFixed(2)
