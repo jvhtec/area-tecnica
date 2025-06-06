@@ -18,7 +18,7 @@ export const BulkTourFolderActions = ({ tours, onRefresh }: BulkTourFolderAction
   const [isCreating, setIsCreating] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
 
-  // Find tours that need root folders
+  // Find tours that need root folders - check both flags and actual folder IDs
   const toursNeedingRootFolders = tours.filter(tour => !tour.flex_folders_created);
 
   const handleVerifyFolders = async () => {
@@ -155,7 +155,7 @@ export const BulkTourFolderActions = ({ tours, onRefresh }: BulkTourFolderAction
           <div className="flex gap-2">
             <Button 
               onClick={handleVerifyFolders}
-              disabled={isVerifying}
+              disabled={isVerifying || isCreating}
               variant="outline"
               className="flex-1"
             >
@@ -174,7 +174,7 @@ export const BulkTourFolderActions = ({ tours, onRefresh }: BulkTourFolderAction
 
             <Button 
               onClick={handleCreateBulkRootFolders}
-              disabled={isCreating}
+              disabled={isCreating || isVerifying}
               className="flex-1"
             >
               {isCreating ? (

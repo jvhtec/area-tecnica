@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,7 @@ import CreateTourDialog from "../tours/CreateTourDialog";
 import { toast } from "@/hooks/use-toast";
 import { exportTourPDF } from "@/lib/tourPdfExport";
 import { BulkTourFolderActions } from "../tours/BulkTourFolderActions";
+import { useTourSubscription } from "@/hooks/useTourSubscription";
 
 interface TourChipsProps {
   onTourClick: (tourId: string) => void;
@@ -19,6 +19,9 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
   const [selectedTourId, setSelectedTourId] = useState<string | null>(null);
   const [isDatesDialogOpen, setIsDatesDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
+  // Set up realtime subscription for tours
+  useTourSubscription();
 
   const { data: tours = [], refetch: refetchTours } = useQuery({
     queryKey: ["tours"],
@@ -34,6 +37,7 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
           end_date,
           color,
           flex_folders_created,
+          flex_main_folder_id,
           tour_dates (
             id,
             date,

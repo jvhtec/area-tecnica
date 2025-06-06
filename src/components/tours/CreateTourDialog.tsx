@@ -1,9 +1,10 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import { Department } from "@/types/department";
-import { useLocations } from "@/hooks/useLocations";
+import { useTourCreation } from "./useTourCreation";
 import { TourFormFields } from "./TourFormFields";
-import { useTourCreation } from "./hooks/useTourCreation";
 
 interface CreateTourDialogProps {
   open: boolean;
@@ -11,10 +12,11 @@ interface CreateTourDialogProps {
   currentDepartment: Department;
 }
 
-const CreateTourDialog = ({ open, onOpenChange, currentDepartment }: CreateTourDialogProps) => {
-  const { data: locations } = useLocations();
-  const availableDepartments: Department[] = ["sound", "lights", "video"];
-
+const CreateTourDialog = ({
+  open,
+  onOpenChange,
+  currentDepartment,
+}: CreateTourDialogProps) => {
   const {
     title,
     setTitle,
@@ -24,50 +26,61 @@ const CreateTourDialog = ({ open, onOpenChange, currentDepartment }: CreateTourD
     color,
     setColor,
     departments,
+    isCreating,
     handleAddDate,
     handleRemoveDate,
     handleDateChange,
     handleDepartmentChange,
     handleSubmit,
-    startDate,
-    endDate,
-    handleStartDateChange,
-    handleEndDateChange,
   } = useTourCreation(currentDepartment, () => onOpenChange(false));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Tour</DialogTitle>
-          <DialogDescription>Add a new tour with multiple dates and locations.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+
+        <form onSubmit={handleSubmit} className="space-y-6">
           <TourFormFields
             title={title}
             setTitle={setTitle}
             description={description}
             setDescription={setDescription}
             dates={dates}
-            onDateChange={handleDateChange}
-            onAddDate={handleAddDate}
-            onRemoveDate={handleRemoveDate}
             color={color}
             setColor={setColor}
             departments={departments}
-            availableDepartments={availableDepartments}
-            currentDepartment={currentDepartment}
-            onDepartmentChange={handleDepartmentChange}
-            locations={locations}
-            startDate={startDate}
-            endDate={endDate}
-            onStartDateChange={handleStartDateChange}
-            onEndDateChange={handleEndDateChange}
+            handleAddDate={handleAddDate}
+            handleRemoveDate={handleRemoveDate}
+            handleDateChange={handleDateChange}
+            handleDepartmentChange={handleDepartmentChange}
           />
 
-          <Button type="submit" className="w-full">
-            Create Tour
-          </Button>
+          <div className="flex justify-end gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isCreating}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit"
+              disabled={isCreating}
+              className="min-w-[120px]"
+            >
+              {isCreating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Tour"
+              )}
+            </Button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
