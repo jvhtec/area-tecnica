@@ -119,7 +119,7 @@ export const useTourCreationMutation = () => {
               folder_type: "tour_department"
             });
 
-          // Create department-specific hojaInfo elements for sound, lights, and video
+          // Create department-specific hojaInfo elements for sound, lights, and video only
           if (["sound", "lights", "video"].includes(dept)) {
             const hojaInfoType = dept === "sound" 
               ? FLEX_FOLDER_IDS.hojaInfoSx 
@@ -151,8 +151,9 @@ export const useTourCreationMutation = () => {
             }
           }
 
-          // ... keep existing code (additional subfolders creation logic)
-          if (dept !== "personnel") {
+          // Create additional subfolders only for technical departments (sound, lights, video, production)
+          // Skip personnel and comercial departments to keep them empty
+          if (["sound", "lights", "video", "production"].includes(dept)) {
             const additionalSubfolders = [
               {
                 definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
@@ -194,90 +195,10 @@ export const useTourCreationMutation = () => {
               }
             }
 
-            // Add specific folders for sound department
-            if (dept === "sound") {
-              const soundSubfolders = [
-                { name: `${tour.name} - Tour Pack`, suffix: "TP" },
-                { name: `${tour.name} - PA`, suffix: "PA" },
-              ];
-
-              for (const sf of soundSubfolders) {
-                const subPayload = {
-                  definitionId: FLEX_FOLDER_IDS.pullSheet,
-                  parentElementId: subFolder.elementId,
-                  open: true,
-                  locked: false,
-                  name: sf.name,
-                  plannedStartDate: formattedStartDate,
-                  plannedEndDate: formattedEndDate,
-                  locationId: FLEX_FOLDER_IDS.location,
-                  documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
-                  departmentId: DEPARTMENT_IDS[dept],
-                  personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
-                };
-                
-                try {
-                  await createFlexFolder(subPayload);
-                } catch (err) {
-                  console.error(`Exception creating sound subfolder for ${sf.name}:`, err);
-                }
-              }
-            }
-          } else if (dept === "personnel") {
-            // Special folders for personnel department
-            const personnelSubfolders = [
-              { name: `Gastos de Personal - ${tour.name}`, suffix: "GP", definitionId: FLEX_FOLDER_IDS.subFolder },
-            ];
-
-            for (const sf of personnelSubfolders) {
-              const childPayload = {
-                definitionId: sf.definitionId,
-                parentElementId: subFolder.elementId,
-                open: true,
-                locked: false,
-                name: sf.name,
-                plannedStartDate: formattedStartDate,
-                plannedEndDate: formattedEndDate,
-                locationId: FLEX_FOLDER_IDS.location,
-                departmentId: DEPARTMENT_IDS[dept],
-                documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
-                personResponsibleId: RESPONSIBLE_PERSON_IDS[dept]
-              };
-              console.log(`Creating personnel subfolder with payload:`, childPayload);
-              try {
-                await createFlexFolder(childPayload);
-              } catch (err) {
-                console.error(`Exception creating personnel subfolder:`, err);
-              }
-            }
-
-            const personnelcrewCall = [
-              { name: `Crew Call Sonido - ${tour.name}`, suffix: "CCS" },  
-              { name: `Crew Call Luces - ${tour.name}`, suffix: "CCL" },
-            ];
-
-            for (const sf of personnelcrewCall) {
-              const crewCallPayload = {
-                definitionId: FLEX_FOLDER_IDS.crewCall,
-                parentElementId: subFolder.elementId,
-                open: true,
-                locked: false,
-                name: sf.name,
-                plannedStartDate: formattedStartDate,
-                plannedEndDate: formattedEndDate,
-                locationId: FLEX_FOLDER_IDS.location,
-                documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
-                departmentId: DEPARTMENT_IDS[dept],
-                personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
-              };
-              
-              try {
-                await createFlexFolder(crewCallPayload);
-              } catch (err) {
-                console.error(`Exception creating crew call folder for ${sf.name}:`, err);
-              }
-            }
+            // Note: Removed pullsheet creation for sound department in tour roots
+            // Pullsheets (Tour Pack, PA) should only be created for individual jobs, not tour roots
           }
+
         } catch (error) {
           console.error(`Error creating ${dept} subfolder:`, error);
           continue;
