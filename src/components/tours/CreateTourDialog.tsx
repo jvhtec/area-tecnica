@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { Department } from "@/types/department";
-import { useTourCreation } from "./useTourCreation";
+import { useTourCreation } from "@/hooks/useTourCreation";
 import { TourFormFields } from "./TourFormFields";
 
 interface CreateTourDialogProps {
@@ -26,7 +26,6 @@ const CreateTourDialog = ({
     color,
     setColor,
     departments,
-    isCreating,
     handleAddDate,
     handleRemoveDate,
     handleDateChange,
@@ -77,23 +76,14 @@ const CreateTourDialog = ({
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={isCreating}
             >
               Cancel
             </Button>
             <Button 
               type="submit"
-              disabled={isCreating}
               className="min-w-[120px]"
             >
-              {isCreating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                "Create Tour"
-              )}
+              Create Tour
             </Button>
           </div>
         </form>
