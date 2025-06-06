@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { FileText, ArrowLeft, Edit, Trash2 } from 'lucide-react';
+import { FileText, ArrowLeft } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
@@ -14,74 +15,54 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 import { supabase } from '@/lib/supabase';
 
-const lightsComponentDatabase = [
-  { id: 1, name: 'CAMEO OPS S5', weight: 26 },
-  { id: 2, name: 'CLAY PAKY A-LEDA K20', weight: 23 },
-  { id: 3, name: 'CLAY PAKY A-LEDA K25', weight: 30 },
-  { id: 4, name: 'CLAY PAKY STORMY CC', weight: 8 },
-  { id: 5, name: 'ELATION CHORUS LINE 16', weight: 22 },
-  { id: 6, name: 'MARTIN MAC AURA', weight: 7 },
-  { id: 7, name: 'MARTIN MAC VIPER', weight: 39 },
-  { id: 8, name: 'ROBE BMFL BLADE', weight: 40 },
-  { id: 9, name: 'ROBE BMFL SPOT', weight: 38 },
-  { id: 10, name: 'ROBE BMFL WASHBEAM', weight: 41 },
-  { id: 11, name: 'ROBE MEGAPOINTE', weight: 24 },
-  { id: 12, name: 'ROBE POINTE', weight: 17 },
-  { id: 13, name: 'TRITON BLUE 15R BEAM', weight: 21 },
-  { id: 14, name: 'TRITON BLUE 15R SPOT', weight: 24 },
-  { id: 15, name: 'TRITON BLUE WALLY 3715', weight: 17 },
-  { id: 16, name: 'CAMEO AURO BAR 100', weight: 12 },
-  { id: 17, name: 'ACL 250W (2 BARRAS)', weight: 34 },
-  { id: 18, name: 'ACL 650W (2 BARRAS)', weight: 34 },
-  { id: 19, name: 'BARRA PAR 64x6', weight: 28 },
-  { id: 20, name: 'FRESNELL 2KW', weight: 9 },
-  { id: 21, name: 'MOLEFAY BLINDER 4', weight: 7 },
-  { id: 22, name: 'MOLEFAY BLINDER 8', weight: 9 },
-  { id: 23, name: 'PAR 64', weight: 4 },
-  { id: 24, name: 'ADMIRAL VINTAGE 53cm', weight: 7 },
-  { id: 25, name: 'ADMIRAL VINTAGE 38cm', weight: 5 },
-  { id: 26, name: 'FRESNELL 5KW', weight: 13 },
-  { id: 27, name: 'MOLEFAY BLINDER 2', weight: 4 },
-  { id: 28, name: 'RECORTE ETC 25º/50º', weight: 10 },
-  { id: 29, name: 'RECORTE ETC 15º/30º', weight: 12 },
-  { id: 30, name: 'RECORTE ETC 19º', weight: 8 },
-  { id: 31, name: 'RECORTE ETC 10º', weight: 8 },
-  { id: 32, name: 'RECORTE TB LED 25º/50º', weight: 15 },
-  { id: 33, name: 'SUNSTRIP', weight: 7 },
-  { id: 34, name: 'CAMEO ZENIT 120', weight: 10 },
-  { id: 35, name: 'ELATION SIXBAR 1000', weight: 8 },
-  { id: 36, name: 'MARTIN ATOMIC 3000', weight: 8 },
-  { id: 37, name: 'SGM Q7', weight: 9 },
-  { id: 38, name: 'ELATION SIXBAR 500', weight: 5 },
-  { id: 39, name: 'MOTOR CM 250Kg', weight: 30 },
-  { id: 40, name: 'MOTOR CM 500Kg', weight: 50 },
-  { id: 41, name: 'MOTOR CM 1000Kg', weight: 70 },
-  { id: 42, name: 'MOTOR CM 2000Kg', weight: 75 },
-  { id: 43, name: 'MOTOR CHAINMASTER 1000KG', weight: 69 },
-  { id: 44, name: 'MOTOR CHAINMASTER D8+ 750KG', weight: 69 },
-  { id: 45, name: 'TRUSS 76x52 3M', weight: 50 },
-  { id: 46, name: 'TRUSS 76x52 2M', weight: 32 },
-  { id: 47, name: 'TRUSS 76x52 1M', weight: 24 },
-  { id: 48, name: 'TRUSS 52x52 3M', weight: 40 },
-  { id: 49, name: 'TRUSS 52x52 2M', weight: 35 },
-  { id: 50, name: 'TRUSS 52x52 1M', weight: 27 },
-  { id: 51, name: 'TRUSS PROLYTE 30x30 4M', weight: 25 },
-  { id: 52, name: 'TRUSS PROLYTE 30x30 3M', weight: 19 },
-  { id: 53, name: 'TRUSS PROLYTE 30x30 2M', weight: 13 },
-  { id: 54, name: 'TRUSS PROLYTE 30x30 1M', weight: 7 },
-  { id: 55, name: 'TRUSS PROLYTE 30x30 0,7M', weight: 6 },
-  { id: 56, name: 'TRUSS PROLYTE 30x30 0,5M', weight: 4 },
-  { id: 57, name: 'TRUSS PROLYTE 30x30 0,3M', weight: 3 },
-  { id: 58, name: 'TRUSS PROLYTE 30x30 CUBO', weight: 12 },
-  { id: 59, name: 'TRUSS PRT 2.44M', weight: 45 },
-  { id: 60, name: 'TRUSS PRT 3,06M', weight: 43 },
-  { id: 61, name: 'VARIOS', weight: 100 },
-  { id: 62, name: 'TRUSS 40x40 1M', weight: 12 },
-  { id: 63, name: 'TRUSS 40x40 2M', weight: 21 },
-  { id: 64, name: 'TRUSS 40x40 3M', weight: 30 }
+const soundComponentDatabase = [
+  { id: 1, name: 'L-ACOUSTICS K1', weight: 110 },
+  { id: 2, name: 'L-ACOUSTICS K2', weight: 75 },
+  { id: 3, name: 'L-ACOUSTICS K3', weight: 33 },
+  { id: 4, name: 'L-ACOUSTICS KARA II', weight: 28 },
+  { id: 5, name: 'L-ACOUSTICS KS28', weight: 135 },
+  { id: 6, name: 'L-ACOUSTICS SB28', weight: 115 },
+  { id: 7, name: 'L-ACOUSTICS X4i', weight: 14 },
+  { id: 8, name: 'L-ACOUSTICS X8', weight: 11 },
+  { id: 9, name: 'L-ACOUSTICS X12', weight: 21 },
+  { id: 10, name: 'L-ACOUSTICS X15 HiQ', weight: 30 },
+  { id: 11, name: 'MEYER SOUND UPA-1P', weight: 20 },
+  { id: 12, name: 'MEYER SOUND UPM-1P', weight: 30 },
+  { id: 13, name: 'MEYER SOUND 750-LFC', weight: 165 },
+  { id: 14, name: 'NEXO GEO M6', weight: 25 },
+  { id: 15, name: 'NEXO GEO M10', weight: 40 },
+  { id: 16, name: 'NEXO GEO S12', weight: 85 },
+  { id: 17, name: 'NEXO STM M28', weight: 45 },
+  { id: 18, name: 'NEXO STM B112', weight: 75 },
+  { id: 19, name: 'D&B Y7P', weight: 18 },
+  { id: 20, name: 'D&B Y10P', weight: 28 },
+  { id: 21, name: 'D&B Y12', weight: 38 },
+  { id: 22, name: 'D&B GSL12', weight: 115 },
+  { id: 23, name: 'D&B GSL8', weight: 85 },
+  { id: 24, name: 'D&B B22-SUB', weight: 140 },
+  { id: 25, name: 'JBL VTX V25', weight: 85 },
+  { id: 26, name: 'JBL VTX V20', weight: 65 },
+  { id: 27, name: 'JBL VTX S28', weight: 135 },
+  { id: 28, name: 'ADAMSON E15', weight: 95 },
+  { id: 29, name: 'ADAMSON S10', weight: 55 },
+  { id: 30, name: 'ADAMSON T21', weight: 175 },
+  { id: 31, name: 'MOTOR CM 250Kg', weight: 30 },
+  { id: 32, name: 'MOTOR CM 500Kg', weight: 50 },
+  { id: 33, name: 'MOTOR CM 1000Kg', weight: 70 },
+  { id: 34, name: 'MOTOR CM 2000Kg', weight: 75 },
+  { id: 35, name: 'MOTOR CHAINMASTER 1000KG', weight: 69 },
+  { id: 36, name: 'MOTOR CHAINMASTER D8+ 750KG', weight: 69 },
+  { id: 37, name: 'TRUSS 76x52 3M', weight: 50 },
+  { id: 38, name: 'TRUSS 76x52 2M', weight: 32 },
+  { id: 39, name: 'TRUSS 76x52 1M', weight: 24 },
+  { id: 40, name: 'TRUSS 52x52 3M', weight: 40 },
+  { id: 41, name: 'TRUSS 52x52 2M', weight: 35 },
+  { id: 42, name: 'TRUSS 52x52 1M', weight: 27 },
+  { id: 43, name: 'VARIOS', weight: 100 }
 ];
 
-const RIGGING_POINT_OPTIONS = ['1', '2', '3', '4', '5', '6', '7', '8'];
+// Global counter for generating SX numbers
+let soundTableCounter = 0;
 
 interface TableRow {
   quantity: string;
@@ -98,12 +79,13 @@ interface Table {
   id?: number | string;
   dualMotors?: boolean;
   mirroredCluster?: boolean;
-  riggingPoint?: string;
+  riggingPoints?: string;
   cablePick?: boolean;
   isDefault?: boolean;
+  clusterId?: string;
 }
 
-const LightsPesosTool: React.FC = () => {
+const PesosTool: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
@@ -127,7 +109,6 @@ const LightsPesosTool: React.FC = () => {
   const [tables, setTables] = useState<Table[]>([]);
   const [dualMotors, setDualMotors] = useState(false);
   const [mirroredCluster, setMirroredCluster] = useState(false);
-  const [selectedRiggingPoint, setSelectedRiggingPoint] = useState<string>('');
   const [cablePick, setCablePick] = useState(false);
   const [tourName, setTourName] = useState<string>('');
 
@@ -136,23 +117,38 @@ const LightsPesosTool: React.FC = () => {
     rows: [{ quantity: '', componentId: '', weight: '' }],
   });
 
-  // Helper function to get or create the set ID for lights department
-  const getOrCreateLightsSetId = (): string | null => {
-    if (!tourId) return null;
-    
-    // Check if a lights set already exists
-    const existingLightsSet = defaultSets.find(set => set.department === 'lights');
-    return existingLightsSet?.id || null;
+  // Helper to generate a SX suffix for sound department
+  const getSuffix = () => {
+    if (dualMotors) {
+      soundTableCounter++;
+      const num1 = soundTableCounter.toString().padStart(2, '0');
+      soundTableCounter++;
+      const num2 = soundTableCounter.toString().padStart(2, '0');
+      return `SX${num1}, SX${num2}`;
+    } else {
+      soundTableCounter++;
+      const num = soundTableCounter.toString().padStart(2, '0');
+      return `SX${num}`;
+    }
   };
 
-  const createLightsSetId = async (): Promise<string> => {
+  // Helper function to get or create the set ID for sound department
+  const getOrCreateSoundSetId = (): string | null => {
+    if (!tourId) return null;
+    
+    // Check if a sound set already exists
+    const existingSoundSet = defaultSets.find(set => set.department === 'sound');
+    return existingSoundSet?.id || null;
+  };
+
+  const createSoundSetId = async (): Promise<string> => {
     if (!tourId) throw new Error('No tour ID');
     
     const newSet = await createSet({
       tour_id: tourId,
-      name: `${tourName} Lights Defaults`,
-      department: 'lights',
-      description: 'Lights department weight defaults'
+      name: `${tourName} Sound Defaults`,
+      department: 'sound',
+      description: 'Sound department weight defaults'
     });
     
     return newSet.id;
@@ -164,10 +160,10 @@ const LightsPesosTool: React.FC = () => {
 
     try {
       // Get existing set ID or create new one
-      let setId = getOrCreateLightsSetId();
+      let setId = getOrCreateSoundSetId();
       
       if (!setId) {
-        setId = await createLightsSetId();
+        setId = await createSoundSetId();
       }
 
       // Create the table with detailed data and metadata
@@ -178,7 +174,7 @@ const LightsPesosTool: React.FC = () => {
           rows: table.rows,
           dualMotors: table.dualMotors,
           mirroredCluster: table.mirroredCluster,
-          riggingPoint: table.riggingPoint,
+          riggingPoints: table.riggingPoints,
           cablePick: table.cablePick
         },
         table_type: 'weight',
@@ -186,7 +182,7 @@ const LightsPesosTool: React.FC = () => {
         metadata: {
           dualMotors: table.dualMotors,
           mirroredCluster: table.mirroredCluster,
-          riggingPoint: table.riggingPoint,
+          riggingPoints: table.riggingPoints,
           cablePick: table.cablePick
         }
       });
@@ -215,7 +211,7 @@ const LightsPesosTool: React.FC = () => {
   const updateInput = (index: number, field: keyof TableRow, value: string) => {
     const newRows = [...currentTable.rows];
     if (field === 'componentId') {
-      const component = lightsComponentDatabase.find((c) => c.id.toString() === value);
+      const component = soundComponentDatabase.find((c) => c.id.toString() === value);
       newRows[index] = {
         ...newRows[index],
         [field]: value,
@@ -250,7 +246,7 @@ const LightsPesosTool: React.FC = () => {
     }
 
     const calculatedRows = currentTable.rows.map((row) => {
-      const component = lightsComponentDatabase.find((c) => c.id.toString() === row.componentId);
+      const component = soundComponentDatabase.find((c) => c.id.toString() === row.componentId);
       const totalWeight =
         parseFloat(row.quantity) && parseFloat(row.weight)
           ? parseFloat(row.quantity) * parseFloat(row.weight)
@@ -264,22 +260,66 @@ const LightsPesosTool: React.FC = () => {
 
     const totalWeight = calculatedRows.reduce((sum, row) => sum + (row.totalWeight || 0), 0);
 
-    const newTable: Table = {
-      name: tableName,
-      rows: calculatedRows,
-      totalWeight,
-      id: Date.now(),
-      dualMotors,
-      mirroredCluster,
-      riggingPoint: selectedRiggingPoint,
-      cablePick
-    };
+    // For grouping, assign a new clusterId for this generation
+    const newClusterId = Date.now().toString();
 
-    setTables((prev) => [...prev, newTable]);
+    if (mirroredCluster) {
+      // For mirrored clusters, generate two tables sharing the same clusterId
+      const leftSuffix = getSuffix();
+      const rightSuffix = getSuffix();
 
-    // Save based on mode
-    if (isTourDefaults) {
-      await saveTourDefault(newTable);
+      const leftTable: Table = {
+        name: `${tableName} L (${leftSuffix})`,
+        riggingPoints: leftSuffix,
+        rows: calculatedRows,
+        totalWeight,
+        id: Date.now(),
+        dualMotors,
+        mirroredCluster: true,
+        cablePick,
+        clusterId: newClusterId,
+      };
+
+      const rightTable: Table = {
+        name: `${tableName} R (${rightSuffix})`,
+        riggingPoints: rightSuffix,
+        rows: calculatedRows,
+        totalWeight,
+        id: Date.now() + 1,
+        dualMotors,
+        mirroredCluster: true,
+        cablePick,
+        clusterId: newClusterId,
+      };
+
+      setTables((prev) => [...prev, leftTable, rightTable]);
+      
+      // Save both tables if in tour defaults mode
+      if (isTourDefaults) {
+        await saveTourDefault(leftTable);
+        await saveTourDefault(rightTable);
+      }
+    } else {
+      // Single table: assign the newClusterId to it and generate suffix
+      const suffix = getSuffix();
+      const newTable: Table = {
+        name: `${tableName} (${suffix})`,
+        riggingPoints: suffix,
+        rows: calculatedRows,
+        totalWeight,
+        id: Date.now(),
+        dualMotors,
+        mirroredCluster: false,
+        cablePick,
+        clusterId: newClusterId,
+      };
+
+      setTables((prev) => [...prev, newTable]);
+      
+      // Save if in tour defaults mode
+      if (isTourDefaults) {
+        await saveTourDefault(newTable);
+      }
     }
 
     resetCurrentTable();
@@ -293,7 +333,6 @@ const LightsPesosTool: React.FC = () => {
     setTableName('');
     setDualMotors(false);
     setMirroredCluster(false);
-    setSelectedRiggingPoint('');
     setCablePick(false);
   };
 
@@ -315,7 +354,7 @@ const LightsPesosTool: React.FC = () => {
       // Generate summary rows for weight reports
       const summaryRows = tables.map((table) => ({
         clusterName: table.name,
-        riggingPoints: table.riggingPoint || 'N/A',
+        riggingPoints: table.riggingPoints || 'N/A',
         clusterWeight: table.totalWeight || 0
       }));
 
@@ -332,31 +371,41 @@ const LightsPesosTool: React.FC = () => {
         console.error("Error fetching logo:", logoError);
       }
 
+      const jobTitle = isTourDefaults ? `${tourName} Sound Weight Defaults` : selectedJob?.title || 'Weight Report';
+      
       const pdfBlob = await exportToPDF(
-        selectedJob?.title || 'Weight Report',
+        jobTitle,
         tables.map((table) => ({ ...table, toolType: 'pesos' })),
         'weight',
-        selectedJob?.title || 'Weight Report',
-        selectedJob?.date || new Date().toISOString(),
+        jobTitle,
+        'sound',
         summaryRows,
-        undefined, // powerSummary - undefined for weight reports
-        undefined, // safetyMargin - undefined for weight reports
+        undefined,
+        0,
         logoUrl
       );
 
-      const fileName = `Sound Weight Report - ${selectedJob?.title || 'Report'}.pdf`;
-      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-      const filePath = `sound/${selectedJobId}/${crypto.randomUUID()}.pdf`;
+      const fileName = `Sound Weight Report - ${jobTitle}.pdf`;
+      
+      if (!isTourDefaults && selectedJobId) {
+        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+        const filePath = `sound/${selectedJobId}/${crypto.randomUUID()}.pdf`;
 
-      const { error: uploadError } = await supabase.storage.from('task_documents').upload(filePath, file);
-      if (uploadError) throw uploadError;
+        const { error: uploadError } = await supabase.storage.from('task_documents').upload(filePath, file);
+        if (uploadError) throw uploadError;
 
-      toast({
-        title: 'Success',
-        description: 'PDF has been generated and uploaded successfully.',
-      });
+        toast({
+          title: 'Success',
+          description: 'PDF has been generated and uploaded successfully.',
+        });
+      } else {
+        toast({
+          title: 'Success',
+          description: 'PDF has been generated successfully.',
+        });
+      }
 
-      // Also provide download to user
+      // Provide download to user
       const url = window.URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -398,11 +447,11 @@ const LightsPesosTool: React.FC = () => {
     <Card className="w-full max-w-4xl mx-auto my-6">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/lights')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/sound')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-2">
-            <CardTitle className="text-2xl font-bold">Weight Calculator</CardTitle>
+            <CardTitle className="text-2xl font-bold">Sound Weight Calculator</CardTitle>
             {isTourDefaults && (
               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                 Tour Defaults
@@ -467,51 +516,33 @@ const LightsPesosTool: React.FC = () => {
             />
           </div>
 
-          {/* Advanced Options - Always Available */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="dualMotors"
-                  checked={dualMotors}
-                  onCheckedChange={(checked) => setDualMotors(checked as boolean)}
-                />
-                <Label htmlFor="dualMotors">Dual motors for safety</Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="mirroredCluster"
-                  checked={mirroredCluster}
-                  onCheckedChange={(checked) => setMirroredCluster(checked as boolean)}
-                />
-                <Label htmlFor="mirroredCluster">Mirrored cluster</Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="cablePick"
-                  checked={cablePick}
-                  onCheckedChange={(checked) => setCablePick(checked as boolean)}
-                />
-                <Label htmlFor="cablePick">Cable pick</Label>
-              </div>
+          {/* Advanced Options */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="dualMotors"
+                checked={dualMotors}
+                onCheckedChange={(checked) => setDualMotors(checked as boolean)}
+              />
+              <Label htmlFor="dualMotors">Dual motors for safety</Label>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="riggingPoint">Rigging Point</Label>
-              <Select value={selectedRiggingPoint} onValueChange={setSelectedRiggingPoint}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select rigging point" />
-                </SelectTrigger>
-                <SelectContent>
-                  {RIGGING_POINT_OPTIONS.map((point) => (
-                    <SelectItem key={point} value={point}>
-                      Point {point}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="mirroredCluster"
+                checked={mirroredCluster}
+                onCheckedChange={(checked) => setMirroredCluster(checked as boolean)}
+              />
+              <Label htmlFor="mirroredCluster">Mirrored cluster</Label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="cablePick"
+                checked={cablePick}
+                onCheckedChange={(checked) => setCablePick(checked as boolean)}
+              />
+              <Label htmlFor="cablePick">Cable pick</Label>
             </div>
           </div>
 
@@ -545,7 +576,7 @@ const LightsPesosTool: React.FC = () => {
                           <SelectValue placeholder="Select component" />
                         </SelectTrigger>
                         <SelectContent>
-                          {lightsComponentDatabase.map((component) => (
+                          {soundComponentDatabase.map((component) => (
                             <SelectItem key={component.id} value={component.id.toString()}>
                               {component.name}
                             </SelectItem>
@@ -599,7 +630,7 @@ const LightsPesosTool: React.FC = () => {
               </div>
               
               {/* Advanced Options Display */}
-              {(table.dualMotors || table.mirroredCluster || table.cablePick || table.riggingPoint) && (
+              {(table.dualMotors || table.mirroredCluster || table.cablePick || table.riggingPoints) && (
                 <div className="p-4 bg-muted/50 space-y-2">
                   <h4 className="font-medium text-sm">Configuration:</h4>
                   <div className="flex flex-wrap gap-4 text-sm">
@@ -618,9 +649,9 @@ const LightsPesosTool: React.FC = () => {
                         Cable Pick
                       </span>
                     )}
-                    {table.riggingPoint && (
+                    {table.riggingPoints && (
                       <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded">
-                        Rigging Point {table.riggingPoint}
+                        Rigging Points: {table.riggingPoints}
                       </span>
                     )}
                   </div>
@@ -661,4 +692,4 @@ const LightsPesosTool: React.FC = () => {
   );
 };
 
-export default LightsPesosTool;
+export default PesosTool;
