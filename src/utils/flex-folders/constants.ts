@@ -82,7 +82,7 @@ export const DEPARTMENT_SUFFIXES = {
   sound: "S",
   lights: "L",
   video: "V",
-  production: "P",More actions
+  production: "P",
   personnel: "HR",
   comercial: "QT"
 };
