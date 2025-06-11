@@ -105,9 +105,23 @@ export function JobCardNew({
     updateFolderStatus
   } = useOptimizedJobCard(job, department, userRole, onEditClick, onDeleteClick, onJobClick);
 
-  // Check folder existence
-  const { data: foldersExist } = useFolderExistence(job.id);
-  const foldersAreCreated = job.flex_folders_created || foldersExist || job.flex_folders_exist;
+  // Check folder existence with proper loading state handling
+  const { data: foldersExist, isLoading: isFoldersLoading } = useFolderExistence(job.id);
+  
+  // Fix the folder existence logic - be more explicit about the checks
+  const foldersAreCreated = Boolean(
+    job.flex_folders_created || 
+    (foldersExist === true) || 
+    job.flex_folders_exist
+  );
+
+  console.log("JobCardNew: Folder status check for job", job.id, {
+    flexFoldersCreated: job.flex_folders_created,
+    foldersExist,
+    flexFoldersExist: job.flex_folders_exist,
+    combined: foldersAreCreated,
+    isLoading: isFoldersLoading
+  });
 
   // Optimistic delete handler with instant UI feedback
   const handleDeleteClick = async (e: React.MouseEvent) => {
@@ -184,7 +198,8 @@ export function JobCardNew({
       flexFoldersCreated: job.flex_folders_created,
       foldersExist,
       flexFoldersExist: job.flex_folders_exist,
-      combined: foldersAreCreated
+      combined: foldersAreCreated,
+      isLoading: isFoldersLoading
     });
 
     if (foldersAreCreated) {
@@ -201,6 +216,7 @@ export function JobCardNew({
       setIsCreatingFolders(true);
       console.log("JobCardNew: Starting folder creation for job:", job.id);
 
+      // Double-check in the database before creating
       const { data: existingFolders } = await supabase
         .from("flex_folders")
         .select("id")
@@ -315,7 +331,7 @@ export function JobCardNew({
           <JobCardActions 
             job={job}
             userRole={userRole || null}
-            foldersAreCreated={foldersAreCreated}
+            foldersAreCreated={foldersAreCreated || isFoldersLoading}
             isProjectManagementPage={isProjectManagementPage}
             isHouseTech={isHouseTech}
             showUpload={showUpload}
@@ -416,3 +432,5 @@ export function JobCardNew({
 }
 
 export type { JobDocument } from './JobCardDocuments';
+
+}

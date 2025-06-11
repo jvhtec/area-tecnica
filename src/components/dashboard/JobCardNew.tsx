@@ -294,19 +294,37 @@ export function JobCardNew({
     }
   };
 
+  const { data: foldersExist, isLoading: isFoldersLoading } = useFolderExistence(job.id);
+  
+  // Fix the folder existence logic - be more explicit about the checks
+  const foldersAreCreated = Boolean(
+    job.flex_folders_created || 
+    (foldersExist === true) || 
+    job.flex_folders_exist
+  );
+
+  console.log("JobCardNew: Folder status check for job", job.id, {
+    flexFoldersCreated: job.flex_folders_created,
+    foldersExist,
+    flexFoldersExist: job.flex_folders_exist,
+    combined: foldersAreCreated,
+    isLoading: isFoldersLoading
+  });
+
   const createFlexFoldersHandler = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    console.log("Folder existence check:", {
+    console.log("Dashboard JobCardNew: Folder existence check:", {
       jobId: job.id,
       flexFoldersCreated: job.flex_folders_created,
       foldersExist,
       flexFoldersExist: job.flex_folders_exist,
-      combined: foldersAreCreated
+      combined: foldersAreCreated,
+      isLoading: isFoldersLoading
     });
 
     if (foldersAreCreated) {
-      console.log("Folders already exist, preventing creation");
+      console.log("Dashboard JobCardNew: Folders already exist, preventing creation");
       toast({
         title: "Folders already created",
         description: "Flex folders have already been created for this job.",
@@ -316,8 +334,9 @@ export function JobCardNew({
     }
 
     try {
-      console.log("Starting folder creation for job:", job.id);
+      console.log("Dashboard JobCardNew: Starting folder creation for job:", job.id);
 
+      // Double-check in the database before creating
       const { data: existingFolders } = await supabase
         .from("flex_folders")
         .select("id")
@@ -325,7 +344,7 @@ export function JobCardNew({
         .limit(1);
 
       if (existingFolders && existingFolders.length > 0) {
-        console.log("Found existing folders in final check:", existingFolders);
+        console.log("Dashboard JobCardNew: Found existing folders in final check:", existingFolders);
         toast({
           title: "Folders already exist",
           description: "Flex folders have already been created for this job.",
@@ -352,7 +371,7 @@ export function JobCardNew({
         description: "Flex folders have been created successfully."
       });
     } catch (error: any) {
-      console.error("Error creating Flex folders:", error);
+      console.error("Dashboard JobCardNew: Error creating Flex folders:", error);
       toast({
         title: "Error creating folders",
         description: error.message,
@@ -695,14 +714,16 @@ export function JobCardNew({
                   variant="ghost"
                   size="icon"
                   onClick={createFlexFoldersHandler}
-                  disabled={foldersAreCreated || isJobBeingDeleted}
+                  disabled={foldersAreCreated || isJobBeingDeleted || isFoldersLoading}
                   title={
-                    foldersAreCreated
+                    isFoldersLoading
+                      ? "Checking folder status..."
+                      : foldersAreCreated
                       ? "Folders already exist"
                       : "Create Flex folders"
                   }
                   className={
-                    foldersAreCreated || isJobBeingDeleted
+                    foldersAreCreated || isJobBeingDeleted || isFoldersLoading
                       ? "opacity-50 cursor-not-allowed"
                       : "hover:bg-accent/50"
                   }
