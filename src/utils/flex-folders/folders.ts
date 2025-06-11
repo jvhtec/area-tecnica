@@ -1,3 +1,4 @@
+
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { FlexFolderType } from "@/types/flex";
@@ -15,40 +16,39 @@ export const createFlexFolder = async (
   department?: string
 ): Promise<FolderCreationResult> => {
   try {
-    const flexApiUrl = import.meta.env.VITE_FLEX_API_URL;
-    const flexAuthToken = import.meta.env.VITE_FLEX_AUTH_TOKEN;
-
-    if (!flexApiUrl || !flexAuthToken) {
-      console.error("Flex API URL or Auth Token not configured");
-      toast.error("Flex integration not properly configured.");
-      return { success: false, error: "Flex configuration missing" };
-    }
-
-    const createFolderUrl = `${flexApiUrl}/folder/create`;
-
-    const payload = {
-      name: folderName,
-      parent_id: import.meta.env.VITE_FLEX_PARENT_FOLDER_ID,
-    };
-
-    const response = await fetch(createFolderUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Auth-Token": flexAuthToken,
-      },
-      body: JSON.stringify(payload),
+    console.log("Creating Flex folder via secure edge function:", {
+      folderName,
+      folderType,
+      department
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Flex folder creation failed:", errorData);
-      toast.error(`Flex folder creation failed: ${errorData.message || response.statusText}`);
-      return { success: false, error: `Flex API Error: ${response.statusText}` };
+    // Use the secure edge function (same as tours system)
+    const { data, error } = await supabase.functions.invoke('secure-flex-api', {
+      body: {
+        endpoint: '/element',
+        method: 'POST',
+        payload: {
+          name: folderName,
+          // Using a hardcoded parent ID as this should be configured server-side
+          parent_id: "00000000-0000-0000-0000-000000000000" // This should be the actual parent folder ID
+        }
+      }
+    });
+
+    if (error) {
+      console.error("Secure Flex API error:", error);
+      toast.error(`Failed to create Flex folder: ${error.message}`);
+      return { success: false, error: error.message };
     }
 
-    const result = await response.json();
-    const folderId = result.id;
+    if (!data.success) {
+      console.error("Flex folder creation failed:", data.error);
+      toast.error(`Flex folder creation failed: ${data.error || 'Unknown error'}`);
+      return { success: false, error: data.error || 'Unknown error' };
+    }
+
+    const folderId = data.data.id;
+    console.log("Flex folder created successfully:", { folderId, folderName });
 
     // Store the folder ID in the database
     const { error: dbError } = await supabase
