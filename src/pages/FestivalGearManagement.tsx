@@ -6,9 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ArrowLeft, Plus, Copy, Save, Wrench, Printer, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/enhanced-supabase-client";
-import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
-import { ConnectionIndicator } from "@/components/ui/connection-indicator";
+import { supabase } from "@/lib/supabase";
 import { FestivalGearSetupForm } from "@/components/festival/FestivalGearSetupForm";
 import { FestivalGearSetup } from "@/types/festival";
 import { Input } from "@/components/ui/input";
@@ -16,9 +14,6 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { generateStageGearPDF } from "@/utils/gearSetupPdfExport";
-import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
-import { PrintOptions, PrintOptionsDialog } from "@/components/festival/pdf/PrintOptionsDialog";
-import { Badge } from "@/components/ui/badge";
 
 const FestivalGearManagement = () => {
   const { jobId } = useParams();
@@ -35,22 +30,6 @@ const FestivalGearManagement = () => {
   const [isCreateStageDialogOpen, setIsCreateStageDialogOpen] = useState(false);
   const [newStageName, setNewStageName] = useState("");
   const [isPrinting, setIsPrinting] = useState(false);
-  const [isPrintOptionsDialogOpen, setIsPrintOptionsDialogOpen] = useState(false);
-  const [stageSetups, setStageSetups] = useState<Record<number, boolean>>({});
-
-  // Use our new realtime subscription hook
-  useRealtimeSubscription([
-    {
-      table: "jobs",
-      filter: `id=eq.${jobId}`,
-      queryKey: ["job", jobId]
-    },
-    {
-      table: "festival_gear_setups",
-      filter: `job_id=eq.${jobId}`,
-      queryKey: ["festival-gear", jobId, selectedDate]
-    }
-  ]);
 
   useEffect(() => {
     if (!jobId) return;
@@ -133,52 +112,6 @@ const FestivalGearManagement = () => {
     }
   }, [jobId, selectedDate, toast]);
 
-  const fetchStageSetups = async () => {
-    if (!selectedDate || !jobId) return;
-    
-    try {
-      // First get the gear setup ID for the selected date
-      const { data: gearSetup, error: gearError } = await supabase
-        .from("festival_gear_setups")
-        .select("id")
-        .eq("job_id", jobId)
-        .eq("date", selectedDate)
-        .maybeSingle();
-        
-      if (gearError) {
-        console.error("Error fetching gear setup ID:", gearError);
-        return;
-      }
-      
-      if (!gearSetup) return;
-      
-      // Then fetch all stage setups for this gear setup
-      const { data: stageSetupData, error: stageError } = await supabase
-        .from("festival_stage_gear_setups")
-        .select("stage_number")
-        .eq("gear_setup_id", gearSetup.id);
-        
-      if (stageError) {
-        console.error("Error fetching stage setups:", stageError);
-        return;
-      }
-      
-      // Create a map of stage numbers to true (has custom setup)
-      const setupMap = stageSetupData.reduce((acc, item) => {
-        acc[item.stage_number] = true;
-        return acc;
-      }, {});
-      
-      setStageSetups(setupMap);
-    } catch (error) {
-      console.error("Error checking stage setups:", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchStageSetups();
-  }, [selectedDate, jobId]);
-
   const handleUpdateMaxStages = async (newMaxStages: number) => {
     try {
       setIsLoading(true);
@@ -189,8 +122,6 @@ const FestivalGearManagement = () => {
           job_id: jobId,
           date: selectedDate,
           max_stages: newMaxStages
-        }, {
-          onConflict: 'job_id,date'
         });
 
       if (error) throw error;
@@ -232,11 +163,7 @@ const FestivalGearManagement = () => {
     setIsPrinting(true);
     try {
       console.log(`Generating PDF for Stage ${selectedStage} on ${selectedDate}`);
-      const pdf = await generateStageGearPDF(
-        jobId, 
-        selectedStage, 
-        `Stage ${selectedStage}`
-      );
+      const pdf = await generateStageGearPDF(jobId, selectedDate, selectedStage);
       
       if (!pdf || pdf.size === 0) {
         throw new Error('Generated PDF is empty');
@@ -267,45 +194,6 @@ const FestivalGearManagement = () => {
     }
   };
 
-  const handlePrintAllDocumentation = async (options: PrintOptions, filename: string) => {
-    if (!jobId) return;
-    
-    setIsPrinting(true);
-    try {
-      console.log("Starting documentation print process with options:", options);
-      
-      const result = await generateAndMergeFestivalPDFs(jobId, jobTitle || 'Festival', options, filename);
-      
-      console.log(`Merged PDF created, size: ${result.blob.size} bytes`);
-      if (!result.blob || result.blob.size === 0) {
-        throw new Error('Generated PDF is empty');
-      }
-      
-      const url = URL.createObjectURL(result.blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = result.filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      toast({
-        title: "Success",
-        description: 'Documentation generated successfully'
-      });
-    } catch (error: any) {
-      console.error('Error generating documentation:', error);
-      toast({
-        title: "Error",
-        description: `Failed to generate documentation: ${error.message}`,
-        variant: "destructive"
-      });
-    } finally {
-      setIsPrinting(false);
-    }
-  };
-
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -317,12 +205,9 @@ const FestivalGearManagement = () => {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Festival Management
         </Button>
-        <div className="text-right flex flex-col items-end">
+        <div className="text-right">
           <h1 className="text-2xl font-bold">{jobTitle}</h1>
-          <div className="flex items-center gap-2">
-            <p className="text-muted-foreground">Gear Management</p>
-            <ConnectionIndicator variant="icon" />
-          </div>
+          <p className="text-muted-foreground">Gear Management</p>
         </div>
       </div>
 
@@ -374,20 +259,14 @@ const FestivalGearManagement = () => {
           <CardContent>
             <div className="flex flex-wrap gap-4">
               {stages.map((stage) => (
-                <div key={stage} className="relative">
-                  <Button
-                    variant={selectedStage === stage ? "default" : "outline"}
-                    onClick={() => setSelectedStage(stage)}
-                    className="px-6"
-                  >
-                    Stage {stage}
-                    {stageSetups[stage] && (
-                      <Badge variant="outline" className="ml-2 bg-blue-100">
-                        Custom
-                      </Badge>
-                    )}
-                  </Button>
-                </div>
+                <Button
+                  key={stage}
+                  variant={selectedStage === stage ? "default" : "outline"}
+                  onClick={() => setSelectedStage(stage)}
+                  className="px-6"
+                >
+                  Stage {stage}
+                </Button>
               ))}
             </div>
           </CardContent>
@@ -465,16 +344,6 @@ const FestivalGearManagement = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {isPrintOptionsDialogOpen && (
-        <PrintOptionsDialog
-          open={isPrintOptionsDialogOpen}
-          onOpenChange={setIsPrintOptionsDialogOpen}
-          onConfirm={handlePrintAllDocumentation}
-          maxStages={maxStages}
-          jobTitle={jobTitle}
-        />
-      )}
     </div>
   );
 };

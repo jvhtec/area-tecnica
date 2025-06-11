@@ -1,3 +1,4 @@
+
 import { format } from "date-fns";
 import {
   Table,
@@ -39,6 +40,7 @@ export const ShiftsTable = ({
       if (!jobId) return;
       
       try {
+        // Fetch job title
         const { data: jobData, error: jobError } = await supabase
           .from("jobs")
           .select("title")
@@ -51,6 +53,7 @@ export const ShiftsTable = ({
           setJobTitle(jobData.title);
         }
         
+        // Fetch logo
         const { data, error } = await supabase
           .from("festival_settings")
           .select("logo_url")
@@ -210,9 +213,7 @@ export const ShiftsTable = ({
                   <ul className="list-disc list-inside">
                     {shift.assignments.map((assignment) => (
                       <li key={assignment.id} className="text-sm">
-                        {assignment.external_technician_name || 
-                          (assignment.profiles && 
-                            `${assignment.profiles.first_name} ${assignment.profiles.last_name}`)} ({assignment.role})
+                        {assignment.profiles?.first_name} {assignment.profiles?.last_name} ({assignment.role})
                       </li>
                     ))}
                   </ul>

@@ -1,6 +1,6 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Edit2, Loader2, Mic, Headphones, FileText, Trash2, ChevronDown, ChevronUp, Printer, Link2, Clock, AlertTriangle } from "lucide-react";
+import { Edit2, Loader2, Mic, Headphones, FileText, Trash2, ChevronDown, ChevronUp, Printer, Link2, Clock } from "lucide-react";
 import { format, parseISO, isBefore, addDays, set } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
@@ -26,7 +26,6 @@ interface ArtistTableProps {
   searchTerm: string;
   stageFilter: string;
   equipmentFilter: string;
-  riderFilter?: string;
   dayStartTime?: string;
 }
 
@@ -58,7 +57,6 @@ export const ArtistTable = ({
   searchTerm,
   stageFilter,
   equipmentFilter,
-  riderFilter = "all",
   dayStartTime = "07:00"
 }: ArtistTableProps) => {
   const { toast } = useToast();
@@ -102,22 +100,6 @@ export const ArtistTable = ({
       console.error('Error formatting time:', error);
       return timeString;
     }
-  };
-
-  const getWirelessSummary = (artist: any) => {
-    const wirelessSystems = artist.wireless_systems || [];
-    return {
-      hh: wirelessSystems.reduce((sum: number, system: any) => sum + (system.quantity_hh || 0), 0),
-      bp: wirelessSystems.reduce((sum: number, system: any) => sum + (system.quantity_bp || 0), 0)
-    };
-  };
-
-  const getIEMSummary = (artist: any) => {
-    const iemSystems = artist.iem_systems || [];
-    return {
-      channels: iemSystems.reduce((sum: number, system: any) => sum + (system.quantity_hh || 0), 0),
-      bodypacks: iemSystems.reduce((sum: number, system: any) => sum + (system.quantity_bp || 0), 0)
-    };
   };
 
   useEffect(() => {
@@ -316,17 +298,15 @@ export const ArtistTable = ({
             providedBy: artist.mon_console_provided_by
           },
           wireless: {
-            systems: artist.wireless_systems,
-            providedBy: artist.wireless_provided_by,
             model: artist.wireless_model,
+            providedBy: artist.wireless_provided_by,
             handhelds: artist.wireless_quantity_hh,
             bodypacks: artist.wireless_quantity_bp,
             band: artist.wireless_band
           },
           iem: {
-            systems: artist.iem_systems,
-            providedBy: artist.iem_provided_by,
             model: artist.iem_model,
+            providedBy: artist.iem_provided_by,
             quantity: artist.iem_quantity,
             band: artist.iem_band
           },
@@ -432,15 +412,11 @@ export const ArtistTable = ({
     const matchesSearch = artist.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStage = !stageFilter || artist.stage?.toString() === stageFilter;
     const matchesEquipment = !equipmentFilter || (
-      (equipmentFilter === 'wireless' && getWirelessSummary(artist).hh + getWirelessSummary(artist).bp > 0) ||
-      (equipmentFilter === 'iem' && getIEMSummary(artist).channels + getIEMSummary(artist).bodypacks > 0) ||
+      (equipmentFilter === 'wireless' && (artist.wireless_quantity_hh > 0 || artist.wireless_quantity_bp > 0)) ||
+      (equipmentFilter === 'iem' && artist.iem_quantity > 0) ||
       (equipmentFilter === 'monitors' && artist.monitors_enabled)
     );
-    const matchesRider = !riderFilter || riderFilter === 'all' || (
-      (riderFilter === 'missing' && artist.rider_missing) ||
-      (riderFilter === 'complete' && !artist.rider_missing)
-    );
-    return matchesSearch && matchesStage && matchesEquipment && matchesRider;
+    return matchesSearch && matchesStage && matchesEquipment;
   });
 
   const sortedArtists = [...filteredArtists].sort((a, b) => {
@@ -465,7 +441,7 @@ export const ArtistTable = ({
     );
   }
 
-  if (!filteredArtists.length) {
+  if (!sortedArtists.length) {
     return (
       <div className="text-center p-4 text-muted-foreground">
         No artists found matching the current filters.
@@ -509,20 +485,18 @@ export const ArtistTable = ({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredArtists.map((artist) => {
+          {sortedArtists.map((artist) => {
             const issues = checkGearRequirements(artist);
             const hasIssues = Object.keys(issues).length > 0;
             const formStatus = formStatuses[artist.id];
-            const isAfterMidnight = artist.isaftermidnight;
-            const hasRiderMissing = artist.rider_missing;
+            const isAfterMidnight = artist.isAfterMidnight;
             
             return (
               <>
                 <TableRow key={artist.id} className={cn(
                   expandedRows.includes(artist.id) && "bg-muted/50",
                   hasIssues && "bg-red-50/50 dark:bg-red-950/20",
-                  isAfterMidnight && "bg-blue-50/30 dark:bg-blue-950/20",
-                  hasRiderMissing && "border-l-4 border-l-red-500"
+                  isAfterMidnight && "bg-blue-50/30 dark:bg-blue-950/20"
                 )}>
                   <TableCell>
                     <Button
@@ -538,36 +512,19 @@ export const ArtistTable = ({
                     </Button>
                   </TableCell>
                   <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      {artist.name}
-                      {hasRiderMissing && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Badge variant="destructive" className="text-xs">
-                                <AlertTriangle className="h-3 w-3 mr-1" />
-                                Rider Missing
-                              </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Technical rider is missing for this artist</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                      {isAfterMidnight && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Badge className="ml-2 bg-blue-500 hover:bg-blue-600">AM</Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>After midnight performance (early morning)</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                    </div>
+                    {artist.name}
+                    {isAfterMidnight && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge className="ml-2 bg-blue-500 hover:bg-blue-600">AM</Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>After midnight performance (early morning)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
                   </TableCell>
                   <TableCell>{artist.stage}</TableCell>
                   <TableCell>
@@ -605,24 +562,22 @@ export const ArtistTable = ({
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-2">
-                      {(getWirelessSummary(artist).hh > 0 || getWirelessSummary(artist).bp > 0) && (
+                      {(artist.wireless_quantity_hh > 0 || artist.wireless_quantity_bp > 0) && (
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1" title="Wireless Mics">
                             <Mic className="h-4 w-4" />
                             <span className="text-xs">
-                              HH: {getWirelessSummary(artist).hh} / BP: {getWirelessSummary(artist).bp}
+                              HH: {artist.wireless_quantity_hh} / BP: {artist.wireless_quantity_bp}
                             </span>
                           </div>
                           {renderProviderBadge(artist.wireless_provided_by)}
                         </div>
                       )}
-                      {(getIEMSummary(artist).channels > 0 || getIEMSummary(artist).bodypacks > 0) && (
+                      {artist.iem_quantity > 0 && (
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1" title="IEM Systems">
                             <Headphones className="h-4 w-4" />
-                            <span className="text-xs">
-                              CH: {getIEMSummary(artist).channels} / BP: {getIEMSummary(artist).bodypacks}
-                            </span>
+                            <span className="text-xs">{artist.iem_quantity}</span>
                           </div>
                           {renderProviderBadge(artist.iem_provided_by)}
                         </div>
@@ -698,18 +653,6 @@ export const ArtistTable = ({
                   <TableRow>
                     <TableCell colSpan={9} className="bg-muted/50">
                       <div className="p-4 space-y-4">
-                        {hasRiderMissing && (
-                          <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-md p-3">
-                            <div className="flex items-center text-red-800 dark:text-red-200">
-                              <AlertTriangle className="h-4 w-4 mr-2" />
-                              <span className="font-medium">Rider Missing</span>
-                            </div>
-                            <p className="text-sm text-red-700 dark:text-red-300 mt-1">
-                              This artist's technical rider is missing. Please follow up to obtain the rider document.
-                            </p>
-                          </div>
-                        )}
-                        
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <h4 className="font-medium mb-2">Infrastructure</h4>

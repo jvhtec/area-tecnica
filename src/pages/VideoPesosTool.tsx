@@ -1,19 +1,14 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { FileText, ArrowLeft } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
-import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
-import { Badge } from '@/components/ui/badge';
+import { useNavigate } from 'react-router-dom';
 
 const videoComponentDatabase = [
   { id: 1, name: 'Pantalla Central', weight: 32 },
@@ -21,9 +16,6 @@ const videoComponentDatabase = [
   { id: 3, name: 'IMAGE Right', weight: 32 },
   { id: 4, name: 'LED Screen', weight: 32 }
 ];
-
-// Global counter for generating VX numbers
-let videoTableCounter = 0;
 
 interface TableRow {
   quantity: string;
@@ -37,58 +29,26 @@ interface Table {
   name: string;
   rows: TableRow[];
   totalWeight?: number;
-  id?: number | string;
+  id?: number;
   dualMotors?: boolean;
-  isDefault?: boolean;
-  riggingPoints?: string; // Stores the generated VX suffix(es)
-  clusterId?: string;     // New property to group tables (e.g. mirrored pair)
 }
 
 const VideoPesosTool: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
-  const [searchParams] = useSearchParams();
-  
-  // Tour override mode detection
-  const tourId = searchParams.get('tourId');
-  const tourDateId = searchParams.get('tourDateId');
-  
-  const { 
-    isOverrideMode, 
-    overrideData, 
-    isLoading: overrideLoading,
-    saveOverride 
-  } = useTourOverrideMode(tourId || undefined, tourDateId || undefined, 'video');
+  const department = 'video';
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [tableName, setTableName] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
-  const [defaultTables, setDefaultTables] = useState<Table[]>([]);
   const [useDualMotors, setUseDualMotors] = useState(false);
-  const [mirroredCluster, setMirroredCluster] = useState(false);
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
     rows: [{ quantity: '', componentId: '', weight: '' }],
   });
-
-  // Helper to generate a VX suffix for video department
-  // Returns a string such as "VX01" or "VX01, VX02" depending on useDualMotors
-  const getSuffix = () => {
-    if (useDualMotors) {
-      videoTableCounter++;
-      const num1 = videoTableCounter.toString().padStart(2, '0');
-      videoTableCounter++;
-      const num2 = videoTableCounter.toString().padStart(2, '0');
-      return `VX${num1}, VX${num2}`;
-    } else {
-      videoTableCounter++;
-      const num = videoTableCounter.toString().padStart(2, '0');
-      return `VX${num}`;
-    }
-  };
 
   const addRow = () => {
     setCurrentTable((prev) => ({
@@ -124,41 +84,6 @@ const VideoPesosTool: React.FC = () => {
     setSelectedJob(job);
   };
 
-  const saveWeightTable = async (table: Table) => {
-    if (isOverrideMode && overrideData) {
-      // Save as override for tour date with all metadata
-      const overrideSuccess = await saveOverride('weight', {
-        item_name: table.name,
-        weight_kg: table.totalWeight || 0,
-        quantity: 1,
-        category: 'video',
-        override_data: {
-          rows: table.rows,
-          dualMotors: table.dualMotors,
-          riggingPoints: table.riggingPoints,
-          clusterId: table.clusterId,
-          toolType: 'pesos'
-        }
-      });
-
-      if (overrideSuccess) {
-        toast({
-          title: "Success",
-          description: "Weight override saved for tour date",
-        });
-      }
-      return;
-    }
-
-    // For regular job mode, we don't have a weight table to save to, so just show success
-    if (selectedJobId) {
-      toast({
-        title: "Success",
-        description: "Weight table created successfully",
-      });
-    }
-  };
-
   const generateTable = () => {
     if (!tableName) {
       toast({
@@ -184,58 +109,15 @@ const VideoPesosTool: React.FC = () => {
 
     const totalWeight = calculatedRows.reduce((sum, row) => sum + (row.totalWeight || 0), 0);
 
-    // For grouping, assign a new clusterId for this generation
-    const newClusterId = Date.now().toString();
+    const newTable: Table = {
+      name: tableName,
+      rows: calculatedRows,
+      totalWeight,
+      id: Date.now(),
+      dualMotors: useDualMotors,
+    };
 
-    if (mirroredCluster) {
-      // For mirrored clusters, generate two tables sharing the same clusterId
-      const leftSuffix = getSuffix();
-      const rightSuffix = getSuffix();
-
-      const leftTable: Table = {
-        name: `${tableName} L (${leftSuffix})`,
-        riggingPoints: leftSuffix,
-        rows: calculatedRows,
-        totalWeight,
-        id: Date.now(),
-        dualMotors: useDualMotors,
-        clusterId: newClusterId,
-      };
-
-      const rightTable: Table = {
-        name: `${tableName} R (${rightSuffix})`,
-        riggingPoints: rightSuffix,
-        rows: calculatedRows,
-        totalWeight,
-        id: Date.now() + 1,
-        dualMotors: useDualMotors,
-        clusterId: newClusterId,
-      };
-
-      setTables((prev) => [...prev, leftTable, rightTable]);
-      
-      // Save both tables
-      saveWeightTable(leftTable);
-      saveWeightTable(rightTable);
-    } else {
-      // Single table: assign the newClusterId to it and generate suffix
-      const suffix = getSuffix();
-      const newTable: Table = {
-        name: `${tableName} (${suffix})`,
-        riggingPoints: suffix,
-        rows: calculatedRows,
-        totalWeight,
-        id: Date.now(),
-        dualMotors: useDualMotors,
-        clusterId: newClusterId,
-      };
-
-      setTables((prev) => [...prev, newTable]);
-      
-      // Save to override or job context
-      saveWeightTable(newTable);
-    }
-    
+    setTables((prev) => [...prev, newTable]);
     resetCurrentTable();
   };
 
@@ -245,60 +127,32 @@ const VideoPesosTool: React.FC = () => {
       rows: [{ quantity: '', componentId: '', weight: '' }],
     });
     setTableName('');
-    setUseDualMotors(false);
-    setMirroredCluster(false);
   };
 
-  const removeTable = (tableId: number | string) => {
-    // Only allow removal of regular tables (numeric IDs), not default tables
-    if (typeof tableId === 'number') {
-      setTables((prev) => prev.filter((table) => table.id !== tableId));
-    }
+  const removeTable = (tableId: number) => {
+    setTables((prev) => prev.filter((table) => table.id !== tableId));
   };
 
   const handleExportPDF = async () => {
-    const jobToUse = isOverrideMode && overrideData 
-      ? { id: 'override', title: `${overrideData.tourName} - ${overrideData.locationName}` }
-      : selectedJob;
-
-    if (!jobToUse) {
+    if (!selectedJobId || !selectedJob) {
       toast({
-        title: isOverrideMode ? 'No tour data' : 'No job selected',
-        description: isOverrideMode ? 'Tour data not loaded' : 'Please select a job before exporting.',
+        title: 'No job selected',
+        description: 'Please select a job before exporting.',
         variant: 'destructive',
       });
       return;
     }
 
     try {
-      // Combine defaults and current tables for export
-      const allTables = isOverrideMode 
-        ? [...defaultTables, ...tables]
-        : tables;
-
-      let logoUrl: string | undefined = undefined;
-      try {
-        if (isOverrideMode && tourId) {
-          const { fetchTourLogo } = await import('@/utils/pdf/logoUtils');
-          logoUrl = await fetchTourLogo(tourId);
-        }
-      } catch (logoError) {
-        console.error("Error fetching logo:", logoError);
-      }
-
       const pdfBlob = await exportToPDF(
-        jobToUse.title,
-        allTables.map((table) => ({ ...table, toolType: 'pesos' })),
+        selectedJob.title,
+        tables.map((table) => ({ ...table, toolType: 'pesos' })),
         'weight',
-        jobToUse.title,
-        new Date().toISOString(),
-        undefined,
-        undefined,
-        0,
-        logoUrl
+        selectedJob.title,
+        new Date().toISOString(), // Add job date
       );
 
-      const fileName = `Video Weight Report - ${jobToUse.title}.pdf`;
+      const fileName = `Video Weight Report - ${selectedJob.title}.pdf`;
       const url = window.URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -322,33 +176,6 @@ const VideoPesosTool: React.FC = () => {
     }
   };
 
-  // Load defaults when in override mode
-  useEffect(() => {
-    if (isOverrideMode && overrideData) {
-      const weightDefaults = overrideData.defaults
-        .filter(table => table.table_type === 'weight')
-        .map(table => ({
-          name: `${table.table_name} (Default)`,
-          rows: table.table_data.rows || [],
-          totalWeight: table.total_value,
-          id: `default-${table.id}`,
-          isDefault: true
-        }));
-      
-      setDefaultTables(weightDefaults);
-    }
-  }, [isOverrideMode, overrideData]);
-
-  if (overrideLoading) {
-    return (
-      <Card className="w-full max-w-4xl mx-auto my-6">
-        <CardContent className="pt-6">
-          <p>Loading tour override data...</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <Card className="w-full max-w-4xl mx-auto my-6">
       <CardHeader className="space-y-1">
@@ -356,46 +183,11 @@ const VideoPesosTool: React.FC = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate('/video')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <CardTitle className="text-2xl font-bold">
-            {isOverrideMode ? 'Override Mode - ' : ''}Video Weight Calculator
-          </CardTitle>
+          <CardTitle className="text-2xl font-bold">Video Weight Calculator</CardTitle>
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {isOverrideMode && overrideData && (
-            <TourOverrideModeHeader
-              tourName={overrideData.tourName}
-              tourDate={overrideData.tourDate}
-              locationName={overrideData.locationName}
-              defaultsCount={defaultTables.length}
-              overridesCount={tables.length}
-              department="video"
-            />
-          )}
-
-          {/* Show defaults section when in override mode */}
-          {isOverrideMode && defaultTables.length > 0 && (
-            <div className="border rounded-lg p-4 bg-green-50">
-              <h3 className="font-semibold mb-3 text-green-800">Tour Defaults (Read-Only)</h3>
-              {defaultTables.map((table) => (
-                <div key={table.id} className="border rounded-lg overflow-hidden mt-4 bg-white">
-                  <div className="bg-green-100 px-4 py-3 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-semibold">{table.name}</h4>
-                      <Badge variant="outline" className="bg-green-50 text-green-700">Default</Badge>
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <div className="text-sm">
-                      <span className="font-medium">Total Weight:</span> {table.totalWeight?.toFixed(2)} kg
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
           <div className="space-y-2">
             <Label htmlFor="jobSelect">Select Job</Label>
             <Select value={selectedJobId} onValueChange={handleJobSelect}>
@@ -420,28 +212,6 @@ const VideoPesosTool: React.FC = () => {
               onChange={(e) => setTableName(e.target.value)}
               placeholder="Enter table name"
             />
-            
-            {/* Add configuration checkboxes */}
-            <div className="flex items-center space-x-2 mt-2">
-              <Checkbox
-                id="dualMotors"
-                checked={useDualMotors}
-                onCheckedChange={(checked) => setUseDualMotors(checked as boolean)}
-              />
-              <Label htmlFor="dualMotors" className="text-sm font-medium">
-                Dual Motors Configuration
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2 mt-2">
-              <Checkbox
-                id="mirroredCluster"
-                checked={mirroredCluster}
-                onCheckedChange={(checked) => setMirroredCluster(checked as boolean)}
-              />
-              <Label htmlFor="mirroredCluster" className="text-sm font-medium">
-                Mirrored Cluster
-              </Label>
-            </div>
           </div>
 
           <div className="border rounded-lg overflow-hidden">
@@ -510,23 +280,15 @@ const VideoPesosTool: React.FC = () => {
           {tables.map((table) => (
             <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold">{table.name}</h3>
-                  {isOverrideMode && (
-                    <Badge variant="outline" className="bg-orange-50 text-orange-700">Override</Badge>
-                  )}
-                </div>
-                {typeof table.id === 'number' && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => removeTable(table.id as number)}
-                  >
-                    Remove Table
-                  </Button>
-                )}
+                <h3 className="font-semibold">{table.name}</h3>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => table.id && removeTable(table.id)}
+                >
+                  Remove Table
+                </Button>
               </div>
-              
               <table className="w-full">
                 <thead className="bg-muted/50">
                   <tr>
@@ -553,20 +315,6 @@ const VideoPesosTool: React.FC = () => {
                   </tr>
                 </tbody>
               </table>
-              
-              {/* Show dual motors indicator */}
-              {table.dualMotors && (
-                <div className="px-4 py-2 text-sm text-gray-500 bg-muted/30 italic">
-                  *This configuration uses dual motors. Load is distributed between two motors for safety and redundancy.
-                </div>
-              )}
-              
-              {/* Show rigging points */}
-              {table.riggingPoints && (
-                <div className="px-4 py-2 text-sm text-blue-600 bg-blue-50 border-t">
-                  <strong>Rigging Points:</strong> {table.riggingPoints}
-                </div>
-              )}
             </div>
           ))}
         </div>

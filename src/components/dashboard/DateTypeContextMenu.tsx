@@ -1,13 +1,12 @@
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
-import { Plane, Wrench, Star, Moon, Mic, ExternalLink, Loader2 } from "lucide-react";
+import { Plane, Wrench, Star, Moon, Mic } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { format, startOfDay } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
-import { useTableSubscription } from "@/hooks/useTableSubscription";
-import { useFlexUuidLazy } from "@/hooks/useFlexUuidLazy";
+import { useTableSubscription } from "@/hooks/useSubscription";
 
 interface DateTypeContextMenuProps {
   children: React.ReactNode;
@@ -18,16 +17,17 @@ interface DateTypeContextMenuProps {
 
 export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: DateTypeContextMenuProps) => {
   const queryClient = useQueryClient();
-  const { uuid: flexUuid, isLoading: isLoadingFlexUuid, error: flexError, hasChecked, fetchFlexUuid } = useFlexUuidLazy();
 
-  // Use the improved subscription hook with correct parameters
-  useTableSubscription('job_date_types', ['job-date-types', jobId]);
+  // Use the improved subscription hook
+  useTableSubscription('job_date_types', ['job-date-types', jobId], {
+    filter: `job_id=eq.${jobId}`
+  });
 
   const handleSetDateType = async (type: 'travel' | 'setup' | 'show' | 'off' | 'rehearsal') => {
     try {
       const localDate = startOfDay(date);
       const formattedDate = format(localDate, 'yyyy-MM-dd');
-
+      
       console.log('Setting date type:', {
         type,
         jobId,
@@ -41,7 +41,7 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         const key = `${jobId}-${formattedDate}`;
         return { ...old, [key]: { type, job_id: jobId, date: formattedDate } };
       });
-
+      
       const { error } = await supabase
         .from('job_date_types')
         .upsert({
@@ -53,74 +53,20 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         });
 
       if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: `Date type set to ${type}`,
-      });
+      
+      toast.success(`Date type set to ${type}`);
       onTypeChange();
     } catch (error: any) {
       console.error('Error setting date type:', error);
-      toast({
-        title: "Error",
-        description: "Failed to set date type",
-        variant: "destructive",
-      });
+      toast.error('Failed to set date type');
+      // Invalidate the query to revert to the correct state
       queryClient.invalidateQueries({ queryKey: ['job-date-types', jobId] });
     }
   };
 
-  const handleFlexClick = async () => {
-    // If we haven't checked yet, fetch the UUID first
-    if (!hasChecked) {
-      await fetchFlexUuid(jobId);
-      return;
-    }
-
-    if (isLoadingFlexUuid) {
-      toast({
-        title: "Loading",
-        description: "Please wait while we load the Flex folder...",
-      });
-      return;
-    }
-
-    if (flexUuid) {
-      const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
-      window.open(flexUrl, '_blank', 'noopener');
-    } else if (flexError) {
-      toast({
-        title: "Error",
-        description: flexError,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Info",
-        description: "Flex folder not available for this job",
-      });
-    }
-  };
-
-  const getFlexMenuText = () => {
-    if (!hasChecked) return "Check Flex";
-    if (isLoadingFlexUuid) return "Loading Flex...";
-    if (flexUuid) return "Open Flex";
-    return "Flex";
-  };
-
-  const getFlexIcon = () => {
-    if (isLoadingFlexUuid) {
-      return <Loader2 className="h-4 w-4 animate-spin" />;
-    }
-    return <ExternalLink className="h-4 w-4" />;
-  };
-
   return (
     <ContextMenu>
-      <ContextMenuTrigger>
-        {children}
-      </ContextMenuTrigger>
+      <ContextMenuTrigger>{children}</ContextMenuTrigger>
       <ContextMenuContent className="w-48">
         <ContextMenuItem onClick={() => handleSetDateType('travel')} className="flex items-center gap-2">
           <Plane className="h-4 w-4" /> Travel
@@ -137,16 +83,6 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         <ContextMenuItem onClick={() => handleSetDateType('off')} className="flex items-center gap-2">
           <Moon className="h-4 w-4" /> Off
         </ContextMenuItem>
-        {jobId && (
-          <ContextMenuItem 
-            onClick={handleFlexClick} 
-            className="flex items-center gap-2"
-            disabled={isLoadingFlexUuid}
-          >
-            {getFlexIcon()}
-            {getFlexMenuText()}
-          </ContextMenuItem>
-        )}
       </ContextMenuContent>
     </ContextMenu>
   );

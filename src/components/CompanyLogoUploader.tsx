@@ -2,10 +2,11 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { Upload, Image as ImageIcon } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 
 export const CompanyLogoUploader = () => {
+  const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
 
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -13,8 +14,10 @@ export const CompanyLogoUploader = () => {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      toast.error("Invalid file type", {
-        description: "Please upload an image file"
+      toast({
+        title: "Invalid file type",
+        description: "Please upload an image file",
+        variant: "destructive",
       });
       return;
     }
@@ -29,13 +32,16 @@ export const CompanyLogoUploader = () => {
 
       if (uploadError) throw uploadError;
 
-      toast.success("Success", {
-        description: "Company logo has been uploaded"
+      toast({
+        title: "Success",
+        description: "Company logo has been uploaded",
       });
     } catch (error: any) {
       console.error('Error uploading logo:', error);
-      toast.error("Error", {
-        description: "Could not upload logo"
+      toast({
+        title: "Error",
+        description: "Could not upload logo",
+        variant: "destructive",
       });
     } finally {
       setIsUploading(false);

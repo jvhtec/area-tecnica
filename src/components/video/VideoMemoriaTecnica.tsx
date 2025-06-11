@@ -7,9 +7,6 @@ import { Upload, File, FilePlus, FileCheck, Loader2, Image as ImageIcon, Downloa
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { Progress } from "@/components/ui/progress";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useLogoOptions, LogoOption } from "@/hooks/useLogoOptions";
 
 interface PDFFile {
   file: File;
@@ -30,11 +27,6 @@ export const VideoMemoriaTecnica = () => {
   const [progress, setProgress] = useState(0);
   const [logo, setLogo] = useState<{ file: File; url: string } | null>(null);
   const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
-  const [logoSource, setLogoSource] = useState<"upload" | "existing">("upload");
-  const [selectedLogoOption, setSelectedLogoOption] = useState<string | null>(null);
-  
-  // Fetch logo options
-  const { logoOptions, isLoading: isLoadingLogos } = useLogoOptions();
   
   const [documents, setDocuments] = useState<DocumentSection[]>([
     { id: "material", title: "Listado de Material", file: null, landscape: false },
@@ -56,8 +48,6 @@ export const VideoMemoriaTecnica = () => {
     try {
       const url = URL.createObjectURL(file);
       setLogo({ file, url });
-      // When a new logo is uploaded, switch to upload mode
-      setLogoSource("upload");
     } catch (error) {
       console.error("Error handling logo:", error);
       toast({
@@ -66,29 +56,6 @@ export const VideoMemoriaTecnica = () => {
         variant: "destructive",
       });
     }
-  };
-
-  const handleLogoOptionSelect = (value: string) => {
-    setSelectedLogoOption(value);
-    
-    // Find the selected logo option
-    const selectedLogo = logoOptions.find(option => option.value === value);
-    
-    if (selectedLogo) {
-      // Clear any uploaded logo since we're using an existing one
-      setLogo(null);
-    }
-  };
-
-  // Function to determine which logo URL to use
-  const getLogoUrlForGeneration = (): string | null => {
-    if (logoSource === "upload" && logo) {
-      return null; // Will be uploaded in the generateMemoriaTecnica function
-    } else if (logoSource === "existing" && selectedLogoOption) {
-      const selectedLogo = logoOptions.find(option => option.value === selectedLogoOption);
-      return selectedLogo?.url || null;
-    }
-    return null;
   };
 
   const handleFileUpload = async (file: File, sectionId: string) => {
@@ -158,9 +125,7 @@ export const VideoMemoriaTecnica = () => {
 
     try {
       let logoUrl = null;
-      
-      // Handle logo based on source
-      if (logoSource === "upload" && logo) {
+      if (logo) {
         try {
           const logoPath = `${projectName}/logo_${Date.now()}.${logo.file.name.split('.').pop()}`;
           logoUrl = await uploadToStorage(logo.file, logoPath);
@@ -172,11 +137,6 @@ export const VideoMemoriaTecnica = () => {
             description: "No se pudo subir el logo, continuando sin él",
           });
         }
-      } else if (logoSource === "existing" && selectedLogoOption) {
-        // Use the existing logo URL directly
-        const selectedLogo = logoOptions.find(option => option.value === selectedLogoOption);
-        logoUrl = selectedLogo?.url || null;
-        setProgress(10);
       }
 
       const documentUrls: Record<string, string> = {};
@@ -270,109 +230,47 @@ export const VideoMemoriaTecnica = () => {
             </div>
 
             <div className="space-y-2">
-              <Label>Logo</Label>
-              
-              <RadioGroup 
-                value={logoSource} 
-                onValueChange={(value) => setLogoSource(value as "upload" | "existing")} 
-                className="flex items-center space-x-6 mb-2"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="upload" id="r-upload" />
-                  <Label htmlFor="r-upload">Subir nuevo logo</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="existing" id="r-existing" />
-                  <Label htmlFor="r-existing">Usar logo existente</Label>
-                </div>
-              </RadioGroup>
-
-              {logoSource === "upload" ? (
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    id="logo-upload"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleLogoUpload(file);
-                    }}
-                  />
+              <Label>Logo (opcional)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  id="logo-upload"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleLogoUpload(file);
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  asChild
+                  className="w-full"
+                >
+                  <label htmlFor="logo-upload" className="cursor-pointer flex items-center justify-center gap-2">
+                    {logo ? (
+                      <>
+                        <FileCheck className="h-4 w-4" />
+                        Logo cargado
+                      </>
+                    ) : (
+                      <>
+                        <ImageIcon className="h-4 w-4" />
+                        Subir logo
+                      </>
+                    )}
+                  </label>
+                </Button>
+                {logo && (
                   <Button
-                    variant="outline"
-                    asChild
-                    className="w-full"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => window.open(logo.url, '_blank')}
                   >
-                    <label htmlFor="logo-upload" className="cursor-pointer flex items-center justify-center gap-2">
-                      {logo ? (
-                        <>
-                          <FileCheck className="h-4 w-4" />
-                          Logo cargado
-                        </>
-                      ) : (
-                        <>
-                          <ImageIcon className="h-4 w-4" />
-                          Subir logo
-                        </>
-                      )}
-                    </label>
+                    <ImageIcon className="h-4 w-4" />
                   </Button>
-                  {logo && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => window.open(logo.url, '_blank')}
-                    >
-                      <ImageIcon className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Select
-                    value={selectedLogoOption || ""}
-                    onValueChange={handleLogoOptionSelect}
-                    disabled={isLoadingLogos}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecciona un logo existente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {isLoadingLogos ? (
-                        <SelectItem value="loading" disabled>
-                          <Loader2 className="h-4 w-4 animate-spin mr-2 inline" />
-                          Cargando logos...
-                        </SelectItem>
-                      ) : logoOptions.length > 0 ? (
-                        logoOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="none" disabled>
-                          No hay logos disponibles
-                        </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-
-                  {selectedLogoOption && (
-                    <div className="flex justify-center p-2 bg-muted rounded-md">
-                      <img 
-                        src={logoOptions.find(opt => opt.value === selectedLogoOption)?.url || ''} 
-                        alt="Selected logo preview" 
-                        className="h-16 object-contain"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
-                          console.error('Error loading logo preview');
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             <div className="space-y-4">

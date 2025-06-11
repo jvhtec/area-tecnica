@@ -1,4 +1,3 @@
-
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -11,14 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Department } from "@/types/department";
 import { JobType } from "@/types/job";
 import { SimplifiedJobColorPicker } from "./SimplifiedJobColorPicker";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
-import { localInputToUTC } from "@/utils/timezoneUtils";
 
-// Simplified schema for better performance
+// Schema for validation
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
@@ -28,7 +26,6 @@ const formSchema = z.object({
   job_type: z.enum(["single", "tour", "festival", "dryhire", "tourdate"] as const),
   departments: z.array(z.string()).min(1, "At least one department is required"),
   color: z.string().min(1, "Color is required"),
-  timezone: z.string().min(1, "Timezone is required"),
 }).refine((data) => {
   const start = new Date(data.start_time);
   const end = new Date(data.end_time);
@@ -68,27 +65,18 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
       job_type: "single" as JobType,
       departments: currentDepartment ? [currentDepartment] : [],
       color: "#7E69AB",
-      timezone: "Europe/Madrid",
     },
   });
 
-  const onSubmit = useCallback(async (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
 
     try {
-      console.log("CreateJobDialog: Starting job creation process");
-      
-      // Start location resolution and time conversion in parallel
-      const [locationId, startTimeUTC, endTimeUTC] = await Promise.all([
-        getOrCreateLocation(values.location_id),
-        Promise.resolve(localInputToUTC(values.start_time, values.timezone)),
-        Promise.resolve(localInputToUTC(values.end_time, values.timezone))
-      ]);
+      // Get or create location
+      const locationId = await getOrCreateLocation(values.location_id);
 
-      console.log("CreateJobDialog: Location resolved and times converted");
-
-      // Create job and departments in a single transaction-like approach
+      // Insert the job
       const { data: job, error: jobError } = await supabase
         .from("jobs")
         .insert([
@@ -96,24 +84,18 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
             title: values.title,
             description: values.description,
             location_id: locationId,
-            start_time: startTimeUTC.toISOString(),
-            end_time: endTimeUTC.toISOString(),
+            start_time: new Date(values.start_time).toISOString(),
+            end_time: new Date(values.end_time).toISOString(),
             job_type: values.job_type,
             color: values.color,
-            timezone: values.timezone,
           },
         ])
         .select()
         .single();
 
-      if (jobError) {
-        console.error("CreateJobDialog: Job creation error:", jobError);
-        throw jobError;
-      }
+      if (jobError) throw jobError;
 
-      console.log("CreateJobDialog: Job created successfully:", job.id);
-
-      // Insert departments in batch
+      // Insert job departments
       const departmentInserts = values.departments.map((department) => ({
         job_id: job.id,
         department,
@@ -123,18 +105,10 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
         .from("job_departments")
         .insert(departmentInserts);
 
-      if (deptError) {
-        console.error("CreateJobDialog: Department insertion error:", deptError);
-        throw deptError;
-      }
+      if (deptError) throw deptError;
 
-      console.log("CreateJobDialog: Departments added successfully");
-
-      // Optimistically update the cache instead of invalidating
-      queryClient.setQueryData(["jobs"], (oldData: any) => {
-        if (!oldData) return oldData;
-        return [...oldData, { ...job, job_departments: departmentInserts }];
-      });
+      // Refresh job list
+      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
 
       toast({
         title: "Success",
@@ -144,7 +118,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
       reset();
       onOpenChange(false);
     } catch (error) {
-      console.error("CreateJobDialog: Error creating job:", error);
+      console.error("Error creating job:", error);
       toast({
         title: "Error",
         description: "Failed to create job",
@@ -153,17 +127,17 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, getOrCreateLocation, queryClient, toast, reset, onOpenChange]);
+  };
 
   const departments: Department[] = ["sound", "lights", "video"];
   const selectedDepartments = watch("departments") || [];
 
-  const toggleDepartment = useCallback((department: Department) => {
+  const toggleDepartment = (department: Department) => {
     const updatedDepartments = selectedDepartments.includes(department)
       ? selectedDepartments.filter((d) => d !== department)
       : [...selectedDepartments, department];
     setValue("departments", updatedDepartments);
-  }, [selectedDepartments, setValue]);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -191,30 +165,6 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
             {errors.location_id && (
               <p className="text-sm text-destructive">
                 {errors.location_id.message as string}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label>Timezone</Label>
-            <Select
-              onValueChange={(value) => setValue("timezone", value)}
-              defaultValue={watch("timezone")}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select timezone" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Europe/Madrid">Europe/Madrid</SelectItem>
-                <SelectItem value="Europe/London">Europe/London</SelectItem>
-                <SelectItem value="Europe/Paris">Europe/Paris</SelectItem>
-                <SelectItem value="America/New_York">America/New_York</SelectItem>
-                <SelectItem value="America/Los_Angeles">America/Los_Angeles</SelectItem>
-              </SelectContent>
-            </Select>
-            {errors.timezone && (
-              <p className="text-sm text-destructive">
-                {errors.timezone.message as string}
               </p>
             )}
           </div>

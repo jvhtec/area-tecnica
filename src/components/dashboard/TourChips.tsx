@@ -6,10 +6,9 @@ import { useState } from "react";
 import { TourDateManagementDialog } from "../tours/TourDateManagementDialog";
 import { TourCard } from "../tours/TourCard";
 import CreateTourDialog from "../tours/CreateTourDialog";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { exportTourPDF } from "@/lib/tourPdfExport";
-import { BulkTourFolderActions } from "../tours/BulkTourFolderActions";
-import { useTourSubscription } from "@/hooks/useTourSubscription";
+import { format } from "date-fns";
 
 interface TourChipsProps {
   onTourClick: (tourId: string) => void;
@@ -19,11 +18,9 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
   const [selectedTourId, setSelectedTourId] = useState<string | null>(null);
   const [isDatesDialogOpen, setIsDatesDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const { toast } = useToast();
 
-  // Set up realtime subscription for tours
-  useTourSubscription();
-
-  const { data: tours = [], refetch: refetchTours } = useQuery({
+  const { data: tours = [] } = useQuery({
     queryKey: ["tours"],
     queryFn: async () => {
       console.log("Fetching tours...");
@@ -37,7 +34,6 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
           end_date,
           color,
           flex_folders_created,
-          flex_main_folder_id,
           tour_dates (
             id,
             date,
@@ -70,23 +66,56 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
         toast({
           title: "Error",
           description: "No tour dates available to print",
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
 
-      await exportTourPDF(tour);
+      // Sort tour dates chronologically before mapping
+      const rows = [...tour.tour_dates]
+        .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .map((td: any) => ({
+          date: format(new Date(td.date), 'dd/MM/yyyy'),
+          location: td.location?.name || "TBD",
+        }));
+
+      const start = tour.start_date ? format(new Date(tour.start_date), 'dd/MM/yyyy') : "TBD";
+      const end = tour.end_date ? format(new Date(tour.end_date), 'dd/MM/yyyy') : "TBD";
+      const dateSpan = `${start} - ${end}`;
+
+      console.log("Generating PDF with:", {
+        tourName: tour.name,
+        dateSpan,
+        rows: rows
+      });
+
+      const pdfBlob = await exportTourPDF(
+        tour.name,
+        dateSpan,
+        rows
+      );
+      
+      console.log("PDF generated successfully, creating download URL");
+      const url = URL.createObjectURL(pdfBlob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${tour.name} - Schedule.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
 
       toast({
         title: "Success",
-        description: "Tour schedule exported successfully"
+        description: "Tour schedule exported successfully",
       });
     } catch (error: any) {
       console.error("Error exporting PDF:", error);
       toast({
         title: "Error",
         description: "Failed to export PDF: " + (error.message || "Unknown error"),
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -112,11 +141,6 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
         </Button>
       </div>
 
-      <BulkTourFolderActions 
-        tours={tours} 
-        onRefresh={() => refetchTours()} 
-      />
-
       <div className="flex flex-wrap gap-4">
         {tours.map((tour: any) => (
           <div
@@ -125,6 +149,7 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
           >
             <TourCard
               tour={tour}
+              onTourClick={() => onTourClick(tour.id)}
               onManageDates={() => handleManageDates(tour.id)}
               onPrint={() => handlePrint(tour)}
             />

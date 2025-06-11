@@ -24,24 +24,5 @@ export const IEM_SYSTEMS = [
   'Other'
 ] as const;
 
-export type WirelessSystemModel = typeof WIRELESS_SYSTEMS[number];
-export type IEMSystemModel = typeof IEM_SYSTEMS[number];
-
-// Base interface for wireless system
-export interface WirelessSystem {
-  model: WirelessSystemModel | string;
-  quantity_hh?: number;
-  quantity_bp?: number;
-  band?: string;
-  provided_by?: 'festival' | 'band';
-}
-
-// Base interface for IEM system
-export interface IEMSystem {
-  model: IEMSystemModel | string;
-  quantity?: number;  // Keep for backward compatibility
-  quantity_hh?: number;  // Channels
-  quantity_bp?: number;  // Bodypacks
-  band?: string;
-  provided_by?: 'festival' | 'band';
-}
+export type WirelessSystem = typeof WIRELESS_SYSTEMS[number];
+export type IEMSystem = typeof IEM_SYSTEMS[number];

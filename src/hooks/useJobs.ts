@@ -1,6 +1,6 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase-client"; // Updated import path
+import { supabase } from "@/lib/supabase";
 import { useMultiTableSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 

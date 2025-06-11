@@ -1,10 +1,9 @@
-
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
 import { Department } from "@/types/department";
-import { useTourCreation } from "@/hooks/useTourCreation";
+import { useLocations } from "@/hooks/useLocations";
 import { TourFormFields } from "./TourFormFields";
+import { useTourCreation } from "./hooks/useTourCreation";
 
 interface CreateTourDialogProps {
   open: boolean;
@@ -12,11 +11,10 @@ interface CreateTourDialogProps {
   currentDepartment: Department;
 }
 
-const CreateTourDialog = ({
-  open,
-  onOpenChange,
-  currentDepartment,
-}: CreateTourDialogProps) => {
+const CreateTourDialog = ({ open, onOpenChange, currentDepartment }: CreateTourDialogProps) => {
+  const { data: locations } = useLocations();
+  const availableDepartments: Department[] = ["sound", "lights", "video"];
+
   const {
     title,
     setTitle,
@@ -37,19 +35,14 @@ const CreateTourDialog = ({
     handleEndDateChange,
   } = useTourCreation(currentDepartment, () => onOpenChange(false));
 
-  // Mock available departments for now - you might want to fetch these from a hook
-  const availableDepartments: Department[] = [
-    "sound", "lights", "video", "production", "logistics", "administrative", "personnel", "comercial"
-  ];
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Tour</DialogTitle>
+          <DialogDescription>Add a new tour with multiple dates and locations.</DialogDescription>
         </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <TourFormFields
             title={title}
             setTitle={setTitle}
@@ -65,27 +58,16 @@ const CreateTourDialog = ({
             availableDepartments={availableDepartments}
             currentDepartment={currentDepartment}
             onDepartmentChange={handleDepartmentChange}
+            locations={locations}
             startDate={startDate}
             endDate={endDate}
             onStartDateChange={handleStartDateChange}
             onEndDateChange={handleEndDateChange}
           />
 
-          <div className="flex justify-end gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button 
-              type="submit"
-              className="min-w-[120px]"
-            >
-              Create Tour
-            </Button>
-          </div>
+          <Button type="submit" className="w-full">
+            Create Tour
+          </Button>
         </form>
       </DialogContent>
     </Dialog>

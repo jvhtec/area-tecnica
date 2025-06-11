@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,7 +23,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { JobType } from "@/types/job";
-import { utcToLocalInput, localInputToUTC } from "@/utils/timezoneUtils";
 
 interface EditJobDialogProps {
   open: boolean;
@@ -35,11 +33,10 @@ interface EditJobDialogProps {
 export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) => {
   const [title, setTitle] = useState(job.title);
   const [description, setDescription] = useState(job.description || "");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
+  const [startTime, setStartTime] = useState(job.start_time?.slice(0, 16) || "");
+  const [endTime, setEndTime] = useState(job.end_time?.slice(0, 16) || "");
   const [color, setColor] = useState(job.color || "#7E69AB");
   const [jobType, setJobType] = useState<JobType>(job.job_type || "single");
-  const [timezone, setTimezone] = useState(job.timezone || "Europe/Madrid");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
   const { toast } = useToast();
@@ -50,16 +47,10 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
     if (job) {
       setTitle(job.title);
       setDescription(job.description || "");
+      setStartTime(job.start_time?.slice(0, 16) || "");
+      setEndTime(job.end_time?.slice(0, 16) || "");
       setColor(job.color || "#7E69AB");
       setJobType(job.job_type || "single");
-      setTimezone(job.timezone || "Europe/Madrid");
-      
-      // Convert UTC times to local input format using job's timezone
-      if (job.start_time && job.end_time) {
-        const jobTimezone = job.timezone || "Europe/Madrid";
-        setStartTime(utcToLocalInput(job.start_time, jobTimezone));
-        setEndTime(utcToLocalInput(job.end_time, jobTimezone));
-      }
     }
   }, [job]);
 
@@ -98,20 +89,15 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
     setIsLoading(true);
 
     try {
-      // Convert local datetime-local input values to UTC using the job's timezone
-      const startTimeUTC = localInputToUTC(startTime, timezone);
-      const endTimeUTC = localInputToUTC(endTime, timezone);
-
       const { error: jobError } = await supabase
         .from("jobs")
         .update({
           title,
           description,
-          start_time: startTimeUTC.toISOString(),
-          end_time: endTimeUTC.toISOString(),
+          start_time: startTime,
+          end_time: endTime,
           color,
-          job_type: jobType,
-          timezone,
+          job_type: jobType
         })
         .eq("id", job.id);
 
@@ -188,24 +174,6 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
             />
-          </div>
-          <div>
-            <Label>Timezone</Label>
-            <Select
-              value={timezone}
-              onValueChange={setTimezone}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select timezone" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Europe/Madrid">Europe/Madrid</SelectItem>
-                <SelectItem value="Europe/London">Europe/London</SelectItem>
-                <SelectItem value="Europe/Paris">Europe/Paris</SelectItem>
-                <SelectItem value="America/New_York">America/New_York</SelectItem>
-                <SelectItem value="America/Los_Angeles">America/Los_Angeles</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

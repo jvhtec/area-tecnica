@@ -1,206 +1,119 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { format } from 'date-fns';
-import { fetchTourLogo } from '@/utils/pdf/tourLogoUtils';
 
-export const exportTourPDF = async (tour: any) => {
-  const pdf = new jsPDF();
-  const pageWidth = pdf.internal.pageSize.width;
-  const pageHeight = pdf.internal.pageSize.height;
+interface TourRow {
+  date: string;
+  location: string;
+}
 
-  // Try to load tour logo
-  let logoUrl: string | undefined;
-  try {
-    logoUrl = await fetchTourLogo(tour.id);
-  } catch (error) {
-    console.warn('Could not load tour logo:', error);
-  }
+// Add type declaration for jsPDF with autotable
+interface AutoTableJsPDF extends jsPDF {
+  lastAutoTable?: {
+    finalY: number;
+  };
+}
 
-  // Header with logo if available
-  let startY = 20;
-  if (logoUrl) {
+export const exportTourPDF = async (
+  tourName: string,
+  dateSpan: string,
+  rows: TourRow[],
+): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
     try {
-      pdf.addImage(logoUrl, 'PNG', 20, 10, 30, 30);
-      pdf.setFontSize(20);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(tour.name, 60, 25);
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text('Tour Schedule', 60, 35);
-      startY = 50;
+      console.log("Starting PDF generation with:", { tourName, dateSpan, rows });
+      
+      const doc = new jsPDF() as AutoTableJsPDF;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const createdDate = new Date().toLocaleDateString('en-GB');
+
+      // === HEADER SECTION ===
+      doc.setFillColor(125, 1, 1);
+      doc.rect(0, 0, pageWidth, 40, 'F');
+
+      doc.setFontSize(24);
+      doc.setTextColor(255, 255, 255);
+      doc.text("Tour Schedule", pageWidth / 2, 20, { align: 'center' });
+
+      doc.setFontSize(16);
+      doc.text(tourName, pageWidth / 2, 30, { align: 'center' });
+      
+      doc.setFontSize(12);
+      doc.text(dateSpan, pageWidth / 2, 38, { align: 'center' });
+
+      // === TABLE SECTION ===
+      const tableRows = rows.map(row => [row.date, row.location]);
+
+      autoTable(doc, {
+        head: [['Date', 'Location']],
+        body: tableRows,
+        startY: 50,
+        theme: 'grid',
+        styles: {
+          fontSize: 10,
+          cellPadding: 5,
+          lineColor: [220, 220, 230],
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [125, 1, 1],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+        },
+        bodyStyles: { textColor: [51, 51, 51] },
+        alternateRowStyles: { fillColor: [250, 250, 255] },
+      });
+
+      // === PAGE NUMBERS SECTION ===
+      const totalPages = (doc.internal as any).pages.length - 1;
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+      }
+
+      // === LOGO & CREATED DATE SECTION ===
+      const logo = new Image();
+      logo.crossOrigin = 'anonymous';
+      logo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
+
+      logo.onload = () => {
+        const logoWidth = 50;
+        const logoHeight = logoWidth * (logo.height / logo.width);
+        const totalPagesAfterLogo = (doc.internal as any).pages.length - 1;
+
+        for (let i = 1; i <= totalPagesAfterLogo; i++) {
+          doc.setPage(i);
+          const xPosition = (pageWidth - logoWidth) / 2;
+          const yLogo = pageHeight - 20;
+          try {
+            doc.addImage(logo, 'PNG', xPosition, yLogo - logoHeight, logoWidth, logoHeight);
+          } catch (error) {
+            console.error(`Error adding logo on page ${i}:`, error);
+          }
+        }
+
+        doc.setPage(totalPagesAfterLogo);
+        doc.setFontSize(10);
+        doc.setTextColor(51, 51, 51);
+        doc.text(`Created: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
+        const blob = doc.output('blob');
+        resolve(blob);
+      };
+
+      logo.onerror = () => {
+        console.error('Failed to load logo');
+        const totalPagesAfterLogo = (doc.internal as any).pages.length - 1;
+        doc.setPage(totalPagesAfterLogo);
+        doc.setFontSize(10);
+        doc.setTextColor(51, 51, 51);
+        doc.text(`Created: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
+        const blob = doc.output('blob');
+        resolve(blob);
+      };
+
     } catch (error) {
-      console.warn('Error adding logo to PDF:', error);
-      // Fallback to text-only header
-      pdf.setFontSize(20);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(tour.name, 20, 20);
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text('Tour Schedule', 20, 30);
-      startY = 40;
-    }
-  } else {
-    // Text-only header
-    pdf.setFontSize(20);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(tour.name, 20, 20);
-    pdf.setFontSize(12);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('Tour Schedule', 20, 30);
-    startY = 40;
-  }
-
-  // Sort tour dates
-  const sortedDates = tour.tour_dates?.sort((a: any, b: any) => 
-    new Date(a.date).getTime() - new Date(b.date).getTime()
-  ) || [];
-
-  // Prepare table data
-  const tableData = sortedDates.map((date: any) => [
-    format(new Date(date.date), 'dd/MM/yyyy'),
-    format(new Date(date.date), 'EEEE'),
-    date.location?.name || 'TBC',
-    date.is_tour_pack_only ? 'Tour Pack Only' : 'Full Setup'
-  ]);
-
-  // Calculate available space for table (leave space for footer)
-  const bottomMargin = 60; // Increased space for footer and logo
-  const availableHeight = pageHeight - startY - bottomMargin;
-
-  // Add table with improved spacing
-  autoTable(pdf, {
-    head: [['Date', 'Day', 'Venue', 'Setup Type']],
-    body: tableData,
-    startY: startY,
-    theme: 'striped',
-    headStyles: {
-      fillColor: [126, 105, 171], // Tour color
-      textColor: 255,
-      fontStyle: 'bold'
-    },
-    bodyStyles: {
-      fontSize: 10
-    },
-    alternateRowStyles: {
-      fillColor: [245, 245, 245]
-    },
-    margin: { 
-      top: startY, 
-      bottom: bottomMargin,
-      left: 20, 
-      right: 20 
-    },
-    tableWidth: 'auto',
-    columnStyles: {
-      0: { cellWidth: 30 },
-      1: { cellWidth: 30 },
-      2: { cellWidth: 'auto' },
-      3: { cellWidth: 40 }
+      console.error("Error in PDF generation:", error);
+      reject(error);
     }
   });
-
-  // Add footer text
-  const finalY = (pdf as any).lastAutoTable.finalY || startY + 100;
-  const footerTextY = Math.max(finalY + 20, pageHeight - 50);
-
-  pdf.setFontSize(10);
-  pdf.setTextColor(128, 128, 128);
-  pdf.text(
-    `Generated on ${format(new Date(), 'dd/MM/yyyy HH:mm')}`,
-    20,
-    footerTextY
-  );
-
-  // Function to load image as base64
-  const loadImageAsBase64 = async (imagePath: string): Promise<string | null> => {
-    try {
-      console.log("Attempting to fetch image:", imagePath);
-      
-      const response = await fetch(imagePath);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
-      }
-      
-      const blob = await response.blob();
-      
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const base64String = reader.result as string;
-          console.log("Successfully converted image to base64");
-          resolve(base64String);
-        };
-        reader.onerror = () => {
-          console.error("Error reading image as base64");
-          reject(new Error("Failed to convert image to base64"));
-        };
-        reader.readAsDataURL(blob);
-      });
-    } catch (error) {
-      console.error("Error loading image:", error);
-      return null;
-    }
-  };
-
-  // Function to add Sector Pro logo and save PDF
-  const addSectorProLogoAndSave = async () => {
-    try {
-      console.log("Starting Sector Pro logo loading process");
-      
-      // Try multiple possible paths for the logo
-      const possiblePaths = [
-        '/sector pro logo.png',
-        './sector pro logo.png',
-        'sector pro logo.png'
-      ];
-      
-      let logoBase64: string | null = null;
-      
-      for (const path of possiblePaths) {
-        console.log(`Trying logo path: ${path}`);
-        logoBase64 = await loadImageAsBase64(path);
-        if (logoBase64) {
-          console.log(`Successfully loaded logo from: ${path}`);
-          break;
-        }
-      }
-      
-      if (logoBase64) {
-        try {
-          const logoWidth = 40;
-          const logoHeight = 15;
-          const xPosition = (pageWidth - logoWidth) / 2; // Center horizontally
-          const yPosition = pageHeight - 30; // 30 units from bottom
-          
-          console.log(`Adding Sector Pro logo at position: x=${xPosition}, y=${yPosition}`);
-          
-          pdf.addImage(
-            logoBase64,
-            'PNG',
-            xPosition,
-            yPosition,
-            logoWidth,
-            logoHeight
-          );
-          
-          console.log('Sector Pro logo added successfully to PDF');
-        } catch (addError) {
-          console.error('Error adding logo to PDF:', addError);
-        }
-      } else {
-        console.warn('Could not load Sector Pro logo from any path');
-      }
-      
-    } catch (error) {
-      console.error('Error in logo loading process:', error);
-    }
-    
-    // Always save the PDF, regardless of logo success/failure
-    console.log('Saving PDF...');
-    pdf.save(`${tour.name}_schedule.pdf`);
-  };
-
-  // Execute logo loading and save
-  await addSectorProLogoAndSave();
 };

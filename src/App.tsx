@@ -14,8 +14,6 @@ import Profile from '@/pages/Profile';
 import Settings from '@/pages/Settings';
 import ProjectManagement from '@/pages/ProjectManagement';
 import TechnicianDashboard from '@/pages/TechnicianDashboard';
-import Personal from '@/pages/Personal';
-import Tours from '@/pages/Tours';
 import PesosTool from '@/pages/PesosTool';
 import LightsPesosTool from '@/pages/LightsPesosTool';
 import VideoPesosTool from '@/pages/VideoPesosTool';
@@ -39,8 +37,6 @@ import Festivals from '@/pages/Festivals';
 import { AuthProvider } from "@/hooks/useAuth";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { AppInit } from "@/components/AppInit";
-import { TourManagementWrapper } from "@/components/tours/TourManagementWrapper";
 
 export default function App() {
   return (
@@ -50,7 +46,6 @@ export default function App() {
           <Router>
             <AuthProvider>
               <div className="app">
-                <AppInit />
                 <Routes>
                   <Route path="/" element={<Auth />} />
                   <Route path="/auth" element={<Auth />} />
@@ -63,8 +58,6 @@ export default function App() {
                   {/* Protected Routes */}
                   <Route element={<Layout />}>
                     <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/technician-dashboard" element={<TechnicianDashboard />} />
-                    <Route path="/personal" element={<Personal />} />
                     <Route path="/sound" element={<Sound />} />
                     <Route path="/lights" element={<Lights />} />
                     <Route path="/video" element={<Video />} />
@@ -73,15 +66,10 @@ export default function App() {
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/project-management" element={<ProjectManagement />} />
                     <Route path="/equipment-management" element={<EquipmentManagement />} />
-                    <Route path="/tours" element={<Tours />} />
                     <Route path="/festivals" element={<Festivals />} />
+                    <Route path="/technician-dashboard" element={<TechnicianDashboard />} />
                     
-                    {/* Tour Management Route */}
-                    <Route path="/tour-management/:tourId" element={<TourManagementWrapper />} />
-                    
-                    {/* Tools Routes - Both nested and original paths for compatibility */}
-                    <Route path="/sound/pesos" element={<PesosTool />} />
-                    <Route path="/sound/consumos" element={<ConsumosTool />} />
+                    {/* Tools Routes */}
                     <Route path="/pesos-tool" element={<PesosTool />} />
                     <Route path="/lights-pesos-tool" element={<LightsPesosTool />} />
                     <Route path="/video-pesos-tool" element={<VideoPesosTool />} />
@@ -93,22 +81,6 @@ export default function App() {
                     <Route path="/excel-tool" element={<ExcelTool />} />
                     <Route path="/hoja-de-ruta" element={<HojaDeRuta />} />
                     <Route path="/labor-po-form" element={<LaborPOForm />} />
-                    
-                    {/* Tour-specific tool routes */}
-                    <Route path="/tours/:tourId/sound/pesos" element={<PesosTool />} />
-                    <Route path="/tours/:tourId/sound/consumos" element={<ConsumosTool />} />
-                    <Route path="/tours/:tourId/lights/pesos" element={<LightsPesosTool />} />
-                    <Route path="/tours/:tourId/lights/consumos" element={<LightsConsumosTool />} />
-                    <Route path="/tours/:tourId/video/pesos" element={<VideoPesosTool />} />
-                    <Route path="/tours/:tourId/video/consumos" element={<VideoConsumosTool />} />
-                    
-                    {/* Tour date-specific tool routes */}
-                    <Route path="/tour-dates/:tourDateId/sound/pesos" element={<PesosTool />} />
-                    <Route path="/tour-dates/:tourDateId/sound/consumos" element={<ConsumosTool />} />
-                    <Route path="/tour-dates/:tourDateId/lights/pesos" element={<LightsPesosTool />} />
-                    <Route path="/tour-dates/:tourDateId/lights/consumos" element={<LightsConsumosTool />} />
-                    <Route path="/tour-dates/:tourDateId/video/pesos" element={<VideoPesosTool />} />
-                    <Route path="/tour-dates/:tourDateId/video/consumos" element={<VideoConsumosTool />} />
                     
                     {/* Disponibilidad Routes */}
                     <Route path="/lights-disponibilidad" element={<LightsDisponibilidad />} />

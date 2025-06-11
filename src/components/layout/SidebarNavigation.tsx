@@ -10,9 +10,7 @@ import {
   Truck,
   UserCircle,
   ClipboardList,
-  Tent,
-  Calendar,
-  MapPin
+  Tent
 } from "lucide-react";
 
 interface SidebarNavigationProps {
@@ -89,19 +87,6 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
           </Link>
         )}
 
-        {/* Personal Calendar - Available to all authenticated users */}
-        <Link to="/personal">
-          <Button
-            variant="ghost"
-            className={`w-full justify-start gap-2 ${
-              location.pathname === "/personal" ? "bg-accent" : ""
-            }`}
-          >
-            <Calendar className="h-4 w-4" />
-            <span>Personal Calendar</span>
-          </Button>
-        </Link>
-
         {/* Department Pages - Show for Management and House Techs */}
         {(isManagementUser || userRole === 'house_tech') && (
           <>
@@ -143,21 +128,6 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
                 <span>Video</span>
               </Button>
             </Link>
-
-            {/* Tours - Only show for management users and house techs from sound department */}
-            {(isManagementUser || isSoundHouseTech) && (
-              <Link to="/tours">
-                <Button
-                  variant="ghost"
-                  className={`w-full justify-start gap-2 ${
-                    location.pathname === "/tours" ? "bg-accent" : ""
-                  }`}
-                >
-                  <MapPin className="h-4 w-4" />
-                  <span>Tours</span>
-                </Button>
-              </Link>
-            )}
             
             {/* Festivals - Only show for management users and house techs from sound department */}
             {(isManagementUser || isSoundHouseTech) && (

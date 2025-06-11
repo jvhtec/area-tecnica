@@ -1,4 +1,3 @@
-
 import * as React from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -7,19 +6,15 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { Input } from "./input";
-import { utcToLocalInput, localInputToUTC } from "@/utils/timezoneUtils";
 
 interface DateTimePickerProps {
   value: Date;
   onChange: (date: Date) => void;
-  timezone?: string;
 }
 
-export function DateTimePicker({ value, onChange, timezone = 'Europe/Madrid' }: DateTimePickerProps) {
-  // Convert UTC value to local input format
-  const localValue = utcToLocalInput(value, timezone);
+export function DateTimePicker({ value, onChange }: DateTimePickerProps) {
   const [date, setDate] = React.useState<Date>(value);
-  const [time, setTime] = React.useState(localValue.split('T')[1] || format(value, "HH:mm"));
+  const [time, setTime] = React.useState(format(value, "HH:mm"));
 
   // Update parent when either date or time changes
   React.useEffect(() => {
@@ -27,19 +22,8 @@ export function DateTimePicker({ value, onChange, timezone = 'Europe/Madrid' }: 
     const newDate = new Date(date);
     newDate.setHours(hours);
     newDate.setMinutes(minutes);
-    
-    // Convert local datetime to UTC considering the job's timezone
-    const utcDate = localInputToUTC(format(newDate, "yyyy-MM-dd'T'HH:mm"), timezone);
-    onChange(utcDate);
-  }, [date, time, onChange, timezone]);
-
-  // Update local state when value prop changes
-  React.useEffect(() => {
-    const localInput = utcToLocalInput(value, timezone);
-    const [datePart, timePart] = localInput.split('T');
-    setDate(new Date(datePart + 'T00:00:00'));
-    setTime(timePart || format(value, "HH:mm"));
-  }, [value, timezone]);
+    onChange(newDate);
+  }, [date, time, onChange]);
 
   return (
     <div className="flex gap-2">

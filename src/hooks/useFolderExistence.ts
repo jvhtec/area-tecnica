@@ -2,30 +2,27 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
-export const useFolderExistence = (jobId: string) => {
+export const useFolderExistence = (jobId?: string, tourDateId?: string) => {
   return useQuery({
-    queryKey: ["folder-existence", jobId],
+    queryKey: ["flex-folders", jobId, tourDateId],
     queryFn: async () => {
-      console.log("useFolderExistence: Checking folder existence for job:", jobId);
-      
-      const { data, error } = await supabase
-        .from("flex_folders")
-        .select("id")
-        .eq("job_id", jobId)
-        .limit(1);
+      if (!jobId && !tourDateId) return false;
 
-      if (error) {
-        console.error("useFolderExistence: Error checking folder existence:", error);
-        throw error;
+      const query = supabase.from("flex_folders").select("id");
+      
+      if (jobId) {
+        query.eq("job_id", jobId);
+      }
+      
+      if (tourDateId) {
+        query.eq("tour_date_id", tourDateId);
       }
 
-      const exists = data && data.length > 0;
-      console.log("useFolderExistence: Folder existence result for job", jobId, ":", exists);
+      const { data, error } = await query;
+      if (error) throw error;
       
-      return exists;
+      return data?.length > 0;
     },
-    enabled: !!jobId,
-    staleTime: 1000 * 60 * 2, // 2 minutes
-    retry: 1
+    enabled: !!jobId || !!tourDateId,
   });
 };

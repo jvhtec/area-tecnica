@@ -1,89 +1,130 @@
 
-import { useQuery, QueryKey, UseQueryOptions } from '@tanstack/react-query';
-import { useTableSubscription } from './useTableSubscription';
-import { useState, useEffect } from 'react';
-import { toast } from "@/hooks/use-toast";
+import { useQuery, UseQueryOptions, UseQueryResult } from '@tanstack/react-query';
+import { useState, useEffect, useCallback } from 'react';
+import { useTableSubscription } from './useSubscription';
+import { toast } from 'sonner';
 
 /**
- * Hook that combines React Query with Supabase realtime subscriptions
+ * Enhanced hook that combines React Query with Supabase real-time updates
+ * and provides automatic recovery from stale data
  * @param queryKey The query key for React Query
- * @param queryFn The query function
- * @param tableName The table name to subscribe to
- * @param options Additional query options
- * @returns Query result plus additional helpers
+ * @param queryFn The query function for fetching data
+ * @param table The table name to subscribe to for real-time updates
+ * @param options Additional React Query options
+ * @returns UseQueryResult with the data, status and refetch function
  */
-export function useRealtimeQuery<T>(
-  queryKey: QueryKey,
-  queryFn: () => Promise<T>,
-  tableName: string,
-  options?: Omit<UseQueryOptions<T, Error, T, QueryKey>, 
-    'queryKey' | 'queryFn' | 'initialData'>
-) {
+export function useRealtimeQuery<TData, TError = Error>(
+  queryKey: string | string[],
+  queryFn: () => Promise<TData>,
+  table: string,
+  options?: Omit<
+    UseQueryOptions<TData, TError, TData, (string | string[])[]>,
+    'queryKey' | 'queryFn'
+  >
+): UseQueryResult<TData, TError> & { isRefreshing: boolean; manualRefresh: () => Promise<void> } {
+  // State for tracking manual refresh
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastSuccessTime, setLastSuccessTime] = useState<number>(Date.now());
+  const [lastSuccessfulFetch, setLastSuccessfulFetch] = useState(Date.now());
+  const [isStale, setIsStale] = useState(false);
   
-  // Convert QueryKey to string or string[] as required by the hook
-  const stringifiedQueryKey = Array.isArray(queryKey) 
-    ? queryKey.map(item => String(item)) 
-    : String(queryKey);
+  // Set up the subscription to the table
+  useTableSubscription(table, queryKey);
   
-  // Call the subscription hook and track subscription status
-  const { isSubscribed, isStale } = useTableSubscription(tableName, stringifiedQueryKey);
+  // Normalize queryKey to array format for React Query
+  const normalizedQueryKey = Array.isArray(queryKey) ? queryKey : [queryKey];
   
-  // Track query state changes for debugging
-  useEffect(() => {
-    if (!isSubscribed) {
-      console.log(`Subscription inactive for table ${tableName}. Data fetching will continue but won't auto-update.`);
-    }
-  }, [isSubscribed, tableName]);
-  
-  // Use React Query for data fetching
-  const query = useQuery({
-    queryKey,
+  // Use React Query to fetch the data with enhanced options
+  const queryResult = useQuery({
+    queryKey: normalizedQueryKey,
     queryFn: async () => {
       try {
         const result = await queryFn();
-        // Track successful fetches
-        setLastSuccessTime(Date.now());
+        // Update last successful fetch time
+        setLastSuccessfulFetch(Date.now());
+        setIsStale(false);
         return result;
       } catch (error) {
-        // Log and re-throw error
-        console.error(`Error fetching data for ${String(queryKey)}:`, error);
+        console.error(`Error fetching data for ${table}:`, error);
         throw error;
       }
     },
-    ...options
+    // Default stale time to 2 minutes if not specified
+    staleTime: (options?.staleTime !== undefined) ? options.staleTime : 1000 * 60 * 2,
+    // Add retry with exponential backoff
+    retry: (options?.retry !== undefined) ? options.retry : 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    ...options,
   });
-  
-  // Function to manually refresh data with enhanced error handling
-  const manualRefresh = async () => {
-    setIsRefreshing(true);
+
+  // Check for stale data periodically
+  useEffect(() => {
+    const staleCheckInterval = setInterval(() => {
+      const now = Date.now();
+      const staleThreshold = 5 * 60 * 1000; // 5 minutes
+      
+      if (now - lastSuccessfulFetch > staleThreshold) {
+        setIsStale(true);
+      }
+    }, 30000); // Check every 30 seconds
     
+    return () => clearInterval(staleCheckInterval);
+  }, [lastSuccessfulFetch]);
+
+  // Automatically refresh when tab becomes visible after being hidden
+  useEffect(() => {
+    let lastVisibilityChange = 0;
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const now = Date.now();
+        // Only refresh if it's been at least 30 seconds since last visibility change
+        if (now - lastVisibilityChange > 30000) {
+          lastVisibilityChange = now;
+          
+          // If data is stale or it's been more than 2 minutes, refresh
+          if (isStale || now - lastSuccessfulFetch > 2 * 60 * 1000) {
+            queryResult.refetch();
+          }
+        }
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [queryResult, lastSuccessfulFetch, isStale]);
+
+  // Manual refresh function with user feedback
+  const manualRefresh = useCallback(async () => {
+    setIsRefreshing(true);
     try {
-      console.log(`Manually refreshing data for ${String(queryKey)}...`);
-      
-      // Then refetch data
-      await query.refetch();
-      
-      // Update last success time
-      setLastSuccessTime(Date.now());
+      await queryResult.refetch();
+      setIsStale(false);
+      toast.success(`${table} data refreshed successfully`);
     } catch (error) {
-      console.error(`Error in manual refresh for ${String(queryKey)}:`, error);
-      toast.error(`Failed to refresh ${tableName} data`, { 
-        description: 'Please try again'
-      });
-      throw error;
+      console.error(`Error refreshing ${table} data:`, error);
+      toast.error(`Failed to refresh ${table} data`);
     } finally {
       setIsRefreshing(false);
     }
-  };
-  
+  }, [queryResult, table]);
+
+  // If data is stale for too long, auto-refresh
+  useEffect(() => {
+    if (isStale) {
+      const autoRefreshTimeout = setTimeout(() => {
+        queryResult.refetch();
+      }, 60000); // Auto-refresh after 1 minute of staleness
+      
+      return () => clearTimeout(autoRefreshTimeout);
+    }
+  }, [isStale, queryResult]);
+
   return {
-    ...query,
-    isSubscribed,
-    isStale,
-    isRefreshing: isRefreshing || query.isFetching,
-    manualRefresh,
-    lastSuccessTime
+    ...queryResult,
+    isRefreshing,
+    manualRefresh
   };
 }

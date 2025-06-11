@@ -1,9 +1,10 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { UnifiedSubscriptionManager } from '@/lib/unified-subscription-manager';
-import { toast } from 'sonner';
+import { SubscriptionManager } from '@/lib/subscription-manager';
+import { useToast } from '@/hooks/use-toast';
 import { TokenManager } from '@/lib/token-manager';
+import { toast } from 'sonner';
 
 // Context for providing subscription manager state
 interface SubscriptionContextType {
@@ -57,7 +58,7 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
 
   // Initialize the subscription manager
   useEffect(() => {
-    const manager = UnifiedSubscriptionManager.getInstance(queryClient);
+    const manager = SubscriptionManager.getInstance(queryClient);
     
     // Setup network status and visibility monitoring
     manager.setupNetworkStatusRefetching();
@@ -66,12 +67,12 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     // Subscribe to token refreshes to update subscriptions
     const unsubscribe = tokenManager.subscribe(() => {
       console.log("Token refreshed, updating subscriptions");
-      
-      // Get current subscriptions by table
+      // Recreate subscriptions by unsubscribing and resubscribing
       const tables = Object.keys(manager.getSubscriptionsByTable());
-      
-      // Force refresh all subscriptions
-      manager.forceRefreshSubscriptions(tables);
+      tables.forEach(table => {
+        manager.unsubscribeFromTable(table, table);
+        manager.subscribeToTable(table, table);
+      });
       queryClient.invalidateQueries();
       setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
     });
@@ -79,12 +80,12 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     // Define refresh function
     const refreshSubscriptions = () => {
       console.log("Manually refreshing subscriptions...");
-      
-      // Get current subscriptions by table
+      // Recreate subscriptions by unsubscribing and resubscribing
       const tables = Object.keys(manager.getSubscriptionsByTable());
-      
-      // Force refresh all subscriptions
-      manager.forceRefreshSubscriptions(tables);
+      tables.forEach(table => {
+        manager.unsubscribeFromTable(table, table);
+        manager.subscribeToTable(table, table);
+      });
       setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
       
       // Show toast notification
@@ -106,22 +107,20 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     const forceRefresh = (tables?: string[]) => {
       if (tables && tables.length > 0) {
         // Refresh specific tables
-        manager.forceRefreshSubscriptions(tables);
-        
-        // Invalidate related queries
         tables.forEach(table => {
+          // Unsubscribe and resubscribe
+          manager.unsubscribeFromTable(table, table);
+          manager.subscribeToTable(table, table);
+          // Invalidate related queries
           queryClient.invalidateQueries({ queryKey: [table] });
         });
-        
         toast.success(`Refreshed ${tables.join(', ')} tables`);
       } else {
         // Refresh all tables
-        const allTables = Object.keys(manager.getSubscriptionsByTable());
-        manager.forceRefreshSubscriptions(allTables);
+        refreshSubscriptions();
         queryClient.invalidateQueries();
         toast.success('All subscriptions refreshed');
       }
-      
       setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
     };
     
@@ -206,14 +205,15 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
 
   // Setup core tables subscription
   useEffect(() => {
-    const manager = UnifiedSubscriptionManager.getInstance(queryClient);
+    const manager = SubscriptionManager.getInstance(queryClient);
     
     // Set up core tables that most pages need
-    manager.subscribeToTable('profiles', 'profiles', undefined, 'high');
-    manager.subscribeToTable('jobs', 'jobs', undefined, 'high');
+    manager.subscribeToTable('profiles', 'profiles');
+    manager.subscribeToTable('jobs', 'jobs');
     
     return () => {
-      // Don't unsubscribe from core tables as they are needed throughout the app
+      manager.unsubscribeFromTable('profiles', 'profiles');
+      manager.unsubscribeFromTable('jobs', 'jobs');
     };
   }, [queryClient]);
 

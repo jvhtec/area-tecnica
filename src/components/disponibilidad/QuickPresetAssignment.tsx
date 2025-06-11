@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
+import { useSessionManager } from "@/hooks/useSessionManager";
 import { supabase } from "@/lib/supabase";
 import { PresetWithItems } from "@/types/equipment";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -16,7 +16,7 @@ interface QuickPresetAssignmentProps {
 }
 
 export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAssignmentProps) {
-  const { session } = useAuth();
+  const { session } = useSessionManager();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

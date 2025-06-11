@@ -8,7 +8,6 @@ import { FlexFolderPayload, FlexFolderResponse } from "./types";
  */
 export async function createFlexFolder(payload: FlexFolderPayload): Promise<FlexFolderResponse> {
   console.log("Creating Flex folder with payload:", payload);
-  
   const response = await fetch("https://sectorpro.flexrentalsolutions.com/f5/api/element", {
     method: "POST",
     headers: {

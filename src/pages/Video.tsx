@@ -193,9 +193,8 @@ const Video = () => {
 
       {selectedJobId && (
         <JobAssignmentDialog
-          isOpen={isAssignmentDialogOpen}
-          onClose={() => setIsAssignmentDialogOpen(false)}
-          onAssignmentChange={() => {}}
+          open={isAssignmentDialogOpen}
+          onOpenChange={setIsAssignmentDialogOpen}
           jobId={selectedJobId}
           department={currentDepartment}
         />

@@ -22,18 +22,12 @@ export const EventDetailsSection = ({
   isLoadingJobs,
   jobs,
 }: EventDetailsSectionProps) => {
-  // Filter out jobs with empty or invalid IDs
-  const validJobs = jobs?.filter(job => job.id && job.id.trim() !== '') || [];
-  
-  // Ensure we have a valid value for the Select component
-  const selectValue = selectedJobId && selectedJobId.trim() !== '' ? selectedJobId : "";
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col space-y-2">
         <Label htmlFor="jobSelect">Seleccione Trabajo</Label>
         <Select
-          value={selectValue}
+          value={selectedJobId || "unselected"}
           onValueChange={setSelectedJobId}
         >
           <SelectTrigger className="w-full">
@@ -42,10 +36,10 @@ export const EventDetailsSection = ({
           <SelectContent>
             {isLoadingJobs ? (
               <SelectItem value="loading">Cargando trabajos...</SelectItem>
-            ) : validJobs.length === 0 ? (
-              <SelectItem value="no-jobs">No hay trabajos disponibles</SelectItem>
+            ) : jobs?.length === 0 ? (
+              <SelectItem value="unselected">No hay trabajos disponibles</SelectItem>
             ) : (
-              validJobs.map((job: any) => (
+              jobs?.map((job: any) => (
                 <SelectItem key={job.id} value={job.id}>
                   {job.title}
                 </SelectItem>

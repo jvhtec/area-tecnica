@@ -5,15 +5,6 @@ import { Label } from "@/components/ui/label";
 import { Plus, Minus } from "lucide-react";
 import { ConsoleConfigProps } from "@/types/festival-gear";
 import { ConsoleSetup } from "@/types/festival";
-import { EquipmentSelect } from "../form/shared/EquipmentSelect";
-
-const consoleOptions = [
-  'Yamaha CL5', 'Yamaha PMx', 'Yamaha DM7','Yamaha DM3', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
-  'DiGiCo SD10', 'DiGiCo SD11', 'DiGiCo SD12', 'DiGiCo SD5Q', 'DiGiCo SD7Q',
-  'DiGiCo Q225', 'DiGiCo Q326', 'DiGiCo Q338', 'DiGiCo Q852', 'Avid S6L',
-  'A&H C1500', 'A&H C2500', 'A&H S3000', 'A&H S5000', 'A&H S7000',
-  'Waves LV1 (homemade)', 'Waves LV1 Classic', 'SSL', 'Other'
-];
 
 export const ConsoleConfig = ({ consoles, onChange, label }: ConsoleConfigProps) => {
   const addConsole = () => {
@@ -50,12 +41,10 @@ export const ConsoleConfig = ({ consoles, onChange, label }: ConsoleConfigProps)
       {consoles.map((console, index) => (
         <div key={index} className="flex gap-4 items-start">
           <div className="flex-1">
-            <EquipmentSelect
+            <Input
+              placeholder="Console model"
               value={console.model}
-              onChange={(value) => updateConsole(index, 'model', value)}
-              options={[]}
-              fallbackOptions={consoleOptions}
-              placeholder="Select console"
+              onChange={(e) => updateConsole(index, 'model', e.target.value)}
             />
           </div>
           <div className="w-24">
