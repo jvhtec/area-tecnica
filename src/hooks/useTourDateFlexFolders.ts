@@ -3,7 +3,6 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { createAllFoldersForJob } from "@/utils/flex-folders/folders";
-import { format } from "date-fns";
 import { toast } from "sonner";
 
 export const useTourDateFlexFolders = (tourId: string) => {
@@ -25,8 +24,9 @@ export const useTourDateFlexFolders = (tourId: string) => {
         throw new Error(`No job found for tour date ${tourDate.id}`);
       }
 
-      const formattedStartDate = format(new Date(job.start_time), 'yyyy-MM-dd');
-      const formattedEndDate = format(new Date(job.end_time), 'yyyy-MM-dd');
+      // Use the correct ISO datetime format that works with Flex API
+      const formattedStartDate = new Date(job.start_time).toISOString().split(".")[0] + ".000Z";
+      const formattedEndDate = new Date(job.end_time).toISOString().split(".")[0] + ".000Z";
       
       const jobDate = new Date(job.start_time);
       const year = jobDate.getFullYear().toString().slice(-2);
@@ -49,7 +49,7 @@ export const useTourDateFlexFolders = (tourId: string) => {
       return { job, tourDate };
     },
     onSuccess: (data) => {
-      toast.success(`Flex folders created successfully for ${format(new Date(data.tourDate.date), 'MMM d, yyyy')}`);
+      toast.success(`Flex folders created successfully for ${new Date(data.tourDate.date).toLocaleDateString()}`);
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
       queryClient.invalidateQueries({ queryKey: ['tour-dates', tourId] });
     },

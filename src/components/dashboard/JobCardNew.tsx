@@ -373,12 +373,12 @@ export function JobCardNew({
         return;
       }
 
-      // Use the restored sophisticated flex folder creation system
+      // Use the correct ISO datetime format that works with Flex API
       const startDate = new Date(job.start_time);
-      const endDate = new Date(job.end_time);
-      const formattedStartDate = format(startDate, 'yyyy-MM-dd');
-      const formattedEndDate = format(endDate, 'yyyy-MM-dd');
       const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, "");
+
+      const formattedStartDate = new Date(job.start_time).toISOString().split(".")[0] + ".000Z";
+      const formattedEndDate = new Date(job.end_time).toISOString().split(".")[0] + ".000Z";
 
       toast({
         title: "Creating folders...",
