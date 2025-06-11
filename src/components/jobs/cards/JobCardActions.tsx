@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
@@ -38,7 +37,6 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   canUploadDocuments,
   canManageArtists,
   isCreatingFolders = false,
-  currentFolderStep = '',
   onRefreshData,
   onEditButtonClick,
   onDeleteClick,
@@ -49,7 +47,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
 }) => {
   const getFlexButtonTitle = () => {
     if (isCreatingFolders) {
-      return currentFolderStep ? `Creating folders: ${currentFolderStep}...` : "Creating folders...";
+      return "Creating folders...";
     }
     return foldersAreCreated ? "Folders already exist" : "Create Flex folders";
   };

@@ -10,7 +10,6 @@ import createFolderIcon from "@/assets/icons/icon.png";
 import { useNavigate } from "react-router-dom";
 import { useDeletionState } from "@/hooks/useDeletionState";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
-import { useProgressiveFlexFolders } from "@/hooks/useProgressiveFlexFolders";
 
 import { 
   createAllFoldersForJob
@@ -87,7 +86,9 @@ export function JobCardNew({
   const navigate = useNavigate();
   const isDark = theme === "dark";
   const { addDeletingJob, removeDeletingJob, isDeletingJob } = useDeletionState();
-  const { createProgressiveFolders, isCreating: isCreatingFolders, currentStep } = useProgressiveFlexFolders();
+
+  // Add state for folder creation loading
+  const [isCreatingFolders, setIsCreatingFolders] = useState(false);
 
   const borderColor = job.color ? job.color : "#7E69AB";
   const appliedBorderColor = isDark ? (job.darkColor ? job.darkColor : borderColor) : borderColor;
@@ -109,7 +110,7 @@ export function JobCardNew({
 
   const getFlexButtonTitle = () => {
     if (isCreatingFolders) {
-      return currentStep ? `Creating folders: ${currentStep}...` : "Creating folders...";
+      return "Creating folders...";
     }
     return foldersAreCreated ? "Folders already exist" : "Create Flex folders";
   };
@@ -335,15 +336,13 @@ export function JobCardNew({
   const createFlexFoldersHandler = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // Prevent multiple clicks
     if (isCreatingFolders) {
       console.log("Dashboard JobCardNew: Folder creation already in progress");
       return;
     }
 
-    console.log("Dashboard JobCardNew: Starting progressive folder creation for job:", job.id);
+    console.log("Dashboard JobCardNew: Starting folder creation for job:", job.id);
 
-    // Only check actual folder existence, not database flags
     if (actualFoldersExist) {
       console.log("Dashboard JobCardNew: Folders actually exist, preventing creation");
       toast({
@@ -355,6 +354,8 @@ export function JobCardNew({
     }
 
     try {
+      setIsCreatingFolders(true);
+
       // Double-check in the database before creating
       const { data: existingFolders } = await supabase
         .from("flex_folders")
@@ -372,16 +373,38 @@ export function JobCardNew({
         return;
       }
 
-      await createProgressiveFolders({
-        jobId: job.id,
-        jobTitle: job.title,
-        startTime: job.start_time,
-        endTime: job.end_time
+      // Use your existing flex folder creation system
+      const startDate = new Date(job.start_time);
+      const endDate = new Date(job.end_time);
+      const formattedStartDate = format(startDate, 'yyyy-MM-dd');
+      const formattedEndDate = format(endDate, 'yyyy-MM-dd');
+      const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, "");
+
+      toast({
+        title: "Creating folders...",
+        description: "Setting up Flex folder structure for this job."
       });
 
+      await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber);
+
+      toast({
+        title: "Success!",
+        description: "Flex folders have been created successfully."
+      });
+
+      // Refresh queries
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["folder-existence"] });
+
     } catch (error: any) {
-      console.error("Dashboard JobCardNew: Error in progressive folder creation:", error);
-      // Error handling is done in the hook
+      console.error("Dashboard JobCardNew: Error creating flex folders:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create Flex folders",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreatingFolders(false);
     }
   };
 

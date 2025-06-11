@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -7,9 +6,10 @@ import { useNavigate } from "react-router-dom";
 import { useFolderExistence } from "@/hooks/useFolderExistence";
 import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
 import { useDeletionState } from '@/hooks/useDeletionState';
-import { useProgressiveFlexFolders } from '@/hooks/useProgressiveFlexFolders';
 import { supabase } from "@/lib/supabase";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
+import { createAllFoldersForJob } from "@/utils/flex-folders";
+import { format } from "date-fns";
 import { JobCardHeader } from './JobCardHeader';
 import { JobCardActions } from './JobCardActions';
 import { JobCardAssignments } from './JobCardAssignments';
@@ -56,7 +56,9 @@ export function JobCardNew({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { addDeletingJob, removeDeletingJob, isDeletingJob } = useDeletionState();
-  const { createProgressiveFolders, isCreating: isCreatingFolders, currentStep } = useProgressiveFlexFolders();
+  
+  // Add folder creation loading state
+  const [isCreatingFolders, setIsCreatingFolders] = useState(false);
   
   const {
     // Styling
@@ -186,15 +188,13 @@ export function JobCardNew({
   const createFlexFoldersHandler = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // Prevent multiple clicks
     if (isCreatingFolders) {
       console.log("JobCardNew: Folder creation already in progress");
       return;
     }
 
-    console.log("JobCardNew: Starting progressive folder creation for job:", job.id);
+    console.log("JobCardNew: Starting folder creation for job:", job.id);
 
-    // Only check actual folder existence, not database flags
     if (actualFoldersExist) {
       console.log("JobCardNew: Folders actually exist, preventing creation");
       toast({
@@ -206,6 +206,8 @@ export function JobCardNew({
     }
 
     try {
+      setIsCreatingFolders(true);
+
       // Double-check in the database before creating
       const { data: existingFolders } = await supabase
         .from("flex_folders")
@@ -223,16 +225,38 @@ export function JobCardNew({
         return;
       }
 
-      await createProgressiveFolders({
-        jobId: job.id,
-        jobTitle: job.title,
-        startTime: job.start_time,
-        endTime: job.end_time
+      // Use your existing flex folder creation system
+      const startDate = new Date(job.start_time);
+      const endDate = new Date(job.end_time);
+      const formattedStartDate = format(startDate, 'yyyy-MM-dd');
+      const formattedEndDate = format(endDate, 'yyyy-MM-dd');
+      const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, "");
+
+      toast({
+        title: "Creating folders...",
+        description: "Setting up Flex folder structure for this job."
       });
 
+      await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber);
+
+      toast({
+        title: "Success!",
+        description: "Flex folders have been created successfully."
+      });
+
+      // Refresh queries
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["folder-existence"] });
+
     } catch (error: any) {
-      console.error("JobCardNew: Error in progressive folder creation:", error);
-      // Error handling is done in the hook
+      console.error("JobCardNew: Error creating flex folders:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create Flex folders",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreatingFolders(false);
     }
   };
 
@@ -314,7 +338,7 @@ export function JobCardNew({
             canUploadDocuments={canUploadDocuments}
             canManageArtists={canManageArtists}
             isCreatingFolders={isCreatingFolders}
-            currentFolderStep={currentStep}
+            currentFolderStep=""
             onRefreshData={refreshData}
             onEditButtonClick={handleEditButtonClick}
             onDeleteClick={handleDeleteClick}
@@ -407,3 +431,5 @@ export function JobCardNew({
 }
 
 export type { JobDocument } from './JobCardDocuments';
+
+}
