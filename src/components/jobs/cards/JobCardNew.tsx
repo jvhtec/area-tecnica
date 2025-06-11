@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -194,7 +193,7 @@ export function JobCardNew({
       return;
     }
 
-    console.log("JobCardNew: Starting folder creation for job:", job.id);
+    console.log("JobCardNew: Starting sophisticated folder creation for job:", job.id);
 
     if (actualFoldersExist) {
       console.log("JobCardNew: Folders actually exist, preventing creation");
@@ -226,7 +225,7 @@ export function JobCardNew({
         return;
       }
 
-      // Use your existing flex folder creation system
+      // Use the restored sophisticated flex folder creation system
       const startDate = new Date(job.start_time);
       const endDate = new Date(job.end_time);
       const formattedStartDate = format(startDate, 'yyyy-MM-dd');
@@ -235,14 +234,14 @@ export function JobCardNew({
 
       toast({
         title: "Creating folders...",
-        description: "Setting up Flex folder structure for this job."
+        description: "Setting up sophisticated Flex folder structure for this job."
       });
 
       await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber);
 
       toast({
         title: "Success!",
-        description: "Flex folders have been created successfully."
+        description: "Flex folders have been created successfully with proper configuration."
       });
 
       // Refresh queries
@@ -250,7 +249,7 @@ export function JobCardNew({
       queryClient.invalidateQueries({ queryKey: ["folder-existence"] });
 
     } catch (error: any) {
-      console.error("JobCardNew: Error creating flex folders:", error);
+      console.error("JobCardNew: Error creating sophisticated flex folders:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to create Flex folders",
@@ -432,3 +431,5 @@ export function JobCardNew({
 }
 
 export type { JobDocument } from './JobCardDocuments';
+
+}

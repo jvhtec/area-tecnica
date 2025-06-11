@@ -2,6 +2,14 @@
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { FlexFolderType } from "@/types/flex";
+import { createFlexFolder } from "./api";
+import { 
+  FLEX_FOLDER_IDS, 
+  DRYHIRE_PARENT_IDS, 
+  DEPARTMENT_IDS, 
+  RESPONSIBLE_PERSON_IDS, 
+  DEPARTMENT_SUFFIXES 
+} from "./constants";
 
 interface FolderCreationResult {
   success: boolean;
@@ -9,45 +17,96 @@ interface FolderCreationResult {
   error?: string;
 }
 
-export const createFlexFolder = async (
+export const createFlexFolderWithType = async (
   jobId: string,
   folderName: string,
   folderType: FlexFolderType,
-  department?: string
+  department?: string,
+  job?: any,
+  formattedStartDate?: string,
+  formattedEndDate?: string,
+  documentNumber?: string
 ): Promise<FolderCreationResult> => {
   try {
-    console.log("Creating Flex folder via secure edge function:", {
+    console.log("Creating Flex folder with sophisticated logic:", {
       folderName,
       folderType,
-      department
+      department,
+      jobType: job?.job_type
     });
 
-    // Use the secure edge function (same as tours system)
-    const { data, error } = await supabase.functions.invoke('secure-flex-api', {
-      body: {
-        endpoint: '/element',
-        method: 'POST',
-        payload: {
-          name: folderName,
-          // Using a hardcoded parent ID as this should be configured server-side
-          parent_id: "00000000-0000-0000-0000-000000000000" // This should be the actual parent folder ID
+    let payload: any = {
+      name: folderName,
+      open: true,
+      locked: false
+    };
+
+    // Configure payload based on folder type and job details
+    if (folderType === 'job') {
+      // Main job folder
+      payload.definitionId = FLEX_FOLDER_IDS.mainFolder;
+      payload.parentElementId = FLEX_FOLDER_IDS.mainFolder;
+      
+      if (job) {
+        if (formattedStartDate) payload.plannedStartDate = formattedStartDate;
+        if (formattedEndDate) payload.plannedEndDate = formattedEndDate;
+        if (job.location_id) payload.locationId = job.location_id;
+        if (documentNumber) payload.documentNumber = documentNumber;
+        
+        // Set responsible person based on job type or default
+        if (job.job_type === 'dryhire' && department) {
+          payload.personResponsibleId = RESPONSIBLE_PERSON_IDS[department as keyof typeof RESPONSIBLE_PERSON_IDS] || RESPONSIBLE_PERSON_IDS.comercial;
+        } else {
+          payload.personResponsibleId = RESPONSIBLE_PERSON_IDS.mainResponsible;
         }
       }
-    });
-
-    if (error) {
-      console.error("Secure Flex API error:", error);
-      toast.error(`Failed to create Flex folder: ${error.message}`);
-      return { success: false, error: error.message };
+      
+    } else if (folderType === 'department') {
+      // Department subfolder
+      payload.definitionId = FLEX_FOLDER_IDS.subFolder;
+      
+      if (department) {
+        payload.departmentId = DEPARTMENT_IDS[department as keyof typeof DEPARTMENT_IDS];
+        payload.personResponsibleId = RESPONSIBLE_PERSON_IDS[department as keyof typeof RESPONSIBLE_PERSON_IDS];
+        
+        // For dryhire jobs, use date-dependent parent folders
+        if (job?.job_type === 'dryhire' && formattedStartDate) {
+          const month = formattedStartDate.substring(5, 7); // Extract MM from YYYY-MM-DD
+          const dryhireParents = DRYHIRE_PARENT_IDS[department as keyof typeof DRYHIRE_PARENT_IDS];
+          if (dryhireParents && dryhireParents[month as keyof typeof dryhireParents]) {
+            payload.parentElementId = dryhireParents[month as keyof typeof dryhireParents];
+          }
+        }
+      }
+      
+    } else if (folderType === 'crew_call') {
+      // Crew call folder
+      payload.definitionId = FLEX_FOLDER_IDS.crewCall;
+      
+      if (department) {
+        payload.departmentId = DEPARTMENT_IDS[department as keyof typeof DEPARTMENT_IDS];
+        payload.personResponsibleId = RESPONSIBLE_PERSON_IDS[department as keyof typeof RESPONSIBLE_PERSON_IDS];
+      }
+      
+      if (job && formattedStartDate) {
+        payload.plannedStartDate = formattedStartDate;
+        if (formattedEndDate) payload.plannedEndDate = formattedEndDate;
+        if (job.location_id) payload.locationId = job.location_id;
+        
+        // Document number with department suffix
+        if (documentNumber && department) {
+          const suffix = DEPARTMENT_SUFFIXES[department as keyof typeof DEPARTMENT_SUFFIXES] || '';
+          payload.documentNumber = `${documentNumber}${suffix}`;
+        }
+      }
     }
 
-    if (!data.success) {
-      console.error("Flex folder creation failed:", data.error);
-      toast.error(`Flex folder creation failed: ${data.error || 'Unknown error'}`);
-      return { success: false, error: data.error || 'Unknown error' };
-    }
+    console.log("Using payload for Flex folder creation:", payload);
 
-    const folderId = data.data.id;
+    // Use the secure edge function with proper payload
+    const folderResponse = await createFlexFolder(payload);
+    const folderId = folderResponse.elementId;
+
     console.log("Flex folder created successfully:", { folderId, folderName });
 
     // Store the folder ID in the database
@@ -76,21 +135,58 @@ export const createFlexFolder = async (
 };
 
 export const createJobFolders = async (jobId: string, jobTitle: string): Promise<void> => {
-  const folderName = `${jobTitle} - ${new Date().toLocaleDateString()}`;
+  // Get job details for proper folder configuration
+  const { data: job, error: jobError } = await supabase
+    .from('jobs')
+    .select('*')
+    .eq('id', jobId)
+    .single();
 
-  // Create main job folder
-  const jobFolderResult = await createFlexFolder(jobId, folderName, 'job');
+  if (jobError || !job) {
+    console.error("Error fetching job details:", jobError);
+    toast.error("Error fetching job details for folder creation.");
+    return;
+  }
+
+  const startDate = new Date(job.start_time);
+  const endDate = new Date(job.end_time);
+  const formattedStartDate = startDate.toISOString().slice(0, 10); // YYYY-MM-DD
+  const formattedEndDate = endDate.toISOString().slice(0, 10);
+  const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, ""); // YYMMDD
+
+  const folderName = `${jobTitle} - ${startDate.toLocaleDateString()}`;
+
+  // Create main job folder with sophisticated logic
+  const jobFolderResult = await createFlexFolderWithType(
+    jobId, 
+    folderName, 
+    'job',
+    undefined,
+    job,
+    formattedStartDate,
+    formattedEndDate,
+    documentNumber
+  );
 
   if (!jobFolderResult.success) {
     console.error("Failed to create job folder:", jobFolderResult.error);
     return;
   }
 
-  // Create subfolders
-  const subfolders = ["Sound", "Lights", "Video", "Stage", "General"];
+  // Create department subfolders with proper configuration
+  const subfolders = ["sound", "lights", "video", "stage", "general"];
   for (const subfolder of subfolders) {
-    const subfolderName = `${folderName} ${subfolder}`;
-    const subfolderResult = await createFlexFolder(jobId, subfolderName, 'department', subfolder.toLowerCase());
+    const subfolderName = `${folderName} ${subfolder.charAt(0).toUpperCase() + subfolder.slice(1)}`;
+    const subfolderResult = await createFlexFolderWithType(
+      jobId, 
+      subfolderName, 
+      'department', 
+      subfolder,
+      job,
+      formattedStartDate,
+      formattedEndDate,
+      documentNumber
+    );
 
     if (!subfolderResult.success) {
       console.error(`Failed to create ${subfolder} folder:`, subfolderResult.error);
@@ -109,11 +205,38 @@ export const createJobFolders = async (jobId: string, jobTitle: string): Promise
 };
 
 export const createJobCrewCalls = async (jobId: string, departments: string[]): Promise<void> => {
-  // Create crew call folders
+  // Get job details for proper folder configuration
+  const { data: job, error: jobError } = await supabase
+    .from('jobs')
+    .select('*')
+    .eq('id', jobId)
+    .single();
+
+  if (jobError || !job) {
+    console.error("Error fetching job details:", jobError);
+    return;
+  }
+
+  const startDate = new Date(job.start_time);
+  const endDate = new Date(job.end_time);
+  const formattedStartDate = startDate.toISOString().slice(0, 10);
+  const formattedEndDate = endDate.toISOString().slice(0, 10);
+  const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, "");
+
+  // Create crew call folders for sound and lights only
   for (const department of departments) {
     if (department === 'sound' || department === 'lights') {
       const crewCallName = `Crew Call - ${department}`;
-      const crewCallResult = await createFlexFolder(jobId, crewCallName, 'crew_call', department);
+      const crewCallResult = await createFlexFolderWithType(
+        jobId, 
+        crewCallName, 
+        'crew_call', 
+        department,
+        job,
+        formattedStartDate,
+        formattedEndDate,
+        documentNumber
+      );
 
       if (!crewCallResult.success) {
         console.error(`Failed to create ${department} crew call folder:`, crewCallResult.error);
@@ -121,7 +244,7 @@ export const createJobCrewCalls = async (jobId: string, departments: string[]): 
     }
   }
 
-  // After creating crew call folders, store them in our new table
+  // Store crew call folders in the database
   for (const department of departments) {
     if (department === 'sound' || department === 'lights') {
       try {
@@ -162,7 +285,6 @@ export const createJobCrewCalls = async (jobId: string, departments: string[]): 
   }
 };
 
-// Add the missing createAllFoldersForJob function
 export const createAllFoldersForJob = async (
   job: any, 
   formattedStartDate: string, 
@@ -170,14 +292,14 @@ export const createAllFoldersForJob = async (
   documentNumber: string
 ): Promise<void> => {
   try {
-    // Create job folders
+    // Create job folders with sophisticated logic
     await createJobFolders(job.id, job.title);
     
     // Create crew call folders for departments in the job
     const departments = job.job_departments?.map((dept: any) => dept.department) || [];
     await createJobCrewCalls(job.id, departments);
     
-    console.log(`All folders created for job ${job.id}`);
+    console.log(`All folders created for job ${job.id} with sophisticated configuration`);
   } catch (error) {
     console.error(`Error creating all folders for job ${job.id}:`, error);
     throw error;
