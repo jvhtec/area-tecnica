@@ -4,9 +4,11 @@ import { supabase } from "@/lib/supabase";
 import { Assignment } from "@/types/assignment";
 import { toast } from "sonner";
 import { useRealtimeQuery } from "./useRealtimeQuery";
+import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
 
-export function useJobAssignmentsRealtime(jobId: string) {
+export const useJobAssignmentsRealtime = (jobId: string) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isRemoving, setIsRemoving] = useState<Record<string, boolean>>({});
   
   // Use our enhanced real-time query hook for better reliability
   const { 
@@ -93,6 +95,83 @@ export function useJobAssignmentsRealtime(jobId: string) {
     };
   }, [jobId, manualRefresh]);
 
+  const { manageFlexCrewAssignment } = useFlexCrewAssignments();
+
+  const addAssignment = async (technicianId: string, soundRole: string, lightsRole: string) => {
+    try {
+      const { error } = await supabase
+        .from('job_assignments')
+        .insert({
+          job_id: jobId,
+          technician_id: technicianId,
+          sound_role: soundRole !== 'none' ? soundRole : null,
+          lights_role: lightsRole !== 'none' ? lightsRole : null,
+          assigned_by: (await supabase.auth.getUser()).data.user?.id,
+          assigned_at: new Date().toISOString(),
+        });
+
+      if (error) {
+        console.error('Error adding assignment:', error);
+        toast.error("Failed to add assignment");
+        return;
+      }
+
+      // Add to Flex crew calls if applicable
+      if (soundRole && soundRole !== 'none') {
+        await manageFlexCrewAssignment(jobId, technicianId, 'sound', 'add');
+      }
+      
+      if (lightsRole && lightsRole !== 'none') {
+        await manageFlexCrewAssignment(jobId, technicianId, 'lights', 'add');
+      }
+
+      toast.success("Assignment added successfully");
+    } catch (error: any) {
+      console.error('Error in addAssignment:', error);
+      toast.error("Failed to add assignment");
+    }
+  };
+
+  const removeAssignment = async (technicianId: string) => {
+    try {
+      setIsRemoving(prev => ({ ...prev, [technicianId]: true }));
+
+      // Get the assignment details before removal for Flex cleanup
+      const assignmentToRemove = assignments.find(a => a.technician_id === technicianId);
+      
+      // Remove from database
+      const { error } = await supabase
+        .from('job_assignments')
+        .delete()
+        .eq('job_id', jobId)
+        .eq('technician_id', technicianId);
+
+      if (error) {
+        console.error('Error removing assignment:', error);
+        toast.error("Failed to remove assignment");
+        return;
+      }
+
+      // Remove from Flex crew calls if applicable
+      if (assignmentToRemove) {
+        if (assignmentToRemove.sound_role && assignmentToRemove.sound_role !== 'none') {
+          await manageFlexCrewAssignment(jobId, technicianId, 'sound', 'remove');
+        }
+        
+        if (assignmentToRemove.lights_role && assignmentToRemove.lights_role !== 'none') {
+          await manageFlexCrewAssignment(jobId, technicianId, 'lights', 'remove');
+        }
+      }
+
+      toast.success("Assignment removed successfully");
+    } catch (error: any) {
+      console.error('Error in removeAssignment:', error);
+      toast.error("Failed to remove assignment");
+    } finally {
+      setIsRemoving(prev => ({ ...prev, [technicianId]: false }));
+    }
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -110,6 +189,9 @@ export function useJobAssignmentsRealtime(jobId: string) {
     assignments,
     isLoading,
     isRefreshing: isRefreshing || isQueryRefreshing,
-    refetch: handleRefresh
+    refetch: handleRefresh,
+    addAssignment,
+    removeAssignment,
+    isRemoving
   };
-}
+};

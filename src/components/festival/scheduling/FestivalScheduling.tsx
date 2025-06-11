@@ -64,8 +64,22 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
   });
 
   const handleShiftCreated = async () => {
+    console.log("Shift created - refreshing data");
     await refetch();
     setIsCreateShiftOpen(false);
+  };
+
+  const handleShiftsCopied = async () => {
+    console.log("Shifts copied - refreshing data with delay to ensure database consistency");
+    
+    // Add a small delay to ensure database operations are complete
+    setTimeout(async () => {
+      await refetch();
+      toast({
+        title: "Data refreshed",
+        description: "Shifts and assignments have been updated",
+      });
+    }, 500);
   };
 
   const handleDeleteShift = async (shiftId: string) => {
@@ -227,6 +241,7 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
             isViewOnly={isViewOnly}
             jobDates={jobDates}
             selectedDate={selectedDate}
+            onShiftsCopied={handleShiftsCopied}
           />
         ) : (
           <ShiftsTable 

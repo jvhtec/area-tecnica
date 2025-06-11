@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { FileText, ArrowLeft } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection } from '@/hooks/useJobSelection';
@@ -20,6 +22,9 @@ const videoComponentDatabase = [
   { id: 4, name: 'LED Screen', weight: 32 }
 ];
 
+// Global counter for generating VX numbers
+let videoTableCounter = 0;
+
 interface TableRow {
   quantity: string;
   componentId: string;
@@ -35,6 +40,8 @@ interface Table {
   id?: number | string;
   dualMotors?: boolean;
   isDefault?: boolean;
+  riggingPoints?: string; // Stores the generated VX suffix(es)
+  clusterId?: string;     // New property to group tables (e.g. mirrored pair)
 }
 
 const VideoPesosTool: React.FC = () => {
@@ -60,11 +67,28 @@ const VideoPesosTool: React.FC = () => {
   const [tables, setTables] = useState<Table[]>([]);
   const [defaultTables, setDefaultTables] = useState<Table[]>([]);
   const [useDualMotors, setUseDualMotors] = useState(false);
+  const [mirroredCluster, setMirroredCluster] = useState(false);
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
     rows: [{ quantity: '', componentId: '', weight: '' }],
   });
+
+  // Helper to generate a VX suffix for video department
+  // Returns a string such as "VX01" or "VX01, VX02" depending on useDualMotors
+  const getSuffix = () => {
+    if (useDualMotors) {
+      videoTableCounter++;
+      const num1 = videoTableCounter.toString().padStart(2, '0');
+      videoTableCounter++;
+      const num2 = videoTableCounter.toString().padStart(2, '0');
+      return `VX${num1}, VX${num2}`;
+    } else {
+      videoTableCounter++;
+      const num = videoTableCounter.toString().padStart(2, '0');
+      return `VX${num}`;
+    }
+  };
 
   const addRow = () => {
     setCurrentTable((prev) => ({
@@ -102,14 +126,18 @@ const VideoPesosTool: React.FC = () => {
 
   const saveWeightTable = async (table: Table) => {
     if (isOverrideMode && overrideData) {
-      // Save as override for tour date
+      // Save as override for tour date with all metadata
       const overrideSuccess = await saveOverride('weight', {
         item_name: table.name,
         weight_kg: table.totalWeight || 0,
         quantity: 1,
         category: 'video',
         override_data: {
-          rows: table.rows
+          rows: table.rows,
+          dualMotors: table.dualMotors,
+          riggingPoints: table.riggingPoints,
+          clusterId: table.clusterId,
+          toolType: 'pesos'
         }
       });
 
@@ -156,18 +184,57 @@ const VideoPesosTool: React.FC = () => {
 
     const totalWeight = calculatedRows.reduce((sum, row) => sum + (row.totalWeight || 0), 0);
 
-    const newTable: Table = {
-      name: tableName,
-      rows: calculatedRows,
-      totalWeight,
-      id: Date.now(),
-      dualMotors: useDualMotors,
-    };
+    // For grouping, assign a new clusterId for this generation
+    const newClusterId = Date.now().toString();
 
-    setTables((prev) => [...prev, newTable]);
-    
-    // Save to override or job context
-    saveWeightTable(newTable);
+    if (mirroredCluster) {
+      // For mirrored clusters, generate two tables sharing the same clusterId
+      const leftSuffix = getSuffix();
+      const rightSuffix = getSuffix();
+
+      const leftTable: Table = {
+        name: `${tableName} L (${leftSuffix})`,
+        riggingPoints: leftSuffix,
+        rows: calculatedRows,
+        totalWeight,
+        id: Date.now(),
+        dualMotors: useDualMotors,
+        clusterId: newClusterId,
+      };
+
+      const rightTable: Table = {
+        name: `${tableName} R (${rightSuffix})`,
+        riggingPoints: rightSuffix,
+        rows: calculatedRows,
+        totalWeight,
+        id: Date.now() + 1,
+        dualMotors: useDualMotors,
+        clusterId: newClusterId,
+      };
+
+      setTables((prev) => [...prev, leftTable, rightTable]);
+      
+      // Save both tables
+      saveWeightTable(leftTable);
+      saveWeightTable(rightTable);
+    } else {
+      // Single table: assign the newClusterId to it and generate suffix
+      const suffix = getSuffix();
+      const newTable: Table = {
+        name: `${tableName} (${suffix})`,
+        riggingPoints: suffix,
+        rows: calculatedRows,
+        totalWeight,
+        id: Date.now(),
+        dualMotors: useDualMotors,
+        clusterId: newClusterId,
+      };
+
+      setTables((prev) => [...prev, newTable]);
+      
+      // Save to override or job context
+      saveWeightTable(newTable);
+    }
     
     resetCurrentTable();
   };
@@ -178,6 +245,8 @@ const VideoPesosTool: React.FC = () => {
       rows: [{ quantity: '', componentId: '', weight: '' }],
     });
     setTableName('');
+    setUseDualMotors(false);
+    setMirroredCluster(false);
   };
 
   const removeTable = (tableId: number | string) => {
@@ -351,6 +420,28 @@ const VideoPesosTool: React.FC = () => {
               onChange={(e) => setTableName(e.target.value)}
               placeholder="Enter table name"
             />
+            
+            {/* Add configuration checkboxes */}
+            <div className="flex items-center space-x-2 mt-2">
+              <Checkbox
+                id="dualMotors"
+                checked={useDualMotors}
+                onCheckedChange={(checked) => setUseDualMotors(checked as boolean)}
+              />
+              <Label htmlFor="dualMotors" className="text-sm font-medium">
+                Dual Motors Configuration
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2 mt-2">
+              <Checkbox
+                id="mirroredCluster"
+                checked={mirroredCluster}
+                onCheckedChange={(checked) => setMirroredCluster(checked as boolean)}
+              />
+              <Label htmlFor="mirroredCluster" className="text-sm font-medium">
+                Mirrored Cluster
+              </Label>
+            </div>
           </div>
 
           <div className="border rounded-lg overflow-hidden">
@@ -462,6 +553,20 @@ const VideoPesosTool: React.FC = () => {
                   </tr>
                 </tbody>
               </table>
+              
+              {/* Show dual motors indicator */}
+              {table.dualMotors && (
+                <div className="px-4 py-2 text-sm text-gray-500 bg-muted/30 italic">
+                  *This configuration uses dual motors. Load is distributed between two motors for safety and redundancy.
+                </div>
+              )}
+              
+              {/* Show rigging points */}
+              {table.riggingPoints && (
+                <div className="px-4 py-2 text-sm text-blue-600 bg-blue-50 border-t">
+                  <strong>Rigging Points:</strong> {table.riggingPoints}
+                </div>
+              )}
             </div>
           ))}
         </div>

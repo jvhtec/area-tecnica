@@ -17,7 +17,7 @@ export interface TourDefaultTable {
   id: string;
   set_id: string;
   table_name: string;
-  table_data: any; // The complete table structure
+  table_data: any; // The complete table structure with rows
   table_type: 'power' | 'weight';
   total_value: number;
   metadata: any;

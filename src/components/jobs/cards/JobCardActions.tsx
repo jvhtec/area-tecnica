@@ -1,8 +1,7 @@
-
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
-import { Edit, Trash2, Upload, RefreshCw, Users } from "lucide-react";
+import { Edit, Trash2, Upload, RefreshCw, Users, Loader2 } from "lucide-react";
 
 interface JobCardActionsProps {
   job: any;
@@ -15,6 +14,8 @@ interface JobCardActionsProps {
   canCreateFlexFolders: boolean;
   canUploadDocuments: boolean;
   canManageArtists: boolean;
+  isCreatingFolders?: boolean;
+  currentFolderStep?: string;
   onRefreshData: (e: React.MouseEvent) => void;
   onEditButtonClick: (e: React.MouseEvent) => void;
   onDeleteClick: (e: React.MouseEvent) => void;
@@ -35,6 +36,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   canCreateFlexFolders,
   canUploadDocuments,
   canManageArtists,
+  isCreatingFolders = false,
   onRefreshData,
   onEditButtonClick,
   onDeleteClick,
@@ -43,6 +45,13 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   onAssignmentDialogOpen,
   handleFileUpload
 }) => {
+  const getFlexButtonTitle = () => {
+    if (isCreatingFolders) {
+      return "Creating folders...";
+    }
+    return foldersAreCreated ? "Folders already exist" : "Create Flex folders";
+  };
+
   return (
     <div className="flex flex-wrap gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
       {job.job_type === "festival" && isProjectManagementPage && canManageArtists && (
@@ -101,19 +110,19 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           variant="ghost"
           size="icon"
           onClick={onCreateFlexFolders}
-          disabled={foldersAreCreated}
-          title={
-            foldersAreCreated
-              ? "Folders already exist"
-              : "Create Flex folders"
-          }
+          disabled={foldersAreCreated || isCreatingFolders}
+          title={getFlexButtonTitle()}
           className={
-            foldersAreCreated
+            foldersAreCreated || isCreatingFolders
               ? "opacity-50 cursor-not-allowed"
               : "hover:bg-accent/50"
           }
         >
-          <img src={createFolderIcon} alt="Create Flex folders" className="h-4 w-4" />
+          {isCreatingFolders ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <img src={createFolderIcon} alt="Create Flex folders" className="h-4 w-4" />
+          )}
         </Button>
       )}
       {job.job_type !== "dryhire" && showUpload && canUploadDocuments && (

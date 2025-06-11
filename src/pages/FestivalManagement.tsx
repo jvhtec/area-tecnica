@@ -57,7 +57,7 @@ const FestivalManagement = () => {
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const { userRole } = useAuth();
   const [maxStages, setMaxStages] = useState(1);
-  const { flexUuid, isLoading: isFlexLoading, error: flexError } = useFlexUuid(jobId || '');
+  const { flexUuid, isLoading: isFlexLoading, error: flexError, folderExists } = useFlexUuid(jobId || '');
 
   const isSchedulingRoute = location.pathname.includes('/scheduling');
   
@@ -190,24 +190,24 @@ const FestivalManagement = () => {
     fetchJobDetails();
   }, [jobId]);
 
-  const handlePrintAllDocumentation = async (options: PrintOptions) => {
+  const handlePrintAllDocumentation = async (options: PrintOptions, filename: string) => {
     if (!jobId) return;
     
     setIsPrinting(true);
     try {
       console.log("Starting documentation print process with options:", options);
       
-      const mergedPdf = await generateAndMergeFestivalPDFs(jobId, job?.title || 'Festival', options);
+      const result = await generateAndMergeFestivalPDFs(jobId, job?.title || 'Festival', options, filename);
       
-      console.log(`Merged PDF created, size: ${mergedPdf.size} bytes`);
-      if (!mergedPdf || mergedPdf.size === 0) {
+      console.log(`Merged PDF created, size: ${result.blob.size} bytes`);
+      if (!result.blob || result.blob.size === 0) {
         throw new Error('Generated PDF is empty');
       }
       
-      const url = URL.createObjectURL(mergedPdf);
+      const url = URL.createObjectURL(result.blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${job?.title || 'Festival'}_Documentation.pdf`;
+      a.download = result.filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -231,6 +231,32 @@ const FestivalManagement = () => {
 
   const handlePrintButtonClick = () => {
     setIsPrintDialogOpen(true);
+  };
+
+  const handleFlexClick = () => {
+    if (isFlexLoading) {
+      toast({
+        title: "Loading",
+        description: "Please wait while we load the Flex folder...",
+      });
+      return;
+    }
+
+    if (flexUuid) {
+      const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+      window.open(flexUrl, '_blank', 'noopener');
+    } else if (flexError) {
+      toast({
+        title: "Error",
+        description: flexError,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Info",
+        description: "Flex folder not available for this festival",
+      });
+    }
   };
 
   if (!jobId) {
@@ -276,21 +302,21 @@ const FestivalManagement = () => {
                   {isPrinting ? 'Generating...' : 'Print Documentation'}
                 </Button>
               )}
-              {canEdit && (
+              {/* Only show Flex button if folder exists or is loading */}
+              {canEdit && (folderExists || isFlexLoading) && (
                 <Button
                   variant="outline"
                   size="sm"
                   className="flex items-center gap-2"
-                  onClick={() => {
-                    if (flexUuid) {
-                      const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
-                      window.open(flexUrl, '_blank', 'noopener');
-                    }
-                  }}
-                  disabled={!flexUuid}
+                  onClick={handleFlexClick}
+                  disabled={!flexUuid || isFlexLoading}
                 >
-                  <img src={createFolderIcon} alt="Flex" className="h-4 w-4" />
-                  Flex
+                  {isFlexLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <img src={createFolderIcon} alt="Flex" className="h-4 w-4" />
+                  )}
+                  {isFlexLoading ? 'Loading...' : 'Flex'}
                 </Button>
               )}
               {canEdit && <FestivalLogoManager jobId={jobId} />}
@@ -391,6 +417,7 @@ const FestivalManagement = () => {
           onOpenChange={setIsPrintDialogOpen}
           onConfirm={handlePrintAllDocumentation}
           maxStages={maxStages}
+          jobTitle={job?.title || ''}
         />
       )}
     </div>

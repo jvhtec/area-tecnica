@@ -3,21 +3,43 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { useTourDefaultSets } from "@/hooks/useTourDefaultSets";
-import { useTourDateOverrides } from "@/hooks/useTourDateOverrides";
 import { useToast } from "@/hooks/use-toast";
 import { FileText, Weight, Calculator, Trash2, Download, Calendar } from "lucide-react";
 import { exportToPDF } from "@/utils/pdfExport";
 import { fetchTourLogo } from "@/utils/pdf/logoUtils";
 import { supabase } from "@/lib/supabase";
+import { useTourPowerDefaults } from "@/hooks/useTourPowerDefaults";
+import { useTourWeightDefaults } from "@/hooks/useTourWeightDefaults";
+import { useTourDefaultSets, TourDefaultTable } from "@/hooks/useTourDefaultSets";
 
 interface TourDefaultsManagerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tour: any;
 }
+
+// Legacy types for backward compatibility
+interface TourPowerDefault {
+  id: string;
+  table_name?: string;
+  item_name?: string;
+  total_watts: number;
+  current_per_phase?: number;
+  pdu_type?: string;
+  custom_pdu_type?: string;
+  department?: string;
+}
+
+interface TourWeightDefault {
+  id: string;
+  table_name?: string;
+  item_name?: string;
+  weight_kg: number;
+  quantity?: number;
+  department?: string;
+}
+
+type CombinedDefaultType = TourDefaultTable | TourPowerDefault | TourWeightDefault;
 
 export const TourDefaultsManager = ({
   open,
@@ -28,27 +50,29 @@ export const TourDefaultsManager = ({
   const [activeTab, setActiveTab] = useState('sound');
   const [tourDates, setTourDates] = useState<any[]>([]);
 
-  // Fetch defaults for each department
+  // Use the new tour default sets hook
   const {
-    defaultSets: soundDefaultSets,
-    defaultTables: soundDefaultTables,
-    deleteSet: deleteSoundSet,
-    isLoading: soundLoading
-  } = useTourDefaultSets(tour?.id || '', 'sound');
+    defaultSets,
+    defaultTables,
+    isLoading: defaultSetsLoading,
+    deleteSet,
+    deleteTable,
+    isDeletingSet,
+    isDeletingTable
+  } = useTourDefaultSets(tour?.id || '');
+
+  // Keep the old hooks for backward compatibility but prioritize new system
+  const {
+    powerDefaults: legacyPowerDefaults,
+    isLoading: soundPowerLoading,
+    deleteDefault: deleteSoundPowerDefault
+  } = useTourPowerDefaults(tour?.id || '');
 
   const {
-    defaultSets: lightsDefaultSets,
-    defaultTables: lightsDefaultTables,
-    deleteSet: deleteLightsSet,
-    isLoading: lightsLoading
-  } = useTourDefaultSets(tour?.id || '', 'lights');
-
-  const {
-    defaultSets: videoDefaultSets,
-    defaultTables: videoDefaultTables,
-    deleteSet: deleteVideoSet,
-    isLoading: videoLoading
-  } = useTourDefaultSets(tour?.id || '', 'video');
+    weightDefaults: legacyWeightDefaults,
+    isLoading: soundWeightLoading,
+    deleteDefault: deleteSoundWeightDefault
+  } = useTourWeightDefaults(tour?.id || '');
 
   // Fetch tour dates
   React.useEffect(() => {
@@ -78,16 +102,130 @@ export const TourDefaultsManager = ({
     fetchTourDates();
   }, [tour?.id]);
 
+  // Type guards to check data format
+  const isNewFormatTable = (item: CombinedDefaultType): item is TourDefaultTable => {
+    return 'set_id' in item || 'table_data' in item;
+  };
+
+  const isLegacyPowerDefault = (item: CombinedDefaultType): item is TourPowerDefault => {
+    return 'total_watts' in item && !('set_id' in item);
+  };
+
+  const isLegacyWeightDefault = (item: CombinedDefaultType): item is TourWeightDefault => {
+    return 'weight_kg' in item && !('set_id' in item);
+  };
+
+  // Get defaults by department - prioritize new system, fallback to legacy
+  const getDepartmentDefaults = (department: string, type: 'power' | 'weight'): CombinedDefaultType[] => {
+    // First check if we have new format defaults
+    const departmentSets = defaultSets.filter(set => set.department === department);
+    const departmentTables = defaultTables.filter(table => 
+      departmentSets.some(set => set.id === table.set_id) && table.table_type === type
+    );
+
+    if (departmentTables.length > 0) {
+      return departmentTables;
+    }
+
+    // Fallback to legacy system
+    if (type === 'power') {
+      return legacyPowerDefaults.filter(d => d.department === department || (!d.department && department === 'sound'));
+    } else {
+      return legacyWeightDefaults.filter(d => d.department === department || (!d.department && department === 'sound'));
+    }
+  };
+
+  // Handle deletion based on format type
+  const handleDeleteTable = async (table: CombinedDefaultType, type: 'power' | 'weight') => {
+    try {
+      // Check if this is new format (has table_data or set_id)
+      if (isNewFormatTable(table)) {
+        // New format - use deleteTable from useTourDefaultSets
+        await deleteTable(table.id);
+      } else {
+        // Legacy format - use the old delete functions
+        if (type === 'power' && isLegacyPowerDefault(table)) {
+          await deleteSoundPowerDefault(table.id);
+        } else if (type === 'weight' && isLegacyWeightDefault(table)) {
+          await deleteSoundWeightDefault(table.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting table:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete table',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Handle set deletion
+  const handleDeleteSet = async (setId: string) => {
+    try {
+      await deleteSet(setId);
+    } catch (error) {
+      console.error('Error deleting set:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete set',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Helper function to get table name based on format
+  const getTableName = (table: CombinedDefaultType): string => {
+    if (isNewFormatTable(table)) {
+      return table.table_name || 'Unnamed';
+    }
+    if (isLegacyPowerDefault(table)) {
+      return table.table_name || table.item_name || 'Unnamed';
+    }
+    if (isLegacyWeightDefault(table)) {
+      return table.table_name || table.item_name || 'Unnamed';
+    }
+    return 'Unnamed';
+  };
+
+  // Helper function to get power value based on format
+  const getPowerValue = (table: CombinedDefaultType): number => {
+    if (isNewFormatTable(table)) {
+      return table.total_value || 0;
+    }
+    if (isLegacyPowerDefault(table)) {
+      return table.total_watts || 0;
+    }
+    return 0;
+  };
+
+  // Helper function to get weight value based on format
+  const getWeightValue = (table: CombinedDefaultType): number => {
+    if (isNewFormatTable(table)) {
+      return table.total_value || 0;
+    }
+    if (isLegacyWeightDefault(table)) {
+      return ((table.weight_kg || 0) * (table.quantity || 1));
+    }
+    return 0;
+  };
+
+  // Helper function to get current per phase based on format
+  const getCurrentPerPhase = (table: CombinedDefaultType): number | undefined => {
+    if (isNewFormatTable(table)) {
+      return table.metadata?.current_per_phase;
+    }
+    if (isLegacyPowerDefault(table)) {
+      return table.current_per_phase;
+    }
+    return undefined;
+  };
+
   const handleBulkPDFExport = async (department: string, type: 'power' | 'weight') => {
     try {
-      const relevantSets = department === 'sound' ? soundDefaultSets : 
-                          department === 'lights' ? lightsDefaultSets : videoDefaultSets;
-      const relevantTables = department === 'sound' ? soundDefaultTables : 
-                            department === 'lights' ? lightsDefaultTables : videoDefaultTables;
+      const relevantDefaults = getDepartmentDefaults(department, type);
 
-      const filteredTables = relevantTables.filter(table => table.table_type === type);
-
-      if (filteredTables.length === 0) {
+      if (relevantDefaults.length === 0) {
         toast({
           title: 'No defaults found',
           description: `No ${type} defaults found for ${department} department`,
@@ -104,20 +242,41 @@ export const TourDefaultsManager = ({
         console.error('Error fetching tour logo:', error);
       }
 
-      // Get the safety margin from the first table's metadata, defaulting to 0
-      const safetyMargin = filteredTables[0]?.metadata?.safetyMargin || 0;
-
-      // Convert to the format expected by exportToPDF with proper typing
-      const tables = filteredTables.map(table => ({
-        name: table.table_name,
-        rows: table.table_data.rows || [],
-        totalWeight: type === 'weight' ? table.total_value : undefined,
-        totalWatts: type === 'power' ? table.total_value : undefined,
-        currentPerPhase: table.metadata?.currentPerPhase,
-        pduType: table.metadata?.pduType,
-        toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
-        id: Date.now()
-      }));
+      // Convert defaults to the format expected by exportToPDF
+      const tables = relevantDefaults.map(defaultItem => {
+        // Check if this is new format with table_data
+        if (isNewFormatTable(defaultItem) && defaultItem.table_data?.rows) {
+          return {
+            name: getTableName(defaultItem),
+            rows: defaultItem.table_data.rows || [],
+            totalWeight: type === 'weight' ? defaultItem.total_value : undefined,
+            totalWatts: type === 'power' ? defaultItem.total_value : undefined,
+            currentPerPhase: type === 'power' ? defaultItem.metadata?.current_per_phase : undefined,
+            pduType: type === 'power' ? defaultItem.metadata?.pdu_type || defaultItem.metadata?.custom_pdu_type : undefined,
+            toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+            id: Date.now() + Math.random()
+          };
+        } else {
+          // Legacy format - create a summary row
+          return {
+            name: getTableName(defaultItem),
+            rows: [{
+              quantity: '1',
+              componentName: getTableName(defaultItem),
+              weight: type === 'weight' && isLegacyWeightDefault(defaultItem) ? defaultItem.weight_kg?.toString() : undefined,
+              watts: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.total_watts?.toString() : undefined,
+              totalWeight: type === 'weight' ? getWeightValue(defaultItem) : undefined,
+              totalWatts: type === 'power' ? getPowerValue(defaultItem) : undefined,
+            }],
+            totalWeight: type === 'weight' ? getWeightValue(defaultItem) : undefined,
+            totalWatts: type === 'power' ? getPowerValue(defaultItem) : undefined,
+            currentPerPhase: type === 'power' ? getCurrentPerPhase(defaultItem) : undefined,
+            pduType: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.pdu_type || defaultItem.custom_pdu_type : undefined,
+            toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+            id: Date.now() + Math.random()
+          };
+        }
+      });
 
       // Calculate power summary for power exports
       let powerSummary;
@@ -129,6 +288,18 @@ export const TourDefaultsManager = ({
         }, 0);
         powerSummary = { totalSystemWatts, totalSystemAmps };
       }
+
+      // Get safety margin from the first default's metadata, fallback to 0
+      const safetyMargin = (() => {
+        const firstDefault = relevantDefaults[0];
+        if (isNewFormatTable(firstDefault) && firstDefault.metadata?.safetyMargin) {
+          return firstDefault.metadata.safetyMargin;
+        }
+        if (isNewFormatTable(firstDefault) && firstDefault.table_data?.safetyMargin) {
+          return firstDefault.table_data.safetyMargin;
+        }
+        return 0;
+      })();
 
       const pdfBlob = await exportToPDF(
         `${tour.name} - ${department.toUpperCase()} ${type.toUpperCase()} Defaults`,
@@ -205,51 +376,68 @@ export const TourDefaultsManager = ({
   };
 
   const exportTourDatePDF = async (tourDate: any, department: string, type: 'power' | 'weight', logoUrl?: string) => {
-    // Get defaults
-    const relevantTables = department === 'sound' ? soundDefaultTables : 
-                          department === 'lights' ? lightsDefaultTables : videoDefaultTables;
-    const defaultTables = relevantTables.filter(table => table.table_type === type);
+    // Get defaults for this department and type
+    let defaultsData = getDepartmentDefaults(department, type);
 
-    // Get overrides for this tour date
+    // Check for any overrides for this tour date
+    const overrideTable = type === 'power' ? 'tour_date_power_overrides' : 'tour_date_weight_overrides';
     const { data: overrides } = await supabase
-      .from(type === 'power' ? 'tour_date_power_overrides' : 'tour_date_weight_overrides')
+      .from(overrideTable)
       .select('*')
       .eq('tour_date_id', tourDate.id)
       .eq('department', department);
 
-    // Determine safety margin - use from overrides if available, otherwise from defaults
-    let safetyMargin = 0;
-    if (overrides && overrides.length > 0) {
-      safetyMargin = overrides[0]?.override_data?.safetyMargin || 0;
-    } else if (defaultTables.length > 0) {
-      safetyMargin = defaultTables[0]?.metadata?.safetyMargin || 0;
-    }
-
     let combinedTables;
+    let safetyMargin = 0;
 
-    // If overrides exist, use only overrides, otherwise use defaults
+    // If overrides exist, use overrides, otherwise use defaults
     if (overrides && overrides.length > 0) {
       combinedTables = overrides.map((override: any) => ({
-        name: override.table_name || override.item_name,
+        name: override.table_name || override.item_name || 'Override',
         rows: override.override_data?.rows || [],
-        totalWeight: type === 'weight' ? override.weight_kg * (override.quantity || 1) : undefined,
-        totalWatts: type === 'power' ? override.total_watts : undefined,
+        totalWeight: type === 'weight' ? (override.weight_kg || 0) * (override.quantity || 1) : undefined,
+        totalWatts: type === 'power' ? override.total_watts || 0 : undefined,
         currentPerPhase: type === 'power' ? override.current_per_phase : undefined,
-        pduType: type === 'power' ? override.pdu_type : undefined,
+        pduType: type === 'power' ? override.pdu_type || override.custom_pdu_type : undefined,
         toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
         id: Date.now() + Math.random()
       }));
+      safetyMargin = overrides[0]?.override_data?.safetyMargin || 0;
     } else {
-      combinedTables = defaultTables.map(table => ({
-        name: table.table_name,
-        rows: table.table_data.rows || [],
-        totalWeight: type === 'weight' ? table.total_value : undefined,
-        totalWatts: type === 'power' ? table.total_value : undefined,
-        currentPerPhase: table.metadata?.currentPerPhase,
-        pduType: table.metadata?.pduType,
-        toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
-        id: Date.now() + Math.random()
-      }));
+      combinedTables = defaultsData.map(defaultItem => {
+        // Check if this is new format with table_data
+        if (isNewFormatTable(defaultItem) && defaultItem.table_data?.rows) {
+          return {
+            name: getTableName(defaultItem),
+            rows: defaultItem.table_data.rows || [],
+            totalWeight: type === 'weight' ? defaultItem.total_value : undefined,
+            totalWatts: type === 'power' ? defaultItem.total_value : undefined,
+            currentPerPhase: type === 'power' ? defaultItem.metadata?.current_per_phase : undefined,
+            pduType: type === 'power' ? defaultItem.metadata?.pdu_type || defaultItem.metadata?.custom_pdu_type : undefined,
+            toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+            id: Date.now() + Math.random()
+          };
+        } else {
+          // Legacy format
+          return {
+            name: getTableName(defaultItem),
+            rows: [{
+              quantity: '1',
+              componentName: getTableName(defaultItem),
+              weight: type === 'weight' && isLegacyWeightDefault(defaultItem) ? defaultItem.weight_kg?.toString() : undefined,
+              watts: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.total_watts?.toString() : undefined,
+              totalWeight: type === 'weight' ? getWeightValue(defaultItem) : undefined,
+              totalWatts: type === 'power' ? getPowerValue(defaultItem) : undefined,
+            }],
+            totalWeight: type === 'weight' ? getWeightValue(defaultItem) : undefined,
+            totalWatts: type === 'power' ? getPowerValue(defaultItem) : undefined,
+            currentPerPhase: type === 'power' ? getCurrentPerPhase(defaultItem) : undefined,
+            pduType: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.pdu_type || defaultItem.custom_pdu_type : undefined,
+            toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+            id: Date.now() + Math.random()
+          };
+        }
+      });
     }
 
     if (combinedTables.length === 0) return;
@@ -291,22 +479,18 @@ export const TourDefaultsManager = ({
     document.body.removeChild(a);
   };
 
-  // Wrapper functions to handle Promise<string> to Promise<void> conversion
-  const handleDeleteSoundSet = async (id: string): Promise<void> => {
-    await deleteSoundSet(id);
-  };
+  const renderDepartmentDefaults = (department: string) => {
+    const powerTables = getDepartmentDefaults(department, 'power');
+    const weightTables = getDepartmentDefaults(department, 'weight');
 
-  const handleDeleteLightsSet = async (id: string): Promise<void> => {
-    await deleteLightsSet(id);
-  };
-
-  const handleDeleteVideoSet = async (id: string): Promise<void> => {
-    await deleteVideoSet(id);
-  };
-
-  const renderDepartmentDefaults = (department: string, sets: any[], tables: any[], deleteSet: (id: string) => Promise<void>) => {
-    const powerTables = tables.filter(t => t.table_type === 'power');
-    const weightTables = tables.filter(t => t.table_type === 'weight');
+    // Group new format tables by sets
+    const departmentSets = defaultSets.filter(set => set.department === department);
+    const powerSets = departmentSets.filter(set => 
+      defaultTables.some(table => table.set_id === set.id && table.table_type === 'power')
+    );
+    const weightSets = departmentSets.filter(set => 
+      defaultTables.some(table => table.set_id === set.id && table.table_type === 'weight')
+    );
 
     return (
       <div className="space-y-6">
@@ -338,33 +522,93 @@ export const TourDefaultsManager = ({
               </Button>
             </div>
           </div>
-          {powerTables.length > 0 ? (
+
+          {/* New Format Sets */}
+          {powerSets.map((set) => {
+            const setTables = defaultTables.filter(table => 
+              table.set_id === set.id && table.table_type === 'power'
+            );
+            
+            return (
+              <div key={set.id} className="mb-6 border rounded-lg p-4 bg-gray-50">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h5 className="font-medium text-lg">{set.name}</h5>
+                    {set.description && (
+                      <p className="text-sm text-muted-foreground">{set.description}</p>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteSet(set.id)}
+                    disabled={isDeletingSet}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {setTables.map((table) => (
+                    <div key={table.id} className="border rounded-lg p-4 bg-white">
+                      <div className="flex justify-between items-start mb-2">
+                        <h6 className="font-medium">{table.table_name}</h6>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteTable(table, 'power')}
+                          disabled={isDeletingTable}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {table.total_value.toFixed(2)} W
+                      </p>
+                      {table.metadata?.current_per_phase && (
+                        <p className="text-xs text-muted-foreground">
+                          {table.metadata.current_per_phase.toFixed(2)} A per phase
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Legacy Format Tables */}
+          {powerTables.filter(table => !isNewFormatTable(table)).length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {powerTables.map((table) => (
+              {powerTables.filter(table => !isNewFormatTable(table)).map((table) => (
                 <div key={table.id} className="border rounded-lg p-4">
                   <div className="flex justify-between items-start mb-2">
-                    <h5 className="font-medium">{table.table_name}</h5>
+                    <h5 className="font-medium">{getTableName(table)}</h5>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => deleteSet(table.set_id)}
+                      onClick={() => handleDeleteTable(table, 'power')}
                       className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {table.total_value.toFixed(2)} W
+                    {getPowerValue(table).toFixed(2)} W
                   </p>
-                  {table.metadata?.currentPerPhase && (
+                  {getCurrentPerPhase(table) && (
                     <p className="text-xs text-muted-foreground">
-                      {table.metadata.currentPerPhase.toFixed(2)} A per phase
+                      {getCurrentPerPhase(table)!.toFixed(2)} A per phase
                     </p>
                   )}
                 </div>
               ))}
             </div>
-          ) : (
+          )}
+
+          {powerTables.length === 0 && (
             <p className="text-muted-foreground">No power defaults configured</p>
           )}
         </div>
@@ -397,28 +641,88 @@ export const TourDefaultsManager = ({
               </Button>
             </div>
           </div>
-          {weightTables.length > 0 ? (
+
+          {/* New Format Sets */}
+          {weightSets.map((set) => {
+            const setTables = defaultTables.filter(table => 
+              table.set_id === set.id && table.table_type === 'weight'
+            );
+            
+            return (
+              <div key={set.id} className="mb-6 border rounded-lg p-4 bg-gray-50">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h5 className="font-medium text-lg">{set.name}</h5>
+                    {set.description && (
+                      <p className="text-sm text-muted-foreground">{set.description}</p>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteSet(set.id)}
+                    disabled={isDeletingSet}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {setTables.map((table) => (
+                    <div key={table.id} className="border rounded-lg p-4 bg-white">
+                      <div className="flex justify-between items-start mb-2">
+                        <h6 className="font-medium">{table.table_name}</h6>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteTable(table, 'weight')}
+                          disabled={isDeletingTable}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {table.total_value.toFixed(2)} kg
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Legacy Format Tables */}
+          {weightTables.filter(table => !isNewFormatTable(table)).length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {weightTables.map((table) => (
+              {weightTables.filter(table => !isNewFormatTable(table)).map((table) => (
                 <div key={table.id} className="border rounded-lg p-4">
                   <div className="flex justify-between items-start mb-2">
-                    <h5 className="font-medium">{table.table_name}</h5>
+                    <h5 className="font-medium">{getTableName(table)}</h5>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => deleteSet(table.set_id)}
+                      onClick={() => handleDeleteTable(table, 'weight')}
                       className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {table.total_value.toFixed(2)} kg
+                    {getWeightValue(table).toFixed(2)} kg
                   </p>
+                  {isLegacyWeightDefault(table) && table.quantity && table.weight_kg && (
+                    <p className="text-xs text-muted-foreground">
+                      {table.quantity} × {table.weight_kg.toFixed(2)} kg
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
-          ) : (
+          )}
+
+          {weightTables.length === 0 && (
             <p className="text-muted-foreground">No weight defaults configured</p>
           )}
         </div>
@@ -505,26 +809,26 @@ export const TourDefaultsManager = ({
           </TabsList>
           
           <TabsContent value="sound" className="mt-6">
-            {soundLoading ? (
+            {defaultSetsLoading || soundPowerLoading || soundWeightLoading ? (
               <p>Loading sound defaults...</p>
             ) : (
-              renderDepartmentDefaults('sound', soundDefaultSets, soundDefaultTables, handleDeleteSoundSet)
+              renderDepartmentDefaults('sound')
             )}
           </TabsContent>
           
           <TabsContent value="lights" className="mt-6">
-            {lightsLoading ? (
+            {defaultSetsLoading || soundPowerLoading || soundWeightLoading ? (
               <p>Loading lights defaults...</p>
             ) : (
-              renderDepartmentDefaults('lights', lightsDefaultSets, lightsDefaultTables, handleDeleteLightsSet)
+              renderDepartmentDefaults('lights')
             )}
           </TabsContent>
           
           <TabsContent value="video" className="mt-6">
-            {videoLoading ? (
+            {defaultSetsLoading || soundPowerLoading || soundWeightLoading ? (
               <p>Loading video defaults...</p>
             ) : (
-              renderDepartmentDefaults('video', videoDefaultSets, videoDefaultTables, handleDeleteVideoSet)
+              renderDepartmentDefaults('video')
             )}
           </TabsContent>
 

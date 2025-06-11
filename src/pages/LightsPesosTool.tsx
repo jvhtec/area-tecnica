@@ -1,14 +1,19 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, ArrowLeft } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { FileText, ArrowLeft, Edit, Trash2 } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
+import { supabase } from '@/lib/supabase';
 
 const lightsComponentDatabase = [
   { id: 1, name: 'CAMEO OPS S5', weight: 26 },
@@ -77,6 +82,8 @@ const lightsComponentDatabase = [
   { id: 64, name: 'TRUSS 40x40 3M', weight: 30 }
 ];
 
+const RIGGING_POINT_OPTIONS = ['1', '2', '3', '4', '5', '6', '7', '8'];
+
 interface TableRow {
   quantity: string;
   componentId: string;
@@ -89,26 +96,115 @@ interface Table {
   name: string;
   rows: TableRow[];
   totalWeight?: number;
-  id?: number;
+  id?: number | string;
   dualMotors?: boolean;
+  mirroredCluster?: boolean;
+  riggingPoint?: string;
+  cablePick?: boolean;
+  isDefault?: boolean;
 }
 
 const LightsPesosTool: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
-  const department = 'lights';
+  const [searchParams] = useSearchParams();
+  
+  // Tour defaults mode detection
+  const tourId = searchParams.get('tourId');
+  const mode = searchParams.get('mode');
+  const isTourDefaults = mode === 'tour-defaults';
+
+  // Tour defaults hooks
+  const { 
+    defaultSets,
+    createSet,
+    createTable: createTourDefaultTable 
+  } = useTourDefaultSets(tourId || '');
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [tableName, setTableName] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
-  const [useDualMotors, setUseDualMotors] = useState(false);
+  const [dualMotors, setDualMotors] = useState(false);
+  const [mirroredCluster, setMirroredCluster] = useState(false);
+  const [selectedRiggingPoint, setSelectedRiggingPoint] = useState<string>('');
+  const [cablePick, setCablePick] = useState(false);
+  const [tourName, setTourName] = useState<string>('');
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
     rows: [{ quantity: '', componentId: '', weight: '' }],
   });
+
+  // Helper function to get or create the set ID for lights department
+  const getOrCreateLightsSetId = (): string | null => {
+    if (!tourId) return null;
+    
+    // Check if a lights set already exists
+    const existingLightsSet = defaultSets.find(set => set.department === 'lights');
+    return existingLightsSet?.id || null;
+  };
+
+  const createLightsSetId = async (): Promise<string> => {
+    if (!tourId) throw new Error('No tour ID');
+    
+    const newSet = await createSet({
+      tour_id: tourId,
+      name: `${tourName} Lights Defaults`,
+      department: 'lights',
+      description: 'Lights department weight defaults'
+    });
+    
+    return newSet.id;
+  };
+
+  // Save as tour defaults using the new system
+  const saveTourDefault = async (table: Table) => {
+    if (!tourId) return;
+
+    try {
+      // Get existing set ID or create new one
+      let setId = getOrCreateLightsSetId();
+      
+      if (!setId) {
+        setId = await createLightsSetId();
+      }
+
+      // Create the table with detailed data and metadata
+      await createTourDefaultTable({
+        set_id: setId,
+        table_name: table.name,
+        table_data: {
+          rows: table.rows,
+          dualMotors: table.dualMotors,
+          mirroredCluster: table.mirroredCluster,
+          riggingPoint: table.riggingPoint,
+          cablePick: table.cablePick
+        },
+        table_type: 'weight',
+        total_value: table.totalWeight || 0,
+        metadata: {
+          dualMotors: table.dualMotors,
+          mirroredCluster: table.mirroredCluster,
+          riggingPoint: table.riggingPoint,
+          cablePick: table.cablePick
+        }
+      });
+
+      toast({
+        title: "Success",
+        description: "Tour default saved successfully",
+      });
+    } catch (error: any) {
+      console.error('Error saving tour default:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save tour default",
+        variant: "destructive"
+      });
+    }
+  };
 
   const addRow = () => {
     setCurrentTable((prev) => ({
@@ -144,11 +240,11 @@ const LightsPesosTool: React.FC = () => {
     setSelectedJob(job);
   };
 
-  const generateTable = () => {
+  const generateTable = async () => {
     if (!tableName) {
       toast({
-        title: 'Falta el nombre de la tabla',
-        description: 'Por favor, ingrese un nombre para la tabla',
+        title: 'Missing table name',
+        description: 'Please enter a name for the table',
         variant: 'destructive',
       });
       return;
@@ -174,12 +270,20 @@ const LightsPesosTool: React.FC = () => {
       rows: calculatedRows,
       totalWeight,
       id: Date.now(),
-      dualMotors: useDualMotors
+      dualMotors,
+      mirroredCluster,
+      riggingPoint: selectedRiggingPoint,
+      cablePick
     };
 
     setTables((prev) => [...prev, newTable]);
+
+    // Save based on mode
+    if (isTourDefaults) {
+      await saveTourDefault(newTable);
+    }
+
     resetCurrentTable();
-    setUseDualMotors(false);
   };
 
   const resetCurrentTable = () => {
@@ -188,6 +292,10 @@ const LightsPesosTool: React.FC = () => {
       rows: [{ quantity: '', componentId: '', weight: '' }],
     });
     setTableName('');
+    setDualMotors(false);
+    setMirroredCluster(false);
+    setSelectedRiggingPoint('');
+    setCablePick(false);
   };
 
   const removeTable = (tableId: number) => {
@@ -195,25 +303,71 @@ const LightsPesosTool: React.FC = () => {
   };
 
   const handleExportPDF = async () => {
-    if (!selectedJobId || !selectedJob) {
+    if (!selectedJobId && !isTourDefaults) {
       toast({
-        title: 'No se ha seleccionado ningún trabajo',
-        description: 'Por favor, seleccione un trabajo antes de exportar.',
+        title: 'No job selected',
+        description: 'Please select a job before exporting.',
         variant: 'destructive',
       });
       return;
     }
 
     try {
+      // Generate summary rows for weight reports
+      const summaryRows = tables.map((table) => ({
+        clusterName: table.name,
+        riggingPoints: table.riggingPoint || 'N/A',
+        clusterWeight: table.totalWeight || 0
+      }));
+
+      let logoUrl: string | undefined = undefined;
+      try {
+        if (isTourDefaults && tourId) {
+          const { fetchTourLogo } = await import('@/utils/pdf/logoUtils');
+          logoUrl = await fetchTourLogo(tourId);
+        } else if (selectedJobId) {
+          const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
+          logoUrl = await fetchJobLogo(selectedJobId);
+        }
+      } catch (logoError) {
+        console.error("Error fetching logo:", logoError);
+      }
+
+      const jobTitle = isTourDefaults ? `${tourName} Lights Weight Defaults` : selectedJob?.title || 'Weight Report';
+      
       const pdfBlob = await exportToPDF(
-        selectedJob.title,
+        jobTitle,
         tables.map((table) => ({ ...table, toolType: 'pesos' })),
         'weight',
-        selectedJob.title,
-        undefined
+        jobTitle,
+        'lights',
+        summaryRows,
+        undefined,
+        0,
+        logoUrl
       );
 
-      const fileName = `Informe de Peso de Luces - ${selectedJob.title}.pdf`;
+      const fileName = `Lights Weight Report - ${jobTitle}.pdf`;
+      
+      if (!isTourDefaults && selectedJobId) {
+        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+        const filePath = `lights/${selectedJobId}/${crypto.randomUUID()}.pdf`;
+
+        const { error: uploadError } = await supabase.storage.from('task_documents').upload(filePath, file);
+        if (uploadError) throw uploadError;
+
+        toast({
+          title: 'Success',
+          description: 'PDF has been generated and uploaded successfully.',
+        });
+      } else {
+        toast({
+          title: 'Success',
+          description: 'PDF has been generated successfully.',
+        });
+      }
+
+      // Provide download to user
       const url = window.URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -222,20 +376,34 @@ const LightsPesosTool: React.FC = () => {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-
-      toast({
-        title: 'Éxito',
-        description: 'El PDF se ha generado exitosamente.',
-      });
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      console.error('Error exporting PDF:', error);
       toast({
         title: 'Error',
-        description: 'No se pudo generar el PDF.',
+        description: 'Failed to generate or upload the PDF.',
         variant: 'destructive',
       });
     }
   };
+
+  // Load tour name for display
+  useEffect(() => {
+    const fetchTourInfo = async () => {
+      if (tourId) {
+        const { data } = await supabase
+          .from('tours')
+          .select('name')
+          .eq('id', tourId)
+          .single();
+        
+        if (data) {
+          setTourName(data.name);
+        }
+      }
+    };
+
+    fetchTourInfo();
+  }, [tourId]);
 
   return (
     <Card className="w-full max-w-4xl mx-auto my-6">
@@ -244,44 +412,127 @@ const LightsPesosTool: React.FC = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate('/lights')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <CardTitle className="text-2xl font-bold">Calculadora de Peso de Luces</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-2xl font-bold">Weight Calculator</CardTitle>
+            {isTourDefaults && (
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                Tour Defaults
+              </Badge>
+            )}
+          </div>
         </div>
+        {isTourDefaults && (
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">
+              Creating weight defaults for tour: <span className="font-medium">{tourName}</span>
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              These defaults will apply to all tour dates unless specifically overridden
+            </p>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="jobSelect">Seleccionar Trabajo</Label>
-            <Select value={selectedJobId} onValueChange={handleJobSelect}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccione un trabajo" />
-              </SelectTrigger>
-              <SelectContent>
-                {jobs?.map((job) => (
-                  <SelectItem key={job.id} value={job.id}>
-                    {job.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {isTourDefaults && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 bg-green-500 rounded-full"></div>
+                <p className="text-sm font-medium text-green-900">
+                  Tour Defaults Mode Active
+                </p>
+              </div>
+              <p className="text-sm text-green-700 mt-1">
+                Any tables you create will be saved as global defaults for this tour. These defaults will apply to all tour dates unless specifically overridden.
+              </p>
+            </div>
+          )}
+
+          {!isTourDefaults && (
+            <div className="space-y-2">
+              <Label htmlFor="jobSelect">Select Job</Label>
+              <Select value={selectedJobId} onValueChange={handleJobSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a job" />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobs?.map((job) => (
+                    <SelectItem key={job.id} value={job.id}>
+                      {job.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
-            <Label htmlFor="tableName">Nombre de la Tabla</Label>
+            <Label htmlFor="tableName">
+              {isTourDefaults ? 'Default Name' : 'Table Name'}
+            </Label>
             <Input
               id="tableName"
               value={tableName}
               onChange={(e) => setTableName(e.target.value)}
-              placeholder="Ingrese el nombre de la tabla"
+              placeholder={isTourDefaults ? "Enter default name" : "Enter table name"}
             />
+          </div>
+
+          {/* Advanced Options - Always Available */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="dualMotors"
+                  checked={dualMotors}
+                  onCheckedChange={(checked) => setDualMotors(checked as boolean)}
+                />
+                <Label htmlFor="dualMotors">Dual motors for safety</Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="mirroredCluster"
+                  checked={mirroredCluster}
+                  onCheckedChange={(checked) => setMirroredCluster(checked as boolean)}
+                />
+                <Label htmlFor="mirroredCluster">Mirrored cluster</Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="cablePick"
+                  checked={cablePick}
+                  onCheckedChange={(checked) => setCablePick(checked as boolean)}
+                />
+                <Label htmlFor="cablePick">Cable pick</Label>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="riggingPoint">Rigging Point</Label>
+              <Select value={selectedRiggingPoint} onValueChange={setSelectedRiggingPoint}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select rigging point" />
+                </SelectTrigger>
+                <SelectContent>
+                  {RIGGING_POINT_OPTIONS.map((point) => (
+                    <SelectItem key={point} value={point}>
+                      Point {point}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="border rounded-lg overflow-hidden">
             <table className="w-full">
               <thead className="bg-muted">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium">Cantidad</th>
-                  <th className="px-4 py-3 text-left font-medium">Componente</th>
-                  <th className="px-4 py-3 text-left font-medium">Peso (por unidad)</th>
+                  <th className="px-4 py-3 text-left font-medium">Quantity</th>
+                  <th className="px-4 py-3 text-left font-medium">Component</th>
+                  <th className="px-4 py-3 text-left font-medium">Weight (per unit)</th>
                 </tr>
               </thead>
               <tbody>
@@ -299,10 +550,10 @@ const LightsPesosTool: React.FC = () => {
                     <td className="p-4">
                       <Select
                         value={row.componentId}
-                        onValueChange={(value) => updateInput(index, 'componentId', value)}
+                        onValueChange={(value) => value && updateInput(index, 'componentId', value)}
                       >
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Seleccione componente" />
+                          <SelectValue placeholder="Select component" />
                         </SelectTrigger>
                         <SelectContent>
                           {lightsComponentDatabase.map((component) => (
@@ -323,17 +574,17 @@ const LightsPesosTool: React.FC = () => {
           </div>
 
           <div className="flex gap-2">
-            <Button onClick={addRow}>Agregar Fila</Button>
+            <Button onClick={addRow}>Add Row</Button>
             <Button onClick={generateTable} variant="secondary">
-              Generar Tabla
+              {isTourDefaults ? 'Save Tour Default' : 'Generate Table'}
             </Button>
             <Button onClick={resetCurrentTable} variant="destructive">
-              Reiniciar
+              Reset
             </Button>
             {tables.length > 0 && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
-                <FileText className="w-4 h-4" />
-                Exportar PDF
+                <FileText className="h-4 w-4" />
+                Export PDF
               </Button>
             )}
           </div>
@@ -341,22 +592,59 @@ const LightsPesosTool: React.FC = () => {
           {tables.map((table) => (
             <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
-                <h3 className="font-semibold">{table.name}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">{table.name}</h3>
+                  {isTourDefaults && (
+                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                      Default
+                    </Badge>
+                  )}
+                </div>
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={() => table.id && removeTable(table.id)}
+                  onClick={() => removeTable(table.id as number)}
                 >
-                  Eliminar Tabla
+                  Remove Table
                 </Button>
               </div>
+              
+              {/* Advanced Options Display */}
+              {(table.dualMotors || table.mirroredCluster || table.cablePick || table.riggingPoint) && (
+                <div className="p-4 bg-muted/50 space-y-2">
+                  <h4 className="font-medium text-sm">Configuration:</h4>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    {table.dualMotors && (
+                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                        Dual Motors
+                      </span>
+                    )}
+                    {table.mirroredCluster && (
+                      <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
+                        Mirrored Cluster
+                      </span>
+                    )}
+                    {table.cablePick && (
+                      <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                        Cable Pick
+                      </span>
+                    )}
+                    {table.riggingPoint && (
+                      <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded">
+                        Rigging Point {table.riggingPoint}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <table className="w-full">
                 <thead className="bg-muted/50">
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium">Cantidad</th>
-                    <th className="px-4 py-3 text-left font-medium">Componente</th>
-                    <th className="px-4 py-3 text-left font-medium">Peso (por unidad)</th>
-                    <th className="px-4 py-3 text-left font-medium">Peso Total</th>
+                    <th className="px-4 py-3 text-left font-medium">Quantity</th>
+                    <th className="px-4 py-3 text-left font-medium">Component</th>
+                    <th className="px-4 py-3 text-left font-medium">Weight (per unit)</th>
+                    <th className="px-4 py-3 text-left font-medium">Total Weight</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -370,9 +658,9 @@ const LightsPesosTool: React.FC = () => {
                   ))}
                   <tr className="border-t bg-muted/50 font-medium">
                     <td colSpan={3} className="px-4 py-3 text-right">
-                      Peso Total:
+                      Total Weight:
                     </td>
-                    <td className="px-4 py-3">{table.totalWeight?.toFixed(2)}</td>
+                    <td className="px-4 py-3">{table.totalWeight?.toFixed(2)} kg</td>
                   </tr>
                 </tbody>
               </table>

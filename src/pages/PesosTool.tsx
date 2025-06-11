@@ -15,7 +15,6 @@ import { useTourWeightDefaults } from '@/hooks/useTourWeightDefaults';
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 import { useTourDateOverrides } from '@/hooks/useTourDateOverrides';
 import { Badge } from '@/components/ui/badge';
-import { useTourPowerDefaults } from '@/hooks/useTourPowerDefaults';
 
 // Database for sound components.
 const soundComponentDatabase = [
@@ -87,12 +86,12 @@ const PesosTool: React.FC = () => {
   const { data: jobs } = useJobSelection();
   const [searchParams] = useSearchParams();
   
-  // Tour context detection - ADD TOUR DEFAULTS MODE DETECTION
+  // Tour context detection - UPDATED TOUR DEFAULTS MODE DETECTION
   const tourId = searchParams.get('tourId');
   const tourDateId = searchParams.get('tourDateId');
   const mode = searchParams.get('mode');
   const isDefaults = mode === 'defaults';
-  const isTourDefaults = mode === 'tour-defaults'; // NEW: Tour defaults mode
+  const isTourDefaults = mode === 'tour-defaults'; // Tour defaults mode
   const isTourContext = !!tourId;
   const isTourDateContext = !!tourDateId;
 
@@ -115,7 +114,7 @@ const PesosTool: React.FC = () => {
     rows: [{ quantity: '', componentId: '', weight: '' }],
   });
 
-  // New hooks for tour defaults
+  // Updated hooks for tour defaults
   const {
     defaultSets,
     defaultTables,
@@ -136,6 +135,26 @@ const PesosTool: React.FC = () => {
   // Get tour name for display
   const [tourName, setTourName] = useState<string>('');
   const [tourDateInfo, setTourDateInfo] = useState<{ date: string; location: string } | null>(null);
+
+  // Helper function to get or create the set ID for sound department
+  const getOrCreateSoundSetId = async (): Promise<string> => {
+    // Check if a sound set already exists
+    const existingSoundSet = defaultSets.find(set => set.department === 'sound');
+    
+    if (existingSoundSet) {
+      return existingSoundSet.id;
+    }
+
+    // Create a new sound set
+    const newSet = await createSet({
+      tour_id: tourId!,
+      name: `${tourName} Sound Defaults`,
+      department: 'sound',
+      description: 'Sound department weight defaults'
+    });
+    
+    return newSet.id;
+  };
 
   // Detect job-based override mode
   useEffect(() => {
@@ -377,21 +396,35 @@ const PesosTool: React.FC = () => {
     }
   };
 
-  // NEW: Save as tour defaults for global tour use
+  // UPDATED: Save as tour defaults using the new system
   const saveAsTourDefaults = async (table: Table) => {
     if (!tourId) return;
 
     try {
-      // Save the table as a tour default using the tour weight defaults hook
-      const { createDefault } = useTourWeightDefaults(tourId);
-      
-      await createDefault({
-        tour_id: tourId,
-        item_name: table.name,
-        weight_kg: table.totalWeight || 0,
-        quantity: 1,
-        category: 'rigging',
-        department: 'sound'
+      // Get or create the sound set ID
+      const setId = await getOrCreateSoundSetId();
+
+      // Create the table with detailed data and metadata
+      await createDefaultTable({
+        set_id: setId,
+        table_name: table.name,
+        table_data: {
+          rows: table.rows,
+          dualMotors: table.dualMotors,
+          mirroredCluster: table.clusterId ? true : false,
+          riggingPoints: table.riggingPoints,
+          cablePick: cablePick,
+          cablePickWeight: cablePickWeight
+        },
+        table_type: 'weight',
+        total_value: table.totalWeight || 0,
+        metadata: {
+          dualMotors: table.dualMotors,
+          riggingPoints: table.riggingPoints,
+          clusterId: table.clusterId,
+          cablePick: cablePick,
+          cablePickWeight: cablePickWeight
+        }
       });
 
       toast({
@@ -500,43 +533,13 @@ const PesosTool: React.FC = () => {
 
     const totalWeight = calculatedRows.reduce((sum, row) => sum + (row.totalWeight || 0), 0);
 
-    // For grouping cable pick later, assign a new clusterId for this generation.
+    // For grouping, assign a new clusterId for this generation.
     const newClusterId = Date.now().toString();
 
-    // NEW: Handle tour defaults mode
-    if (isTourDefaults) {
-      const newTable: Table = {
-        name: tableName,
-        rows: calculatedRows,
-        totalWeight,
-        id: Date.now(),
-        clusterId: newClusterId,
-      };
-      setTables((prev) => [...prev, newTable]);
-      saveAsTourDefaults(newTable);
-    } else if (isDefaults) {
-      // In defaults mode, just save a simple table
-      const newTable: Table = {
-        name: tableName,
-        rows: calculatedRows,
-        totalWeight,
-        id: Date.now(),
-        clusterId: newClusterId,
-      };
-      setTables((prev) => [...prev, newTable]);
-    } else if (isTourDateContext || isJobOverrideMode) {
-      // For tour date context or job override mode, create table and save as override
-      const newTable: Table = {
-        name: tableName,
-        rows: calculatedRows,
-        totalWeight,
-        id: Date.now(),
-        clusterId: newClusterId,
-        isOverride: true
-      };
-      setTables((prev) => [...prev, newTable]);
-      saveAsOverride(newTable);
-    } else if (mirroredCluster) {
+    // FIXED: Always generate rigging points/suffixes for pesos tool, regardless of mode
+    let tablesToCreate: Table[] = [];
+
+    if (mirroredCluster) {
       // For mirrored clusters, generate two tables sharing the same clusterId.
       const leftSuffix = getSuffix();
       const rightSuffix = getSuffix();
@@ -561,9 +564,9 @@ const PesosTool: React.FC = () => {
         clusterId: newClusterId,
       };
 
-      setTables((prev) => [...prev, leftTable, rightTable]);
+      tablesToCreate = [leftTable, rightTable];
     } else {
-      // Single table: assign the newClusterId to it.
+      // Single table with suffix generation
       const suffix = getSuffix();
       const newTable: Table = {
         name: `${tableName} (${suffix})`,
@@ -574,8 +577,24 @@ const PesosTool: React.FC = () => {
         dualMotors: useDualMotors,
         clusterId: newClusterId,
       };
-      setTables((prev) => [...prev, newTable]);
+
+      tablesToCreate = [newTable];
     }
+
+    // Add all tables to state
+    setTables((prev) => [...prev, ...tablesToCreate]);
+
+    // Handle saving based on mode
+    tablesToCreate.forEach(table => {
+      if (isTourDefaults) {
+        saveAsTourDefaults(table);
+      } else if (isTourDateContext || isJobOverrideMode) {
+        table.isOverride = true;
+        saveAsOverride(table);
+      }
+      // For regular defaults mode, tables are just saved to local state
+    });
+
     resetCurrentTable();
     setUseDualMotors(false);
     setMirroredCluster(false);
@@ -653,7 +672,7 @@ const PesosTool: React.FC = () => {
         jobDateStr,
         summaryRows,
         undefined,
-        undefined,
+        undefined, // FIXED: Remove safety margin for weight reports
         logoUrl
       );
 
@@ -701,7 +720,7 @@ const PesosTool: React.FC = () => {
             <CardTitle className="text-2xl font-bold">
               Weight Calculator
             </CardTitle>
-            {/* NEW: Tour defaults mode indicator */}
+            {/* Tour defaults mode indicator */}
             {isTourDefaults && (
               <div className="flex items-center justify-center gap-2 mt-2">
                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
@@ -755,7 +774,7 @@ const PesosTool: React.FC = () => {
             </div>
           )}
 
-          {/* NEW: Tour defaults mode notification */}
+          {/* Tour defaults mode notification */}
           {isTourDefaults && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
@@ -797,7 +816,7 @@ const PesosTool: React.FC = () => {
             </div>
           )}
 
-          {/* NEW: Don't show job selection in tour defaults mode */}
+          {/* Don't show job selection in tour defaults mode */}
           {!isTourContext && !isTourDefaults && (
             <div className="space-y-2">
               <Label htmlFor="jobSelect">Select Job</Label>
@@ -827,54 +846,51 @@ const PesosTool: React.FC = () => {
               placeholder={isDefaults || isTourDefaults ? "Enter default name (e.g., K2 Array)" : "Enter table name"}
             />
             
-            {!isDefaults && !isTourDefaults && (
-              <>
-                <div className="flex items-center space-x-2 mt-2">
-                  <Checkbox
-                    id="dualMotors"
-                    checked={useDualMotors}
-                    onCheckedChange={(checked) => setUseDualMotors(checked as boolean)}
-                  />
-                  <Label htmlFor="dualMotors" className="text-sm font-medium">
-                    Dual Motors Configuration
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2 mt-2">
-                  <Checkbox
-                    id="mirroredCluster"
-                    checked={mirroredCluster}
-                    onCheckedChange={(checked) => setMirroredCluster(checked as boolean)}
-                  />
-                  <Label htmlFor="mirroredCluster" className="text-sm font-medium">
-                    Mirrored Cluster
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2 mt-2">
-                  <Checkbox
-                    id="cablePick"
-                    checked={cablePick}
-                    onCheckedChange={(checked) => setCablePick(checked as boolean)}
-                  />
-                  <Label htmlFor="cablePick" className="text-sm font-medium">
-                    Cable Pick
-                  </Label>
-                  {cablePick && (
-                    <Select value={cablePickWeight} onValueChange={(value) => setCablePickWeight(value)}>
-                      <SelectTrigger className="w-32">
-                        <SelectValue placeholder="Select weight" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {['100', '200', '300', '400', '500'].map((w) => (
-                          <SelectItem key={w} value={w}>
-                            {w} kg
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-              </>
-            )}
+            {/* UPDATED: Enable advanced features in tour defaults mode */}
+            <div className="flex items-center space-x-2 mt-2">
+              <Checkbox
+                id="dualMotors"
+                checked={useDualMotors}
+                onCheckedChange={(checked) => setUseDualMotors(checked as boolean)}
+              />
+              <Label htmlFor="dualMotors" className="text-sm font-medium">
+                Dual Motors Configuration
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2 mt-2">
+              <Checkbox
+                id="mirroredCluster"
+                checked={mirroredCluster}
+                onCheckedChange={(checked) => setMirroredCluster(checked as boolean)}
+              />
+              <Label htmlFor="mirroredCluster" className="text-sm font-medium">
+                Mirrored Cluster
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2 mt-2">
+              <Checkbox
+                id="cablePick"
+                checked={cablePick}
+                onCheckedChange={(checked) => setCablePick(checked as boolean)}
+              />
+              <Label htmlFor="cablePick" className="text-sm font-medium">
+                Cable Pick
+              </Label>
+              {cablePick && (
+                <Select value={cablePickWeight} onValueChange={(value) => setCablePickWeight(value)}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Select weight" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {['100', '200', '300', '400', '500'].map((w) => (
+                      <SelectItem key={w} value={w}>
+                        {w} kg
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           </div>
 
           <div className="border rounded-lg overflow-hidden">
@@ -1005,7 +1021,14 @@ const PesosTool: React.FC = () => {
           {tables.map((table) => (
             <div key={table.id} className="border rounded-lg overflow-hidden mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
-                <h3 className="font-semibold">{table.name}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">{table.name}</h3>
+                  {isTourDefaults && (
+                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                      Default
+                    </Badge>
+                  )}
+                </div>
                 <div className="flex gap-2">
                   {!isDefaults && isTourContext && (
                     <Button
@@ -1022,6 +1045,31 @@ const PesosTool: React.FC = () => {
                   </Button>
                 </div>
               </div>
+              
+              {/* Advanced Options Display */}
+              {(table.dualMotors || table.clusterId || cablePick) && (
+                <div className="p-4 bg-muted/50 space-y-2">
+                  <h4 className="font-medium text-sm">Configuration:</h4>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    {table.dualMotors && (
+                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                        Dual Motors
+                      </span>
+                    )}
+                    {table.clusterId && (
+                      <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
+                        Mirrored Cluster
+                      </span>
+                    )}
+                    {cablePick && (
+                      <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                        Cable Pick ({cablePickWeight} kg)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <table className="w-full">
                 <thead className="bg-muted/50">
                   <tr>
@@ -1036,8 +1084,8 @@ const PesosTool: React.FC = () => {
                     <tr key={index} className="border-t">
                       <td className="px-4 py-3">{row.quantity}</td>
                       <td className="px-4 py-3">{row.componentName}</td>
-                      <td className="px-4 py-3">{row.weight}</td>
-                      <td className="px-4 py-3">{row.totalWeight?.toFixed(2)}</td>
+                      <td className="px-4 py-3">{row.weight} kg</td>
+                      <td className="px-4 py-3">{row.totalWeight?.toFixed(2)} kg</td>
                     </tr>
                   ))}
                   <tr className="border-t bg-muted/50 font-medium">
@@ -1048,9 +1096,14 @@ const PesosTool: React.FC = () => {
                   </tr>
                 </tbody>
               </table>
-              {!isDefaults && table.dualMotors && (
+              {table.dualMotors && (
                 <div className="px-4 py-2 text-sm text-gray-500 bg-muted/30 italic">
                   *This configuration uses dual motors. Load is distributed between two motors for safety and redundancy.
+                </div>
+              )}
+              {table.riggingPoints && (
+                <div className="px-4 py-2 text-sm text-blue-600 bg-blue-50 border-t">
+                  <strong>Rigging Points:</strong> {table.riggingPoints}
                 </div>
               )}
             </div>

@@ -1,12 +1,16 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Department } from "@/types/department";
 import { useNavigate } from "react-router-dom";
 import { useFolderExistence } from "@/hooks/useFolderExistence";
-import { useJobCard } from '@/hooks/useJobCard';
-import { createAllFoldersForJob } from "@/utils/flex-folders";
+import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
+import { useDeletionState } from '@/hooks/useDeletionState';
 import { supabase } from "@/lib/supabase";
+import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
+import { createAllFoldersForJob } from "@/utils/flex-folders";
+import { format } from "date-fns";
 import { JobCardHeader } from './JobCardHeader';
 import { JobCardActions } from './JobCardActions';
 import { JobCardAssignments } from './JobCardAssignments';
@@ -18,6 +22,7 @@ import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 export interface JobCardNewProps {
   job: any;
@@ -50,6 +55,11 @@ export function JobCardNew({
 }: JobCardNewProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { addDeletingJob, removeDeletingJob, isDeletingJob } = useDeletionState();
+  
+  // Add folder creation loading state
+  const [isCreatingFolders, setIsCreatingFolders] = useState(false);
   
   const {
     // Styling
@@ -66,6 +76,7 @@ export function JobCardNew({
     videoTaskDialogOpen,
     editJobDialogOpen,
     assignmentDialogOpen,
+    isJobBeingDeleted,
     
     // Data
     soundTasks,
@@ -81,7 +92,6 @@ export function JobCardNew({
     // Event handlers
     toggleCollapse,
     handleEditButtonClick,
-    handleDeleteClick,
     handleFileUpload,
     handleDeleteDocument,
     refreshData,
@@ -91,29 +101,103 @@ export function JobCardNew({
     setLightsTaskDialogOpen,
     setVideoTaskDialogOpen,
     setEditJobDialogOpen,
-    setAssignmentDialogOpen,
-    
-    // Folder handling
-    updateFolderStatus
-  } = useJobCard(job, department, userRole, onEditClick, onDeleteClick, onJobClick);
+    setAssignmentDialogOpen
+  } = useOptimizedJobCard(job, department, userRole, onEditClick, onDeleteClick, onJobClick);
 
-  // Check folder existence
-  const { data: foldersExist } = useFolderExistence(job.id);
-  const foldersAreCreated = job.flex_folders_created || foldersExist || job.flex_folders_exist;
+  // Check folder existence with proper loading state handling
+  const { data: foldersExist, isLoading: isFoldersLoading } = useFolderExistence(job.id);
+  
+  // Updated logic: prioritize actual folder existence over database flags
+  const actualFoldersExist = foldersExist === true;
+  const systemThinksFoldersExist = job.flex_folders_created || job.flex_folders_exist;
+  
+  // Detect inconsistency for logging/debugging
+  const hasInconsistency = systemThinksFoldersExist && !actualFoldersExist;
+  if (hasInconsistency) {
+    console.warn("JobCardNew: Folder state inconsistency detected for job", job.id, {
+      systemThinks: systemThinksFoldersExist,
+      actualExists: actualFoldersExist,
+      dbFlag: job.flex_folders_created,
+      flexFoldersExist: job.flex_folders_exist
+    });
+  }
+  
+  // Final decision: only consider folders created if they actually exist
+  const foldersAreCreated = actualFoldersExist;
+
+  // Optimistic delete handler with instant UI feedback
+  const handleDeleteClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Check if already being deleted
+    if (isJobBeingDeleted) {
+      console.log("JobCardNew: Job deletion already in progress");
+      return;
+    }
+    
+    // Check permissions
+    if (!["admin", "management"].includes(userRole || "")) {
+      toast({
+        title: "Permission denied",
+        description: "Only admin and management users can delete jobs",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!window.confirm('Are you sure you want to delete this job? This action cannot be undone and will remove all related data.')) {
+      return;
+    }
+
+    try {
+      console.log("JobCardNew: Starting optimistic job deletion for:", job.id);
+      
+      // Mark job as being deleted for immediate visual feedback
+      addDeletingJob(job.id);
+      
+      // Call optimistic deletion service
+      const result = await deleteJobOptimistically(job.id);
+      
+      if (result.success) {
+        toast({
+          title: "Job deleted",
+          description: result.details || "The job has been removed and cleanup is running in background."
+        });
+        
+        // Call the parent's onDeleteClick to handle any additional UI updates
+        onDeleteClick(job.id);
+        
+        // Invalidate queries to refresh the list
+        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+      } else {
+        throw new Error(result.error || "Unknown deletion error");
+      }
+    } catch (error: any) {
+      console.error("JobCardNew: Error in optimistic job deletion:", error);
+      toast({
+        title: "Error deleting job",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      // Always remove from deletion state, even on error
+      removeDeletingJob(job.id);
+    }
+  };
 
   const createFlexFoldersHandler = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    console.log("Folder existence check:", {
-      jobId: job.id,
-      flexFoldersCreated: job.flex_folders_created,
-      foldersExist,
-      flexFoldersExist: job.flex_folders_exist,
-      combined: foldersAreCreated
-    });
+    if (isCreatingFolders) {
+      console.log("JobCardNew: Folder creation already in progress");
+      return;
+    }
 
-    if (foldersAreCreated) {
-      console.log("Folders already exist, preventing creation");
+    console.log("JobCardNew: Starting folder creation for job:", job.id);
+
+    if (actualFoldersExist) {
+      console.log("JobCardNew: Folders actually exist, preventing creation");
       toast({
         title: "Folders already created",
         description: "Flex folders have already been created for this job.",
@@ -123,8 +207,9 @@ export function JobCardNew({
     }
 
     try {
-      console.log("Starting folder creation for job:", job.id);
+      setIsCreatingFolders(true);
 
+      // Double-check in the database before creating
       const { data: existingFolders } = await supabase
         .from("flex_folders")
         .select("id")
@@ -132,7 +217,7 @@ export function JobCardNew({
         .limit(1);
 
       if (existingFolders && existingFolders.length > 0) {
-        console.log("Found existing folders in final check:", existingFolders);
+        console.log("JobCardNew: Found existing folders in final check:", existingFolders);
         toast({
           title: "Folders already exist",
           description: "Flex folders have already been created for this job.",
@@ -141,36 +226,54 @@ export function JobCardNew({
         return;
       }
 
+      // Use the restored working flex folder creation system
       const startDate = new Date(job.start_time);
-      const documentNumber = startDate
-        .toISOString()
-        .slice(2, 10)
-        .replace(/-/g, "");
+      const endDate = new Date(job.end_time);
+      const formattedStartDate = format(startDate, 'yyyy-MM-dd');
+      const formattedEndDate = format(endDate, 'yyyy-MM-dd');
+      const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, "");
 
-      const formattedStartDate = new Date(job.start_time).toISOString().split(".")[0] + ".000Z";
-      const formattedEndDate = new Date(job.end_time).toISOString().split(".")[0] + ".000Z";
+      toast({
+        title: "Creating folders...",
+        description: "Setting up Flex folder structure for this job."
+      });
 
       await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber);
-      await updateFolderStatus.mutateAsync();
 
-      console.log("Successfully created folders for job:", job.id);
+      // Update job record to indicate folders were created
+      const { error: updateError } = await supabase
+        .from('jobs')
+        .update({ flex_folders_created: true })
+        .eq('id', job.id);
+
+      if (updateError) {
+        console.error("Error updating job record:", updateError);
+      }
+
       toast({
-        title: "Success",
+        title: "Success!",
         description: "Flex folders have been created successfully."
       });
+
+      // Refresh queries
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["folder-existence"] });
+
     } catch (error: any) {
-      console.error("Error creating Flex folders:", error);
+      console.error("JobCardNew: Error creating flex folders:", error);
       toast({
-        title: "Error creating folders",
-        description: error.message,
+        title: "Error",
+        description: error.message || "Failed to create Flex folders",
         variant: "destructive"
       });
+    } finally {
+      setIsCreatingFolders(false);
     }
   };
 
   const handleJobCardClick = () => {
-    if (isHouseTech) {
-      return; // Block job card clicks for house techs
+    if (isHouseTech || isJobBeingDeleted) {
+      return; // Block job card clicks for house techs or jobs being deleted
     }
     
     if (isProjectManagementPage) {
@@ -190,16 +293,23 @@ export function JobCardNew({
 
   const handleFestivalArtistsClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log("Navigating to festival management:", job.id);
+    if (isJobBeingDeleted) return;
+    console.log("JobCardNew: Navigating to festival management:", job.id);
     navigate(`/festival-management/${job.id}`);
   };
+
+  // Show loading state if job is being deleted
+  const cardOpacity = isJobBeingDeleted ? "opacity-50" : "";
+  const pointerEvents = isJobBeingDeleted ? "pointer-events-none" : "";
 
   return (
     <div className="p-4 bg-gray-50 dark:bg-gray-900">
       <Card
         className={cn(
           "mb-4 hover:shadow-md transition-all duration-200",
-          !isHouseTech && "cursor-pointer"
+          !isHouseTech && !isJobBeingDeleted && "cursor-pointer",
+          cardOpacity,
+          pointerEvents
         )}
         onClick={handleJobCardClick}
         style={{
@@ -207,6 +317,14 @@ export function JobCardNew({
           backgroundColor: appliedBgColor
         }}
       >
+        {isJobBeingDeleted && (
+          <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10 rounded">
+            <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-md shadow-lg">
+              <span className="text-sm font-medium">Deleting job...</span>
+            </div>
+          </div>
+        )}
+
         <JobCardHeader 
           job={job}
           collapsed={collapsed}
@@ -222,7 +340,7 @@ export function JobCardNew({
           <JobCardActions 
             job={job}
             userRole={userRole || null}
-            foldersAreCreated={foldersAreCreated}
+            foldersAreCreated={foldersAreCreated || isFoldersLoading}
             isProjectManagementPage={isProjectManagementPage}
             isHouseTech={isHouseTech}
             showUpload={showUpload}
@@ -230,6 +348,8 @@ export function JobCardNew({
             canCreateFlexFolders={canCreateFlexFolders}
             canUploadDocuments={canUploadDocuments}
             canManageArtists={canManageArtists}
+            isCreatingFolders={isCreatingFolders}
+            currentFolderStep=""
             onRefreshData={refreshData}
             onEditButtonClick={handleEditButtonClick}
             onDeleteClick={handleDeleteClick}
@@ -237,7 +357,9 @@ export function JobCardNew({
             onFestivalArtistsClick={handleFestivalArtistsClick}
             onAssignmentDialogOpen={(e) => {
               e.stopPropagation();
-              setAssignmentDialogOpen(true);
+              if (!isJobBeingDeleted) {
+                setAssignmentDialogOpen(true);
+              }
             }}
             handleFileUpload={handleFileUpload}
           />
@@ -274,7 +396,7 @@ export function JobCardNew({
         </div>
       </Card>
 
-      {!isHouseTech && (
+      {!isHouseTech && !isJobBeingDeleted && (
         <>
           {soundTaskDialogOpen && (
             <SoundTaskDialog
@@ -306,8 +428,9 @@ export function JobCardNew({
           )}
           {assignmentDialogOpen && job.job_type !== "dryhire" && (
             <JobAssignmentDialog
-              open={assignmentDialogOpen}
-              onOpenChange={setAssignmentDialogOpen}
+              isOpen={assignmentDialogOpen}
+              onClose={() => setAssignmentDialogOpen(false)}
+              onAssignmentChange={() => {}}
               jobId={job.id}
               department={department as Department}
             />

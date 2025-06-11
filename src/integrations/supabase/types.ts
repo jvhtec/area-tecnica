@@ -516,6 +516,7 @@ export type Database = {
           rf_festival_mics: number | null
           rf_festival_url: string | null
           rf_festival_wireless: number | null
+          rider_missing: boolean | null
           show_end: string | null
           show_start: string | null
           soundcheck: boolean | null
@@ -574,6 +575,7 @@ export type Database = {
           rf_festival_mics?: number | null
           rf_festival_url?: string | null
           rf_festival_wireless?: number | null
+          rider_missing?: boolean | null
           show_end?: string | null
           show_start?: string | null
           soundcheck?: boolean | null
@@ -632,6 +634,7 @@ export type Database = {
           rf_festival_mics?: number | null
           rf_festival_url?: string | null
           rf_festival_wireless?: number | null
+          rider_missing?: boolean | null
           show_end?: string | null
           show_start?: string | null
           soundcheck?: boolean | null
@@ -1020,6 +1023,80 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "festival_stages_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flex_crew_assignments: {
+        Row: {
+          created_at: string | null
+          crew_call_id: string
+          flex_line_item_id: string
+          id: string
+          technician_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          crew_call_id: string
+          flex_line_item_id: string
+          id?: string
+          technician_id: string
+        }
+        Update: {
+          created_at?: string | null
+          crew_call_id?: string
+          flex_line_item_id?: string
+          id?: string
+          technician_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flex_crew_assignments_crew_call_id_fkey"
+            columns: ["crew_call_id"]
+            isOneToOne: false
+            referencedRelation: "flex_crew_calls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flex_crew_assignments_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flex_crew_calls: {
+        Row: {
+          created_at: string | null
+          department: string
+          flex_element_id: string
+          id: string
+          job_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          department: string
+          flex_element_id: string
+          id?: string
+          job_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          department?: string
+          flex_element_id?: string
+          id?: string
+          job_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flex_crew_calls_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
@@ -2355,6 +2432,8 @@ export type Database = {
           dni: string | null
           email: string
           first_name: string | null
+          flex_id: string | null
+          flex_resource_id: string | null
           flex_user_id: string | null
           id: string
           last_activity: string | null
@@ -2374,6 +2453,8 @@ export type Database = {
           dni?: string | null
           email: string
           first_name?: string | null
+          flex_id?: string | null
+          flex_resource_id?: string | null
           flex_user_id?: string | null
           id: string
           last_activity?: string | null
@@ -2393,6 +2474,8 @@ export type Database = {
           dni?: string | null
           email?: string
           first_name?: string | null
+          flex_id?: string | null
+          flex_resource_id?: string | null
           flex_user_id?: string | null
           id?: string
           last_activity?: string | null
@@ -2617,6 +2700,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      technician_availability: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          date: string
+          id: number
+          status: string
+          technician_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          date: string
+          id?: number
+          status: string
+          technician_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          date?: string
+          id?: number
+          status?: string
+          technician_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       technician_departments: {
         Row: {
@@ -3270,6 +3383,63 @@ export type Database = {
           start_date?: string | null
         }
         Relationships: []
+      }
+      vacation_requests: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string | null
+          end_date: string
+          id: string
+          reason: string | null
+          rejection_reason: string | null
+          start_date: string
+          status: string
+          technician_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          end_date: string
+          id?: string
+          reason?: string | null
+          rejection_reason?: string | null
+          start_date: string
+          status?: string
+          technician_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          end_date?: string
+          id?: string
+          reason?: string | null
+          rejection_reason?: string | null
+          start_date?: string
+          status?: string
+          technician_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vacation_requests_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vacation_requests_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       video_job_personnel: {
         Row: {

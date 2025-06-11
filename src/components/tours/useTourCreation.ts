@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Department } from "@/types/department";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +14,7 @@ export const useTourCreation = (
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [color, setColor] = useState("#7E69AB");
+  const [isCreating, setIsCreating] = useState(false);
   
   const { dates, handleAddDate, handleRemoveDate, handleDateChange } = useTourDates();
   const { departments, handleDepartmentChange } = useTourDepartments(currentDepartment);
@@ -23,6 +25,12 @@ export const useTourCreation = (
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent multiple submissions
+    if (isCreating) {
+      console.log("Tour creation already in progress, ignoring submission");
+      return;
+    }
     
     if (!title.trim()) {
       toast({
@@ -41,6 +49,8 @@ export const useTourCreation = (
       });
       return;
     }
+
+    setIsCreating(true);
 
     try {
       console.log("Creating tour...");
@@ -74,6 +84,8 @@ export const useTourCreation = (
         description: error.message || "Failed to create tour",
         variant: "destructive",
       });
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -86,6 +98,7 @@ export const useTourCreation = (
     color,
     setColor,
     departments,
+    isCreating,
     handleAddDate,
     handleRemoveDate,
     handleDateChange,

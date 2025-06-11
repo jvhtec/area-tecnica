@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
@@ -15,6 +14,8 @@ import { Link } from "react-router-dom";
 import { Scale, Zap, File } from "lucide-react";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
+import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
+import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 
 const Operaciones = () => {
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
@@ -102,26 +103,41 @@ const Operaciones = () => {
   };
 
   const handleDeleteClick = async (jobId: string) => {
+    // Check permissions
+    if (!["admin", "management"].includes(userRole || "")) {
+      toast({
+        title: "Permission denied",
+        description: "Only admin and management users can delete jobs",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!window.confirm("Are you sure you want to delete this job?")) return;
 
     try {
-      const { error } = await supabase
-        .from('jobs')
-        .delete()
-        .eq('id', jobId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Job deleted",
-        description: "The job has been successfully deleted.",
-      });
-      await queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      console.log("Operaciones page: Starting optimistic job deletion for:", jobId);
+      
+      // Call optimistic deletion service
+      const result = await deleteJobOptimistically(jobId);
+      
+      if (result.success) {
+        toast({
+          title: "Job deleted",
+          description: result.details || "The job has been removed and cleanup completed"
+        });
+        
+        // Invalidate queries to refresh the list
+        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      } else {
+        throw new Error(result.error || "Unknown deletion error");
+      }
     } catch (error: any) {
+      console.error("Operaciones page: Error in optimistic job deletion:", error);
       toast({
         title: "Error deleting job",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
@@ -194,6 +210,15 @@ const Operaciones = () => {
           open={isEditDialogOpen}
           onOpenChange={setIsEditDialogOpen}
           job={selectedJob}
+        />
+      )}
+      {selectedJobId && (
+        <JobAssignmentDialog
+          isOpen={isAssignmentDialogOpen}
+          onClose={() => setIsAssignmentDialogOpen(false)}
+          onAssignmentChange={() => {}}
+          jobId={selectedJobId}
+          department={currentDepartment}
         />
       )}
     </div>

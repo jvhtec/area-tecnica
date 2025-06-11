@@ -68,7 +68,8 @@ export const ArtistManagementDialog = ({
           infrastructure_provided_by: "festival",
           other_infrastructure: "",
           notes: "",
-          isaftermidnight: false
+          isaftermidnight: false,
+          rider_missing: false
         });
       }
     }

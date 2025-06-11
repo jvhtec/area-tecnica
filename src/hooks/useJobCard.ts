@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
@@ -6,12 +5,14 @@ import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { JobDocument } from '@/components/jobs/cards/JobCardDocuments';
 import { Department } from '@/types/department';
+import { useDeletionState } from './useDeletionState';
 
 export const useJobCard = (job: any, department: Department, userRole: string | null, onEditClick?: (job: any) => void, onDeleteClick?: (jobId: string) => void, onJobClick?: (jobId: string) => void) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const { isDeletingJob } = useDeletionState();
 
   // Card styling
   const borderColor = job.color ? job.color : "#7E69AB";
@@ -37,52 +38,67 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
   const canUploadDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
   const canCreateFlexFolders = ['admin', 'management', 'logistics'].includes(userRole || '');
 
-  // Fetch date types
-  useEffect(() => {
-    async function fetchDateTypes() {
-      const { data, error } = await supabase
-        .from("job_date_types")
-        .select("*")
-        .eq("job_id", job.id);
-      if (!error && data && data.length > 0) {
-        const key = `${job.id}-${new Date(job.start_time).toISOString().split('T')[0]}`;
-        setDateTypes({ [key]: data[0] });
-      }
-    }
-    fetchDateTypes();
-  }, [job.id, job.start_time]);
+  // Check if this job is being deleted to prevent queries
+  const isJobBeingDeleted = isDeletingJob(job.id);
 
-  // Fetch sound tasks if in sound department
-  const { data: soundTasks } = useQuery({
+  // Optimized date types fetch - only if not already loaded
+  useEffect(() => {
+    if (!job.job_date_types && !isJobBeingDeleted) {
+      async function fetchDateTypes() {
+        const { data, error } = await supabase
+          .from("job_date_types")
+          .select("*")
+          .eq("job_id", job.id);
+        if (!error && data && data.length > 0) {
+          const key = `${job.id}-${new Date(job.start_time).toISOString().split('T')[0]}`;
+          setDateTypes({ [key]: data[0] });
+        }
+      }
+      fetchDateTypes();
+    } else if (job.job_date_types) {
+      // Use pre-loaded data
+      const processedDateTypes = job.job_date_types.reduce((acc: any, dt: any) => {
+        const key = `${job.id}-${dt.date}`;
+        acc[key] = dt;
+        return acc;
+      }, {});
+      setDateTypes(processedDateTypes);
+    }
+  }, [job.id, job.start_time, job.job_date_types, isJobBeingDeleted]);
+
+  // Use pre-loaded data when available
+  const soundTasks = job.tasks?.sound || job.sound_job_tasks;
+  const personnel = job.personnel?.sound || job.sound_job_personnel?.[0];
+
+  // Fallback queries only when data not pre-loaded
+  const shouldFetchSoundData = department === "sound" && !job.tasks?.sound && !isJobBeingDeleted;
+  
+  const { data: fallbackSoundTasks } = useQuery({
     queryKey: ["sound-tasks", job.id],
     queryFn: async () => {
-      if (department !== "sound") return null;
       const { data, error } = await supabase
         .from("sound_job_tasks")
-        .select(
-          `
-            *,
-            assigned_to (
-              first_name,
-              last_name
-            ),
-            task_documents(*)
-          `
-        )
+        .select(`
+          *,
+          assigned_to (
+            first_name,
+            last_name
+          ),
+          task_documents(*)
+        `)
         .eq("job_id", job.id);
       if (error) throw error;
       return data;
     },
-    enabled: department === "sound",
-    retry: 3,
-    retryDelay: 1000
+    enabled: shouldFetchSoundData,
+    retry: 2,
+    retryDelay: 1000,
+    staleTime: 1000 * 60 * 5 // 5 minutes
   });
 
-  // Fetch personnel for sound department
-  const { data: personnel } = useQuery({
+  const { data: fallbackPersonnel } = useQuery({
     queryKey: ["sound-personnel", job.id],
     queryFn: async () => {
-      if (department !== "sound") return null;
       const { data: existingData, error: fetchError } = await supabase
         .from("sound_job_personnel")
         .select("*")
@@ -106,7 +122,8 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
       }
       return existingData;
     },
-    enabled: department === "sound"
+    enabled: shouldFetchSoundData,
+    staleTime: 1000 * 60 * 5 // 5 minutes
   });
 
   // Update folder status mutation
@@ -138,130 +155,8 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
     }
   };
 
-  const handleDeleteClick = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (!["admin", "management"].includes(userRole || "")) {
-      toast({
-        title: "Permission denied",
-        description: "Only management users can delete jobs",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!window.confirm("Are you sure you want to delete this job?")) {
-      return;
-    }
-
-    try {
-      console.log("Deleting job:", job.id);
-      
-      // Delete task documents
-      const { data: soundTaskIds } = await supabase
-        .from("sound_job_tasks")
-        .select("id")
-        .eq("job_id", job.id);
-      const { data: lightsTaskIds } = await supabase
-        .from("lights_job_tasks")
-        .select("id")
-        .eq("job_id", job.id);
-      const { data: videoTaskIds } = await supabase
-        .from("video_job_tasks")
-        .select("id")
-        .eq("job_id", job.id);
-
-      if (soundTaskIds?.length) {
-        const { error: soundDocsError } = await supabase
-          .from("task_documents")
-          .delete()
-          .in("sound_task_id", soundTaskIds.map((t) => t.id));
-        if (soundDocsError) throw soundDocsError;
-      }
-      if (lightsTaskIds?.length) {
-        const { error: lightsDocsError } = await supabase
-          .from("task_documents")
-          .delete()
-          .in("lights_task_id", lightsTaskIds.map((t) => t.id));
-        if (lightsDocsError) throw lightsDocsError;
-      }
-      if (videoTaskIds?.length) {
-        const { error: videoDocsError } = await supabase
-          .from("task_documents")
-          .delete()
-          .in("video_task_id", videoTaskIds.map((t) => t.id));
-        if (videoDocsError) throw videoDocsError;
-      }
-
-      // Delete tasks
-      await Promise.all([
-        supabase.from("sound_job_tasks").delete().eq("job_id", job.id),
-        supabase.from("lights_job_tasks").delete().eq("job_id", job.id),
-        supabase.from("video_job_tasks").delete().eq("job_id", job.id)
-      ]);
-
-      // Delete personnel
-      await Promise.all([
-        supabase.from("sound_job_personnel").delete().eq("job_id", job.id),
-        supabase.from("lights_job_personnel").delete().eq("job_id", job.id),
-        supabase.from("video_job_personnel").delete().eq("job_id", job.id)
-      ]);
-
-      // Delete documents from storage
-      if (job.job_documents?.length > 0) {
-        const { error: storageError } = await supabase.storage
-          .from("job_documents")
-          .remove(job.job_documents.map((doc: JobDocument) => doc.file_path));
-        if (storageError) throw storageError;
-      }
-
-      // Delete job documents from database
-      const { error: jobDocsError } = await supabase
-        .from("job_documents")
-        .delete()
-        .eq("job_id", job.id);
-      if (jobDocsError) throw jobDocsError;
-
-      // Delete assignments
-      const { error: assignmentsError } = await supabase
-        .from("job_assignments")
-        .delete()
-        .eq("job_id", job.id);
-      if (assignmentsError) throw assignmentsError;
-
-      // Delete departments
-      const { error: departmentsError } = await supabase
-        .from("job_departments")
-        .delete()
-        .eq("job_id", job.id);
-      if (departmentsError) throw departmentsError;
-
-      // Delete the job itself
-      const { error: jobError } = await supabase
-        .from("jobs")
-        .delete()
-        .eq("id", job.id);
-      if (jobError) throw jobError;
-
-      if (onDeleteClick) {
-        onDeleteClick(job.id);
-      }
-      
-      toast({
-        title: "Success",
-        description: "Job deleted successfully"
-      });
-
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
-    } catch (error: any) {
-      console.error("Error deleting job:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete job",
-        variant: "destructive"
-      });
-    }
-  };
+  // Remove the duplicate deletion handler - use only the centralized one from JobCardNew
+  // This prevents race conditions and ensures consistency
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
@@ -306,7 +201,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
   const handleDeleteDocument = async (doc: JobDocument) => {
     if (!window.confirm("Are you sure you want to delete this document?")) return;
     try {
-      console.log("Starting document deletion:", doc);
+      console.log("useJobCard: Starting document deletion:", doc);
       const { error: storageError } = await supabase.storage
         .from("job_documents")
         .remove([doc.file_path]);
@@ -344,6 +239,8 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
 
   const refreshData = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isJobBeingDeleted) return; // Don't refresh if job is being deleted
+    
     await queryClient.invalidateQueries({ queryKey: ["jobs"] });
     await queryClient.invalidateQueries({ queryKey: ["sound-tasks", job.id] });
     await queryClient.invalidateQueries({ queryKey: ["sound-personnel", job.id] });
@@ -371,10 +268,11 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
     videoTaskDialogOpen,
     editJobDialogOpen,
     assignmentDialogOpen,
+    isJobBeingDeleted,
     
-    // Data
-    soundTasks,
-    personnel,
+    // Data - use pre-loaded or fallback
+    soundTasks: soundTasks || fallbackSoundTasks,
+    personnel: personnel || fallbackPersonnel,
     
     // Permissions
     isHouseTech,
@@ -386,7 +284,6 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
     // Event handlers
     toggleCollapse,
     handleEditButtonClick,
-    handleDeleteClick,
     handleFileUpload,
     handleDeleteDocument,
     refreshData,

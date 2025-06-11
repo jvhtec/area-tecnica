@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Department } from "@/types/department";
 import { JobDocument } from "@/types/job";
 import { useCallback } from "react";
+import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 
 export const useJobManagement = (
   selectedDepartment: Department,
@@ -82,6 +83,8 @@ export const useJobManagement = (
 
   const handleDeleteDocument = async (jobId: string, document: JobDocument) => {
     try {
+      console.log("useJobManagement: Deleting document:", document);
+      
       // Delete from storage
       const { error: storageError } = await supabase.storage
         .from("job_documents")
@@ -113,92 +116,20 @@ export const useJobManagement = (
 
   const deleteJob = async (jobId: string) => {
     try {
-      console.log("Starting job deletion process for job:", jobId);
-
-      // 1. Delete task documents for all departments
-      console.log("Deleting task documents...");
-      const { error: taskDocsError } = await supabase
-        .from("task_documents")
-        .delete()
-        .or(
-          `sound_task_id.in.(select id from sound_job_tasks where job_id='${jobId}'),lights_task_id.in.(select id from lights_job_tasks where job_id='${jobId}'),video_task_id.in.(select id from video_job_tasks where job_id='${jobId}')`
-        );
-
-      if (taskDocsError) {
-        console.error("Error deleting task documents:", taskDocsError);
-        throw taskDocsError;
+      console.log("useJobManagement: Starting optimistic job deletion for:", jobId);
+      
+      const result = await deleteJobOptimistically(jobId);
+      
+      if (result.success) {
+        toast({
+          title: "Job deleted successfully",
+          description: result.details || "The job has been removed and cleanup is running in background."
+        });
+      } else {
+        throw new Error(result.error || "Unknown deletion error");
       }
-
-      // 2. Delete department tasks
-      console.log("Deleting department tasks...");
-      await Promise.all([
-        supabase.from("sound_job_tasks").delete().eq("job_id", jobId),
-        supabase.from("lights_job_tasks").delete().eq("job_id", jobId),
-        supabase.from("video_job_tasks").delete().eq("job_id", jobId)
-      ]);
-
-      // 3. Delete department personnel
-      console.log("Deleting department personnel...");
-      await Promise.all([
-        supabase.from("sound_job_personnel").delete().eq("job_id", jobId),
-        supabase.from("lights_job_personnel").delete().eq("job_id", jobId),
-        supabase.from("video_job_personnel").delete().eq("job_id", jobId)
-      ]);
-
-      // 4. Delete job documents
-      console.log("Deleting job documents...");
-      const { error: jobDocsError } = await supabase
-        .from("job_documents")
-        .delete()
-        .eq("job_id", jobId);
-
-      if (jobDocsError) {
-        console.error("Error deleting job documents:", jobDocsError);
-        throw jobDocsError;
-      }
-
-      // 5. Delete job assignments
-      console.log("Deleting job assignments...");
-      const { error: assignmentsError } = await supabase
-        .from("job_assignments")
-        .delete()
-        .eq("job_id", jobId);
-
-      if (assignmentsError) {
-        console.error("Error deleting job assignments:", assignmentsError);
-        throw assignmentsError;
-      }
-
-      // 6. Delete job departments
-      console.log("Deleting job departments...");
-      const { error: departmentsError } = await supabase
-        .from("job_departments")
-        .delete()
-        .eq("job_id", jobId);
-
-      if (departmentsError) {
-        console.error("Error deleting job departments:", departmentsError);
-        throw departmentsError;
-      }
-
-      // 7. Finally delete the job itself
-      console.log("Deleting the job...");
-      const { error: jobError } = await supabase
-        .from("jobs")
-        .delete()
-        .eq("id", jobId);
-
-      if (jobError) {
-        console.error("Error deleting job:", jobError);
-        throw jobError;
-      }
-
-      toast({
-        title: "Job deleted successfully",
-        description: "The job and all related records have been removed."
-      });
     } catch (error: any) {
-      console.error("Error in deletion process:", error);
+      console.error("useJobManagement: Error in optimistic job deletion:", error);
       toast({
         title: "Error deleting job",
         description: error.message,

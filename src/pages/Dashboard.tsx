@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Department } from "@/types/department";
 import { useJobs } from "@/hooks/useJobs";
@@ -7,17 +8,20 @@ import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { supabase } from "@/lib/supabase";
 import { useDashboardSubscriptions } from "@/hooks/useUnifiedSubscriptions";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { DashboardContent } from "@/components/dashboard/DashboardContent";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TourChips } from "@/components/dashboard/TourChips";
-import { MessageSquare, Send, ChevronDown, ChevronUp } from "lucide-react";
+import { MessageSquare, Send } from "lucide-react";
 import { MessagesList } from "@/components/messages/MessagesList";
 import { DirectMessagesList } from "@/components/messages/DirectMessagesList";
 import { Button } from "@/components/ui/button";
 import { DirectMessageDialog } from "@/components/messages/DirectMessageDialog";
+import { CalendarSection } from "@/components/dashboard/CalendarSection";
+import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { isJobOnDate } from "@/utils/timezoneUtils";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 
 const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
   if (!date || !jobs) return [];
@@ -35,7 +39,6 @@ const Dashboard = () => {
   // User data & preferences
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [showTours, setShowTours] = useState(true);
   const [showMessages, setShowMessages] = useState(false);
   
   // Dashboard state
@@ -53,6 +56,8 @@ const Dashboard = () => {
   // Data fetching
   const { data: jobs, isLoading } = useJobs();
   const { forceSubscribe } = useSubscriptionContext();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   useDashboardSubscriptions();
   
   // Setup subscriptions
@@ -62,8 +67,7 @@ const Dashboard = () => {
       'job_assignments', 
       'job_date_types', 
       'messages', 
-      'direct_messages',
-      'tours'
+      'direct_messages'
     ]);
   }, [forceSubscribe]);
 
@@ -75,18 +79,17 @@ const Dashboard = () => {
         setUserId(session.user.id);
         const { data, error } = await supabase
           .from("profiles")
-          .select("role, tours_expanded")
+          .select("role")
           .eq("id", session.user.id)
           .single();
 
         if (error) {
-          console.error("Error fetching user role and preferences:", error);
+          console.error("Error fetching user role:", error);
           return;
         }
 
         if (data) {
           setUserRole(data.role);
-          setShowTours(data.tours_expanded !== null && data.tours_expanded !== undefined ? data.tours_expanded : true);
 
           const params = new URLSearchParams(window.location.search);
           if (params.get("showMessages") === "true") {
@@ -113,27 +116,48 @@ const Dashboard = () => {
   };
 
   const handleDeleteClick = async (jobId: string) => {
-    console.log("Delete job called from Dashboard");
-    // This is handled by the JobCardNew component's delete functionality
+    // Check permissions
+    if (!["admin", "management"].includes(userRole || "")) {
+      toast({
+        title: "Permission denied",
+        description: "Only admin and management users can delete jobs",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!window.confirm("Are you sure you want to delete this job? This action cannot be undone and will remove all related data.")) return;
+
+    try {
+      console.log("Dashboard: Starting optimistic job deletion for:", jobId);
+      
+      // Call optimistic deletion service
+      const result = await deleteJobOptimistically(jobId);
+      
+      if (result.success) {
+        toast({
+          title: "Job deleted",
+          description: result.details || "The job has been removed and cleanup is running in background."
+        });
+        
+        // Invalidate queries to refresh the list
+        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      } else {
+        throw new Error(result.error || "Unknown deletion error");
+      }
+    } catch (error: any) {
+      console.error("Dashboard: Error in optimistic job deletion:", error);
+      toast({
+        title: "Error deleting job",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   };
 
   const handleDateTypeChange = () => {
     console.log("Date type change called from Dashboard");
     // This is handled by the CalendarSection component
-  };
-
-  const handleToggleTours = async () => {
-    const newValue = !showTours;
-    setShowTours(newValue);
-    if (userId) {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ tours_expanded: newValue })
-        .eq("id", userId);
-      if (error) {
-        console.error("Error updating tours preference:", error);
-      }
-    }
   };
 
   const selectedDateJobs = getSelectedDateJobs(date, jobs);
@@ -181,49 +205,35 @@ const Dashboard = () => {
         </Card>
       )}
 
-      <Card className="w-full bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            Tours {new Date().getFullYear()}
-          </CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleToggleTours}
-            className="h-8 w-8 p-0"
-          >
-            {showTours ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </Button>
-        </CardHeader>
-        {showTours && (
-          <CardContent>
-            <TourChips
-              onTourClick={(tourId) => {
-                if (userRole === "logistics") return;
-                const tour = jobs?.find((job) => job.id === tourId);
-                if (tour) handleEditClick(tour);
-              }}
-            />
-          </CardContent>
-        )}
-      </Card>
-
-      <DashboardContent
-        date={date}
-        setDate={setDate}
-        jobs={jobs}
-        selectedDateJobs={selectedDateJobs}
-        onEditClick={handleEditClick}
-        onDeleteClick={handleDeleteClick}
-        onJobClick={handleJobClick}
-        userRole={userRole}
-        onDateTypeChange={handleDateTypeChange}
-      />
+      <div className="space-y-8">
+        {/* Calendar section - full width */}
+        <div className="w-full">
+          <CalendarSection 
+            date={date} 
+            onDateSelect={setDate} 
+            jobs={jobs} 
+            onDateTypeChange={handleDateTypeChange}
+          />
+        </div>
+        
+        {/* Today's Schedule below the calendar */}
+        <div className="w-full">
+          <TodaySchedule
+            jobs={selectedDateJobs}
+            onEditClick={handleEditClick}
+            onDeleteClick={handleDeleteClick}
+            onJobClick={handleJobClick}
+            userRole={userRole}
+            selectedDate={date}
+          />
+        </div>
+      </div>
 
       {selectedJobId && (
         <JobAssignmentDialog
-          open={isAssignmentDialogOpen}
-          onOpenChange={setIsAssignmentDialogOpen}
+          isOpen={isAssignmentDialogOpen}
+          onClose={() => setIsAssignmentDialogOpen(false)}
+          onAssignmentChange={() => {}}
           jobId={selectedJobId}
           department={selectedDepartment}
         />

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
@@ -15,6 +14,7 @@ import { Scale, Zap, Calendar, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
+import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 
 const Lights = () => {
   const navigate = useNavigate();
@@ -89,26 +89,41 @@ const Lights = () => {
   };
 
   const handleDeleteClick = async (jobId: string) => {
+    // Check permissions
+    if (!["admin", "management"].includes(userRole || "")) {
+      toast({
+        title: "Permission denied",
+        description: "Only admin and management users can delete jobs",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!window.confirm("¿Está seguro de que desea eliminar este trabajo?")) return;
 
     try {
-      const { error } = await supabase
-        .from('jobs')
-        .delete()
-        .eq('id', jobId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Trabajo eliminado",
-        description: "El trabajo se ha eliminado con éxito.",
-      });
-      await queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      console.log("Lights page: Starting optimistic job deletion for:", jobId);
+      
+      // Call optimistic deletion service
+      const result = await deleteJobOptimistically(jobId);
+      
+      if (result.success) {
+        toast({
+          title: "Trabajo eliminado",
+          description: result.details || "El trabajo se ha eliminado con éxito."
+        });
+        
+        // Invalidate queries to refresh the list
+        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      } else {
+        throw new Error(result.error || "Unknown deletion error");
+      }
     } catch (error: any) {
+      console.error("Lights page: Error in optimistic job deletion:", error);
       toast({
         title: "Error al eliminar el trabajo",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
@@ -192,8 +207,9 @@ const Lights = () => {
 
       {selectedJobId && (
         <JobAssignmentDialog
-          open={isAssignmentDialogOpen}
-          onOpenChange={setIsAssignmentDialogOpen}
+          isOpen={isAssignmentDialogOpen}
+          onClose={() => setIsAssignmentDialogOpen(false)}
+          onAssignmentChange={() => {}}
           jobId={selectedJobId}
           department={currentDepartment}
         />

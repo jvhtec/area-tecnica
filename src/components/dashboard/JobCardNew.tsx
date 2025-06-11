@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { Department } from "@/types/department";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { useNavigate } from "react-router-dom";
+import { useDeletionState } from "@/hooks/useDeletionState";
+import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 
 import { 
   createAllFoldersForJob
@@ -18,7 +20,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plane, Wrench, Star, Moon, Mic } from "lucide-react";
+import { Plane, Wrench, Star, Moon, Mic, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import {
   Clock,
@@ -83,6 +85,10 @@ export function JobCardNew({
   const { theme } = useTheme();
   const navigate = useNavigate();
   const isDark = theme === "dark";
+  const { addDeletingJob, removeDeletingJob, isDeletingJob } = useDeletionState();
+
+  // Add state for folder creation loading
+  const [isCreatingFolders, setIsCreatingFolders] = useState(false);
 
   const borderColor = job.color ? job.color : "#7E69AB";
   const appliedBorderColor = isDark ? (job.darkColor ? job.darkColor : borderColor) : borderColor;
@@ -98,6 +104,16 @@ export function JobCardNew({
   const [videoTaskDialogOpen, setVideoTaskDialogOpen] = useState(false);
   const [editJobDialogOpen, setEditJobDialogOpen] = useState(false);
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
+
+  // Check if this job is being deleted
+  const isJobBeingDeleted = isDeletingJob(job.id);
+
+  const getFlexButtonTitle = () => {
+    if (isCreatingFolders) {
+      return "Creating folders...";
+    }
+    return foldersAreCreated ? "Folders already exist" : "Create Flex folders";
+  };
 
   const getDateTypeIcon = (jobId: string, date: Date, dateTypes: Record<string, any>) => {
     const key = `${jobId}-${format(date, "yyyy-MM-dd")}`;
@@ -120,6 +136,8 @@ export function JobCardNew({
 
   useEffect(() => {
     async function fetchDateTypes() {
+      if (isJobBeingDeleted) return; // Prevent queries during deletion
+      
       const { data, error } = await supabase
         .from("job_date_types")
         .select("*")
@@ -130,7 +148,7 @@ export function JobCardNew({
       }
     }
     fetchDateTypes();
-  }, [job.id, job.start_time]);
+  }, [job.id, job.start_time, isJobBeingDeleted]);
 
   const assignedTechnicians = job.job_type !== "dryhire"
     ? assignments
@@ -162,7 +180,7 @@ export function JobCardNew({
   const { data: soundTasks } = useQuery({
     queryKey: ["sound-tasks", job.id],
     queryFn: async () => {
-      if (department !== "sound") return null;
+      if (department !== "sound" || isJobBeingDeleted) return null;
       const { data, error } = await supabase
         .from("sound_job_tasks")
         .select(
@@ -179,7 +197,7 @@ export function JobCardNew({
       if (error) throw error;
       return data;
     },
-    enabled: department === "sound",
+    enabled: department === "sound" && !isJobBeingDeleted,
     retry: 3,
     retryDelay: 1000
   });
@@ -187,7 +205,7 @@ export function JobCardNew({
   const { data: personnel } = useQuery({
     queryKey: ["sound-personnel", job.id],
     queryFn: async () => {
-      if (department !== "sound") return null;
+      if (department !== "sound" || isJobBeingDeleted) return null;
       const { data: existingData, error: fetchError } = await supabase
         .from("sound_job_personnel")
         .select("*")
@@ -211,7 +229,7 @@ export function JobCardNew({
       }
       return existingData;
     },
-    enabled: department === "sound"
+    enabled: department === "sound" && !isJobBeingDeleted
   });
 
   const updateFolderStatus = useMutation({
@@ -227,28 +245,118 @@ export function JobCardNew({
     }
   });
 
+  // Centralized delete handler with proper state management
+  const handleDeleteClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    // Check if already being deleted
+    if (isJobBeingDeleted) {
+      console.log("Dashboard JobCardNew: Job deletion already in progress");
+      return;
+    }
+
+    if (!["admin", "management"].includes(userRole || "")) {
+      toast({
+        title: "Permission denied",
+        description: "Only management users can delete jobs",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!window.confirm("Are you sure you want to delete this job?")) {
+      return;
+    }
+
+    try {
+      console.log("Dashboard JobCardNew: Starting job deletion for:", job.id);
+      
+      // Mark job as being deleted to prevent race conditions
+      addDeletingJob(job.id);
+      
+      // Cancel any ongoing queries for this job to prevent race conditions
+      await queryClient.cancelQueries({ queryKey: ["sound-tasks", job.id] });
+      await queryClient.cancelQueries({ queryKey: ["sound-personnel", job.id] });
+      
+      const result = await deleteJobOptimistically(job.id);
+      
+      if (result.success) {
+        onDeleteClick(job.id);
+        toast({
+          title: "Success",
+          description: "Job deleted successfully"
+        });
+
+        queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      } else {
+        throw new Error(result.error || "Unknown deletion error");
+      }
+    } catch (error: any) {
+      console.error("Dashboard JobCardNew: Error deleting job:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete job",
+        variant: "destructive"
+      });
+    } finally {
+      // Always remove from deletion state, even on error
+      removeDeletingJob(job.id);
+    }
+  };
+
+  // Check folder existence with proper loading state handling
+  const { data: foldersExist, isLoading: isFoldersLoading } = useFolderExistence(job.id);
+  
+  // Updated logic: prioritize actual folder existence over database flags
+  const actualFoldersExist = foldersExist === true;
+  const systemThinksFoldersExist = job.flex_folders_created || job.flex_folders_exist;
+  
+  // Detect inconsistency for logging/debugging
+  const hasInconsistency = systemThinksFoldersExist && !actualFoldersExist;
+  if (hasInconsistency) {
+    console.warn("Dashboard JobCardNew: Folder state inconsistency detected for job", job.id, {
+      systemThinks: systemThinksFoldersExist,
+      actualExists: actualFoldersExist,
+      dbFlag: job.flex_folders_created,
+      flexFoldersExist: job.flex_folders_exist
+    });
+  }
+  
+  // Final decision: only consider folders created if they actually exist
+  const foldersAreCreated = actualFoldersExist;
+
+  console.log("Dashboard JobCardNew: Updated folder status check for job", job.id, {
+    actualFoldersExist,
+    systemThinksFoldersExist,
+    hasInconsistency,
+    finalDecision: foldersAreCreated,
+    isLoading: isFoldersLoading
+  });
+
   const createFlexFoldersHandler = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    console.log("Folder existence check:", {
-      jobId: job.id,
-      flexFoldersCreated: job.flex_folders_created,
-      foldersExist,
-      flexFoldersExist: job.flex_folders_exist,
-      combined: foldersAreCreated
-    });
+    if (isCreatingFolders) {
+      console.log("Dashboard JobCardNew: Folder creation already in progress");
+      return;
+    }
 
-    if (foldersAreCreated) {
-      console.log("Folders already exist, preventing creation");
-      toast.error("Folders already created", {
-        description: "Flex folders have already been created for this job."
+    console.log("Dashboard JobCardNew: Starting sophisticated folder creation for job:", job.id);
+
+    if (actualFoldersExist) {
+      console.log("Dashboard JobCardNew: Folders actually exist, preventing creation");
+      toast({
+        title: "Folders already created",
+        description: "Flex folders have already been created for this job.",
+        variant: "destructive"
       });
       return;
     }
 
     try {
-      console.log("Starting folder creation for job:", job.id);
+      setIsCreatingFolders(true);
 
+      // Double-check in the database before creating
       const { data: existingFolders } = await supabase
         .from("flex_folders")
         .select("id")
@@ -256,34 +364,47 @@ export function JobCardNew({
         .limit(1);
 
       if (existingFolders && existingFolders.length > 0) {
-        console.log("Found existing folders in final check:", existingFolders);
-        toast.error("Folders already exist", {
-          description: "Flex folders have already been created for this job."
+        console.log("Dashboard JobCardNew: Found existing folders in final check:", existingFolders);
+        toast({
+          title: "Folders already exist",
+          description: "Flex folders have already been created for this job.",
+          variant: "destructive"
         });
         return;
       }
 
+      // Use the restored sophisticated flex folder creation system
       const startDate = new Date(job.start_time);
-      const documentNumber = startDate
-        .toISOString()
-        .slice(2, 10)
-        .replace(/-/g, "");
+      const endDate = new Date(job.end_time);
+      const formattedStartDate = format(startDate, 'yyyy-MM-dd');
+      const formattedEndDate = format(endDate, 'yyyy-MM-dd');
+      const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, "");
 
-      const formattedStartDate = new Date(job.start_time).toISOString().split(".")[0] + ".000Z";
-      const formattedEndDate = new Date(job.end_time).toISOString().split(".")[0] + ".000Z";
+      toast({
+        title: "Creating folders...",
+        description: "Setting up sophisticated Flex folder structure for this job."
+      });
 
       await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber);
-      await updateFolderStatus.mutateAsync();
 
-      console.log("Successfully created folders for job:", job.id);
-      toast.success("Success", {
-        description: "Flex folders have been created successfully."
+      toast({
+        title: "Success!",
+        description: "Flex folders have been created successfully with proper configuration."
       });
+
+      // Refresh queries
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["folder-existence"] });
+
     } catch (error: any) {
-      console.error("Error creating Flex folders:", error);
-      toast.error("Error creating folders", {
-        description: error.message
+      console.error("Dashboard JobCardNew: Error creating sophisticated flex folders:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create Flex folders",
+        variant: "destructive"
       });
+    } finally {
+      setIsCreatingFolders(false);
     }
   };
 
@@ -311,115 +432,6 @@ export function JobCardNew({
   const handleEditClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onEditClick(job);
-  };
-
-  const handleDeleteClick = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (!["admin", "management"].includes(userRole || "")) {
-      toast.error("Permission denied", {
-        description: "Only management users can delete jobs"
-      });
-      return;
-    }
-
-    if (!window.confirm("Are you sure you want to delete this job?")) {
-      return;
-    }
-
-    try {
-      console.log("Deleting job:", job.id);
-
-      const { data: soundTaskIds } = await supabase
-        .from("sound_job_tasks")
-        .select("id")
-        .eq("job_id", job.id);
-      const { data: lightsTaskIds } = await supabase
-        .from("lights_job_tasks")
-        .select("id")
-        .eq("job_id", job.id);
-      const { data: videoTaskIds } = await supabase
-        .from("video_job_tasks")
-        .select("id")
-        .eq("job_id", job.id);
-
-      if (soundTaskIds?.length) {
-        const { error: soundDocsError } = await supabase
-          .from("task_documents")
-          .delete()
-          .in("sound_task_id", soundTaskIds.map((t) => t.id));
-        if (soundDocsError) throw soundDocsError;
-      }
-      if (lightsTaskIds?.length) {
-        const { error: lightsDocsError } = await supabase
-          .from("task_documents")
-          .delete()
-          .in("lights_task_id", lightsTaskIds.map((t) => t.id));
-        if (lightsDocsError) throw lightsDocsError;
-      }
-      if (videoTaskIds?.length) {
-        const { error: videoDocsError } = await supabase
-          .from("task_documents")
-          .delete()
-          .in("video_task_id", videoTaskIds.map((t) => t.id));
-        if (videoDocsError) throw videoDocsError;
-      }
-
-      await Promise.all([
-        supabase.from("sound_job_tasks").delete().eq("job_id", job.id),
-        supabase.from("lights_job_tasks").delete().eq("job_id", job.id),
-        supabase.from("video_job_tasks").delete().eq("job_id", job.id)
-      ]);
-
-      await Promise.all([
-        supabase.from("sound_job_personnel").delete().eq("job_id", job.id),
-        supabase.from("lights_job_personnel").delete().eq("job_id", job.id),
-        supabase.from("video_job_personnel").delete().eq("job_id", job.id)
-      ]);
-
-      if (job.job_documents?.length > 0) {
-        const { error: storageError } = await supabase.storage
-          .from("job_documents")
-          .remove(job.job_documents.map((doc: JobDocument) => doc.file_path));
-        if (storageError) throw storageError;
-      }
-
-      const { error: jobDocsError } = await supabase
-        .from("job_documents")
-        .delete()
-        .eq("job_id", job.id);
-      if (jobDocsError) throw jobDocsError;
-
-      const { error: assignmentsError } = await supabase
-        .from("job_assignments")
-        .delete()
-        .eq("job_id", job.id);
-      if (assignmentsError) throw assignmentsError;
-
-      const { error: departmentsError } = await supabase
-        .from("job_departments")
-        .delete()
-        .eq("job_id", job.id);
-      if (departmentsError) throw departmentsError;
-
-      const { error: jobError } = await supabase
-        .from("jobs")
-        .delete()
-        .eq("id", job.id);
-      if (jobError) throw jobError;
-
-      onDeleteClick(job.id);
-      toast.success("Success", {
-        description: "Job deleted successfully"
-      });
-
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
-    } catch (error: any) {
-      console.error("Error deleting job:", error);
-      toast.error("Error", {
-        description: error.message || "Failed to delete job"
-      });
-    }
   };
 
   const toggleCollapse = (e: React.MouseEvent) => {
@@ -454,12 +466,15 @@ export function JobCardNew({
 
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
 
-      toast.success("Document uploaded", {
+      toast({
+        title: "Document uploaded",
         description: "The document has been successfully uploaded."
       });
     } catch (err: any) {
-      toast.error("Upload failed", {
-        description: err.message
+      toast({
+        title: "Upload failed",
+        description: err.message,
+        variant: "destructive"
       });
     }
   };
@@ -480,8 +495,10 @@ export function JobCardNew({
       window.open(data.signedUrl, "_blank");
     } catch (err: any) {
       console.error("Error in handleViewDocument:", err);
-      toast.error("Error viewing document", {
-        description: err.message
+      toast({
+        title: "Error viewing document",
+        description: err.message,
+        variant: "destructive"
       });
     }
   };
@@ -511,13 +528,16 @@ export function JobCardNew({
 
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
 
-      toast.success("Document deleted", {
+      toast({
+        title: "Document deleted",
         description: "The document has been successfully deleted."
       });
     } catch (err: any) {
       console.error("Error in handleDeleteDocument:", err);
-      toast.error("Error deleting document", {
-        description: err.message
+      toast({
+        title: "Error deleting document",
+        description: err.message,
+        variant: "destructive"
       });
     }
   };
@@ -526,11 +546,14 @@ export function JobCardNew({
 
   const refreshData = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isJobBeingDeleted) return; // Don't refresh if job is being deleted
+    
     await queryClient.invalidateQueries({ queryKey: ["jobs"] });
     await queryClient.invalidateQueries({ queryKey: ["sound-tasks", job.id] });
     await queryClient.invalidateQueries({ queryKey: ["sound-personnel", job.id] });
 
-    toast.success("Data refreshed", {
+    toast({
+      title: "Data refreshed",
       description: "The job information has been updated."
     });
   };
@@ -553,8 +576,8 @@ export function JobCardNew({
   };
 
   const handleJobCardClick = () => {
-    if (isHouseTech) {
-      return; // Block job card clicks for house techs
+    if (isHouseTech || isJobBeingDeleted) {
+      return; // Block job card clicks for house techs or jobs being deleted
     }
     
     if (isProjectManagementPage) {
@@ -574,11 +597,13 @@ export function JobCardNew({
 
   const handleEditButtonClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isJobBeingDeleted) return;
     setEditJobDialogOpen(true);
   };
 
   const handleFestivalArtistsClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isJobBeingDeleted) return;
     console.log("Navigating to festival management:", job.id);
     navigate(`/festival-management/${job.id}`);
   };
@@ -589,8 +614,9 @@ export function JobCardNew({
   const canUploadDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
   const canCreateFlexFolders = ['admin', 'management', 'logistics'].includes(userRole || '');
 
-  const { data: foldersExist } = useFolderExistence(job.id);
-  const foldersAreCreated = job.flex_folders_created || foldersExist || job.flex_folders_exist;
+  // Show loading state if job is being deleted
+  const cardOpacity = isJobBeingDeleted ? "opacity-50" : "";
+  const pointerEvents = isJobBeingDeleted ? "pointer-events-none" : "";
 
   console.log("Job card rendering with:", {
     jobType: job.job_type,
@@ -605,7 +631,9 @@ export function JobCardNew({
       <Card
         className={cn(
           "mb-4 hover:shadow-md transition-all duration-200",
-          !isHouseTech && "cursor-pointer"
+          !isHouseTech && !isJobBeingDeleted && "cursor-pointer",
+          cardOpacity,
+          pointerEvents
         )}
         onClick={handleJobCardClick}
         style={{
@@ -613,6 +641,14 @@ export function JobCardNew({
           backgroundColor: appliedBgColor
         }}
       >
+        {isJobBeingDeleted && (
+          <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10 rounded">
+            <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-md shadow-lg">
+              <span className="text-sm font-medium">Deleting job...</span>
+            </div>
+          </div>
+        )}
+
         <div className="p-6 pb-3">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -627,6 +663,7 @@ export function JobCardNew({
                 onClick={toggleCollapse}
                 title="Toggle Details"
                 className="ml-2 hover:bg-accent/50 shrink-0"
+                disabled={isJobBeingDeleted}
               >
                 {collapsed ? (
                   <ChevronDown className="h-4 w-4" />
@@ -642,6 +679,7 @@ export function JobCardNew({
                   size="sm"
                   onClick={handleFestivalArtistsClick}
                   className="hover:bg-accent/50"
+                  disabled={isJobBeingDeleted}
                 >
                   {userRole === 'technician' || userRole === 'house_tech' ? 'View Festival' : 'Manage Festival'}
                 </Button>
@@ -652,9 +690,12 @@ export function JobCardNew({
                   size="sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setAssignmentDialogOpen(true);
+                    if (!isJobBeingDeleted) {
+                      setAssignmentDialogOpen(true);
+                    }
                   }}
                   className="hover:bg-accent/50"
+                  disabled={isJobBeingDeleted}
                 >
                   <Users className="h-4 w-4 mr-2" />
                   Assign
@@ -666,6 +707,7 @@ export function JobCardNew({
                 onClick={refreshData}
                 title="Refresh"
                 className="hover:bg-accent/50"
+                disabled={isJobBeingDeleted}
               >
                 <RefreshCw className="h-4 w-4" />
               </Button>
@@ -677,6 +719,7 @@ export function JobCardNew({
                     onClick={handleEditButtonClick}
                     title="Edit job details"
                     className="hover:bg-accent/50"
+                    disabled={isJobBeingDeleted}
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
@@ -685,6 +728,7 @@ export function JobCardNew({
                     size="icon"
                     onClick={handleDeleteClick}
                     className="hover:bg-accent/50"
+                    disabled={isJobBeingDeleted}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -695,19 +739,19 @@ export function JobCardNew({
                   variant="ghost"
                   size="icon"
                   onClick={createFlexFoldersHandler}
-                  disabled={foldersAreCreated}
-                  title={
-                    foldersAreCreated
-                      ? "Folders already exist"
-                      : "Create Flex folders"
-                  }
+                  disabled={foldersAreCreated || isJobBeingDeleted || isFoldersLoading || isCreatingFolders}
+                  title={getFlexButtonTitle()}
                   className={
-                    foldersAreCreated
+                    foldersAreCreated || isJobBeingDeleted || isFoldersLoading || isCreatingFolders
                       ? "opacity-50 cursor-not-allowed"
                       : "hover:bg-accent/50"
                   }
                 >
-                  <img src={createFolderIcon} alt="Create Flex folders" className="h-4 w-4" />
+                  {isCreatingFolders ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <img src={createFolderIcon} alt="Create Flex folders" className="h-4 w-4" />
+                  )}
                 </Button>
               )}
               {job.job_type !== "dryhire" && showUpload && canUploadDocuments && (
@@ -717,8 +761,14 @@ export function JobCardNew({
                     onChange={handleFileUpload}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     onClick={(ev) => ev.stopPropagation()}
+                    disabled={isJobBeingDeleted}
                   />
-                  <Button variant="ghost" size="icon" className="hover:bg-accent/50">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="hover:bg-accent/50"
+                    disabled={isJobBeingDeleted}
+                  >
                     <Upload className="h-4 w-4" />
                   </Button>
                 </div>
@@ -784,6 +834,7 @@ export function JobCardNew({
                               size="icon"
                               onClick={() => handleViewDocument(doc)}
                               title="View"
+                              disabled={isJobBeingDeleted}
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
@@ -792,6 +843,7 @@ export function JobCardNew({
                               size="icon"
                               onClick={() => handleDownload(doc)}
                               title="Download"
+                              disabled={isJobBeingDeleted}
                             >
                               <Download className="h-4 w-4" />
                             </Button>
@@ -801,6 +853,7 @@ export function JobCardNew({
                                 size="icon"
                                 onClick={() => handleDeleteDocument(doc)}
                                 title="Delete"
+                                disabled={isJobBeingDeleted}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -870,7 +923,7 @@ export function JobCardNew({
         </div>
       </Card>
 
-      {!isHouseTech && (
+      {!isHouseTech && !isJobBeingDeleted && (
         <>
           {soundTaskDialogOpen && (
             <SoundTaskDialog
@@ -902,8 +955,9 @@ export function JobCardNew({
           )}
           {assignmentDialogOpen && job.job_type !== "dryhire" && (
             <JobAssignmentDialog
-              open={assignmentDialogOpen}
-              onOpenChange={setAssignmentDialogOpen}
+              isOpen={assignmentDialogOpen}
+              onClose={() => setAssignmentDialogOpen(false)}
+              onAssignmentChange={() => {}}
               jobId={job.id}
               department={department as Department}
             />

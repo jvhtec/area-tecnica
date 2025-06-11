@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
 import CreateTourDialog from "@/components/tours/CreateTourDialog";
@@ -22,6 +21,7 @@ import { PdfAnalysis } from "@/components/sound/PdfAnalysis";
 import { AmplifierTool } from "@/components/sound/AmplifierTool";
 import { useNavigate } from "react-router-dom";
 import { MemoriaTecnica } from "@/components/sound/MemoriaTecnica";
+import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 
 const Sound = () => {
   const navigate = useNavigate();
@@ -105,26 +105,41 @@ const Sound = () => {
   };
 
   const handleDeleteClick = async (jobId: string) => {
-    if (!window.confirm("Are you sure you want to delete this job?")) return;
+    // Check permissions
+    if (!["admin", "management"].includes(userRole || "")) {
+      toast({
+        title: "Permission denied",
+        description: "Only admin and management users can delete jobs",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!window.confirm("Are you sure you want to delete this job? This action cannot be undone and will remove all related data.")) return;
 
     try {
-      const { error } = await supabase
-        .from('jobs')
-        .delete()
-        .eq('id', jobId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Job deleted",
-        description: "The job has been successfully deleted.",
-      });
-      await queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      console.log("Sound page: Starting optimistic job deletion for:", jobId);
+      
+      // Call optimistic deletion service
+      const result = await deleteJobOptimistically(jobId);
+      
+      if (result.success) {
+        toast({
+          title: "Job deleted",
+          description: result.details || "The job has been removed and cleanup is running in background."
+        });
+        
+        // Invalidate queries to refresh the list
+        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      } else {
+        throw new Error(result.error || "Unknown deletion error");
+      }
     } catch (error: any) {
+      console.error("Sound page: Error in optimistic job deletion:", error);
       toast({
         title: "Error deleting job",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
@@ -253,8 +268,9 @@ const Sound = () => {
       )}
       {selectedJobId && (
         <JobAssignmentDialog
-          open={isAssignmentDialogOpen}
-          onOpenChange={setIsAssignmentDialogOpen}
+          isOpen={isAssignmentDialogOpen}
+          onClose={() => setIsAssignmentDialogOpen(false)}
+          onAssignmentChange={() => {}}
           jobId={selectedJobId}
           department={currentDepartment}
         />

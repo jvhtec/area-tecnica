@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
+import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 
 const soundComponentDatabase = [
   { id: 1, name: 'LA12X', watts: 2900 },
@@ -78,8 +79,14 @@ const ConsumosTool: React.FC = () => {
   // NEW: Get tour name for tour defaults mode
   const [tourName, setTourName] = useState<string>('');
 
-  // Tour-specific hooks
-  const { powerDefaults: tourDefaults = [], createDefault: createTourDefault } = useTourPowerDefaults(tourId || '');
+  // Tour-specific hooks - use the new defaults system for tour mode
+  const { 
+    defaultSets,
+    createSet,
+    createTable: createTourDefaultTable 
+  } = useTourDefaultSets(tourId || '');
+  
+  const { powerDefaults: legacyTourDefaults = [], createDefault: createLegacyTourDefault } = useTourPowerDefaults(tourId || '');
   const { 
     powerOverrides = [],
     createPowerOverride,
@@ -91,6 +98,26 @@ const ConsumosTool: React.FC = () => {
     name: '',
     rows: [{ quantity: '', componentId: '', watts: '' }],
   });
+
+  // Helper function to get or create the set ID for sound department
+  const getOrCreateSoundSetId = async (): Promise<string> => {
+    // Check if a sound set already exists
+    const existingSoundSet = defaultSets.find(set => set.department === 'sound');
+    
+    if (existingSoundSet) {
+      return existingSoundSet.id;
+    }
+
+    // Create a new sound set
+    const newSet = await createSet({
+      tour_id: tourId!,
+      name: `${tourName} Sound Defaults`,
+      department: 'sound',
+      description: 'Sound department power defaults'
+    });
+    
+    return newSet.id;
+  };
 
   const addRow = () => {
     setCurrentTable((prev) => ({
@@ -176,20 +203,30 @@ const ConsumosTool: React.FC = () => {
     }
   };
 
-  // NEW: Save as tour defaults
+  // NEW: Save as tour defaults using the new system
   const saveTourDefault = async (table: Table) => {
     if (!tourId) return;
 
     try {
-      await createTourDefault({
-        tour_id: tourId,
+      // Get or create the sound set ID
+      const setId = await getOrCreateSoundSetId();
+
+      // Now create the table with the detailed data
+      await createTourDefaultTable({
+        set_id: setId,
         table_name: table.name,
-        total_watts: table.totalWatts || 0,
-        current_per_phase: table.currentPerPhase || 0,
-        pdu_type: table.customPduType || table.pduType || '',
-        custom_pdu_type: table.customPduType,
-        includes_hoist: table.includesHoist || false,
-        department: 'sound'
+        table_data: {
+          rows: table.rows,
+          safetyMargin: safetyMargin
+        },
+        table_type: 'power',
+        total_value: table.totalWatts || 0,
+        metadata: {
+          current_per_phase: table.currentPerPhase,
+          pdu_type: table.customPduType || table.pduType,
+          custom_pdu_type: table.customPduType,
+          safetyMargin: safetyMargin
+        }
       });
 
       toast({
@@ -355,7 +392,7 @@ const ConsumosTool: React.FC = () => {
   };
 
   const handleExportPDF = async () => {
-    if (!selectedJobId || !selectedJob) {
+    if (!selectedJobId) {
       toast({
         title: 'No job selected',
         description: 'Please select a job before exporting.',
@@ -365,6 +402,11 @@ const ConsumosTool: React.FC = () => {
     }
 
     try {
+      // Generate power summary for consumos reports
+      const totalSystemWatts = tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
+      const totalSystemAmps = tables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
+      const powerSummary = { totalSystemWatts, totalSystemAmps };
+
       let logoUrl: string | undefined = undefined;
       try {
         const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
@@ -374,18 +416,18 @@ const ConsumosTool: React.FC = () => {
       }
 
       const pdfBlob = await exportToPDF(
-        selectedJob.title,
+        selectedJob?.title || 'Power Report',
         tables.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
-        selectedJob.title,
-        'sound',
-        undefined,
-        undefined,
+        selectedJob?.title || 'Power Report',
+        selectedJob?.date || new Date().toISOString(),
+        undefined, // summaryRows - undefined for power reports (auto-generated)
+        powerSummary,
         safetyMargin,
         logoUrl
       );
 
-      const fileName = `Sound Power Report - ${selectedJob.title}.pdf`;
+      const fileName = `Sound Power Report - ${selectedJob?.title || 'Report'}.pdf`;
       const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
       const filePath = `sound/${selectedJobId}/${crypto.randomUUID()}.pdf`;
 
@@ -436,7 +478,7 @@ const ConsumosTool: React.FC = () => {
   }, [tourId]);
 
   // Convert tour defaults to display format
-  const tourDefaultTables = tourDefaults.map(def => ({
+  const tourDefaultTables = legacyTourDefaults.map(def => ({
     id: `default-${def.id}`,
     name: def.table_name,
     rows: [],
