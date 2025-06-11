@@ -1,4 +1,3 @@
-
 /**
  * Collection of folder IDs used in the Flex system
  */
@@ -16,6 +15,11 @@ export const FLEX_FOLDER_IDS = {
   crewCall: "253878cc-af31-11df-b8d5-00e08175e43e",
   pullSheet: "a220432c-af33-11df-b8d5-00e08175e43e"
 };
+
+/**
+ * Fixed Flex location ID that should be used for all folder creation
+ */
+export const FLEX_LOCATION_ID = "2f49c62c-b139-11df-b8d5-00e08175e43e";
 
 /**
  * Parent folder IDs for dryhire jobs by department and month

@@ -5,6 +5,7 @@ import { FlexFolderType } from "@/types/flex";
 import { createFlexFolder } from "./api";
 import { 
   FLEX_FOLDER_IDS, 
+  FLEX_LOCATION_ID,
   DRYHIRE_PARENT_IDS, 
   DEPARTMENT_IDS, 
   RESPONSIBLE_PERSON_IDS, 
@@ -34,13 +35,14 @@ export const createFlexFolderWithType = async (
   documentNumber?: string
 ): Promise<FolderCreationResult> => {
   try {
-    console.log("Creating Flex folder with sophisticated logic:", {
+    console.log("Creating Flex folder with fixed location ID:", {
       folderName,
       folderType,
       department,
       jobType: job?.job_type,
       startDate: formattedStartDate,
-      endDate: formattedEndDate
+      endDate: formattedEndDate,
+      fixedLocationId: FLEX_LOCATION_ID
     });
 
     let payload: any = {
@@ -63,7 +65,8 @@ export const createFlexFolderWithType = async (
         if (formattedEndDate) {
           payload.plannedEndDate = formatDateForFlex(formattedEndDate + 'T18:00:00');
         }
-        if (job.location_id) payload.locationId = job.location_id;
+        // Always use the fixed Flex location ID instead of job.location_id
+        payload.locationId = FLEX_LOCATION_ID;
         if (documentNumber) payload.documentNumber = documentNumber;
         
         // Set responsible person based on job type or default
@@ -106,7 +109,8 @@ export const createFlexFolderWithType = async (
         if (formattedEndDate) {
           payload.plannedEndDate = formatDateForFlex(formattedEndDate + 'T18:00:00');
         }
-        if (job.location_id) payload.locationId = job.location_id;
+        // Always use the fixed Flex location ID instead of job.location_id
+        payload.locationId = FLEX_LOCATION_ID;
         
         // Document number with department suffix
         if (documentNumber && department) {
@@ -116,13 +120,13 @@ export const createFlexFolderWithType = async (
       }
     }
 
-    console.log("Final payload for Flex folder creation:", payload);
+    console.log("Final payload for Flex folder creation with fixed location ID:", payload);
 
     // Use the secure edge function with proper payload
     const folderResponse = await createFlexFolder(payload);
     const folderId = folderResponse.elementId;
 
-    console.log("Flex folder created successfully:", { folderId, folderName });
+    console.log("Flex folder created successfully with fixed location ID:", { folderId, folderName });
 
     // Store the folder ID in the database
     const { error: dbError } = await supabase
