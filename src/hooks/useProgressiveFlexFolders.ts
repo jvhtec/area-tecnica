@@ -71,12 +71,12 @@ export const useProgressiveFlexFolders = () => {
         // Step 1: Initialize
         updateProgress('init', 'in-progress', 'Starting folder creation process...');
         
-        // Get environment variables
-        const authToken = process.env.NEXT_PUBLIC_FLEX_AUTH_TOKEN;
-        const parentFolderId = process.env.NEXT_PUBLIC_FLEX_PARENT_FOLDER_ID;
+        // Get environment variables using Vite syntax
+        const authToken = import.meta.env.VITE_FLEX_AUTH_TOKEN;
+        const parentFolderId = import.meta.env.VITE_FLEX_PARENT_FOLDER_ID;
         
         if (!authToken || !parentFolderId) {
-          throw new Error('Flex API configuration missing');
+          throw new Error('Flex API configuration missing. Please check VITE_FLEX_AUTH_TOKEN and VITE_FLEX_PARENT_FOLDER_ID environment variables.');
         }
 
         // Step 2: Create main job folder
