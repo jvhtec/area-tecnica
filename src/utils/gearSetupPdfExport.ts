@@ -3,6 +3,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
+import { CombinedGearSetup } from '@/types/festival';
 
 export interface GearSetupPdfData {
   jobTitle: string;
@@ -75,12 +76,6 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
         
         let currentY = 40;
         
-        // Job title
-        doc.setFontSize(14);
-        doc.setTextColor(0, 0, 0);
-        doc.text(data.jobTitle, pageWidth / 2, currentY, { align: 'center' });
-        currentY += 15;
-        
         // FOH and MON Console Section
         doc.setFontSize(14);
         doc.setTextColor(125, 1, 1); // Corporate red for section headers
@@ -91,18 +86,25 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
         doc.setFontSize(10);
         
         const consoleData = [];
+        
+        // Add all FOH consoles
         if (data.gearSetup.foh_consoles && data.gearSetup.foh_consoles.length > 0) {
-          consoleData.push(['FOH Console', data.gearSetup.foh_consoles[0].model || 'N/A']);
+          data.gearSetup.foh_consoles.forEach(console => {
+            consoleData.push(['FOH Console', `${console.model} (${console.quantity})`]);
+          });
         }
         
+        // Add all MON consoles
         if (data.gearSetup.mon_consoles && data.gearSetup.mon_consoles.length > 0) {
-          consoleData.push(['MON Console', data.gearSetup.mon_consoles[0].model || 'N/A']);
+          data.gearSetup.mon_consoles.forEach(console => {
+            consoleData.push(['MON Console', `${console.model} (${console.quantity})`]);
+          });
         }
         
         if (consoleData.length > 0) {
           autoTable(doc, {
             startY: currentY,
-            head: [['Type', 'Model']],
+            head: [['Type', 'Model (Quantity)']],
             body: consoleData,
             theme: 'grid',
             styles: {
@@ -111,7 +113,7 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
               lineWidth: 0.1,
             },
             headStyles: {
-              fillColor: [125, 1, 1], // Corporate red for table headers
+              fillColor: [125, 1, 1],
               textColor: [255, 255, 255]
             }
           });
@@ -148,9 +150,15 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
         if (data.gearSetup.iem_systems && data.gearSetup.iem_systems.length > 0) {
           const iem = data.gearSetup.iem_systems[0];
           wirelessData.push([
-            'IEM Systems', 
+            'IEM Channels', 
             iem.model || 'N/A', 
-            `${iem.quantity || 0}`,
+            `${iem.quantity_hh || 0}`,
+            iem.band || 'N/A'
+          ]);
+          wirelessData.push([
+            'IEM Bodypacks', 
+            iem.model || 'N/A', 
+            `${iem.quantity_bp || 0}`,
             iem.band || 'N/A'
           ]);
         }
@@ -185,10 +193,10 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
         doc.setFontSize(10);
         
         const monitorData = [];
-        monitorData.push(['Wedge Monitors', `${data.gearSetup.available_monitors || 0}`]);
-        monitorData.push(['Side Fills', data.gearSetup.has_side_fills ? 'Yes' : 'No']);
-        monitorData.push(['Drum Fills', data.gearSetup.has_drum_fills ? 'Yes' : 'No']);
-        monitorData.push(['DJ Booths', data.gearSetup.has_dj_booths ? 'Yes' : 'No']);
+        monitorData.push(['Wedge Monitors', `${data.gearSetup.monitors_quantity || 0}`]);
+        monitorData.push(['Side Fills', data.gearSetup.extras_sf ? 'Yes' : 'No']);
+        monitorData.push(['Drum Fills', data.gearSetup.extras_df ? 'Yes' : 'No']);
+        monitorData.push(['DJ Booths', data.gearSetup.extras_djbooth ? 'Yes' : 'No']);
         monitorData.push(['Other', data.gearSetup.extras_wired || 'N/A']);
         
         autoTable(doc, {
@@ -219,20 +227,20 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
         doc.setFontSize(10);
         
         const infraData = [];
-        if (data.gearSetup.available_cat6_runs > 0) {
-          infraData.push(['CAT6', `${data.gearSetup.available_cat6_runs}`]);
+        if (data.gearSetup.infra_cat6) {
+          infraData.push(['CAT6', `${data.gearSetup.infra_cat6_quantity || 0}`]);
         }
-        if (data.gearSetup.available_hma_runs > 0) {
-          infraData.push(['HMA', `${data.gearSetup.available_hma_runs}`]);
+        if (data.gearSetup.infra_hma) {
+          infraData.push(['HMA', `${data.gearSetup.infra_hma_quantity || 0}`]);
         }
-        if (data.gearSetup.available_coax_runs > 0) {
-          infraData.push(['Coax', `${data.gearSetup.available_coax_runs}`]);
+        if (data.gearSetup.infra_coax) {
+          infraData.push(['Coax', `${data.gearSetup.infra_coax_quantity || 0}`]);
         }
-        if (data.gearSetup.available_opticalcon_duo_runs > 0) {
-          infraData.push(['Opticalcon Duo', `${data.gearSetup.available_opticalcon_duo_runs}`]);
+        if (data.gearSetup.infra_opticalcon_duo) {
+          infraData.push(['Opticalcon Duo', `${data.gearSetup.infra_opticalcon_duo_quantity || 0}`]);
         }
-        if (data.gearSetup.available_analog_runs > 0) {
-          infraData.push(['Analog', `${data.gearSetup.available_analog_runs}`]);
+        if (data.gearSetup.infra_analog > 0) {
+          infraData.push(['Analog', `${data.gearSetup.infra_analog || 0}`]);
         }
         
         if (data.gearSetup.other_infrastructure) {
@@ -387,12 +395,11 @@ export const exportGearSetupPDF = async (data: GearSetupPdfData): Promise<Blob> 
 
 export const generateStageGearPDF = async (
   jobId: string,
-  selectedDate: string,
   stageNumber: number,
   stageName?: string
-): Promise<Blob> => {
+): Promise<Blob | null> => {
   try {
-    console.log(`Generating gear setup PDF for stage ${stageNumber} on ${selectedDate}`);
+    console.log(`Generating gear setup PDF for stage ${stageNumber}`);
     
     // Fetch job details
     const { data: jobData, error: jobError } = await supabase
@@ -403,15 +410,111 @@ export const generateStageGearPDF = async (
     
     if (jobError) throw jobError;
     
-    // Fetch gear setup
-    const { data: gearSetup, error: gearError } = await supabase
+    // Fetch global gear setup
+    const { data: globalSetupData, error: globalError } = await supabase
       .from("festival_gear_setups")
       .select("*")
       .eq("job_id", jobId)
-      .eq("date", selectedDate)
-      .single();
+      .order('created_at', { ascending: false })
+      .limit(1);
     
-    if (gearError) throw gearError;
+    if (globalError) throw globalError;
+    
+    if (!globalSetupData || globalSetupData.length === 0) {
+      console.log('No global gear setup found for this festival');
+      return null;
+    }
+    
+    const globalSetup = globalSetupData[0];
+    
+    // Fetch stage-specific gear setup if it exists
+    let stageSetup = null;
+    if (stageNumber !== 1) { // Only fetch stage-specific setup if not stage 1
+      const { data: stageSetupData, error: stageError } = await supabase
+        .from("festival_stage_gear_setups")
+        .select("*")
+        .eq("gear_setup_id", globalSetup.id)
+        .eq("stage_number", stageNumber)
+        .maybeSingle();
+      
+      if (stageError) {
+        console.error('Error fetching stage-specific setup:', stageError);
+      } else {
+        stageSetup = stageSetupData;
+      }
+
+      console.log('Stage-specific setup:', stageSetup);
+    }
+
+    // For stage 1, just use the global setup as is
+    // For other stages, combine global and stage-specific data, with stage-specific taking precedence
+    let combinedSetup: any;
+    
+    if (stageNumber === 1 || !stageSetup) {
+      // For stage 1 or if no stage-specific setup exists, use global setup
+      combinedSetup = {
+        // Direct mappings
+        foh_consoles: globalSetup.foh_consoles || [],
+        mon_consoles: globalSetup.mon_consoles || [],
+        wireless_systems: globalSetup.wireless_systems || [],
+        iem_systems: globalSetup.iem_systems || [],
+        
+        // Convert properties with different names
+        monitors_quantity: globalSetup.available_monitors || 0,
+        monitors_enabled: globalSetup.available_monitors > 0,
+        extras_sf: globalSetup.has_side_fills || false,
+        extras_df: globalSetup.has_drum_fills || false,
+        extras_djbooth: globalSetup.has_dj_booths || false,
+        extras_wired: globalSetup.extras_wired || '',
+        
+        // Infrastructure
+        infra_cat6: globalSetup.available_cat6_runs > 0,
+        infra_cat6_quantity: globalSetup.available_cat6_runs || 0,
+        infra_hma: globalSetup.available_hma_runs > 0,
+        infra_hma_quantity: globalSetup.available_hma_runs || 0,
+        infra_coax: globalSetup.available_coax_runs > 0,
+        infra_coax_quantity: globalSetup.available_coax_runs || 0,
+        infra_opticalcon_duo: globalSetup.available_opticalcon_duo_runs > 0,
+        infra_opticalcon_duo_quantity: globalSetup.available_opticalcon_duo_runs || 0,
+        infra_analog: globalSetup.available_analog_runs || 0,
+        other_infrastructure: globalSetup.other_infrastructure || '',
+        
+        // Notes
+        notes: globalSetup.notes || ''
+      };
+      
+      console.log('Using global setup for PDF generation (Stage 1):', combinedSetup);
+    } else {
+      // For other stages with stage-specific setup, merge with stage-specific taking precedence
+      combinedSetup = {
+        foh_consoles: stageSetup.foh_consoles || globalSetup.foh_consoles || [],
+        mon_consoles: stageSetup.mon_consoles || globalSetup.mon_consoles || [],
+        wireless_systems: stageSetup.wireless_systems || globalSetup.wireless_systems || [],
+        iem_systems: stageSetup.iem_systems || globalSetup.iem_systems || [],
+        
+        monitors_quantity: stageSetup.monitors_quantity,
+        monitors_enabled: stageSetup.monitors_enabled,
+        extras_sf: stageSetup.extras_sf,
+        extras_df: stageSetup.extras_df,
+        extras_djbooth: stageSetup.extras_djbooth,
+        extras_wired: stageSetup.extras_wired || globalSetup.extras_wired || '',
+        
+        infra_cat6: stageSetup.infra_cat6,
+        infra_cat6_quantity: stageSetup.infra_cat6_quantity,
+        infra_hma: stageSetup.infra_hma,
+        infra_hma_quantity: stageSetup.infra_hma_quantity,
+        infra_coax: stageSetup.infra_coax,
+        infra_coax_quantity: stageSetup.infra_coax_quantity,
+        infra_opticalcon_duo: stageSetup.infra_opticalcon_duo,
+        infra_opticalcon_duo_quantity: stageSetup.infra_opticalcon_duo_quantity,
+        infra_analog: stageSetup.infra_analog,
+        other_infrastructure: stageSetup.other_infrastructure || globalSetup.other_infrastructure || '',
+        
+        notes: stageSetup.notes || globalSetup.notes || ''
+      };
+      
+      console.log('Using merged setup for PDF generation (Stage ' + stageNumber + '):', combinedSetup);
+    }
     
     // Fetch logo URL
     const { data: logoData } = await supabase
@@ -435,8 +538,8 @@ export const generateStageGearPDF = async (
       jobTitle: jobData.title,
       stageNumber,
       stageName,
-      date: selectedDate,
-      gearSetup,
+      date: new Date().toISOString().split('T')[0], // Current date as fallback
+      gearSetup: combinedSetup,
       logoUrl
     };
     

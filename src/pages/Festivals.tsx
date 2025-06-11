@@ -1,18 +1,27 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useJobsRealtime } from "@/hooks/useJobsRealtime";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { JobCard } from "@/components/jobs/JobCard";
 import { Separator } from "@/components/ui/separator";
 import { Tent, Printer, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase, ensureRealtimeConnection } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
-import { useAuthSession } from "@/hooks/auth/useAuthSession";
+import { useAuth } from "@/hooks/useAuth";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
+import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
+import { useConnectionStatus } from "@/hooks/useConnectionStatus";
+import { FestivalsPagination } from "@/components/ui/festivals-pagination";
+import { findClosestFestival, calculatePageForFestival } from "@/utils/dateUtils";
 
+const ITEMS_PER_PAGE = 9; // 3x3 grid
+
+/**
+ * Festivals page component showing all festival events with pagination
+ */
 const Festivals = () => {
   const navigate = useNavigate();
   const { 
@@ -21,15 +30,20 @@ const Festivals = () => {
     isError, 
     error, 
     isRefreshing, 
-    refetch, 
-    subscriptionStatus 
+    refetch,
+    subscriptionStatus
   } = useJobsRealtime();
   
   const [festivalJobs, setFestivalJobs] = useState<any[]>([]);
   const [festivalLogos, setFestivalLogos] = useState<Record<string, string>>({});
   const [isPrinting, setIsPrinting] = useState<Record<string, boolean>>({});
-  const { userRole } = useAuthSession();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [highlightedFestivalId, setHighlightedFestivalId] = useState<string | null>(null);
+  const { userRole } = useAuth();
+  const { status: connectionStatus, recoverConnection } = useConnectionStatus();
+  const festivalRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
+  // Filter jobs to only show festivals
   useEffect(() => {
     if (jobs) {
       const festivals = jobs.filter(job => job.job_type === 'festival');
@@ -39,6 +53,53 @@ const Festivals = () => {
     }
   }, [jobs]);
 
+  // Auto-center on closest festival when festivals are loaded
+  useEffect(() => {
+    if (festivalJobs.length > 0) {
+      const closestFestival = findClosestFestival(festivalJobs);
+      if (closestFestival) {
+        const targetPage = calculatePageForFestival(festivalJobs, closestFestival, ITEMS_PER_PAGE);
+        setCurrentPage(targetPage);
+        setHighlightedFestivalId(closestFestival.id);
+        
+        // Scroll to the festival after a brief delay to ensure rendering
+        setTimeout(() => {
+          scrollToFestival(closestFestival.id);
+        }, 300);
+      }
+    }
+  }, [festivalJobs]);
+
+  // Clear highlight after some time
+  useEffect(() => {
+    if (highlightedFestivalId) {
+      const timer = setTimeout(() => {
+        setHighlightedFestivalId(null);
+      }, 3000); // Remove highlight after 3 seconds
+      
+      return () => clearTimeout(timer);
+    }
+  }, [highlightedFestivalId]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(festivalJobs.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedFestivals = festivalJobs.slice(startIndex, endIndex);
+
+  // Auto-recover connection if needed
+  useEffect(() => {
+    if (isError || (connectionStatus !== 'connected' && !isLoading)) {
+      console.log("Connection issue detected, attempting recovery...");
+      const attemptRecovery = async () => {
+        await recoverConnection();
+        refetch();
+      };
+      attemptRecovery();
+    }
+  }, [isError, connectionStatus, isLoading, recoverConnection, refetch]);
+
+  // Fetch festival logo for each festival job
   const fetchFestivalLogo = async (job: any) => {
     try {
       const { data, error } = await supabase
@@ -68,16 +129,46 @@ const Festivals = () => {
     }
   };
 
+  // Scroll to specific festival
+  const scrollToFestival = (festivalId: string) => {
+    const festivalElement = festivalRefs.current[festivalId];
+    if (festivalElement) {
+      festivalElement.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center',
+        inline: 'center'
+      });
+    }
+  };
+
+  // Navigate to festival management page when clicking on a job
   const handleJobClick = (jobId: string) => {
     navigate(`/festival-management/${jobId}`);
   };
 
+  // Handle printing all documentation for a festival
   const handlePrintAllDocumentation = async (jobId: string, jobTitle: string) => {
     setIsPrinting(prev => ({ ...prev, [jobId]: true }));
     
     try {
       console.log("Starting document generation for festival:", jobTitle);
-      const mergedPdf = await generateAndMergeFestivalPDFs(jobId, jobTitle);
+      
+      const defaultOptions: PrintOptions = {
+        includeGearSetup: true,
+        gearSetupStages: [1], // Default to stage 1
+        includeShiftSchedules: true,
+        shiftScheduleStages: [1], // Default to stage 1
+        includeArtistTables: true,
+        artistTableStages: [1], // Default to stage 1
+        includeArtistRequirements: true,
+        artistRequirementStages: [1], // Default to stage 1
+        includeRfIemTable: true,
+        rfIemTableStages: [1],
+        includeInfrastructureTable: true,
+        infrastructureTableStages: [1]
+      };
+      
+      const mergedPdf = await generateAndMergeFestivalPDFs(jobId, jobTitle, defaultOptions);
       
       if (!mergedPdf || mergedPdf.size === 0) {
         throw new Error('Generated PDF is empty');
@@ -101,10 +192,30 @@ const Festivals = () => {
     }
   };
 
-  // Check if user can print documentation
-  const canPrintDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
+  // Handle refresh button click with enhanced recovery
+  const handleRefreshClick = async () => {
+    try {
+      toast.info("Refreshing festival data...");
+      
+      // First try to ensure realtime connection
+      const connectionRestored = await ensureRealtimeConnection();
+      
+      if (connectionRestored) {
+        await refetch();
+        toast.success("Festival data refreshed");
+      } else {
+        // If connection couldn't be restored, try the full recovery
+        await recoverConnection();
+        await refetch();
+        toast.success("Connection restored and data refreshed");
+      }
+    } catch (error) {
+      console.error("Error during refresh:", error);
+      toast.error("Could not refresh data. Please try again.");
+    }
+  };
 
-  // Empty functions for onEditClick and onDeleteClick since we don't want those buttons
+  const canPrintDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
   const emptyFunction = () => {};
 
   return (
@@ -118,26 +229,11 @@ const Festivals = () => {
           
           <div className="flex items-center gap-2">
             <SubscriptionIndicator 
-              tables={['jobs', 'job_assignments', 'job_departments', 'job_date_types']} 
+              tables={['jobs', 'job_assignments', 'job_departments', 'job_date_types', 'festival_logos']} 
               showRefreshButton 
-              onRefresh={refetch}
+              onRefresh={handleRefreshClick}
               showLabel
             />
-            
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={refetch} 
-              disabled={isLoading || isRefreshing}
-              className="ml-2"
-            >
-              {isRefreshing ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-1" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-1" />
-              )}
-              Refresh
-            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -150,6 +246,9 @@ const Festivals = () => {
             <div className="flex flex-col justify-center items-center h-40">
               <Loader2 className="h-8 w-8 animate-spin mb-2 text-primary" />
               <p className="text-muted-foreground">Loading festivals...</p>
+              {connectionStatus !== 'connected' && (
+                <p className="text-amber-500 mt-2">Establishing connection...</p>
+              )}
             </div>
           ) : isError ? (
             <div className="flex flex-col justify-center items-center h-40 text-center">
@@ -158,13 +257,15 @@ const Festivals = () => {
               <p className="text-muted-foreground mt-2 max-w-md">
                 {error instanceof Error ? error.message : 'An unknown error occurred'}
               </p>
+              <p className="text-sm text-muted-foreground mt-2">Connection status: {connectionStatus}</p>
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={refetch}
+                onClick={handleRefreshClick}
                 className="mt-4"
               >
-                Try Again
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Reconnect & Try Again
               </Button>
             </div>
           ) : festivalJobs.length === 0 ? (
@@ -175,42 +276,67 @@ const Festivals = () => {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {festivalJobs.map((job) => (
-                <div key={job.id} className="relative">
-                  <div onClick={() => handleJobClick(job.id)} className="cursor-pointer">
-                    <JobCard 
-                      job={job} 
-                      onJobClick={() => handleJobClick(job.id)} 
-                      onEditClick={emptyFunction} 
-                      onDeleteClick={emptyFunction}
-                      userRole={userRole}
-                      department="sound"
-                      festivalLogo={festivalLogos[job.id]}
-                      hideFestivalControls={true}
-                    />
-                  </div>
-                  {canPrintDocuments && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="absolute top-2 right-2 z-10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePrintAllDocumentation(job.id, job.title);
-                      }}
-                      disabled={isPrinting[job.id]}
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {paginatedFestivals.map((job) => (
+                  <div 
+                    key={job.id} 
+                    className="relative"
+                    ref={(el) => {
+                      festivalRefs.current[job.id] = el;
+                    }}
+                  >
+                    <div 
+                      onClick={() => handleJobClick(job.id)} 
+                      className={`cursor-pointer transition-all duration-300 ${
+                        highlightedFestivalId === job.id 
+                          ? 'ring-2 ring-primary ring-offset-2 shadow-lg scale-105' 
+                          : ''
+                      }`}
                     >
-                      {isPrinting[job.id] ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Printer className="h-4 w-4" />
-                      )}
-                      <span className="sr-only">Print Documentation</span>
-                    </Button>
-                  )}
-                </div>
-              ))}
+                      <JobCard 
+                        job={job} 
+                        onJobClick={() => handleJobClick(job.id)} 
+                        onEditClick={emptyFunction} 
+                        onDeleteClick={emptyFunction}
+                        userRole={userRole}
+                        department="sound"
+                        festivalLogo={festivalLogos[job.id]}
+                        hideFestivalControls={true}
+                      />
+                    </div>
+                    {canPrintDocuments && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="absolute top-2 right-2 z-10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePrintAllDocumentation(job.id, job.title);
+                        }}
+                        disabled={isPrinting[job.id]}
+                      >
+                        {isPrinting[job.id] ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Printer className="h-4 w-4" />
+                        )}
+                        <span className="sr-only">Print Documentation</span>
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              
+              {totalPages > 1 && (
+                <FestivalsPagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  totalItems={festivalJobs.length}
+                  itemsPerPage={ITEMS_PER_PAGE}
+                />
+              )}
             </div>
           )}
         </CardContent>

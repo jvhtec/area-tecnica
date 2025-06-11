@@ -1,253 +1,320 @@
-
-import { supabase } from "@/lib/supabase";
+import { supabase } from '@/lib/supabase-client';
+import { Session } from '@supabase/supabase-js';
 
 /**
- * TokenManager - Enhanced singleton class for JWT token management
- * Handles token refresh, expiration prediction, and session maintenance
+ * Token Manager - Singleton class for managing auth tokens and refresh logic
+ * - Handles automatic token refresh on expiry
+ * - Manages subscription to token refresh events
+ * - Coordinates token-related operations across the app
+ * - Caches session data to reduce redundant calls
  */
 export class TokenManager {
   private static instance: TokenManager;
-  private refreshPromise: Promise<any> | null = null;
-  private lastRefreshTime: number = 0;
-  private refreshQueue: Array<{
-    resolve: (value: any) => void;
-    reject: (reason: any) => void;
-  }> = [];
-  private tokenExpiryTimes: Map<string, number> = new Map();
-  private refreshInProgress: boolean = false;
-  private refreshBackoff: number = 1000; // Start with 1s backoff
-  private maxBackoff: number = 30000; // Max 30s backoff
-  private consecutiveFailures: number = 0;
-  private listeners: Set<() => void> = new Set();
-
-  private constructor() {}
-
+  private subscribers: Array<() => void> = [];
+  private isRefreshing = false;
+  private refreshTimeout: number | null = null;
+  private lastRefresh: number = Date.now();
+  
+  // Session caching properties
+  private cachedSession: Session | null = null;
+  private sessionCacheTime: number = 0;
+  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  
+  private constructor() {
+    // Set up auth state change listener
+    supabase.auth.onAuthStateChange((event, session) => {
+      console.log(`Auth state changed: ${event}`);
+      
+      // Update cached session whenever auth state changes
+      this.updateCachedSession(session);
+      
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        this.lastRefresh = Date.now();
+        this.notifySubscribers();
+        this.scheduleNextRefresh(session);
+      } else if (event === 'SIGNED_OUT') {
+        if (this.refreshTimeout) {
+          clearTimeout(this.refreshTimeout);
+          this.refreshTimeout = null;
+        }
+      }
+    });
+    
+    // Set up custom event listener for token refresh requests
+    window.addEventListener('token-refresh-needed', () => {
+      console.log('Token refresh requested');
+      this.refreshToken();
+    });
+    
+    // Setup visibility change listener to refresh token when tab becomes visible
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        // Get time since last refresh
+        const timeSinceRefresh = Date.now() - this.lastRefresh;
+        
+        // If it's been more than 5 minutes since last refresh, refresh token
+        if (timeSinceRefresh > 5 * 60 * 1000) {
+          console.log('Tab became visible after inactivity, refreshing token');
+          this.refreshToken();
+        }
+      }
+    });
+  }
+  
+  /**
+   * Get the singleton instance
+   */
   public static getInstance(): TokenManager {
     if (!TokenManager.instance) {
       TokenManager.instance = new TokenManager();
     }
     return TokenManager.instance;
   }
-
+  
   /**
-   * Subscribe to token refresh events
-   * @param callback Function to be called when token is refreshed
-   * @returns Function to unsubscribe
+   * Update the cached session and timestamp
    */
-  public subscribe(callback: () => void): () => void {
-    this.listeners.add(callback);
-    return () => {
-      this.listeners.delete(callback);
-    };
+  private updateCachedSession(session: Session | null): void {
+    this.cachedSession = session;
+    this.sessionCacheTime = Date.now();
+  }
+  
+  /**
+   * Check if cached session is still valid
+   */
+  private isCacheValid(): boolean {
+    const now = Date.now();
+    const cacheAge = now - this.sessionCacheTime;
+    return cacheAge < this.CACHE_DURATION;
+  }
+  
+  /**
+   * Get cached session if valid, otherwise fetch fresh session
+   */
+  public async getCachedSession(): Promise<Session | null> {
+    // Return cached session if it's still valid
+    if (this.cachedSession && this.isCacheValid()) {
+      console.log('Returning cached session');
+      return this.cachedSession;
+    }
+    
+    // Cache is invalid or empty, fetch fresh session
+    console.log('Fetching fresh session (cache miss or expired)');
+    const { data } = await supabase.auth.getSession();
+    this.updateCachedSession(data.session);
+    return data.session;
+  }
+  
+  /**
+   * Refresh the token
+   */
+  public async refreshToken(): Promise<any> {
+    if (this.isRefreshing) {
+      console.log('Token refresh already in progress');
+      return { session: null, error: false };
+    }
+    
+    try {
+      this.isRefreshing = true;
+      
+      const { data, error } = await supabase.auth.refreshSession();
+      
+      if (error) {
+        console.error('Error refreshing token:', error);
+        return { session: null, error };
+      }
+      
+      if (data.session) {
+        this.lastRefresh = Date.now();
+        this.updateCachedSession(data.session);
+        this.notifySubscribers();
+        this.scheduleNextRefresh(data.session);
+        return { session: data.session, error: null };
+      }
+      
+      return { session: null, error: null };
+    } catch (error) {
+      console.error('Exception during token refresh:', error);
+      return { session: null, error };
+    } finally {
+      this.isRefreshing = false;
+    }
+  }
+  
+  /**
+   * Get the current session, optionally refreshing it if needed
+   */
+  public async getSession(forceRefresh = false): Promise<any> {
+    if (forceRefresh) {
+      await this.refreshToken();
+    }
+    
+    return this.getCachedSession();
   }
 
-  private notifyListeners(): void {
-    this.listeners.forEach(callback => {
+  /**
+   * Sign the user out
+   */
+  public async signOut(): Promise<{ error: any }> {
+    try {
+      // Clear cached session
+      this.updateCachedSession(null);
+      
+      const { error } = await supabase.auth.signOut();
+      return { error };
+    } catch (error) {
+      console.error('Error during sign out:', error);
+      return { error };
+    }
+  }
+  
+  /**
+   * Schedule the next token refresh based on expiry time
+   */
+  private scheduleNextRefresh(session: any): void {
+    if (this.refreshTimeout) {
+      clearTimeout(this.refreshTimeout);
+      this.refreshTimeout = null;
+    }
+    
+    if (!session) return;
+    
+    // If we have an expiry time, refresh 5 minutes before it expires
+    if (session.expires_at) {
+      const expiresAt = session.expires_at * 1000; // Convert to milliseconds
+      const now = Date.now();
+      const timeUntilExpiry = expiresAt - now;
+      
+      // Refresh 5 minutes before expiry or immediately if already close to expiry
+      const refreshIn = Math.max(timeUntilExpiry - (5 * 60 * 1000), 0);
+      
+      console.log(`Scheduling token refresh in ${refreshIn / 1000} seconds`);
+      
+      this.refreshTimeout = window.setTimeout(() => {
+        console.log('Token expiry approaching, refreshing token');
+        this.refreshToken();
+      }, refreshIn);
+    } else {
+      // If no expiry time, refresh every 30 minutes
+      this.refreshTimeout = window.setTimeout(() => {
+        this.refreshToken();
+      }, 30 * 60 * 1000);
+    }
+  }
+  
+  /**
+   * Subscribe to token refresh events
+   */
+  public subscribe(callback: () => void): () => void {
+    this.subscribers.push(callback);
+    
+    // Return unsubscribe function
+    return () => {
+      this.subscribers = this.subscribers.filter(cb => cb !== callback);
+    };
+  }
+  
+  /**
+   * Notify all subscribers of a token refresh
+   */
+  private notifySubscribers(): void {
+    this.subscribers.forEach(callback => {
       try {
         callback();
       } catch (error) {
-        console.error("Error in token refresh listener:", error);
+        console.error('Error in token refresh subscriber:', error);
       }
     });
   }
-
+  
   /**
-   * Refresh the session token with intelligent queueing and backoff
+   * Get time since last token refresh
    */
-  public async refreshToken(): Promise<{session: any | null, error: any | null}> {
-    // If there's a refresh already in progress, queue this request
-    if (this.refreshInProgress) {
-      console.log("Token refresh already in progress, queueing request");
-      return new Promise((resolve, reject) => {
-        this.refreshQueue.push({ resolve, reject });
-      });
-    }
-
-    // Apply backoff if we've had consecutive failures
-    if (this.consecutiveFailures > 0) {
-      const backoffTime = Math.min(
-        this.refreshBackoff * Math.pow(2, this.consecutiveFailures - 1),
-        this.maxBackoff
-      );
-      console.log(`Applying backoff of ${backoffTime}ms after ${this.consecutiveFailures} failures`);
-      await new Promise(resolve => setTimeout(resolve, backoffTime));
-    }
-
-    // Set refresh in progress
-    this.refreshInProgress = true;
-
-    // Create a new refresh promise
-    this.refreshPromise = new Promise(async (resolve) => {
-      try {
-        console.log("Starting token refresh");
-        const { data, error } = await supabase.auth.refreshSession();
-        
-        if (error) {
-          console.error("Error refreshing token:", error);
-          this.consecutiveFailures++;
-          resolve({ session: null, error });
-        } else {
-          console.log("Token refreshed successfully");
-          this.lastRefreshTime = Date.now();
-          this.consecutiveFailures = 0;
-          
-          // Store the expiry time for prediction
-          if (data.session?.expires_at) {
-            this.tokenExpiryTimes.set(
-              data.session.access_token,
-              data.session.expires_at * 1000
-            );
-          }
-          
-          // Notify listeners of successful refresh
-          this.notifyListeners();
-          
-          resolve({ session: data.session, error: null });
-        }
-      } catch (error) {
-        console.error("Exception in token refresh:", error);
-        this.consecutiveFailures++;
-        resolve({ session: null, error });
-      } finally {
-        // Clear refresh state
-        this.refreshInProgress = false;
-        this.refreshPromise = null;
-        
-        // Process any queued refreshes
-        if (this.refreshQueue.length > 0) {
-          console.log(`Processing ${this.refreshQueue.length} queued token refresh requests`);
-          const { session, error } = await this.refreshToken();
-          
-          // Resolve all queued promises with the same result
-          while (this.refreshQueue.length > 0) {
-            const request = this.refreshQueue.shift();
-            if (request) {
-              if (error) {
-                request.reject(error);
-              } else {
-                request.resolve({ session, error: null });
-              }
-            }
-          }
-        }
-      }
-    });
-
-    return this.refreshPromise;
+  public getTimeSinceLastRefresh(): number {
+    return Date.now() - this.lastRefresh;
   }
 
   /**
-   * Check if the token is about to expire with predictive timing
-   * @param session Current session
-   * @param bufferTime Time in ms before expiry to consider token expired (default: 5 min)
+   * Calculate optimal refresh time based on session expiry
+   * @param session Current authentication session
+   * @returns Milliseconds until next refresh
    */
-  public async checkTokenExpiration(
-    session: any,
-    bufferTime: number = 5 * 60 * 1000
-  ): Promise<boolean> {
-    if (!session) return false;
-    
-    // Get expiry time from token storage or session
-    let expiresAt = this.tokenExpiryTimes.get(session.access_token);
-    
-    // Fallback to session expires_at if not in our map
-    if (!expiresAt && session.expires_at) {
-      expiresAt = session.expires_at * 1000;
-      
-      // Store for future reference
-      this.tokenExpiryTimes.set(session.access_token, expiresAt);
+  public calculateRefreshTime(session: any): number {
+    if (!session?.expires_at) {
+      // Default refresh every 30 minutes if no expiry
+      return 30 * 60 * 1000;
     }
     
-    // If we still don't have an expiry time, use a conservative estimate
-    if (!expiresAt) {
-      // JWT tokens typically last 1 hour, so assume that if we haven't
-      // refreshed in 55 minutes, we need to refresh
-      return (Date.now() - this.lastRefreshTime) > (55 * 60 * 1000);
-    }
-    
+    const expiresAt = session.expires_at * 1000; // Convert to milliseconds
     const now = Date.now();
     const timeUntilExpiry = expiresAt - now;
     
-    // If token expires in less than the buffer time, consider it expired
-    return timeUntilExpiry < bufferTime;
+    if (timeUntilExpiry <= 0) {
+      // Already expired, refresh immediately
+      return 0;
+    }
+    
+    // Refresh 5 minutes before expiry or at 25% of remaining time, whichever is earlier
+    const safetyBuffer = Math.min(5 * 60 * 1000, timeUntilExpiry * 0.25);
+    return Math.max(timeUntilExpiry - safetyBuffer, 0);
   }
 
   /**
-   * Get the current session with optional auto-refresh
-   * @param autoRefresh Whether to automatically refresh if session is expired
+   * Check if token is close to expiration
+   * @param session Current authentication session
+   * @param thresholdMs Time in milliseconds that is considered "close to expiration"
+   * @returns Boolean indicating if token is close to expiration
    */
-  public async getSession(autoRefresh: boolean = true): Promise<any> {
-    try {
-      const { data } = await supabase.auth.getSession();
-      const session = data.session;
-      
-      // If session exists but is about to expire, refresh it
-      if (autoRefresh && session && await this.checkTokenExpiration(session)) {
-        console.log("Session is about to expire, refreshing token");
-        const { session: refreshedSession } = await this.refreshToken();
-        return refreshedSession;
-      }
-      
-      return session;
-    } catch (error) {
-      console.error("Error getting session:", error);
-      return null;
+  public checkTokenExpiration(session: any, thresholdMs: number = 5 * 60 * 1000): boolean {
+    if (!session?.expires_at) {
+      return false;
     }
+    
+    const expiresAt = session.expires_at * 1000; // Convert to milliseconds
+    const now = Date.now();
+    const timeUntilExpiry = expiresAt - now;
+    
+    // Return true if we're within the threshold of expiration
+    return timeUntilExpiry < thresholdMs;
   }
-
+  
   /**
-   * Get the time until the token expires
-   * @param session Current session
-   * @returns Time in ms until token expires, or null if unknown
+   * Force synchronization of session and subscriptions
+   * Useful after long periods of inactivity
    */
-  public getTimeUntilExpiry(session: any): number | null {
-    if (!session) return null;
+  public async synchronizeState(): Promise<boolean> {
+    // Refresh the token
+    const { session } = await this.refreshToken();
     
-    // Try to get expiry from our map first
-    let expiresAt = this.tokenExpiryTimes.get(session.access_token);
-    
-    // Fallback to session expires_at
-    if (!expiresAt && session.expires_at) {
-      expiresAt = session.expires_at * 1000;
+    // Dispatch events to coordinate with other systems
+    if (session) {
+      window.dispatchEvent(new CustomEvent('supabase-reconnect'));
+      window.dispatchEvent(new CustomEvent('connection-restored'));
+      return true;
     }
     
-    if (!expiresAt) return null;
-    
-    return Math.max(0, expiresAt - Date.now());
+    return false;
   }
-
+  
   /**
-   * Calculate the optimal time to refresh the token
-   * @param session Current session
-   * @returns Time in ms to wait before refreshing
+   * Clear session cache (useful for testing or forced refresh)
    */
-  public calculateRefreshTime(session: any): number {
-    const timeUntilExpiry = this.getTimeUntilExpiry(session);
-    
-    if (!timeUntilExpiry) {
-      // If we can't determine expiry time, use a conservative default
-      return 15 * 60 * 1000; // 15 minutes
-    }
-    
-    // Refresh when 20% of time remains, but at least 1 minute before expiry
-    // and no more than 15 minutes before expiry
-    return Math.min(
-      Math.max(timeUntilExpiry * 0.2, 60 * 1000),
-      15 * 60 * 1000
-    );
+  public clearCache(): void {
+    console.log('Clearing session cache');
+    this.cachedSession = null;
+    this.sessionCacheTime = 0;
   }
-
+  
   /**
-   * Sign out and clear session
+   * Get cache status for debugging
    */
-  public async signOut(): Promise<void> {
-    try {
-      await supabase.auth.signOut();
-      this.tokenExpiryTimes.clear();
-      this.lastRefreshTime = 0;
-    } catch (error) {
-      console.error("Error signing out:", error);
-      throw error;
-    }
+  public getCacheStatus(): { hasCache: boolean; cacheAge: number; isValid: boolean } {
+    const now = Date.now();
+    const cacheAge = now - this.sessionCacheTime;
+    return {
+      hasCache: !!this.cachedSession,
+      cacheAge,
+      isValid: this.isCacheValid()
+    };
   }
 }

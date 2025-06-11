@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -18,23 +19,26 @@ import {
   Trash2,
   FolderPlus,
   Edit,
+  Package,
 } from "lucide-react";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
-
+import { useTourDateRealtime } from "@/hooks/useTourDateRealtime";
 import {
   FLEX_FOLDER_IDS,
   DEPARTMENT_IDS,
   RESPONSIBLE_PERSON_IDS,
   DEPARTMENT_SUFFIXES,
 } from "@/utils/flex-folders/constants";
-
 import { createFlexFolder } from "@/utils/flex-folders/api";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 interface TourDateManagementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tourId: string | null;
   tourDates: any[];
+  readOnly?: boolean;
 }
 
 async function createFoldersForDate(
@@ -224,10 +228,19 @@ async function createFoldersForDate(
       }
 
       if (dept === "sound") {
+        // Check if this is a tour pack only date
+        const isTourPackOnly = dateObj.is_tour_pack_only;
+        console.log(`Tour pack only setting for ${dateObj.date}:`, isTourPackOnly);
+
         const soundSubfolders = [
           { name: `${tourData.name} - Tour Pack`, suffix: "TP" },
-          { name: `${tourData.name} - PA`, suffix: "PA" },
         ];
+
+        // Only add PA if not tour pack only
+        if (!isTourPackOnly) {
+          soundSubfolders.push({ name: `${tourData.name} - PA`, suffix: "PA" });
+        }
+
         for (const sf of soundSubfolders) {
           const subPayload = {
             definitionId: FLEX_FOLDER_IDS.pullSheet,
@@ -256,6 +269,7 @@ async function createFoldersForDate(
       }
 
       if (dept === "personnel") {
+        // ... keep existing code (personnel subfolder creation)
         const personnelSubfolders = [
           { name: `Gastos de Personal - ${tourData.name}`, suffix: "GP" },
         ];
@@ -331,34 +345,46 @@ async function createFoldersForDate(
   }
 }
 
-interface TourDateManagementDialogInternalProps extends TourDateManagementDialogProps {}
-
-export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternalProps> = ({
+export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> = ({
   open,
   onOpenChange,
   tourId,
   tourDates = [],
+  readOnly = false,
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { getOrCreateLocation } = useLocationManagement();
 
+  // Add real-time subscriptions
+  const tourDateIds = tourDates.map(d => d.id);
+  useTourDateRealtime(tourId, tourDateIds);
+
+  // Force refresh parent component data when dialog opens
+  useEffect(() => {
+    if (open && tourId) {
+      console.log('Dialog opened, refreshing tour data');
+      queryClient.invalidateQueries({ queryKey: ['tour', tourId] });
+    }
+  }, [open, tourId, queryClient]);
+
   const [editingTourDate, setEditingTourDate] = useState<any>(null);
   const [editDateValue, setEditDateValue] = useState<string>("");
   const [editLocationValue, setEditLocationValue] = useState<string>("");
-
+  const [editTourPackOnly, setEditTourPackOnly] = useState<boolean>(false);
+  const [isDeletingDate, setIsDeletingDate] = useState<string | null>(null);
   const [createdTourDateIds, setCreatedTourDateIds] = useState<string[]>([]);
   const [isCreatingFolders, setIsCreatingFolders] = useState(false);
 
-  const { data: foldersExistenceMap } = useQuery({
-    queryKey: ["flex-folders-existence", tourDates.map(d => d.id)],
+  const { data: foldersExistenceMap, refetch: refetchFoldersExistence } = useQuery({
+    queryKey: ["flex-folders-existence", tourDateIds],
     queryFn: async () => {
       if (!tourDates.length) return {};
 
       const { data, error } = await supabase
         .from("flex_folders")
         .select("tour_date_id")
-        .in("tour_date_id", tourDates.map(d => d.id));
+        .in("tour_date_id", tourDateIds);
 
       if (error) throw error;
 
@@ -451,12 +477,13 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
     }
   };
 
-  const handleAddDate = async (date: string, location: string) => {
+  const handleAddDate = async (date: string, location: string, isTourPackOnly: boolean = false) => {
     try {
       if (!tourId) {
         throw new Error("Tour ID is required");
       }
-      console.log("Adding new tour date:", { date, location, tourId });
+      console.log("Adding new tour date:", { date, location, tourId, isTourPackOnly });
+      
       const locationId = await getOrCreateLocation(location);
       console.log("Location ID:", locationId);
       const { data: newTourDate, error: tourDateError } = await supabase
@@ -465,10 +492,12 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
           tour_id: tourId,
           date,
           location_id: locationId,
+          is_tour_pack_only: isTourPackOnly,
         })
         .select(`
           id,
           date,
+          is_tour_pack_only,
           location:locations (
             id,
             name
@@ -481,6 +510,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
       }
       console.log("Tour date created:", newTourDate);
 
+      // ... keep existing code (job creation and department assignment)
       const { data: tourData, error: tourError } = await supabase
         .from("tours")
         .select(`
@@ -505,8 +535,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
         .from("jobs")
         .insert({
           title: `${tourData.name} (${location || 'No Location'})`,
-          start_time: `${date}T00:00:00`,
-          end_time: `${date}T23:59:59`,
+          start_time: `${date}T06:00:00`,
+          end_time: `${date}T21:59:59`,
           location_id: locationId,
           tour_date_id: newTourDate.id,
           tour_id: tourId,
@@ -537,8 +567,13 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
         throw deptError;
       }
 
-      await queryClient.invalidateQueries({ queryKey: ["tours"] });
-      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      // Force refresh all related queries after successful creation
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
+        queryClient.invalidateQueries({ queryKey: ["tours"] }),
+        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["flex-folders-existence"] }),
+      ]);
 
       toast({
         title: "Success",
@@ -557,13 +592,14 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
   const handleEditDate = async (
     dateId: string,
     newDate: string,
-    newLocation: string
+    newLocation: string,
+    isTourPackOnly: boolean
   ) => {
     try {
       if (!tourId) {
         throw new Error("Tour ID is required");
       }
-      console.log("Editing tour date:", { dateId, newDate, newLocation });
+      console.log("Editing tour date:", { dateId, newDate, newLocation, isTourPackOnly });
       const locationId = await getOrCreateLocation(newLocation);
 
       const { data: tourData, error: tourError } = await supabase
@@ -582,11 +618,13 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
         .update({
           date: newDate,
           location_id: locationId,
+          is_tour_pack_only: isTourPackOnly,
         })
         .eq("id", dateId)
         .select(`
           id,
           date,
+          is_tour_pack_only,
           location:locations (
             id,
             name
@@ -606,7 +644,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
         .from("jobs")
         .update({
           title: `${tourData.name} (${newLocation || 'No Location'})`,
-          start_time: `${newDate}T00:00:00`,
+          start_: `${newDate}T00:00:00`,
           end_time: `${newDate}T23:59:59`,
           location_id: locationId,
         })
@@ -617,11 +655,17 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
         throw jobsError;
       }
 
+      // Force refresh all related queries after successful edit
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
+        queryClient.invalidateQueries({ queryKey: ["tours"] }),
+        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+      ]);
+
       toast({
         title: "Success",
         description: "Tour date updated successfully",
       });
-      await queryClient.invalidateQueries({ queryKey: ["tours"] });
     } catch (error: any) {
       console.error("Error editing date:", error);
       toast({
@@ -633,9 +677,16 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
   };
 
   const handleDeleteDate = async (dateId: string) => {
+    // ... keep existing code (deletion logic remains the same)
+    if (isDeletingDate) return; // Prevent multiple simultaneous deletions
+
+    setIsDeletingDate(dateId);
+
     try {
       console.log("Starting deletion of tour date:", dateId);
 
+      // Step 1: Delete flex folders first
+      console.log("Deleting flex folders...");
       const { error: flexFoldersError } = await supabase
         .from("flex_folders")
         .delete()
@@ -646,57 +697,155 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
         throw flexFoldersError;
       }
 
+      // Step 2: Get all jobs for this tour date
+      console.log("Fetching jobs for tour date...");
       const { data: jobs, error: jobsError } = await supabase
         .from("jobs")
         .select("id")
         .eq("tour_date_id", dateId);
 
-      if (jobsError) throw jobsError;
+      if (jobsError) {
+        console.error("Error fetching jobs:", jobsError);
+        throw jobsError;
+      }
 
+      console.log("Found jobs to delete:", jobs);
+
+      // Step 3: Delete job-related data if jobs exist
       if (jobs && jobs.length > 0) {
         const jobIds = jobs.map(j => j.id);
+        console.log("Deleting job-related data for jobs:", jobIds);
 
-        const { error: assignmentsError } = await supabase
-          .from("job_assignments")
-          .delete()
-          .in("job_id", jobIds);
+        // Delete in the correct order to avoid foreign key constraints
+        const deletionSteps = [
+          // Task documents first
+          { table: "task_documents", condition: "sound_task_id", subquery: "sound_job_tasks" },
+          { table: "task_documents", condition: "lights_task_id", subquery: "lights_job_tasks" },
+          { table: "task_documents", condition: "video_task_id", subquery: "video_job_tasks" },
 
-        if (assignmentsError) throw assignmentsError;
+          // Tasks
+          { table: "sound_job_tasks", condition: "job_id" },
+          { table: "lights_job_tasks", condition: "job_id" },
+          { table: "video_job_tasks", condition: "job_id" },
 
-        const { error: departmentsError } = await supabase
-          .from("job_departments")
-          .delete()
-          .in("job_id", jobIds);
+          // Personnel
+          { table: "sound_job_personnel", condition: "job_id" },
+          { table: "lights_job_personnel", condition: "job_id" },
+          { table: "video_job_personnel", condition: "job_id" },
 
-        if (departmentsError) throw departmentsError;
+          // Other job-related tables
+          { table: "job_assignments", condition: "job_id" },
+          { table: "job_departments", condition: "job_id" },
+          { table: "job_documents", condition: "job_id" },
+          { table: "logistics_events", condition: "job_id" },
+          { table: "hoja_de_ruta", condition: "job_id" },
+          { table: "memoria_tecnica_documents", condition: "job_id" },
+          { table: "lights_memoria_tecnica_documents", condition: "job_id" },
+          { table: "video_memoria_tecnica_documents", condition: "job_id" },
+          { table: "job_date_types", condition: "job_id" },
+          { table: "job_milestones", condition: "job_id" },
+          { table: "power_requirement_tables", condition: "job_id" },
+          { table: "festival_artists", condition: "job_id" },
+          { table: "festival_gear_setups", condition: "job_id" },
+          { table: "festival_logos", condition: "job_id" },
+          { table: "festival_shifts", condition: "job_id" },
+          { table: "festival_settings", condition: "job_id" },
+          { table: "festival_stages", condition: "job_id" },
+          { table: "technician_work_records", condition: "job_id" },
+        ];
 
+        for (const step of deletionSteps) {
+          console.log(`Deleting from ${step.table}...`);
+
+          if (step.subquery) {
+            // Handle task documents which reference task IDs
+            const { data: taskIds } = await supabase
+              .from(step.subquery)
+              .select("id")
+              .in("job_id", jobIds);
+
+            if (taskIds && taskIds.length > 0) {
+              const { error } = await supabase
+                .from(step.table)
+                .delete()
+                .in(step.condition, taskIds.map(t => t.id));
+
+              if (error) {
+                console.error(`Error deleting from ${step.table}:`, error);
+                // Continue with other deletions even if one fails
+              }
+            }
+          } else {
+            // Direct deletion by job_id
+            const { error } = await supabase
+              .from(step.table)
+              .delete()
+              .in(step.condition, jobIds);
+
+            if (error) {
+              console.error(`Error deleting from ${step.table}:`, error);
+              // Continue with other deletions even if one fails
+            }
+          }
+        }
+
+        // Finally delete the jobs themselves
+        console.log("Deleting jobs...");
         const { error: jobsDeleteError } = await supabase
           .from("jobs")
           .delete()
           .in("id", jobIds);
 
-        if (jobsDeleteError) throw jobsDeleteError;
+        if (jobsDeleteError) {
+          console.error("Error deleting jobs:", jobsDeleteError);
+          throw jobsDeleteError;
+        }
       }
 
+      // Step 4: Delete tour date overrides
+      console.log("Deleting tour date overrides...");
+      await Promise.all([
+        supabase.from("tour_date_power_overrides").delete().eq("tour_date_id", dateId),
+        supabase.from("tour_date_weight_overrides").delete().eq("tour_date_id", dateId)
+      ]);
+
+      // Step 5: Finally delete the tour date itself
+      console.log("Deleting tour date...");
       const { error: dateError } = await supabase
         .from("tour_dates")
         .delete()
         .eq("id", dateId);
 
-      if (dateError) throw dateError;
+      if (dateError) {
+        console.error("Error deleting tour date:", dateError);
+        throw dateError;
+      }
 
-      await queryClient.invalidateQueries({ queryKey: ["tours"] });
+      console.log("Tour date deletion completed successfully");
+
+      // Force refresh all related queries after successful deletion
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
+        queryClient.invalidateQueries({ queryKey: ["tours"] }),
+        queryClient.invalidateQueries({ queryKey: ["tours-with-dates"] }),
+        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["flex-folders-existence"] }),
+      ]);
+
       toast({
         title: "Success",
         description: "Tour date deleted successfully"
       });
+
     } catch (error: any) {
       console.error("Error deleting date:", error);
       toast({
         title: "Error deleting date",
-        description: error.message,
+        description: error.message || "An unexpected error occurred while deleting the tour date",
         variant: "destructive",
       });
+    } finally {
+      setIsDeletingDate(null);
     }
   };
 
@@ -704,150 +853,209 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogInternal
     setEditingTourDate(dateObj);
     setEditDateValue(dateObj.date.split("T")[0]);
     setEditLocationValue(dateObj.location?.name || "");
+    setEditTourPackOnly(dateObj.is_tour_pack_only || false);
   };
 
   const cancelEditing = () => {
     setEditingTourDate(null);
     setEditDateValue("");
     setEditLocationValue("");
+    setEditTourPackOnly(false);
   };
 
   const submitEditing = async (dateId: string) => {
-    await handleEditDate(dateId, editDateValue, editLocationValue);
+    await handleEditDate(dateId, editDateValue, editLocationValue, editTourPackOnly);
     cancelEditing();
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Manage Tour Dates</DialogTitle>
+          <DialogTitle>
+            {readOnly ? 'Tour Dates' : 'Manage Tour Dates'}
+          </DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          {tourDates.length > 0 && (
-            <Button
-              onClick={createAllFolders}
-              className="w-full"
-              variant="outline"
-              disabled={isCreatingFolders}
-            >
-              <FolderPlus className="h-4 w-4 mr-2" />
-              Create Folders for All Dates
-            </Button>
-          )}
-          <div className="space-y-4">
-            {tourDates?.map((dateObj) => {
-              const foldersExist = foldersExistenceMap?.[dateObj.id] || false;
 
-              return (
-                <div key={dateObj.id} className="p-3 border rounded-lg">
-                  {editingTourDate && editingTourDate.id === dateObj.id ? (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        <Input
-                          type="date"
-                          value={editDateValue}
-                          onChange={(e) => setEditDateValue(e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4" />
-                        <Input
-                          type="text"
-                          value={editLocationValue}
-                          onChange={(e) => setEditLocationValue(e.target.value)}
-                          placeholder="Location"
-                          required
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <Button onClick={() => submitEditing(dateObj.id)}>
-                          Save
-                        </Button>
-                        <Button variant="outline" onClick={cancelEditing}>
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-sm">
+        <ScrollArea className="h-[60vh] pr-4">
+          <div className="space-y-4">
+            {!readOnly && tourDates.length > 0 && (
+              <Button
+                onClick={createAllFolders}
+                className="w-full"
+                variant="outline"
+                disabled={isCreatingFolders}
+              >
+                <FolderPlus className="h-4 w-4 mr-2" />
+                {isCreatingFolders ? 'Creating Folders...' : 'Create Folders for All Dates'}
+              </Button>
+            )}
+            
+            <div className="space-y-4">
+              {tourDates?.map((dateObj) => {
+                const foldersExist = foldersExistenceMap?.[dateObj.id] || false;
+                const isDeleting = isDeletingDate === dateObj.id;
+                const isCreatingFoldersForDate = createdTourDateIds.includes(dateObj.id);
+
+                return (
+                  <div key={dateObj.id} className="p-3 border rounded-lg">
+                    {editingTourDate && editingTourDate.id === dateObj.id && !readOnly ? (
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4" />
-                          <span>{format(new Date(dateObj.date), "MMM d, yyyy")}</span>
+                          <Input
+                            type="date"
+                            value={editDateValue}
+                            onChange={(e) => setEditDateValue(e.target.value)}
+                            required
+                          />
                         </div>
-                        {dateObj.location?.name && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <MapPin className="h-4 w-4" />
-                            <span>{dateObj.location.name}</span>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          <Input
+                            type="text"
+                            value={editLocationValue}
+                            onChange={(e) => setEditLocationValue(e.target.value)}
+                            placeholder="Location"
+                            required
+                          />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="tour-pack-only-edit"
+                            checked={editTourPackOnly}
+                            onCheckedChange={(checked) => setEditTourPackOnly(checked as boolean)}
+                          />
+                          <Label htmlFor="tour-pack-only-edit" className="text-sm">
+                            Tour Pack Only (skip PA pullsheet)
+                          </Label>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button onClick={() => submitEditing(dateObj.id)}>
+                            Save
+                          </Button>
+                          <Button variant="outline" onClick={cancelEditing}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="h-4 w-4" />
+                            <span>{format(new Date(dateObj.date), "MMM d, yyyy")}</span>
+                            {dateObj.is_tour_pack_only && (
+                              <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
+                                <Package className="h-3 w-3" />
+                                Tour Pack Only
+                              </div>
+                            )}
                           </div>
-                        )}
+                          {dateObj.location?.name && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <MapPin className="h-4 w-4" />
+                              <span>{dateObj.location.name}</span>
+                            </div>
+                          )}
+                          {foldersExist && (
+                            <div className="text-xs text-green-600">
+                              ✓ Flex folders created
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          {!readOnly && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleCreateFoldersForDate(dateObj)}
+                                title="Create Flex folders"
+                                disabled={foldersExist || isCreatingFoldersForDate}
+                                className={foldersExist ? "opacity-50 cursor-not-allowed" : ""}
+                              >
+                                {isCreatingFoldersForDate ? (
+                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                ) : (
+                                  <FolderPlus className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => startEditing(dateObj)}
+                                title="Edit Date"
+                                disabled={isDeleting}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteDate(dateObj.id)}
+                                title="Delete Date"
+                                disabled={isDeleting}
+                                className={isDeleting ? "opacity-50 cursor-not-allowed" : ""}
+                              >
+                                {isDeleting ? (
+                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleCreateFoldersForDate(dateObj)}
-                          title="Create Flex folders"
-                          disabled={dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id) || foldersExist}
-                          className={(dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id) || foldersExist) ? "opacity-50 cursor-not-allowed" : ""}
-                        >
-                          <FolderPlus className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => startEditing(dateObj)}
-                          title="Edit Date"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteDate(dateObj.id)}
-                          title="Delete Date"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              const date = formData.get("date") as string;
-              const location = formData.get("location") as string;
-              if (!date || !location) {
-                toast({
-                  title: "Error",
-                  description: "Please fill in all fields",
-                  variant: "destructive",
-                });
-                return;
-              }
-              handleAddDate(date, location);
-              e.currentTarget.reset();
-            }}
-            className="space-y-4"
-          >
-            <div className="grid grid-cols-2 gap-4">
-              <Input type="date" name="date" required />
-              <Input type="text" name="location" placeholder="Location" required />
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <Button type="submit" className="w-full">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Date
-            </Button>
-          </form>
-        </div>
+            
+            {!readOnly && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const date = formData.get("date") as string;
+                  const location = formData.get("location") as string;
+                  const isTourPackOnly = formData.get("is_tour_pack_only") === "on";
+                  if (!date || !location) {
+                    toast({
+                      title: "Error",
+                      description: "Please fill in all fields",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  handleAddDate(date, location, isTourPackOnly);
+                  e.currentTarget.reset();
+                }}
+                className="space-y-4"
+              >
+                <div className="grid grid-cols-2 gap-4">
+                  <Input type="date" name="date" required />
+                  <Input type="text" name="location" placeholder="Location" required />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="tour-pack-only"
+                    name="is_tour_pack_only"
+                  />
+                  <Label htmlFor="tour-pack-only" className="text-sm">
+                    Tour Pack Only (skip PA pullsheet)
+                  </Label>
+                </div>
+                <Button type="submit" className="w-full">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Date
+                </Button>
+              </form>
+            )}
+          </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );

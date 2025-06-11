@@ -12,6 +12,64 @@ import {
 } from "./constants";
 
 /**
+ * Helper function to fetch selected departments for a job
+ */
+async function getJobDepartments(jobId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("job_departments")
+    .select("department")
+    .eq("job_id", jobId);
+
+  if (error) {
+    console.error("Error fetching job departments:", error);
+    return [];
+  }
+
+  return data.map(d => d.department);
+}
+
+/**
+ * Helper function to get departments for a tour job
+ */
+async function getTourJobDepartments(tourId: string): Promise<string[]> {
+  // Get departments from any job in the tour
+  const { data, error } = await supabase
+    .from("jobs")
+    .select(`
+      job_departments (department)
+    `)
+    .eq("tour_id", tourId)
+    .limit(1);
+
+  if (error || !data || data.length === 0) {
+    console.error("Error fetching tour job departments:", error);
+    return [];
+  }
+
+  return data[0].job_departments?.map((jd: any) => jd.department) || [];
+}
+
+/**
+ * Determines which departments should have folders created
+ */
+function shouldCreateDepartmentFolder(department: string, selectedDepartments: string[]): boolean {
+  // Always create these administrative departments
+  const alwaysCreateDepartments = ["production", "personnel", "comercial"];
+  
+  if (alwaysCreateDepartments.includes(department)) {
+    return true;
+  }
+
+  // For technical departments (sound, lights, video), only create if selected
+  const technicalDepartments = ["sound", "lights", "video"];
+  if (technicalDepartments.includes(department)) {
+    return selectedDepartments.includes(department);
+  }
+
+  return false;
+}
+
+/**
  * Creates all necessary folders in Flex for a job
  * @param job The job object
  * @param formattedStartDate The formatted start date
@@ -77,6 +135,10 @@ export async function createAllFoldersForJob(
       throw new Error("Tour ID is missing for tourdate job");
     }
 
+    // Get selected departments for the tour
+    const selectedDepartments = await getTourJobDepartments(job.tour_id);
+    console.log("Selected departments for tour:", selectedDepartments);
+
     const { data: tourData, error: tourError } = await supabase
       .from("tours")
       .select(`
@@ -101,13 +163,34 @@ export async function createAllFoldersForJob(
       throw new Error("Tour folders have not been created yet. Please create tour folders first.");
     }
 
-    console.log("Using tour folders:", tourData);
+    // Get tour date info to check if it's tour pack only
+    let tourDateInfo = null;
+    if (job.tour_date_id) {
+      const { data: tourDateData, error: tourDateError } = await supabase
+        .from("tour_dates")
+        .select("is_tour_pack_only")
+        .eq("id", job.tour_date_id)
+        .single();
+      
+      if (!tourDateError && tourDateData) {
+        tourDateInfo = tourDateData;
+      }
+    }
 
-    const departments = ["sound", "lights", "video", "production", "personnel", "comercial"];
+    console.log("Using tour folders:", tourData);
+    console.log("Tour date info:", tourDateInfo);
+
+    const allDepartments = ["sound", "lights", "video", "production", "personnel", "comercial"];
     const locationName = job.location?.name || "No Location";
     const formattedDate = format(new Date(job.start_time), "MMM d, yyyy");
 
-    for (const dept of departments) {
+    for (const dept of allDepartments) {
+      // Check if this department should have a folder created
+      if (!shouldCreateDepartmentFolder(dept, selectedDepartments)) {
+        console.log(`Skipping ${dept} folder - department not selected`);
+        continue;
+      }
+
       const parentFolderId = tourData[`flex_${dept}_folder_id`];
       if (!parentFolderId) {
         console.warn(`No parent folder ID found for ${dept} department`);
@@ -194,17 +277,17 @@ export async function createAllFoldersForJob(
         const subfolders = [
           {
             definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
-            name: `Documentación Técnica - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+            name: `${tourData.name} - ${locationName} - ${formattedDate} - Documentación Técnica - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
             suffix: "DT",
           },
           {
             definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos,
-            name: `Presupuestos Recibidos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+            name: `${tourData.name} - ${locationName} - ${formattedDate} - Presupuestos Recibidos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
             suffix: "PR",
           },
           {
             definitionId: FLEX_FOLDER_IDS.hojaGastos,
-            name: `Hoja de Gastos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+            name: `${tourData.name} - ${locationName} - ${formattedDate} - Hoja de Gastos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
             suffix: "HG",
           },
         ];
@@ -228,10 +311,18 @@ export async function createAllFoldersForJob(
         }
       }
       if (dept === "sound") {
+        // Check if this is a tour pack only date
+        const isTourPackOnly = tourDateInfo?.is_tour_pack_only || false;
+        console.log(`Tour pack only setting for sound folder:`, isTourPackOnly);
+
         const soundSubfolders = [
           { name: `${job.title} - Tour Pack`, suffix: "TP" },
-          { name: `${job.title} - PA`, suffix: "PA" },
         ];
+
+        // Only add PA if not tour pack only
+        if (!isTourPackOnly) {
+          soundSubfolders.push({ name: `${job.title} - PA`, suffix: "PA" });
+        }
 
         for (const sf of soundSubfolders) {
           const subPayload = {
@@ -303,6 +394,10 @@ export async function createAllFoldersForJob(
 
   console.log("Default job type detected. Creating full folder structure.");
 
+  // Get selected departments for regular jobs
+  const selectedDepartments = await getJobDepartments(job.id);
+  console.log("Selected departments for job:", selectedDepartments);
+
   const topPayload = {
     definitionId: FLEX_FOLDER_IDS.mainFolder,
     open: true,
@@ -326,10 +421,14 @@ export async function createAllFoldersForJob(
       folder_type: "main_event",
     });
 
-  // Removed generic hojaInfo since we'll add department-specific ones
+  const allDepartments = ["sound", "lights", "video", "production", "personnel", "comercial"];
+  for (const dept of allDepartments) {
+    // Check if this department should have a folder created
+    if (!shouldCreateDepartmentFolder(dept, selectedDepartments)) {
+      console.log(`Skipping ${dept} folder - department not selected`);
+      continue;
+    }
 
-  const departments = ["sound", "lights", "video", "production", "personnel", "comercial"];
-  for (const dept of departments) {
     const deptPayload = {
       definitionId: FLEX_FOLDER_IDS.subFolder,
       parentElementId: topFolderId,
@@ -347,8 +446,6 @@ export async function createAllFoldersForJob(
     console.log(`Creating department folder for ${dept}:`, deptPayload);
     const deptFolder = await createFlexFolder(deptPayload);
 
-    // IMPORTANT: capture the inserted row so we get its internal (local DB) ID,
-    // similar to what we do in the tourdate branch.
     const { data: [childRow], error: childErr } = await supabase
       .from("flex_folders")
       .insert({
@@ -399,17 +496,17 @@ export async function createAllFoldersForJob(
       const subfolders = [
         {
           definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
-          name: `Documentación Técnica - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+          name: `${job.title} - Documentación Técnica - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
           suffix: "DT",
         },
         {
           definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos,
-          name: `Presupuestos Recibidos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+          name: `${job.title} - Presupuestos Recibidos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
           suffix: "PR",
         },
         {
           definitionId: FLEX_FOLDER_IDS.hojaGastos,
-          name: `Hoja de Gastos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+          name: `${job.title} - Hoja de Gastos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
           suffix: "HG",
         },
       ];

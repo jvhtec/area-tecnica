@@ -1,9 +1,9 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { Loader2 } from "lucide-react";
-import { JobCardNew } from "./JobCardNew";
-import { Department } from "@/types/department";
-import { JobDocument } from "@/types/job";
 import { useState } from "react";
+import { JobCardNew } from "../jobs/cards/JobCardNew";
+import { Department } from "@/types/department";
+import { JobDocument } from "@/components/jobs/cards/JobCardDocuments";
 import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
 import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";

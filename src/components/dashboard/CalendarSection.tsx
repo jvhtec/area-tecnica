@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,6 +50,7 @@ import {
   Printer,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatInJobTimezone, isJobOnDate } from "@/utils/timezoneUtils";
 
 interface CalendarSectionProps {
   date: Date | undefined;
@@ -230,19 +230,14 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     if (!jobs) return [];
     return jobs.filter((job) => {
       try {
-        const startDate = job.start_time ? parseISO(job.start_time) : null;
-        const endDate = job.end_time ? parseISO(job.end_time) : null;
-        if (!startDate || !endDate) {
+        if (!job.start_time || !job.end_time) {
           console.warn("Invalid date found for job:", job);
           return false;
         }
-        const compareDate = format(date, "yyyy-MM-dd");
-        const jobStartDate = format(startDate, "yyyy-MM-dd");
-        const jobEndDate = format(endDate, "yyyy-MM-dd");
-        const isSingleDayJob = jobStartDate === jobEndDate;
-        const isWithinDuration = isSingleDayJob
-          ? compareDate === jobStartDate
-          : compareDate >= jobStartDate && compareDate <= jobEndDate;
+
+        const jobTimezone = job.timezone || 'Europe/Madrid';
+        const isWithinDuration = isJobOnDate(job.start_time, job.end_time, date, jobTimezone);
+        
         const matchesDepartment = department
           ? isWithinDuration && job.job_departments.some((d: any) => d.department === department)
           : isWithinDuration;
@@ -273,7 +268,8 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       const jobType = job.job_type?.toLowerCase();
       return jobType && printSettings.jobTypes[jobType] === true;
     });
-    const doc = new jsPDF("landscape");
+    
+    const doc = new jsPDF("landscape", "mm", [420, 297]); // A3 dimensions explicitly
     const currentDate = date || new Date();
     let startDate: Date, endDate: Date;
 
@@ -285,15 +281,17 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       img.onerror = (err) => reject(err);
     }).catch(() => null);
 
-    const logoWidth = 50;
-    const logoHeight = logo ? logoWidth * (logo.height / logo.width) : 0;
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     
-    // Define standard vertical spacing values
-    const logoTopY = 10;
-    const monthTitleY = logo ? logoTopY + logoHeight + 5 : 20;
-    const calendarStartY = monthTitleY + 10;
-    const footerSpace = 40; // Space reserved for logo and created date
+    const logoWidth = 60;
+    const logoHeight = logo ? logoWidth * (logo.height / logo.width) : 0;
+    
+    const logoTopY = 15;
+    const monthTitleY = logo ? logoTopY + logoHeight + 8 : 25;
+    const calendarStartY = monthTitleY + 15;
+    const footerSpace = 40;
+    const legendSpace = 15;
 
     switch (range) {
       case "month":
@@ -314,9 +312,14 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     }
 
     const months = eachMonthOfInterval({ start: startDate, end: endDate });
-    const cellWidth = 40;
-    const cellHeight = 30;
-    const startX = 10;
+    
+    const cellWidth = 57;
+    const eventHeight = 3.2;
+    const eventSpacing = 0.3;
+    const startX = 15;
+    const dayNumberHeight = 8;
+    const cellPadding = 2;
+    
     const daysOfWeek = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
     const dateTypeLabels: Record<string, string> = {
       travel: "V",
@@ -326,102 +329,239 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       rehearsal: "E",
     };
 
-    for (const [pageIndex, monthStart] of months.entries()) {
-      if (pageIndex > 0) doc.addPage("landscape");
+    // Helper function to calculate events for a day
+    const getEventsForDay = (day: Date) => {
+      return filteredJobs.filter((job) => {
+        try {
+          const startDate = job.start_time ? parseISO(job.start_time) : null;
+          const endDate = job.end_time ? parseISO(job.end_time) : null;
+          if (!startDate || !endDate) return false;
+          
+          const jobTimezone = job.timezone || 'Europe/Madrid';
+          return isJobOnDate(job.start_time, job.end_time, day, jobTimezone);
+        } catch (error) {
+          console.error("Error processing job dates for PDF:", error, job);
+          return false;
+        }
+      });
+    };
 
-      // Add logo if available
+    // Enhanced function to calculate optimal week heights with better distribution
+    const calculateOptimalWeekHeights = (weeks: Array<Array<Date | null>>) => {
+      const availableHeight = pageHeight - calendarStartY - 8 - footerSpace - legendSpace;
+      
+      // Calculate event counts for each day in each week
+      const weekEventData = weeks.map(week => {
+        const dayEventCounts = week.map(day => {
+          if (!day) return 0;
+          const dayEvents = getEventsForDay(day);
+          return dayEvents.length;
+        });
+        const maxEvents = Math.max(...dayEventCounts);
+        const totalEvents = dayEventCounts.reduce((sum, count) => sum + count, 0);
+        const avgEvents = totalEvents / dayEventCounts.filter(count => count > 0).length || 0;
+        
+        return {
+          maxEvents,
+          totalEvents,
+          avgEvents,
+          dayEventCounts
+        };
+      });
+
+      // Calculate minimum required height for each week
+      const minHeights = weekEventData.map(weekData => {
+        const { maxEvents } = weekData;
+        const maxDisplayEvents = Math.min(maxEvents, 12);
+        const eventsSpace = maxDisplayEvents * (eventHeight + eventSpacing);
+        const moreIndicatorSpace = maxEvents > 12 ? (eventHeight + eventSpacing) : 0;
+        
+        return dayNumberHeight + cellPadding * 2 + eventsSpace + moreIndicatorSpace;
+      });
+
+      const totalMinHeight = minHeights.reduce((sum, height) => sum + height, 0);
+
+      // If minimum heights fit, use them with some extra space
+      if (totalMinHeight <= availableHeight) {
+        const extraSpace = availableHeight - totalMinHeight;
+        const extraPerWeek = extraSpace / weeks.length;
+        
+        return minHeights.map((minHeight, index) => {
+          const weekData = weekEventData[index];
+          const eventFactor = Math.max(weekData.maxEvents / 12, 0.2);
+          const additionalSpace = extraPerWeek * eventFactor;
+          return minHeight + additionalSpace;
+        });
+      }
+
+      // If we need to compress, use intelligent distribution
+      const totalWeight = weekEventData.reduce((sum, data) => sum + Math.max(data.maxEvents, 1), 0);
+      
+      return weekEventData.map(data => {
+        const weight = Math.max(data.maxEvents, 1) / totalWeight;
+        const allocatedHeight = availableHeight * weight;
+        
+        const minReasonableHeight = dayNumberHeight + cellPadding * 2 + 
+          Math.min(data.maxEvents, 3) * (eventHeight + eventSpacing);
+        
+        return Math.max(allocatedHeight, minReasonableHeight);
+      });
+    };
+
+    for (const [pageIndex, monthStart] of months.entries()) {
+      if (pageIndex > 0) doc.addPage([420, 297], "landscape");
+      
+      // Add logo
       const logoX = logo ? (pageWidth - logoWidth) / 2 : 0;
       if (logo) {
         doc.addImage(logo, "PNG", logoX, logoTopY, logoWidth, logoHeight);
       }
 
-      // Month title - set consistent styling and positioning
-      doc.setFontSize(16);
-      doc.setTextColor(51, 51, 51); // Reset to standard text color
+      // Month title
+      doc.setFontSize(20);
+      doc.setTextColor(51, 51, 51);
       doc.text(format(monthStart, "MMMM yyyy"), pageWidth / 2, monthTitleY, { align: "center" });
 
       // Days of week header
       daysOfWeek.forEach((day, index) => {
         doc.setFillColor(41, 128, 185);
-        doc.rect(startX + index * cellWidth, calendarStartY, cellWidth, 10, "F");
+        doc.rect(startX + index * cellWidth, calendarStartY, cellWidth, 8, "F");
         doc.setTextColor(255);
-        doc.setFontSize(10);
-        doc.text(day, startX + index * cellWidth + 15, calendarStartY + 7);
+        doc.setFontSize(12);
+        const textX = startX + index * cellWidth + cellWidth / 2;
+        doc.text(day, textX, calendarStartY + 6, { align: "center" });
       });
 
       const monthEnd = endOfMonth(monthStart);
       const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
       const firstDayOfWeek = 1;
+      
       function getDayIndex(d: Date) {
         return firstDayOfWeek === 1 ? (d.getDay() + 6) % 7 : d.getDay();
       }
+      
       const offset = getDayIndex(monthStart);
       const offsetDays = Array.from({ length: offset }, () => null);
       const allMonthDays = [...offsetDays, ...monthDays];
       const weeks: Array<Array<Date | null>> = [];
+      
       while (allMonthDays.length > 0) {
         weeks.push(allMonthDays.splice(0, 7));
       }
       
-      let currentY = calendarStartY + 10;
+      let currentY = calendarStartY + 8;
       
-      for (const week of weeks) {
+      // Calculate optimal heights for all weeks
+      const weekHeights = calculateOptimalWeekHeights(weeks);
+      
+      for (const [weekIndex, week] of weeks.entries()) {
+        const weekHeight = weekHeights[weekIndex];
+        
         for (const [dayIndex, day] of week.entries()) {
           const x = startX + dayIndex * cellWidth;
+          
+          // Draw cell border
           doc.setDrawColor(200);
-          doc.rect(x, currentY, cellWidth, cellHeight);
-          if (!day) continue;
-          doc.setTextColor(isSameMonth(day, monthStart) ? 0 : 200);
+          doc.setLineWidth(0.5);
+          doc.rect(x, currentY, cellWidth, weekHeight);
+          
+          if (!day) {
+            continue;
+          }
+          
+          // Day number with better positioning
+          doc.setTextColor(isSameMonth(day, monthStart) ? 0 : 150);
           doc.setFontSize(12);
-          doc.text(format(day, "d"), x + 2, currentY + 5);
-          const dayJobs = filteredJobs.filter((job) => {
-            try {
-              const startDate = job.start_time ? parseISO(job.start_time) : null;
-              const endDate = job.end_time ? parseISO(job.end_time) : null;
-              if (!startDate || !endDate) return false;
-              const compareDate = format(day, "yyyy-MM-dd");
-              const jobStartDate = format(startDate, "yyyy-MM-dd");
-              const jobEndDate = format(endDate, "yyyy-MM-dd");
-              const isSingleDayJob = jobStartDate === jobEndDate;
-              return isSingleDayJob
-                ? compareDate === jobStartDate
-                : compareDate >= jobStartDate && compareDate <= jobEndDate;
-            } catch (error) {
-              console.error("Error processing job dates for PDF:", error, job);
-              return false;
-            }
-          });
-          let eventY = currentY + 8;
-          for (const [index, job] of dayJobs.slice(0, 8).entries()) {
+          doc.setFont("helvetica", "bold");
+          doc.text(format(day, "d"), x + 2, currentY + 6);
+          
+          const dayJobs = getEventsForDay(day);
+          
+          if (dayJobs.length === 0) continue;
+          
+          // Calculate available space for events
+          const availableEventSpace = weekHeight - dayNumberHeight - (cellPadding * 2);
+          const maxPossibleEvents = Math.floor(availableEventSpace / (eventHeight + eventSpacing));
+          const maxEventsToShow = Math.min(dayJobs.length, Math.max(maxPossibleEvents, 1));
+          
+          let eventY = currentY + dayNumberHeight + cellPadding;
+          
+          // Render events with improved layout
+          for (const [index, job] of dayJobs.slice(0, maxEventsToShow).entries()) {
             const key = `${job.id}-${format(day, "yyyy-MM-dd")}`;
             const dateType = dateTypes[key]?.type;
             const typeLabel = dateType ? dateTypeLabels[dateType] : "";
             const baseColor = job.color || "#cccccc";
             const [r, g, b] = hexToRgb(baseColor);
             const textColor = getContrastColor(baseColor);
+            
+            const yPos = eventY + index * (eventHeight + eventSpacing);
+            
+            // Event background
             doc.setFillColor(r, g, b);
-            doc.rect(x + 1, eventY + index * 5, cellWidth - 2, 4, "F");
+            doc.rect(x + 1, yPos, cellWidth - 2, eventHeight, "F");
+            
+            // Date type label
             if (typeLabel) {
-              doc.setFontSize(8);
+              doc.setFont("helvetica", "bold");
+              doc.setFontSize(7);
               doc.setTextColor(textColor);
-              doc.text(typeLabel, x + 3, eventY + index * 5 + 3);
+              doc.text(typeLabel, x + 2, yPos + 2.2);
             }
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(7);
+            
+            // Job title
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(6.5);
             doc.setTextColor(textColor);
-            const titleX = typeLabel ? x + 8 : x + 3;
-            doc.text(job.title.substring(0, 18), titleX, eventY + index * 5 + 3);
+            const titleX = typeLabel ? x + 8 : x + 2;
+            const maxTitleWidth = cellWidth - (titleX - x) - 2;
+            const maxTitleLength = Math.floor(maxTitleWidth / 1.2);
+            
+            let displayTitle = job.title;
+            if (displayTitle.length > maxTitleLength) {
+              displayTitle = displayTitle.substring(0, maxTitleLength - 3) + "...";
+            }
+            
+            doc.text(displayTitle, titleX, yPos + 2.2);
+          }
+          
+          // "More events" indicator
+          if (dayJobs.length > maxEventsToShow) {
+            const moreY = eventY + maxEventsToShow * (eventHeight + eventSpacing);
+            if (moreY + eventHeight < currentY + weekHeight - cellPadding) {
+              doc.setFillColor(240, 240, 240);
+              doc.rect(x + 1, moreY, cellWidth - 2, eventHeight, "F");
+              doc.setFont("helvetica", "italic");
+              doc.setFontSize(6);
+              doc.setTextColor(100);
+              const moreText = `+${dayJobs.length - maxEventsToShow} more`;
+              doc.text(moreText, x + 2, moreY + 2.2);
+            }
           }
         }
-        currentY += cellHeight;
+        currentY += weekHeight;
       }
       
+      // Enhanced legend with better positioning
       if (pageIndex === 0) {
-        const legendY = currentY + 10;
-        doc.setFontSize(8);
+        let legendY = currentY + 8; // Changed from const to let
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
         doc.setTextColor(0);
+        doc.text("Date Types:", startX, legendY);
+        
+        let legendX = startX + 50;
         Object.entries(dateTypeLabels).forEach(([type, label], index) => {
-          doc.text(`${label} = ${type}`, 10 + index * 40, legendY);
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(8);
+          doc.text(`${label} = ${type.charAt(0).toUpperCase() + type.slice(1)}`, legendX, legendY);
+          legendX += 60;
+          
+          // Wrap to next line if needed
+          if (legendX > pageWidth - 60 && index < Object.entries(dateTypeLabels).length - 1) {
+            legendX = startX + 50;
+            legendY += 10;
+          }
         });
       }
     }
@@ -786,6 +926,7 @@ const JobCard: React.FC<JobCardProps> = ({
 
   const totalRequired = getTotalRequiredPersonnel(job);
   const currentlyAssigned = job.job_assignments?.length || 0;
+  const jobTimezone = job.timezone || 'Europe/Madrid';
   const dateTypeIcon = getDateTypeIcon(job.id, date);
 
   return (
@@ -825,8 +966,8 @@ const JobCard: React.FC<JobCardProps> = ({
               <div className="flex items-center gap-2 text-sm">
                 <Clock className="h-4 w-4" />
                 <span>
-                  {format(new Date(job.start_time), "MMM d, HH:mm")} -{" "}
-                  {format(new Date(job.end_time), "MMM d, HH:mm")}
+                  {formatInJobTimezone(job.start_time, "MMM d, HH:mm", jobTimezone)} -{" "}
+                  {formatInJobTimezone(job.end_time, "MMM d, HH:mm", jobTimezone)}
                 </span>
               </div>
               {job.location?.name && (

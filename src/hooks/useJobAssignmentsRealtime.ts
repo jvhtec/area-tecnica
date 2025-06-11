@@ -1,9 +1,7 @@
 
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Assignment } from "@/types/assignment";
-import { useTableSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 import { useRealtimeQuery } from "./useRealtimeQuery";
 
@@ -58,12 +56,42 @@ export function useJobAssignmentsRealtime(jobId: string) {
     },
     "job_assignments",
     {
-      staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
+      staleTime: 1000 * 60 * 2, // Consider data fresh for 2 minutes
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
-      refetchInterval: 1000 * 60 * 10, // Refresh every 10 minutes
+      refetchInterval: false, // Rely on real-time updates instead of polling
     }
   );
+
+  // Additional real-time subscription specifically for this job
+  useEffect(() => {
+    if (!jobId) return;
+
+    console.log(`Setting up job-specific assignment subscription for job ${jobId}`);
+
+    const channel = supabase
+      .channel(`assignments-${jobId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'job_assignments',
+          filter: `job_id=eq.${jobId}`
+        },
+        (payload) => {
+          console.log(`Assignment change detected for job ${jobId}:`, payload);
+          // Force immediate refresh
+          manualRefresh();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log(`Cleaning up job assignment subscription for job ${jobId}`);
+      supabase.removeChannel(channel);
+    };
+  }, [jobId, manualRefresh]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

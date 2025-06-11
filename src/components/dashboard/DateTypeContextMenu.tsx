@@ -1,12 +1,12 @@
-
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
-import { Plane, Wrench, Star, Moon, Mic } from "lucide-react";
+import { Plane, Wrench, Star, Moon, Mic, ExternalLink } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 import { format, startOfDay } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
-import { useTableSubscription } from "@/hooks/useSubscription";
+import { useTableSubscription } from "@/hooks/useTableSubscription";
+import { useFlexUuid } from "@/hooks/useFlexUuid";
 
 interface DateTypeContextMenuProps {
   children: React.ReactNode;
@@ -17,17 +17,16 @@ interface DateTypeContextMenuProps {
 
 export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: DateTypeContextMenuProps) => {
   const queryClient = useQueryClient();
+  const { flexUuid, isLoading, error } = useFlexUuid(jobId);
 
-  // Use the improved subscription hook
-  useTableSubscription('job_date_types', ['job-date-types', jobId], {
-    filter: `job_id=eq.${jobId}`
-  });
+  // Use the improved subscription hook with correct parameters
+  useTableSubscription('job_date_types', ['job-date-types', jobId]);
 
   const handleSetDateType = async (type: 'travel' | 'setup' | 'show' | 'off' | 'rehearsal') => {
     try {
       const localDate = startOfDay(date);
       const formattedDate = format(localDate, 'yyyy-MM-dd');
-      
+
       console.log('Setting date type:', {
         type,
         jobId,
@@ -41,7 +40,7 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         const key = `${jobId}-${formattedDate}`;
         return { ...old, [key]: { type, job_id: jobId, date: formattedDate } };
       });
-      
+
       const { error } = await supabase
         .from('job_date_types')
         .upsert({
@@ -53,7 +52,8 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         });
 
       if (error) throw error;
-      
+
+      // Updated to use proper toast API
       toast.success(`Date type set to ${type}`);
       onTypeChange();
     } catch (error: any) {
@@ -61,6 +61,13 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
       toast.error('Failed to set date type');
       // Invalidate the query to revert to the correct state
       queryClient.invalidateQueries({ queryKey: ['job-date-types', jobId] });
+    }
+  };
+
+  const handleFlexClick = () => {
+    if (flexUuid) {
+      const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+      window.open(flexUrl, '_blank', 'noopener');
     }
   };
 
@@ -83,6 +90,11 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         <ContextMenuItem onClick={() => handleSetDateType('off')} className="flex items-center gap-2">
           <Moon className="h-4 w-4" /> Off
         </ContextMenuItem>
+        {flexUuid && (
+          <ContextMenuItem onClick={handleFlexClick} className="flex items-center gap-2">
+            <ExternalLink className="h-4 w-4" /> Flex
+          </ContextMenuItem>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );

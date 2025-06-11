@@ -1,79 +1,99 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
 import { formatDistanceToNow } from 'date-fns';
+import { getRealtimeConnectionStatus } from '@/lib/supabase-client';
+import { forceRefreshSubscriptions } from '@/lib/enhanced-supabase-client';
 
 /**
- * Hook to monitor subscription status for specific tables with enhanced staleness detection
+ * Hook to monitor subscription status for specific tables
  * @param tables Array of table names to monitor
- * @returns Object containing detailed subscription status information
+ * @returns Subscription status details
  */
 export function useSubscriptionStatus(tables: string[]) {
   const { 
-    subscriptionsByTable, 
-    connectionStatus, 
+    connectionStatus: globalConnectionStatus, 
+    activeSubscriptions, 
     lastRefreshTime,
-    forceRefresh 
+    refreshSubscriptions,
+    subscriptionsByTable
   } = useSubscriptionContext();
-  
-  const [status, setStatus] = useState({
-    isSubscribed: false,
-    tablesSubscribed: [] as string[],
-    tablesUnsubscribed: [] as string[],
-    connectionStatus,
-    lastRefreshTime: lastRefreshTime || 0,
-    isStale: false,
-    lastRefreshFormatted: '',
-    refreshSubscription: () => {}
-  });
 
-  // Create a refresh function that's specific to these tables
-  const refreshSubscription = useCallback(() => {
-    forceRefresh(tables);
-  }, [tables, forceRefresh]);
+  const [tablesSubscribed, setTablesSubscribed] = useState<string[]>([]);
+  const [tablesUnsubscribed, setTablesUnsubscribed] = useState<string[]>([]);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isStale, setIsStale] = useState(false);
+  const [supportsRealtime, setSupportsRealtime] = useState(true);
 
-  // Update status whenever relevant state changes
+  // Effect to update table subscription status
   useEffect(() => {
-    const tablesSubscribed: string[] = [];
-    const tablesUnsubscribed: string[] = [];
-
+    // Check which tables are actively subscribed
+    const subscribed: string[] = [];
+    const unsubscribed: string[] = [];
+    
     tables.forEach(table => {
-      if (subscriptionsByTable[table]?.length > 0) {
-        tablesSubscribed.push(table);
+      const tableSubscriptions = subscriptionsByTable[table] || [];
+      if (tableSubscriptions.length > 0) {
+        subscribed.push(table);
       } else {
-        tablesUnsubscribed.push(table);
+        unsubscribed.push(table);
       }
     });
-
-    // Calculate staleness with dynamic thresholds based on connection status
-    let staleThreshold = 5 * 60 * 1000; // 5 minutes default
     
-    // If we're disconnected, reduce threshold to mark as stale sooner
-    if (connectionStatus !== 'connected') {
-      staleThreshold = 60 * 1000; // 1 minute when disconnected
-    }
+    setTablesSubscribed(subscribed);
+    setTablesUnsubscribed(unsubscribed);
+    setIsSubscribed(unsubscribed.length === 0 && globalConnectionStatus === 'connected');
     
-    const isStale = Date.now() - lastRefreshTime > staleThreshold;
+    // Check if data is stale (older than 5 minutes)
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
+    setIsStale(now - lastRefreshTime > fiveMinutes);
     
-    // Format the last refresh time in a human-readable format
-    let lastRefreshFormatted = 'unknown';
+    // Check if realtime is supported for these tables
+    const directRealtimeSupport = tables.every(table => 
+      ['jobs', 'job_assignments', 'job_date_types', 'job_departments', 'profiles',
+       'festival_artists', 'festival_shifts', 'festival_shift_assignments',
+       'messages', 'direct_messages'].includes(table)
+    );
+    setSupportsRealtime(directRealtimeSupport);
+    
+  }, [tables, activeSubscriptions, globalConnectionStatus, lastRefreshTime, subscriptionsByTable]);
+  
+  // Format the last refresh time for display
+  const lastRefreshFormatted = formatDistanceToNow(lastRefreshTime, { addSuffix: true });
+  
+  // Function to refresh all subscriptions for the specified tables
+  const refreshSubscription = async () => {
+    console.log(`Refreshing subscriptions for tables: ${tables.join(', ')}`);
+    
     try {
-      lastRefreshFormatted = formatDistanceToNow(lastRefreshTime) + ' ago';
+      // Ensure primary Supabase realtime connection is active
+      const realtimeStatus = getRealtimeConnectionStatus();
+      
+      if (realtimeStatus !== 'CONNECTED') {
+        // If not connected, force a connection refresh first
+        await forceRefreshSubscriptions(tables);
+      }
+      
+      // Then refresh all subscriptions in the provider
+      refreshSubscriptions();
+      
+      return true;
     } catch (error) {
-      console.error('Error formatting last refresh time:', error);
+      console.error('Error refreshing subscriptions:', error);
+      return false;
     }
+  };
 
-    setStatus({
-      isSubscribed: tablesSubscribed.length === tables.length,
-      tablesSubscribed,
-      tablesUnsubscribed,
-      connectionStatus,
-      lastRefreshTime,
-      isStale,
-      lastRefreshFormatted,
-      refreshSubscription
-    });
-  }, [tables, subscriptionsByTable, connectionStatus, lastRefreshTime, refreshSubscription]);
-
-  return status;
+  return {
+    isSubscribed,
+    tablesSubscribed,
+    tablesUnsubscribed,
+    connectionStatus: globalConnectionStatus,
+    lastRefreshTime,
+    lastRefreshFormatted,
+    isStale,
+    supportsRealtime,
+    refreshSubscription
+  };
 }

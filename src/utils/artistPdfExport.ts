@@ -1,6 +1,6 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { WirelessSystem, IEMSystem } from '@/types/festival-equipment';
 
 export interface ArtistTechnicalInfo {
   fohTech: boolean;
@@ -8,22 +8,40 @@ export interface ArtistTechnicalInfo {
   fohConsole: { model: string; providedBy: string };
   monConsole: { model: string; providedBy: string };
   wireless: {
-    model: string;
+    systems?: WirelessSystem[];
+    model?: string;
     providedBy: string;
-    handhelds: number;
-    bodypacks: number;
-    band: string;
+    handhelds?: number;
+    bodypacks?: number;
+    band?: string;
+    hh?: number;
+    bp?: number;
   };
   iem: {
-    model: string;
+    systems?: IEMSystem[];
+    model?: string;
     providedBy: string;
-    quantity: number;
-    band: string;
+    quantity?: number;
+    band?: string;
   };
   monitors: {
     enabled: boolean;
     quantity: number;
   };
+}
+
+// Local interfaces for internal PDF generation use
+interface WirelessSystemDetail {
+  quantity_hh?: number;
+  quantity_bp?: number;
+  model: string;
+  band?: string;
+}
+
+interface IEMSystemDetail {
+  quantity: number;
+  model: string;
+  band?: string;
 }
 
 export interface ArtistInfrastructure {
@@ -53,8 +71,25 @@ export interface ArtistPdfData {
     wired: string;
   };
   notes?: string;
-  logoUrl?: string; // Add the missing logoUrl property as optional
+  logoUrl?: string;
 }
+
+// Helper functions to process wireless and IEM data
+const getWirelessSummary = (systems: WirelessSystem[] = []) => {
+  const totalHH = systems.reduce((sum, system) => sum + (system.quantity_hh || 0), 0);
+  const totalBP = systems.reduce((sum, system) => sum + (system.quantity_bp || 0), 0);
+  return { hh: totalHH, bp: totalBP };
+};
+
+const getIEMSummary = (systems: IEMSystem[] = []) => {
+  const totalChannels = systems.reduce((sum, system) => sum + (system.quantity_hh || 0), 0);
+  const totalBodpacks = systems.reduce((sum, system) => sum + (system.quantity_bp || 0), 0);
+  return { 
+    channels: totalChannels, 
+    bodypacks: totalBodpacks,
+    total: totalChannels // For backward compatibility
+  };
+};
 
 export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
   return new Promise((resolve) => {
@@ -137,7 +172,7 @@ export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
       ];
 
       autoTable(doc, {
-        head: [['Position', 'Required']],
+        head: [['Position', 'Artist Provided']],
         body: technicalStaffRows,
         startY: yPosition,
         theme: 'grid',
@@ -181,11 +216,84 @@ export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
       yPosition = (doc as any).lastAutoTable.finalY + 8;
 
       // === RF & WIRELESS ===
-      const wirelessRows = [
-        ['Handheld', data.technical.wireless.handhelds, data.technical.wireless.model, data.technical.wireless.band, data.technical.wireless.providedBy],
-        ['Bodypack', data.technical.wireless.bodypacks, data.technical.wireless.model, data.technical.wireless.band, data.technical.wireless.providedBy],
-        ['IEM', data.technical.iem.quantity, data.technical.iem.model, data.technical.iem.band, data.technical.iem.providedBy]
-      ].filter(row => Number(row[1]) > 0);
+      const wirelessRows: any[] = [];
+      
+      // Process wireless systems
+      if (data.technical.wireless.systems && data.technical.wireless.systems.length > 0) {
+        data.technical.wireless.systems.forEach(system => {
+          if (system.quantity_hh && system.quantity_hh > 0) {
+            wirelessRows.push([
+              'Handheld',
+              system.quantity_hh,
+              system.model,
+              system.band || '-',
+              system.provided_by || data.technical.wireless.providedBy || 'festival' 
+            ]);
+          }
+          if (system.quantity_bp && system.quantity_bp > 0) {
+            wirelessRows.push([
+              'Bodypack',
+              system.quantity_bp,
+              system.model,
+              system.band || '-',
+              system.provided_by || data.technical.wireless.providedBy || 'festival'
+            ]);
+          }
+        });
+      } else if (data.technical.wireless.handhelds || data.technical.wireless.bodypacks) {
+        // Handle legacy format
+        if (data.technical.wireless.handhelds) {
+          wirelessRows.push([
+            'Handheld',
+            data.technical.wireless.handhelds,
+            data.technical.wireless.model || '-',
+            data.technical.wireless.band || '-',
+            data.technical.wireless.providedBy
+          ]);
+        }
+        if (data.technical.wireless.bodypacks) {
+          wirelessRows.push([
+            'Bodypack',
+            data.technical.wireless.bodypacks,
+            data.technical.wireless.model || '-',
+            data.technical.wireless.band || '-',
+            data.technical.wireless.providedBy
+          ]);
+        }
+      }
+
+      // Process IEM systems
+      if (data.technical.iem.systems && data.technical.iem.systems.length > 0) {
+        data.technical.iem.systems.forEach(system => {
+          if (system.quantity_hh && system.quantity_hh > 0) {
+            wirelessRows.push([
+              'IEM Channels',
+              system.quantity_hh,
+              system.model,
+              system.band || '-',
+              system.provided_by || data.technical.iem.providedBy || 'festival'
+            ]);
+          }
+          if (system.quantity_bp && system.quantity_bp > 0) {
+            wirelessRows.push([
+              'IEM Bodypacks',
+              system.quantity_bp,
+              system.model,
+              system.band || '-',
+              system.provided_by || data.technical.iem.providedBy || 'festival'
+            ]);
+          }
+        });
+      } else if (data.technical.iem.quantity) {
+        // Handle legacy format
+        wirelessRows.push([
+          'IEM System',
+          data.technical.iem.quantity,
+          data.technical.iem.model || '-',
+          data.technical.iem.band || '-',
+          data.technical.iem.providedBy
+        ]);
+      }
 
       if (wirelessRows.length > 0) {
         autoTable(doc, {

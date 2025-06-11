@@ -486,10 +486,8 @@ export type Database = {
             | null
           foh_tech: boolean | null
           id: string
-          iem_band: string | null
-          iem_model: string | null
           iem_provided_by: Database["public"]["Enums"]["provider_type"] | null
-          iem_quantity: number | null
+          iem_systems: Json | null
           infra_analog: number | null
           infra_cat6: boolean | null
           infra_cat6_quantity: number | null
@@ -526,14 +524,11 @@ export type Database = {
           stage: number | null
           timezone: string | null
           updated_at: string | null
-          wireless_band: string | null
-          wireless_model: string | null
           wireless_provided_by:
             | Database["public"]["Enums"]["provider_type"]
             | null
           wireless_quantity: number | null
-          wireless_quantity_bp: number | null
-          wireless_quantity_hh: number | null
+          wireless_systems: Json | null
         }
         Insert: {
           created_at?: string | null
@@ -549,10 +544,8 @@ export type Database = {
             | null
           foh_tech?: boolean | null
           id?: string
-          iem_band?: string | null
-          iem_model?: string | null
           iem_provided_by?: Database["public"]["Enums"]["provider_type"] | null
-          iem_quantity?: number | null
+          iem_systems?: Json | null
           infra_analog?: number | null
           infra_cat6?: boolean | null
           infra_cat6_quantity?: number | null
@@ -589,14 +582,11 @@ export type Database = {
           stage?: number | null
           timezone?: string | null
           updated_at?: string | null
-          wireless_band?: string | null
-          wireless_model?: string | null
           wireless_provided_by?:
             | Database["public"]["Enums"]["provider_type"]
             | null
           wireless_quantity?: number | null
-          wireless_quantity_bp?: number | null
-          wireless_quantity_hh?: number | null
+          wireless_systems?: Json | null
         }
         Update: {
           created_at?: string | null
@@ -612,10 +602,8 @@ export type Database = {
             | null
           foh_tech?: boolean | null
           id?: string
-          iem_band?: string | null
-          iem_model?: string | null
           iem_provided_by?: Database["public"]["Enums"]["provider_type"] | null
-          iem_quantity?: number | null
+          iem_systems?: Json | null
           infra_analog?: number | null
           infra_cat6?: boolean | null
           infra_cat6_quantity?: number | null
@@ -652,14 +640,11 @@ export type Database = {
           stage?: number | null
           timezone?: string | null
           updated_at?: string | null
-          wireless_band?: string | null
-          wireless_model?: string | null
           wireless_provided_by?:
             | Database["public"]["Enums"]["provider_type"]
             | null
           wireless_quantity?: number | null
-          wireless_quantity_bp?: number | null
-          wireless_quantity_hh?: number | null
+          wireless_systems?: Json | null
         }
         Relationships: [
           {
@@ -830,6 +815,7 @@ export type Database = {
       festival_shift_assignments: {
         Row: {
           created_at: string | null
+          external_technician_name: string | null
           id: string
           role: string
           shift_id: string | null
@@ -837,6 +823,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          external_technician_name?: string | null
           id?: string
           role: string
           shift_id?: string | null
@@ -844,6 +831,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          external_technician_name?: string | null
           id?: string
           role?: string
           shift_id?: string | null
@@ -905,6 +893,101 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      festival_stage_gear_setups: {
+        Row: {
+          created_at: string | null
+          extras_df: boolean | null
+          extras_djbooth: boolean | null
+          extras_sf: boolean | null
+          extras_wired: string | null
+          foh_consoles: Json | null
+          gear_setup_id: string
+          id: string
+          iem_systems: Json | null
+          infra_analog: number | null
+          infra_cat6: boolean | null
+          infra_cat6_quantity: number | null
+          infra_coax: boolean | null
+          infra_coax_quantity: number | null
+          infra_hma: boolean | null
+          infra_hma_quantity: number | null
+          infra_opticalcon_duo: boolean | null
+          infra_opticalcon_duo_quantity: number | null
+          mon_consoles: Json | null
+          monitors_enabled: boolean | null
+          monitors_quantity: number | null
+          notes: string | null
+          other_infrastructure: string | null
+          stage_number: number
+          updated_at: string | null
+          wireless_systems: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          extras_df?: boolean | null
+          extras_djbooth?: boolean | null
+          extras_sf?: boolean | null
+          extras_wired?: string | null
+          foh_consoles?: Json | null
+          gear_setup_id: string
+          id?: string
+          iem_systems?: Json | null
+          infra_analog?: number | null
+          infra_cat6?: boolean | null
+          infra_cat6_quantity?: number | null
+          infra_coax?: boolean | null
+          infra_coax_quantity?: number | null
+          infra_hma?: boolean | null
+          infra_hma_quantity?: number | null
+          infra_opticalcon_duo?: boolean | null
+          infra_opticalcon_duo_quantity?: number | null
+          mon_consoles?: Json | null
+          monitors_enabled?: boolean | null
+          monitors_quantity?: number | null
+          notes?: string | null
+          other_infrastructure?: string | null
+          stage_number: number
+          updated_at?: string | null
+          wireless_systems?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          extras_df?: boolean | null
+          extras_djbooth?: boolean | null
+          extras_sf?: boolean | null
+          extras_wired?: string | null
+          foh_consoles?: Json | null
+          gear_setup_id?: string
+          id?: string
+          iem_systems?: Json | null
+          infra_analog?: number | null
+          infra_cat6?: boolean | null
+          infra_cat6_quantity?: number | null
+          infra_coax?: boolean | null
+          infra_coax_quantity?: number | null
+          infra_hma?: boolean | null
+          infra_hma_quantity?: number | null
+          infra_opticalcon_duo?: boolean | null
+          infra_opticalcon_duo_quantity?: number | null
+          mon_consoles?: Json | null
+          monitors_enabled?: boolean | null
+          monitors_quantity?: number | null
+          notes?: string | null
+          other_infrastructure?: string | null
+          stage_number?: number
+          updated_at?: string | null
+          wireless_systems?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "festival_stage_gear_setups_gear_setup_id_fkey"
+            columns: ["gear_setup_id"]
+            isOneToOne: false
+            referencedRelation: "festival_gear_setups"
             referencedColumns: ["id"]
           },
         ]
@@ -1355,6 +1438,7 @@ export type Database = {
         Row: {
           assigned_at: string
           assigned_by: string | null
+          assignment_source: string | null
           job_id: string
           lights_role: string | null
           response_time: string | null
@@ -1366,6 +1450,7 @@ export type Database = {
         Insert: {
           assigned_at?: string
           assigned_by?: string | null
+          assignment_source?: string | null
           job_id: string
           lights_role?: string | null
           response_time?: string | null
@@ -1377,6 +1462,7 @@ export type Database = {
         Update: {
           assigned_at?: string
           assigned_by?: string | null
+          assignment_source?: string | null
           job_id?: string
           lights_role?: string | null
           response_time?: string | null
@@ -2269,6 +2355,7 @@ export type Database = {
           dni: string | null
           email: string
           first_name: string | null
+          flex_user_id: string | null
           id: string
           last_activity: string | null
           last_name: string | null
@@ -2287,6 +2374,7 @@ export type Database = {
           dni?: string | null
           email: string
           first_name?: string | null
+          flex_user_id?: string | null
           id: string
           last_activity?: string | null
           last_name?: string | null
@@ -2305,6 +2393,7 @@ export type Database = {
           dni?: string | null
           email?: string
           first_name?: string | null
+          flex_user_id?: string | null
           id?: string
           last_activity?: string | null
           last_name?: string | null
@@ -2549,12 +2638,262 @@ export type Database = {
           },
         ]
       }
+      technician_work_records: {
+        Row: {
+          break_duration: number | null
+          created_at: string | null
+          end_time: string
+          id: string
+          job_id: string
+          notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          signature_date: string | null
+          signature_url: string | null
+          start_time: string
+          status: string | null
+          technician_id: string
+          total_hours: number
+          updated_at: string | null
+          work_date: string
+        }
+        Insert: {
+          break_duration?: number | null
+          created_at?: string | null
+          end_time: string
+          id?: string
+          job_id: string
+          notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          signature_date?: string | null
+          signature_url?: string | null
+          start_time: string
+          status?: string | null
+          technician_id: string
+          total_hours: number
+          updated_at?: string | null
+          work_date: string
+        }
+        Update: {
+          break_duration?: number | null
+          created_at?: string | null
+          end_time?: string
+          id?: string
+          job_id?: string
+          notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          signature_date?: string | null
+          signature_url?: string | null
+          start_time?: string
+          status?: string | null
+          technician_id?: string
+          total_hours?: number
+          updated_at?: string | null
+          work_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_work_records_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tour_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          created_at: string
+          department: string
+          external_technician_name: string | null
+          id: string
+          notes: string | null
+          role: string
+          technician_id: string | null
+          tour_id: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          created_at?: string
+          department: string
+          external_technician_name?: string | null
+          id?: string
+          notes?: string | null
+          role: string
+          technician_id?: string | null
+          tour_id: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          created_at?: string
+          department?: string
+          external_technician_name?: string | null
+          id?: string
+          notes?: string | null
+          role?: string
+          technician_id?: string | null
+          tour_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_assignments_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_assignments_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tour_date_power_overrides: {
+        Row: {
+          created_at: string | null
+          current_per_phase: number
+          custom_pdu_type: string | null
+          default_table_id: string | null
+          department: string | null
+          id: string
+          includes_hoist: boolean | null
+          override_data: Json | null
+          pdu_type: string
+          table_name: string
+          total_watts: number
+          tour_date_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_per_phase: number
+          custom_pdu_type?: string | null
+          default_table_id?: string | null
+          department?: string | null
+          id?: string
+          includes_hoist?: boolean | null
+          override_data?: Json | null
+          pdu_type: string
+          table_name: string
+          total_watts: number
+          tour_date_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_per_phase?: number
+          custom_pdu_type?: string | null
+          default_table_id?: string | null
+          department?: string | null
+          id?: string
+          includes_hoist?: boolean | null
+          override_data?: Json | null
+          pdu_type?: string
+          table_name?: string
+          total_watts?: number
+          tour_date_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_date_power_overrides_default_table_id_fkey"
+            columns: ["default_table_id"]
+            isOneToOne: false
+            referencedRelation: "tour_default_tables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_date_power_overrides_tour_date_id_fkey"
+            columns: ["tour_date_id"]
+            isOneToOne: false
+            referencedRelation: "tour_dates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tour_date_weight_overrides: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          default_table_id: string | null
+          department: string | null
+          id: string
+          item_name: string
+          override_data: Json | null
+          quantity: number | null
+          tour_date_id: string
+          updated_at: string | null
+          weight_kg: number
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          default_table_id?: string | null
+          department?: string | null
+          id?: string
+          item_name: string
+          override_data?: Json | null
+          quantity?: number | null
+          tour_date_id: string
+          updated_at?: string | null
+          weight_kg: number
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          default_table_id?: string | null
+          department?: string | null
+          id?: string
+          item_name?: string
+          override_data?: Json | null
+          quantity?: number | null
+          tour_date_id?: string
+          updated_at?: string | null
+          weight_kg?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_date_weight_overrides_default_table_id_fkey"
+            columns: ["default_table_id"]
+            isOneToOne: false
+            referencedRelation: "tour_default_tables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_date_weight_overrides_tour_date_id_fkey"
+            columns: ["tour_date_id"]
+            isOneToOne: false
+            referencedRelation: "tour_dates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tour_dates: {
         Row: {
           created_at: string
           date: string
           flex_folders_created: boolean | null
           id: string
+          is_tour_pack_only: boolean | null
           location_id: string | null
           tour_id: string | null
         }
@@ -2563,6 +2902,7 @@ export type Database = {
           date: string
           flex_folders_created?: boolean | null
           id?: string
+          is_tour_pack_only?: boolean | null
           location_id?: string | null
           tour_id?: string | null
         }
@@ -2571,6 +2911,7 @@ export type Database = {
           date?: string
           flex_folders_created?: boolean | null
           id?: string
+          is_tour_pack_only?: boolean | null
           location_id?: string | null
           tour_id?: string | null
         }
@@ -2584,6 +2925,129 @@ export type Database = {
           },
           {
             foreignKeyName: "tour_dates_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tour_default_sets: {
+        Row: {
+          created_at: string
+          department: string | null
+          description: string | null
+          id: string
+          name: string
+          tour_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          department?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          tour_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          department?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          tour_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_default_sets_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tour_default_tables: {
+        Row: {
+          created_at: string
+          id: string
+          metadata: Json | null
+          set_id: string
+          table_data: Json
+          table_name: string
+          table_type: string
+          total_value: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          set_id: string
+          table_data: Json
+          table_name: string
+          table_type: string
+          total_value?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          set_id?: string
+          table_data?: Json
+          table_name?: string
+          table_type?: string
+          total_value?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_default_tables_set_id_fkey"
+            columns: ["set_id"]
+            isOneToOne: false
+            referencedRelation: "tour_default_sets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tour_documents: {
+        Row: {
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+          tour_id: string
+          uploaded_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          tour_id: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          tour_id?: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_documents_tour_id_fkey"
             columns: ["tour_id"]
             isOneToOne: false
             referencedRelation: "tours"
@@ -2625,6 +3089,100 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "tour_logos_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tour_power_defaults: {
+        Row: {
+          created_at: string | null
+          current_per_phase: number
+          custom_pdu_type: string | null
+          department: string | null
+          id: string
+          includes_hoist: boolean | null
+          pdu_type: string
+          table_name: string
+          total_watts: number
+          tour_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_per_phase: number
+          custom_pdu_type?: string | null
+          department?: string | null
+          id?: string
+          includes_hoist?: boolean | null
+          pdu_type: string
+          table_name: string
+          total_watts: number
+          tour_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_per_phase?: number
+          custom_pdu_type?: string | null
+          department?: string | null
+          id?: string
+          includes_hoist?: boolean | null
+          pdu_type?: string
+          table_name?: string
+          total_watts?: number
+          tour_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_power_defaults_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tour_weight_defaults: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          department: string | null
+          id: string
+          item_name: string
+          quantity: number | null
+          tour_id: string
+          updated_at: string | null
+          weight_kg: number
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          department?: string | null
+          id?: string
+          item_name: string
+          quantity?: number | null
+          tour_id: string
+          updated_at?: string | null
+          weight_kg: number
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          department?: string | null
+          id?: string
+          item_name?: string
+          quantity?: number | null
+          tour_id?: string
+          updated_at?: string | null
+          weight_kg?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_weight_defaults_tour_id_fkey"
             columns: ["tour_id"]
             isOneToOne: false
             referencedRelation: "tours"
@@ -2859,18 +3417,25 @@ export type Database = {
       }
     }
     Functions: {
+      can_manage_users: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       convert_to_timezone: {
-        Args: {
-          timestamp_val: string
-          target_timezone?: string
-        }
+        Args: { timestamp_val: string; target_timezone?: string }
         Returns: string
       }
       create_default_logistics_events_for_job: {
-        Args: {
-          job_id: string
-        }
+        Args: { job_id: string }
         Returns: undefined
+      }
+      get_current_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
       }
     }
     Enums: {
@@ -2897,7 +3462,7 @@ export type Database = {
       form_status: "pending" | "submitted" | "expired"
       global_preset_status: "available" | "unavailable" | "tentative"
       job_date_type: "travel" | "setup" | "show" | "off" | "rehearsal"
-      job_status: "pending" | "in_progress" | "completed" | "cancelled"
+      job_status: "Tentativa" | "Confirmado" | "Completado" | "Cancelado"
       job_type: "single" | "tour" | "festival" | "dryhire" | "tourdate"
       logistics_event_type: "load" | "unload"
       message_status: "unread" | "read"
@@ -2937,27 +3502,29 @@ export type Database = {
   }
 }
 
-type PublicSchema = Database[Extract<keyof Database, "public">]
+type DefaultSchema = Database[Extract<keyof Database, "public">]
 
 export type Tables<
-  PublicTableNameOrOptions extends
-    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-        Database[PublicTableNameOrOptions["schema"]]["Views"])
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
-        PublicSchema["Views"])
-    ? (PublicSchema["Tables"] &
-        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -2965,20 +3532,22 @@ export type Tables<
     : never
 
 export type TablesInsert<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
     | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -2986,20 +3555,22 @@ export type TablesInsert<
     : never
 
 export type TablesUpdate<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
     | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -3007,21 +3578,23 @@ export type TablesUpdate<
     : never
 
 export type Enums<
-  PublicEnumNameOrOptions extends
-    | keyof PublicSchema["Enums"]
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
     | { schema: keyof Database },
-  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
-    ? PublicSchema["Enums"][PublicEnumNameOrOptions]
+> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof PublicSchema["CompositeTypes"]
+    | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof Database },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof Database
@@ -3030,6 +3603,70 @@ export type CompositeTypes<
     : never = never,
 > = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
   ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
-    ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      assignment_status: ["invited", "confirmed", "declined"],
+      department: [
+        "sound",
+        "lights",
+        "video",
+        "logistics",
+        "production",
+        "administrative",
+      ],
+      direct_message_status: ["unread", "read"],
+      equipment_category: [
+        "convencional",
+        "robotica",
+        "fx",
+        "rigging",
+        "controles",
+        "cuadros",
+        "led",
+        "strobo",
+        "canones",
+        "estructuras",
+      ],
+      form_status: ["pending", "submitted", "expired"],
+      global_preset_status: ["available", "unavailable", "tentative"],
+      job_date_type: ["travel", "setup", "show", "off", "rehearsal"],
+      job_status: ["Tentativa", "Confirmado", "Completado", "Cancelado"],
+      job_type: ["single", "tour", "festival", "dryhire", "tourdate"],
+      logistics_event_type: ["load", "unload"],
+      message_status: ["unread", "read"],
+      milestone_category: [
+        "planning",
+        "technical",
+        "logistics",
+        "administrative",
+        "production",
+      ],
+      movement_type: ["addition", "subtraction"],
+      notification_channel: [
+        "messages",
+        "assignments",
+        "form_submissions",
+        "gear_movements",
+      ],
+      project_status: ["pending", "in_progress", "completed", "cancelled"],
+      provider_type: ["festival", "band"],
+      room_type: ["single", "double"],
+      task_status: ["not_started", "in_progress", "completed"],
+      transport_type: ["trailer", "9m", "8m", "6m", "4m", "furgoneta", "rv"],
+      transportation_type: ["van", "sleeper_bus", "train", "plane", "rv"],
+      user_role: [
+        "admin",
+        "user",
+        "management",
+        "logistics",
+        "technician",
+        "house_tech",
+      ],
+    },
+  },
+} as const

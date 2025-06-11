@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,8 @@ import { useJobSelection } from "@/hooks/useJobSelection";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
+import { fetchJobLogo } from "@/utils/pdf/logoUtils";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const reportSections = [
   {
@@ -39,9 +41,30 @@ export const ReportGenerator = () => {
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
   const [selectedJobId, setSelectedJobId] = useState<string>("");
+  const [reportSystem, setReportSystem] = useState<"LA" | "Turbo">("LA");
   const [equipamiento, setEquipamiento] = useState("");
   const [images, setImages] = useState<{ [key: string]: File | null }>({});
   const [isoViewEnabled, setIsoViewEnabled] = useState<{ [key: string]: boolean }>({});
+  const [jobLogo, setJobLogo] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    const loadJobLogo = async () => {
+      if (selectedJobId) {
+        try {
+          const logoUrl = await fetchJobLogo(selectedJobId);
+          setJobLogo(logoUrl);
+          console.log("Job logo loaded:", logoUrl);
+        } catch (error) {
+          console.error("Error loading job logo:", error);
+          setJobLogo(undefined);
+        }
+      } else {
+        setJobLogo(undefined);
+      }
+    };
+
+    loadJobLogo();
+  }, [selectedJobId]);
 
   const handleImageChange = (section: string, view: string, file: File | null) => {
     const key = `${section}-${view}`;
@@ -58,7 +81,11 @@ export const ReportGenerator = () => {
   const addPageHeader = async (pdf: jsPDF, pageNumber: number, jobTitle: string, jobDate: string) => {
     return new Promise<void>((resolve) => {
       const pageWidth = pdf.internal.pageSize.getWidth();
-      const logoPath = '/lovable-uploads/a2246e0e-373b-4091-9471-1a7c00fe82ed.png';
+      
+      // Select the appropriate logo based on the report system
+      const logoPath = reportSystem === "LA" 
+        ? '/lovable-uploads/a2246e0e-373b-4091-9471-1a7c00fe82ed.png'
+        : '/lovable-uploads/e78ab52e-aa81-4770-a6bb-f802a5ff651e.png';
       
       // Purple header background
       pdf.setFillColor(125, 1, 1);
@@ -67,7 +94,10 @@ export const ReportGenerator = () => {
       // White text for header
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(24);
-      pdf.text("SOUNDVISION REPORT", pageWidth / 2, 15, { align: 'center' });
+      
+      // Use different header text based on selection
+      const headerText = reportSystem === "LA" ? "SOUNDVISION REPORT" : "EASE FOCUS REPORT";
+      pdf.text(headerText, pageWidth / 2, 15, { align: 'center' });
 
       // Job title and date
       pdf.setFontSize(14);
@@ -78,29 +108,67 @@ export const ReportGenerator = () => {
       pdf.setFontSize(12);
       pdf.text(pageNumber.toString(), pageWidth - 10, 15, { align: 'right' });
 
-      // Add the logo
-      const logo = new Image();
-      logo.crossOrigin = 'anonymous';
-      logo.src = logoPath;
+      const promises = [];
+      
+      // Add the job logo if available (left-aligned, smaller)
+      if (jobLogo) {
+        promises.push(
+          new Promise<void>((resolveLogo) => {
+            const jobLogoImg = new Image();
+            jobLogoImg.crossOrigin = 'anonymous';
+            jobLogoImg.src = jobLogo;
+            
+            jobLogoImg.onload = () => {
+              const logoHeight = 7.5; // 1/4 of original size
+              const logoWidth = logoHeight * (jobLogoImg.width / jobLogoImg.height);
+              const logoX = 10; // Left position
+              const logoY = 5;
+              
+              try {
+                pdf.addImage(jobLogoImg, 'PNG', logoX, logoY, logoWidth, logoHeight);
+              } catch (error) {
+                console.error('Error adding job logo:', error);
+              }
+              resolveLogo();
+            };
+            
+            jobLogoImg.onerror = () => {
+              console.error('Failed to load job logo');
+              resolveLogo();
+            };
+          })
+        );
+      }
 
-      logo.onload = () => {
-        const logoWidth = 30;
-        const logoHeight = logoWidth * (logo.height / logo.width);
-        const logoX = pageWidth - logoWidth - 10;
-        const logoY = 5;
+      // Add the standard logo (right-aligned)
+      promises.push(
+        new Promise<void>((resolveLogo) => {
+          const logo = new Image();
+          logo.crossOrigin = 'anonymous';
+          logo.src = logoPath;
 
-        try {
-          pdf.addImage(logo, 'PNG', logoX, logoY, logoWidth, logoHeight);
-        } catch (error) {
-          console.error('Error adding header logo:', error);
-        }
-        resolve();
-      };
+          logo.onload = () => {
+            const logoWidth = 30;
+            const logoHeight = logoWidth * (logo.height / logo.width);
+            const logoX = pageWidth - logoWidth - 10;
+            const logoY = 5;
 
-      logo.onerror = () => {
-        console.error('Failed to load header logo');
-        resolve();
-      };
+            try {
+              pdf.addImage(logo, 'PNG', logoX, logoY, logoWidth, logoHeight);
+            } catch (error) {
+              console.error('Error adding header logo:', error);
+            }
+            resolveLogo();
+          };
+
+          logo.onerror = () => {
+            console.error('Failed to load header logo');
+            resolveLogo();
+          };
+        })
+      );
+
+      Promise.all(promises).then(() => resolve());
     });
   };
 
@@ -193,7 +261,7 @@ export const ReportGenerator = () => {
       try {
         pdf.addImage(footerLogo, 'PNG', xPosition, yPosition - logoHeight, logoWidth, logoHeight);
         const blob = pdf.output('blob');
-        const filename = `SoundVision_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
+        const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
         pdf.save(filename);
         toast({
           title: "Success",
@@ -202,7 +270,7 @@ export const ReportGenerator = () => {
       } catch (error) {
         console.error('Error adding footer logo:', error);
         const blob = pdf.output('blob');
-        const filename = `SoundVision_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
+        const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
         pdf.save(filename);
         toast({
           title: "Success",
@@ -213,7 +281,7 @@ export const ReportGenerator = () => {
 
     footerLogo.onerror = () => {
       console.error('Failed to load footer logo');
-      const filename = `SoundVision_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
+      const filename = `${reportSystem === "LA" ? "SoundVision" : "EaseFocus"}_Report_${jobTitle.replace(/\s+/g, "_")}.pdf`;
       pdf.save(filename);
       toast({
         title: "Success",
@@ -256,6 +324,24 @@ export const ReportGenerator = () => {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div>
+            <Label className="mb-2">Report System</Label>
+            <RadioGroup 
+              value={reportSystem}
+              onValueChange={(value) => setReportSystem(value as "LA" | "Turbo")}
+              className="flex items-center space-x-6"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="LA" id="r-la" />
+                <Label htmlFor="r-la" className="cursor-pointer">L'Acoustics</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="Turbo" id="r-turbo" />
+                <Label htmlFor="r-turbo" className="cursor-pointer">Turbosound</Label>
+              </div>
+            </RadioGroup>
           </div>
 
           <div>

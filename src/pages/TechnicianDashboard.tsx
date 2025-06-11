@@ -7,6 +7,7 @@ import { addWeeks, addMonths } from "date-fns";
 import { TimeSpanSelector } from "@/components/technician/TimeSpanSelector";
 import { MessageManagementDialog } from "@/components/technician/MessageManagementDialog";
 import { AssignmentsList } from "@/components/technician/AssignmentsList";
+import { MyToursSection } from "@/components/technician/MyToursSection";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useQueryClient } from "@tanstack/react-query";
@@ -263,6 +264,9 @@ const TechnicianDashboard = () => {
           <MessageManagementDialog department={userDepartment} />
         </div>
       </div>
+
+      {/* My Tours Section */}
+      <MyToursSection />
 
       <Card>
         <CardHeader>

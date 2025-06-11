@@ -16,7 +16,8 @@ export interface FestivalShift {
 export interface ShiftAssignment {
   id: string;
   shift_id: string;
-  technician_id: string;
+  technician_id?: string;
+  external_technician_name?: string;
   role: string;
   created_at?: string;
   profiles?: {

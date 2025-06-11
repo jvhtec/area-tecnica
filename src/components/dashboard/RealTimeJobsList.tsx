@@ -86,6 +86,12 @@ export function RealTimeJobsList({
     groupedJobs[monthYear].push(job);
   });
 
+  // Handle button click event
+  const handleRefreshClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    refetch();
+  };
+
   return (
     <>
       <Card className="w-full">
@@ -101,7 +107,7 @@ export function RealTimeJobsList({
             <Button
               variant="outline"
               size="sm"
-              onClick={refetch}
+              onClick={handleRefreshClick}
               disabled={isRefreshing || isLoading}
               className="gap-1"
             >

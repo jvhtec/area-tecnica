@@ -102,6 +102,22 @@ export const ArtistTable = ({
     }
   };
 
+  const getWirelessSummary = (artist: any) => {
+    const wirelessSystems = artist.wireless_systems || [];
+    return {
+      hh: wirelessSystems.reduce((sum: number, system: any) => sum + (system.quantity_hh || 0), 0),
+      bp: wirelessSystems.reduce((sum: number, system: any) => sum + (system.quantity_bp || 0), 0)
+    };
+  };
+
+  const getIEMSummary = (artist: any) => {
+    const iemSystems = artist.iem_systems || [];
+    return {
+      channels: iemSystems.reduce((sum: number, system: any) => sum + (system.quantity_hh || 0), 0),
+      bodypacks: iemSystems.reduce((sum: number, system: any) => sum + (system.quantity_bp || 0), 0)
+    };
+  };
+
   useEffect(() => {
     const fetchGearSetup = async () => {
       if (artists.length > 0) {
@@ -298,15 +314,17 @@ export const ArtistTable = ({
             providedBy: artist.mon_console_provided_by
           },
           wireless: {
-            model: artist.wireless_model,
+            systems: artist.wireless_systems,
             providedBy: artist.wireless_provided_by,
+            model: artist.wireless_model,
             handhelds: artist.wireless_quantity_hh,
             bodypacks: artist.wireless_quantity_bp,
             band: artist.wireless_band
           },
           iem: {
-            model: artist.iem_model,
+            systems: artist.iem_systems,
             providedBy: artist.iem_provided_by,
+            model: artist.iem_model,
             quantity: artist.iem_quantity,
             band: artist.iem_band
           },
@@ -412,8 +430,8 @@ export const ArtistTable = ({
     const matchesSearch = artist.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStage = !stageFilter || artist.stage?.toString() === stageFilter;
     const matchesEquipment = !equipmentFilter || (
-      (equipmentFilter === 'wireless' && (artist.wireless_quantity_hh > 0 || artist.wireless_quantity_bp > 0)) ||
-      (equipmentFilter === 'iem' && artist.iem_quantity > 0) ||
+      (equipmentFilter === 'wireless' && getWirelessSummary(artist).hh + getWirelessSummary(artist).bp > 0) ||
+      (equipmentFilter === 'iem' && getIEMSummary(artist).channels + getIEMSummary(artist).bodypacks > 0) ||
       (equipmentFilter === 'monitors' && artist.monitors_enabled)
     );
     return matchesSearch && matchesStage && matchesEquipment;
@@ -562,22 +580,24 @@ export const ArtistTable = ({
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-2">
-                      {(artist.wireless_quantity_hh > 0 || artist.wireless_quantity_bp > 0) && (
+                      {(getWirelessSummary(artist).hh > 0 || getWirelessSummary(artist).bp > 0) && (
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1" title="Wireless Mics">
                             <Mic className="h-4 w-4" />
                             <span className="text-xs">
-                              HH: {artist.wireless_quantity_hh} / BP: {artist.wireless_quantity_bp}
+                              HH: {getWirelessSummary(artist).hh} / BP: {getWirelessSummary(artist).bp}
                             </span>
                           </div>
                           {renderProviderBadge(artist.wireless_provided_by)}
                         </div>
                       )}
-                      {artist.iem_quantity > 0 && (
+                      {(getIEMSummary(artist).channels > 0 || getIEMSummary(artist).bodypacks > 0) && (
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1" title="IEM Systems">
                             <Headphones className="h-4 w-4" />
-                            <span className="text-xs">{artist.iem_quantity}</span>
+                            <span className="text-xs">
+                              CH: {getIEMSummary(artist).channels} / BP: {getIEMSummary(artist).bodypacks}
+                            </span>
                           </div>
                           {renderProviderBadge(artist.iem_provided_by)}
                         </div>

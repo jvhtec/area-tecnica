@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,13 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import { WirelessSetupSection } from "./form/sections/WirelessSetupSection";
 
 const consoleOptions = [
-  'Yamaha CL5', 'Yamaha PMx', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
+  'Yamaha CL5', 'Yamaha PMx', 'Yamaha DM7','Yamaha DM3', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
   'DiGiCo SD10', 'DiGiCo SD11', 'DiGiCo SD12', 'DiGiCo SD5Q', 'DiGiCo SD7Q',
   'DiGiCo Q225', 'DiGiCo Q326', 'DiGiCo Q338', 'DiGiCo Q852', 'Avid S6L',
   'A&H C1500', 'A&H C2500', 'A&H S3000', 'A&H S5000', 'A&H S7000',
-  'Waves LV1 (homemade)', 'Waves LV1 Classic', 'SSL', 'Other'
+  'Waves LV1 (homemade)', 'Waves LV1 Classic', 'SSL', 'Midas HD96', 'Other'
 ];
 
 export const ArtistForm = () => {
@@ -29,15 +29,10 @@ export const ArtistForm = () => {
     mon_console: "",
     mon_console_provided_by: "festival",
     mon_tech: false,
-    wireless_model: "",
+    wireless_systems: [],
+    iem_systems: [],
     wireless_provided_by: "festival",
-    wireless_quantity_hh: 0,
-    wireless_quantity_bp: 0,
-    wireless_band: "",
-    iem_model: "",
     iem_provided_by: "festival",
-    iem_quantity: 0,
-    iem_band: "",
     monitors_enabled: false,
     monitors_quantity: 0,
     extras_sf: false,
@@ -198,6 +193,12 @@ export const ArtistForm = () => {
                 </Select>
               </div>
             </div>
+
+            {/* RF & Wireless Setup Section */}
+            <WirelessSetupSection
+              formData={formData}
+              onChange={(data) => setFormData(prev => ({ ...prev, ...data }))}
+            />
 
             {/* Notes Section */}
             <div className="space-y-2">

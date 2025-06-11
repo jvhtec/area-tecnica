@@ -1,0 +1,195 @@
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { useState } from "react";
+
+export interface PrintOptions {
+  includeGearSetup: boolean;
+  gearSetupStages: number[];
+  includeShiftSchedules: boolean;
+  shiftScheduleStages: number[];
+  includeArtistTables: boolean;
+  artistTableStages: number[];
+  includeArtistRequirements: boolean;
+  artistRequirementStages: number[];
+  includeRfIemTable: boolean;
+  rfIemTableStages: number[];
+  includeInfrastructureTable: boolean;
+  infrastructureTableStages: number[];
+}
+
+interface PrintOptionsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: (options: PrintOptions) => void;
+  maxStages: number;
+}
+
+export const PrintOptionsDialog = ({ 
+  open, 
+  onOpenChange, 
+  onConfirm,
+  maxStages
+}: PrintOptionsDialogProps) => {
+  const [options, setOptions] = useState<PrintOptions>({
+    includeGearSetup: true,
+    gearSetupStages: Array.from({ length: maxStages }, (_, i) => i + 1),
+    includeShiftSchedules: true,
+    shiftScheduleStages: Array.from({ length: maxStages }, (_, i) => i + 1),
+    includeArtistTables: true,
+    artistTableStages: Array.from({ length: maxStages }, (_, i) => i + 1),
+    includeArtistRequirements: true,
+    artistRequirementStages: Array.from({ length: maxStages }, (_, i) => i + 1),
+    includeRfIemTable: true,
+    rfIemTableStages: Array.from({ length: maxStages }, (_, i) => i + 1),
+    includeInfrastructureTable: true,
+    infrastructureTableStages: Array.from({ length: maxStages }, (_, i) => i + 1)
+  });
+
+  const handleStageChange = (section: keyof PrintOptions, stageNumber: number, checked: boolean) => {
+    if (section === 'gearSetupStages' || section === 'shiftScheduleStages' || 
+        section === 'artistTableStages' || section === 'artistRequirementStages' || 
+        section === 'rfIemTableStages' || section === 'infrastructureTableStages') {
+      setOptions(prev => ({
+        ...prev,
+        [section]: checked 
+          ? [...prev[section], stageNumber].sort((a, b) => a - b)
+          : prev[section].filter(s => s !== stageNumber)
+      }));
+    }
+  };
+
+  const renderStageSelections = (section: 'gearSetupStages' | 'shiftScheduleStages' | 'artistTableStages' | 'artistRequirementStages' | 'rfIemTableStages' | 'infrastructureTableStages') => {
+    return (
+      <div className="pl-6 space-y-2">
+        <p className="text-sm text-muted-foreground">Select stages:</p>
+        <div className="grid grid-cols-2 gap-2">
+          {Array.from({ length: maxStages }, (_, i) => i + 1).map((stageNum) => (
+            <div key={stageNum} className="flex items-center space-x-2">
+              <Checkbox
+                id={`${section}-${stageNum}`}
+                checked={options[section].includes(stageNum)}
+                onCheckedChange={(checked) => 
+                  handleStageChange(section, stageNum, checked as boolean)
+                }
+              />
+              <Label htmlFor={`${section}-${stageNum}`}>Stage {stageNum}</Label>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const handleConfirm = () => {
+    onConfirm(options);
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Select Documents to Print</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-6 py-4">
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="gear-setup"
+                  checked={options.includeGearSetup}
+                  onCheckedChange={(checked) => 
+                    setOptions(prev => ({ ...prev, includeGearSetup: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="gear-setup">Stage Equipment Setup</Label>
+              </div>
+              {options.includeGearSetup && maxStages > 1 && renderStageSelections('gearSetupStages')}
+            </div>
+
+            <div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="shift-schedules"
+                  checked={options.includeShiftSchedules}
+                  onCheckedChange={(checked) => 
+                    setOptions(prev => ({ ...prev, includeShiftSchedules: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="shift-schedules">Staff Shift Schedules</Label>
+              </div>
+              {options.includeShiftSchedules && maxStages > 1 && renderStageSelections('shiftScheduleStages')}
+            </div>
+
+            <div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="artist-tables"
+                  checked={options.includeArtistTables}
+                  onCheckedChange={(checked) => 
+                    setOptions(prev => ({ ...prev, includeArtistTables: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="artist-tables">Artist Schedule Tables</Label>
+              </div>
+              {options.includeArtistTables && maxStages > 1 && renderStageSelections('artistTableStages')}
+            </div>
+
+            <div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="artist-requirements"
+                  checked={options.includeArtistRequirements}
+                  onCheckedChange={(checked) => 
+                    setOptions(prev => ({ ...prev, includeArtistRequirements: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="artist-requirements">Individual Artist Requirements</Label>
+              </div>
+              {options.includeArtistRequirements && maxStages > 1 && renderStageSelections('artistRequirementStages')}
+            </div>
+
+            <div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="rf-iem-table"
+                  checked={options.includeRfIemTable}
+                  onCheckedChange={(checked) => 
+                    setOptions(prev => ({ ...prev, includeRfIemTable: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="rf-iem-table">Artist RF & IEM Overview</Label>
+              </div>
+              {options.includeRfIemTable && maxStages > 1 && renderStageSelections('rfIemTableStages')}
+            </div>
+
+            <div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="infrastructure-table"
+                  checked={options.includeInfrastructureTable}
+                  onCheckedChange={(checked) => 
+                    setOptions(prev => ({ ...prev, includeInfrastructureTable: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="infrastructure-table">Infrastructure Needs Overview</Label>
+              </div>
+              {options.includeInfrastructureTable && maxStages > 1 && renderStageSelections('infrastructureTableStages')}
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={() => onConfirm(options)}>
+            Generate PDF
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};

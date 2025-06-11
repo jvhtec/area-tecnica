@@ -1,6 +1,7 @@
+
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useSessionManager } from '@/hooks/useSessionManager';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
@@ -87,7 +88,7 @@ interface EquipmentCreationManagerProps {
 }
 
 export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreationManagerProps) {
-  const { session } = useSessionManager();
+  const { session } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [equipmentName, setEquipmentName] = useState('');

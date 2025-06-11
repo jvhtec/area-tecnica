@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
@@ -23,6 +24,11 @@ export const useJobSelection = () => {
     queryKey: ["jobs-for-selection"],
     queryFn: async () => {
       console.log("Fetching jobs for selection...");
+      
+      // Get today's date in ISO format to filter future/present jobs
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Set to start of day
+      
       const { data: jobs, error } = await supabase
         .from("jobs")
         .select(`
@@ -31,6 +37,7 @@ export const useJobSelection = () => {
           start_time,
           end_time,
           tour_date_id,
+          job_type,
           tour_date:tour_dates!tour_date_id (
             id,
             tour:tours (
@@ -39,6 +46,8 @@ export const useJobSelection = () => {
             )
           )
         `)
+        .gte('start_time', today.toISOString()) // Filter to present/future jobs only
+        .neq('job_type', 'dryhire') // Exclude dry hire jobs
         .order("start_time", { ascending: true });
 
       if (error) {
