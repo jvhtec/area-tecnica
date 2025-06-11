@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plane, Wrench, Star, Moon, Mic } from "lucide-react";
+import { Plane, Wrench, Star, Moon, Mic, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import {
   Clock,
@@ -106,6 +106,13 @@ export function JobCardNew({
 
   // Check if this job is being deleted
   const isJobBeingDeleted = isDeletingJob(job.id);
+
+  const getFlexButtonTitle = () => {
+    if (isCreatingFolders) {
+      return currentStep ? `Creating folders: ${currentStep}...` : "Creating folders...";
+    }
+    return foldersAreCreated ? "Folders already exist" : "Create Flex folders";
+  };
 
   const getDateTypeIcon = (jobId: string, date: Date, dateTypes: Record<string, any>) => {
     const key = `${jobId}-${format(date, "yyyy-MM-dd")}`;
@@ -718,7 +725,7 @@ export function JobCardNew({
                   }
                 >
                   {isCreatingFolders ? (
-                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <img src={createFolderIcon} alt="Create Flex folders" className="h-4 w-4" />
                   )}
