@@ -294,6 +294,7 @@ export function JobCardNew({
     }
   };
 
+  // Check folder existence with proper loading state handling
   const { data: foldersExist, isLoading: isFoldersLoading } = useFolderExistence(job.id);
   
   // Updated logic: prioritize actual folder existence over database flags
@@ -595,9 +596,6 @@ export function JobCardNew({
   const canManageArtists = ['admin', 'management', 'logistics', 'technician', 'house_tech'].includes(userRole || '');
   const canUploadDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
   const canCreateFlexFolders = ['admin', 'management', 'logistics'].includes(userRole || '');
-
-  const { data: foldersExist } = useFolderExistence(job.id);
-  const foldersAreCreated = job.flex_folders_created || foldersExist || job.flex_folders_exist;
 
   // Show loading state if job is being deleted
   const cardOpacity = isJobBeingDeleted ? "opacity-50" : "";
