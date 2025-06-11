@@ -1,4 +1,3 @@
-
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { FlexFolderType } from "@/types/flex";
@@ -16,8 +15,8 @@ export const createFlexFolder = async (
   department?: string
 ): Promise<FolderCreationResult> => {
   try {
-    const flexApiUrl = process.env.NEXT_PUBLIC_FLEX_API_URL;
-    const flexAuthToken = process.env.NEXT_PUBLIC_FLEX_AUTH_TOKEN;
+    const flexApiUrl = import.meta.env.VITE_FLEX_API_URL;
+    const flexAuthToken = import.meta.env.VITE_FLEX_AUTH_TOKEN;
 
     if (!flexApiUrl || !flexAuthToken) {
       console.error("Flex API URL or Auth Token not configured");
@@ -29,7 +28,7 @@ export const createFlexFolder = async (
 
     const payload = {
       name: folderName,
-      parent_id: process.env.NEXT_PUBLIC_FLEX_PARENT_FOLDER_ID,
+      parent_id: import.meta.env.VITE_FLEX_PARENT_FOLDER_ID,
     };
 
     const response = await fetch(createFolderUrl, {
