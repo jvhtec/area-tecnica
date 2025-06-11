@@ -1,3 +1,4 @@
+
 /**
  * Collection of folder IDs used in the Flex system
  */
@@ -9,17 +10,10 @@ export const FLEX_FOLDER_IDS = {
   documentacionTecnica: "3787806c-af2d-11df-b8d5-00e08175e43e",
   presupuestosRecibidos: "3787806c-af2d-11df-b8d5-00e08175e43e",
   hojaGastos: "566d32e0-1a1e-11e0-a472-00e08175e43e",
-  hojaInfoSx: "702029c3-ba89-4304-98fe-fbc6fc695eb0",
-  hojaInfoLx: "4db54bad-b5fa-4c1f-85d4-525d991d7b62",
-  hojaInfoVx: "484249f0-6307-47a3-a782-6352ee5ef493",
+  hojaInfo: "702029c3-ba89-4304-98fe-fbc6fc695eb0",
   crewCall: "253878cc-af31-11df-b8d5-00e08175e43e",
   pullSheet: "a220432c-af33-11df-b8d5-00e08175e43e"
 };
-
-/**
- * Fixed Flex location ID that should be used for all folder creation
- */
-export const FLEX_LOCATION_ID = "2f49c62c-b139-11df-b8d5-00e08175e43e";
 
 /**
  * Parent folder IDs for dryhire jobs by department and month
@@ -76,8 +70,7 @@ export const RESPONSIBLE_PERSON_IDS = {
   video: "bb9690ac-f22e-4bc4-94a2-6d341ca0138d",
   production: "4ce97ce3-5159-401a-9cf8-542d3e479ade",
   personnel: "4b618540-e700-11ea-97d0-2a0a4490a7fb",
-  comercial: "4bc2df20-e700-11ea-97d0-2a0a4490a7fb",
-  mainResponsible: "4bc2df20-e700-11ea-97d0-2a0a4490a7fb"
+  comercial: "4bc2df20-e700-11ea-97d0-2a0a4490a7fb"
 };
 
 /**

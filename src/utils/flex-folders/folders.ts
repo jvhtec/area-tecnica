@@ -1,326 +1,426 @@
 
+import { format } from "date-fns";
 import { supabase } from "@/lib/supabase";
-import { toast } from "sonner";
-import { FlexFolderType } from "@/types/flex";
+import { Department } from "@/types/department";
+import { FolderCreationParams } from "./types";
 import { createFlexFolder } from "./api";
-import { 
-  FLEX_FOLDER_IDS, 
-  FLEX_LOCATION_ID,
-  DRYHIRE_PARENT_IDS, 
-  DEPARTMENT_IDS, 
-  RESPONSIBLE_PERSON_IDS, 
-  DEPARTMENT_SUFFIXES 
+import {
+  FLEX_FOLDER_IDS,
+  DRYHIRE_PARENT_IDS,
+  DEPARTMENT_IDS,
+  RESPONSIBLE_PERSON_IDS,
+  DEPARTMENT_SUFFIXES
 } from "./constants";
 
-interface FolderCreationResult {
-  success: boolean;
-  folderId?: string;
-  error?: string;
-}
+/**
+ * Creates all necessary folders in Flex for a job
+ * @param job The job object
+ * @param formattedStartDate The formatted start date
+ * @param formattedEndDate The formatted end date
+ * @param documentNumber The document number
+ */
+export async function createAllFoldersForJob(
+  job: any,
+  formattedStartDate: string,
+  formattedEndDate: string,
+  documentNumber: string
+) {
+  if (job.job_type === "dryhire") {
+    console.log("Dryhire job type detected. Creating dryhire folder...");
+    
+    const department = job.job_departments[0]?.department;
+    if (!department || !["sound", "lights"].includes(department)) {
+      throw new Error("Invalid department for dryhire job");
+    }
 
-// Helper function to format dates for Flex API (expects ISO 8601 with timezone)
-const formatDateForFlex = (dateString: string): string => {
-  const date = new Date(dateString);
-  return date.toISOString(); // This returns YYYY-MM-DDTHH:mm:ss.sssZ format
-};
+    const startDate = new Date(job.start_time);
+    const monthKey = startDate.toISOString().slice(5, 7);
+    const parentFolderId = DRYHIRE_PARENT_IDS[department as "sound" | "lights"][monthKey];
+    
+    if (!parentFolderId) {
+      throw new Error(`No parent folder found for month ${monthKey}`);
+    }
 
-export const createFlexFolderWithType = async (
-  jobId: string,
-  folderName: string,
-  folderType: FlexFolderType,
-  department?: string,
-  job?: any,
-  formattedStartDate?: string,
-  formattedEndDate?: string,
-  documentNumber?: string
-): Promise<FolderCreationResult> => {
-  try {
-    console.log("Creating Flex folder with fixed location ID:", {
-      folderName,
-      folderType,
-      department,
-      jobType: job?.job_type,
-      startDate: formattedStartDate,
-      endDate: formattedEndDate,
-      fixedLocationId: FLEX_LOCATION_ID
-    });
-
-    let payload: any = {
-      name: folderName,
+    const dryHireFolderPayload = {
+      definitionId: FLEX_FOLDER_IDS.subFolder,
+      parentElementId: parentFolderId,
       open: true,
-      locked: false
+      locked: false,
+      name: `Dry Hire - ${job.title}`,
+      plannedStartDate: formattedStartDate,
+      plannedEndDate: formattedEndDate,
+      locationId: FLEX_FOLDER_IDS.location,
+      departmentId: DEPARTMENT_IDS[department as Department],
+      documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[department as Department]}`,
+      personResponsibleId: RESPONSIBLE_PERSON_IDS[department as Department],
     };
 
-    // Configure payload based on folder type and job details
-    if (folderType === 'job') {
-      // Main job folder
-      payload.definitionId = FLEX_FOLDER_IDS.mainFolder;
-      payload.parentElementId = FLEX_FOLDER_IDS.mainFolder;
-      
-      if (job) {
-        // Use proper date formatting for Flex API
-        if (formattedStartDate) {
-          payload.plannedStartDate = formatDateForFlex(formattedStartDate + 'T09:00:00');
-        }
-        if (formattedEndDate) {
-          payload.plannedEndDate = formatDateForFlex(formattedEndDate + 'T18:00:00');
-        }
-        // Always use the fixed Flex location ID instead of job.location_id
-        payload.locationId = FLEX_LOCATION_ID;
-        if (documentNumber) payload.documentNumber = documentNumber;
-        
-        // Set responsible person based on job type or default
-        if (job.job_type === 'dryhire' && department) {
-          payload.personResponsibleId = RESPONSIBLE_PERSON_IDS[department as keyof typeof RESPONSIBLE_PERSON_IDS] || RESPONSIBLE_PERSON_IDS.comercial;
-        } else {
-          payload.personResponsibleId = RESPONSIBLE_PERSON_IDS.mainResponsible;
-        }
-      }
-      
-    } else if (folderType === 'department') {
-      // Department subfolder
-      payload.definitionId = FLEX_FOLDER_IDS.subFolder;
-      
-      if (department) {
-        payload.departmentId = DEPARTMENT_IDS[department as keyof typeof DEPARTMENT_IDS];
-        payload.personResponsibleId = RESPONSIBLE_PERSON_IDS[department as keyof typeof RESPONSIBLE_PERSON_IDS];
-        
-        // For dryhire jobs, use date-dependent parent folders
-        if (job?.job_type === 'dryhire' && formattedStartDate) {
-          const month = formattedStartDate.substring(5, 7); // Extract MM from YYYY-MM-DD
-          const dryhireParents = DRYHIRE_PARENT_IDS[department as keyof typeof DRYHIRE_PARENT_IDS];
-          if (dryhireParents && dryhireParents[month as keyof typeof dryhireParents]) {
-            payload.parentElementId = dryhireParents[month as keyof typeof dryhireParents];
-          }
-        }
-      }
-      
-    } else if (folderType === 'crew_call') {
-      // Crew call folder
-      payload.definitionId = FLEX_FOLDER_IDS.crewCall;
-      
-      if (department) {
-        payload.departmentId = DEPARTMENT_IDS[department as keyof typeof DEPARTMENT_IDS];
-        payload.personResponsibleId = RESPONSIBLE_PERSON_IDS[department as keyof typeof RESPONSIBLE_PERSON_IDS];
-      }
-      
-      if (job && formattedStartDate) {
-        payload.plannedStartDate = formatDateForFlex(formattedStartDate + 'T09:00:00');
-        if (formattedEndDate) {
-          payload.plannedEndDate = formatDateForFlex(formattedEndDate + 'T18:00:00');
-        }
-        // Always use the fixed Flex location ID instead of job.location_id
-        payload.locationId = FLEX_LOCATION_ID;
-        
-        // Document number with department suffix
-        if (documentNumber && department) {
-          const suffix = DEPARTMENT_SUFFIXES[department as keyof typeof DEPARTMENT_SUFFIXES] || '';
-          payload.documentNumber = `${documentNumber}${suffix}`;
-        }
-      }
-    }
+    console.log("Creating dryhire folder with payload:", dryHireFolderPayload);
+    const dryHireFolder = await createFlexFolder(dryHireFolderPayload);
 
-    console.log("Final payload for Flex folder creation with fixed location ID:", payload);
-
-    // Use the secure edge function with proper payload
-    const folderResponse = await createFlexFolder(payload);
-    const folderId = folderResponse.elementId;
-
-    console.log("Flex folder created successfully with fixed location ID:", { folderId, folderName });
-
-    // Store the folder ID in the database
-    const { error: dbError } = await supabase
+    await supabase
       .from("flex_folders")
       .insert({
-        job_id: jobId,
-        element_id: folderId,
-        folder_type: folderType,
+        job_id: job.id,
+        parent_id: parentFolderId,
+        element_id: dryHireFolder.elementId,
         department: department,
+        folder_type: "dryhire",
       });
 
-    if (dbError) {
-      console.error("Error storing Flex folder ID:", dbError);
-      toast.error("Error linking Flex folder to job.");
-      return { success: false, error: "Database error" };
+    return;
+  }
+
+  if (job.job_type === "tourdate") {
+    console.log("Tourdate job type detected. Validating tour data...");
+    
+    if (!job.tour_id) {
+      throw new Error("Tour ID is missing for tourdate job");
     }
 
-    toast.success(`Flex folder "${folderName}" created successfully!`);
-    return { success: true, folderId: folderId };
-  } catch (error: any) {
-    console.error("Error creating Flex folder:", error);
-    toast.error(`Failed to create Flex folder: ${error.message}`);
-    return { success: false, error: error.message };
-  }
-};
+    const { data: tourData, error: tourError } = await supabase
+      .from("tours")
+      .select(`
+        id,
+        name,
+        flex_main_folder_id,
+        flex_sound_folder_id,
+        flex_lights_folder_id,
+        flex_video_folder_id,
+        flex_production_folder_id,
+        flex_personnel_folder_id
+      `)
+      .eq("id", job.tour_id)
+      .single();
 
-export const createJobFolders = async (jobId: string, jobTitle: string): Promise<void> => {
-  // Get job details for proper folder configuration
-  const { data: job, error: jobError } = await supabase
-    .from('jobs')
-    .select('*')
-    .eq('id', jobId)
-    .single();
-
-  if (jobError || !job) {
-    console.error("Error fetching job details:", jobError);
-    toast.error("Error fetching job details for folder creation.");
-    return;
-  }
-
-  const startDate = new Date(job.start_time);
-  const endDate = new Date(job.end_time);
-  const formattedStartDate = startDate.toISOString().slice(0, 10); // YYYY-MM-DD
-  const formattedEndDate = endDate.toISOString().slice(0, 10);
-  const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, ""); // YYMMDD
-
-  const folderName = `${jobTitle} - ${startDate.toLocaleDateString()}`;
-
-  // Create main job folder with sophisticated logic
-  const jobFolderResult = await createFlexFolderWithType(
-    jobId, 
-    folderName, 
-    'job',
-    undefined,
-    job,
-    formattedStartDate,
-    formattedEndDate,
-    documentNumber
-  );
-
-  if (!jobFolderResult.success) {
-    console.error("Failed to create job folder:", jobFolderResult.error);
-    return;
-  }
-
-  // Create department subfolders with proper configuration
-  const subfolders = ["sound", "lights", "video", "stage", "general"];
-  for (const subfolder of subfolders) {
-    const subfolderName = `${folderName} ${subfolder.charAt(0).toUpperCase() + subfolder.slice(1)}`;
-    const subfolderResult = await createFlexFolderWithType(
-      jobId, 
-      subfolderName, 
-      'department', 
-      subfolder,
-      job,
-      formattedStartDate,
-      formattedEndDate,
-      documentNumber
-    );
-
-    if (!subfolderResult.success) {
-      console.error(`Failed to create ${subfolder} folder:`, subfolderResult.error);
+    if (tourError || !tourData) {
+      console.error("Error fetching tour data:", tourError);
+      throw new Error(`Tour not found for tour_id: ${job.tour_id}`);
     }
-  }
 
-  // Update job record to indicate folders were created
-  const { error: updateError } = await supabase
-    .from('jobs')
-    .update({ flex_folders_created: true })
-    .eq('id', jobId);
+    if (!tourData.flex_main_folder_id) {
+      throw new Error("Tour folders have not been created yet. Please create tour folders first.");
+    }
 
-  if (updateError) {
-    console.error("Error updating job record:", updateError);
-  }
-};
+    console.log("Using tour folders:", tourData);
 
-export const createJobCrewCalls = async (jobId: string, departments: string[]): Promise<void> => {
-  // Get job details for proper folder configuration
-  const { data: job, error: jobError } = await supabase
-    .from('jobs')
-    .select('*')
-    .eq('id', jobId)
-    .single();
+    const departments = ["sound", "lights", "video", "production", "personnel", "comercial"];
+    const locationName = job.location?.name || "No Location";
+    const formattedDate = format(new Date(job.start_time), "MMM d, yyyy");
 
-  if (jobError || !job) {
-    console.error("Error fetching job details:", jobError);
+    for (const dept of departments) {
+      const parentFolderId = tourData[`flex_${dept}_folder_id`];
+      
+      if (!parentFolderId) {
+        console.warn(`No parent folder ID found for ${dept} department`);
+        continue;
+      }
+
+      const { data: [parentRow], error: parentErr } = await supabase
+        .from("flex_folders")
+        .select("*")
+        .eq("element_id", parentFolderId)
+        .limit(1);
+
+      if (parentErr) {
+        console.error("Error fetching parent row:", parentErr);
+        continue;
+      }
+
+      if (!parentRow) {
+        console.warn(`No local DB row found for parent element_id=${parentFolderId}`);
+        continue;
+      }
+
+      const tourDateFolderPayload = {
+        definitionId: FLEX_FOLDER_IDS.subFolder,
+        parentElementId: parentFolderId,
+        open: true,
+        locked: false,
+        name: `${locationName} - ${formattedDate} - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+        plannedStartDate: formattedStartDate,
+        plannedEndDate: formattedEndDate,
+        locationId: FLEX_FOLDER_IDS.location,
+        departmentId: DEPARTMENT_IDS[dept as Department],
+        documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}`,
+        personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+      };
+
+      console.log(`Creating tour date folder for ${dept}:`, tourDateFolderPayload);
+      const tourDateFolder = await createFlexFolder(tourDateFolderPayload);
+
+      const { data: [childRow], error: childErr } = await supabase
+        .from("flex_folders")
+        .insert({
+          job_id: job.id,
+          parent_id: parentRow.id,
+          element_id: tourDateFolder.elementId,
+          department: dept,
+          folder_type: "tourdate",
+        })
+        .select("*");
+
+      if (childErr) {
+        console.error("Error inserting child folder row:", childErr);
+        continue;
+      }
+
+      if (dept !== "personnel") {
+        const subfolders = [
+          {
+            definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
+            name: `Documentación Técnica - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+            suffix: "DT",
+          },
+          {
+            definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos,
+            name: `Presupuestos Recibidos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+            suffix: "PR",
+          },
+          {
+            definitionId: FLEX_FOLDER_IDS.hojaGastos,
+            name: `Hoja de Gastos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+            suffix: "HG",
+          },
+        ];
+
+        for (const sf of subfolders) {
+          const subPayload = {
+            definitionId: sf.definitionId,
+            parentElementId: childRow.element_id,
+            open: true,
+            locked: false,
+            name: sf.name,
+            plannedStartDate: formattedStartDate,
+            plannedEndDate: formattedEndDate,
+            locationId: FLEX_FOLDER_IDS.location,
+            departmentId: DEPARTMENT_IDS[dept as Department],
+            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${sf.suffix}`,
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+          };
+
+          await createFlexFolder(subPayload);
+        }
+      }
+
+      if (dept === "sound") {
+        const soundSubfolders = [
+          { name: `${job.title} - Tour Pack`, suffix: "TP" },
+          { name: `${job.title} - PA`, suffix: "PA" },
+        ];
+
+        for (const sf of soundSubfolders) {
+          const subPayload = {
+            definitionId: FLEX_FOLDER_IDS.pullSheet,
+            parentElementId: childRow.element_id,
+            open: true,
+            locked: false,
+            name: sf.name,
+            plannedStartDate: formattedStartDate,
+            plannedEndDate: formattedEndDate,
+            locationId: FLEX_FOLDER_IDS.location,
+            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${sf.suffix}`,
+            departmentId: DEPARTMENT_IDS[dept as Department],
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+          };
+          
+          await createFlexFolder(subPayload);
+        }
+      }
+
+      if (dept === "personnel") {
+        const personnelSubfolders = [
+          { name: `Gastos de Personal - ${job.title}`, suffix: "GP" },
+        ];
+
+        for (const sf of personnelSubfolders) {
+          const subPayload = {
+            definitionId: FLEX_FOLDER_IDS.subFolder,
+            parentElementId: childRow.element_id,
+            open: true,
+            locked: false,
+            name: sf.name,
+            plannedStartDate: formattedStartDate,
+            plannedEndDate: formattedEndDate,
+            locationId: FLEX_FOLDER_IDS.location,
+            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${sf.suffix}`,
+            departmentId: DEPARTMENT_IDS[dept as Department],
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+          };
+
+          await createFlexFolder(subPayload);
+        }
+
+        const personnelcrewCall = [
+          { name: `Crew Call Sonido - ${job.title}`, suffix: "CCS" },
+          { name: `Crew Call Luces - ${job.title}`, suffix: "CCL" },
+        ];
+
+        for (const sf of personnelcrewCall) {
+          const subPayload = {
+            definitionId: FLEX_FOLDER_IDS.crewCall,
+            parentElementId: childRow.element_id,
+            open: true,
+            locked: false,
+            name: sf.name,
+            plannedStartDate: formattedStartDate,
+            plannedEndDate: formattedEndDate,
+            locationId: FLEX_FOLDER_IDS.location,
+            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${sf.suffix}`,
+            departmentId: DEPARTMENT_IDS[dept as Department],
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+          };
+
+          await createFlexFolder(subPayload);
+        }
+      }
+    }
+
     return;
   }
 
-  const startDate = new Date(job.start_time);
-  const endDate = new Date(job.end_time);
-  const formattedStartDate = startDate.toISOString().slice(0, 10);
-  const formattedEndDate = endDate.toISOString().slice(0, 10);
-  const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, "");
+  console.log("Default job type detected. Creating full folder structure.");
 
-  // Create crew call folders for sound and lights only
-  for (const department of departments) {
-    if (department === 'sound' || department === 'lights') {
-      const crewCallName = `Crew Call - ${department}`;
-      const crewCallResult = await createFlexFolderWithType(
-        jobId, 
-        crewCallName, 
-        'crew_call', 
-        department,
-        job,
-        formattedStartDate,
-        formattedEndDate,
-        documentNumber
-      );
+  const topPayload = {
+    definitionId: FLEX_FOLDER_IDS.mainFolder,
+    open: true,
+    locked: false,
+    name: job.title,
+    plannedStartDate: formattedStartDate,
+    plannedEndDate: formattedEndDate,
+    locationId: FLEX_FOLDER_IDS.location,
+    personResponsibleId: FLEX_FOLDER_IDS.mainResponsible,
+    documentNumber,
+  };
 
-      if (!crewCallResult.success) {
-        console.error(`Failed to create ${department} crew call folder:`, crewCallResult.error);
+  const topFolder = await createFlexFolder(topPayload);
+  const topFolderId = topFolder.elementId;
+
+  await supabase
+    .from("flex_folders")
+    .insert({
+      job_id: job.id,
+      element_id: topFolderId,
+      folder_type: "main_event",
+    });
+
+  // Add hojaInfo element to the main folder
+  const hojaInfoPayload = {
+    definitionId: FLEX_FOLDER_IDS.hojaInfo,
+    parentElementId: topFolderId,
+    open: true,
+    locked: false,
+    name: `Hoja de Información - ${job.title}`,
+    plannedStartDate: formattedStartDate,
+    plannedEndDate: formattedEndDate,
+    locationId: FLEX_FOLDER_IDS.location,
+    personResponsibleId: FLEX_FOLDER_IDS.mainResponsible,
+    documentNumber: `${documentNumber}IP`,
+  };
+
+  console.log("Creating hojaInfo element:", hojaInfoPayload);
+  await createFlexFolder(hojaInfoPayload);
+
+  const departments = ["sound", "lights", "video", "production", "personnel", "comercial"];
+
+  for (const dept of departments) {
+    const deptPayload = {
+      definitionId: FLEX_FOLDER_IDS.subFolder,
+      parentElementId: topFolderId,
+      open: true,
+      locked: false,
+      name: `${job.title} - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+      plannedStartDate: formattedStartDate,
+      plannedEndDate: formattedEndDate,
+      locationId: FLEX_FOLDER_IDS.location,
+      departmentId: DEPARTMENT_IDS[dept as Department],
+      documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}`,
+      personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+    };
+
+    console.log(`Creating department folder for ${dept}:`, deptPayload);
+    const deptFolder = await createFlexFolder(deptPayload);
+
+    // IMPORTANT: capture the inserted row so we get its internal (local DB) ID,
+    // similar to what we do in the tourdate branch.
+    const { data: [childRow], error: childErr } = await supabase
+      .from("flex_folders")
+      .insert({
+        job_id: job.id,
+        parent_id: topFolderId,
+        element_id: deptFolder.elementId,
+        department: dept,
+        folder_type: "department",
+      })
+      .select("*");
+
+    if (childErr || !childRow) {
+      console.error("Error inserting department folder row:", childErr);
+      continue;
+    }
+
+    const deptFolderId = childRow.element_id;
+
+    if (dept !== "personnel") {
+      const subfolders = [
+        {
+          definitionId: FLEX_FOLDER_IDS.documentacionTecnica,
+          name: `Documentación Técnica - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+          suffix: "DT",
+        },
+        {
+          definitionId: FLEX_FOLDER_IDS.presupuestosRecibidos,
+          name: `Presupuestos Recibidos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+          suffix: "PR",
+        },
+        {
+          definitionId: FLEX_FOLDER_IDS.hojaGastos,
+          name: `Hoja de Gastos - ${dept.charAt(0).toUpperCase() + dept.slice(1)}`,
+          suffix: "HG",
+        },
+      ];
+
+      for (const sf of subfolders) {
+        const subPayload = {
+          definitionId: sf.definitionId,
+          parentElementId: deptFolderId,
+          open: true,
+          locked: false,
+          name: sf.name,
+          plannedStartDate: formattedStartDate,
+          plannedEndDate: formattedEndDate,
+          locationId: FLEX_FOLDER_IDS.location,
+          departmentId: DEPARTMENT_IDS[dept as Department],
+          documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${sf.suffix}`,
+          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+        };
+
+        await createFlexFolder(subPayload);
+      }
+    } else if (dept === "personnel") {
+      const personnelSubfolders = [
+        { name: `Crew Call Sonido - ${job.title}`, suffix: "CCS" },
+        { name: `Crew Call Luces - ${job.title}`, suffix: "CCL" },
+        { name: `Gastos de Personal - ${job.title}`, suffix: "GP" },
+      ];
+
+      for (const sf of personnelSubfolders) {
+        const subPayload = {
+          definitionId: FLEX_FOLDER_IDS.subFolder,
+          parentElementId: deptFolderId,
+          open: true,
+          locked: false,
+          name: sf.name,
+          plannedStartDate: formattedStartDate,
+          plannedEndDate: formattedEndDate,
+          locationId: FLEX_FOLDER_IDS.location,
+          documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${sf.suffix}`,
+          departmentId: DEPARTMENT_IDS[dept as Department],
+          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+        };
+
+        await createFlexFolder(subPayload);
       }
     }
   }
-
-  // Store crew call folders in the database
-  for (const department of departments) {
-    if (department === 'sound' || department === 'lights') {
-      try {
-        // Get the created folder for this department
-        const { data: flexFolder, error: flexError } = await supabase
-          .from('flex_folders')
-          .select('element_id')
-          .eq('job_id', jobId)
-          .eq('department', department)
-          .eq('folder_type', 'crew_call')
-          .single();
-
-        if (flexError || !flexFolder) {
-          console.error(`Error finding Flex folder for ${department} crew call:`, flexError);
-          continue;
-        }
-
-        // Store in flex_crew_calls table
-        const { error: insertError } = await supabase
-          .from('flex_crew_calls')
-          .upsert({
-            job_id: jobId,
-            department: department,
-            flex_element_id: flexFolder.element_id
-          }, {
-            onConflict: 'job_id,department'
-          });
-
-        if (insertError) {
-          console.error(`Error storing ${department} crew call:`, insertError);
-        } else {
-          console.log(`Successfully stored ${department} crew call for job ${jobId}`);
-        }
-      } catch (error) {
-        console.error(`Error processing ${department} crew call:`, error);
-      }
-    }
-  }
-};
-
-export const createAllFoldersForJob = async (
-  job: any, 
-  formattedStartDate: string, 
-  formattedEndDate: string, 
-  documentNumber: string
-): Promise<void> => {
-  try {
-    // Create job folders with sophisticated logic
-    await createJobFolders(job.id, job.title);
-    
-    // Create crew call folders for departments in the job
-    const departments = job.job_departments?.map((dept: any) => dept.department) || [];
-    await createJobCrewCalls(job.id, departments);
-    
-    console.log(`All folders created for job ${job.id} with sophisticated configuration`);
-  } catch (error) {
-    console.error(`Error creating all folders for job ${job.id}:`, error);
-    throw error;
-  }
-};
+}
