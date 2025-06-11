@@ -1,4 +1,3 @@
-
 /**
  * Collection of folder IDs used in the Flex system
  */
@@ -11,6 +10,9 @@ export const FLEX_FOLDER_IDS = {
   presupuestosRecibidos: "3787806c-af2d-11df-b8d5-00e08175e43e",
   hojaGastos: "566d32e0-1a1e-11e0-a472-00e08175e43e",
   hojaInfo: "702029c3-ba89-4304-98fe-fbc6fc695eb0",
+  hojaInfoSx: "702029c3-ba89-4304-98fe-fbc6fc695eb0",
+  hojaInfoLx: "702029c3-ba89-4304-98fe-fbc6fc695eb0", 
+  hojaInfoVx: "702029c3-ba89-4304-98fe-fbc6fc695eb0",
   crewCall: "253878cc-af31-11df-b8d5-00e08175e43e",
   pullSheet: "a220432c-af33-11df-b8d5-00e08175e43e"
 };
