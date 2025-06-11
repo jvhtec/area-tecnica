@@ -72,7 +72,8 @@ export const RESPONSIBLE_PERSON_IDS = {
   video: "bb9690ac-f22e-4bc4-94a2-6d341ca0138d",
   production: "4ce97ce3-5159-401a-9cf8-542d3e479ade",
   personnel: "4b618540-e700-11ea-97d0-2a0a4490a7fb",
-  comercial: "4bc2df20-e700-11ea-97d0-2a0a4490a7fb"
+  comercial: "4bc2df20-e700-11ea-97d0-2a0a4490a7fb",
+  mainResponsible: "4bc2df20-e700-11ea-97d0-2a0a4490a7fb"
 };
 
 /**
