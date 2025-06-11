@@ -54,6 +54,8 @@ serve(async (req) => {
       throw new Error('Endpoint not allowed')
     }
 
+    console.log('Payload before sending to Flex:', JSON.stringify(payload, null, 2));
+
     // Make secure API call to Flex
     const flexUrl = `${FLEX_API_BASE_URL}${endpoint}`
     console.log(`Making ${method} request to Flex API:`, flexUrl)
@@ -67,14 +69,16 @@ serve(async (req) => {
       body: payload ? JSON.stringify(payload) : undefined
     });
 
+    console.log('Flex API response status:', response.status);
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      console.error("Flex API error:", errorData);
+      console.error("Flex API error response:", errorData);
       throw new Error(errorData.exceptionMessage || `Flex API error: ${response.status}`)
     }
 
     const data = await response.json()
-    console.log("Flex API response:", data)
+    console.log("Flex API success response:", data)
 
     return new Response(
       JSON.stringify({ success: true, data }),

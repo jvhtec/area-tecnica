@@ -17,6 +17,12 @@ interface FolderCreationResult {
   error?: string;
 }
 
+// Helper function to format dates for Flex API (expects ISO 8601 with timezone)
+const formatDateForFlex = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toISOString(); // This returns YYYY-MM-DDTHH:mm:ss.sssZ format
+};
+
 export const createFlexFolderWithType = async (
   jobId: string,
   folderName: string,
@@ -32,7 +38,9 @@ export const createFlexFolderWithType = async (
       folderName,
       folderType,
       department,
-      jobType: job?.job_type
+      jobType: job?.job_type,
+      startDate: formattedStartDate,
+      endDate: formattedEndDate
     });
 
     let payload: any = {
@@ -48,8 +56,13 @@ export const createFlexFolderWithType = async (
       payload.parentElementId = FLEX_FOLDER_IDS.mainFolder;
       
       if (job) {
-        if (formattedStartDate) payload.plannedStartDate = formattedStartDate;
-        if (formattedEndDate) payload.plannedEndDate = formattedEndDate;
+        // Use proper date formatting for Flex API
+        if (formattedStartDate) {
+          payload.plannedStartDate = formatDateForFlex(formattedStartDate + 'T09:00:00');
+        }
+        if (formattedEndDate) {
+          payload.plannedEndDate = formatDateForFlex(formattedEndDate + 'T18:00:00');
+        }
         if (job.location_id) payload.locationId = job.location_id;
         if (documentNumber) payload.documentNumber = documentNumber;
         
@@ -89,8 +102,10 @@ export const createFlexFolderWithType = async (
       }
       
       if (job && formattedStartDate) {
-        payload.plannedStartDate = formattedStartDate;
-        if (formattedEndDate) payload.plannedEndDate = formattedEndDate;
+        payload.plannedStartDate = formatDateForFlex(formattedStartDate + 'T09:00:00');
+        if (formattedEndDate) {
+          payload.plannedEndDate = formatDateForFlex(formattedEndDate + 'T18:00:00');
+        }
         if (job.location_id) payload.locationId = job.location_id;
         
         // Document number with department suffix
@@ -101,7 +116,7 @@ export const createFlexFolderWithType = async (
       }
     }
 
-    console.log("Using payload for Flex folder creation:", payload);
+    console.log("Final payload for Flex folder creation:", payload);
 
     // Use the secure edge function with proper payload
     const folderResponse = await createFlexFolder(payload);
