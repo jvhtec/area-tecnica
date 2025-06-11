@@ -10,6 +10,7 @@ import createFolderIcon from "@/assets/icons/icon.png";
 import { useNavigate } from "react-router-dom";
 import { useDeletionState } from "@/hooks/useDeletionState";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
+import { useProgressiveFlexFolders } from "@/hooks/useProgressiveFlexFolders";
 
 import { 
   createAllFoldersForJob
@@ -86,6 +87,7 @@ export function JobCardNew({
   const navigate = useNavigate();
   const isDark = theme === "dark";
   const { addDeletingJob, removeDeletingJob, isDeletingJob } = useDeletionState();
+  const { createProgressiveFolders, isCreating: isCreatingFolders, currentStep } = useProgressiveFlexFolders();
 
   const borderColor = job.color ? job.color : "#7E69AB";
   const appliedBorderColor = isDark ? (job.darkColor ? job.darkColor : borderColor) : borderColor;
@@ -326,12 +328,13 @@ export function JobCardNew({
   const createFlexFoldersHandler = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    console.log("Dashboard JobCardNew: Starting folder creation process for job:", job.id, {
-      actualFoldersExist,
-      systemThinksFoldersExist,
-      hasInconsistency,
-      isLoading: isFoldersLoading
-    });
+    // Prevent multiple clicks
+    if (isCreatingFolders) {
+      console.log("Dashboard JobCardNew: Folder creation already in progress");
+      return;
+    }
+
+    console.log("Dashboard JobCardNew: Starting progressive folder creation for job:", job.id);
 
     // Only check actual folder existence, not database flags
     if (actualFoldersExist) {
@@ -345,8 +348,6 @@ export function JobCardNew({
     }
 
     try {
-      console.log("Dashboard JobCardNew: Starting folder creation for job:", job.id);
-
       // Double-check in the database before creating
       const { data: existingFolders } = await supabase
         .from("flex_folders")
@@ -364,30 +365,16 @@ export function JobCardNew({
         return;
       }
 
-      const startDate = new Date(job.start_time);
-      const documentNumber = startDate
-        .toISOString()
-        .slice(2, 10)
-        .replace(/-/g, "");
-
-      const formattedStartDate = new Date(job.start_time).toISOString().split(".")[0] + ".000Z";
-      const formattedEndDate = new Date(job.end_time).toISOString().split(".")[0] + ".000Z";
-
-      await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber);
-      await updateFolderStatus.mutateAsync();
-
-      console.log("Successfully created folders for job:", job.id);
-      toast({
-        title: "Success",
-        description: "Flex folders have been created successfully."
+      await createProgressiveFolders({
+        jobId: job.id,
+        jobTitle: job.title,
+        startTime: job.start_time,
+        endTime: job.end_time
       });
+
     } catch (error: any) {
-      console.error("Dashboard JobCardNew: Error creating Flex folders:", error);
-      toast({
-        title: "Error creating folders",
-        description: error.message,
-        variant: "destructive"
-      });
+      console.error("Dashboard JobCardNew: Error in progressive folder creation:", error);
+      // Error handling is done in the hook
     }
   };
 
@@ -722,21 +709,19 @@ export function JobCardNew({
                   variant="ghost"
                   size="icon"
                   onClick={createFlexFoldersHandler}
-                  disabled={foldersAreCreated || isJobBeingDeleted || isFoldersLoading}
-                  title={
-                    isFoldersLoading
-                      ? "Checking folder status..."
-                      : foldersAreCreated
-                      ? "Folders already exist"
-                      : "Create Flex folders"
-                  }
+                  disabled={foldersAreCreated || isJobBeingDeleted || isFoldersLoading || isCreatingFolders}
+                  title={getFlexButtonTitle()}
                   className={
-                    foldersAreCreated || isJobBeingDeleted || isFoldersLoading
+                    foldersAreCreated || isJobBeingDeleted || isFoldersLoading || isCreatingFolders
                       ? "opacity-50 cursor-not-allowed"
                       : "hover:bg-accent/50"
                   }
                 >
-                  <img src={createFolderIcon} alt="Create Flex folders" className="h-4 w-4" />
+                  {isCreatingFolders ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <img src={createFolderIcon} alt="Create Flex folders" className="h-4 w-4" />
+                  )}
                 </Button>
               )}
               {job.job_type !== "dryhire" && showUpload && canUploadDocuments && (

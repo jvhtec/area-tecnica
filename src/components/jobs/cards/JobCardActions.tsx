@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
@@ -15,6 +16,7 @@ interface JobCardActionsProps {
   canUploadDocuments: boolean;
   canManageArtists: boolean;
   isCreatingFolders?: boolean;
+  currentFolderStep?: string;
   onRefreshData: (e: React.MouseEvent) => void;
   onEditButtonClick: (e: React.MouseEvent) => void;
   onDeleteClick: (e: React.MouseEvent) => void;
@@ -36,6 +38,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   canUploadDocuments,
   canManageArtists,
   isCreatingFolders = false,
+  currentFolderStep = '',
   onRefreshData,
   onEditButtonClick,
   onDeleteClick,
@@ -44,6 +47,13 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   onAssignmentDialogOpen,
   handleFileUpload
 }) => {
+  const getFlexButtonTitle = () => {
+    if (isCreatingFolders) {
+      return currentFolderStep ? `Creating folders: ${currentFolderStep}...` : "Creating folders...";
+    }
+    return foldersAreCreated ? "Folders already exist" : "Create Flex folders";
+  };
+
   return (
     <div className="flex flex-wrap gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
       {job.job_type === "festival" && isProjectManagementPage && canManageArtists && (
@@ -103,13 +113,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           size="icon"
           onClick={onCreateFlexFolders}
           disabled={foldersAreCreated || isCreatingFolders}
-          title={
-            isCreatingFolders
-              ? "Creating folders..."
-              : foldersAreCreated
-              ? "Folders already exist"
-              : "Create Flex folders"
-          }
+          title={getFlexButtonTitle()}
           className={
             foldersAreCreated || isCreatingFolders
               ? "opacity-50 cursor-not-allowed"

@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { useFolderExistence } from "@/hooks/useFolderExistence";
 import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
 import { useDeletionState } from '@/hooks/useDeletionState';
-import { createAllFoldersForJob } from "@/utils/flex-folders";
+import { useProgressiveFlexFolders } from '@/hooks/useProgressiveFlexFolders';
 import { supabase } from "@/lib/supabase";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { JobCardHeader } from './JobCardHeader';
@@ -56,9 +56,7 @@ export function JobCardNew({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { addDeletingJob, removeDeletingJob, isDeletingJob } = useDeletionState();
-  
-  // Add local loading state for folder creation
-  const [isCreatingFolders, setIsCreatingFolders] = useState(false);
+  const { createProgressiveFolders, isCreating: isCreatingFolders, currentStep } = useProgressiveFlexFolders();
   
   const {
     // Styling
@@ -100,10 +98,7 @@ export function JobCardNew({
     setLightsTaskDialogOpen,
     setVideoTaskDialogOpen,
     setEditJobDialogOpen,
-    setAssignmentDialogOpen,
-    
-    // Folder handling
-    updateFolderStatus
+    setAssignmentDialogOpen
   } = useOptimizedJobCard(job, department, userRole, onEditClick, onDeleteClick, onJobClick);
 
   // Check folder existence with proper loading state handling
@@ -126,14 +121,6 @@ export function JobCardNew({
   
   // Final decision: only consider folders created if they actually exist
   const foldersAreCreated = actualFoldersExist;
-
-  console.log("JobCardNew: Updated folder status check for job", job.id, {
-    actualFoldersExist,
-    systemThinksFoldersExist,
-    hasInconsistency,
-    finalDecision: foldersAreCreated,
-    isLoading: isFoldersLoading
-  });
 
   // Optimistic delete handler with instant UI feedback
   const handleDeleteClick = async (e: React.MouseEvent) => {
@@ -205,12 +192,7 @@ export function JobCardNew({
       return;
     }
 
-    console.log("JobCardNew: Starting folder creation process for job:", job.id, {
-      actualFoldersExist,
-      systemThinksFoldersExist,
-      hasInconsistency,
-      isLoading: isFoldersLoading
-    });
+    console.log("JobCardNew: Starting progressive folder creation for job:", job.id);
 
     // Only check actual folder existence, not database flags
     if (actualFoldersExist) {
@@ -224,9 +206,6 @@ export function JobCardNew({
     }
 
     try {
-      setIsCreatingFolders(true);
-      console.log("JobCardNew: Starting folder creation for job:", job.id);
-
       // Double-check in the database before creating
       const { data: existingFolders } = await supabase
         .from("flex_folders")
@@ -244,32 +223,16 @@ export function JobCardNew({
         return;
       }
 
-      const startDate = new Date(job.start_time);
-      const documentNumber = startDate
-        .toISOString()
-        .slice(2, 10)
-        .replace(/-/g, "");
-
-      const formattedStartDate = new Date(job.start_time).toISOString().split(".")[0] + ".000Z";
-      const formattedEndDate = new Date(job.end_time).toISOString().split(".")[0] + ".000Z";
-
-      await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber);
-      await updateFolderStatus.mutateAsync();
-
-      console.log("JobCardNew: Successfully created folders for job:", job.id);
-      toast({
-        title: "Success",
-        description: "Flex folders have been created successfully."
+      await createProgressiveFolders({
+        jobId: job.id,
+        jobTitle: job.title,
+        startTime: job.start_time,
+        endTime: job.end_time
       });
+
     } catch (error: any) {
-      console.error("JobCardNew: Error creating Flex folders:", error);
-      toast({
-        title: "Error creating folders",
-        description: error.message,
-        variant: "destructive"
-      });
-    } finally {
-      setIsCreatingFolders(false);
+      console.error("JobCardNew: Error in progressive folder creation:", error);
+      // Error handling is done in the hook
     }
   };
 
@@ -351,6 +314,7 @@ export function JobCardNew({
             canUploadDocuments={canUploadDocuments}
             canManageArtists={canManageArtists}
             isCreatingFolders={isCreatingFolders}
+            currentFolderStep={currentStep}
             onRefreshData={refreshData}
             onEditButtonClick={handleEditButtonClick}
             onDeleteClick={handleDeleteClick}
