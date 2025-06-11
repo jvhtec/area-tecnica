@@ -296,35 +296,45 @@ export function JobCardNew({
 
   const { data: foldersExist, isLoading: isFoldersLoading } = useFolderExistence(job.id);
   
-  // Fix the folder existence logic - be more explicit about the checks
-  const foldersAreCreated = Boolean(
-    job.flex_folders_created || 
-    (foldersExist === true) || 
-    job.flex_folders_exist
-  );
+  // Updated logic: prioritize actual folder existence over database flags
+  const actualFoldersExist = foldersExist === true;
+  const systemThinksFoldersExist = job.flex_folders_created || job.flex_folders_exist;
+  
+  // Detect inconsistency for logging/debugging
+  const hasInconsistency = systemThinksFoldersExist && !actualFoldersExist;
+  if (hasInconsistency) {
+    console.warn("Dashboard JobCardNew: Folder state inconsistency detected for job", job.id, {
+      systemThinks: systemThinksFoldersExist,
+      actualExists: actualFoldersExist,
+      dbFlag: job.flex_folders_created,
+      flexFoldersExist: job.flex_folders_exist
+    });
+  }
+  
+  // Final decision: only consider folders created if they actually exist
+  const foldersAreCreated = actualFoldersExist;
 
-  console.log("JobCardNew: Folder status check for job", job.id, {
-    flexFoldersCreated: job.flex_folders_created,
-    foldersExist,
-    flexFoldersExist: job.flex_folders_exist,
-    combined: foldersAreCreated,
+  console.log("Dashboard JobCardNew: Updated folder status check for job", job.id, {
+    actualFoldersExist,
+    systemThinksFoldersExist,
+    hasInconsistency,
+    finalDecision: foldersAreCreated,
     isLoading: isFoldersLoading
   });
 
   const createFlexFoldersHandler = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    console.log("Dashboard JobCardNew: Folder existence check:", {
-      jobId: job.id,
-      flexFoldersCreated: job.flex_folders_created,
-      foldersExist,
-      flexFoldersExist: job.flex_folders_exist,
-      combined: foldersAreCreated,
+    console.log("Dashboard JobCardNew: Starting folder creation process for job:", job.id, {
+      actualFoldersExist,
+      systemThinksFoldersExist,
+      hasInconsistency,
       isLoading: isFoldersLoading
     });
 
-    if (foldersAreCreated) {
-      console.log("Dashboard JobCardNew: Folders already exist, preventing creation");
+    // Only check actual folder existence, not database flags
+    if (actualFoldersExist) {
+      console.log("Dashboard JobCardNew: Folders actually exist, preventing creation");
       toast({
         title: "Folders already created",
         description: "Flex folders have already been created for this job.",
