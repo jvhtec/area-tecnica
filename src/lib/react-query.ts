@@ -1,79 +1,52 @@
 
 import { QueryClient, QueryOptions, DefaultOptions } from "@tanstack/react-query";
-import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
+import { createOptimizedQueryClient, createQueryKey, optimizedInvalidation } from "@/lib/optimized-react-query";
 
-// Configure default options with intelligent defaults
-const defaultQueryOptions: DefaultOptions = {
-  queries: {
-    staleTime: 1000 * 60 * 5, // 5 minutes - how long before data is considered stale
-    retry: 3, // Retry failed queries three times
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff with max of 30s
-    refetchOnWindowFocus: true, // Refetch when window regains focus
-    refetchOnMount: true, // Refetch when component mounts
-    refetchOnReconnect: true, // Refetch when network reconnects
-    gcTime: 10 * 60 * 1000, // 10 minutes - how long to keep unused data in cache
-  },
-  mutations: {
-    retry: 1, // Only retry mutations once
-    retryDelay: 2000, // Fixed retry delay for mutations
-    gcTime: 5 * 60 * 1000, // 5 minutes - how long to keep unused mutation data
-  },
-};
+// Use the optimized query client
+export const queryClient = createOptimizedQueryClient();
 
-// Create a singleton query client with optimized configuration
-export const queryClient = new QueryClient({
-  defaultOptions: defaultQueryOptions
-});
-
-// Setup function to initialize React Query and Subscriptions
+// Setup function to initialize React Query with optimizations
 export const setupReactQuery = () => {
-  // Initialize the subscription manager
-  const subscriptionManager = UnifiedSubscriptionManager.getInstance(queryClient);
-  
-  // Set up global refetch strategies
-  subscriptionManager.setupVisibilityBasedRefetching();
-  subscriptionManager.setupNetworkStatusRefetching();
-  
-  return { queryClient, subscriptionManager };
+  console.log('Setting up optimized React Query configuration');
+  return { queryClient };
 };
 
-// Factory function to create a new QueryClient with the same defaults
-export const createQueryClient = () => {
-  return new QueryClient({
-    defaultOptions: defaultQueryOptions
-  });
-};
+// Re-export optimized utilities
+export { createQueryKey, optimizedInvalidation };
 
-// Custom hook factory for common entity queries
+// Factory function to create a new optimized QueryClient
+export const createQueryClient = createOptimizedQueryClient;
+
+// Custom hook factory for common entity queries with optimized keys
 export const createEntityQueryOptions = <T>(
   entityType: string,
   id: string,
   options?: Partial<QueryOptions<T>>
 ): QueryOptions<T> => {
   return {
-    queryKey: [entityType, id],
+    queryKey: createQueryKey[entityType as keyof typeof createQueryKey]?.detail?.(id) || [entityType, id],
     ...options,
   };
 };
 
-// Helper for optimistic updates
+// Optimized helper for optimistic updates
 export const applyOptimisticUpdate = <T>(
   entityType: string,
   id: string,
   updateFn: (oldData: T) => T
 ) => {
-  // Get the current data
-  const oldData = queryClient.getQueryData<T>([entityType, id]);
+  const queryKey = createQueryKey[entityType as keyof typeof createQueryKey]?.detail?.(id) || [entityType, id];
+  const oldData = queryClient.getQueryData<T>(queryKey);
   
   if (!oldData) return;
   
-  // Apply the update optimistically
-  queryClient.setQueryData<T>([entityType, id], updateFn(oldData));
+  queryClient.setQueryData<T>(queryKey, updateFn(oldData));
 };
 
-// Helper for invalidating related entities
+// Optimized helper for invalidating related entities
 export const invalidateRelatedQueries = (entities: string[]) => {
   entities.forEach(entity => {
-    queryClient.invalidateQueries({ queryKey: [entity] });
+    const key = createQueryKey[entity as keyof typeof createQueryKey]?.all || [entity];
+    queryClient.invalidateQueries({ queryKey: key });
   });
 };
