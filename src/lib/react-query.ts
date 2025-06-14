@@ -1,5 +1,5 @@
 
-import { QueryClient, QueryOptions, DefaultOptions } from "@tanstack/react-query";
+import { QueryClient, QueryOptions, DefaultOptions, QueryKey } from "@tanstack/react-query";
 import { createOptimizedQueryClient, createQueryKey, optimizedInvalidation } from "@/lib/optimized-react-query";
 
 // Use the optimized query client
@@ -23,8 +23,11 @@ export const createEntityQueryOptions = <T>(
   id: string,
   options?: Partial<QueryOptions<T>>
 ): QueryOptions<T> => {
+  const keyGenerator = createQueryKey[entityType as keyof typeof createQueryKey];
   return {
-    queryKey: createQueryKey[entityType as keyof typeof createQueryKey]?.detail?.(id) || [entityType, id],
+    queryKey: (keyGenerator && 'detail' in keyGenerator)
+      ? (keyGenerator as { detail: (id: string) => QueryKey }).detail(id)
+      : [entityType, id],
     ...options,
   };
 };
@@ -35,7 +38,10 @@ export const applyOptimisticUpdate = <T>(
   id: string,
   updateFn: (oldData: T) => T
 ) => {
-  const queryKey = createQueryKey[entityType as keyof typeof createQueryKey]?.detail?.(id) || [entityType, id];
+  const keyGenerator = createQueryKey[entityType as keyof typeof createQueryKey];
+  const queryKey = (keyGenerator && 'detail' in keyGenerator)
+    ? (keyGenerator as { detail: (id: string) => QueryKey }).detail(id)
+    : [entityType, id];
   const oldData = queryClient.getQueryData<T>(queryKey);
   
   if (!oldData) return;
