@@ -430,7 +430,7 @@ export const ArtistTable = ({
 
   const filteredArtists = artists.filter(artist => {
     const matchesSearch = artist.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStage = !stageFilter || artist.stage?.toString() === stageFilter;
+    const matchesStage = stageFilter === "all" || !stageFilter || artist.stage?.toString() === stageFilter;
     const matchesEquipment = !equipmentFilter || (
       (equipmentFilter === 'wireless' && getWirelessSummary(artist).hh + getWirelessSummary(artist).bp > 0) ||
       (equipmentFilter === 'iem' && getIEMSummary(artist).channels + getIEMSummary(artist).bodypacks > 0) ||
