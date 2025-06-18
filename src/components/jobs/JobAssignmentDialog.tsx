@@ -1,3 +1,4 @@
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -262,9 +263,10 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">None</SelectItem>
-                <SelectItem value="operator">Operator</SelectItem>
-                <SelectItem value="engineer">Engineer</SelectItem>
-                <SelectItem value="tech">Tech</SelectItem>
+                <SelectItem value="FOH Engineer">FOH Engineer</SelectItem>
+                <SelectItem value="Monitor Engineer">Monitor Engineer</SelectItem>
+                <SelectItem value="RF Technician">RF Technician</SelectItem>
+                <SelectItem value="PA Technician">PA Technician</SelectItem>
               </SelectContent>
             </Select>
           </div>
