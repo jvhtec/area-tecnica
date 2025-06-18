@@ -60,6 +60,8 @@ const FestivalManagement = () => {
   const { flexUuid, isLoading: isFlexLoading, error: flexError, folderExists } = useFlexUuid(jobId || '');
 
   const isSchedulingRoute = location.pathname.includes('/scheduling');
+  const isArtistRoute = location.pathname.includes('/artists');
+  const isGearRoute = location.pathname.includes('/gear');
   
   const canEdit = ['admin', 'management', 'logistics'].includes(userRole || '');
   const isViewOnly = userRole === 'technician';
@@ -325,7 +327,7 @@ const FestivalManagement = () => {
         </CardHeader>
       </Card>
 
-      {!isSchedulingRoute && (
+      {!isSchedulingRoute && !isArtistRoute && !isGearRoute && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/artists`)}>
             <CardHeader>

@@ -1,10 +1,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ShiftsList } from "./ShiftsList";
-import { CreateShiftDialog } from "./CreateShiftDialog";
-import { ShiftsTable } from "./ShiftsTable";
 import { Button } from "@/components/ui/button";
 import { Plus, FileDown, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
@@ -12,6 +8,11 @@ import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { useFestivalShifts } from "@/hooks/festival/useFestivalShifts";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { FestivalDateNavigation } from "@/components/festival/FestivalDateNavigation";
+import { ShiftsList } from "./ShiftsList";
+import { CreateShiftDialog } from "./CreateShiftDialog";
+import { ShiftsTable } from "./ShiftsTable";
+import { useQuery } from "@tanstack/react-query";
 
 interface FestivalSchedulingProps {
   jobId: string;
@@ -24,6 +25,8 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
   const [isCreateShiftOpen, setIsCreateShiftOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "table">("list");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [dateTypes, setDateTypes] = useState<Record<string, string>>({});
+  const [dayStartTime, setDayStartTime] = useState<string>("07:00");
   const { toast } = useToast();
   
   const formatDateToString = useCallback((date: Date): string => {
@@ -35,6 +38,66 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
       return "";
     }
   }, []);
+
+  // Fetch festival settings for day start time
+  const { data: festivalSettings } = useQuery({
+    queryKey: ['festival-settings', jobId],
+    queryFn: async () => {
+      if (!jobId) return null;
+
+      const { data: existingSettings, error: fetchError } = await supabase
+        .from('festival_settings')
+        .select('*')
+        .eq('job_id', jobId)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error('Error fetching festival settings:', fetchError);
+        return null;
+      }
+
+      return existingSettings;
+    },
+    enabled: !!jobId
+  });
+
+  useEffect(() => {
+    if (festivalSettings?.day_start_time) {
+      setDayStartTime(festivalSettings.day_start_time);
+    }
+  }, [festivalSettings]);
+
+  // Fetch date types for navigation
+  const { data: dateTypeData, refetch: refetchDateTypes } = useQuery({
+    queryKey: ['job-date-types', jobId],
+    queryFn: async () => {
+      if (!jobId) return {};
+
+      const { data, error } = await supabase
+        .from('job_date_types')
+        .select('*')
+        .eq('job_id', jobId);
+
+      if (error) {
+        console.error('Error fetching date types:', error);
+        return {};
+      }
+
+      const dateTypeMap: Record<string, string> = {};
+      data.forEach(item => {
+        dateTypeMap[`${jobId}-${item.date}`] = item.type;
+      });
+
+      return dateTypeMap;
+    },
+    enabled: !!jobId
+  });
+
+  useEffect(() => {
+    if (dateTypeData) {
+      setDateTypes(dateTypeData);
+    }
+  }, [dateTypeData]);
 
   // Set initial selected date
   useEffect(() => {
@@ -178,35 +241,6 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
           </div>
         </div>
         <div className="mt-2 flex justify-between items-center">
-          <Tabs 
-            value={selectedDate} 
-            onValueChange={setSelectedDate} 
-            className="w-full"
-          >
-            <TabsList className="mb-2 flex flex-wrap h-auto">
-              {jobDates.map((date, index) => {
-                try {
-                  const dateValue = formatDateToString(date);
-                  if (!dateValue) return null;
-                  
-                  const displayDate = format(date, 'MMM d');
-                  
-                  return (
-                    <TabsTrigger
-                      key={`date-${index}-${dateValue}`}
-                      value={dateValue}
-                      className="mb-1"
-                    >
-                      {displayDate}
-                    </TabsTrigger>
-                  );
-                } catch (err) {
-                  console.error("Error rendering date tab:", err);
-                  return null;
-                }
-              })}
-            </TabsList>
-          </Tabs>
           <SubscriptionIndicator 
             tables={['festival_shifts', 'festival_shift_assignments']} 
             variant="compact"
@@ -226,32 +260,48 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
         </div>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
-          <div className="flex justify-center p-8">Loading...</div>
-        ) : shifts.length === 0 ? (
-          <div className="text-center p-8 text-muted-foreground">
-            No shifts scheduled for this date. {!isViewOnly && "Click \"Create Shift\" to add one."}
-          </div>
-        ) : viewMode === "list" ? (
-          <ShiftsList 
-            shifts={shifts} 
-            onDeleteShift={handleDeleteShift} 
-            onShiftUpdated={refetch}
-            jobId={jobId}
-            isViewOnly={isViewOnly}
-            jobDates={jobDates}
-            selectedDate={selectedDate}
-            onShiftsCopied={handleShiftsCopied}
-          />
-        ) : (
-          <ShiftsTable 
-            shifts={shifts} 
-            onDeleteShift={handleDeleteShift} 
-            date={selectedDate}
-            jobId={jobId}
-            isViewOnly={isViewOnly}
-          />
-        )}
+        <div className="space-y-4">
+          {jobDates.length > 0 && (
+            <FestivalDateNavigation
+              jobDates={jobDates}
+              selectedDate={selectedDate}
+              onDateChange={setSelectedDate}
+              dateTypes={dateTypes}
+              jobId={jobId}
+              onTypeChange={() => refetchDateTypes()}
+              dayStartTime={dayStartTime}
+            />
+          )}
+
+          {selectedDate && (
+            isLoading ? (
+              <div className="flex justify-center p-8">Loading...</div>
+            ) : shifts.length === 0 ? (
+              <div className="text-center p-8 text-muted-foreground">
+                No shifts scheduled for this date. {!isViewOnly && "Click \"Create Shift\" to add one."}
+              </div>
+            ) : viewMode === "list" ? (
+              <ShiftsList 
+                shifts={shifts} 
+                onDeleteShift={handleDeleteShift} 
+                onShiftUpdated={refetch}
+                jobId={jobId}
+                isViewOnly={isViewOnly}
+                jobDates={jobDates}
+                selectedDate={selectedDate}
+                onShiftsCopied={handleShiftsCopied}
+              />
+            ) : (
+              <ShiftsTable 
+                shifts={shifts} 
+                onDeleteShift={handleDeleteShift} 
+                date={selectedDate}
+                jobId={jobId}
+                isViewOnly={isViewOnly}
+              />
+            )
+          )}
+        </div>
       </CardContent>
 
       {!isViewOnly && (
