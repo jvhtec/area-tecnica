@@ -228,7 +228,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     return getDepartmentRoles(currentDepartment);
   };
 
-  const formatTechnicianName = (technician: User) => {
+  const formatTechnicianName = (technician: { first_name: string; last_name: string; role: string }) => {
     const isHouseTech = technician.role === 'house_tech';
     return `${technician.first_name} ${technician.last_name}${isHouseTech ? ' (House Tech)' : ''}`;
   };
