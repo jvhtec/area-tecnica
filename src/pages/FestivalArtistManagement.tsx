@@ -7,11 +7,11 @@ import { Plus, ArrowLeft, Printer, Info } from "lucide-react";
 import { ArtistTable } from "@/components/festival/ArtistTable";
 import { ArtistManagementDialog } from "@/components/festival/ArtistManagementDialog";
 import { ArtistTableFilters } from "@/components/festival/ArtistTableFilters";
+import { FestivalDateNavigation } from "@/components/festival/FestivalDateNavigation";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/enhanced-supabase-client";
 import { ConnectionIndicator } from "@/components/ui/connection-indicator";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { 
   format, 
   eachDayOfInterval, 
@@ -23,7 +23,6 @@ import {
 } from "date-fns";
 import { ArtistTablePrintDialog } from "@/components/festival/ArtistTablePrintDialog";
 import { exportArtistTablePDF } from "@/utils/artistTablePdfExport";
-import { DateTypeContextMenu } from "@/components/dashboard/DateTypeContextMenu";
 import { useQuery } from "@tanstack/react-query";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useArtistsQuery } from "@/hooks/useArtistsQuery";
@@ -38,7 +37,6 @@ const FestivalArtistManagement = () => {
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
   const [jobTitle, setJobTitle] = useState("");
   const [jobDates, setJobDates] = useState<Date[]>([]);
-  const [festivalDates, setFestivalDates] = useState<{display: string, actual: string}[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   const [stageFilter, setStageFilter] = useState("");
@@ -144,24 +142,6 @@ const FestivalArtistManagement = () => {
     queryKey: ["festival-artists", jobId, selectedDate]
   });
 
-  const toFestivalDay = (date: Date, time: string): Date => {
-    const [hours, minutes] = time.split(':').map(Number);
-    const showTime = new Date(date);
-    showTime.setHours(hours || 0);
-    showTime.setMinutes(minutes || 0);
-    
-    if (hours < DAY_START_HOUR) {
-      return addDays(date, -1);
-    }
-    return date;
-  };
-
-  const formatFestivalDay = (date: Date, includeDay = true): string => {
-    const dayStr = includeDay ? 'EEE, ' : '';
-    return format(date, `${dayStr}MMM d`) + 
-      (includeDay ? ` (${format(date, 'yyyy-MM-dd')})` : '');
-  };
-
   useEffect(() => {
     const fetchJobDetails = async () => {
       if (!jobId) return;
@@ -181,12 +161,6 @@ const FestivalArtistManagement = () => {
         if (isValid(startDate) && isValid(endDate)) {
           const dates = eachDayOfInterval({ start: startDate, end: endDate });
           setJobDates(dates);
-          
-          const festivalDaysMap = dates.map(date => ({
-            display: formatFestivalDay(date),
-            actual: format(date, 'yyyy-MM-dd')
-          }));
-          setFestivalDates(festivalDaysMap);
           
           const formattedDate = format(dates[0], 'yyyy-MM-dd');
           setSelectedDate(formattedDate);
@@ -218,31 +192,6 @@ const FestivalArtistManagement = () => {
     // Invalidate artists query if there was an update
     if (wasUpdated) {
       invalidateArtists();
-    }
-  };
-
-  const formatTabDate = (date: Date) => {
-    return format(date, 'EEE, MMM d');
-  };
-
-  const getDateTypeColor = (date: Date) => {
-    const formattedDate = format(date, 'yyyy-MM-dd');
-    const key = `${jobId}-${formattedDate}`;
-    const dateType = dateTypes[key];
-    
-    switch (dateType) {
-      case 'travel':
-        return 'border-blue-500';
-      case 'setup':
-        return 'border-amber-500';
-      case 'show':
-        return 'border-green-500';
-      case 'off':
-        return 'border-gray-500';
-      case 'rehearsal':
-        return 'border-purple-500';
-      default:
-        return '';
     }
   };
 
@@ -428,83 +377,38 @@ const FestivalArtistManagement = () => {
             )}
             
             {jobDates.length > 0 ? (
-              <Tabs
-                value={selectedDate}
-                onValueChange={setSelectedDate}
-                className="w-full"
-              >
-                <TabsList className="mb-4 flex flex-wrap">
-                  {jobDates.map((date) => {
-                    const formattedDateValue = format(date, 'yyyy-MM-dd');
-                    const dateTypeColor = getDateTypeColor(date);
-                    
-                    return (
-                      <DateTypeContextMenu 
-                        key={formattedDateValue}
-                        jobId={jobId || ''}
-                        date={date}
-                        onTypeChange={() => refetchDateTypes()}
-                      >
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <TabsTrigger
-                                value={formattedDateValue}
-                                className={`border-b-2 ${dateTypeColor}`}
-                              >
-                                {formatTabDate(date)}
-                              </TabsTrigger>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Festival day runs from {dayStartTime} to {dayStartTime} the next day</p>
-                              <p>Date: {format(date, 'yyyy-MM-dd')}</p>
-                              <p>Type: {dateTypes[`${jobId}-${formattedDateValue}`] || 'Not set'}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </DateTypeContextMenu>
-                    );
-                  })}
-                </TabsList>
-                {jobDates.map((date) => (
-                  <TabsContent
-                    key={format(date, 'yyyy-MM-dd')}
-                    value={format(date, 'yyyy-MM-dd')}
-                  >
-                    {isShowDate(date) ? (
-                      <ArtistTable
-                        artists={artists}
-                        isLoading={artistsLoading}
-                        onEditArtist={handleEditArtist}
-                        onDeleteArtist={handleDeleteArtist}
-                        searchTerm={searchTerm}
-                        stageFilter={stageFilter}
-                        equipmentFilter={equipmentFilter}
-                        riderFilter={riderFilter}
-                        dayStartTime={dayStartTime}
-                      />
-                    ) : (
-                      <div className="p-8 text-center text-muted-foreground border rounded-md">
-                        <p>This is not configured as a show date.</p>
-                        <p>Artist management is only available on show dates.</p>
-                        <p className="mt-2 text-sm">Right-click on the date tab to change its type.</p>
-                      </div>
-                    )}
-                  </TabsContent>
-                ))}
-              </Tabs>
-            ) : (
-              <ArtistTable
-                artists={artists}
-                isLoading={artistsLoading}
-                onEditArtist={handleEditArtist}
-                onDeleteArtist={handleDeleteArtist}
-                searchTerm={searchTerm}
-                stageFilter={stageFilter}
-                equipmentFilter={equipmentFilter}
-                riderFilter={riderFilter}
+              <FestivalDateNavigation
+                jobDates={jobDates}
+                selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
+                dateTypes={dateTypes}
+                jobId={jobId || ''}
+                onTypeChange={() => refetchDateTypes()}
                 dayStartTime={dayStartTime}
               />
+            ) : null}
+
+            {/* Content for selected date */}
+            {selectedDate && (
+              isShowDate(new Date(selectedDate)) ? (
+                <ArtistTable
+                  artists={artists}
+                  isLoading={artistsLoading}
+                  onEditArtist={handleEditArtist}
+                  onDeleteArtist={handleDeleteArtist}
+                  searchTerm={searchTerm}
+                  stageFilter={stageFilter}
+                  equipmentFilter={equipmentFilter}
+                  riderFilter={riderFilter}
+                  dayStartTime={dayStartTime}
+                />
+              ) : (
+                <div className="p-8 text-center text-muted-foreground border rounded-md">
+                  <p>This is not configured as a show date.</p>
+                  <p>Artist management is only available on show dates.</p>
+                  <p className="mt-2 text-sm">Right-click on the date tab to change its type.</p>
+                </div>
+              )
             )}
           </div>
         </CardContent>
