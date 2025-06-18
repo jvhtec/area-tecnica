@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ArrowLeft, Plus, Copy, Save, Wrench, Printer, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Copy, Save, Wrench, Printer, Loader2, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/enhanced-supabase-client";
@@ -19,6 +18,7 @@ import { generateStageGearPDF } from "@/utils/gearSetupPdfExport";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { PrintOptions, PrintOptionsDialog } from "@/components/festival/pdf/PrintOptionsDialog";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const FestivalGearManagement = () => {
   const { jobId } = useParams();
@@ -331,28 +331,35 @@ const FestivalGearManagement = () => {
           <CardHeader>
             <div className="flex justify-between items-center">
               <div>
-                <CardTitle>Festival Dates</CardTitle>
+                <CardTitle>Festival Date</CardTitle>
                 <CardDescription>Select a date to configure gear</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            <Tabs
-              value={selectedDate}
-              onValueChange={setSelectedDate}
-              className="w-full"
-            >
-              <TabsList className="mb-4 flex flex-wrap">
-                {jobDates.map((date) => (
-                  <TabsTrigger
-                    key={format(date, 'yyyy-MM-dd')}
-                    value={format(date, 'yyyy-MM-dd')}
-                  >
-                    {format(date, 'EEE, MMM d')}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+            <div className="flex items-center gap-4">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedDate} onValueChange={setSelectedDate}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select date" />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobDates.map((date) => (
+                    <SelectItem
+                      key={format(date, 'yyyy-MM-dd')}
+                      value={format(date, 'yyyy-MM-dd')}
+                    >
+                      {format(date, 'EEE, MMM d, yyyy')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedDate && (
+                <div className="text-sm text-muted-foreground">
+                  Configuring gear for {format(new Date(selectedDate), 'MMMM d, yyyy')}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
