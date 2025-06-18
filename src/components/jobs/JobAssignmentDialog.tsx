@@ -38,6 +38,9 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
+import { useAvailableTechnicians } from "@/hooks/useAvailableTechnicians";
+import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 
 interface JobAssignmentDialogProps {
@@ -54,9 +57,23 @@ interface Assignment {
   lights_role: string;
 }
 
+// Department-specific role options
+const getDepartmentRoles = (department: string) => {
+  switch (department) {
+    case "sound":
+      return ["FOH Engineer", "Monitor Engineer", "RF Technician", "PA Technician"];
+    case "lights":
+      return ["Lighting Designer", "Lighting Technician", "Follow Spot", "Rigger"];
+    case "video":
+      return ["Video Director", "Video Technician", "Camera Operator", "Playback Technician"];
+    default:
+      return ["FOH Engineer", "Monitor Engineer", "RF Technician", "PA Technician"];
+  }
+};
+
 export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId, department }: JobAssignmentDialogProps) => {
   const { toast } = useToast();
-  const [availableTechnicians, setAvailableTechnicians] = useState<User[]>([]);
+  const { user } = useAuth();
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
   const [soundRole, setSoundRole] = useState<string>("none");
   const [lightsRole, setLightsRole] = useState<string>("none");
@@ -65,40 +82,44 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   const { assignments, addAssignment, removeAssignment, isRemoving } = useJobAssignmentsRealtime(jobId);
   const { manageFlexCrewAssignment, useCrewCallData } = useFlexCrewAssignments();
 
+  // Get current user's department or use the passed department
+  const currentDepartment = department || user?.department || "sound";
+
+  // Fetch job data to get start/end times for availability checking
+  const { data: jobData, isLoading: isLoadingJob } = useQuery({
+    queryKey: ["job", jobId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("jobs")
+        .select("id, start_time, end_time, title")
+        .eq("id", jobId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: isOpen && !!jobId
+  });
+
+  // Use the available technicians hook with proper filtering
+  const { 
+    technicians: availableTechnicians, 
+    isLoading: isLoadingTechnicians 
+  } = useAvailableTechnicians({
+    department: currentDepartment,
+    jobId: jobId,
+    jobStartTime: jobData?.start_time || "",
+    jobEndTime: jobData?.end_time || "",
+    enabled: isOpen && !!jobData && !!jobId
+  });
+
+  // Filter technicians to only include technician and house_tech roles
+  const filteredTechnicians = availableTechnicians.filter(tech => 
+    tech.role === 'technician' || tech.role === 'house_tech'
+  );
+
   // Fetch crew call data for the current job and department
-  const { data: crewCallData, isLoading: isLoadingCrewCall } = useCrewCallData(jobId, department || 'sound');
-
-  useEffect(() => {
-    const fetchTechnicians = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .order("first_name", { ascending: true });
-
-        if (error) {
-          console.error("Error fetching technicians:", error);
-          toast({
-            title: "Error",
-            description: "Could not load technicians",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        setAvailableTechnicians(data as User[]);
-      } catch (error) {
-        console.error("Error fetching technicians:", error);
-        toast({
-          title: "Error",
-          description: "Could not load technicians",
-          variant: "destructive",
-        });
-      }
-    };
-
-    fetchTechnicians();
-  }, [toast]);
+  const { data: crewCallData, isLoading: isLoadingCrewCall } = useCrewCallData(jobId, currentDepartment);
 
   const handleAddTechnician = async () => {
     if (!selectedTechnician) {
@@ -138,7 +159,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   const handleSaveAssignments = async () => {
     const assignmentsToProcess: Assignment[] = [];
 
-    availableTechnicians.forEach((technician) => {
+    filteredTechnicians.forEach((technician) => {
       const assignment = assignments.find(
         (a) => a.technician_id === technician.id
       );
@@ -203,12 +224,21 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     }
   };
 
+  const getDepartmentRoleOptions = () => {
+    return getDepartmentRoles(currentDepartment);
+  };
+
+  const formatTechnicianName = (technician: User) => {
+    const isHouseTech = technician.role === 'house_tech';
+    return `${technician.first_name} ${technician.last_name}${isHouseTech ? ' (House Tech)' : ''}`;
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[625px]">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
-            <span>Manage Job Assignments</span>
+            <span>Manage {currentDepartment} Assignments</span>
             {crewCallData?.flex_element_id && (
               <Button
                 variant="outline"
@@ -222,10 +252,10 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
             )}
           </DialogTitle>
           <DialogDescription>
-            Assign technicians to this job and specify their roles.
-            {department && crewCallData?.flex_element_id && (
+            Assign available {currentDepartment} technicians to this job.
+            {crewCallData?.flex_element_id && (
               <span className="block text-sm text-muted-foreground mt-1">
-                Crew call available for {department} department.
+                Crew call available for {currentDepartment} department.
               </span>
             )}
           </DialogDescription>
@@ -238,59 +268,71 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
             </Label>
             <Select
               onValueChange={setSelectedTechnician}
-              defaultValue={selectedTechnician || ""}
+              value={selectedTechnician || ""}
+              disabled={isLoadingTechnicians || isLoadingJob}
             >
               <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Select a technician" />
+                <SelectValue placeholder={
+                  isLoadingTechnicians || isLoadingJob 
+                    ? "Loading available technicians..." 
+                    : "Select a technician"
+                } />
               </SelectTrigger>
               <SelectContent>
-                {availableTechnicians.map((technician) => (
+                {filteredTechnicians.map((technician) => (
                   <SelectItem key={technician.id} value={technician.id}>
-                    {technician.first_name} {technician.last_name}
+                    {formatTechnicianName(technician)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="sound-role" className="text-right">
-              Sound Role
-            </Label>
-            <Select onValueChange={setSoundRole} defaultValue={soundRole}>
-              <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Select a role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                <SelectItem value="FOH Engineer">FOH Engineer</SelectItem>
-                <SelectItem value="Monitor Engineer">Monitor Engineer</SelectItem>
-                <SelectItem value="RF Technician">RF Technician</SelectItem>
-                <SelectItem value="PA Technician">PA Technician</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {currentDepartment === "sound" && (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="sound-role" className="text-right">
+                Sound Role
+              </Label>
+              <Select onValueChange={setSoundRole} value={soundRole}>
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {getDepartmentRoleOptions().map((role) => (
+                    <SelectItem key={role} value={role}>
+                      {role}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="lights-role" className="text-right">
-              Lights Role
-            </Label>
-            <Select onValueChange={setLightsRole} defaultValue={lightsRole}>
-              <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Select a role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                <SelectItem value="operator">Operator</SelectItem>
-                <SelectItem value="designer">Designer</SelectItem>
-                <SelectItem value="tech">Tech</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {currentDepartment === "lights" && (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="lights-role" className="text-right">
+                Lights Role
+              </Label>
+              <Select onValueChange={setLightsRole} value={lightsRole}>
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {getDepartmentRoleOptions().map((role) => (
+                    <SelectItem key={role} value={role}>
+                      {role}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <Button
             onClick={handleAddTechnician}
-            disabled={isAdding || !selectedTechnician}
+            disabled={isAdding || !selectedTechnician || isLoadingTechnicians || isLoadingJob}
           >
             {isAdding ? (
               <>
@@ -310,7 +352,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
           ) : (
             <div className="space-y-2">
               {assignments.map((assignment) => {
-                const technician = availableTechnicians.find(
+                const technician = filteredTechnicians.find(
                   (t) => t.id === assignment.technician_id
                 );
                 return (
@@ -320,11 +362,11 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                   >
                     <div>
                       {technician
-                        ? `${technician.first_name} ${technician.last_name}`
+                        ? formatTechnicianName(technician)
                         : "Unknown Technician"}
                       <p className="text-sm text-muted-foreground">
-                        Sound: {assignment.sound_role}, Lights:{" "}
-                        {assignment.lights_role}
+                        {currentDepartment === "sound" && `Sound: ${assignment.sound_role || "None"}`}
+                        {currentDepartment === "lights" && `Lights: ${assignment.lights_role || "None"}`}
                       </p>
                     </div>
                     <AlertDialog>
