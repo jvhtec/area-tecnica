@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -14,6 +13,7 @@ import {
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface FestivalDateNavigationProps {
   jobDates: Date[];
@@ -23,6 +23,11 @@ interface FestivalDateNavigationProps {
   jobId: string;
   onTypeChange: () => void;
   dayStartTime: string;
+  // Optional stage filtering props
+  showStageFilter?: boolean;
+  selectedStage?: string;
+  onStageChange?: (stage: string) => void;
+  maxStages?: number;
 }
 
 export const FestivalDateNavigation = ({
@@ -32,7 +37,11 @@ export const FestivalDateNavigation = ({
   dateTypes,
   jobId,
   onTypeChange,
-  dayStartTime
+  dayStartTime,
+  showStageFilter = false,
+  selectedStage = "all",
+  onStageChange,
+  maxStages = 3
 }: FestivalDateNavigationProps) => {
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
     const selected = new Date(selectedDate);
@@ -206,6 +215,26 @@ export const FestivalDateNavigation = ({
                 <Label htmlFor="show-filter" className="text-sm">Key dates only</Label>
               </div>
             </>
+          )}
+
+          {/* Stage Filter */}
+          {showStageFilter && onStageChange && (
+            <div className="flex items-center gap-2">
+              <Label htmlFor="stage-filter" className="text-sm">Stage:</Label>
+              <Select value={selectedStage} onValueChange={onStageChange}>
+                <SelectTrigger id="stage-filter" className="w-[120px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Stages</SelectItem>
+                  {Array.from({ length: maxStages }, (_, i) => i + 1).map((stage) => (
+                    <SelectItem key={stage} value={stage.toString()}>
+                      Stage {stage}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
         </div>
 

@@ -39,7 +39,7 @@ const FestivalArtistManagement = () => {
   const [jobDates, setJobDates] = useState<Date[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [stageFilter, setStageFilter] = useState("");
+  const [stageFilter, setStageFilter] = useState("all");
   const [equipmentFilter, setEquipmentFilter] = useState("");
   const [riderFilter, setRiderFilter] = useState("all");
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
@@ -49,6 +49,7 @@ const FestivalArtistManagement = () => {
   const [dateTypes, setDateTypes] = useState<Record<string, string>>({});
   const [dayStartTime, setDayStartTime] = useState<string>("07:00");
   const [logoUrl, setLogoUrl] = useState("");
+  const [maxStages, setMaxStages] = useState(3);
 
   // Use React Query for artists data
   const { 
@@ -165,6 +166,20 @@ const FestivalArtistManagement = () => {
           const formattedDate = format(dates[0], 'yyyy-MM-dd');
           setSelectedDate(formattedDate);
         }
+      }
+
+      // Fetch max stages for stage filtering
+      const { data: gearSetups, error: gearError } = await supabase
+        .from("festival_gear_setups")
+        .select("max_stages")
+        .eq("job_id", jobId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+        
+      if (gearError) {
+        console.error("Error fetching gear setup:", gearError);
+      } else if (gearSetups && gearSetups.length > 0) {
+        setMaxStages(gearSetups[0].max_stages || 3);
       }
     };
 
@@ -367,8 +382,8 @@ const FestivalArtistManagement = () => {
               <ArtistTableFilters
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
-                stageFilter={stageFilter}
-                onStageFilterChange={setStageFilter}
+                stageFilter="all" // Hide stage filter since it's now in date navigation
+                onStageFilterChange={() => {}} // No-op since handled by date navigation
                 equipmentFilter={equipmentFilter}
                 onEquipmentFilterChange={setEquipmentFilter}
                 riderFilter={riderFilter}
@@ -385,6 +400,10 @@ const FestivalArtistManagement = () => {
                 jobId={jobId || ''}
                 onTypeChange={() => refetchDateTypes()}
                 dayStartTime={dayStartTime}
+                showStageFilter={showArtistControls}
+                selectedStage={stageFilter}
+                onStageChange={setStageFilter}
+                maxStages={maxStages}
               />
             ) : null}
 

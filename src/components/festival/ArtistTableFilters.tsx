@@ -12,6 +12,7 @@ interface ArtistTableFiltersProps {
   onEquipmentFilterChange: (value: string) => void;
   riderFilter?: string;
   onRiderFilterChange?: (value: string) => void;
+  hideStageFilter?: boolean;
 }
 
 export const ArtistTableFilters = ({
@@ -23,10 +24,13 @@ export const ArtistTableFilters = ({
   onEquipmentFilterChange,
   riderFilter = "all",
   onRiderFilterChange,
+  hideStageFilter = false,
 }: ArtistTableFiltersProps) => {
+  const gridCols = hideStageFilter ? "lg:grid-cols-3" : "lg:grid-cols-4";
+  
   return (
     <div className="space-y-4 mb-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 md:grid-cols-2 ${gridCols} gap-4`}>
         <div>
           <Label htmlFor="search">Search Artist</Label>
           <Input
@@ -37,20 +41,22 @@ export const ArtistTableFilters = ({
           />
         </div>
         
-        <div>
-          <Label htmlFor="stage">Filter by Stage</Label>
-          <Select value={stageFilter} onValueChange={onStageFilterChange}>
-            <SelectTrigger id="stage">
-              <SelectValue placeholder="All Stages" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Stages</SelectItem>
-              <SelectItem value="1">Stage 1</SelectItem>
-              <SelectItem value="2">Stage 2</SelectItem>
-              <SelectItem value="3">Stage 3</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {!hideStageFilter && (
+          <div>
+            <Label htmlFor="stage">Filter by Stage</Label>
+            <Select value={stageFilter} onValueChange={onStageFilterChange}>
+              <SelectTrigger id="stage">
+                <SelectValue placeholder="All Stages" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Stages</SelectItem>
+                <SelectItem value="1">Stage 1</SelectItem>
+                <SelectItem value="2">Stage 2</SelectItem>
+                <SelectItem value="3">Stage 3</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div>
           <Label htmlFor="equipment">Filter by Equipment</Label>
