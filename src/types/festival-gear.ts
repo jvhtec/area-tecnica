@@ -1,4 +1,3 @@
-
 import { WirelessSetup, ConsoleSetup } from "./festival";
 
 export interface WirelessConfigProps {
@@ -7,6 +6,7 @@ export interface WirelessConfigProps {
   label: string;
   includeQuantityTypes?: boolean;
   isIEM?: boolean;
+  hideProvidedBy?: boolean;
 }
 
 export interface ConsoleConfigProps {

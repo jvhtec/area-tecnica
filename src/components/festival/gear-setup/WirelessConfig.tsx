@@ -14,7 +14,8 @@ export const WirelessConfig = ({
   onChange, 
   label, 
   includeQuantityTypes = false,
-  isIEM = false
+  isIEM = false,
+  hideProvidedBy = false
 }: WirelessConfigProps) => {
   const addSystem = () => {
     const newSystem: WirelessSetup = {
@@ -151,23 +152,25 @@ export const WirelessConfig = ({
             />
           </div>
           
-          <div>
-            <Label>Provided By</Label>
-            <RadioGroup
-              value={system.provided_by || 'festival'}
-              onValueChange={(value: 'festival' | 'band') => updateSystem(index, 'provided_by', value)}
-              className="flex space-x-4 mt-1"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="festival" id={`${index}-festival`} />
-                <Label htmlFor={`${index}-festival`}>Festival</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="band" id={`${index}-band`} />
-                <Label htmlFor={`${index}-band`}>Band</Label>
-              </div>
-            </RadioGroup>
-          </div>
+          {!hideProvidedBy && (
+            <div>
+              <Label>Provided By</Label>
+              <RadioGroup
+                value={system.provided_by || 'festival'}
+                onValueChange={(value: 'festival' | 'band') => updateSystem(index, 'provided_by', value)}
+                className="flex space-x-4 mt-1"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="festival" id={`${index}-festival`} />
+                  <Label htmlFor={`${index}-festival`}>Festival</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="band" id={`${index}-band`} />
+                  <Label htmlFor={`${index}-band`}>Band</Label>
+                </div>
+              </RadioGroup>
+            </div>
+          )}
         </div>
       ))}
     </div>

@@ -25,6 +25,7 @@ export const WirelessSetupSection = ({ formData, onChange }: SectionProps) => {
             onChange={handleWirelessChange}
             label="Wireless Systems"
             includeQuantityTypes={true}
+            hideProvidedBy={true}
           />
         </div>
         <div className="space-y-4">
@@ -34,6 +35,7 @@ export const WirelessSetupSection = ({ formData, onChange }: SectionProps) => {
             label="IEM Systems"
             includeQuantityTypes={true}
             isIEM={true}
+            hideProvidedBy={true}
           />
         </div>
       </div>
