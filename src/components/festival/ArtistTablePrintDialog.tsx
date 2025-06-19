@@ -40,6 +40,7 @@ export const ArtistTablePrintDialog = ({
                 <SelectValue placeholder="Select date" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">All dates (chronological)</SelectItem>
                 {jobDates.map((date) => (
                   <SelectItem key={format(date, 'yyyy-MM-dd')} value={format(date, 'yyyy-MM-dd')}>
                     {format(date, 'EEE, MMM d')}

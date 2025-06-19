@@ -1,9 +1,10 @@
+
 import { supabase } from '@/lib/supabase';
 import { exportArtistPDF, ArtistPdfData } from '../artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from '../artistTablePdfExport';
 import { exportShiftsTablePDF, ShiftsTablePdfData } from '../shiftsTablePdfExport';
 import { exportRfIemTablePDF, RfIemTablePdfData } from '../rfIemTablePdfExport';
-import { exportInfrastructureTablePDF, ArtistInfrastructureData } from '../infrastructureTablePdfExport';
+import { exportInfrastructureTablePDF, InfrastructureTablePdfData } from '../infrastructureTablePdfExport';
 import { exportMissingRiderReportPDF, MissingRiderReportData } from '../missingRiderReportPdfExport';
 import { generateStageGearPDF } from '../gearSetupPdfExport';
 import { fetchLogoUrl } from './logoUtils';
@@ -11,6 +12,39 @@ import { generateCoverPage } from './coverPageGenerator';
 import { generateTableOfContents } from './tocGenerator';
 import { mergePDFs } from './pdfMerge';
 import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
+
+// Helper function to sort artists chronologically across all dates
+const sortArtistsChronologically = (artists: any[]) => {
+  return artists.sort((a, b) => {
+    // First sort by date
+    if (a.date !== b.date) {
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    }
+    
+    // Then sort by stage within the same date
+    if (a.stage !== b.stage) {
+      return a.stage - b.stage;
+    }
+    
+    // Finally sort by show time within the same date and stage
+    const aTime = a.show_start || '';
+    const bTime = b.show_start || '';
+    
+    // Handle shows that cross midnight (early morning shows)
+    const aHour = aTime ? parseInt(aTime.split(':')[0], 10) : 0;
+    const bHour = bTime ? parseInt(bTime.split(':')[0], 10) : 0;
+    
+    // If show starts between 00:00-06:59, treat it as next day for sorting
+    const adjustedATime = aHour >= 0 && aHour < 7 ? `${aHour + 24}${aTime.substring(aTime.indexOf(':'))}` : aTime;
+    const adjustedBTime = bHour >= 0 && bHour < 7 ? `${bHour + 24}${bTime.substring(bTime.indexOf(':'))}` : bTime;
+    
+    if (adjustedATime < adjustedBTime) return -1;
+    if (adjustedATime > adjustedBTime) return 1;
+    
+    // Fallback to artist name
+    return (a.name || '').localeCompare(b.name || '');
+  });
+};
 
 export const generateAndMergeFestivalPDFs = async (
   jobId: string,
@@ -189,30 +223,46 @@ export const generateAndMergeFestivalPDFs = async (
     }
     
     if (options.includeArtistTables) {
-      for (const date of uniqueDates) {
-        if (!date) continue;
+      // Filter artists by selected stages first
+      const stageFilteredArtists = artists?.filter(a => 
+        options.artistTableStages.includes(Number(a.stage))
+      );
+      
+      if (stageFilteredArtists && stageFilteredArtists.length > 0) {
+        // Sort ALL artists chronologically first
+        const sortedArtists = sortArtistsChronologically(stageFilteredArtists);
         
-        const stageArtists = artists?.filter(a => 
-          a.date === date && options.artistTableStages.includes(Number(a.stage))
-        );
+        // Then group by date while maintaining chronological order
+        const dateGroups = new Map<string, any[]>();
         
-        if (stageArtists && stageArtists.length > 0) {
+        sortedArtists.forEach(artist => {
+          if (!dateGroups.has(artist.date)) {
+            dateGroups.set(artist.date, []);
+          }
+          dateGroups.get(artist.date)?.push(artist);
+        });
+        
+        const { data: stages } = await supabase
+          .from("festival_stages")
+          .select("*")
+          .eq("job_id", jobId);
+        
+        // Process dates in chronological order
+        for (const [date, dateArtists] of dateGroups.entries()) {
+          if (!dateArtists || dateArtists.length === 0) continue;
+          
+          // Group by stage within each date
           const stageMap = new Map<number, any[]>();
           
-          stageArtists?.forEach(artist => {
+          dateArtists.forEach(artist => {
             if (!stageMap.has(artist.stage)) {
               stageMap.set(artist.stage, []);
             }
             stageMap.get(artist.stage)?.push(artist);
           });
           
-          const { data: stages } = await supabase
-            .from("festival_stages")
-            .select("*")
-            .eq("job_id", jobId);
-          
-          for (const [stageNum, filteredArtists] of stageMap.entries()) {
-            if (filteredArtists.length === 0) continue;
+          for (const [stageNum, stageArtists] of stageMap.entries()) {
+            if (stageArtists.length === 0) continue;
             
             const stageObj = stages?.find(s => s.number === stageNum);
             const stageName = stageObj ? stageObj.name : `Stage ${stageNum}`;
@@ -221,7 +271,7 @@ export const generateAndMergeFestivalPDFs = async (
               jobTitle: jobTitle,
               date: date,
               stage: stageName,
-              artists: filteredArtists.map(artist => {
+              artists: stageArtists.map(artist => {
                 // Convert the database wireless_systems and iem_systems to the correct format
                 const wirelessSystems = (artist.wireless_systems || []).map((system: any) => ({
                   model: system.model || '',
@@ -306,27 +356,8 @@ export const generateAndMergeFestivalPDFs = async (
         options.artistRequirementStages.includes(Number(artist.stage))
       );
       
-      const sortedArtists = [...filteredArtists].sort((a, b) => {
-        if (a.stage < b.stage) return -1;
-        if (a.stage > b.stage) return 1;
-        
-        if (a.date < b.date) return -1;
-        if (a.date > b.date) return 1;
-        
-        const aTime = a.show_start || '';
-        const bTime = b.show_start || '';
-        
-        const aHour = aTime ? parseInt(aTime.split(':')[0], 10) : 0;
-        const bHour = bTime ? parseInt(bTime.split(':')[0], 10) : 0;
-        
-        const adjustedATime = aHour >= 0 && aHour < 7 ? `${aHour + 24}${aTime.substring(aTime.indexOf(':'))}` : aTime;
-        const adjustedBTime = bHour >= 0 && bHour < 7 ? `${bHour + 24}${bTime.substring(bTime.indexOf(':'))}` : bTime;
-        
-        if (adjustedATime < adjustedBTime) return -1;
-        if (adjustedATime > adjustedBTime) return 1;
-        
-        return (a.name || '').localeCompare(b.name || '');
-      });
+      // Use the same chronological sorting for individual artist requirements
+      const sortedArtists = sortArtistsChronologically(filteredArtists);
       
       console.log(`Sorted ${sortedArtists.length} artists for PDF generation`);
       
@@ -429,15 +460,8 @@ export const generateAndMergeFestivalPDFs = async (
         options.rfIemTableStages.includes(Number(artist.stage))
       );
       
-      const sortedArtists = [...filteredArtists].sort((a, b) => {
-        if (a.stage < b.stage) return -1;
-        if (a.stage > b.stage) return 1;
-        
-        if (a.date < b.date) return -1;
-        if (a.date > b.date) return 1;
-        
-        return (a.name || '').localeCompare(b.name || '');
-      });
+      // Use chronological sorting for RF & IEM table as well
+      const sortedArtists = sortArtistsChronologically(filteredArtists);
       
       console.log(`Generating RF & IEM table with ${sortedArtists.length} artists`);
       
@@ -472,20 +496,13 @@ export const generateAndMergeFestivalPDFs = async (
         options.infrastructureTableStages.includes(Number(artist.stage))
       );
       
-      const sortedArtists = [...filteredArtists].sort((a, b) => {
-        if (a.stage < b.stage) return -1;
-        if (a.stage > b.stage) return 1;
-        
-        if (a.date < b.date) return -1;
-        if (a.date > b.date) return 1;
-        
-        return (a.name || '').localeCompare(b.name || '');
-      });
+      // Use chronological sorting for Infrastructure table as well
+      const sortedArtists = sortArtistsChronologically(filteredArtists);
       
       console.log(`Generating Infrastructure table with ${sortedArtists.length} artists`);
       
       if (sortedArtists.length > 0) {
-        const infrastructureData = {
+        const infrastructureData: InfrastructureTablePdfData = {
           jobTitle,
           logoUrl,
           artists: sortedArtists.map(artist => {
@@ -511,7 +528,7 @@ export const generateAndMergeFestivalPDFs = async (
               },
               analog: Number(artist.infra_analog || 0),
               other: String(artist.other_infrastructure || '')
-            } as ArtistInfrastructureData;
+            };
           })
         };
         
@@ -532,15 +549,8 @@ export const generateAndMergeFestivalPDFs = async (
       
       console.log(`Generating Missing Rider Report with ${missingRiderArtists.length} artists`);
       
-      const sortedMissingRiderArtists = [...missingRiderArtists].sort((a, b) => {
-        if (a.stage < b.stage) return -1;
-        if (a.stage > b.stage) return 1;
-        
-        if (a.date < b.date) return -1;
-        if (a.date > b.date) return 1;
-        
-        return (a.name || '').localeCompare(b.name || '');
-      });
+      // Use chronological sorting for Missing Rider Report as well
+      const sortedMissingRiderArtists = sortArtistsChronologically(missingRiderArtists);
       
       const missingRiderData: MissingRiderReportData = {
         jobTitle,
