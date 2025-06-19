@@ -10,10 +10,6 @@ export interface WirelessSetup {
   quantity?: number; // Make quantity optional since we're using quantity_hh/quantity_bp instead
   quantity_hh?: number;
   quantity_bp?: number;
-  handheld_quantity?: number;
-  bodypack_quantity?: number;
-  lapel_quantity?: number;
-  headset_quantity?: number;
   band?: string;
   notes?: string;
   provided_by?: 'festival' | 'band';

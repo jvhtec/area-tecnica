@@ -3,19 +3,18 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { ArtistWirelessSetupSection } from "./form/sections/ArtistWirelessSetupSection";
 import { ArtistFormData } from "@/types/festival";
-import { EquipmentSelect } from "./form/shared/EquipmentSelect";
 
-// Fallback options in case database is empty
-const fallbackConsoleOptions = [
+const consoleOptions = [
   'Yamaha CL5', 'Yamaha PMx', 'Yamaha DM7','Yamaha DM3', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
   'DiGiCo SD10', 'DiGiCo SD11', 'DiGiCo SD12', 'DiGiCo SD5Q', 'DiGiCo SD7Q',
   'DiGiCo Q225', 'DiGiCo Q326', 'DiGiCo Q338', 'DiGiCo Q852', 'Avid S6L',
   'A&H C1500', 'A&H C2500', 'A&H S3000', 'A&H S5000', 'A&H S7000',
-  'Waves LV1 (homemade)', 'Waves LV1 Classic', 'SSL', 'Other'
+  'Waves LV1 (homemade)', 'Waves LV1 Classic', 'SSL', 'Midas HD96', 'Other'
 ];
 
 export const ArtistForm = () => {
@@ -155,13 +154,21 @@ export const ArtistForm = () => {
               <h2 className="text-xl font-semibold">FOH Console</h2>
               <div className="space-y-2">
                 <Label>Console Model</Label>
-                <EquipmentSelect
+                <Select
                   value={formData.foh_console || ""}
-                  onChange={(value) => setFormData(prev => ({ ...prev, foh_console: value }))}
-                  category="foh_console"
-                  placeholder="Select console"
-                  fallbackOptions={fallbackConsoleOptions}
-                />
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, foh_console: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select console" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {consoleOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -170,13 +177,21 @@ export const ArtistForm = () => {
               <h2 className="text-xl font-semibold">Monitor Console</h2>
               <div className="space-y-2">
                 <Label>Console Model</Label>
-                <EquipmentSelect
+                <Select
                   value={formData.mon_console || ""}
-                  onChange={(value) => setFormData(prev => ({ ...prev, mon_console: value }))}
-                  category="mon_console"
-                  placeholder="Select console"
-                  fallbackOptions={fallbackConsoleOptions}
-                />
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, mon_console: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select console" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {consoleOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
