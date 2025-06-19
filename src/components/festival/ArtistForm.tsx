@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { WirelessSetupSection } from "./form/sections/WirelessSetupSection";
+import { ArtistFormData } from "@/types/festival";
 
 const consoleOptions = [
   'Yamaha CL5', 'Yamaha PMx', 'Yamaha DM7','Yamaha DM3', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
@@ -21,7 +22,7 @@ export const ArtistForm = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Partial<ArtistFormData>>({
     name: "",
     foh_console: "",
     foh_console_provided_by: "festival",
@@ -142,7 +143,7 @@ export const ArtistForm = () => {
               <Label>Artist/Band Name</Label>
               <Input
                 type="text"
-                value={formData.name}
+                value={formData.name || ""}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 required
               />
@@ -154,7 +155,7 @@ export const ArtistForm = () => {
               <div className="space-y-2">
                 <Label>Console Model</Label>
                 <Select
-                  value={formData.foh_console}
+                  value={formData.foh_console || ""}
                   onValueChange={(value) => setFormData(prev => ({ ...prev, foh_console: value }))}
                 >
                   <SelectTrigger>
@@ -177,7 +178,7 @@ export const ArtistForm = () => {
               <div className="space-y-2">
                 <Label>Console Model</Label>
                 <Select
-                  value={formData.mon_console}
+                  value={formData.mon_console || ""}
                   onValueChange={(value) => setFormData(prev => ({ ...prev, mon_console: value }))}
                 >
                   <SelectTrigger>
@@ -205,7 +206,7 @@ export const ArtistForm = () => {
               <Label>Additional Notes</Label>
               <Input
                 type="text"
-                value={formData.notes}
+                value={formData.notes || ""}
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                 placeholder="Any additional requirements or comments"
               />
