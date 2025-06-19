@@ -1,5 +1,6 @@
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useEquipmentModels } from "@/hooks/useEquipmentModels";
 
 interface EquipmentSelectProps {
   value: string;
@@ -7,6 +8,7 @@ interface EquipmentSelectProps {
   options: Array<{ model: string; quantity?: number }> | readonly string[];
   placeholder?: string;
   fallbackOptions?: readonly string[];
+  category?: string;
 }
 
 export const EquipmentSelect = ({
@@ -14,17 +16,34 @@ export const EquipmentSelect = ({
   onChange,
   options,
   placeholder = "Select equipment",
-  fallbackOptions = []
+  fallbackOptions = [],
+  category
 }: EquipmentSelectProps) => {
-  // Determine if we have valid options to render
-  const hasValidOptions = Array.isArray(options) && options.length > 0;
-  // Use fallback options if provided options are empty
-  const itemsToRender = hasValidOptions ? options : fallbackOptions;
+  const { models, isLoading } = useEquipmentModels();
+  
+  // Filter models by category if provided
+  const categoryModels = category 
+    ? models.filter(model => model.category === category).map(model => model.name)
+    : [];
+
+  // Determine what options to use: database models, provided options, or fallback
+  let itemsToRender: Array<{ model: string; quantity?: number }> | readonly string[] = [];
+  
+  if (category && categoryModels.length > 0) {
+    // Use database models for this category
+    itemsToRender = categoryModels;
+  } else if (Array.isArray(options) && options.length > 0) {
+    // Use provided options
+    itemsToRender = options;
+  } else {
+    // Use fallback options
+    itemsToRender = fallbackOptions;
+  }
 
   return (
-    <Select value={value} onValueChange={onChange}>
+    <Select value={value} onValueChange={onChange} disabled={isLoading}>
       <SelectTrigger>
-        <SelectValue placeholder={placeholder} />
+        <SelectValue placeholder={isLoading ? "Loading..." : placeholder} />
       </SelectTrigger>
       <SelectContent>
         {Array.isArray(itemsToRender) && itemsToRender.length > 0 && 

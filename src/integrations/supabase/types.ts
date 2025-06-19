@@ -331,6 +331,30 @@ export type Database = {
         }
         Relationships: []
       }
+      equipment_models: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       festival_artist_files: {
         Row: {
           artist_id: string | null

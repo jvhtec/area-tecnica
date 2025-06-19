@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserPlus, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +7,8 @@ import { useState } from "react";
 import { FilterBar } from "@/components/users/filters/FilterBar";
 import { ImportUsersDialog } from "@/components/users/import/ImportUsersDialog";
 import { CompanyLogoUploader } from "@/components/CompanyLogoUploader";
+import { EquipmentModelsList } from "@/components/equipment/EquipmentModelsList";
+import { useAuth } from "@/hooks/useAuth";
 
 const Settings = () => {
   const [createUserOpen, setCreateUserOpen] = useState(false);
@@ -15,6 +16,9 @@ const Settings = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRole, setSelectedRole] = useState("all");
   const [selectedDepartment, setSelectedDepartment] = useState("all");
+  
+  const { userRole } = useAuth();
+  const isManagementUser = ['admin', 'management'].includes(userRole || '');
 
   const handleClearFilters = () => {
     setSearchQuery("");
@@ -78,6 +82,22 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
+          
+          {isManagementUser && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Equipment Models</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Manage equipment models used in festival forms and gear setup.
+                  </p>
+                  <EquipmentModelsList />
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 

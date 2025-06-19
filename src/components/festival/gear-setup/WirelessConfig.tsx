@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +23,7 @@ export const WirelessConfig = ({
       quantity_hh: 0,
       quantity_bp: 0,
       band: '',
-      provided_by: 'festival' // Default to festival for new systems
+      provided_by: 'festival'
     };
     onChange([...systems, newSystem]);
   };
@@ -76,6 +75,10 @@ export const WirelessConfig = ({
     bp: "Bodypacks"
   };
 
+  const getCategory = () => {
+    return isIEM ? 'iem' : 'wireless';
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -104,6 +107,7 @@ export const WirelessConfig = ({
                 options={[]}
                 fallbackOptions={options}
                 placeholder="Select system"
+                category={getCategory()}
               />
             </div>
             <Button

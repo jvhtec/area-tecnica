@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { ArtistWirelessSetupSection } from "./form/sections/ArtistWirelessSetupSection";
 import { ArtistFormData } from "@/types/festival";
+import { useEquipmentModels } from "@/hooks/useEquipmentModels";
 
 const consoleOptions = [
   'Yamaha CL5', 'Yamaha PMx', 'Yamaha DM7','Yamaha DM3', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
@@ -22,6 +23,8 @@ export const ArtistForm = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const { models } = useEquipmentModels();
+  
   const [formData, setFormData] = useState<Partial<ArtistFormData>>({
     name: "",
     foh_console: "",
@@ -53,6 +56,17 @@ export const ArtistForm = () => {
     other_infrastructure: "",
     notes: "",
   });
+
+  // Get console options from database with fallback
+  const fohConsoleOptions = models
+    .filter(model => model.category === 'foh_console')
+    .map(model => model.name);
+  const monConsoleOptions = models
+    .filter(model => model.category === 'mon_console')
+    .map(model => model.name);
+    
+  const fohOptions = fohConsoleOptions.length > 0 ? fohConsoleOptions : consoleOptions;
+  const monOptions = monConsoleOptions.length > 0 ? monConsoleOptions : consoleOptions;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,7 +176,7 @@ export const ArtistForm = () => {
                     <SelectValue placeholder="Select console" />
                   </SelectTrigger>
                   <SelectContent>
-                    {consoleOptions.map((option) => (
+                    {fohOptions.map((option) => (
                       <SelectItem key={option} value={option}>
                         {option}
                       </SelectItem>
@@ -185,7 +199,7 @@ export const ArtistForm = () => {
                     <SelectValue placeholder="Select console" />
                   </SelectTrigger>
                   <SelectContent>
-                    {consoleOptions.map((option) => (
+                    {monOptions.map((option) => (
                       <SelectItem key={option} value={option}>
                         {option}
                       </SelectItem>

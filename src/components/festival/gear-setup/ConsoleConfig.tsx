@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +31,13 @@ export const ConsoleConfig = ({ consoles, onChange, label }: ConsoleConfigProps)
     );
   };
 
+  // Determine category based on label
+  const getCategory = () => {
+    if (label.toLowerCase().includes('foh')) return 'foh_console';
+    if (label.toLowerCase().includes('monitor')) return 'mon_console';
+    return undefined;
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -56,6 +62,7 @@ export const ConsoleConfig = ({ consoles, onChange, label }: ConsoleConfigProps)
               options={[]}
               fallbackOptions={consoleOptions}
               placeholder="Select console"
+              category={getCategory()}
             />
           </div>
           <div className="w-24">
