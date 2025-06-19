@@ -1,10 +1,11 @@
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useEquipmentModels } from "@/hooks/useEquipmentModels";
 
 interface EquipmentSelectProps {
   value: string;
   onChange: (value: string) => void;
-  options: Array<{ model: string; quantity?: number }> | readonly string[];
+  category?: string;
   placeholder?: string;
   fallbackOptions?: readonly string[];
 }
@@ -12,39 +13,28 @@ interface EquipmentSelectProps {
 export const EquipmentSelect = ({
   value,
   onChange,
-  options,
+  category,
   placeholder = "Select equipment",
   fallbackOptions = []
 }: EquipmentSelectProps) => {
-  // Determine if we have valid options to render
-  const hasValidOptions = Array.isArray(options) && options.length > 0;
-  // Use fallback options if provided options are empty
-  const itemsToRender = hasValidOptions ? options : fallbackOptions;
+  const { data: models, isLoading } = useEquipmentModels(category);
+
+  // Use database models if available, otherwise fallback to provided options
+  const options = models && models.length > 0 
+    ? models.map(model => model.name)
+    : fallbackOptions;
 
   return (
-    <Select value={value} onValueChange={onChange}>
+    <Select value={value} onValueChange={onChange} disabled={isLoading}>
       <SelectTrigger>
-        <SelectValue placeholder={placeholder} />
+        <SelectValue placeholder={isLoading ? "Loading..." : placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {Array.isArray(itemsToRender) && itemsToRender.length > 0 && 
-          itemsToRender.map((option) => {
-            if (typeof option === 'string') {
-              return (
-                <SelectItem key={option} value={option}>
-                  {option}
-                </SelectItem>
-              );
-            } else if (option && typeof option === 'object') {
-              return (
-                <SelectItem key={option.model} value={option.model}>
-                  {option.model}{option.quantity ? ` (${option.quantity} available)` : ''}
-                </SelectItem>
-              );
-            }
-            return null;
-          })
-        }
+        {options.map((option) => (
+          <SelectItem key={option} value={option}>
+            {option}
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );
