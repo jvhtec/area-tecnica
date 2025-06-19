@@ -13,9 +13,6 @@ interface ArtistTableFiltersProps {
   riderFilter?: string;
   onRiderFilterChange?: (value: string) => void;
   hideStageFilter?: boolean;
-  // New props for date type filtering
-  dateTypeFilter?: string;
-  onDateTypeFilterChange?: (value: string) => void;
 }
 
 export const ArtistTableFilters = ({
@@ -28,10 +25,8 @@ export const ArtistTableFilters = ({
   riderFilter = "all",
   onRiderFilterChange,
   hideStageFilter = false,
-  dateTypeFilter = "all",
-  onDateTypeFilterChange,
 }: ArtistTableFiltersProps) => {
-  const gridCols = hideStageFilter ? "lg:grid-cols-4" : "lg:grid-cols-5";
+  const gridCols = hideStageFilter ? "lg:grid-cols-3" : "lg:grid-cols-4";
   
   return (
     <div className="space-y-4 mb-4">
@@ -58,8 +53,6 @@ export const ArtistTableFilters = ({
                 <SelectItem value="1">Stage 1</SelectItem>
                 <SelectItem value="2">Stage 2</SelectItem>
                 <SelectItem value="3">Stage 3</SelectItem>
-                <SelectItem value="4">Stage 4</SelectItem>
-                <SelectItem value="5">Stage 5</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -93,26 +86,6 @@ export const ArtistTableFilters = ({
             </SelectContent>
           </Select>
         </div>
-
-        {onDateTypeFilterChange && (
-          <div>
-            <Label htmlFor="date-type">Filter by Day Type</Label>
-            <Select value={dateTypeFilter} onValueChange={onDateTypeFilterChange}>
-              <SelectTrigger id="date-type">
-                <SelectValue placeholder="All Day Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Day Types</SelectItem>
-                <SelectItem value="setup">Setup Days</SelectItem>
-                <SelectItem value="build">Build Days</SelectItem>
-                <SelectItem value="rehearsal">Rehearsal Days</SelectItem>
-                <SelectItem value="show">Show Days</SelectItem>
-                <SelectItem value="travel">Travel Days</SelectItem>
-                <SelectItem value="off">Off Days</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
       </div>
     </div>
   );

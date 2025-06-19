@@ -3,35 +3,14 @@ import { exportArtistPDF, ArtistPdfData } from '../artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from '../artistTablePdfExport';
 import { exportShiftsTablePDF, ShiftsTablePdfData } from '../shiftsTablePdfExport';
 import { exportRfIemTablePDF, RfIemTablePdfData } from '../rfIemTablePdfExport';
-import { exportInfrastructureTablePDF, InfrastructureTablePdfData } from '../infrastructureTablePdfExport';
+import { exportInfrastructureTablePDF, ArtistInfrastructureData } from '../infrastructureTablePdfExport';
 import { exportMissingRiderReportPDF, MissingRiderReportData } from '../missingRiderReportPdfExport';
 import { generateStageGearPDF } from '../gearSetupPdfExport';
 import { fetchLogoUrl } from './logoUtils';
 import { generateCoverPage } from './coverPageGenerator';
 import { generateTableOfContents } from './tocGenerator';
 import { mergePDFs } from './pdfMerge';
-import { sortChronologically, groupByDateChronologically } from '../timeUtils';
 import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
-
-interface FestivalDate {
-  date: string;
-  type: string;
-}
-
-const fetchFestivalDates = async (jobId: string): Promise<FestivalDate[]> => {
-  const { data: dateTypes, error } = await supabase
-    .from("job_date_types")
-    .select("date, type")
-    .eq("job_id", jobId)
-    .order("date", { ascending: true });
-
-  if (error) {
-    console.error("Error fetching date types:", error);
-    return [];
-  }
-
-  return dateTypes || [];
-};
 
 export const generateAndMergeFestivalPDFs = async (
   jobId: string,
@@ -53,11 +32,6 @@ export const generateAndMergeFestivalPDFs = async (
   let missingRiderReportPdf: Blob | null = null;
   
   try {
-    // Fetch all festival dates with types
-    const festivalDates = await fetchFestivalDates(jobId);
-    console.log("Festival dates found:", festivalDates);
-
-    // Fetch all artists
     const { data: artists, error: artistError } = await supabase
       .from("festival_artists")
       .select("*")
@@ -92,23 +66,22 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
-    // Process shift schedules for ALL festival dates (including setup days)
+    const uniqueDates = [...new Set(artists?.map(a => a.date) || [])];
+    
     if (options.includeShiftSchedules) {
-      console.log("Starting shift table PDF generation for all festival dates:", festivalDates);
-      
-      for (const festivalDate of festivalDates) {
+      console.log("Starting shift table PDF generation for dates:", uniqueDates);
+      for (const date of uniqueDates) {
+        if (!date) continue;
+        
         const { data: shiftsData, error: shiftsError } = await supabase
           .from("festival_shifts")
           .select(`
             id, job_id, name, date, start_time, end_time, department, stage
           `)
           .eq("job_id", jobId)
-          .eq("date", festivalDate.date);
+          .eq("date", date);
         
-        if (shiftsError) {
-          console.error(`Error fetching shifts for ${festivalDate.date}:`, shiftsError);
-          continue;
-        }
+        if (shiftsError) continue;
         
         const filteredShifts = shiftsData?.filter(shift => 
           !shift.stage || options.shiftScheduleStages.includes(Number(shift.stage))
@@ -116,7 +89,7 @@ export const generateAndMergeFestivalPDFs = async (
         
         if (filteredShifts && filteredShifts.length > 0) {
           try {
-            console.log(`Generating shifts PDF for ${festivalDate.type} day ${festivalDate.date} with ${filteredShifts.length} shifts`);
+            console.log(`Generating shifts PDF for date ${date} with ${filteredShifts.length} shifts`);
           
             const shiftsWithAssignments = await Promise.all(filteredShifts.map(async (shift) => {
               try {
@@ -190,57 +163,43 @@ export const generateAndMergeFestivalPDFs = async (
           
             const shiftsTableData: ShiftsTablePdfData = {
               jobTitle: jobTitle || 'Festival',
-              date: festivalDate.date,
-              dateType: festivalDate.type,
+              date: date,
               jobId: jobId,
               shifts: typedShifts,
               logoUrl
             };
           
-            console.log(`Creating shifts table PDF with ${typedShifts.length} shifts for ${festivalDate.type} day and logoUrl: ${logoUrl}`);
+            console.log(`Creating shifts table PDF with ${typedShifts.length} shifts and logoUrl: ${logoUrl}`);
             const shiftPdf = await exportShiftsTablePDF(shiftsTableData);
           
-            console.log(`Generated shifts PDF for ${festivalDate.type} day ${festivalDate.date}, size: ${shiftPdf.size} bytes, type: ${shiftPdf.type}`);
+            console.log(`Generated shifts PDF for date ${date}, size: ${shiftPdf.size} bytes, type: ${shiftPdf.type}`);
             if (shiftPdf && shiftPdf.size > 0) {
               shiftPdfs.push(shiftPdf);
               console.log(`Added shift PDF to array. Current count: ${shiftPdfs.length}`);
             } else {
-              console.warn(`Generated empty shifts PDF for ${festivalDate.type} day ${festivalDate.date}, skipping`);
+              console.warn(`Generated empty shifts PDF for date ${date}, skipping`);
             }
           } catch (err) {
-            console.error(`Error generating shifts PDF for ${festivalDate.type} day ${festivalDate.date}:`, err);
+            console.error(`Error generating shifts PDF for date ${date}:`, err);
           }
         } else {
-          console.log(`No shifts found for ${festivalDate.type} day ${festivalDate.date}, skipping shifts PDF generation`);
+          console.log(`No shifts found for date ${date}, skipping shifts PDF generation`);
         }
       }
     }
     
-    // Process artist tables chronologically across all dates
-    if (options.includeArtistTables && artists && artists.length > 0) {
-      console.log("Starting chronological artist table generation");
-      
-      // Sort all artists chronologically across all dates
-      const sortedArtists = sortChronologically(
-        artists.map(artist => ({
-          ...artist,
-          time: artist.show_start
-        }))
-      );
-      
-      // Group by date while maintaining chronological order
-      const artistsByDate = groupByDateChronologically(sortedArtists);
-      
-      // Generate PDFs for each date in chronological order
-      for (const [date, dateArtists] of Object.entries(artistsByDate)) {
-        const stageArtists = dateArtists.filter(a => 
-          options.artistTableStages.includes(Number(a.stage))
+    if (options.includeArtistTables) {
+      for (const date of uniqueDates) {
+        if (!date) continue;
+        
+        const stageArtists = artists?.filter(a => 
+          a.date === date && options.artistTableStages.includes(Number(a.stage))
         );
         
-        if (stageArtists.length > 0) {
+        if (stageArtists && stageArtists.length > 0) {
           const stageMap = new Map<number, any[]>();
           
-          stageArtists.forEach(artist => {
+          stageArtists?.forEach(artist => {
             if (!stageMap.has(artist.stage)) {
               stageMap.set(artist.stage, []);
             }
@@ -252,9 +211,6 @@ export const generateAndMergeFestivalPDFs = async (
             .select("*")
             .eq("job_id", jobId);
           
-          // Find date type for this date
-          const dateTypeInfo = festivalDates.find(fd => fd.date === date);
-          
           for (const [stageNum, filteredArtists] of stageMap.entries()) {
             if (filteredArtists.length === 0) continue;
             
@@ -264,7 +220,6 @@ export const generateAndMergeFestivalPDFs = async (
             const tableData: ArtistTablePdfData = {
               jobTitle: jobTitle,
               date: date,
-              dateType: dateTypeInfo?.type,
               stage: stageName,
               artists: filteredArtists.map(artist => {
                 // Convert the database wireless_systems and iem_systems to the correct format
@@ -330,7 +285,7 @@ export const generateAndMergeFestivalPDFs = async (
             };
             
             try {
-              console.log(`Generating chronological table PDF for ${dateTypeInfo?.type || 'Unknown'} day ${date} Stage ${stageNum}`);
+              console.log(`Generating table PDF for ${date} Stage ${stageNum}`);
               const pdf = await exportArtistTablePDF(tableData);
               console.log(`Generated table PDF, size: ${pdf.size} bytes`);
               if (pdf && pdf.size > 0) {
@@ -346,25 +301,38 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
-    // Process individual artist requirements chronologically
     if (options.includeArtistRequirements && artists && artists.length > 0) {
       const filteredArtists = artists.filter(artist => 
         options.artistRequirementStages.includes(Number(artist.stage))
       );
       
-      // Sort artists chronologically across all dates and times
-      const sortedArtists = sortChronologically(
-        filteredArtists.map(artist => ({
-          ...artist,
-          time: artist.show_start
-        }))
-      );
+      const sortedArtists = [...filteredArtists].sort((a, b) => {
+        if (a.stage < b.stage) return -1;
+        if (a.stage > b.stage) return 1;
+        
+        if (a.date < b.date) return -1;
+        if (a.date > b.date) return 1;
+        
+        const aTime = a.show_start || '';
+        const bTime = b.show_start || '';
+        
+        const aHour = aTime ? parseInt(aTime.split(':')[0], 10) : 0;
+        const bHour = bTime ? parseInt(bTime.split(':')[0], 10) : 0;
+        
+        const adjustedATime = aHour >= 0 && aHour < 7 ? `${aHour + 24}${aTime.substring(aTime.indexOf(':'))}` : aTime;
+        const adjustedBTime = bHour >= 0 && bHour < 7 ? `${bHour + 24}${bTime.substring(bTime.indexOf(':'))}` : bTime;
+        
+        if (adjustedATime < adjustedBTime) return -1;
+        if (adjustedATime > adjustedBTime) return 1;
+        
+        return (a.name || '').localeCompare(b.name || '');
+      });
       
-      console.log(`Sorted ${sortedArtists.length} artists chronologically for PDF generation`);
+      console.log(`Sorted ${sortedArtists.length} artists for PDF generation`);
       
       for (const artist of sortedArtists) {
         try {
-          console.log(`Generating PDF for artist: ${artist.name}, Stage: ${artist.stage}, Date: ${artist.date}, Time: ${artist.show_start}`);
+          console.log(`Generating PDF for artist: ${artist.name}, Stage: ${artist.stage}, Time: ${artist.show_start}`);
           
           const artistData: ArtistPdfData = {
             name: artist.name || 'Unnamed Artist',
@@ -438,13 +406,16 @@ export const generateAndMergeFestivalPDFs = async (
               djBooth: Boolean(artist.extras_djbooth || false),
               wired: String(artist.extras_wired || '')
             },
-            notes: String(artist.notes || '')
+            notes: artist.notes ? String(artist.notes) : undefined,
+            logoUrl
           };
-
+          
           const pdf = await exportArtistPDF(artistData);
-          console.log(`Generated individual artist PDF for ${artist.name}, size: ${pdf.size} bytes`);
+          console.log(`Generated PDF for artist ${artist.name}, size: ${pdf.size} bytes`);
           if (pdf && pdf.size > 0) {
             individualArtistPdfs.push(pdf);
+          } else {
+            console.warn(`Generated empty PDF for artist ${artist.name}, skipping`);
           }
         } catch (err) {
           console.error(`Error generating PDF for artist ${artist.name}:`, err);
@@ -452,90 +423,144 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
-    // Generate RF/IEM table with chronological sorting
+    // Generate RF & IEM table if option is selected
     if (options.includeRfIemTable && artists && artists.length > 0) {
       const filteredArtists = artists.filter(artist => 
         options.rfIemTableStages.includes(Number(artist.stage))
       );
       
-      // Sort artists chronologically
-      const sortedArtists = sortChronologically(
-        filteredArtists.map(artist => ({
-          ...artist,
-          time: artist.show_start
-        }))
-      );
+      const sortedArtists = [...filteredArtists].sort((a, b) => {
+        if (a.stage < b.stage) return -1;
+        if (a.stage > b.stage) return 1;
+        
+        if (a.date < b.date) return -1;
+        if (a.date > b.date) return 1;
+        
+        return (a.name || '').localeCompare(b.name || '');
+      });
       
-      const rfIemData: RfIemTablePdfData = {
-        jobTitle: jobTitle || 'Festival',
-        artists: sortedArtists,
-        logoUrl
-      };
+      console.log(`Generating RF & IEM table with ${sortedArtists.length} artists`);
       
-      try {
-        console.log(`Generating RF/IEM table PDF with ${sortedArtists.length} artists`);
-        rfIemTablePdf = await exportRfIemTablePDF(rfIemData);
-        console.log(`Generated RF/IEM table PDF, size: ${rfIemTablePdf.size} bytes`);
-      } catch (err) {
-        console.error('Error generating RF/IEM table PDF:', err);
+      if (sortedArtists.length > 0) {
+        const rfIemData: RfIemTablePdfData = {
+          jobTitle,
+          logoUrl,
+          artists: sortedArtists.map(artist => {
+            return {
+              name: artist.name || 'Unnamed Artist',
+              stage: artist.stage || 1,
+              wirelessSystems: artist.wireless_systems || [],
+              iemSystems: artist.iem_systems || [],
+              wirelessProvidedBy: artist.wireless_provided_by || 'festival',
+              iemProvidedBy: artist.iem_provided_by || 'festival'
+            };
+          })
+        };
+        
+        try {
+          rfIemTablePdf = await exportRfIemTablePDF(rfIemData);
+          console.log(`Generated RF & IEM table PDF, size: ${rfIemTablePdf.size} bytes`);
+        } catch (err) {
+          console.error('Error generating RF & IEM table PDF:', err);
+        }
       }
     }
     
-    // Generate infrastructure table with chronological sorting
+    // Generate Infrastructure table if option is selected
     if (options.includeInfrastructureTable && artists && artists.length > 0) {
       const filteredArtists = artists.filter(artist => 
         options.infrastructureTableStages.includes(Number(artist.stage))
       );
       
-      // Sort artists chronologically
-      const sortedArtists = sortChronologically(
-        filteredArtists.map(artist => ({
-          ...artist,
-          time: artist.show_start
-        }))
-      );
-      
-      const infrastructureData: InfrastructureTablePdfData = {
-        jobTitle: jobTitle || 'Festival',
-        artists: sortedArtists,
-        logoUrl
-      };
-      
-      try {
-        console.log(`Generating infrastructure table PDF with ${sortedArtists.length} artists`);
-        infrastructureTablePdf = await exportInfrastructureTablePDF(infrastructureData);
-        console.log(`Generated infrastructure table PDF, size: ${infrastructureTablePdf.size} bytes`);
-      } catch (err) {
-        console.error('Error generating infrastructure table PDF:', err);
-      }
-    }
-    
-    // Generate missing rider report with chronological sorting
-    if (options.includeMissingRiderReport && artists && artists.length > 0) {
-      const missingRiderArtists = artists.filter(artist => artist.rider_missing);
-      
-      if (missingRiderArtists.length > 0) {
-        // Sort artists chronologically
-        const sortedMissingRiderArtists = sortChronologically(
-          missingRiderArtists.map(artist => ({
-            ...artist,
-            time: artist.show_start
-          }))
-        );
+      const sortedArtists = [...filteredArtists].sort((a, b) => {
+        if (a.stage < b.stage) return -1;
+        if (a.stage > b.stage) return 1;
         
-        const missingRiderData: MissingRiderReportData = {
-          jobTitle: jobTitle || 'Festival',
-          artists: sortedMissingRiderArtists,
-          logoUrl
+        if (a.date < b.date) return -1;
+        if (a.date > b.date) return 1;
+        
+        return (a.name || '').localeCompare(b.name || '');
+      });
+      
+      console.log(`Generating Infrastructure table with ${sortedArtists.length} artists`);
+      
+      if (sortedArtists.length > 0) {
+        const infrastructureData = {
+          jobTitle,
+          logoUrl,
+          artists: sortedArtists.map(artist => {
+            return {
+              name: artist.name || 'Unnamed Artist',
+              stage: artist.stage || 1,
+              providedBy: artist.infrastructure_provided_by || 'festival',
+              cat6: { 
+                enabled: Boolean(artist.infra_cat6 || false), 
+                quantity: Number(artist.infra_cat6_quantity || 0) 
+              },
+              hma: { 
+                enabled: Boolean(artist.infra_hma || false), 
+                quantity: Number(artist.infra_hma_quantity || 0) 
+              },
+              coax: { 
+                enabled: Boolean(artist.infra_coax || false), 
+                quantity: Number(artist.infra_coax_quantity || 0) 
+              },
+              opticalconDuo: { 
+                enabled: Boolean(artist.infra_opticalcon_duo || false), 
+                quantity: Number(artist.infra_opticalcon_duo_quantity || 0) 
+              },
+              analog: Number(artist.infra_analog || 0),
+              other: String(artist.other_infrastructure || '')
+            } as ArtistInfrastructureData;
+          })
         };
         
         try {
-          console.log(`Generating missing rider report PDF with ${sortedMissingRiderArtists.length} artists`);
-          missingRiderReportPdf = await exportMissingRiderReportPDF(missingRiderData);
-          console.log(`Generated missing rider report PDF, size: ${missingRiderReportPdf.size} bytes`);
+          infrastructureTablePdf = await exportInfrastructureTablePDF(infrastructureData);
+          console.log(`Generated Infrastructure table PDF, size: ${infrastructureTablePdf.size} bytes`);
         } catch (err) {
-          console.error('Error generating missing rider report PDF:', err);
+          console.error('Error generating Infrastructure table PDF:', err);
         }
+      }
+    }
+    
+    // Generate Missing Rider Report if option is selected
+    if (options.includeMissingRiderReport && artists && artists.length > 0) {
+      const missingRiderArtists = artists.filter(artist => 
+        Boolean(artist.rider_missing)
+      );
+      
+      console.log(`Generating Missing Rider Report with ${missingRiderArtists.length} artists`);
+      
+      const sortedMissingRiderArtists = [...missingRiderArtists].sort((a, b) => {
+        if (a.stage < b.stage) return -1;
+        if (a.stage > b.stage) return 1;
+        
+        if (a.date < b.date) return -1;
+        if (a.date > b.date) return 1;
+        
+        return (a.name || '').localeCompare(b.name || '');
+      });
+      
+      const missingRiderData: MissingRiderReportData = {
+        jobTitle,
+        logoUrl,
+        artists: sortedMissingRiderArtists.map(artist => ({
+          name: artist.name || 'Unnamed Artist',
+          stage: artist.stage || 1,
+          date: artist.date || '',
+          showTime: {
+            start: artist.show_start || '',
+            end: artist.show_end || ''
+          }
+        }))
+      };
+      
+      try {
+        missingRiderReportPdf = await exportMissingRiderReportPDF(missingRiderData);
+        console.log(`Generated Missing Rider Report PDF, size: ${missingRiderReportPdf.size} bytes`);
+      } catch (err) {
+        console.error('Error generating Missing Rider Report PDF:', err);
       }
     }
     

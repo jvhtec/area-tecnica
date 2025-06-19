@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -95,14 +96,16 @@ export const PrintOptionsDialog = ({
     const selectedSections = [];
     if (options.includeShiftSchedules) selectedSections.push('Shifts');
     if (options.includeGearSetup) selectedSections.push('Equipment');
-    if (options.includeArtistTables) selectedSections.push('Artist_Schedules');
+    if (options.includeArtistTables) selectedSections.push('Artist_Tables');
     if (options.includeRfIemTable) selectedSections.push('RF_IEM');
     if (options.includeInfrastructureTable) selectedSections.push('Infrastructure');
     if (options.includeMissingRiderReport) selectedSections.push('Missing_Riders');
-    if (options.includeArtistRequirements) selectedSections.push('Technical_Requirements');
+    if (options.includeArtistRequirements) selectedSections.push('Artist_Requirements');
 
-    // Enhanced filename generation for comprehensive documentation
-    if (selectedSections.length >= 4) {
+    // If only one section is selected, make it more specific
+    if (selectedSections.length === 1) {
+      const section = selectedSections[0];
+      
       // Get unique stages across all selected sections
       const allSelectedStages = new Set([
         ...(options.includeGearSetup ? options.gearSetupStages : []),
@@ -119,36 +122,32 @@ export const PrintOptionsDialog = ({
         const stageString = sortedStages.length === 1 
           ? `Stage${sortedStages[0]}`
           : `Stages${sortedStages.join('_')}`;
-        return `${baseTitle}_${stageString}_Complete_Festival_Documentation.pdf`;
-      }
-      
-      return `${baseTitle}_Complete_Festival_Documentation.pdf`;
-    }
-
-    // If only one section is selected, make it more specific
-    if (selectedSections.length === 1) {
-      const section = selectedSections[0];
-      
-      // Get unique stages for the specific section
-      let sectionStages: number[] = [];
-      if (section === 'Shifts') sectionStages = options.shiftScheduleStages;
-      else if (section === 'Equipment') sectionStages = options.gearSetupStages;
-      else if (section === 'Artist_Schedules') sectionStages = options.artistTableStages;
-      else if (section === 'RF_IEM') sectionStages = options.rfIemTableStages;
-      else if (section === 'Infrastructure') sectionStages = options.infrastructureTableStages;
-      else if (section === 'Technical_Requirements') sectionStages = options.artistRequirementStages;
-      
-      if (sectionStages.length < maxStages && sectionStages.length > 0) {
-        const stageString = sectionStages.length === 1 
-          ? `Stage${sectionStages[0]}`
-          : `Stages${sectionStages.join('_')}`;
         return `${baseTitle}_${stageString}_${section}.pdf`;
       }
       
       return `${baseTitle}_${section}.pdf`;
     }
 
-    return `${baseTitle}_Festival_Documentation.pdf`;
+    // If multiple sections or all sections, check if specific stages are selected
+    const allSelectedStages = new Set([
+      ...(options.includeGearSetup ? options.gearSetupStages : []),
+      ...(options.includeShiftSchedules ? options.shiftScheduleStages : []),
+      ...(options.includeArtistTables ? options.artistTableStages : []),
+      ...(options.includeArtistRequirements ? options.artistRequirementStages : []),
+      ...(options.includeRfIemTable ? options.rfIemTableStages : []),
+      ...(options.includeInfrastructureTable ? options.infrastructureTableStages : [])
+    ]);
+    
+    const sortedStages = Array.from(allSelectedStages).sort((a, b) => a - b);
+    
+    if (sortedStages.length < maxStages && sortedStages.length > 0) {
+      const stageString = sortedStages.length === 1 
+        ? `Stage${sortedStages[0]}`
+        : `Stages${sortedStages.join('_')}`;
+      return `${baseTitle}_${stageString}_Documentation.pdf`;
+    }
+
+    return `${baseTitle}_Complete_Documentation.pdf`;
   };
 
   const renderStageSelections = (section: 'gearSetupStages' | 'shiftScheduleStages' | 'artistTableStages' | 'artistRequirementStages' | 'rfIemTableStages' | 'infrastructureTableStages') => {
@@ -183,15 +182,9 @@ export const PrintOptionsDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Generate Festival Documentation</DialogTitle>
+          <DialogTitle>Select Documents to Print</DialogTitle>
         </DialogHeader>
         <div className="space-y-6 py-4">
-          <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md p-3">
-            <p className="text-sm text-blue-800 dark:text-blue-200">
-              <strong>Enhanced Documentation:</strong> All documents will be generated with proper chronological ordering across all festival dates, including setup and build days.
-            </p>
-          </div>
-
           {maxStages > 1 && (
             <div className="border-b pb-4">
               <h3 className="text-sm font-medium mb-3">Global Stage Controls</h3>
@@ -243,9 +236,6 @@ export const PrintOptionsDialog = ({
                 />
                 <Label htmlFor="shift-schedules">Staff Shift Schedules</Label>
               </div>
-              <div className="pl-6 text-sm text-muted-foreground">
-                Includes all festival days: setup, build, rehearsal, and show days
-              </div>
               {options.includeShiftSchedules && maxStages > 1 && renderStageSelections('shiftScheduleStages')}
             </div>
 
@@ -260,9 +250,6 @@ export const PrintOptionsDialog = ({
                 />
                 <Label htmlFor="artist-tables">Artist Schedule Tables</Label>
               </div>
-              <div className="pl-6 text-sm text-muted-foreground">
-                Chronologically ordered across all festival dates
-              </div>
               {options.includeArtistTables && maxStages > 1 && renderStageSelections('artistTableStages')}
             </div>
 
@@ -275,10 +262,7 @@ export const PrintOptionsDialog = ({
                     setOptions(prev => ({ ...prev, includeArtistRequirements: checked as boolean }))
                   }
                 />
-                <Label htmlFor="artist-requirements">Individual Artist Technical Requirements</Label>
-              </div>
-              <div className="pl-6 text-sm text-muted-foreground">
-                One page per artist, sorted chronologically by performance time
+                <Label htmlFor="artist-requirements">Individual Artist Requirements</Label>
               </div>
               {options.includeArtistRequirements && maxStages > 1 && renderStageSelections('artistRequirementStages')}
             </div>
@@ -294,9 +278,6 @@ export const PrintOptionsDialog = ({
                 />
                 <Label htmlFor="rf-iem-table">Artist RF & IEM Overview</Label>
               </div>
-              <div className="pl-6 text-sm text-muted-foreground">
-                Chronologically sorted wireless and IEM requirements
-              </div>
               {options.includeRfIemTable && maxStages > 1 && renderStageSelections('rfIemTableStages')}
             </div>
 
@@ -310,9 +291,6 @@ export const PrintOptionsDialog = ({
                   }
                 />
                 <Label htmlFor="infrastructure-table">Infrastructure Needs Overview</Label>
-              </div>
-              <div className="pl-6 text-sm text-muted-foreground">
-                Chronologically sorted infrastructure requirements
               </div>
               {options.includeInfrastructureTable && maxStages > 1 && renderStageSelections('infrastructureTableStages')}
             </div>
@@ -329,7 +307,7 @@ export const PrintOptionsDialog = ({
                 <Label htmlFor="missing-rider-report">Missing Rider Report</Label>
               </div>
               <div className="pl-6 text-sm text-muted-foreground">
-                Chronologically sorted list of artists with missing technical riders
+                Summary of all artists with missing technical riders
               </div>
             </div>
           </div>
@@ -346,7 +324,7 @@ export const PrintOptionsDialog = ({
             Cancel
           </Button>
           <Button onClick={handleConfirm}>
-            Generate Comprehensive PDF
+            Generate PDF
           </Button>
         </DialogFooter>
       </DialogContent>
