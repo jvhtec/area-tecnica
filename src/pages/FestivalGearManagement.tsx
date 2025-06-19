@@ -79,35 +79,50 @@ const FestivalGearManagement = () => {
       
       console.log(`Current max_stages: ${actualMaxStages}`);
       
-      // Ensure all stage records exist (1 through max_stages)
-      const stagesToCreate = [];
-      for (let i = 1; i <= actualMaxStages; i++) {
-        stagesToCreate.push({
-          job_id: jobId,
-          number: i,
-          name: `Stage ${i}`
-        });
+      // First, fetch existing stages to preserve custom names
+      const { data: existingStages, error: fetchError } = await supabase
+        .from("festival_stages")
+        .select("id, number, name")
+        .eq("job_id", jobId)
+        .order("number");
+
+      if (fetchError) {
+        console.error("Error fetching existing stages:", fetchError);
+        return;
       }
+
+      console.log("Existing stages:", existingStages);
+
+      // Determine which stages need to be created
+      const existingStageNumbers = new Set((existingStages || []).map(stage => stage.number));
+      const stagesToCreate = [];
       
-      if (stagesToCreate.length > 0) {
-        console.log("Upserting stage records:", stagesToCreate);
-        
-        // Use upsert to create or update stage records
-        const { error: upsertError } = await supabase
-          .from("festival_stages")
-          .upsert(stagesToCreate, {
-            onConflict: 'job_id,number',
-            ignoreDuplicates: false
+      for (let i = 1; i <= actualMaxStages; i++) {
+        if (!existingStageNumbers.has(i)) {
+          stagesToCreate.push({
+            job_id: jobId,
+            number: i,
+            name: `Stage ${i}`
           });
-        
-        if (upsertError) {
-          console.error("Error upserting stage records:", upsertError);
-        } else {
-          console.log("Successfully upserted stage records");
         }
       }
       
-      // Now fetch the current stage data from database
+      // Only create missing stages (don't overwrite existing ones)
+      if (stagesToCreate.length > 0) {
+        console.log("Creating missing stage records:", stagesToCreate);
+        
+        const { error: insertError } = await supabase
+          .from("festival_stages")
+          .insert(stagesToCreate);
+        
+        if (insertError) {
+          console.error("Error inserting new stage records:", insertError);
+        } else {
+          console.log("Successfully created missing stage records");
+        }
+      }
+      
+      // Now fetch the complete current stage data from database
       const { data: stageData, error: stageError } = await supabase
         .from("festival_stages")
         .select("id, number, name")
