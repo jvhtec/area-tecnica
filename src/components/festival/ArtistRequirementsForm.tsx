@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { BasicInfoSection } from "./form/sections/BasicInfoSection";
 import { ConsoleSetupSection } from "./form/sections/ConsoleSetupSection";
-import { WirelessSetupSection } from "./form/sections/WirelessSetupSection";
+import { ArtistWirelessSetupSection } from "./form/sections/ArtistWirelessSetupSection";
 import { MonitorSetupSection } from "./form/sections/MonitorSetupSection";
 import { ExtraRequirementsSection } from "./form/sections/ExtraRequirementsSection";
 import { InfrastructureSection } from "./form/sections/InfrastructureSection";
@@ -292,8 +292,7 @@ export const ArtistRequirementsForm = () => {
               <form onSubmit={handleSubmit} className="space-y-8">
                 <BasicInfoSection 
                   formData={formData} 
-                  onChange={handleFormChange} 
-                  gearSetup={gearSetup}
+                  onChange={handleFormChange}
                 />
 
                 <ConsoleSetupSection 
@@ -302,10 +301,9 @@ export const ArtistRequirementsForm = () => {
                   gearSetup={gearSetup}
                 />
 
-                <WirelessSetupSection 
+                <ArtistWirelessSetupSection 
                   formData={formData} 
-                  onChange={handleFormChange} 
-                  gearSetup={gearSetup}
+                  onChange={handleFormChange}
                 />
 
                 <MonitorSetupSection 
@@ -328,8 +326,7 @@ export const ArtistRequirementsForm = () => {
 
                 <NotesSection 
                   formData={formData} 
-                  onChange={handleFormChange} 
-                  gearSetup={gearSetup}
+                  onChange={handleFormChange}
                 />
 
                 <Button type="submit" disabled={isLoading} className="w-full">

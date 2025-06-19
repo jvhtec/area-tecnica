@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { WirelessSetupSection } from "./form/sections/WirelessSetupSection";
+import { ArtistWirelessSetupSection } from "./form/sections/ArtistWirelessSetupSection";
 import { ArtistFormData } from "@/types/festival";
 
 const consoleOptions = [
@@ -196,7 +196,7 @@ export const ArtistForm = () => {
             </div>
 
             {/* RF & Wireless Setup Section */}
-            <WirelessSetupSection
+            <ArtistWirelessSetupSection
               formData={formData}
               onChange={(data) => setFormData(prev => ({ ...prev, ...data }))}
             />

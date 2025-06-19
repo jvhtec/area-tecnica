@@ -1,8 +1,8 @@
 
 import { WirelessConfig } from "../../gear-setup/WirelessConfig";
-import { SectionProps } from "@/types/festival-form";
+import { ArtistSectionProps } from "@/types/artist-form";
 
-export const WirelessSetupSection = ({ formData, onChange }: SectionProps) => {
+export const ArtistWirelessSetupSection = ({ formData, onChange }: ArtistSectionProps) => {
   const handleWirelessChange = (systems: any[]) => {
     onChange({ 
       wireless_systems: systems
