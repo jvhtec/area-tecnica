@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -414,8 +413,6 @@ export const FestivalGearSetupForm = ({
       <WirelessSetupSection
         formData={setup}
         onChange={handleChange}
-        gearSetup={globalSetup}
-        stageNumber={stageNumber}
       />
 
       <MonitorSetupSection
