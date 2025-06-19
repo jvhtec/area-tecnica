@@ -57,101 +57,102 @@ const FestivalGearManagement = () => {
       table: "festival_gear_setups",
       filter: `job_id=eq.${jobId}`,
       queryKey: ["festival-gear", jobId, selectedDate]
+    },
+    {
+      table: "festival_stages",
+      filter: `job_id=eq.${jobId}`,
+      queryKey: ["festival-stages", jobId]
     }
   ]);
 
-  // Helper function to ensure stage records exist - FIXED VERSION
-  const ensureStageRecordsExist = async (maxStagesCount: number) => {
-    if (!jobId) {
-      console.log("No jobId provided to ensureStageRecordsExist");
-      return false;
-    }
+  // Consolidated function to fetch and sync all stage data
+  const fetchAndSyncStageData = async (currentMaxStages?: number) => {
+    if (!jobId) return;
     
     try {
-      console.log(`=== ENSURING STAGE RECORDS EXIST FOR ${maxStagesCount} STAGES ===`);
+      console.log("=== FETCHING AND SYNCING STAGE DATA ===");
       
-      // Get existing stages
-      const { data: existingStages, error: fetchError } = await supabase
-        .from("festival_stages")
-        .select("*")
-        .eq("job_id", jobId)
-        .order("number");
-
-      if (fetchError) {
-        console.error("Error fetching existing stages:", fetchError);
-        return false;
-      }
-
-      console.log("Existing stages in database:", existingStages);
-      
-      const existingStageNumbers = existingStages?.map(s => s.number) || [];
-      const stagesToCreate = [];
-
-      // Create records for missing stages (1 through maxStagesCount)
-      for (let i = 1; i <= maxStagesCount; i++) {
-        if (!existingStageNumbers.includes(i)) {
-          stagesToCreate.push({
-            job_id: jobId,
-            number: i,
-            name: `Stage ${i}`
-          });
-        }
-      }
-
-      console.log("Stages to create:", stagesToCreate);
-
-      if (stagesToCreate.length > 0) {
-        console.log(`Creating ${stagesToCreate.length} missing stage records`);
+      // Get current max_stages from gear setup if not provided
+      let actualMaxStages = currentMaxStages;
+      if (!actualMaxStages) {
+        const { data: setupData } = await supabase
+          .from("festival_gear_setups")
+          .select("max_stages")
+          .eq("job_id", jobId)
+          .eq("date", selectedDate)
+          .maybeSingle();
         
-        const { data: insertedStages, error: insertError } = await supabase
-          .from("festival_stages")
-          .insert(stagesToCreate)
-          .select();
-
-        if (insertError) {
-          console.error("Error creating stage records:", insertError);
-          return false;
-        }
-
-        console.log("Successfully created stage records:", insertedStages);
+        actualMaxStages = setupData?.max_stages || 1;
       }
-
-      // Always fetch updated stages after creation
-      const { data: updatedStages, error: refetchError } = await supabase
+      
+      console.log(`Current max_stages: ${actualMaxStages}`);
+      
+      // Ensure all stage records exist (1 through max_stages)
+      const stagesToCreate = [];
+      for (let i = 1; i <= actualMaxStages; i++) {
+        stagesToCreate.push({
+          job_id: jobId,
+          number: i,
+          name: `Stage ${i}`
+        });
+      }
+      
+      if (stagesToCreate.length > 0) {
+        console.log("Upserting stage records:", stagesToCreate);
+        
+        // Use upsert to create or update stage records
+        const { error: upsertError } = await supabase
+          .from("festival_stages")
+          .upsert(stagesToCreate, {
+            onConflict: 'job_id,number',
+            ignoreDuplicates: false
+          });
+        
+        if (upsertError) {
+          console.error("Error upserting stage records:", upsertError);
+        } else {
+          console.log("Successfully upserted stage records");
+        }
+      }
+      
+      // Now fetch the current stage data from database
+      const { data: stageData, error: stageError } = await supabase
         .from("festival_stages")
-        .select("*")
+        .select("id, number, name")
         .eq("job_id", jobId)
         .order("number");
 
-      if (refetchError) {
-        console.error("Error refetching stages:", refetchError);
-        return false;
+      if (stageError) {
+        console.error("Error fetching stages:", stageError);
+        return;
       }
 
-      if (updatedStages) {
-        const stageInfo = updatedStages.map(stage => ({
+      if (stageData && stageData.length > 0) {
+        const stageInfo = stageData.map(stage => ({
           id: stage.id,
           number: stage.number,
           name: stage.name || `Stage ${stage.number}`
         }));
         
-        console.log("Updated stages state with:", stageInfo);
+        console.log("Setting stages from database:", stageInfo);
         setStages(stageInfo);
-        return true;
+        setMaxStages(actualMaxStages);
       }
       
-      return false;
     } catch (error) {
-      console.error("Error in ensureStageRecordsExist:", error);
-      return false;
+      console.error("Error in fetchAndSyncStageData:", error);
     }
   };
 
+  // Initial data loading
   useEffect(() => {
     if (!jobId) return;
 
-    const fetchJobDetails = async () => {
+    const initializeData = async () => {
       try {
+        setIsLoading(true);
+        
+        // Fetch job details
         const { data: jobData, error: jobError } = await supabase
           .from("jobs")
           .select("title, start_time, end_time")
@@ -186,36 +187,21 @@ const FestivalGearManagement = () => {
           description: "Could not load festival details",
           variant: "destructive",
         });
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    const fetchStages = async () => {
+    initializeData();
+  }, [jobId, toast]);
+
+  // Sync stage data when selectedDate changes
+  useEffect(() => {
+    if (!selectedDate || !jobId) return;
+    
+    const loadGearSetupAndStages = async () => {
       try {
-        const { data: stageData, error: stageError } = await supabase
-          .from("festival_stages")
-          .select("id, number, name")
-          .eq("job_id", jobId)
-          .order("number");
-
-        if (stageError) throw stageError;
-
-        if (stageData && stageData.length > 0) {
-          const stageInfo = stageData.map(stage => ({
-            id: stage.id,
-            number: stage.number,
-            name: stage.name || `Stage ${stage.number}`
-          }));
-          setStages(stageInfo);
-          setMaxStages(Math.max(...stageInfo.map(s => s.number)));
-          console.log("Loaded existing stages:", stageInfo);
-        }
-      } catch (error) {
-        console.error("Error fetching stages:", error);
-      }
-    };
-
-    const fetchFestivalGearSetup = async () => {
-      try {
+        // Fetch gear setup to get max_stages
         const { data: setupData, error: setupError } = await supabase
           .from("festival_gear_setups")
           .select("*")
@@ -228,41 +214,34 @@ const FestivalGearManagement = () => {
         if (setupData) {
           setGearSetup(setupData);
           const setupMaxStages = setupData.max_stages || 1;
-          setMaxStages(setupMaxStages);
           
           console.log(`Gear setup loaded with max_stages: ${setupMaxStages}`);
           
-          // Ensure stage records exist for the gear setup
-          await ensureStageRecordsExist(setupMaxStages);
+          // Fetch and sync stage data with this max_stages
+          await fetchAndSyncStageData(setupMaxStages);
         } else {
           setGearSetup(null);
           // Even if no gear setup exists, ensure we have at least stage 1
-          await ensureStageRecordsExist(1);
+          await fetchAndSyncStageData(1);
         }
       } catch (error) {
-        console.error("Error fetching festival gear setup:", error);
+        console.error("Error loading gear setup and stages:", error);
         toast({
           title: "Error",
           description: "Could not load festival gear setup",
           variant: "destructive",
         });
-      } finally {
-        setIsLoading(false);
       }
     };
 
-    fetchJobDetails();
-    fetchStages();
-    if (selectedDate) {
-      fetchFestivalGearSetup();
-    }
-  }, [jobId, selectedDate, toast]);
+    loadGearSetupAndStages();
+  }, [selectedDate, jobId, toast]);
 
+  // Fetch stage setups to show custom badges
   const fetchStageSetups = async () => {
     if (!selectedDate || !jobId) return;
     
     try {
-      // First get the gear setup ID for the selected date
       const { data: gearSetup, error: gearError } = await supabase
         .from("festival_gear_setups")
         .select("id")
@@ -277,7 +256,6 @@ const FestivalGearManagement = () => {
       
       if (!gearSetup) return;
       
-      // Then fetch all stage setups for this gear setup
       const { data: stageSetupData, error: stageError } = await supabase
         .from("festival_stage_gear_setups")
         .select("stage_number")
@@ -288,7 +266,6 @@ const FestivalGearManagement = () => {
         return;
       }
       
-      // Create a map of stage numbers to true (has custom setup)
       const setupMap = stageSetupData.reduce((acc, item) => {
         acc[item.stage_number] = true;
         return acc;
@@ -323,23 +300,13 @@ const FestivalGearManagement = () => {
 
       if (error) throw error;
 
-      setMaxStages(newMaxStages);
+      // Fetch and sync stage data with the new max_stages
+      await fetchAndSyncStageData(newMaxStages);
       
-      // Ensure stage records exist for ALL stages up to the new max
-      const success = await ensureStageRecordsExist(newMaxStages);
-      
-      if (success) {
-        toast({
-          title: "Success",
-          description: `Updated to ${newMaxStages} stages`,
-        });
-      } else {
-        toast({
-          title: "Warning",
-          description: "Stages updated but some stage records may not have been created",
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Success",
+        description: `Updated to ${newMaxStages} stages`,
+      });
     } catch (error: any) {
       console.error("Error updating max stages:", error);
       toast({
@@ -379,37 +346,12 @@ const FestivalGearManagement = () => {
     try {
       console.log(`=== SAVING STAGE EDIT: Stage ${editingStage} -> "${editingStageName.trim()}" ===`);
       
-      // Check if stage record exists first
-      const { data: existingStage, error: checkError } = await supabase
-        .from("festival_stages")
-        .select("*")
-        .eq("job_id", jobId)
-        .eq("number", editingStage)
-        .maybeSingle();
-
-      if (checkError) {
-        console.error("Error checking existing stage:", checkError);
-        throw checkError;
-      }
-
-      console.log("Existing stage record:", existingStage);
-
-      if (!existingStage) {
-        console.log("Stage record doesn't exist, creating it first");
-        // Create the missing stage record
-        await ensureStageRecordsExist(Math.max(maxStages, editingStage));
-      }
-
-      // Now save the stage name
+      // Update the stage name in database
       const { data, error } = await supabase
         .from("festival_stages")
-        .upsert({
-          job_id: jobId,
-          number: editingStage,
-          name: editingStageName.trim()
-        }, {
-          onConflict: 'job_id,number'
-        })
+        .update({ name: editingStageName.trim() })
+        .eq("job_id", jobId)
+        .eq("number", editingStage)
         .select();
 
       if (error) {
@@ -419,7 +361,7 @@ const FestivalGearManagement = () => {
 
       console.log("Stage save successful:", data);
 
-      // Update local state
+      // Immediately update local state to reflect the change
       setStages(prev => prev.map(stage => 
         stage.number === editingStage 
           ? { ...stage, name: editingStageName.trim() }
