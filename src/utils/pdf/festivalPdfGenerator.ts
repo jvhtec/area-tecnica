@@ -56,6 +56,22 @@ export const generateAndMergeFestivalPDFs = async (
   const logoUrl = await fetchLogoUrl(jobId);
   console.log("Logo URL for PDFs:", logoUrl);
   
+  // Fetch stage names for consistent usage
+  const { data: stageNames, error: stageError } = await supabase
+    .from("festival_stages")
+    .select("number, name")
+    .eq("job_id", jobId)
+    .order("number");
+  
+  if (stageError) {
+    console.error("Error fetching stage names:", stageError);
+  }
+  
+  const getStageNameByNumber = (stageNumber: number): string => {
+    const stage = stageNames?.find(s => s.number === stageNumber);
+    return stage?.name || `Stage ${stageNumber}`;
+  };
+  
   const gearPdfs: Blob[] = [];
   const shiftPdfs: Blob[] = [];
   const artistTablePdfs: Blob[] = [];
@@ -77,21 +93,15 @@ export const generateAndMergeFestivalPDFs = async (
       
       for (const stageNum of options.gearSetupStages) {
         try {
-          const { data: stages } = await supabase
-            .from("festival_stages")
-            .select("*")
-            .eq("job_id", jobId);
-          
-          const stageObj = stages?.find(s => s.number === stageNum);
-          const stageName = stageObj ? stageObj.name : `Stage ${stageNum}`;
+          const stageName = getStageNameByNumber(stageNum);
           
           const pdf = await generateStageGearPDF(jobId, stageNum, stageName);
           
           if (pdf && pdf.size > 0) {
-            console.log(`Generated gear setup PDF for stage ${stageNum}, size: ${pdf.size} bytes`);
+            console.log(`Generated gear setup PDF for ${stageName}, size: ${pdf.size} bytes`);
             gearPdfs.push(pdf);
           } else {
-            console.log(`No gear setup found for stage ${stageNum}, skipping`);
+            console.log(`No gear setup found for ${stageName}, skipping`);
           }
         } catch (err) {
           console.error(`Error generating gear setup PDF for stage ${stageNum}:`, err);
@@ -277,8 +287,7 @@ export const generateAndMergeFestivalPDFs = async (
           for (const [stageNum, stageArtists] of stageMap.entries()) {
             if (stageArtists.length === 0) continue;
             
-            const stageObj = stages?.find(s => s.number === stageNum);
-            const stageName = stageObj ? stageObj.name : `Stage ${stageNum}`;
+            const stageName = getStageNameByNumber(stageNum);
             
             const tableData: ArtistTablePdfData = {
               jobTitle: jobTitle,
@@ -348,16 +357,16 @@ export const generateAndMergeFestivalPDFs = async (
             };
             
             try {
-              console.log(`Generating table PDF for ${date} Stage ${stageNum}`);
+              console.log(`Generating table PDF for ${date} ${stageName}`);
               const pdf = await exportArtistTablePDF(tableData);
               console.log(`Generated table PDF, size: ${pdf.size} bytes`);
               if (pdf && pdf.size > 0) {
                 artistTablePdfs.push(pdf);
               } else {
-                console.warn(`Generated empty table PDF for ${date} Stage ${stageNum}, skipping`);
+                console.warn(`Generated empty table PDF for ${date} ${stageName}, skipping`);
               }
             } catch (err) {
-              console.error(`Error generating table PDF for ${date} Stage ${stageNum}:`, err);
+              console.error(`Error generating table PDF for ${date} ${stageName}:`, err);
             }
           }
         }

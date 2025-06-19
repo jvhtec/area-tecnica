@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Plus, Copy, Save, Wrench, Printer, Loader2, Calendar } from "lucide-react";
+import { ArrowLeft, Plus, Copy, Save, Wrench, Printer, Loader2, Calendar, Edit2, Check, X } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/enhanced-supabase-client";
@@ -20,6 +20,12 @@ import { PrintOptions, PrintOptionsDialog } from "@/components/festival/pdf/Prin
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+interface StageInfo {
+  id?: string;
+  number: number;
+  name: string;
+}
+
 const FestivalGearManagement = () => {
   const { jobId } = useParams();
   const navigate = useNavigate();
@@ -28,9 +34,11 @@ const FestivalGearManagement = () => {
   const [jobDates, setJobDates] = useState<Date[]>([]);
   const [selectedDate, setSelectedDate] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [stages, setStages] = useState<number[]>([1]);
+  const [stages, setStages] = useState<StageInfo[]>([{ number: 1, name: "Stage 1" }]);
   const [maxStages, setMaxStages] = useState(1);
   const [selectedStage, setSelectedStage] = useState(1);
+  const [editingStage, setEditingStage] = useState<number | null>(null);
+  const [editingStageName, setEditingStageName] = useState("");
   const [gearSetup, setGearSetup] = useState<FestivalGearSetup | null>(null);
   const [isCreateStageDialogOpen, setIsCreateStageDialogOpen] = useState(false);
   const [newStageName, setNewStageName] = useState("");
@@ -94,6 +102,30 @@ const FestivalGearManagement = () => {
       }
     };
 
+    const fetchStages = async () => {
+      try {
+        const { data: stageData, error: stageError } = await supabase
+          .from("festival_stages")
+          .select("id, number, name")
+          .eq("job_id", jobId)
+          .order("number");
+
+        if (stageError) throw stageError;
+
+        if (stageData && stageData.length > 0) {
+          const stageInfo = stageData.map(stage => ({
+            id: stage.id,
+            number: stage.number,
+            name: stage.name || `Stage ${stage.number}`
+          }));
+          setStages(stageInfo);
+          setMaxStages(Math.max(...stageInfo.map(s => s.number)));
+        }
+      } catch (error) {
+        console.error("Error fetching stages:", error);
+      }
+    };
+
     const fetchFestivalGearSetup = async () => {
       try {
         const { data: setupData, error: setupError } = await supabase
@@ -108,12 +140,17 @@ const FestivalGearManagement = () => {
         if (setupData) {
           setGearSetup(setupData);
           setMaxStages(setupData.max_stages || 1);
-          const stagesArray = Array.from({ length: setupData.max_stages || 1 }, (_, i) => i + 1);
-          setStages(stagesArray);
+          
+          // Update stages if gear setup has more stages than currently known
+          if (setupData.max_stages > stages.length) {
+            const additionalStages = [];
+            for (let i = stages.length + 1; i <= setupData.max_stages; i++) {
+              additionalStages.push({ number: i, name: `Stage ${i}` });
+            }
+            setStages(prev => [...prev, ...additionalStages]);
+          }
         } else {
           setGearSetup(null);
-          setMaxStages(1);
-          setStages([1]);
         }
       } catch (error) {
         console.error("Error fetching festival gear setup:", error);
@@ -128,6 +165,7 @@ const FestivalGearManagement = () => {
     };
 
     fetchJobDetails();
+    fetchStages();
     if (selectedDate) {
       fetchFestivalGearSetup();
     }
@@ -195,9 +233,37 @@ const FestivalGearManagement = () => {
 
       if (error) throw error;
 
+      // Create stage records for new stages
+      const newStages = [];
+      for (let i = maxStages + 1; i <= newMaxStages; i++) {
+        newStages.push({
+          job_id: jobId,
+          number: i,
+          name: `Stage ${i}`
+        });
+      }
+
+      if (newStages.length > 0) {
+        const { error: stageError } = await supabase
+          .from("festival_stages")
+          .upsert(newStages, {
+            onConflict: 'job_id,number'
+          });
+
+        if (stageError) throw stageError;
+      }
+
       setMaxStages(newMaxStages);
-      const stagesArray = Array.from({ length: newMaxStages }, (_, i) => i + 1);
-      setStages(stagesArray);
+      const updatedStages = [];
+      for (let i = 1; i <= newMaxStages; i++) {
+        const existingStage = stages.find(s => s.number === i);
+        updatedStages.push({
+          number: i,
+          name: existingStage?.name || `Stage ${i}`,
+          id: existingStage?.id
+        });
+      }
+      setStages(updatedStages);
       
       toast({
         title: "Success",
@@ -216,7 +282,68 @@ const FestivalGearManagement = () => {
   };
 
   const handleAddStage = () => {
-    handleUpdateMaxStages(maxStages + 1);
+    if (newStageName.trim()) {
+      handleUpdateMaxStages(maxStages + 1);
+      setNewStageName("");
+      setIsCreateStageDialogOpen(false);
+    } else {
+      handleUpdateMaxStages(maxStages + 1);
+    }
+  };
+
+  const handleStartEditStage = (stageNumber: number) => {
+    const stage = stages.find(s => s.number === stageNumber);
+    setEditingStage(stageNumber);
+    setEditingStageName(stage?.name || `Stage ${stageNumber}`);
+  };
+
+  const handleSaveStageEdit = async () => {
+    if (!editingStage || !editingStageName.trim()) return;
+
+    try {
+      const { error } = await supabase
+        .from("festival_stages")
+        .upsert({
+          job_id: jobId,
+          number: editingStage,
+          name: editingStageName.trim()
+        }, {
+          onConflict: 'job_id,number'
+        });
+
+      if (error) throw error;
+
+      setStages(prev => prev.map(stage => 
+        stage.number === editingStage 
+          ? { ...stage, name: editingStageName.trim() }
+          : stage
+      ));
+
+      setEditingStage(null);
+      setEditingStageName("");
+
+      toast({
+        title: "Success",
+        description: "Stage name updated",
+      });
+    } catch (error) {
+      console.error("Error updating stage name:", error);
+      toast({
+        title: "Error",
+        description: "Could not update stage name",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCancelStageEdit = () => {
+    setEditingStage(null);
+    setEditingStageName("");
+  };
+
+  const getCurrentStageName = (stageNumber: number) => {
+    const stage = stages.find(s => s.number === stageNumber);
+    return stage?.name || `Stage ${stageNumber}`;
   };
 
   const handleSave = () => {
@@ -375,25 +502,58 @@ const FestivalGearManagement = () => {
               </Button>
             </div>
             <CardDescription>
-              Configure the number of stages for {format(new Date(selectedDate), 'MMMM d, yyyy')}
+              Configure the stages for {format(new Date(selectedDate), 'MMMM d, yyyy')}. Click on a stage name to edit it.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-4">
               {stages.map((stage) => (
-                <div key={stage} className="relative">
+                <div key={stage.number} className="relative">
                   <Button
-                    variant={selectedStage === stage ? "default" : "outline"}
-                    onClick={() => setSelectedStage(stage)}
-                    className="px-6"
+                    variant={selectedStage === stage.number ? "default" : "outline"}
+                    onClick={() => setSelectedStage(stage.number)}
+                    className="px-6 flex items-center gap-2"
                   >
-                    Stage {stage}
-                    {stageSetups[stage] && (
+                    <span>{stage.name}</span>
+                    {stageSetups[stage.number] && (
                       <Badge variant="outline" className="ml-2 bg-blue-100">
                         Custom
                       </Badge>
                     )}
                   </Button>
+                  
+                  {editingStage === stage.number ? (
+                    <div className="absolute top-full left-0 mt-2 p-2 bg-white border rounded-md shadow-lg z-10 min-w-[200px]">
+                      <Input
+                        value={editingStageName}
+                        onChange={(e) => setEditingStageName(e.target.value)}
+                        placeholder="Stage name"
+                        className="mb-2"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveStageEdit();
+                          if (e.key === 'Escape') handleCancelStageEdit();
+                        }}
+                        autoFocus
+                      />
+                      <div className="flex gap-1">
+                        <Button size="sm" onClick={handleSaveStageEdit}>
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={handleCancelStageEdit}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="absolute -top-1 -right-1 h-6 w-6 p-0"
+                      onClick={() => handleStartEditStage(stage.number)}
+                    >
+                      <Edit2 className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
@@ -407,7 +567,7 @@ const FestivalGearManagement = () => {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Wrench className="h-5 w-5" />
-                Stage {selectedStage} Gear Setup
+                {getCurrentStageName(selectedStage)} Gear Setup
               </CardTitle>
               <Button 
                 onClick={handlePrintGearSetup} 
@@ -427,7 +587,7 @@ const FestivalGearManagement = () => {
             <div className="mb-4">
               <Alert>
                 <AlertDescription>
-                  Configure the gear setup for Stage {selectedStage}. This information will be used when artists submit their technical requirements.
+                  Configure the gear setup for {getCurrentStageName(selectedStage)}. This information will be used when artists submit their technical requirements.
                 </AlertDescription>
               </Alert>
             </div>
