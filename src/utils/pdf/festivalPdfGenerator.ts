@@ -3,7 +3,7 @@ import { exportArtistPDF, ArtistPdfData } from '../artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from '../artistTablePdfExport';
 import { exportShiftsTablePDF, ShiftsTablePdfData } from '../shiftsTablePdfExport';
 import { exportRfIemTablePDF, RfIemTablePdfData } from '../rfIemTablePdfExport';
-import { exportInfrastructureTablePDF, ArtistInfrastructureData } from '../infrastructureTablePdfExport';
+import { exportInfrastructureTablePDF, InfrastructureTablePdfData } from '../infrastructureTablePdfExport';
 import { exportMissingRiderReportPDF, MissingRiderReportData } from '../missingRiderReportPdfExport';
 import { generateStageGearPDF } from '../gearSetupPdfExport';
 import { fetchLogoUrl } from './logoUtils';
@@ -468,7 +468,6 @@ export const generateAndMergeFestivalPDFs = async (
       
       const rfIemData: RfIemTablePdfData = {
         jobTitle: jobTitle || 'Festival',
-        jobId: jobId,
         artists: sortedArtists,
         logoUrl
       };
@@ -496,9 +495,8 @@ export const generateAndMergeFestivalPDFs = async (
         }))
       );
       
-      const infrastructureData: ArtistInfrastructureData = {
+      const infrastructureData: InfrastructureTablePdfData = {
         jobTitle: jobTitle || 'Festival',
-        jobId: jobId,
         artists: sortedArtists,
         logoUrl
       };
