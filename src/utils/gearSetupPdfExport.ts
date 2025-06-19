@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -6,11 +7,12 @@ import { supabase } from '@/lib/supabase';
 export const generateStageGearPDF = async (
   jobId: string,
   stageNumber: number,
+  selectedDate: string,
   stageName?: string
 ): Promise<Blob> => {
   return new Promise(async (resolve, reject) => {
     try {
-      console.log(`Starting PDF generation for stage ${stageNumber} (${stageName})`);
+      console.log(`Starting PDF generation for stage ${stageNumber} (${stageName}) on date ${selectedDate}`);
       
       // Fetch stage name from database if not provided
       let actualStageName = stageName;
@@ -42,13 +44,12 @@ export const generateStageGearPDF = async (
         return;
       }
 
-      // Get the gear setup for the stage
+      // Get the gear setup for the specific date
       const { data: gearSetup, error: gearError } = await supabase
         .from("festival_gear_setups")
         .select("*")
         .eq("job_id", jobId)
-        .order("date")
-        .limit(1)
+        .eq("date", selectedDate)
         .maybeSingle();
 
       if (gearError) {
@@ -58,10 +59,12 @@ export const generateStageGearPDF = async (
       }
 
       if (!gearSetup) {
-        console.log("No gear setup found for this job");
-        reject(new Error("No gear setup found"));
+        console.log(`No gear setup found for job ${jobId} on date ${selectedDate}`);
+        reject(new Error(`No gear setup found for date ${selectedDate}`));
         return;
       }
+
+      console.log(`Found gear setup for date ${selectedDate}:`, gearSetup);
 
       // Check for stage-specific setup
       const { data: stageSetup, error: stageSetupError } = await supabase
@@ -75,10 +78,11 @@ export const generateStageGearPDF = async (
         console.error("Error fetching stage setup:", stageSetupError);
       }
 
-      // Use stage-specific setup if available, otherwise use global setup
+      // Determine which data to use: stage-specific takes priority over global
       const setupToUse = stageSetup || gearSetup;
+      const isStageSpecific = !!stageSetup;
       
-      console.log("Using setup data:", setupToUse);
+      console.log(`Using ${isStageSpecific ? 'stage-specific' : 'global'} setup data for stage ${stageNumber}:`, setupToUse);
 
       const doc = new jsPDF({ orientation: 'portrait' });
       const pageWidth = doc.internal.pageSize.width;
@@ -122,13 +126,21 @@ export const generateStageGearPDF = async (
 
       await loadLogoPromise;
 
-      // Title with custom stage name
+      // Title with custom stage name and date
       doc.setFontSize(16);
       doc.setTextColor(255, 255, 255);
       doc.text(`${jobData.title} - ${actualStageName}`, pageWidth / 2, 8, { align: 'center' });
-      doc.text('Equipment Setup', pageWidth / 2, 15, { align: 'center' });
+      doc.text(`Equipment Setup - ${format(new Date(selectedDate), 'MMM d, yyyy')}`, pageWidth / 2, 15, { align: 'center' });
 
       let yPosition = 30;
+
+      // Add configuration note if using stage-specific setup
+      if (isStageSpecific) {
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`Configuration: Stage-specific setup for ${actualStageName}`, 14, yPosition);
+        yPosition += 10;
+      }
 
       // Equipment sections
       doc.setFontSize(12);
@@ -159,6 +171,31 @@ export const generateStageGearPDF = async (
         yPosition = (doc as any).lastAutoTable.finalY + 15;
       }
 
+      // Monitor Consoles
+      if (setupToUse.mon_consoles && setupToUse.mon_consoles.length > 0) {
+        doc.setFontSize(14);
+        doc.setTextColor(125, 1, 1);
+        doc.text('Monitor Consoles', 14, yPosition);
+        yPosition += 10;
+
+        const monData = setupToUse.mon_consoles.map((console: any) => [
+          console.model || 'N/A',
+          console.quantity?.toString() || '1',
+          console.notes || ''
+        ]);
+
+        autoTable(doc, {
+          startY: yPosition,
+          head: [['Model', 'Quantity', 'Notes']],
+          body: monData,
+          theme: 'grid',
+          headStyles: { fillColor: [125, 1, 1] },
+          margin: { left: 14, right: 14 }
+        });
+
+        yPosition = (doc as any).lastAutoTable.finalY + 15;
+      }
+
       // Monitors
       doc.setFontSize(14);
       doc.setTextColor(125, 1, 1);
@@ -167,7 +204,8 @@ export const generateStageGearPDF = async (
 
       doc.setFontSize(12);
       doc.setTextColor(0, 0, 0);
-      doc.text(`Available Monitors: ${setupToUse.available_monitors || 0}`, 14, yPosition);
+      const monitorQuantity = setupToUse.monitors_quantity || (isStageSpecific ? 0 : setupToUse.available_monitors || 0);
+      doc.text(`Available Monitors: ${monitorQuantity}`, 14, yPosition);
       yPosition += 10;
 
       // Wireless
@@ -232,15 +270,23 @@ export const generateStageGearPDF = async (
 
       doc.setFontSize(12);
       doc.setTextColor(0, 0, 0);
-      doc.text(`Available CAT6 Runs: ${setupToUse.available_cat6_runs || 0}`, 14, yPosition);
+      
+      // Use stage-specific infrastructure if available, otherwise fall back to global
+      const cat6Runs = setupToUse.infra_cat6_quantity !== undefined ? setupToUse.infra_cat6_quantity : (setupToUse.available_cat6_runs || 0);
+      const hmaRuns = setupToUse.infra_hma_quantity !== undefined ? setupToUse.infra_hma_quantity : (setupToUse.available_hma_runs || 0);
+      const coaxRuns = setupToUse.infra_coax_quantity !== undefined ? setupToUse.infra_coax_quantity : (setupToUse.available_coax_runs || 0);
+      const analogRuns = setupToUse.infra_analog !== undefined ? setupToUse.infra_analog : (setupToUse.available_analog_runs || 0);
+      const opticalconRuns = setupToUse.infra_opticalcon_duo_quantity !== undefined ? setupToUse.infra_opticalcon_duo_quantity : (setupToUse.available_opticalcon_duo_runs || 0);
+      
+      doc.text(`Available CAT6 Runs: ${cat6Runs}`, 14, yPosition);
       yPosition += 8;
-      doc.text(`Available HMA Runs: ${setupToUse.available_hma_runs || 0}`, 14, yPosition);
+      doc.text(`Available HMA Runs: ${hmaRuns}`, 14, yPosition);
       yPosition += 8;
-      doc.text(`Available Coax Runs: ${setupToUse.available_coax_runs || 0}`, 14, yPosition);
+      doc.text(`Available Coax Runs: ${coaxRuns}`, 14, yPosition);
       yPosition += 8;
-      doc.text(`Available Analog Runs: ${setupToUse.available_analog_runs || 0}`, 14, yPosition);
+      doc.text(`Available Analog Runs: ${analogRuns}`, 14, yPosition);
       yPosition += 8;
-      doc.text(`Available Opticalcon Duo Runs: ${setupToUse.available_opticalcon_duo_runs || 0}`, 14, yPosition);
+      doc.text(`Available Opticalcon Duo Runs: ${opticalconRuns}`, 14, yPosition);
       yPosition += 10;
 
       // Extras
@@ -251,11 +297,17 @@ export const generateStageGearPDF = async (
 
       doc.setFontSize(12);
       doc.setTextColor(0, 0, 0);
-      doc.text(`Side Fills: ${setupToUse.has_side_fills ? 'Yes' : 'No'}`, 14, yPosition);
+      
+      // Use stage-specific extras if available, otherwise fall back to global
+      const sideFills = setupToUse.extras_sf !== undefined ? setupToUse.extras_sf : (setupToUse.has_side_fills || false);
+      const drumFills = setupToUse.extras_df !== undefined ? setupToUse.extras_df : (setupToUse.has_drum_fills || false);
+      const djBooths = setupToUse.extras_djbooth !== undefined ? setupToUse.extras_djbooth : (setupToUse.has_dj_booths || false);
+      
+      doc.text(`Side Fills: ${sideFills ? 'Yes' : 'No'}`, 14, yPosition);
       yPosition += 8;
-      doc.text(`Drum Fills: ${setupToUse.has_drum_fills ? 'Yes' : 'No'}`, 14, yPosition);
+      doc.text(`Drum Fills: ${drumFills ? 'Yes' : 'No'}`, 14, yPosition);
       yPosition += 8;
-      doc.text(`DJ Booths: ${setupToUse.has_dj_booths ? 'Yes' : 'No'}`, 14, yPosition);
+      doc.text(`DJ Booths: ${djBooths ? 'Yes' : 'No'}`, 14, yPosition);
       yPosition += 10;
 
       // Notes
@@ -299,7 +351,7 @@ export const generateStageGearPDF = async (
             );
             
             const blob = doc.output('blob');
-            console.log(`PDF generated successfully for ${actualStageName}`);
+            console.log(`PDF generated successfully for ${actualStageName} on ${selectedDate}`);
             resolve(blob);
           } catch (err) {
             console.error('Error adding Sector Pro logo:', err);

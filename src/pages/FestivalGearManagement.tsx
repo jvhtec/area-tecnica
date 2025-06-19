@@ -415,8 +415,9 @@ const FestivalGearManagement = () => {
       console.log(`Generating PDF for Stage ${selectedStage} on ${selectedDate}`);
       const pdf = await generateStageGearPDF(
         jobId, 
-        selectedStage, 
-        `Stage ${selectedStage}`
+        selectedStage,
+        selectedDate,
+        getCurrentStageName(selectedStage)
       );
       
       if (!pdf || pdf.size === 0) {
@@ -426,7 +427,7 @@ const FestivalGearManagement = () => {
       const url = URL.createObjectURL(pdf);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${jobTitle}_Stage${selectedStage}_GearSetup.pdf`;
+      a.download = `${jobTitle}_Stage${selectedStage}_GearSetup_${selectedDate}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

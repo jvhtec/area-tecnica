@@ -91,25 +91,38 @@ export const generateAndMergeFestivalPDFs = async (
     if (options.includeGearSetup && options.gearSetupStages.length > 0) {
       console.log("Starting gear setup PDF generation for stages:", options.gearSetupStages);
       
-      for (const stageNum of options.gearSetupStages) {
-        try {
-          const stageName = getStageNameByNumber(stageNum);
-          
-          const pdf = await generateStageGearPDF(jobId, stageNum, stageName);
-          
-          if (pdf && pdf.size > 0) {
-            console.log(`Generated gear setup PDF for ${stageName}, size: ${pdf.size} bytes`);
-            gearPdfs.push(pdf);
-          } else {
-            console.log(`No gear setup found for ${stageName}, skipping`);
+      // Get the selected date for gear setup PDFs
+      const { data: jobDates, error: jobDatesError } = await supabase
+        .from("job_date_types")
+        .select("date")
+        .eq("job_id", jobId)
+        .order("date")
+        .limit(1);
+      
+      const selectedDate = jobDates?.[0]?.date;
+      
+      if (!selectedDate) {
+        console.error("No job dates found for gear setup PDFs");
+      } else {
+        for (const stageNum of options.gearSetupStages) {
+          try {
+            const stageName = getStageNameByNumber(stageNum);
+            
+            const pdf = await generateStageGearPDF(jobId, stageNum, selectedDate, stageName);
+            
+            if (pdf && pdf.size > 0) {
+              console.log(`Generated gear setup PDF for ${stageName}, size: ${pdf.size} bytes`);
+              gearPdfs.push(pdf);
+            } else {
+              console.log(`No gear setup found for ${stageName}, skipping`);
+            }
+          } catch (err) {
+            console.error(`Error generating gear setup PDF for stage ${stageNum}:`, err);
           }
-        } catch (err) {
-          console.error(`Error generating gear setup PDF for stage ${stageNum}:`, err);
         }
       }
     }
     
-    // Get all dates from job_date_types for shift schedules
     if (options.includeShiftSchedules) {
       console.log("Starting shift table PDF generation");
       
