@@ -1,3 +1,4 @@
+
 export interface ConsoleSetup {
   model: string;
   quantity: number;
@@ -17,7 +18,6 @@ export interface WirelessSetup {
 export interface FestivalGearSetup {
   id: string;
   job_id: string;
-  date: string;
   max_stages: number;
   foh_consoles: ConsoleSetup[];
   mon_consoles: ConsoleSetup[];

@@ -1,27 +1,10 @@
 
 import { FestivalGearSetup } from "./festival";
-
-export interface QuantityInputProps {
-  value: number;
-  onChange: (value: number) => void;
-  label: string;
-  id: string;
-  available?: number;
-  validate?: (value: number) => boolean;
-  min?: number;
-  className?: string;
-}
+import { GearSetupFormData } from "./festival-gear";
 
 export interface SectionProps {
-  formData: any;
-  onChange: (changes: Partial<any>) => void;
-  gearSetup?: FestivalGearSetup;
+  formData: GearSetupFormData;
+  onChange: (changes: Partial<GearSetupFormData>) => void;
+  gearSetup?: FestivalGearSetup | null;
   stageNumber?: number;
-}
-
-export interface ProviderSelectorProps {
-  value: string;
-  onChange: (value: string) => void;
-  label: string;
-  id: string;
 }

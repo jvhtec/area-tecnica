@@ -7,12 +7,11 @@ import { supabase } from '@/lib/supabase';
 export const generateStageGearPDF = async (
   jobId: string,
   stageNumber: number,
-  selectedDate: string,
   stageName?: string
 ): Promise<Blob> => {
   return new Promise(async (resolve, reject) => {
     try {
-      console.log(`Starting PDF generation for stage ${stageNumber} (${stageName}) on date ${selectedDate}`);
+      console.log(`Starting PDF generation for stage ${stageNumber} (${stageName})`);
       
       // Fetch stage name from database if not provided
       let actualStageName = stageName;
@@ -44,12 +43,11 @@ export const generateStageGearPDF = async (
         return;
       }
 
-      // Get the gear setup for the specific date
+      // Get the gear setup (no date filter needed)
       const { data: gearSetup, error: gearError } = await supabase
         .from("festival_gear_setups")
         .select("*")
         .eq("job_id", jobId)
-        .eq("date", selectedDate)
         .maybeSingle();
 
       if (gearError) {
@@ -59,12 +57,12 @@ export const generateStageGearPDF = async (
       }
 
       if (!gearSetup) {
-        console.log(`No gear setup found for job ${jobId} on date ${selectedDate}`);
-        reject(new Error(`No gear setup found for date ${selectedDate}`));
+        console.log(`No gear setup found for job ${jobId}`);
+        reject(new Error(`No gear setup found for festival`));
         return;
       }
 
-      console.log(`Found gear setup for date ${selectedDate}:`, gearSetup);
+      console.log(`Found gear setup:`, gearSetup);
 
       // Check for stage-specific setup
       const { data: stageSetup, error: stageSetupError } = await supabase
@@ -126,11 +124,11 @@ export const generateStageGearPDF = async (
 
       await loadLogoPromise;
 
-      // Title with custom stage name and date
+      // Title with custom stage name
       doc.setFontSize(16);
       doc.setTextColor(255, 255, 255);
       doc.text(`${jobData.title} - ${actualStageName}`, pageWidth / 2, 8, { align: 'center' });
-      doc.text(`Equipment Setup - ${format(new Date(selectedDate), 'MMM d, yyyy')}`, pageWidth / 2, 15, { align: 'center' });
+      doc.text(`Equipment Setup`, pageWidth / 2, 15, { align: 'center' });
 
       let yPosition = 30;
 
@@ -351,7 +349,7 @@ export const generateStageGearPDF = async (
             );
             
             const blob = doc.output('blob');
-            console.log(`PDF generated successfully for ${actualStageName} on ${selectedDate}`);
+            console.log(`PDF generated successfully for ${actualStageName}`);
             resolve(blob);
           } catch (err) {
             console.error('Error adding Sector Pro logo:', err);

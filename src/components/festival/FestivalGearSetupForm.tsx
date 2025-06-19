@@ -16,14 +16,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface FestivalGearSetupFormProps {
   jobId: string;
-  selectedDate: string;
   stageNumber?: number;
   onSave?: () => void;
 }
 
 export const FestivalGearSetupForm = ({
   jobId,
-  selectedDate,
   stageNumber = 1,
   onSave
 }: FestivalGearSetupFormProps) => {
@@ -64,12 +62,11 @@ export const FestivalGearSetupForm = ({
       try {
         setIsLoading(true);
         
-        // Fetch the main gear setup to get available equipment
+        // Fetch the main gear setup (no date filter needed)
         const { data: setupData, error: setupError } = await supabase
           .from('festival_gear_setups')
           .select('*')
           .eq('job_id', jobId)
-          .eq('date', selectedDate)
           .single();
 
         if (setupError) {
@@ -78,7 +75,7 @@ export const FestivalGearSetupForm = ({
             throw setupError;
           }
           // If the setup doesn't exist, reset the form
-          console.log('No existing setup found for this date');
+          console.log('No existing setup found');
           setExistingSetupId(null);
           setGlobalSetup(null);
           setStageSetupId(null);
@@ -209,10 +206,10 @@ export const FestivalGearSetupForm = ({
       }
     };
 
-    if (jobId && selectedDate) {
+    if (jobId) {
       fetchExistingSetup();
     }
-  }, [jobId, selectedDate, stageNumber, toast, isPrimaryStage]);
+  }, [jobId, stageNumber, toast, isPrimaryStage]);
 
   const handleChange = (changes: Partial<GearSetupFormData>) => {
     setSetup(prev => ({ ...prev, ...changes }));
@@ -231,7 +228,6 @@ export const FestivalGearSetupForm = ({
       if (isPrimaryStage) {
         const setupPayload = {
           job_id: jobId,
-          date: selectedDate,
           max_stages: setup.max_stages,
           foh_consoles: setup.foh_consoles,
           mon_consoles: setup.mon_consoles,
@@ -262,7 +258,7 @@ export const FestivalGearSetupForm = ({
         const { data: globalData, error: globalError } = await supabase
           .from('festival_gear_setups')
           .upsert(setupPayload, { 
-            onConflict: 'job_id,date' 
+            onConflict: 'job_id' 
           })
           .select();
 
@@ -286,14 +282,13 @@ export const FestivalGearSetupForm = ({
           // Create a basic global setup if it doesn't exist
           const basicGlobalSetup = {
             job_id: jobId,
-            date: selectedDate,
             max_stages: Math.max(setup.max_stages, stageNumber || 1)
           };
           
           const { data: newGlobalSetup, error: newGlobalError } = await supabase
             .from('festival_gear_setups')
             .upsert(basicGlobalSetup, { 
-              onConflict: 'job_id,date' 
+              onConflict: 'job_id' 
             })
             .select();
             

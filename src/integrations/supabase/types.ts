@@ -668,7 +668,6 @@ export type Database = {
           available_monitors: number | null
           available_opticalcon_duo_runs: number | null
           created_at: string | null
-          date: string
           extras_wired: string | null
           foh_consoles: Json | null
           has_dj_booths: boolean | null
@@ -692,7 +691,6 @@ export type Database = {
           available_monitors?: number | null
           available_opticalcon_duo_runs?: number | null
           created_at?: string | null
-          date: string
           extras_wired?: string | null
           foh_consoles?: Json | null
           has_dj_booths?: boolean | null
@@ -716,7 +714,6 @@ export type Database = {
           available_monitors?: number | null
           available_opticalcon_duo_runs?: number | null
           created_at?: string | null
-          date?: string
           extras_wired?: string | null
           foh_consoles?: Json | null
           has_dj_booths?: boolean | null
@@ -736,7 +733,7 @@ export type Database = {
           {
             foreignKeyName: "festival_gear_setups_job_id_fkey"
             columns: ["job_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
