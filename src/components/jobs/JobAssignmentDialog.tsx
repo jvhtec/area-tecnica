@@ -71,6 +71,23 @@ const getDepartmentRoles = (department: string) => {
   }
 };
 
+// Helper function to format technician name from assignment
+const formatAssignmentTechnicianName = (assignment: any) => {
+  if (assignment.profiles) {
+    const firstName = assignment.profiles.first_name || '';
+    const lastName = assignment.profiles.last_name || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    return fullName || 'Unnamed Technician';
+  }
+  return 'Unknown Technician';
+};
+
+// Helper function to format available technician name
+const formatAvailableTechnicianName = (technician: { first_name: string; last_name: string; role: string }) => {
+  const isHouseTech = technician.role === 'house_tech';
+  return `${technician.first_name} ${technician.last_name}${isHouseTech ? ' (House Tech)' : ''}`;
+};
+
 export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId, department }: JobAssignmentDialogProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -159,18 +176,13 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   const handleSaveAssignments = async () => {
     const assignmentsToProcess: Assignment[] = [];
 
-    filteredTechnicians.forEach((technician) => {
-      const assignment = assignments.find(
-        (a) => a.technician_id === technician.id
-      );
-
-      if (assignment) {
-        assignmentsToProcess.push({
-          technician_id: technician.id,
-          sound_role: assignment.sound_role,
-          lights_role: assignment.lights_role,
-        });
-      }
+    // Process current assignments for Flex integration
+    assignments.forEach((assignment) => {
+      assignmentsToProcess.push({
+        technician_id: assignment.technician_id,
+        sound_role: assignment.sound_role,
+        lights_role: assignment.lights_role,
+      });
     });
 
     if (assignmentsToProcess.length === 0) {
@@ -228,11 +240,6 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     return getDepartmentRoles(currentDepartment);
   };
 
-  const formatTechnicianName = (technician: { first_name: string; last_name: string; role: string }) => {
-    const isHouseTech = technician.role === 'house_tech';
-    return `${technician.first_name} ${technician.last_name}${isHouseTech ? ' (House Tech)' : ''}`;
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[625px]">
@@ -281,7 +288,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
               <SelectContent>
                 {filteredTechnicians.map((technician) => (
                   <SelectItem key={technician.id} value={technician.id}>
-                    {formatTechnicianName(technician)}
+                    {formatAvailableTechnicianName(technician)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -351,62 +358,55 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
             <p className="text-muted-foreground">No technicians assigned yet.</p>
           ) : (
             <div className="space-y-2">
-              {assignments.map((assignment) => {
-                const technician = filteredTechnicians.find(
-                  (t) => t.id === assignment.technician_id
-                );
-                return (
-                  <div
-                    key={assignment.technician_id}
-                    className="flex items-center justify-between border rounded-md p-2"
-                  >
-                    <div>
-                      {technician
-                        ? formatTechnicianName(technician)
-                        : "Unknown Technician"}
-                      <p className="text-sm text-muted-foreground">
-                        {currentDepartment === "sound" && `Sound: ${assignment.sound_role || "None"}`}
-                        {currentDepartment === "lights" && `Lights: ${assignment.lights_role || "None"}`}
-                      </p>
-                    </div>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          disabled={isRemoving[assignment.technician_id]}
-                        >
-                          {isRemoving[assignment.technician_id] ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Removing...
-                            </>
-                          ) : (
-                            "Remove"
-                          )}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This action cannot be undone. This will permanently
-                            remove the technician from this job.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => removeAssignment(assignment.technician_id)}
-                          >
-                            Continue
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+              {assignments.map((assignment) => (
+                <div
+                  key={assignment.technician_id}
+                  className="flex items-center justify-between border rounded-md p-2"
+                >
+                  <div>
+                    {formatAssignmentTechnicianName(assignment)}
+                    <p className="text-sm text-muted-foreground">
+                      {currentDepartment === "sound" && `Sound: ${assignment.sound_role || "None"}`}
+                      {currentDepartment === "lights" && `Lights: ${assignment.lights_role || "None"}`}
+                    </p>
                   </div>
-                );
-              })}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        disabled={isRemoving[assignment.technician_id]}
+                      >
+                        {isRemoving[assignment.technician_id] ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Removing...
+                          </>
+                        ) : (
+                          "Remove"
+                        )}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently
+                          remove the technician from this job.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => removeAssignment(assignment.technician_id)}
+                        >
+                          Continue
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              ))}
             </div>
           )}
         </div>
