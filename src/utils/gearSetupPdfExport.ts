@@ -187,7 +187,7 @@ export const generateStageGearPDF = async (
           pageBreak: 'auto',
           showHead: 'everyPage',
           didDrawPage: () => {
-            if (doc.internal.getCurrentPageInfo().pageNumber > 1) {
+            if (doc.internal.pages.length > 2) { // More than 1 page (pages array includes empty first element)
               addPageHeader();
             }
           }
@@ -221,7 +221,7 @@ export const generateStageGearPDF = async (
           pageBreak: 'auto',
           showHead: 'everyPage',
           didDrawPage: () => {
-            if (doc.internal.getCurrentPageInfo().pageNumber > 1) {
+            if (doc.internal.pages.length > 2) {
               addPageHeader();
             }
           }
@@ -271,7 +271,7 @@ export const generateStageGearPDF = async (
           pageBreak: 'auto',
           showHead: 'everyPage',
           didDrawPage: () => {
-            if (doc.internal.getCurrentPageInfo().pageNumber > 1) {
+            if (doc.internal.pages.length > 2) {
               addPageHeader();
             }
           }
@@ -307,7 +307,7 @@ export const generateStageGearPDF = async (
           pageBreak: 'auto',
           showHead: 'everyPage',
           didDrawPage: () => {
-            if (doc.internal.getCurrentPageInfo().pageNumber > 1) {
+            if (doc.internal.pages.length > 2) {
               addPageHeader();
             }
           }
@@ -388,7 +388,7 @@ export const generateStageGearPDF = async (
       }
 
       // Add footer and logo to all pages
-      const totalPages = doc.internal.pages.length - 1;
+      const totalPages = doc.internal.pages.length - 1; // Subtract 1 because pages array includes empty first element
       
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
