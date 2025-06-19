@@ -85,10 +85,33 @@ export const generateStageGearPDF = async (
       const doc = new jsPDF({ orientation: 'portrait' });
       const pageWidth = doc.internal.pageSize.width;
       const pageHeight = doc.internal.pageSize.height;
+      const footerHeight = 50; // Reserve space for logo and footer
+      const maxContentHeight = pageHeight - footerHeight;
 
-      // Header with corporate red color
-      doc.setFillColor(125, 1, 1);
-      doc.rect(0, 0, pageWidth, 20, 'F');
+      // Page management functions
+      const checkPageBreak = (requiredHeight: number, currentY: number): number => {
+        if (currentY + requiredHeight > maxContentHeight) {
+          doc.addPage();
+          addPageHeader();
+          return 30; // Return new Y position after header
+        }
+        return currentY;
+      };
+
+      const addPageHeader = () => {
+        // Header with corporate red color
+        doc.setFillColor(125, 1, 1);
+        doc.rect(0, 0, pageWidth, 20, 'F');
+
+        // Title with custom stage name
+        doc.setFontSize(16);
+        doc.setTextColor(255, 255, 255);
+        doc.text(`${jobData.title} - ${actualStageName}`, pageWidth / 2, 8, { align: 'center' });
+        doc.text(`Equipment Setup`, pageWidth / 2, 15, { align: 'center' });
+      };
+
+      // Initial header
+      addPageHeader();
 
       // Load logo
       const loadLogoPromise = new Promise<void>((resolveLogoLoad) => {
@@ -124,16 +147,11 @@ export const generateStageGearPDF = async (
 
       await loadLogoPromise;
 
-      // Title with custom stage name
-      doc.setFontSize(16);
-      doc.setTextColor(255, 255, 255);
-      doc.text(`${jobData.title} - ${actualStageName}`, pageWidth / 2, 8, { align: 'center' });
-      doc.text(`Equipment Setup`, pageWidth / 2, 15, { align: 'center' });
-
       let yPosition = 30;
 
       // Add configuration note if using stage-specific setup
       if (isStageSpecific) {
+        yPosition = checkPageBreak(10, yPosition);
         doc.setFontSize(10);
         doc.setTextColor(0, 0, 0);
         doc.text(`Configuration: Stage-specific setup for ${actualStageName}`, 14, yPosition);
@@ -146,6 +164,8 @@ export const generateStageGearPDF = async (
 
       // FOH Consoles
       if (setupToUse.foh_consoles && setupToUse.foh_consoles.length > 0) {
+        yPosition = checkPageBreak(60, yPosition);
+        
         doc.setFontSize(14);
         doc.setTextColor(125, 1, 1);
         doc.text('FOH Consoles', 14, yPosition);
@@ -163,7 +183,14 @@ export const generateStageGearPDF = async (
           body: fohData,
           theme: 'grid',
           headStyles: { fillColor: [125, 1, 1] },
-          margin: { left: 14, right: 14 }
+          margin: { left: 14, right: 14 },
+          pageBreak: 'auto',
+          showHead: 'everyPage',
+          didDrawPage: () => {
+            if (doc.internal.getCurrentPageInfo().pageNumber > 1) {
+              addPageHeader();
+            }
+          }
         });
 
         yPosition = (doc as any).lastAutoTable.finalY + 15;
@@ -171,6 +198,8 @@ export const generateStageGearPDF = async (
 
       // Monitor Consoles
       if (setupToUse.mon_consoles && setupToUse.mon_consoles.length > 0) {
+        yPosition = checkPageBreak(60, yPosition);
+        
         doc.setFontSize(14);
         doc.setTextColor(125, 1, 1);
         doc.text('Monitor Consoles', 14, yPosition);
@@ -188,13 +217,22 @@ export const generateStageGearPDF = async (
           body: monData,
           theme: 'grid',
           headStyles: { fillColor: [125, 1, 1] },
-          margin: { left: 14, right: 14 }
+          margin: { left: 14, right: 14 },
+          pageBreak: 'auto',
+          showHead: 'everyPage',
+          didDrawPage: () => {
+            if (doc.internal.getCurrentPageInfo().pageNumber > 1) {
+              addPageHeader();
+            }
+          }
         });
 
         yPosition = (doc as any).lastAutoTable.finalY + 15;
       }
 
       // Monitors
+      yPosition = checkPageBreak(20, yPosition);
+      
       doc.setFontSize(14);
       doc.setTextColor(125, 1, 1);
       doc.text('Monitors', 14, yPosition);
@@ -208,6 +246,8 @@ export const generateStageGearPDF = async (
 
       // Wireless
       if (setupToUse.wireless_systems && setupToUse.wireless_systems.length > 0) {
+        yPosition = checkPageBreak(60, yPosition);
+        
         doc.setFontSize(14);
         doc.setTextColor(125, 1, 1);
         doc.text('Wireless Systems', 14, yPosition);
@@ -227,7 +267,14 @@ export const generateStageGearPDF = async (
           body: wirelessData,
           theme: 'grid',
           headStyles: { fillColor: [125, 1, 1] },
-          margin: { left: 14, right: 14 }
+          margin: { left: 14, right: 14 },
+          pageBreak: 'auto',
+          showHead: 'everyPage',
+          didDrawPage: () => {
+            if (doc.internal.getCurrentPageInfo().pageNumber > 1) {
+              addPageHeader();
+            }
+          }
         });
 
         yPosition = (doc as any).lastAutoTable.finalY + 15;
@@ -235,6 +282,8 @@ export const generateStageGearPDF = async (
 
       // IEM
       if (setupToUse.iem_systems && setupToUse.iem_systems.length > 0) {
+        yPosition = checkPageBreak(60, yPosition);
+        
         doc.setFontSize(14);
         doc.setTextColor(125, 1, 1);
         doc.text('IEM Systems', 14, yPosition);
@@ -254,13 +303,22 @@ export const generateStageGearPDF = async (
           body: iemData,
           theme: 'grid',
           headStyles: { fillColor: [125, 1, 1] },
-          margin: { left: 14, right: 14 }
+          margin: { left: 14, right: 14 },
+          pageBreak: 'auto',
+          showHead: 'everyPage',
+          didDrawPage: () => {
+            if (doc.internal.getCurrentPageInfo().pageNumber > 1) {
+              addPageHeader();
+            }
+          }
         });
 
         yPosition = (doc as any).lastAutoTable.finalY + 15;
       }
 
       // Infrastructure
+      yPosition = checkPageBreak(50, yPosition);
+      
       doc.setFontSize(14);
       doc.setTextColor(125, 1, 1);
       doc.text('Infrastructure', 14, yPosition);
@@ -276,6 +334,7 @@ export const generateStageGearPDF = async (
       const analogRuns = setupToUse.infra_analog !== undefined ? setupToUse.infra_analog : (setupToUse.available_analog_runs || 0);
       const opticalconRuns = setupToUse.infra_opticalcon_duo_quantity !== undefined ? setupToUse.infra_opticalcon_duo_quantity : (setupToUse.available_opticalcon_duo_runs || 0);
       
+      yPosition = checkPageBreak(40, yPosition);
       doc.text(`Available CAT6 Runs: ${cat6Runs}`, 14, yPosition);
       yPosition += 8;
       doc.text(`Available HMA Runs: ${hmaRuns}`, 14, yPosition);
@@ -288,6 +347,8 @@ export const generateStageGearPDF = async (
       yPosition += 10;
 
       // Extras
+      yPosition = checkPageBreak(30, yPosition);
+      
       doc.setFontSize(14);
       doc.setTextColor(125, 1, 1);
       doc.text('Extras', 14, yPosition);
@@ -310,6 +371,8 @@ export const generateStageGearPDF = async (
 
       // Notes
       if (setupToUse.notes) {
+        yPosition = checkPageBreak(30, yPosition);
+        
         doc.setFontSize(14);
         doc.setTextColor(125, 1, 1);
         doc.text('Notes', 14, yPosition);
@@ -318,18 +381,27 @@ export const generateStageGearPDF = async (
         doc.setFontSize(12);
         doc.setTextColor(0, 0, 0);
         const notes = doc.splitTextToSize(setupToUse.notes, pageWidth - 28);
+        const notesHeight = notes.length * 6;
+        yPosition = checkPageBreak(notesHeight, yPosition);
         doc.text(notes, 14, yPosition);
-        yPosition += 10;
+        yPosition += notesHeight;
       }
 
-      // Footer
-      doc.setFontSize(8);
-      doc.setTextColor(100, 100, 100);
-      const generatedDate = format(new Date(), 'dd/MM/yyyy HH:mm');
-      doc.text(`Generated: ${generatedDate}`, pageWidth - 14, pageHeight - 10, { align: 'right' });
-      doc.text(`${actualStageName} Equipment Setup`, 14, pageHeight - 10);
+      // Add footer and logo to all pages
+      const totalPages = doc.internal.pages.length - 1;
+      
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        
+        // Footer text
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        const generatedDate = format(new Date(), 'dd/MM/yyyy HH:mm');
+        doc.text(`Generated: ${generatedDate}`, pageWidth - 14, pageHeight - 10, { align: 'right' });
+        doc.text(`${actualStageName} Equipment Setup`, 14, pageHeight - 10);
+      }
 
-      // Add Sector Pro logo at bottom center
+      // Add Sector Pro logo at bottom center of last page
       try {
         const sectorLogoPath = '/sector pro logo.png';
         const sectorImg = new Image();
@@ -339,14 +411,18 @@ export const generateStageGearPDF = async (
             const ratio = sectorImg.width / sectorImg.height;
             const logoHeight = logoWidth / ratio;
             
-            doc.addImage(
-              sectorImg, 
-              'PNG', 
-              pageWidth/2 - logoWidth/2,
-              pageHeight - logoHeight - 15,
-              logoWidth,
-              logoHeight
-            );
+            // Add logo to all pages
+            for (let i = 1; i <= totalPages; i++) {
+              doc.setPage(i);
+              doc.addImage(
+                sectorImg, 
+                'PNG', 
+                pageWidth/2 - logoWidth/2,
+                pageHeight - logoHeight - 15,
+                logoWidth,
+                logoHeight
+              );
+            }
             
             const blob = doc.output('blob');
             console.log(`PDF generated successfully for ${actualStageName}`);
