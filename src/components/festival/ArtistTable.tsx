@@ -2,24 +2,13 @@ import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Pencil, 
-  Trash2, 
-  FileText, 
-  Loader2, 
-  Mic, 
-  Link, 
-  ExternalLink,
-  Upload,
-  Printer
-} from "lucide-react";
+import { Pencil, Trash2, FileText, Loader2, Mic, Link, ExternalLink, Upload, Printer } from "lucide-react";
 import { format, parseISO, isAfter, setHours, setMinutes } from "date-fns";
 import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
 import { ArtistFileDialog } from "./ArtistFileDialog";
 import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
 import { toast } from "sonner";
-
 interface Artist {
   id: string;
   name: string;
@@ -49,10 +38,14 @@ interface Artist {
   mon_tech?: boolean;
   isaftermidnight?: boolean;
   mic_kit?: 'festival' | 'band';
-  wired_mics?: Array<{ model: string; quantity: number; exclusive_use?: boolean; notes?: string }>;
+  wired_mics?: Array<{
+    model: string;
+    quantity: number;
+    exclusive_use?: boolean;
+    notes?: string;
+  }>;
   job_id?: string;
 }
-
 interface ArtistTableProps {
   artists: Artist[];
   isLoading: boolean;
@@ -66,7 +59,6 @@ interface ArtistTableProps {
   jobId?: string;
   selectedDate?: string;
 }
-
 export const ArtistTable = ({
   artists,
   isLoading,
@@ -94,27 +86,26 @@ export const ArtistTable = ({
       if (a.date !== b.date) {
         return new Date(a.date).getTime() - new Date(b.date).getTime();
       }
-      
+
       // Then sort by stage within the same date
       if (a.stage !== b.stage) {
         return a.stage - b.stage;
       }
-      
+
       // Finally sort by show time within the same date and stage
       const aTime = a.show_start || '';
       const bTime = b.show_start || '';
-      
+
       // Handle shows that cross midnight (early morning shows)
       const aHour = aTime ? parseInt(aTime.split(':')[0], 10) : 0;
       const bHour = bTime ? parseInt(bTime.split(':')[0], 10) : 0;
-      
+
       // If show starts between 00:00-06:59, treat it as next day for sorting
       const adjustedATime = aHour >= 0 && aHour < 7 ? `${aHour + 24}${aTime.substring(aTime.indexOf(':'))}` : aTime;
       const adjustedBTime = bHour >= 0 && bHour < 7 ? `${bHour + 24}${bTime.substring(bTime.indexOf(':'))}` : bTime;
-      
       if (adjustedATime < adjustedBTime) return -1;
       if (adjustedATime > adjustedBTime) return 1;
-      
+
       // Fallback to artist name
       return (a.name || '').localeCompare(b.name || '');
     });
@@ -127,26 +118,16 @@ export const ArtistTable = ({
     const artistTime = parseISO(`${date}T${time}`);
     return isAfter(artistTime, dayStart);
   };
-
   const filteredArtists = artists.filter(artist => {
     const matchesSearch = artist.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStage = stageFilter === "all" || artist.stage?.toString() === stageFilter;
-    const matchesEquipment = !equipmentFilter || 
-      artist.foh_console.toLowerCase().includes(equipmentFilter.toLowerCase()) ||
-      artist.mon_console.toLowerCase().includes(equipmentFilter.toLowerCase()) ||
-      (artist.wired_mics && artist.wired_mics.some(mic => 
-        mic.model.toLowerCase().includes(equipmentFilter.toLowerCase())
-      ));
-    const matchesRider = riderFilter === "all" || 
-      (riderFilter === "missing" && artist.rider_missing) ||
-      (riderFilter === "complete" && !artist.rider_missing);
-
+    const matchesEquipment = !equipmentFilter || artist.foh_console.toLowerCase().includes(equipmentFilter.toLowerCase()) || artist.mon_console.toLowerCase().includes(equipmentFilter.toLowerCase()) || artist.wired_mics && artist.wired_mics.some(mic => mic.model.toLowerCase().includes(equipmentFilter.toLowerCase()));
+    const matchesRider = riderFilter === "all" || riderFilter === "missing" && artist.rider_missing || riderFilter === "complete" && !artist.rider_missing;
     return matchesSearch && matchesStage && matchesEquipment && matchesRider;
   });
 
   // Apply chronological sorting to filtered artists
   const sortedFilteredArtists = sortArtistsChronologically(filteredArtists);
-
   const handleDeleteClick = async (artist: Artist) => {
     if (window.confirm(`Are you sure you want to delete ${artist.name}?`)) {
       setDeletingArtistId(artist.id);
@@ -154,18 +135,19 @@ export const ArtistTable = ({
       setDeletingArtistId(null);
     }
   };
-
-  const formatWiredMics = (mics: Array<{ model: string; quantity: number; exclusive_use?: boolean }> = []) => {
+  const formatWiredMics = (mics: Array<{
+    model: string;
+    quantity: number;
+    exclusive_use?: boolean;
+  }> = []) => {
     if (mics.length === 0) return "None";
     return mics.map(mic => {
       const exclusiveIndicator = mic.exclusive_use ? " (E)" : "";
       return `${mic.quantity}x ${mic.model}${exclusiveIndicator}`;
     }).join(", ");
   };
-
   const formatWirelessSystems = (systems: any[] = [], isIEM = false) => {
     if (systems.length === 0) return "None";
-    
     return systems.map(system => {
       if (isIEM) {
         // For IEM: show channels and beltpacks
@@ -186,7 +168,6 @@ export const ArtistTable = ({
       }
     }).join("; ");
   };
-
   const getProviderBadge = (provider: string) => {
     const colors = {
       festival: "bg-blue-100 text-blue-800",
@@ -195,16 +176,15 @@ export const ArtistTable = ({
     };
     return colors[provider as keyof typeof colors] || "bg-gray-100 text-gray-800";
   };
-
   const transformArtistDataForPdf = (artist: Artist): ArtistPdfData => {
     return {
       name: artist.name,
       stage: artist.stage,
       date: artist.date,
       schedule: {
-        show: { 
-          start: artist.show_start, 
-          end: artist.show_end 
+        show: {
+          start: artist.show_start,
+          end: artist.show_end
         },
         soundcheck: artist.soundcheck ? {
           start: artist.soundcheck_start || '',
@@ -214,13 +194,13 @@ export const ArtistTable = ({
       technical: {
         fohTech: artist.foh_tech || false,
         monTech: artist.mon_tech || false,
-        fohConsole: { 
-          model: artist.foh_console, 
-          providedBy: artist.foh_console_provided_by || 'festival' 
+        fohConsole: {
+          model: artist.foh_console,
+          providedBy: artist.foh_console_provided_by || 'festival'
         },
-        monConsole: { 
-          model: artist.mon_console, 
-          providedBy: artist.mon_console_provided_by || 'festival' 
+        monConsole: {
+          model: artist.mon_console,
+          providedBy: artist.mon_console_provided_by || 'festival'
         },
         wireless: {
           systems: artist.wireless_systems || [],
@@ -236,11 +216,24 @@ export const ArtistTable = ({
         }
       },
       infrastructure: {
-        providedBy: 'festival', // Default value
-        cat6: { enabled: false, quantity: 0 },
-        hma: { enabled: false, quantity: 0 },
-        coax: { enabled: false, quantity: 0 },
-        opticalconDuo: { enabled: false, quantity: 0 },
+        providedBy: 'festival',
+        // Default value
+        cat6: {
+          enabled: false,
+          quantity: 0
+        },
+        hma: {
+          enabled: false,
+          quantity: 0
+        },
+        coax: {
+          enabled: false,
+          quantity: 0
+        },
+        opticalconDuo: {
+          enabled: false,
+          quantity: 0
+        },
         analog: 0,
         other: ''
       },
@@ -254,13 +247,12 @@ export const ArtistTable = ({
       wiredMics: artist.wired_mics || []
     };
   };
-
   const handlePrintArtist = async (artist: Artist) => {
     setPrintingArtistId(artist.id);
     try {
       const pdfData = transformArtistDataForPdf(artist);
       const blob = await exportArtistPDF(pdfData);
-      
+
       // Create download link
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -270,7 +262,6 @@ export const ArtistTable = ({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
       toast.success(`PDF generated for ${artist.name}`);
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -279,45 +270,33 @@ export const ArtistTable = ({
       setPrintingArtistId(null);
     }
   };
-
   const handleGenerateLink = (artist: Artist) => {
     setSelectedArtist(artist);
     setLinkDialogOpen(true);
   };
-
   const handleViewLinks = () => {
     setLinksDialogOpen(true);
   };
-
   const handleManageFiles = (artist: Artist) => {
     setSelectedArtist(artist);
     setFileDialogOpen(true);
   };
-
   if (isLoading) {
-    return (
-      <div className="w-full">
+    return <div className="w-full">
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-8 w-8 animate-spin" />
           <span className="ml-2">Loading artists...</span>
         </div>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <>
+  return <>
       <div className="w-full space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between py-4">
           <h2 className="text-2xl font-semibold leading-none tracking-tight">
             Artist Schedule ({sortedFilteredArtists.length} artists)
           </h2>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleViewLinks}
-          >
+          <Button variant="outline" size="sm" onClick={handleViewLinks}>
             <ExternalLink className="h-4 w-4 mr-2" />
             View All Links
           </Button>
@@ -347,14 +326,11 @@ export const ArtistTable = ({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedFilteredArtists.map((artist) => (
-                <TableRow key={artist.id}>
+              {sortedFilteredArtists.map(artist => <TableRow key={artist.id}>
                   <TableCell>
                     <div className="space-y-1">
                       <div className="font-medium">{artist.name}</div>
-                      {artist.isaftermidnight && (
-                        <Badge variant="outline" className="text-xs">After Midnight</Badge>
-                      )}
+                      {artist.isaftermidnight && <Badge variant="outline" className="text-xs bg-blue-700">After Midnight</Badge>}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -366,36 +342,28 @@ export const ArtistTable = ({
                     </div>
                   </TableCell>
                   <TableCell>
-                    {artist.soundcheck ? (
-                      <div className="text-sm">
+                    {artist.soundcheck ? <div className="text-sm">
                         <Badge variant="secondary">Yes</Badge>
                         <div className="text-xs text-muted-foreground">
                           {artist.soundcheck_start} - {artist.soundcheck_end}
                         </div>
-                      </div>
-                    ) : (
-                      <Badge variant="outline">No</Badge>
-                    )}
+                      </div> : <Badge variant="outline">No</Badge>}
                   </TableCell>
                   
                   <TableCell>
                     <div className="text-sm space-y-1">
                       <div className="flex items-center gap-1">
                         <span>FOH: {artist.foh_console || "Not specified"}</span>
-                        {artist.foh_console_provided_by && (
-                          <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.foh_console_provided_by)}`}>
+                        {artist.foh_console_provided_by && <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.foh_console_provided_by)}`}>
                             {artist.foh_console_provided_by}
-                          </Badge>
-                        )}
+                          </Badge>}
                         {artist.foh_tech && <Badge variant="outline" className="text-xs">Tech</Badge>}
                       </div>
                       <div className="flex items-center gap-1">
                         <span>MON: {artist.mon_console || "Not specified"}</span>
-                        {artist.mon_console_provided_by && (
-                          <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
+                        {artist.mon_console_provided_by && <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
                             {artist.mon_console_provided_by}
-                          </Badge>
-                        )}
+                          </Badge>}
                         {artist.mon_tech && <Badge variant="outline" className="text-xs">Tech</Badge>}
                       </div>
                     </div>
@@ -403,30 +371,22 @@ export const ArtistTable = ({
                   
                   <TableCell>
                     <div className="text-sm space-y-1">
-                      {artist.wireless_systems && artist.wireless_systems.length > 0 && (
-                        <div className="flex items-center gap-1">
+                      {artist.wireless_systems && artist.wireless_systems.length > 0 && <div className="flex items-center gap-1">
                           <div className="text-xs" title={formatWirelessSystems(artist.wireless_systems)}>
                             Wireless: {formatWirelessSystems(artist.wireless_systems)}
                           </div>
-                          {artist.wireless_provided_by && (
-                            <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.wireless_provided_by)}`}>
+                          {artist.wireless_provided_by && <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.wireless_provided_by)}`}>
                               {artist.wireless_provided_by}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-                      {artist.iem_systems && artist.iem_systems.length > 0 && (
-                        <div className="flex items-center gap-1">
+                            </Badge>}
+                        </div>}
+                      {artist.iem_systems && artist.iem_systems.length > 0 && <div className="flex items-center gap-1">
                           <div className="text-xs" title={formatWirelessSystems(artist.iem_systems, true)}>
                             IEM: {formatWirelessSystems(artist.iem_systems, true)}
                           </div>
-                          {artist.iem_provided_by && (
-                            <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.iem_provided_by)}`}>
+                          {artist.iem_provided_by && <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.iem_provided_by)}`}>
                               {artist.iem_provided_by}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
+                            </Badge>}
+                        </div>}
                     </div>
                   </TableCell>
 
@@ -435,22 +395,16 @@ export const ArtistTable = ({
                       <Badge variant={artist.mic_kit === 'festival' ? 'default' : 'secondary'}>
                         {artist.mic_kit === 'festival' ? 'Festival' : 'Band'}
                       </Badge>
-                      {artist.mic_kit === 'festival' && artist.wired_mics && artist.wired_mics.length > 0 && (
-                        <div className="text-xs text-muted-foreground max-w-32 truncate" title={formatWiredMics(artist.wired_mics)}>
+                      {artist.mic_kit === 'festival' && artist.wired_mics && artist.wired_mics.length > 0 && <div className="text-xs text-muted-foreground max-w-32 truncate" title={formatWiredMics(artist.wired_mics)}>
                           {formatWiredMics(artist.wired_mics)}
-                        </div>
-                      )}
+                        </div>}
                     </div>
                   </TableCell>
 
                   <TableCell>
-                    {artist.monitors_enabled ? (
-                      <div className="text-sm">
+                    {artist.monitors_enabled ? <div className="text-sm">
                         <Badge variant="secondary">{artist.monitors_quantity}x</Badge>
-                      </div>
-                    ) : (
-                      <Badge variant="outline">None</Badge>
-                    )}
+                      </div> : <Badge variant="outline">None</Badge>}
                   </TableCell>
                   
                   <TableCell>
@@ -469,94 +423,39 @@ export const ArtistTable = ({
                   
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleGenerateLink(artist)}
-                        title="Generate form link"
-                      >
+                      <Button variant="ghost" size="icon" onClick={() => handleGenerateLink(artist)} title="Generate form link">
                         <Link className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleManageFiles(artist)}
-                        title="Manage files/riders"
-                      >
+                      <Button variant="ghost" size="icon" onClick={() => handleManageFiles(artist)} title="Manage files/riders">
                         <FileText className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handlePrintArtist(artist)}
-                        disabled={printingArtistId === artist.id}
-                        title="Print artist details"
-                      >
-                        {printingArtistId === artist.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Printer className="h-4 w-4" />
-                        )}
+                      <Button variant="ghost" size="icon" onClick={() => handlePrintArtist(artist)} disabled={printingArtistId === artist.id} title="Print artist details">
+                        {printingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onEditArtist(artist)}
-                        title="Edit artist"
-                      >
+                      <Button variant="ghost" size="icon" onClick={() => onEditArtist(artist)} title="Edit artist">
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteClick(artist)}
-                        disabled={deletingArtistId === artist.id}
-                        title="Delete artist"
-                      >
-                        {deletingArtistId === artist.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(artist)} disabled={deletingArtistId === artist.id} title="Delete artist">
+                        {deletingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                       </Button>
                     </div>
                   </TableCell>
-                </TableRow>
-              ))}
+                </TableRow>)}
             </TableBody>
           </Table>
         </div>
 
-        {sortedFilteredArtists.length === 0 && !isLoading && (
-          <div className="text-center py-8 text-muted-foreground">
+        {sortedFilteredArtists.length === 0 && !isLoading && <div className="text-center py-8 text-muted-foreground">
             No artists found matching the current filters.
-          </div>
-        )}
+          </div>}
       </div>
 
-      {selectedArtist && (
-        <>
-          <ArtistFormLinkDialog
-            open={linkDialogOpen}
-            onOpenChange={setLinkDialogOpen}
-            artistId={selectedArtist.id}
-            artistName={selectedArtist.name}
-          />
+      {selectedArtist && <>
+          <ArtistFormLinkDialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen} artistId={selectedArtist.id} artistName={selectedArtist.name} />
           
-          <ArtistFileDialog
-            open={fileDialogOpen}
-            onOpenChange={setFileDialogOpen}
-            artistId={selectedArtist.id}
-          />
-        </>
-      )}
+          <ArtistFileDialog open={fileDialogOpen} onOpenChange={setFileDialogOpen} artistId={selectedArtist.id} />
+        </>}
 
-      <ArtistFormLinksDialog
-        open={linksDialogOpen}
-        onOpenChange={setLinksDialogOpen}
-        selectedDate={selectedDate || ''}
-        jobId={jobId || ''}
-      />
-    </>
-  );
+      <ArtistFormLinksDialog open={linksDialogOpen} onOpenChange={setLinksDialogOpen} selectedDate={selectedDate || ''} jobId={jobId || ''} />
+    </>;
 };
