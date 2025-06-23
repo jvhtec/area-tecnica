@@ -1,4 +1,3 @@
-
 import { format } from "date-fns";
 import { useState, useEffect } from "react";
 import {
@@ -10,13 +9,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Trash2, FileDown, Edit, Users } from "lucide-react";
+import { Trash2, FileDown, Edit, Users, Copy } from "lucide-react";
 import { ShiftWithAssignments } from "@/types/festival-scheduling";
 import { useToast } from "@/hooks/use-toast";
 import { exportShiftsTablePDF, ShiftsTablePdfData } from "@/utils/shiftsTablePdfExport";
 import { supabase } from "@/lib/supabase";
 import { EditShiftDialog } from "./EditShiftDialog";
 import { ManageAssignmentsDialog } from "./ManageAssignmentsDialog";
+import { CopyShiftsDialog } from "./CopyShiftsDialog";
 
 interface ShiftsTableProps {
   shifts: ShiftWithAssignments[];
@@ -25,6 +25,8 @@ interface ShiftsTableProps {
   date: string;
   jobId: string;
   isViewOnly?: boolean;
+  jobDates?: Date[];
+  onShiftsCopied?: () => void;
 }
 
 export const ShiftsTable = ({ 
@@ -33,13 +35,16 @@ export const ShiftsTable = ({
   onShiftUpdated,
   date, 
   jobId, 
-  isViewOnly = false 
+  isViewOnly = false,
+  jobDates = [],
+  onShiftsCopied
 }: ShiftsTableProps) => {
   const { toast } = useToast();
   const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
   const [jobTitle, setJobTitle] = useState<string>("");
   const [editingShift, setEditingShift] = useState<ShiftWithAssignments | null>(null);
   const [managingShift, setManagingShift] = useState<ShiftWithAssignments | null>(null);
+  const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   
   useEffect(() => {
     const fetchJobAndLogo = async () => {
@@ -186,14 +191,25 @@ export const ShiftsTable = ({
           <h2 className="text-xl font-bold text-center">{jobTitle}</h2>
           <p className="text-center text-muted-foreground">{formattedDate}</p>
         </div>
-        <Button 
-          variant="outline" 
-          className="ml-auto mb-2 print:hidden"
-          onClick={handleExportPDF}
-        >
-          <FileDown className="h-4 w-4 mr-2" />
-          Export to PDF
-        </Button>
+        <div className="flex gap-2 ml-auto mb-2 print:hidden">
+          {!isViewOnly && sortedShifts.length > 0 && jobDates.length > 1 && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setIsCopyDialogOpen(true)}
+            >
+              <Copy className="h-4 w-4 mr-2" />
+              Copy Shifts
+            </Button>
+          )}
+          <Button 
+            variant="outline" 
+            onClick={handleExportPDF}
+          >
+            <FileDown className="h-4 w-4 mr-2" />
+            Export to PDF
+          </Button>
+        </div>
       </div>
       
       <Table className="border-collapse border border-border print:border-black">
@@ -293,6 +309,22 @@ export const ShiftsTable = ({
             onShiftUpdated();
           }}
           isViewOnly={isViewOnly}
+        />
+      )}
+
+      {isCopyDialogOpen && (
+        <CopyShiftsDialog
+          open={isCopyDialogOpen}
+          onOpenChange={setIsCopyDialogOpen}
+          sourceDate={date}
+          jobDates={jobDates}
+          jobId={jobId}
+          onShiftsCopied={() => {
+            if (onShiftsCopied) {
+              onShiftsCopied();
+            }
+            setIsCopyDialogOpen(false);
+          }}
         />
       )}
     </div>

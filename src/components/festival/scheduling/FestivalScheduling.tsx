@@ -22,7 +22,7 @@ interface FestivalSchedulingProps {
 export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: FestivalSchedulingProps) => {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [isCreateShiftOpen, setIsCreateShiftOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"list" | "table">("table"); // Changed default to "table"
+  const [viewMode, setViewMode] = useState<"list" | "table">("table");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [dateTypes, setDateTypes] = useState<Record<string, string>>({});
   const [dayStartTime, setDayStartTime] = useState<string>("07:00");
@@ -287,6 +287,8 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
                 date={selectedDate}
                 jobId={jobId}
                 isViewOnly={isViewOnly}
+                jobDates={jobDates}
+                onShiftsCopied={handleShiftsCopied}
               />
             ) : (
               <ShiftsList 
