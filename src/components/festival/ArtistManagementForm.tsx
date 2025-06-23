@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +23,55 @@ interface ArtistManagementFormProps {
   isSubmitting: boolean;
 }
 
+// Define the correct form data type for this component
+interface ArtistManagementFormData {
+  name: string;
+  stage: number;
+  date: string;
+  show_start: string;
+  show_end: string;
+  soundcheck: boolean;
+  soundcheck_start?: string;
+  soundcheck_end?: string;
+  foh_console: string;
+  foh_console_provided_by: string;
+  mon_console: string;
+  mon_console_provided_by: string;
+  wireless_systems: any[];
+  iem_systems: any[];
+  wireless_provided_by: string;
+  iem_provided_by: string;
+  monitors_enabled: boolean;
+  monitors_quantity: number;
+  extras_sf: boolean;
+  extras_df: boolean;
+  extras_djbooth: boolean;
+  extras_wired: string;
+  infra_cat6: boolean;
+  infra_cat6_quantity: number;
+  infra_hma: boolean;
+  infra_hma_quantity: number;
+  infra_coax: boolean;
+  infra_coax_quantity: number;
+  infra_opticalcon_duo: boolean;
+  infra_opticalcon_duo_quantity: number;
+  infra_analog: number;
+  infrastructure_provided_by: string;
+  other_infrastructure: string;
+  notes: string;
+  foh_tech?: boolean;
+  mon_tech?: boolean;
+  rider_missing?: boolean;
+  isaftermidnight?: boolean;
+  mic_kit: 'festival' | 'band';
+  wired_mics: Array<{
+    model: string;
+    quantity: number;
+    exclusive_use?: boolean;
+    notes?: string;
+  }>;
+}
+
 export const ArtistManagementForm = ({
   artist,
   jobId,
@@ -38,7 +86,7 @@ export const ArtistManagementForm = ({
   const [isLoading, setIsLoading] = useState(false);
 
   // Create form data without problematic compatibility fields
-  const createFormData = (artistData?: any) => ({
+  const createFormData = (artistData?: any): ArtistManagementFormData => ({
     name: artistData?.name || "",
     stage: artistData?.stage || 1,
     date: selectedDate,
@@ -81,7 +129,7 @@ export const ArtistManagementForm = ({
     wired_mics: artistData?.wired_mics || []
   });
 
-  const [formData, setFormData] = useState(createFormData(artist));
+  const [formData, setFormData] = useState<ArtistManagementFormData>(createFormData(artist));
 
   useEffect(() => {
     if (artist) {
@@ -131,7 +179,7 @@ export const ArtistManagementForm = ({
     await onSubmit(formData);
   };
 
-  const updateFormData = (changes: Partial<typeof formData>) => {
+  const updateFormData = (changes: Partial<ArtistManagementFormData>) => {
     setFormData(prev => ({ ...prev, ...changes }));
   };
 
