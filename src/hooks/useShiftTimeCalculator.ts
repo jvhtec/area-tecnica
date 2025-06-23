@@ -140,12 +140,15 @@ export const useShiftTimeCalculator = (jobId: string, date: string, stage?: numb
     const totalMinutes = latestMinutes - earliestMinutes;
     const overlapMinutes = 60; // 1 hour overlap
     
-    // Calculate shift duration: divide total time evenly among shifts
-    const baseShiftDuration = Math.ceil(totalMinutes / numberOfShifts);
-    const shiftDurationMinutes = baseShiftDuration + overlapMinutes;
+    // For proper overlap calculation:
+    // Total work time = totalMinutes
+    // Each shift duration = (totalMinutes + overlapMinutes * (numberOfShifts - 1)) / numberOfShifts
+    // Interval between shift starts = (totalMinutes - overlapMinutes * (numberOfShifts - 1)) / (numberOfShifts - 1)
     
-    // Calculate the actual interval between shift starts (accounting for overlaps)
-    const shiftStartInterval = Math.ceil((totalMinutes - overlapMinutes * (numberOfShifts - 1)) / numberOfShifts);
+    const shiftDurationMinutes = Math.ceil((totalMinutes + overlapMinutes * (numberOfShifts - 1)) / numberOfShifts);
+    const shiftStartInterval = numberOfShifts > 1 ? 
+      Math.ceil((totalMinutes - overlapMinutes * (numberOfShifts - 1)) / (numberOfShifts - 1)) : 
+      totalMinutes;
 
     const shifts: CalculatedShift[] = [];
 
