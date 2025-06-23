@@ -11,13 +11,14 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 interface ShiftTimeCalculatorProps {
   jobId: string;
   date: string;
+  stage?: number;
   onApplyTimes: (startTime: string, endTime: string) => void;
 }
 
-export const ShiftTimeCalculator = ({ jobId, date, onApplyTimes }: ShiftTimeCalculatorProps) => {
+export const ShiftTimeCalculator = ({ jobId, date, stage, onApplyTimes }: ShiftTimeCalculatorProps) => {
   const [numberOfShifts, setNumberOfShifts] = useState<number>(3);
   const [isOpen, setIsOpen] = useState(false);
-  const { artists, isLoading, calculateOptimalShifts, getScheduleSummary } = useShiftTimeCalculator(jobId, date);
+  const { artists, isLoading, calculateOptimalShifts, getScheduleSummary } = useShiftTimeCalculator(jobId, date, stage);
 
   const calculatedShifts = calculateOptimalShifts(numberOfShifts);
 
@@ -45,7 +46,9 @@ export const ShiftTimeCalculator = ({ jobId, date, onApplyTimes }: ShiftTimeCalc
             ) : (
               <>
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">Festival Schedule</div>
+                  <div className="text-sm font-medium">
+                    {stage ? `Stage ${stage} Schedule` : "Festival Schedule"}
+                  </div>
                   <div className="text-sm text-muted-foreground flex items-center gap-2">
                     <Users className="h-3 w-3" />
                     {artists.length} artists scheduled
@@ -108,7 +111,10 @@ export const ShiftTimeCalculator = ({ jobId, date, onApplyTimes }: ShiftTimeCalc
 
                 {artists.length === 0 && (
                   <div className="text-sm text-muted-foreground bg-muted p-3 rounded-lg">
-                    No artists scheduled for this date. Add artists first to calculate optimal shift times.
+                    {stage 
+                      ? `No artists scheduled for Stage ${stage} on this date.`
+                      : "No artists scheduled for this date. Add artists first to calculate optimal shift times."
+                    }
                   </div>
                 )}
               </>

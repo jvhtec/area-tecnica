@@ -117,6 +117,7 @@ export const EditShiftDialog = ({
           <ShiftTimeCalculator 
             jobId={shift.job_id} 
             date={shift.date} 
+            stage={form.watch("stage") ? parseInt(form.watch("stage")) : undefined}
             onApplyTimes={handleApplyCalculatedTimes}
           />
 

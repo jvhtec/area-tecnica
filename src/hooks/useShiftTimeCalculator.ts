@@ -10,6 +10,8 @@ interface ArtistSchedule {
   soundcheck_start?: string;
   show_start: string;
   show_end: string;
+  isaftermidnight?: boolean;
+  stage?: number;
 }
 
 interface CalculatedShift {
@@ -20,7 +22,7 @@ interface CalculatedShift {
   overlap?: string;
 }
 
-export const useShiftTimeCalculator = (jobId: string, date: string) => {
+export const useShiftTimeCalculator = (jobId: string, date: string, stage?: number) => {
   const [artists, setArtists] = useState<ArtistSchedule[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLastDay, setIsLastDay] = useState(false);
@@ -31,12 +33,19 @@ export const useShiftTimeCalculator = (jobId: string, date: string) => {
       
       setIsLoading(true);
       try {
-        // Fetch artists for the selected date
-        const { data: artistData, error: artistError } = await supabase
+        // Build query with optional stage filter
+        let query = supabase
           .from("festival_artists")
-          .select("id, name, soundcheck, soundcheck_start, show_start, show_end")
+          .select("id, name, soundcheck, soundcheck_start, show_start, show_end, isaftermidnight, stage")
           .eq("job_id", jobId)
           .eq("date", date);
+
+        // Add stage filter if provided
+        if (stage !== undefined) {
+          query = query.eq("stage", stage);
+        }
+
+        const { data: artistData, error: artistError } = await query;
 
         if (artistError) throw artistError;
 
@@ -60,35 +69,12 @@ export const useShiftTimeCalculator = (jobId: string, date: string) => {
     };
 
     fetchArtistData();
-  }, [jobId, date]);
+  }, [jobId, date, stage]);
 
   const calculateOptimalShifts = (numberOfShifts: number): CalculatedShift[] => {
     if (artists.length === 0) return [];
 
-    // Find earliest and latest times
-    let earliestTime = "23:59";
-    let latestTime = "00:00";
-
-    artists.forEach(artist => {
-      // Check soundcheck start
-      if (artist.soundcheck && artist.soundcheck_start) {
-        if (artist.soundcheck_start < earliestTime) {
-          earliestTime = artist.soundcheck_start;
-        }
-      }
-      
-      // Check show start
-      if (artist.show_start && artist.show_start < earliestTime) {
-        earliestTime = artist.show_start;
-      }
-
-      // Check show end
-      if (artist.show_end && artist.show_end > latestTime) {
-        latestTime = artist.show_end;
-      }
-    });
-
-    // Convert times to minutes for calculation
+    // Convert time string to minutes since midnight
     const timeToMinutes = (time: string): number => {
       const [hours, minutes] = time.split(':').map(Number);
       return hours * 60 + minutes;
@@ -100,20 +86,48 @@ export const useShiftTimeCalculator = (jobId: string, date: string) => {
       return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
     };
 
-    let startMinutes = timeToMinutes(earliestTime);
-    let endMinutes = timeToMinutes(latestTime);
+    // Find earliest and latest times
+    let earliestMinutes = 24 * 60; // Start with end of day
+    let latestMinutes = 0; // Start with beginning of day
 
-    // Handle midnight crossover
-    if (endMinutes < startMinutes) {
-      endMinutes += 24 * 60; // Add 24 hours
-    }
+    artists.forEach(artist => {
+      // Check soundcheck start
+      if (artist.soundcheck && artist.soundcheck_start) {
+        const soundcheckMinutes = timeToMinutes(artist.soundcheck_start);
+        if (soundcheckMinutes < earliestMinutes) {
+          earliestMinutes = soundcheckMinutes;
+        }
+      }
+      
+      // Check show start
+      if (artist.show_start) {
+        const showStartMinutes = timeToMinutes(artist.show_start);
+        if (showStartMinutes < earliestMinutes) {
+          earliestMinutes = showStartMinutes;
+        }
+      }
+
+      // Check show end - handle midnight crossover
+      if (artist.show_end) {
+        let showEndMinutes = timeToMinutes(artist.show_end);
+        
+        // If show ends after midnight, add 24 hours
+        if (artist.isaftermidnight) {
+          showEndMinutes += 24 * 60;
+        }
+        
+        if (showEndMinutes > latestMinutes) {
+          latestMinutes = showEndMinutes;
+        }
+      }
+    });
 
     // Add 4 hours for teardown if it's the last day
     if (isLastDay) {
-      endMinutes += 4 * 60;
+      latestMinutes += 4 * 60;
     }
 
-    const totalMinutes = endMinutes - startMinutes;
+    const totalMinutes = latestMinutes - earliestMinutes;
     const overlapMinutes = 60; // 1 hour overlap
     
     // Calculate shift duration with overlap
@@ -123,7 +137,7 @@ export const useShiftTimeCalculator = (jobId: string, date: string) => {
     const shifts: CalculatedShift[] = [];
 
     for (let i = 0; i < numberOfShifts; i++) {
-      const shiftStartMinutes = startMinutes + (i * actualShiftInterval);
+      const shiftStartMinutes = earliestMinutes + (i * actualShiftInterval);
       const shiftEndMinutes = shiftStartMinutes + shiftDurationMinutes;
 
       const shift: CalculatedShift = {
@@ -143,23 +157,56 @@ export const useShiftTimeCalculator = (jobId: string, date: string) => {
   const getScheduleSummary = () => {
     if (artists.length === 0) return "No artists scheduled";
 
-    let earliest = "23:59";
-    let latest = "00:00";
+    // Convert time string to minutes for proper comparison
+    const timeToMinutes = (time: string): number => {
+      const [hours, minutes] = time.split(':').map(Number);
+      return hours * 60 + minutes;
+    };
+
+    const minutesToTime = (minutes: number): string => {
+      const hours = Math.floor(minutes / 60) % 24;
+      const mins = minutes % 60;
+      return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+    };
+
+    let earliestMinutes = 24 * 60;
+    let latestMinutes = 0;
 
     artists.forEach(artist => {
-      if (artist.soundcheck && artist.soundcheck_start && artist.soundcheck_start < earliest) {
-        earliest = artist.soundcheck_start;
+      if (artist.soundcheck && artist.soundcheck_start) {
+        const soundcheckMinutes = timeToMinutes(artist.soundcheck_start);
+        if (soundcheckMinutes < earliestMinutes) {
+          earliestMinutes = soundcheckMinutes;
+        }
       }
-      if (artist.show_start && artist.show_start < earliest) {
-        earliest = artist.show_start;
+      
+      if (artist.show_start) {
+        const showStartMinutes = timeToMinutes(artist.show_start);
+        if (showStartMinutes < earliestMinutes) {
+          earliestMinutes = showStartMinutes;
+        }
       }
-      if (artist.show_end && artist.show_end > latest) {
-        latest = artist.show_end;
+
+      if (artist.show_end) {
+        let showEndMinutes = timeToMinutes(artist.show_end);
+        
+        // Handle midnight crossover
+        if (artist.isaftermidnight) {
+          showEndMinutes += 24 * 60;
+        }
+        
+        if (showEndMinutes > latestMinutes) {
+          latestMinutes = showEndMinutes;
+        }
       }
     });
 
+    const earliest = minutesToTime(earliestMinutes);
+    const latest = minutesToTime(latestMinutes);
     const teardownText = isLastDay ? " + 4h teardown" : "";
-    return `${earliest} → ${latest}${teardownText}`;
+    const stageText = stage ? ` (Stage ${stage})` : "";
+    
+    return `${earliest} → ${latest}${teardownText}${stageText}`;
   };
 
   return {
