@@ -23,10 +23,11 @@ export interface WiredMicrophoneNeedsPdfData {
 }
 
 export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPdfData): Promise<Blob> => {
-  const pdf = new jsPDF();
+  // Use landscape orientation for better table space utilization
+  const pdf = new jsPDF('landscape', 'pt', 'a4');
   const pageWidth = pdf.internal.pageSize.width;
   const pageHeight = pdf.internal.pageSize.height;
-  const margin = 20;
+  const margin = 10; // Reduced from 20 for more usable space
   
   // Festival document styling - consistent burgundy/red theme
   const primaryColor = [139, 21, 33]; // Burgundy/red to match other festival documents
@@ -124,6 +125,9 @@ export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPd
     need.sharedQuantity.toString(),
     need.stages.map(s => `Stage ${s.stage}: ${s.quantity}`).join(', ')
   ]);
+
+  // Calculate available width for dynamic column sizing
+  const availableWidth = pageWidth - (margin * 2);
   
   (pdf as any).autoTable({
     startY: yPosition,
@@ -139,23 +143,46 @@ export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPd
     },
     bodyStyles: { 
       fontSize: 10,
-      textColor: secondaryColor
+      textColor: secondaryColor,
+      cellPadding: 4
     },
     alternateRowStyles: {
       fillColor: lightGray
     },
     styles: { 
-      cellPadding: 6,
+      cellPadding: 4,
       lineColor: [200, 200, 200],
-      lineWidth: 0.5
+      lineWidth: 0.5,
+      overflow: 'linebreak'
     },
+    // Use percentage-based widths for better space utilization
     columnStyles: {
-      0: { cellWidth: 40, fontStyle: 'bold' },
-      1: { cellWidth: 25, halign: 'center', fillColor: [255, 248, 248] },
-      2: { cellWidth: 25, halign: 'center', fillColor: [255, 235, 235] },
-      3: { cellWidth: 25, halign: 'center', fillColor: [235, 255, 235] },
-      4: { cellWidth: 55, fontSize: 9 }
-    }
+      0: { 
+        cellWidth: availableWidth * 0.25, // 25% for microphone model
+        fontStyle: 'bold'
+      },
+      1: { 
+        cellWidth: availableWidth * 0.12, // 12% for total required
+        halign: 'center', 
+        fillColor: [255, 248, 248] 
+      },
+      2: { 
+        cellWidth: availableWidth * 0.12, // 12% for exclusive use
+        halign: 'center', 
+        fillColor: [255, 235, 235] 
+      },
+      3: { 
+        cellWidth: availableWidth * 0.12, // 12% for shared use
+        halign: 'center', 
+        fillColor: [235, 255, 235] 
+      },
+      4: { 
+        cellWidth: availableWidth * 0.39, // 39% for stage distribution (much wider)
+        fontSize: 9,
+        overflow: 'linebreak'
+      }
+    },
+    margin: { left: margin, right: margin }
   });
   
   yPosition = (pdf as any).lastAutoTable.finalY + 25;
@@ -172,7 +199,7 @@ export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPd
   
   for (const need of data.microphoneNeeds) {
     // Check if we need a new page
-    if (yPosition > pageHeight - 80) {
+    if (yPosition > pageHeight - 100) {
       pdf.addPage();
       yPosition = 30;
     }
@@ -208,7 +235,8 @@ export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPd
       },
       bodyStyles: { 
         fontSize: 9,
-        textColor: secondaryColor
+        textColor: secondaryColor,
+        cellPadding: 4
       },
       alternateRowStyles: {
         fillColor: [252, 252, 252]
@@ -216,13 +244,22 @@ export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPd
       styles: { 
         cellPadding: 4,
         lineColor: [200, 200, 200],
-        lineWidth: 0.3
+        lineWidth: 0.3,
+        overflow: 'linebreak'
       },
+      // Optimized column widths for better space usage
       columnStyles: {
-        0: { cellWidth: 25, fontStyle: 'bold', halign: 'center' },
-        1: { cellWidth: 20, halign: 'center' },
+        0: { 
+          cellWidth: availableWidth * 0.15, // 15% for stage
+          fontStyle: 'bold', 
+          halign: 'center' 
+        },
+        1: { 
+          cellWidth: availableWidth * 0.12, // 12% for quantity
+          halign: 'center' 
+        },
         2: { 
-          cellWidth: 20, 
+          cellWidth: availableWidth * 0.12, // 12% for exclusive
           halign: 'center',
           didParseCell: function(data: any) {
             if (data.cell.text[0] === 'Yes') {
@@ -232,8 +269,13 @@ export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPd
             }
           }
         },
-        3: { cellWidth: 105, fontSize: 8 }
-      }
+        3: { 
+          cellWidth: availableWidth * 0.61, // 61% for artists (much wider)
+          fontSize: 8,
+          overflow: 'linebreak'
+        }
+      },
+      margin: { left: margin, right: margin }
     });
     
     yPosition = (pdf as any).lastAutoTable.finalY + 20;
