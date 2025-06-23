@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ShiftWithAssignments } from "@/types/festival-scheduling";
+import { ShiftTimeCalculator } from "./ShiftTimeCalculator";
 
 interface EditShiftDialogProps {
   open: boolean;
@@ -51,6 +52,11 @@ export const EditShiftDialog = ({
       notes: shift.notes || "",
     },
   });
+
+  const handleApplyCalculatedTimes = (startTime: string, endTime: string) => {
+    form.setValue("start_time", startTime);
+    form.setValue("end_time", endTime);
+  };
 
   const handleSubmit = async (values: FormValues) => {
     setIsSubmitting(true);
@@ -107,6 +113,12 @@ export const EditShiftDialog = ({
               </p>
             )}
           </div>
+
+          <ShiftTimeCalculator 
+            jobId={shift.job_id} 
+            date={shift.date} 
+            onApplyTimes={handleApplyCalculatedTimes}
+          />
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

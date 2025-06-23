@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { ShiftTimeCalculator } from "./ShiftTimeCalculator";
 
 interface CreateShiftDialogProps {
   open: boolean;
@@ -53,6 +54,11 @@ export const CreateShiftDialog = ({
       notes: "",
     },
   });
+
+  const handleApplyCalculatedTimes = (startTime: string, endTime: string) => {
+    form.setValue("start_time", startTime);
+    form.setValue("end_time", endTime);
+  };
 
   const handleSubmit = async (values: FormValues) => {
     console.log("Creating shift with values:", values);
@@ -121,6 +127,12 @@ export const CreateShiftDialog = ({
               </p>
             )}
           </div>
+
+          <ShiftTimeCalculator 
+            jobId={jobId} 
+            date={date} 
+            onApplyTimes={handleApplyCalculatedTimes}
+          />
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
