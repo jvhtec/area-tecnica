@@ -5,7 +5,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArtistSectionProps } from "@/types/artist-form";
 
-export const BasicInfoSection = ({ formData, onChange }: ArtistSectionProps) => {
+export const BasicInfoSection = ({ formData, onChange, gearSetup }: ArtistSectionProps) => {
+  // Get max stages from gearSetup or default to 3
+  const maxStages = gearSetup?.max_stages || 3;
+
   return (
     <div className="space-y-4 border rounded-lg p-4">
       <h3 className="text-lg font-semibold">Basic Information</h3>
@@ -29,7 +32,7 @@ export const BasicInfoSection = ({ formData, onChange }: ArtistSectionProps) => 
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Array.from({ length: formData.max_stages || 3 }, (_, i) => (
+              {Array.from({ length: maxStages }, (_, i) => (
                 <SelectItem key={i + 1} value={(i + 1).toString()}>
                   Stage {i + 1}
                 </SelectItem>
