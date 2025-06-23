@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -75,9 +76,10 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
         startTime: string;
         endTime: string;
         exclusive: boolean;
+        showIndex: number;
       }>>();
 
-      sortedArtists.forEach(artist => {
+      sortedArtists.forEach((artist, index) => {
         if (!artist.wired_mics || !Array.isArray(artist.wired_mics)) return;
 
         const wiredMics = artist.wired_mics as WiredMic[];
@@ -89,7 +91,8 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
             mics: [mic],
             startTime: artist.show_start || '',
             endTime: artist.show_end || '',
-            exclusive: mic.exclusive_use || false
+            exclusive: mic.exclusive_use || false,
+            showIndex: index
           };
 
           if (!micUsageByTime.has(mic.model)) {
@@ -117,12 +120,12 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
             const isOverlapping = i === j || isTimeOverlapping(
               usages[i].startTime, usages[i].endTime,
               usage.startTime, usage.endTime
-            ) || isConsecutive(
-              usages[i].startTime, usages[i].endTime,
-              usage.startTime, usage.endTime
             );
+            
+            // Shows are consecutive if their indices are adjacent in the sorted array
+            const isConsecutiveShow = Math.abs(usages[i].showIndex - usage.showIndex) === 1;
 
-            if (isOverlapping) {
+            if (isOverlapping || isConsecutiveShow) {
               const micQuantity = usage.mics[0]?.quantity || 0;
               currentQuantity += micQuantity;
               artistsAtTime.push(usage.artist);
@@ -134,11 +137,21 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
                 // or if shows are consecutive (they need separate mic sets)
                 const hasExclusiveInWindow = usages.some(u => u.exclusive && (
                   isTimeOverlapping(usage.startTime, usage.endTime, u.startTime, u.endTime) ||
-                  isConsecutive(usage.startTime, usage.endTime, u.startTime, u.endTime)
+                  Math.abs(usage.showIndex - u.showIndex) === 1
                 ));
                 
-                if (!hasExclusiveInWindow) {
+                // Also can't share if any show is consecutive to this one
+                const hasConsecutiveShow = usages.some(u => 
+                  Math.abs(usage.showIndex - u.showIndex) === 1 &&
+                  (isTimeOverlapping(usage.startTime, usage.endTime, u.startTime, u.endTime) ||
+                   isConsecutiveShow)
+                );
+                
+                if (!hasExclusiveInWindow && !hasConsecutiveShow) {
                   currentShared = Math.max(currentShared, micQuantity);
+                } else {
+                  // If can't be shared, treat as exclusive for counting
+                  currentExclusive += micQuantity;
                 }
               }
             }
