@@ -11,7 +11,8 @@ const categories = [
   { value: 'foh_console', label: 'FOH Console' },
   { value: 'mon_console', label: 'Monitor Console' },
   { value: 'wireless', label: 'Wireless System' },
-  { value: 'iem', label: 'IEM System' }
+  { value: 'iem', label: 'IEM System' },
+  { value: 'wired_mics', label: 'Wired Microphone' }
 ];
 
 interface CreateEquipmentModelDialogProps {

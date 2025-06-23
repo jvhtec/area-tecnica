@@ -12,7 +12,8 @@ const categories = [
   { value: 'foh_console', label: 'FOH Consoles' },
   { value: 'mon_console', label: 'Monitor Consoles' },
   { value: 'wireless', label: 'Wireless Systems' },
-  { value: 'iem', label: 'IEM Systems' }
+  { value: 'iem', label: 'IEM Systems' },
+  { value: 'wired_mics', label: 'Wired Microphones' }
 ];
 
 export const EquipmentModelsList = () => {
@@ -54,7 +55,7 @@ export const EquipmentModelsList = () => {
       </div>
 
       <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           {categories.map((category) => (
             <TabsTrigger key={category.value} value={category.value}>
               {category.label}
