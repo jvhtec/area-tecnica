@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -131,11 +130,14 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
               if (usage.exclusive) {
                 currentExclusive += micQuantity;
               } else {
-                // For shared mics, only count if no exclusive use at this time
-                if (!usages.some(u => u.exclusive && isTimeOverlapping(
-                  usage.startTime, usage.endTime,
-                  u.startTime, u.endTime
-                ))) {
+                // For shared mics, they can't be shared if ANY show in the time window is exclusive
+                // or if shows are consecutive (they need separate mic sets)
+                const hasExclusiveInWindow = usages.some(u => u.exclusive && (
+                  isTimeOverlapping(usage.startTime, usage.endTime, u.startTime, u.endTime) ||
+                  isConsecutive(usage.startTime, usage.endTime, u.startTime, u.endTime)
+                ));
+                
+                if (!hasExclusiveInWindow) {
                   currentShared = Math.max(currentShared, micQuantity);
                 }
               }
@@ -257,7 +259,7 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
             <div className="space-y-6">
               <div className="text-sm text-muted-foreground">
                 This calculator analyzes all artists using festival microphone kits and determines peak requirements 
-                based on show schedules, exclusive use flags, and consecutive show restrictions.
+                based on show schedules, exclusive use flags, and prevents sharing between consecutive shows.
               </div>
 
               <Table>
