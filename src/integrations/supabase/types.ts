@@ -526,6 +526,7 @@ export type Database = {
             | null
           isaftermidnight: boolean | null
           job_id: string | null
+          mic_kit: string | null
           mic_pack: string | null
           mon_console: string | null
           mon_console_provided_by:
@@ -549,6 +550,7 @@ export type Database = {
           stage: number | null
           timezone: string | null
           updated_at: string | null
+          wired_mics: Json | null
           wireless_provided_by:
             | Database["public"]["Enums"]["provider_type"]
             | null
@@ -585,6 +587,7 @@ export type Database = {
             | null
           isaftermidnight?: boolean | null
           job_id?: string | null
+          mic_kit?: string | null
           mic_pack?: string | null
           mon_console?: string | null
           mon_console_provided_by?:
@@ -608,6 +611,7 @@ export type Database = {
           stage?: number | null
           timezone?: string | null
           updated_at?: string | null
+          wired_mics?: Json | null
           wireless_provided_by?:
             | Database["public"]["Enums"]["provider_type"]
             | null
@@ -644,6 +648,7 @@ export type Database = {
             | null
           isaftermidnight?: boolean | null
           job_id?: string | null
+          mic_kit?: string | null
           mic_pack?: string | null
           mon_console?: string | null
           mon_console_provided_by?:
@@ -667,6 +672,7 @@ export type Database = {
           stage?: number | null
           timezone?: string | null
           updated_at?: string | null
+          wired_mics?: Json | null
           wireless_provided_by?:
             | Database["public"]["Enums"]["provider_type"]
             | null

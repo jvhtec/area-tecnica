@@ -1,499 +1,256 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
-import { WirelessConfig } from "./gear-setup/WirelessConfig";
-import { AlertTriangle } from "lucide-react";
-
-const consoleOptions = [
-  'Yamaha CL5', 'Yamaha PMx', 'Yamaha DM7','Yamaha DM3', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
-  'DiGiCo SD10', 'DiGiCo SD11', 'DiGiCo SD12', 'DiGiCo SD5Q', 'DiGiCo SD7Q',
-  'DiGiCo Q225', 'DiGiCo Q326', 'DiGiCo Q338', 'DiGiCo Q852', 'Avid S6L',
-  'A&H C1500', 'A&H C2500', 'A&H S3000', 'A&H S5000', 'A&H S7000',
-  'Waves LV1 (homemade)', 'Waves LV1 Classic', 'SSL', 'Midas HD96', 'Other'
-];
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
+import { BasicInfoSection } from "./form/sections/BasicInfoSection";
+import { ConsoleSetupSection } from "./form/sections/ConsoleSetupSection";
+import { WirelessSetupSection } from "./form/sections/WirelessSetupSection";
+import { MonitorSetupSection } from "./form/sections/MonitorSetupSection";
+import { ExtraRequirementsSection } from "./form/sections/ExtraRequirementsSection";
+import { InfrastructureSection } from "./form/sections/InfrastructureSection";
+import { NotesSection } from "./form/sections/NotesSection";
+import { MicKitSection } from "./form/sections/MicKitSection";
+import { WiredMic } from "./gear-setup/WiredMicConfig";
+import { ArtistFormData, WirelessSetup } from "@/types/festival";
+import { useCombinedGearSetup } from "@/hooks/useCombinedGearSetup";
 
 interface ArtistManagementFormProps {
-  initialData: any;
-  onSave: (data: any) => Promise<void>;
-  onCancel: () => void;
-  isLoading: boolean;
+  artist?: any;
+  jobId?: string;
+  selectedDate: string;
   dayStartTime: string;
+  onSubmit: (data: any) => Promise<void>;
+  isSubmitting: boolean;
 }
 
-export const ArtistManagementForm = ({ 
-  initialData, 
-  onSave, 
-  onCancel, 
-  isLoading,
-  dayStartTime 
+export const ArtistManagementForm = ({
+  artist,
+  jobId,
+  selectedDate,
+  dayStartTime,
+  onSubmit,
+  isSubmitting
 }: ArtistManagementFormProps) => {
-  const [formData, setFormData] = useState(initialData);
+  const { toast } = useToast();
+  const { combinedSetup } = useCombinedGearSetup(jobId || '', 1);
+
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    setFormData(initialData);
-  }, [initialData]);
+    if (artist) {
+      setFormData({
+        name: artist.name || "",
+        stage: artist.stage || 1,
+        date: selectedDate,
+        show_start: artist.show_start || "20:00",
+        show_end: artist.show_end || "21:00",
+        soundcheck: artist.soundcheck || false,
+        soundcheck_start: artist.soundcheck_start || "18:00",
+        soundcheck_end: artist.soundcheck_end || "19:00",
+        foh_console: artist.foh_console || "",
+        foh_console_provided_by: artist.foh_console_provided_by || "festival",
+        mon_console: artist.mon_console || "",
+        mon_console_provided_by: artist.mon_console_provided_by || "festival",
+        wireless_systems: artist.wireless_systems || [],
+        iem_systems: artist.iem_systems || [],
+        wireless_provided_by: artist.wireless_provided_by || "festival",
+        iem_provided_by: artist.iem_provided_by || "festival",
+        monitors_enabled: artist.monitors_enabled || false,
+        monitors_quantity: artist.monitors_quantity || 0,
+        extras_sf: artist.extras_sf || false,
+        extras_df: artist.extras_df || false,
+        extras_djbooth: artist.extras_djbooth || false,
+        extras_wired: artist.extras_wired || "",
+        infra_cat6: artist.infra_cat6 || false,
+        infra_cat6_quantity: artist.infra_cat6_quantity || 0,
+        infra_hma: artist.infra_hma || false,
+        infra_hma_quantity: artist.infra_hma_quantity || 0,
+        infra_coax: artist.infra_coax || false,
+        infra_coax_quantity: artist.infra_coax_quantity || 0,
+        infra_opticalcon_duo: artist.infra_opticalcon_duo || false,
+        infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity || 0,
+        infra_analog: artist.infra_analog || 0,
+        infrastructure_provided_by: artist.infrastructure_provided_by || "festival",
+        other_infrastructure: artist.other_infrastructure || "",
+        notes: artist.notes || "",
+        foh_tech: artist.foh_tech || false,
+        mon_tech: artist.mon_tech || false,
+        rider_missing: artist.rider_missing || false,
+        mic_kit: artist.mic_kit || "band",
+        wired_mics: artist.wired_mics || []
+      });
+    }
+  }, [artist, selectedDate]);
+
+  const [formData, setFormData] = useState<ArtistFormData & { mic_kit: 'festival' | 'band'; wired_mics: WiredMic[] }>({
+    name: artist?.name || "",
+    stage: artist?.stage || 1,
+    date: selectedDate,
+    show_start: artist?.show_start || "20:00",
+    show_end: artist?.show_end || "21:00",
+    soundcheck: artist?.soundcheck || false,
+    soundcheck_start: artist?.soundcheck_start || "18:00",
+    soundcheck_end: artist?.soundcheck_end || "19:00",
+    foh_console: artist?.foh_console || "",
+    foh_console_provided_by: artist?.foh_console_provided_by || "festival",
+    mon_console: artist?.mon_console || "",
+    mon_console_provided_by: artist?.mon_console_provided_by || "festival",
+    wireless_systems: artist?.wireless_systems || [],
+    iem_systems: artist?.iem_systems || [],
+    wireless_provided_by: artist?.wireless_provided_by || "festival",
+    iem_provided_by: artist?.iem_provided_by || "festival",
+    monitors_enabled: artist?.monitors_enabled || false,
+    monitors_quantity: artist?.monitors_quantity || 0,
+    extras_sf: artist?.extras_sf || false,
+    extras_df: artist?.extras_df || false,
+    extras_djbooth: artist?.extras_djbooth || false,
+    extras_wired: artist?.extras_wired || "",
+    infra_cat6: artist?.infra_cat6 || false,
+    infra_cat6_quantity: artist?.infra_cat6_quantity || 0,
+    infra_hma: artist?.infra_hma || false,
+    infra_hma_quantity: artist?.infra_hma_quantity || 0,
+    infra_coax: artist?.infra_coax || false,
+    infra_coax_quantity: artist?.infra_coax_quantity || 0,
+    infra_opticalcon_duo: artist?.infra_opticalcon_duo || false,
+    infra_opticalcon_duo_quantity: artist?.infra_opticalcon_duo_quantity || 0,
+    infra_analog: artist?.infra_analog || 0,
+    infrastructure_provided_by: artist?.infrastructure_provided_by || "festival",
+    other_infrastructure: artist?.other_infrastructure || "",
+    notes: artist?.notes || "",
+    foh_tech: artist?.foh_tech || false,
+    mon_tech: artist?.mon_tech || false,
+    rider_missing: artist?.rider_missing || false,
+    mic_kit: artist?.mic_kit || "band",
+    wired_mics: artist?.wired_mics || []
+  });
+
+  useEffect(() => {
+    if (artist) {
+      setIsLoading(true);
+      supabase
+        .from("festival_artists")
+        .select("*")
+        .eq("id", artist.id)
+        .single()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error("Error fetching artist:", error);
+            toast({
+              title: "Error",
+              description: "Could not load artist details",
+              variant: "destructive",
+            });
+          } else if (data) {
+            setFormData({
+              name: data.name || "",
+              stage: data.stage || 1,
+              date: selectedDate,
+              show_start: data.show_start || "20:00",
+              show_end: data.show_end || "21:00",
+              soundcheck: data.soundcheck || false,
+              soundcheck_start: data.soundcheck_start || "18:00",
+              soundcheck_end: data.soundcheck_end || "19:00",
+              foh_console: data.foh_console || "",
+              foh_console_provided_by: data.foh_console_provided_by || "festival",
+              mon_console: data.mon_console || "",
+              mon_console_provided_by: data.mon_console_provided_by || "festival",
+              wireless_systems: data.wireless_systems || [],
+              iem_systems: data.iem_systems || [],
+              wireless_provided_by: data.wireless_provided_by || "festival",
+              iem_provided_by: data.iem_provided_by || "festival",
+              monitors_enabled: data.monitors_enabled || false,
+              monitors_quantity: data.monitors_quantity || 0,
+              extras_sf: data.extras_sf || false,
+              extras_df: data.extras_df || false,
+              extras_djbooth: data.extras_djbooth || false,
+              extras_wired: data.extras_wired || "",
+              infra_cat6: data.infra_cat6 || false,
+              infra_cat6_quantity: data.infra_cat6_quantity || 0,
+              infra_hma: data.infra_hma || false,
+              infra_hma_quantity: data.infra_hma_quantity || 0,
+              infra_coax: data.infra_coax || false,
+              infra_coax_quantity: data.infra_coax_quantity || 0,
+              infra_opticalcon_duo: data.infra_opticalcon_duo || false,
+              infra_opticalcon_duo_quantity: data.infra_opticalcon_duo_quantity || 0,
+              infra_analog: data.infra_analog || 0,
+              infrastructure_provided_by: data.infrastructure_provided_by || "festival",
+              other_infrastructure: data.other_infrastructure || "",
+              notes: data.notes || "",
+              foh_tech: data.foh_tech || false,
+              mon_tech: data.mon_tech || false,
+              rider_missing: data.rider_missing || false,
+              mic_kit: data.mic_kit || "band",
+              wired_mics: data.wired_mics || []
+            });
+          }
+        })
+        .finally(() => setIsLoading(false));
+    }
+  }, [artist, selectedDate, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onSave(formData);
+    await onSubmit(formData);
   };
 
-  const updateFormData = (field: string, value: any) => {
-    setFormData((prev: any) => ({ ...prev, [field]: value }));
+  const updateFormData = (changes: Partial<typeof formData>) => {
+    setFormData(prev => ({ ...prev, ...changes }));
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Basic Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="name">Artist/Band Name</Label>
-          <Input
-            id="name"
-            value={formData.name || ""}
-            onChange={(e) => updateFormData("name", e.target.value)}
-            required
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="stage">Stage</Label>
-          <Select value={formData.stage?.toString() || ""} onValueChange={(value) => updateFormData("stage", parseInt(value))}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select stage" />
-            </SelectTrigger>
-            <SelectContent>
-              {[1, 2, 3, 4, 5].map((stage) => (
-                <SelectItem key={stage} value={stage.toString()}>
-                  Stage {stage}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      <BasicInfoSection 
+        formData={formData} 
+        onChange={updateFormData}
+        dayStartTime={dayStartTime}
+        gearSetup={combinedSetup}
+      />
 
-      {/* Rider Status */}
-      <div className="space-y-4">
-        <div className={`flex items-center space-x-2 p-3 rounded-md border ${
-          formData.rider_missing ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20" : "border-gray-200"
-        }`}>
-          <Checkbox
-            id="rider_missing"
-            checked={formData.rider_missing || false}
-            onCheckedChange={(checked) => updateFormData("rider_missing", checked)}
-          />
-          <div className="flex items-center space-x-2">
-            {formData.rider_missing && <AlertTriangle className="h-4 w-4 text-red-500" />}
-            <Label htmlFor="rider_missing" className={formData.rider_missing ? "text-red-700 dark:text-red-300" : ""}>
-              Rider Missing
-            </Label>
-          </div>
-        </div>
-        {formData.rider_missing && (
-          <div className="text-sm text-red-600 dark:text-red-400 ml-6">
-            ⚠️ This artist is missing their technical rider. Follow up required.
-          </div>
-        )}
-      </div>
+      <ConsoleSetupSection 
+        formData={formData} 
+        onChange={updateFormData}
+        gearSetup={combinedSetup}
+      />
 
-      {/* Show Times */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="show_start">Show Start</Label>
-          <Input
-            id="show_start"
-            type="time"
-            value={formData.show_start || ""}
-            onChange={(e) => updateFormData("show_start", e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="show_end">Show End</Label>
-          <Input
-            id="show_end"
-            type="time"
-            value={formData.show_end || ""}
-            onChange={(e) => updateFormData("show_end", e.target.value)}
-          />
-        </div>
-      </div>
+      <WirelessSetupSection 
+        formData={formData} 
+        onChange={updateFormData}
+        gearSetup={combinedSetup}
+      />
 
-      {/* Soundcheck */}
-      <div className="space-y-4">
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="soundcheck"
-            checked={formData.soundcheck || false}
-            onCheckedChange={(checked) => updateFormData("soundcheck", checked)}
-          />
-          <Label htmlFor="soundcheck">Soundcheck Required</Label>
-        </div>
-        
-        {formData.soundcheck && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ml-6">
-            <div className="space-y-2">
-              <Label htmlFor="soundcheck_start">Soundcheck Start</Label>
-              <Input
-                id="soundcheck_start"
-                type="time"
-                value={formData.soundcheck_start || ""}
-                onChange={(e) => updateFormData("soundcheck_start", e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="soundcheck_end">Soundcheck End</Label>
-              <Input
-                id="soundcheck_end"
-                type="time"
-                value={formData.soundcheck_end || ""}
-                onChange={(e) => updateFormData("soundcheck_end", e.target.value)}
-              />
-            </div>
-          </div>
-        )}
-      </div>
+      <MicKitSection
+        micKit={formData.mic_kit}
+        wiredMics={formData.wired_mics}
+        onMicKitChange={(provider) => updateFormData({ mic_kit: provider })}
+        onWiredMicsChange={(mics) => updateFormData({ wired_mics: mics })}
+      />
 
-      {/* Console Setup */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">FOH Console</h3>
-          <div className="space-y-2">
-            <Label>Console Model</Label>
-            <Select
-              value={formData.foh_console || ""}
-              onValueChange={(value) => updateFormData("foh_console", value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select console" />
-              </SelectTrigger>
-              <SelectContent>
-                {consoleOptions.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Provided By</Label>
-            <Select
-              value={formData.foh_console_provided_by || "festival"}
-              onValueChange={(value) => updateFormData("foh_console_provided_by", value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="festival">Festival</SelectItem>
-                <SelectItem value="band">Band</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="foh_tech"
-              checked={formData.foh_tech || false}
-              onCheckedChange={(checked) => updateFormData("foh_tech", checked)}
-            />
-            <Label htmlFor="foh_tech">FOH Technician Required</Label>
-          </div>
-        </div>
+      <MonitorSetupSection 
+        formData={formData} 
+        onChange={updateFormData}
+        gearSetup={combinedSetup}
+      />
 
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Monitor Console</h3>
-          <div className="space-y-2">
-            <Label>Console Model</Label>
-            <Select
-              value={formData.mon_console || ""}
-              onValueChange={(value) => updateFormData("mon_console", value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select console" />
-              </SelectTrigger>
-              <SelectContent>
-                {consoleOptions.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Provided By</Label>
-            <Select
-              value={formData.mon_console_provided_by || "festival"}
-              onValueChange={(value) => updateFormData("mon_console_provided_by", value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="festival">Festival</SelectItem>
-                <SelectItem value="band">Band</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="mon_tech"
-              checked={formData.mon_tech || false}
-              onCheckedChange={(checked) => updateFormData("mon_tech", checked)}
-            />
-            <Label htmlFor="mon_tech">Monitor Technician Required</Label>
-          </div>
-        </div>
-      </div>
+      <ExtraRequirementsSection 
+        formData={formData} 
+        onChange={updateFormData}
+        gearSetup={combinedSetup}
+      />
 
-      {/* Wireless Setup */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold">RF & Wireless Setup</h3>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            <WirelessConfig
-              systems={formData.wireless_systems || []}
-              onChange={(systems) => updateFormData("wireless_systems", systems)}
-              label="Wireless Systems"
-              includeQuantityTypes={true}
-            />
-          </div>
-          <div className="space-y-4">
-            <WirelessConfig
-              systems={formData.iem_systems || []}
-              onChange={(systems) => updateFormData("iem_systems", systems)}
-              label="IEM Systems"
-              includeQuantityTypes={true}
-              isIEM={true}
-            />
-          </div>
-        </div>
-      </div>
+      <InfrastructureSection 
+        formData={formData} 
+        onChange={updateFormData}
+        gearSetup={combinedSetup}
+      />
 
-      {/* Monitors */}
-      <div className="space-y-4">
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="monitors_enabled"
-            checked={formData.monitors_enabled || false}
-            onCheckedChange={(checked) => updateFormData("monitors_enabled", checked)}
-          />
-          <Label htmlFor="monitors_enabled">Stage Monitors Required</Label>
-        </div>
-        
-        {formData.monitors_enabled && (
-          <div className="space-y-2 ml-6">
-            <Label htmlFor="monitors_quantity">Number of Monitors</Label>
-            <Input
-              id="monitors_quantity"
-              type="number"
-              min="0"
-              value={formData.monitors_quantity || 0}
-              onChange={(e) => updateFormData("monitors_quantity", parseInt(e.target.value) || 0)}
-            />
-          </div>
-        )}
-      </div>
+      <NotesSection 
+        formData={formData} 
+        onChange={updateFormData}
+      />
 
-      {/* Extras */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold">Additional Requirements</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="extras_sf"
-              checked={formData.extras_sf || false}
-              onCheckedChange={(checked) => updateFormData("extras_sf", checked)}
-            />
-            <Label htmlFor="extras_sf">Side Fills</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="extras_df"
-              checked={formData.extras_df || false}
-              onCheckedChange={(checked) => updateFormData("extras_df", checked)}
-            />
-            <Label htmlFor="extras_df">Drum Fills</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="extras_djbooth"
-              checked={formData.extras_djbooth || false}
-              onCheckedChange={(checked) => updateFormData("extras_djbooth", checked)}
-            />
-            <Label htmlFor="extras_djbooth">DJ Booth</Label>
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="extras_wired">Additional Wired Requirements</Label>
-          <Input
-            id="extras_wired"
-            value={formData.extras_wired || ""}
-            onChange={(e) => updateFormData("extras_wired", e.target.value)}
-            placeholder="Describe any additional wired requirements"
-          />
-        </div>
-      </div>
-
-      {/* Infrastructure */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold">Infrastructure Requirements</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="infra_cat6"
-                checked={formData.infra_cat6 || false}
-                onCheckedChange={(checked) => updateFormData("infra_cat6", checked)}
-              />
-              <Label htmlFor="infra_cat6">CAT6 Lines</Label>
-            </div>
-            {formData.infra_cat6 && (
-              <Input
-                type="number"
-                min="0"
-                value={formData.infra_cat6_quantity || 0}
-                onChange={(e) => updateFormData("infra_cat6_quantity", parseInt(e.target.value) || 0)}
-                placeholder="Quantity"
-                className="ml-6"
-              />
-            )}
-            
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="infra_hma"
-                checked={formData.infra_hma || false}
-                onCheckedChange={(checked) => updateFormData("infra_hma", checked)}
-              />
-              <Label htmlFor="infra_hma">HMA Lines</Label>
-            </div>
-            {formData.infra_hma && (
-              <Input
-                type="number"
-                min="0"
-                value={formData.infra_hma_quantity || 0}
-                onChange={(e) => updateFormData("infra_hma_quantity", parseInt(e.target.value) || 0)}
-                placeholder="Quantity"
-                className="ml-6"
-              />
-            )}
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="infra_coax"
-                checked={formData.infra_coax || false}
-                onCheckedChange={(checked) => updateFormData("infra_coax", checked)}
-              />
-              <Label htmlFor="infra_coax">Coax Lines</Label>
-            </div>
-            {formData.infra_coax && (
-              <Input
-                type="number"
-                min="0"
-                value={formData.infra_coax_quantity || 0}
-                onChange={(e) => updateFormData("infra_coax_quantity", parseInt(e.target.value) || 0)}
-                placeholder="Quantity"
-                className="ml-6"
-              />
-            )}
-            
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="infra_opticalcon_duo"
-                checked={formData.infra_opticalcon_duo || false}
-                onCheckedChange={(checked) => updateFormData("infra_opticalcon_duo", checked)}
-              />
-              <Label htmlFor="infra_opticalcon_duo">OpticalCON DUO</Label>
-            </div>
-            {formData.infra_opticalcon_duo && (
-              <Input
-                type="number"
-                min="0"
-                value={formData.infra_opticalcon_duo_quantity || 0}
-                onChange={(e) => updateFormData("infra_opticalcon_duo_quantity", parseInt(e.target.value) || 0)}
-                placeholder="Quantity"
-                className="ml-6"
-              />
-            )}
-          </div>
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="infra_analog">Analog Lines</Label>
-          <Input
-            id="infra_analog"
-            type="number"
-            min="0"
-            value={formData.infra_analog || 0}
-            onChange={(e) => updateFormData("infra_analog", parseInt(e.target.value) || 0)}
-          />
-        </div>
-        
-        <div className="space-y-2">
-          <Label>Infrastructure Provided By</Label>
-          <Select
-            value={formData.infrastructure_provided_by || "festival"}
-            onValueChange={(value) => updateFormData("infrastructure_provided_by", value)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="festival">Festival</SelectItem>
-              <SelectItem value="artist">Artist</SelectItem>
-              <SelectItem value="production">Production</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="other_infrastructure">Other Infrastructure</Label>
-          <Textarea
-            id="other_infrastructure"
-            value={formData.other_infrastructure || ""}
-            onChange={(e) => updateFormData("other_infrastructure", e.target.value)}
-            placeholder="Describe any other infrastructure requirements"
-          />
-        </div>
-      </div>
-
-      {/* Notes */}
-      <div className="space-y-2">
-        <Label htmlFor="notes">Additional Notes</Label>
-        <Textarea
-          id="notes"
-          value={formData.notes || ""}
-          onChange={(e) => updateFormData("notes", e.target.value)}
-          placeholder="Any additional requirements or comments"
-        />
-      </div>
-
-      {/* After Midnight Toggle */}
-      <div className="flex items-center space-x-2">
-        <Checkbox
-          id="isaftermidnight"
-          checked={formData.isaftermidnight || false}
-          onCheckedChange={(checked) => updateFormData("isaftermidnight", checked)}
-        />
-        <Label htmlFor="isaftermidnight">Show is after midnight (next day)</Label>
-      </div>
-
-      {/* Form Actions */}
-      <div className="flex justify-end space-x-2 pt-4">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? "Saving..." : "Save Artist"}
-        </Button>
-      </div>
+      <Button type="submit" disabled={isSubmitting} className="w-full">
+        {isSubmitting ? "Saving..." : artist ? "Update Artist" : "Add Artist"}
+      </Button>
     </form>
   );
 };
