@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -186,19 +187,19 @@ export const ArtistManagementForm = ({
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <BasicInfoSection 
-        formData={formData} 
+        formData={formData as any} 
         onChange={updateFormData}
         gearSetup={combinedSetup?.globalSetup || null}
       />
 
       <ConsoleSetupSection 
-        formData={formData} 
+        formData={formData as any} 
         onChange={updateFormData}
         gearSetup={combinedSetup?.globalSetup || null}
       />
 
       <WirelessSetupSection 
-        formData={formData} 
+        formData={formData as any} 
         onChange={updateFormData}
         gearSetup={combinedSetup?.globalSetup || null}
       />
@@ -211,25 +212,25 @@ export const ArtistManagementForm = ({
       />
 
       <MonitorSetupSection 
-        formData={formData} 
+        formData={formData as any} 
         onChange={updateFormData}
         gearSetup={combinedSetup?.globalSetup || null}
       />
 
       <ExtraRequirementsSection 
-        formData={formData} 
+        formData={formData as any} 
         onChange={updateFormData}
         gearSetup={combinedSetup?.globalSetup || null}
       />
 
       <InfrastructureSection 
-        formData={formData} 
+        formData={formData as any} 
         onChange={updateFormData}
         gearSetup={combinedSetup?.globalSetup || null}
       />
 
       <NotesSection 
-        formData={formData} 
+        formData={formData as any} 
         onChange={updateFormData}
       />
 
