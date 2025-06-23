@@ -43,6 +43,10 @@ export interface ArtistSectionProps {
     rider_missing?: boolean;
     mic_kit: 'festival' | 'band';
     wired_mics: WiredMic[];
+    // Add GearSetupFormData compatibility fields
+    max_stages?: number;
+    foh_consoles?: any[];
+    mon_consoles?: any[];
   };
   onChange: (changes: any) => void;
   gearSetup?: FestivalGearSetup | null;

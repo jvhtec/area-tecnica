@@ -128,12 +128,14 @@ export const ArtistManagementForm = ({
   useEffect(() => {
     if (artist) {
       setIsLoading(true);
-      supabase
-        .from("festival_artists")
-        .select("*")
-        .eq("id", artist.id)
-        .single()
-        .then(({ data, error }) => {
+      const fetchArtist = async () => {
+        try {
+          const { data, error } = await supabase
+            .from("festival_artists")
+            .select("*")
+            .eq("id", artist.id)
+            .single();
+          
           if (error) {
             console.error("Error fetching artist:", error);
             toast({
@@ -184,18 +186,19 @@ export const ArtistManagementForm = ({
               wired_mics: data.wired_mics || []
             });
           }
-        })
-        .catch((error) => {
+        } catch (error) {
           console.error("Error fetching artist:", error);
           toast({
             title: "Error",
             description: "Could not load artist details",
             variant: "destructive",
           });
-        })
-        .finally(() => {
+        } finally {
           setIsLoading(false);
-        });
+        }
+      };
+
+      fetchArtist();
     }
   }, [artist, selectedDate, toast]);
 
