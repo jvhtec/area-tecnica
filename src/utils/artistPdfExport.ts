@@ -72,6 +72,12 @@ export interface ArtistPdfData {
   };
   notes?: string;
   logoUrl?: string;
+  wiredMics?: Array<{
+    model: string;
+    quantity: number;
+    exclusive_use?: boolean;
+    notes?: string;
+  }>;
 }
 
 // Helper functions to process wireless and IEM data
@@ -214,6 +220,39 @@ export const exportArtistPDF = (data: ArtistPdfData): Promise<Blob> => {
       });
 
       yPosition = (doc as any).lastAutoTable.finalY + 8;
+
+      // === WIRED MICROPHONES ===
+      if (data.wiredMics && data.wiredMics.length > 0) {
+        const wiredMicRows = data.wiredMics.map(mic => [
+          mic.model,
+          mic.quantity.toString(),
+          mic.exclusive_use ? 'Yes' : 'No',
+          mic.notes || '-'
+        ]);
+
+        autoTable(doc, {
+          head: [['Microphone Model', 'Quantity', 'Exclusive Use', 'Notes']],
+          body: wiredMicRows,
+          startY: yPosition,
+          theme: 'grid',
+          styles: {
+            fontSize: 9,
+            cellPadding: 3,
+          },
+          headStyles: {
+            fillColor: [125, 1, 1],
+            textColor: [255, 255, 255],
+          },
+          columnStyles: {
+            0: { cellWidth: 60 },
+            1: { cellWidth: 25, halign: 'center' },
+            2: { cellWidth: 30, halign: 'center' },
+            3: { cellWidth: 55 }
+          }
+        });
+
+        yPosition = (doc as any).lastAutoTable.finalY + 8;
+      }
 
       // === RF & WIRELESS ===
       const wirelessRows: any[] = [];

@@ -18,7 +18,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
 import { ArtistFileDialog } from "./ArtistFileDialog";
-import { ArtistTablePrintDialog } from "./ArtistTablePrintDialog";
+import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
+import { toast } from "sonner";
 
 interface Artist {
   id: string;
@@ -84,8 +85,8 @@ export const ArtistTable = ({
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linksDialogOpen, setLinksDialogOpen] = useState(false);
   const [fileDialogOpen, setFileDialogOpen] = useState(false);
-  const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
+  const [printingArtistId, setPrintingArtistId] = useState<string | null>(null);
 
   // Filtering logic
   const isTimeAfterDayStart = (time: string, date: string) => {
@@ -160,6 +161,90 @@ export const ArtistTable = ({
     return colors[provider as keyof typeof colors] || "bg-gray-100 text-gray-800";
   };
 
+  const transformArtistDataForPdf = (artist: Artist): ArtistPdfData => {
+    return {
+      name: artist.name,
+      stage: artist.stage,
+      date: artist.date,
+      schedule: {
+        show: { 
+          start: artist.show_start, 
+          end: artist.show_end 
+        },
+        soundcheck: artist.soundcheck ? {
+          start: artist.soundcheck_start || '',
+          end: artist.soundcheck_end || ''
+        } : undefined
+      },
+      technical: {
+        fohTech: artist.foh_tech || false,
+        monTech: artist.mon_tech || false,
+        fohConsole: { 
+          model: artist.foh_console, 
+          providedBy: artist.foh_console_provided_by || 'festival' 
+        },
+        monConsole: { 
+          model: artist.mon_console, 
+          providedBy: artist.mon_console_provided_by || 'festival' 
+        },
+        wireless: {
+          systems: artist.wireless_systems || [],
+          providedBy: artist.wireless_provided_by || 'festival'
+        },
+        iem: {
+          systems: artist.iem_systems || [],
+          providedBy: artist.iem_provided_by || 'festival'
+        },
+        monitors: {
+          enabled: artist.monitors_enabled,
+          quantity: artist.monitors_quantity
+        }
+      },
+      infrastructure: {
+        providedBy: 'festival', // Default value
+        cat6: { enabled: false, quantity: 0 },
+        hma: { enabled: false, quantity: 0 },
+        coax: { enabled: false, quantity: 0 },
+        opticalconDuo: { enabled: false, quantity: 0 },
+        analog: 0,
+        other: ''
+      },
+      extras: {
+        sideFill: artist.extras_sf,
+        drumFill: artist.extras_df,
+        djBooth: artist.extras_djbooth,
+        wired: ''
+      },
+      notes: artist.notes || '',
+      wiredMics: artist.wired_mics || []
+    };
+  };
+
+  const handlePrintArtist = async (artist: Artist) => {
+    setPrintingArtistId(artist.id);
+    try {
+      const pdfData = transformArtistDataForPdf(artist);
+      const blob = await exportArtistPDF(pdfData);
+      
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${artist.name.replace(/[^a-zA-Z0-9]/g, '_')}_Requirements.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success(`PDF generated for ${artist.name}`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('Failed to generate PDF');
+    } finally {
+      setPrintingArtistId(null);
+    }
+  };
+
   const handleGenerateLink = (artist: Artist) => {
     setSelectedArtist(artist);
     setLinkDialogOpen(true);
@@ -172,11 +257,6 @@ export const ArtistTable = ({
   const handleManageFiles = (artist: Artist) => {
     setSelectedArtist(artist);
     setFileDialogOpen(true);
-  };
-
-  const handlePrintArtist = (artist: Artist) => {
-    setSelectedArtist(artist);
-    setPrintDialogOpen(true);
   };
 
   if (isLoading) {
@@ -374,9 +454,14 @@ export const ArtistTable = ({
                           variant="ghost"
                           size="icon"
                           onClick={() => handlePrintArtist(artist)}
+                          disabled={printingArtistId === artist.id}
                           title="Print artist details"
                         >
-                          <Printer className="h-4 w-4" />
+                          {printingArtistId === artist.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Printer className="h-4 w-4" />
+                          )}
                         </Button>
                         <Button
                           variant="ghost"
@@ -428,20 +513,6 @@ export const ArtistTable = ({
             open={fileDialogOpen}
             onOpenChange={setFileDialogOpen}
             artistId={selectedArtist.id}
-          />
-          
-          <ArtistTablePrintDialog
-            open={printDialogOpen}
-            onOpenChange={setPrintDialogOpen}
-            jobDates={selectedDate ? [new Date(selectedDate)] : []}
-            selectedDate={selectedDate || ''}
-            onDateChange={() => {}}
-            onStageChange={() => {}}
-            onPrint={() => {
-              console.log('Print artist:', selectedArtist);
-              setPrintDialogOpen(false);
-            }}
-            isLoading={false}
           />
         </>
       )}
