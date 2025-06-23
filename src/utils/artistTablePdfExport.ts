@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { WirelessSystem, IEMSystem } from '@/types/festival-equipment';
+import { sortArtistsChronologically } from './artistSorting';
 
 // Helper functions for wireless and IEM quantity calculations
 export const getWirelessSummary = (data: { 
@@ -153,7 +154,10 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
 
         const scheduleRows: ScheduleRow[] = [];
         
-        data.artists.forEach(artist => {
+        // Sort artists chronologically before creating schedule rows
+        const sortedArtists = sortArtistsChronologically(data.artists);
+        
+        sortedArtists.forEach(artist => {
           if (artist.soundcheck) {
             scheduleRows.push({
               name: artist.name,
@@ -174,11 +178,8 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
           });
         });
 
-        scheduleRows.sort((a, b) => {
-          const timeA = new Date(`2000/01/01 ${a.time.start}`).getTime();
-          const timeB = new Date(`2000/01/01 ${b.time.start}`).getTime();
-          return timeA - timeB;
-        });
+        // Remove the old basic time sorting since we're now using chronological sorting
+        // The scheduleRows are already in the correct order from sortArtistsChronologically
 
         const tableBody = scheduleRows.map(row => {
           if (row.isSoundcheck) {

@@ -8,7 +8,9 @@ import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
 import { ArtistFileDialog } from "./ArtistFileDialog";
 import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
+import { sortArtistsChronologically } from "@/utils/artistSorting";
 import { toast } from "sonner";
+
 interface Artist {
   id: string;
   name: string;
@@ -126,7 +128,7 @@ export const ArtistTable = ({
     return matchesSearch && matchesStage && matchesEquipment && matchesRider;
   });
 
-  // Apply chronological sorting to filtered artists
+  // Apply chronological sorting to filtered artists using shared utility
   const sortedFilteredArtists = sortArtistsChronologically(filteredArtists);
   const handleDeleteClick = async (artist: Artist) => {
     if (window.confirm(`Are you sure you want to delete ${artist.name}?`)) {
