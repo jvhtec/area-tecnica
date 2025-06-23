@@ -151,7 +151,7 @@ export const ArtistForm = () => {
         throw submissionError;
       }
 
-      // Update the artist record with the form data
+      // Update the artist record with the form data (only fields that exist in the table)
       const { error: updateError } = await supabase
         .from('festival_artists')
         .update({
