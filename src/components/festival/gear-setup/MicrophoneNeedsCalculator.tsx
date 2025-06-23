@@ -1,13 +1,13 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Calculator, Download } from "lucide-react";
+import { Calculator, Download, FileText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { WiredMic } from "./WiredMicConfig";
+import { exportWiredMicrophoneNeedsPDF, WiredMicrophoneNeed } from "@/utils/wiredMicrophoneNeedsPdfExport";
 
 interface MicrophoneNeed {
   model: string;
@@ -42,6 +42,33 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
       
       if (error) throw error;
       return data || [];
+    },
+    enabled: open && !!jobId
+  });
+
+  // Query for job details to get title and logo for PDF export
+  const { data: jobDetails } = useQuery({
+    queryKey: ['job-details', jobId],
+    queryFn: async () => {
+      const { data: job, error: jobError } = await supabase
+        .from('jobs')
+        .select('title')
+        .eq('id', jobId)
+        .single();
+      
+      if (jobError) throw jobError;
+
+      const { data: logo, error: logoError } = await supabase
+        .from('festival_logos')
+        .select('file_path')
+        .eq('job_id', jobId)
+        .maybeSingle();
+      
+      // Don't throw error if no logo found
+      return {
+        title: job.title,
+        logoUrl: logo?.file_path || undefined
+      };
     },
     enabled: open && !!jobId
   });
@@ -225,6 +252,38 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
     URL.revokeObjectURL(url);
   };
 
+  const exportNeedsPDF = async () => {
+    if (!jobDetails || calculatedNeeds.length === 0) return;
+
+    // Transform calculatedNeeds to match the PDF export format
+    const transformedNeeds: WiredMicrophoneNeed[] = calculatedNeeds.map(need => ({
+      model: need.model,
+      maxQuantity: need.maxQuantity,
+      exclusiveQuantity: need.exclusiveQuantity,
+      sharedQuantity: need.sharedQuantity,
+      stages: need.stages
+    }));
+
+    const pdfData = {
+      jobTitle: jobDetails.title,
+      logoUrl: jobDetails.logoUrl,
+      microphoneNeeds: transformedNeeds,
+      selectedStages: [...new Set(calculatedNeeds.flatMap(need => need.stages.map(s => s.stage)))]
+    };
+
+    try {
+      const pdfBlob = await exportWiredMicrophoneNeedsPDF(pdfData);
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${jobDetails.title}_Wired_Microphone_Requirements.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+    }
+  };
+
   const handleCalculate = () => {
     setOpen(true);
     if (artists.length > 0) {
@@ -250,10 +309,16 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
               <span>Microphone Requirements Calculator</span>
               <div className="flex gap-2">
                 {calculatedNeeds.length > 0 && (
-                  <Button onClick={exportNeeds} variant="outline" size="sm">
-                    <Download className="h-4 w-4 mr-2" />
-                    Export CSV
-                  </Button>
+                  <>
+                    <Button onClick={exportNeeds} variant="outline" size="sm">
+                      <Download className="h-4 w-4 mr-2" />
+                      Export CSV
+                    </Button>
+                    <Button onClick={exportNeedsPDF} variant="outline" size="sm">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Export PDF
+                    </Button>
+                  </>
                 )}
                 <Button onClick={calculateMicrophoneNeeds} size="sm" disabled={isLoading}>
                   Recalculate
