@@ -431,7 +431,6 @@ export const FestivalGearSetupForm = ({
         formData={getCompatibleFormData()}
         onChange={(changes) => handleChange(changes)}
         gearSetup={globalSetup}
-        stageNumber={stageNumber}
       />
 
       <WirelessSetupSection
@@ -443,21 +442,18 @@ export const FestivalGearSetupForm = ({
         formData={getCompatibleFormData()}
         onChange={(changes) => handleChange(changes)}
         gearSetup={globalSetup}
-        stageNumber={stageNumber}
       />
 
       <ExtraRequirementsSection
         formData={getCompatibleFormData()}
         onChange={(changes) => handleChange(changes)}
         gearSetup={globalSetup}
-        stageNumber={stageNumber}
       />
 
       <InfrastructureSection
         formData={getCompatibleFormData()}
         onChange={(changes) => handleChange(changes)}
         gearSetup={globalSetup}
-        stageNumber={stageNumber}
       />
 
       <NotesSection

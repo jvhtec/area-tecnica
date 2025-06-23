@@ -419,6 +419,7 @@ export const ArtistTable = ({
             open={linkDialogOpen}
             onOpenChange={setLinkDialogOpen}
             artistId={selectedArtist.id}
+            artistName={selectedArtist.name}
           />
           
           <ArtistFileDialog
