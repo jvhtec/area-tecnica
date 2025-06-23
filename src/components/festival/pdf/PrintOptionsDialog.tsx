@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -178,8 +179,14 @@ export const PrintOptionsDialog = ({
                 onCheckedChange={(checked) => 
                   handleStageChange(section, stageNum, checked as boolean)
                 }
+                className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
               />
-              <Label htmlFor={`${section}-${stageNum}`}>Stage {stageNum}</Label>
+              <Label 
+                htmlFor={`${section}-${stageNum}`}
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
+              >
+                Stage {stageNum}
+              </Label>
             </div>
           ))}
         </div>
@@ -200,7 +207,7 @@ export const PrintOptionsDialog = ({
           <DialogTitle>Select Documents to Print</DialogTitle>
         </DialogHeader>
         <div className="space-y-6 py-4">
-          <div className="border rounded-lg p-4 bg-blue-50">
+          <div className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800">
             <div className="flex items-center space-x-2 mb-2">
               <Checkbox
                 id="individual-stage-pdfs"
@@ -208,12 +215,16 @@ export const PrintOptionsDialog = ({
                 onCheckedChange={(checked) => 
                   setOptions(prev => ({ ...prev, generateIndividualStagePDFs: checked as boolean }))
                 }
+                className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
               />
-              <Label htmlFor="individual-stage-pdfs" className="font-medium">
+              <Label 
+                htmlFor="individual-stage-pdfs" 
+                className="font-medium text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
+              >
                 Generate Individual Stage PDFs
               </Label>
             </div>
-            <p className="text-sm text-muted-foreground pl-6">
+            <p className="text-sm text-muted-foreground pl-6 dark:text-gray-300">
               {options.generateIndividualStagePDFs 
                 ? "Creates separate PDF documents for each stage containing the selected document types. Downloads as a ZIP file containing individual PDFs for each stage."
                 : "Create a single combined PDF with the selected document types and stages. Use the stage selections below to choose which stages to include for each document type."
@@ -223,7 +234,7 @@ export const PrintOptionsDialog = ({
 
           {maxStages > 1 && (
             <div className="border-b pb-4">
-              <h3 className="text-sm font-medium mb-3">Global Stage Controls</h3>
+              <h3 className="text-sm font-medium mb-3 dark:text-gray-200">Global Stage Controls</h3>
               <div className="flex gap-2">
                 <Button 
                   variant="outline" 
@@ -240,7 +251,7 @@ export const PrintOptionsDialog = ({
                   Deselect All Stages
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
+              <p className="text-xs text-muted-foreground mt-2 dark:text-gray-400">
                 {options.generateIndividualStagePDFs 
                   ? "These controls apply to all sections. Individual PDFs will be generated for stages that have content in each selected document type."
                   : "These controls apply to all sections that have stage selections."
@@ -258,8 +269,14 @@ export const PrintOptionsDialog = ({
                   onCheckedChange={(checked) => 
                     setOptions(prev => ({ ...prev, includeGearSetup: checked as boolean }))
                   }
+                  className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
                 />
-                <Label htmlFor="gear-setup">Stage Equipment Setup</Label>
+                <Label 
+                  htmlFor="gear-setup"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
+                >
+                  Stage Equipment Setup
+                </Label>
               </div>
               {options.includeGearSetup && maxStages > 1 && renderStageSelections('gearSetupStages')}
             </div>
@@ -272,8 +289,14 @@ export const PrintOptionsDialog = ({
                   onCheckedChange={(checked) => 
                     setOptions(prev => ({ ...prev, includeShiftSchedules: checked as boolean }))
                   }
+                  className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
                 />
-                <Label htmlFor="shift-schedules">Staff Shift Schedules</Label>
+                <Label 
+                  htmlFor="shift-schedules"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
+                >
+                  Staff Shift Schedules
+                </Label>
               </div>
               {options.includeShiftSchedules && maxStages > 1 && renderStageSelections('shiftScheduleStages')}
             </div>
@@ -286,8 +309,14 @@ export const PrintOptionsDialog = ({
                   onCheckedChange={(checked) => 
                     setOptions(prev => ({ ...prev, includeArtistTables: checked as boolean }))
                   }
+                  className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
                 />
-                <Label htmlFor="artist-tables">Artist Schedule Tables</Label>
+                <Label 
+                  htmlFor="artist-tables"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
+                >
+                  Artist Schedule Tables
+                </Label>
               </div>
               {options.includeArtistTables && maxStages > 1 && renderStageSelections('artistTableStages')}
             </div>
@@ -300,8 +329,14 @@ export const PrintOptionsDialog = ({
                   onCheckedChange={(checked) => 
                     setOptions(prev => ({ ...prev, includeArtistRequirements: checked as boolean }))
                   }
+                  className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
                 />
-                <Label htmlFor="artist-requirements">Individual Artist Requirements</Label>
+                <Label 
+                  htmlFor="artist-requirements"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
+                >
+                  Individual Artist Requirements
+                </Label>
               </div>
               {options.includeArtistRequirements && maxStages > 1 && renderStageSelections('artistRequirementStages')}
             </div>
@@ -314,8 +349,14 @@ export const PrintOptionsDialog = ({
                   onCheckedChange={(checked) => 
                     setOptions(prev => ({ ...prev, includeRfIemTable: checked as boolean }))
                   }
+                  className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
                 />
-                <Label htmlFor="rf-iem-table">Artist RF & IEM Overview</Label>
+                <Label 
+                  htmlFor="rf-iem-table"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
+                >
+                  Artist RF & IEM Overview
+                </Label>
               </div>
               {options.includeRfIemTable && maxStages > 1 && renderStageSelections('rfIemTableStages')}
             </div>
@@ -328,8 +369,14 @@ export const PrintOptionsDialog = ({
                   onCheckedChange={(checked) => 
                     setOptions(prev => ({ ...prev, includeInfrastructureTable: checked as boolean }))
                   }
+                  className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
                 />
-                <Label htmlFor="infrastructure-table">Infrastructure Needs Overview</Label>
+                <Label 
+                  htmlFor="infrastructure-table"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
+                >
+                  Infrastructure Needs Overview
+                </Label>
               </div>
               {options.includeInfrastructureTable && maxStages > 1 && renderStageSelections('infrastructureTableStages')}
             </div>
@@ -342,11 +389,17 @@ export const PrintOptionsDialog = ({
                   onCheckedChange={(checked) => 
                     setOptions(prev => ({ ...prev, includeWiredMicNeeds: checked as boolean }))
                   }
+                  className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
                 />
-                <Label htmlFor="wired-mic-needs">Wired Microphone Requirements</Label>
+                <Label 
+                  htmlFor="wired-mic-needs"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
+                >
+                  Wired Microphone Requirements
+                </Label>
               </div>
               {options.includeWiredMicNeeds && maxStages > 1 && renderStageSelections('wiredMicNeedsStages')}
-              <div className="pl-6 text-sm text-muted-foreground">
+              <div className="pl-6 text-sm text-muted-foreground dark:text-gray-300">
                 Detailed microphone inventory requirements and peak usage analysis
               </div>
             </div>
@@ -359,19 +412,25 @@ export const PrintOptionsDialog = ({
                   onCheckedChange={(checked) => 
                     setOptions(prev => ({ ...prev, includeMissingRiderReport: checked as boolean }))
                   }
+                  className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
                 />
-                <Label htmlFor="missing-rider-report">Missing Rider Report</Label>
+                <Label 
+                  htmlFor="missing-rider-report"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
+                >
+                  Missing Rider Report
+                </Label>
               </div>
-              <div className="pl-6 text-sm text-muted-foreground">
+              <div className="pl-6 text-sm text-muted-foreground dark:text-gray-300">
                 Summary of all artists with missing technical riders
               </div>
             </div>
           </div>
 
           <div className="border-t pt-4">
-            <div className="bg-muted/50 p-3 rounded-md">
-              <h4 className="text-sm font-medium mb-1">Generated filename:</h4>
-              <p className="text-sm text-muted-foreground font-mono">{generateFilename()}</p>
+            <div className="bg-muted/50 p-3 rounded-md dark:bg-muted/20">
+              <h4 className="text-sm font-medium mb-1 dark:text-gray-200">Generated filename:</h4>
+              <p className="text-sm text-muted-foreground font-mono dark:text-gray-300">{generateFilename()}</p>
             </div>
           </div>
         </div>
