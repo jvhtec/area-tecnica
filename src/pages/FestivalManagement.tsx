@@ -13,6 +13,7 @@ import { PrintOptionsDialog, PrintOptions } from "@/components/festival/pdf/Prin
 import { useAuth } from "@/hooks/useAuth";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { useFlexUuid } from "@/hooks/useFlexUuid";
+import { generateIndividualStagePDFs } from "@/utils/pdf/individualStagePdfGenerator";
 
 interface FestivalJob {
   id: string;
@@ -199,11 +200,19 @@ const FestivalManagement = () => {
     try {
       console.log("Starting documentation print process with options:", options);
       
-      const result = await generateAndMergeFestivalPDFs(jobId, job?.title || 'Festival', options, filename);
+      let result: { blob: Blob; filename: string };
       
-      console.log(`Merged PDF created, size: ${result.blob.size} bytes`);
+      if (options.generateIndividualStagePDFs) {
+        console.log("Generating individual stage PDFs");
+        result = await generateIndividualStagePDFs(jobId, job?.title || 'Festival', options, maxStages);
+      } else {
+        console.log("Generating combined PDF");
+        result = await generateAndMergeFestivalPDFs(jobId, job?.title || 'Festival', options, filename);
+      }
+      
+      console.log(`Generated file, size: ${result.blob.size} bytes`);
       if (!result.blob || result.blob.size === 0) {
-        throw new Error('Generated PDF is empty');
+        throw new Error('Generated file is empty');
       }
       
       const url = URL.createObjectURL(result.blob);
@@ -217,7 +226,9 @@ const FestivalManagement = () => {
       
       toast({
         title: "Success",
-        description: 'Documentation generated successfully'
+        description: options.generateIndividualStagePDFs 
+          ? 'Individual stage PDFs generated successfully'
+          : 'Documentation generated successfully'
       });
     } catch (error: any) {
       console.error('Error generating documentation:', error);

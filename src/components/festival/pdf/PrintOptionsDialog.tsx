@@ -1,3 +1,4 @@
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,6 +21,7 @@ export interface PrintOptions {
   includeMissingRiderReport: boolean;
   includeWiredMicNeeds: boolean;
   wiredMicNeedsStages: number[];
+  generateIndividualStagePDFs: boolean;
 }
 
 interface PrintOptionsDialogProps {
@@ -52,7 +54,8 @@ export const PrintOptionsDialog = ({
     infrastructureTableStages: Array.from({ length: maxStages }, (_, i) => i + 1),
     includeMissingRiderReport: true,
     includeWiredMicNeeds: true,
-    wiredMicNeedsStages: Array.from({ length: maxStages }, (_, i) => i + 1)
+    wiredMicNeedsStages: Array.from({ length: maxStages }, (_, i) => i + 1),
+    generateIndividualStagePDFs: false
   });
 
   const handleStageChange = (section: keyof PrintOptions, stageNumber: number, checked: boolean) => {
@@ -98,6 +101,10 @@ export const PrintOptionsDialog = ({
 
   const generateFilename = (): string => {
     const baseTitle = jobTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+    
+    if (options.generateIndividualStagePDFs) {
+      return `${baseTitle}_Individual_Stage_PDFs.zip`;
+    }
     
     const selectedSections = [];
     if (options.includeShiftSchedules) selectedSections.push('Shifts');
@@ -172,6 +179,7 @@ export const PrintOptionsDialog = ({
                 onCheckedChange={(checked) => 
                   handleStageChange(section, stageNum, checked as boolean)
                 }
+                disabled={options.generateIndividualStagePDFs}
               />
               <Label htmlFor={`${section}-${stageNum}`}>Stage {stageNum}</Label>
             </div>
@@ -194,7 +202,26 @@ export const PrintOptionsDialog = ({
           <DialogTitle>Select Documents to Print</DialogTitle>
         </DialogHeader>
         <div className="space-y-6 py-4">
-          {maxStages > 1 && (
+          <div className="border rounded-lg p-4 bg-blue-50">
+            <div className="flex items-center space-x-2 mb-2">
+              <Checkbox
+                id="individual-stage-pdfs"
+                checked={options.generateIndividualStagePDFs}
+                onCheckedChange={(checked) => 
+                  setOptions(prev => ({ ...prev, generateIndividualStagePDFs: checked as boolean }))
+                }
+              />
+              <Label htmlFor="individual-stage-pdfs" className="font-medium">
+                Generate Individual Stage PDFs
+              </Label>
+            </div>
+            <p className="text-sm text-muted-foreground pl-6">
+              Creates separate PDF documents for each stage containing all selected document types. 
+              Downloads as a ZIP file containing individual PDFs for each stage.
+            </p>
+          </div>
+
+          {maxStages > 1 && !options.generateIndividualStagePDFs && (
             <div className="border-b pb-4">
               <h3 className="text-sm font-medium mb-3">Global Stage Controls</h3>
               <div className="flex gap-2">
@@ -231,7 +258,7 @@ export const PrintOptionsDialog = ({
                 />
                 <Label htmlFor="gear-setup">Stage Equipment Setup</Label>
               </div>
-              {options.includeGearSetup && maxStages > 1 && renderStageSelections('gearSetupStages')}
+              {options.includeGearSetup && maxStages > 1 && !options.generateIndividualStagePDFs && renderStageSelections('gearSetupStages')}
             </div>
 
             <div>
@@ -245,7 +272,7 @@ export const PrintOptionsDialog = ({
                 />
                 <Label htmlFor="shift-schedules">Staff Shift Schedules</Label>
               </div>
-              {options.includeShiftSchedules && maxStages > 1 && renderStageSelections('shiftScheduleStages')}
+              {options.includeShiftSchedules && maxStages > 1 && !options.generateIndividualStagePDFs && renderStageSelections('shiftScheduleStages')}
             </div>
 
             <div>
@@ -259,7 +286,7 @@ export const PrintOptionsDialog = ({
                 />
                 <Label htmlFor="artist-tables">Artist Schedule Tables</Label>
               </div>
-              {options.includeArtistTables && maxStages > 1 && renderStageSelections('artistTableStages')}
+              {options.includeArtistTables && maxStages > 1 && !options.generateIndividualStagePDFs && renderStageSelections('artistTableStages')}
             </div>
 
             <div>
@@ -273,7 +300,7 @@ export const PrintOptionsDialog = ({
                 />
                 <Label htmlFor="artist-requirements">Individual Artist Requirements</Label>
               </div>
-              {options.includeArtistRequirements && maxStages > 1 && renderStageSelections('artistRequirementStages')}
+              {options.includeArtistRequirements && maxStages > 1 && !options.generateIndividualStagePDFs && renderStageSelections('artistRequirementStages')}
             </div>
 
             <div>
@@ -287,7 +314,7 @@ export const PrintOptionsDialog = ({
                 />
                 <Label htmlFor="rf-iem-table">Artist RF & IEM Overview</Label>
               </div>
-              {options.includeRfIemTable && maxStages > 1 && renderStageSelections('rfIemTableStages')}
+              {options.includeRfIemTable && maxStages > 1 && !options.generateIndividualStagePDFs && renderStageSelections('rfIemTableStages')}
             </div>
 
             <div>
@@ -301,7 +328,7 @@ export const PrintOptionsDialog = ({
                 />
                 <Label htmlFor="infrastructure-table">Infrastructure Needs Overview</Label>
               </div>
-              {options.includeInfrastructureTable && maxStages > 1 && renderStageSelections('infrastructureTableStages')}
+              {options.includeInfrastructureTable && maxStages > 1 && !options.generateIndividualStagePDFS && renderStageSelections('infrastructureTableStages')}
             </div>
 
             <div>
@@ -315,7 +342,7 @@ export const PrintOptionsDialog = ({
                 />
                 <Label htmlFor="wired-mic-needs">Wired Microphone Requirements</Label>
               </div>
-              {options.includeWiredMicNeeds && maxStages > 1 && renderStageSelections('wiredMicNeedsStages')}
+              {options.includeWiredMicNeeds && maxStages > 1 && !options.generateIndividualStagePDFs && renderStageSelections('wiredMicNeedsStages')}
               <div className="pl-6 text-sm text-muted-foreground">
                 Detailed microphone inventory requirements and peak usage analysis
               </div>
@@ -350,7 +377,7 @@ export const PrintOptionsDialog = ({
             Cancel
           </Button>
           <Button onClick={handleConfirm}>
-            Generate PDF
+            Generate {options.generateIndividualStagePDFs ? 'Individual Stage PDFs' : 'PDF'}
           </Button>
         </DialogFooter>
       </DialogContent>
