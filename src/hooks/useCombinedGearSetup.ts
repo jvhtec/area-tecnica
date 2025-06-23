@@ -18,18 +18,17 @@ export const useCombinedGearSetup = (
 
   useEffect(() => {
     const fetchSetups = async () => {
-      if (!jobId || !selectedDate) return;
+      if (!jobId) return;
       
       setIsLoading(true);
       setError(null);
       
       try {
-        // Fetch global gear setup
+        // Fetch global gear setup - removed the invalid .eq('date', selectedDate) filter
         const { data: globalSetup, error: globalError } = await supabase
           .from('festival_gear_setups')
           .select('*')
           .eq('job_id', jobId)
-          .eq('date', selectedDate)
           .maybeSingle();
         
         if (globalError) {

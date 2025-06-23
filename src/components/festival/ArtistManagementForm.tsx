@@ -37,7 +37,7 @@ export const ArtistManagementForm = ({
 
   const [isLoading, setIsLoading] = useState(false);
 
-  // Create enhanced form data with compatibility fields
+  // Create form data without problematic compatibility fields
   const createFormData = (artistData?: any) => ({
     name: artistData?.name || "",
     stage: artistData?.stage || 1,
@@ -78,11 +78,7 @@ export const ArtistManagementForm = ({
     rider_missing: artistData?.rider_missing || false,
     isaftermidnight: artistData?.isaftermidnight || false,
     mic_kit: artistData?.mic_kit || "band",
-    wired_mics: artistData?.wired_mics || [],
-    // Add compatibility fields
-    max_stages: combinedSetup?.globalSetup?.max_stages || 3,
-    foh_consoles: combinedSetup?.globalSetup?.foh_consoles || [],
-    mon_consoles: combinedSetup?.globalSetup?.mon_consoles || []
+    wired_mics: artistData?.wired_mics || []
   });
 
   const [formData, setFormData] = useState(createFormData(artist));
