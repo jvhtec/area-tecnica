@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -184,10 +183,16 @@ export const ArtistManagementForm = ({
               wired_mics: data.wired_mics || []
             });
           }
-          setIsLoading(false);
         })
         .catch((error) => {
           console.error("Error fetching artist:", error);
+          toast({
+            title: "Error",
+            description: "Could not load artist details",
+            variant: "destructive",
+          });
+        })
+        .finally(() => {
           setIsLoading(false);
         });
     }
@@ -207,7 +212,6 @@ export const ArtistManagementForm = ({
       <BasicInfoSection 
         formData={formData} 
         onChange={updateFormData}
-        dayStartTime={dayStartTime}
         gearSetup={combinedSetup?.globalSetup}
       />
 
