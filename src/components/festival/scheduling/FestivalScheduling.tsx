@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,7 +22,7 @@ interface FestivalSchedulingProps {
 export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: FestivalSchedulingProps) => {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [isCreateShiftOpen, setIsCreateShiftOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"list" | "table">("list");
+  const [viewMode, setViewMode] = useState<"list" | "table">("table"); // Changed default to "table"
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [dateTypes, setDateTypes] = useState<Record<string, string>>({});
   const [dayStartTime, setDayStartTime] = useState<string>("07:00");
@@ -255,7 +254,7 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
             onClick={() => setViewMode(viewMode === "list" ? "table" : "list")}
             className="text-xs"
           >
-            {viewMode === "list" ? "Table View" : "List View"}
+            {viewMode === "table" ? "List View" : "Table View"}
           </Button>
         </div>
       </CardHeader>
@@ -280,7 +279,16 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
               <div className="text-center p-8 text-muted-foreground">
                 No shifts scheduled for this date. {!isViewOnly && "Click \"Create Shift\" to add one."}
               </div>
-            ) : viewMode === "list" ? (
+            ) : viewMode === "table" ? (
+              <ShiftsTable 
+                shifts={shifts} 
+                onDeleteShift={handleDeleteShift}
+                onShiftUpdated={refetch}
+                date={selectedDate}
+                jobId={jobId}
+                isViewOnly={isViewOnly}
+              />
+            ) : (
               <ShiftsList 
                 shifts={shifts} 
                 onDeleteShift={handleDeleteShift} 
@@ -290,14 +298,6 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
                 jobDates={jobDates}
                 selectedDate={selectedDate}
                 onShiftsCopied={handleShiftsCopied}
-              />
-            ) : (
-              <ShiftsTable 
-                shifts={shifts} 
-                onDeleteShift={handleDeleteShift} 
-                date={selectedDate}
-                jobId={jobId}
-                isViewOnly={isViewOnly}
               />
             )
           )}

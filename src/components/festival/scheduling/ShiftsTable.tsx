@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { useState } from "react";
 import {
   Table,
   TableBody,
@@ -8,16 +9,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Trash2, FileDown } from "lucide-react";
+import { Trash2, FileDown, Edit, Users } from "lucide-react";
 import { ShiftWithAssignments } from "@/types/festival-scheduling";
 import { useToast } from "@/hooks/use-toast";
 import { exportShiftsTablePDF, ShiftsTablePdfData } from "@/utils/shiftsTablePdfExport";
 import { supabase } from "@/lib/supabase";
-import { useState, useEffect } from "react";
+import { EditShiftDialog } from "./EditShiftDialog";
+import { ManageAssignmentsDialog } from "./ManageAssignmentsDialog";
 
 interface ShiftsTableProps {
   shifts: ShiftWithAssignments[];
   onDeleteShift: (shiftId: string) => void;
+  onShiftUpdated: () => void;
   date: string;
   jobId: string;
   isViewOnly?: boolean;
@@ -25,7 +28,8 @@ interface ShiftsTableProps {
 
 export const ShiftsTable = ({ 
   shifts, 
-  onDeleteShift, 
+  onDeleteShift,
+  onShiftUpdated,
   date, 
   jobId, 
   isViewOnly = false 
@@ -33,6 +37,8 @@ export const ShiftsTable = ({
   const { toast } = useToast();
   const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
   const [jobTitle, setJobTitle] = useState<string>("");
+  const [editingShift, setEditingShift] = useState<ShiftWithAssignments | null>(null);
+  const [managingShift, setManagingShift] = useState<ShiftWithAssignments | null>(null);
   
   useEffect(() => {
     const fetchJobAndLogo = async () => {
@@ -115,6 +121,16 @@ export const ShiftsTable = ({
     if (confirm("Are you sure you want to delete this shift?")) {
       onDeleteShift(shiftId);
     }
+  };
+
+  const handleEditClick = (e: React.MouseEvent, shift: ShiftWithAssignments) => {
+    e.stopPropagation();
+    setEditingShift(shift);
+  };
+
+  const handleManageClick = (e: React.MouseEvent, shift: ShiftWithAssignments) => {
+    e.stopPropagation();
+    setManagingShift(shift);
   };
 
   const formattedDate = new Date(date).toLocaleDateString(undefined, {
@@ -222,19 +238,62 @@ export const ShiftsTable = ({
               </TableCell>
               <TableCell className="border border-border print:hidden">
                 {!isViewOnly && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => handleDeleteClick(e, shift.id)}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => handleEditClick(e, shift)}
+                      className="h-8 w-8"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => handleManageClick(e, shift)}
+                      className="h-8 w-8"
+                    >
+                      <Users className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => handleDeleteClick(e, shift.id)}
+                      className="h-8 w-8"
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
                 )}
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+
+      {editingShift && (
+        <EditShiftDialog
+          open={!!editingShift}
+          onOpenChange={(open) => !open && setEditingShift(null)}
+          shift={editingShift}
+          onShiftUpdated={() => {
+            onShiftUpdated();
+            setEditingShift(null);
+          }}
+        />
+      )}
+
+      {managingShift && (
+        <ManageAssignmentsDialog
+          open={!!managingShift}
+          onOpenChange={(open) => !open && setManagingShift(null)}
+          shift={managingShift}
+          onAssignmentsUpdated={() => {
+            onShiftUpdated();
+          }}
+          isViewOnly={isViewOnly}
+        />
+      )}
     </div>
   );
 };
