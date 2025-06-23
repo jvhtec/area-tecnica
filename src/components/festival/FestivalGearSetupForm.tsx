@@ -12,6 +12,7 @@ import { ExtraRequirementsSection } from "./form/sections/ExtraRequirementsSecti
 import { InfrastructureSection } from "./form/sections/InfrastructureSection";
 import { NotesSection } from "./form/sections/NotesSection";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { MicrophoneNeedsCalculator } from "./gear-setup/MicrophoneNeedsCalculator";
 
 interface FestivalGearSetupFormProps {
   jobId: string;
@@ -455,6 +456,14 @@ export const FestivalGearSetupForm = ({
         onChange={(changes) => handleChange(changes)}
         gearSetup={globalSetup}
       />
+
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">Microphone Requirements Analysis</h3>
+        <p className="text-sm text-muted-foreground">
+          Calculate wired microphone needs based on artist requirements and show schedules.
+        </p>
+        <MicrophoneNeedsCalculator jobId={jobId} />
+      </div>
 
       <NotesSection
         formData={getCompatibleFormData()}

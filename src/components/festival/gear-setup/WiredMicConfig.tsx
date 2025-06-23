@@ -2,12 +2,14 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Minus } from "lucide-react";
 import { EquipmentSelect } from "../form/shared/EquipmentSelect";
 
 export interface WiredMic {
   model: string;
   quantity: number;
+  exclusive_use?: boolean;
   notes?: string;
 }
 
@@ -19,14 +21,14 @@ interface WiredMicConfigProps {
 
 export const WiredMicConfig = ({ mics, onChange, label = "Wired Microphones" }: WiredMicConfigProps) => {
   const addMic = () => {
-    onChange([...mics, { model: '', quantity: 1 }]);
+    onChange([...mics, { model: '', quantity: 1, exclusive_use: false }]);
   };
 
   const removeMic = (index: number) => {
     onChange(mics.filter((_, i) => i !== index));
   };
 
-  const updateMic = (index: number, field: keyof WiredMic, value: string | number) => {
+  const updateMic = (index: number, field: keyof WiredMic, value: string | number | boolean) => {
     onChange(
       mics.map((mic, i) => 
         i === index ? { ...mic, [field]: value } : mic
@@ -68,6 +70,16 @@ export const WiredMicConfig = ({ mics, onChange, label = "Wired Microphones" }: 
               value={mic.quantity}
               onChange={(e) => updateMic(index, 'quantity', parseInt(e.target.value) || 1)}
             />
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id={`exclusive-${index}`}
+              checked={mic.exclusive_use || false}
+              onCheckedChange={(checked) => updateMic(index, 'exclusive_use', !!checked)}
+            />
+            <Label htmlFor={`exclusive-${index}`} className="text-sm">
+              Exclusive
+            </Label>
           </div>
           <Button
             type="button"

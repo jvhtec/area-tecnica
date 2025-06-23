@@ -1,4 +1,3 @@
-
 import { FestivalGearSetup } from "./festival";
 import { WiredMic } from "@/components/festival/gear-setup/WiredMicConfig";
 
@@ -43,7 +42,12 @@ export interface ArtistSectionProps {
     rider_missing?: boolean;
     isaftermidnight?: boolean;
     mic_kit: 'festival' | 'band';
-    wired_mics: WiredMic[];
+    wired_mics: Array<{
+      model: string;
+      quantity: number;
+      exclusive_use?: boolean;
+      notes?: string;
+    }>;
     // Add GearSetupFormData compatibility fields
     max_stages?: number;
     foh_consoles?: any[];

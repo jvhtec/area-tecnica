@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -50,7 +49,7 @@ interface Artist {
   mon_tech?: boolean;
   isaftermidnight?: boolean;
   mic_kit?: 'festival' | 'band';
-  wired_mics?: Array<{ model: string; quantity: number; notes?: string }>;
+  wired_mics?: Array<{ model: string; quantity: number; exclusive_use?: boolean; notes?: string }>;
   job_id?: string;
 }
 
@@ -120,9 +119,12 @@ export const ArtistTable = ({
     }
   };
 
-  const formatWiredMics = (mics: Array<{ model: string; quantity: number }> = []) => {
+  const formatWiredMics = (mics: Array<{ model: string; quantity: number; exclusive_use?: boolean }> = []) => {
     if (mics.length === 0) return "None";
-    return mics.map(mic => `${mic.quantity}x ${mic.model}`).join(", ");
+    return mics.map(mic => {
+      const exclusiveIndicator = mic.exclusive_use ? " (E)" : "";
+      return `${mic.quantity}x ${mic.model}${exclusiveIndicator}`;
+    }).join(", ");
   };
 
   const formatWirelessSystems = (systems: any[] = [], isIEM = false) => {
