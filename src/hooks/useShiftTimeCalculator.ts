@@ -91,7 +91,7 @@ export const useShiftTimeCalculator = (jobId: string, date: string, stage?: numb
     let latestMinutes = 0; // Start with beginning of day
 
     artists.forEach(artist => {
-      // Check soundcheck start
+      // Check soundcheck start (always on the same day)
       if (artist.soundcheck && artist.soundcheck_start) {
         const soundcheckMinutes = timeToMinutes(artist.soundcheck_start);
         if (soundcheckMinutes < earliestMinutes) {
@@ -99,10 +99,17 @@ export const useShiftTimeCalculator = (jobId: string, date: string, stage?: numb
         }
       }
       
-      // Check show start
+      // Check show start - handle midnight crossover
       if (artist.show_start) {
-        const showStartMinutes = timeToMinutes(artist.show_start);
-        if (showStartMinutes < earliestMinutes) {
+        let showStartMinutes = timeToMinutes(artist.show_start);
+        
+        // If show starts after midnight, add 24 hours
+        if (artist.isaftermidnight) {
+          showStartMinutes += 24 * 60;
+        }
+        
+        // Only consider as earliest if it's on the same day (not after midnight)
+        if (!artist.isaftermidnight && showStartMinutes < earliestMinutes) {
           earliestMinutes = showStartMinutes;
         }
       }
@@ -173,6 +180,7 @@ export const useShiftTimeCalculator = (jobId: string, date: string, stage?: numb
     let latestMinutes = 0;
 
     artists.forEach(artist => {
+      // Soundcheck times (always same day)
       if (artist.soundcheck && artist.soundcheck_start) {
         const soundcheckMinutes = timeToMinutes(artist.soundcheck_start);
         if (soundcheckMinutes < earliestMinutes) {
@@ -180,13 +188,22 @@ export const useShiftTimeCalculator = (jobId: string, date: string, stage?: numb
         }
       }
       
+      // Show start times
       if (artist.show_start) {
-        const showStartMinutes = timeToMinutes(artist.show_start);
-        if (showStartMinutes < earliestMinutes) {
+        let showStartMinutes = timeToMinutes(artist.show_start);
+        
+        // If show starts after midnight, add 24 hours
+        if (artist.isaftermidnight) {
+          showStartMinutes += 24 * 60;
+        }
+        
+        // Only consider as earliest if it's on the same day
+        if (!artist.isaftermidnight && showStartMinutes < earliestMinutes) {
           earliestMinutes = showStartMinutes;
         }
       }
 
+      // Show end times
       if (artist.show_end) {
         let showEndMinutes = timeToMinutes(artist.show_end);
         
