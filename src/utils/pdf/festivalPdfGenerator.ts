@@ -5,6 +5,7 @@ import { exportShiftsTablePDF, ShiftsTablePdfData } from '../shiftsTablePdfExpor
 import { exportRfIemTablePDF, RfIemTablePdfData } from '../rfIemTablePdfExport';
 import { exportInfrastructureTablePDF, InfrastructureTablePdfData } from '../infrastructureTablePdfExport';
 import { exportMissingRiderReportPDF, MissingRiderReportData } from '../missingRiderReportPdfExport';
+import { exportWiredMicrophoneNeedsPDF, WiredMicrophoneNeedsPdfData, calculateWiredMicrophoneNeeds } from '../wiredMicrophoneNeedsPdfExport';
 import { generateStageGearPDF } from '../gearSetupPdfExport';
 import { fetchLogoUrl } from './logoUtils';
 import { generateCoverPage } from './coverPageGenerator';
@@ -79,6 +80,7 @@ export const generateAndMergeFestivalPDFs = async (
   let rfIemTablePdf: Blob | null = null;
   let infrastructureTablePdf: Blob | null = null;
   let missingRiderReportPdf: Blob | null = null;
+  let wiredMicNeedsPdf: Blob | null = null;
   
   try {
     const { data: artists, error: artistError } = await supabase
@@ -595,6 +597,37 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
+    // Generate Wired Microphone Needs PDF if option is selected
+    if (options.includeWiredMicNeeds && artists && artists.length > 0) {
+      const filteredArtists = artists.filter(artist => 
+        options.wiredMicNeedsStages.includes(Number(artist.stage)) &&
+        artist.mic_kit === 'festival' &&
+        artist.wired_mics &&
+        Array.isArray(artist.wired_mics) &&
+        artist.wired_mics.length > 0
+      );
+      
+      console.log(`Generating Wired Microphone Needs PDF with ${filteredArtists.length} artists`);
+      
+      if (filteredArtists.length > 0) {
+        const microphoneNeeds = calculateWiredMicrophoneNeeds(filteredArtists);
+        
+        const wiredMicData: WiredMicrophoneNeedsPdfData = {
+          jobTitle,
+          logoUrl,
+          microphoneNeeds,
+          selectedStages: options.wiredMicNeedsStages
+        };
+        
+        try {
+          wiredMicNeedsPdf = await exportWiredMicrophoneNeedsPDF(wiredMicData);
+          console.log(`Generated Wired Microphone Needs PDF, size: ${wiredMicNeedsPdf.size} bytes`);
+        } catch (err) {
+          console.error('Error generating Wired Microphone Needs PDF:', err);
+        }
+      }
+    }
+    
     const tocSections = [];
     
     if (options.includeShiftSchedules && shiftPdfs.length > 0) {
@@ -611,6 +644,9 @@ export const generateAndMergeFestivalPDFs = async (
     }
     if (options.includeInfrastructureTable && infrastructureTablePdf) {
       tocSections.push({ title: "Infrastructure Needs Overview", pageCount: 1 });
+    }
+    if (options.includeWiredMicNeeds && wiredMicNeedsPdf) {
+      tocSections.push({ title: "Wired Microphone Requirements", pageCount: 1 });
     }
     if (options.includeMissingRiderReport && missingRiderReportPdf) {
       tocSections.push({ title: "Missing Rider Report", pageCount: 1 });
@@ -633,8 +669,9 @@ export const generateAndMergeFestivalPDFs = async (
       ...(options.includeArtistTables ? artistTablePdfs : []),   // 3. Artist Schedule Tables
       ...(options.includeRfIemTable && rfIemTablePdf ? [rfIemTablePdf] : []),  // 4. RF and IEM Overview
       ...(options.includeInfrastructureTable && infrastructureTablePdf ? [infrastructureTablePdf] : []),  // 5. Infrastructure Needs Overview
-      ...(options.includeMissingRiderReport && missingRiderReportPdf ? [missingRiderReportPdf] : []),  // 6. Missing Rider Report
-      ...(options.includeArtistRequirements ? individualArtistPdfs : [])  // 7. Individual Artist Requirements
+      ...(options.includeWiredMicNeeds && wiredMicNeedsPdf ? [wiredMicNeedsPdf] : []),  // 6. Wired Microphone Requirements
+      ...(options.includeMissingRiderReport && missingRiderReportPdf ? [missingRiderReportPdf] : []),  // 7. Missing Rider Report
+      ...(options.includeArtistRequirements ? individualArtistPdfs : [])  // 8. Individual Artist Requirements
     ];
     
     console.log(`Total PDFs to merge: ${selectedPdfs.length}`);
