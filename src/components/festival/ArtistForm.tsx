@@ -25,7 +25,7 @@ export const ArtistForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { models } = useEquipmentModels();
   
-  const [formData, setFormData] = useState<Partial<ArtistFormData>>({
+  const [formData, setFormData] = useState<Partial<ArtistFormData> & { mic_kit: 'festival' | 'band'; wired_mics: any[] }>({
     name: "",
     foh_console: "",
     foh_console_provided_by: "festival",
@@ -55,6 +55,8 @@ export const ArtistForm = () => {
     infrastructure_provided_by: "festival",
     other_infrastructure: "",
     notes: "",
+    mic_kit: "band",
+    wired_mics: []
   });
 
   // Get console options from database with fallback
