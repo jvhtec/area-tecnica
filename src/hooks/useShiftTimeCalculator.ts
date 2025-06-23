@@ -80,9 +80,18 @@ export const useShiftTimeCalculator = (jobId: string, date: string, stage?: numb
     };
 
     const minutesToTime = (minutes: number): string => {
-      const hours = Math.floor(minutes / 60) % 24;
-      const mins = minutes % 60;
-      return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+      // Handle times that go beyond 24 hours (next day)
+      if (minutes >= 24 * 60) {
+        // For times after midnight, show as next day time
+        const nextDayMinutes = minutes - 24 * 60;
+        const hours = Math.floor(nextDayMinutes / 60);
+        const mins = nextDayMinutes % 60;
+        return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+      } else {
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+      }
     };
 
     // Find earliest and latest times
@@ -178,9 +187,18 @@ export const useShiftTimeCalculator = (jobId: string, date: string, stage?: numb
     };
 
     const minutesToTime = (minutes: number): string => {
-      const hours = Math.floor(minutes / 60) % 24;
-      const mins = minutes % 60;
-      return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+      // Handle times that go beyond 24 hours (next day)
+      if (minutes >= 24 * 60) {
+        // For times after midnight, show as next day time
+        const nextDayMinutes = minutes - 24 * 60;
+        const hours = Math.floor(nextDayMinutes / 60);
+        const mins = nextDayMinutes % 60;
+        return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+      } else {
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+      }
     };
 
     let earliestMinutes = 24 * 60;
