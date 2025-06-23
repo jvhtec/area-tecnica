@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -36,6 +37,7 @@ export interface ArtistTablePdfData {
   jobTitle: string;
   date: string;
   stage?: string;
+  stageNames?: Record<number, string>; // Add stage names mapping
   artists: {
     name: string;
     stage: number;
@@ -148,6 +150,11 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
       const pageHeight = doc.internal.pageSize.height;
       const createdDate = format(new Date(), 'dd/MM/yyyy');
 
+      // Helper function to get stage display name
+      const getStageDisplayName = (stageNumber: number) => {
+        return data.stageNames?.[stageNumber] || `Stage ${stageNumber}`;
+      };
+
       doc.setFillColor(125, 1, 1);
       doc.rect(0, 0, pageWidth, 20, 'F');
 
@@ -192,7 +199,8 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
         doc.text(`${data.jobTitle} - Artist Schedule`, pageWidth / 2, 12, { align: 'center' });
         
         if (data.stage) {
-          doc.text(`Stage ${data.stage} - ${format(new Date(data.date), 'dd/MM/yyyy')}`, pageWidth / 2, 18, { align: 'center' });
+          const stageDisplayName = data.stageNames?.[parseInt(data.stage)] || `Stage ${data.stage}`;
+          doc.text(`${stageDisplayName} - ${format(new Date(data.date), 'dd/MM/yyyy')}`, pageWidth / 2, 18, { align: 'center' });
         } else {
           doc.text(format(new Date(data.date), 'dd/MM/yyyy'), pageWidth / 2, 18, { align: 'center' });
         }
@@ -230,7 +238,7 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
           if (row.isSoundcheck) {
             return [
               `${row.name} (Soundcheck)`,
-              `Stage ${row.stage}`,
+              getStageDisplayName(row.stage),
               `${row.time.start}-${row.time.end}`,
               '', '', '', '', '', ''
             ];
@@ -274,7 +282,7 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
           
           return [
             row.name,
-            `Stage ${row.stage}`,
+            getStageDisplayName(row.stage),
             `${row.time.start}-${row.time.end}`,
             `FOH: ${row.technical.fohConsole.model}\n(${row.technical.fohConsole.providedBy})\n\nMON: ${row.technical.monConsole.model}\n(${row.technical.monConsole.providedBy})`,
             `FOH: ${row.technical.fohTech ? 'Y' : 'N'}\nMON: ${row.technical.monTech ? 'Y' : 'N'}`,

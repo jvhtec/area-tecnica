@@ -17,16 +17,14 @@ import { exportArtistTablePDF } from "@/utils/artistTablePdfExport";
 import { useQuery } from "@tanstack/react-query";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useArtistsQuery } from "@/hooks/useArtistsQuery";
+
 const DAY_START_HOUR = 7; // Festival day starts at 7:00 AM
 
 const FestivalArtistManagement = () => {
-  const {
-    jobId
-  } = useParams();
+  const { jobId } = useParams();
   const navigate = useNavigate();
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
+  
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
   const [jobTitle, setJobTitle] = useState("");
@@ -44,6 +42,7 @@ const FestivalArtistManagement = () => {
   const [dayStartTime, setDayStartTime] = useState<string>("07:00");
   const [logoUrl, setLogoUrl] = useState("");
   const [maxStages, setMaxStages] = useState(3);
+  const [stageNames, setStageNames] = useState<Record<number, string>>({});
 
   // Use React Query for artists data
   const {
@@ -118,6 +117,37 @@ const FestivalArtistManagement = () => {
       setDateTypes(dateTypeData);
     }
   }, [dateTypeData]);
+
+  // Fetch stage names
+  const { data: stageNamesData } = useQuery({
+    queryKey: ['festival-stages', jobId],
+    queryFn: async () => {
+      if (!jobId) return {};
+      
+      const { data: stages, error } = await supabase
+        .from('festival_stages')
+        .select('number, name')
+        .eq('job_id', jobId);
+        
+      if (error) {
+        console.error('Error fetching stage names:', error);
+        return {};
+      }
+      
+      const stageMap: Record<number, string> = {};
+      stages?.forEach(stage => {
+        stageMap[stage.number] = stage.name;
+      });
+      return stageMap;
+    },
+    enabled: !!jobId
+  });
+
+  useEffect(() => {
+    if (stageNamesData) {
+      setStageNames(stageNamesData);
+    }
+  }, [stageNamesData]);
 
   // Enhanced real-time subscription that invalidates queries
   useRealtimeSubscription({
@@ -203,10 +233,12 @@ const FestivalArtistManagement = () => {
         const matchesDate = artist.date === printDate;
         return matchesStage && matchesDate;
       });
+
       const data = {
         jobTitle: jobTitle,
         date: printDate,
         stage: printStage,
+        stageNames: stageNames, // Pass stage names to PDF
         artists: filteredArtists.map(artist => {
           const wirelessSystems = artist.wireless_systems || [];
           const iemSystems = artist.iem_systems || [];
@@ -258,11 +290,13 @@ const FestivalArtistManagement = () => {
         }),
         logoUrl
       };
+
       const blob = await exportArtistTablePDF(data);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `artist_schedule_${format(new Date(printDate), 'yyyy-MM-dd')}${printStage ? `_stage${printStage}` : ''}.pdf`;
+      const stageName = printStage ? (stageNames[parseInt(printStage)] || `stage${printStage}`) : '';
+      a.download = `artist_schedule_${format(new Date(printDate), 'yyyy-MM-dd')}${stageName ? `_${stageName.replace(/[^a-zA-Z0-9]/g, '_')}` : ''}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -341,7 +375,19 @@ const FestivalArtistManagement = () => {
             {jobDates.length > 0 ? <FestivalDateNavigation jobDates={jobDates} selectedDate={selectedDate} onDateChange={setSelectedDate} dateTypes={dateTypes} jobId={jobId || ''} onTypeChange={() => refetchDateTypes()} dayStartTime={dayStartTime} showStageFilter={showArtistControls} selectedStage={stageFilter} onStageChange={setStageFilter} maxStages={maxStages} /> : null}
 
             {/* Content for selected date */}
-            {selectedDate && (isShowDate(new Date(selectedDate)) ? <ArtistTable artists={artists} isLoading={artistsLoading} onEditArtist={handleEditArtist} onDeleteArtist={handleDeleteArtist} searchTerm={searchTerm} stageFilter={stageFilter} equipmentFilter={equipmentFilter} riderFilter={riderFilter} dayStartTime={dayStartTime} /> : <div className="p-8 text-center text-muted-foreground border rounded-md">
+            {selectedDate && (isShowDate(new Date(selectedDate)) ? <ArtistTable 
+                artists={artists} 
+                isLoading={artistsLoading} 
+                onEditArtist={handleEditArtist} 
+                onDeleteArtist={handleDeleteArtist} 
+                searchTerm={searchTerm} 
+                stageFilter={stageFilter} 
+                equipmentFilter={equipmentFilter} 
+                riderFilter={riderFilter} 
+                dayStartTime={dayStartTime} 
+                jobId={jobId}
+                selectedDate={selectedDate}
+              /> : <div className="p-8 text-center text-muted-foreground border rounded-md">
                   <p>This is not configured as a show date.</p>
                   <p>Artist management is only available on show dates.</p>
                   <p className="mt-2 text-sm">Right-click on the date tab to change its type.</p>
@@ -355,4 +401,5 @@ const FestivalArtistManagement = () => {
       <ArtistTablePrintDialog open={isPrintDialogOpen} onOpenChange={setIsPrintDialogOpen} jobDates={jobDates} selectedDate={printDate} onDateChange={setPrintDate} onStageChange={setPrintStage} onPrint={handlePrintTable} isLoading={isPrinting} />
     </div>;
 };
+
 export default FestivalArtistManagement;

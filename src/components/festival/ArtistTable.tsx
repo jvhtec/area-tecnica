@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { ArtistFileDialog } from "./ArtistFileDialog";
 import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
 import { sortArtistsChronologically } from "@/utils/artistSorting";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 
 interface Artist {
   id: string;
@@ -80,6 +81,37 @@ export const ArtistTable = ({
   const [fileDialogOpen, setFileDialogOpen] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
   const [printingArtistId, setPrintingArtistId] = useState<string | null>(null);
+  const [stageNames, setStageNames] = useState<Record<number, string>>({});
+
+  // Fetch custom stage names
+  useEffect(() => {
+    const fetchStageNames = async () => {
+      if (!jobId) return;
+      
+      const { data: stages, error } = await supabase
+        .from('festival_stages')
+        .select('number, name')
+        .eq('job_id', jobId);
+        
+      if (error) {
+        console.error('Error fetching stage names:', error);
+        return;
+      }
+      
+      const stageMap: Record<number, string> = {};
+      stages?.forEach(stage => {
+        stageMap[stage.number] = stage.name;
+      });
+      setStageNames(stageMap);
+    };
+    
+    fetchStageNames();
+  }, [jobId]);
+
+  // Helper function to get stage display name
+  const getStageDisplayName = (stageNumber: number) => {
+    return stageNames[stageNumber] || `Stage ${stageNumber}`;
+  };
 
   // Helper function to sort artists chronologically with proper after-midnight handling
   const sortArtistsChronologically = (artists: Artist[]) => {
@@ -310,8 +342,8 @@ export const ArtistTable = ({
             <TableHeader>
               <TableRow>
                 <TableHead>Artist</TableHead>
-                <TableHead>Stage</TableHead>
-                <TableHead>Show Time</TableHead>
+                <TableHead className="whitespace-nowrap">Stage</TableHead>
+                <TableHead className="whitespace-nowrap">Show Time</TableHead>
                 <TableHead>Soundcheck</TableHead>
                 <TableHead>Consoles</TableHead>
                 <TableHead>Wireless/IEM</TableHead>
@@ -336,7 +368,7 @@ export const ArtistTable = ({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">Stage {artist.stage}</Badge>
+                    <Badge variant="outline">{getStageDisplayName(artist.stage)}</Badge>
                   </TableCell>
                   <TableCell>
                     <div className="text-sm">
