@@ -1,12 +1,25 @@
+
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, FileText, Loader2, Mic, Link, ExternalLink } from "lucide-react";
+import { 
+  Pencil, 
+  Trash2, 
+  FileText, 
+  Loader2, 
+  Mic, 
+  Link, 
+  ExternalLink,
+  Upload,
+  Printer
+} from "lucide-react";
 import { format, parseISO, isAfter, setHours, setMinutes } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
+import { ArtistFileDialog } from "./ArtistFileDialog";
+import { ArtistTablePrintDialog } from "./ArtistTablePrintDialog";
 
 interface Artist {
   id: string;
@@ -66,6 +79,8 @@ export const ArtistTable = ({
   const [deletingArtistId, setDeletingArtistId] = useState<string | null>(null);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linksDialogOpen, setLinksDialogOpen] = useState(false);
+  const [fileDialogOpen, setFileDialogOpen] = useState(false);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
 
   // Filtering logic
@@ -145,6 +160,16 @@ export const ArtistTable = ({
 
   const handleViewLinks = () => {
     setLinksDialogOpen(true);
+  };
+
+  const handleManageFiles = (artist: Artist) => {
+    setSelectedArtist(artist);
+    setFileDialogOpen(true);
+  };
+
+  const handlePrintArtist = (artist: Artist) => {
+    setSelectedArtist(artist);
+    setPrintDialogOpen(true);
   };
 
   if (isLoading) {
@@ -321,7 +346,7 @@ export const ArtistTable = ({
                     </TableCell>
                     
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -333,7 +358,24 @@ export const ArtistTable = ({
                         <Button
                           variant="ghost"
                           size="icon"
+                          onClick={() => handleManageFiles(artist)}
+                          title="Manage files/riders"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handlePrintArtist(artist)}
+                          title="Print artist details"
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => onEditArtist(artist)}
+                          title="Edit artist"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -342,6 +384,7 @@ export const ArtistTable = ({
                           size="icon"
                           onClick={() => handleDeleteClick(artist)}
                           disabled={deletingArtistId === artist.id}
+                          title="Delete artist"
                         >
                           {deletingArtistId === artist.id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -366,11 +409,34 @@ export const ArtistTable = ({
       </Card>
 
       {selectedArtist && (
-        <ArtistFormLinkDialog
-          open={linkDialogOpen}
-          onOpenChange={setLinkDialogOpen}
-          artist={selectedArtist}
-        />
+        <>
+          <ArtistFormLinkDialog
+            open={linkDialogOpen}
+            onOpenChange={setLinkDialogOpen}
+            artist={selectedArtist}
+          />
+          
+          <ArtistFileDialog
+            open={fileDialogOpen}
+            onOpenChange={setFileDialogOpen}
+            artistId={selectedArtist.id}
+          />
+          
+          <ArtistTablePrintDialog
+            open={printDialogOpen}
+            onOpenChange={setPrintDialogOpen}
+            jobDates={[new Date(selectedArtist.date)]}
+            selectedDate={selectedArtist.date}
+            onDateChange={() => {}}
+            onStageChange={() => {}}
+            onPrint={() => {
+              // Implementation for individual artist print
+              console.log('Print artist:', selectedArtist);
+              setPrintDialogOpen(false);
+            }}
+            isLoading={false}
+          />
+        </>
       )}
 
       <ArtistFormLinksDialog

@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -210,7 +211,7 @@ export const ArtistForm = () => {
                   <Checkbox 
                     id="soundcheck"
                     checked={formData.soundcheck}
-                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, soundcheck: checked }))}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, soundcheck: !!checked }))}
                   />
                   <Label htmlFor="soundcheck">Soundcheck Required</Label>
                 </div>
@@ -240,7 +241,7 @@ export const ArtistForm = () => {
                   <Checkbox 
                     id="after-midnight"
                     checked={formData.isaftermidnight}
-                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isaftermidnight: checked }))}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isaftermidnight: !!checked }))}
                   />
                   <Label htmlFor="after-midnight">Show is after midnight</Label>
                 </div>
@@ -249,7 +250,7 @@ export const ArtistForm = () => {
                   <Checkbox 
                     id="rider-missing"
                     checked={formData.rider_missing}
-                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, rider_missing: checked }))}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, rider_missing: !!checked }))}
                   />
                   <Label htmlFor="rider-missing">Rider is missing</Label>
                 </div>
@@ -282,7 +283,7 @@ export const ArtistForm = () => {
                   <Label>Provided By</Label>
                   <Select
                     value={formData.foh_console_provided_by || "festival"}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, foh_console_provided_by: value }))}
+                    onValueChange={(value: "festival" | "band") => setFormData(prev => ({ ...prev, foh_console_provided_by: value }))}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -298,7 +299,7 @@ export const ArtistForm = () => {
                 <Checkbox 
                   id="foh-tech"
                   checked={formData.foh_tech}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, foh_tech: checked }))}
+                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, foh_tech: !!checked }))}
                 />
                 <Label htmlFor="foh-tech">FOH Technician Required</Label>
               </div>
@@ -330,7 +331,7 @@ export const ArtistForm = () => {
                   <Label>Provided By</Label>
                   <Select
                     value={formData.mon_console_provided_by || "festival"}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, mon_console_provided_by: value }))}
+                    onValueChange={(value: "festival" | "band") => setFormData(prev => ({ ...prev, mon_console_provided_by: value }))}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -346,7 +347,7 @@ export const ArtistForm = () => {
                 <Checkbox 
                   id="mon-tech"
                   checked={formData.mon_tech}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, mon_tech: checked }))}
+                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, mon_tech: !!checked }))}
                 />
                 <Label htmlFor="mon-tech">Monitor Technician Required</Label>
               </div>
