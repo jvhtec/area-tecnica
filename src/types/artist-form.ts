@@ -1,3 +1,4 @@
+
 import { FestivalGearSetup } from "./festival";
 import { WiredMic } from "@/components/festival/gear-setup/WiredMicConfig";
 
@@ -48,10 +49,6 @@ export interface ArtistSectionProps {
       exclusive_use?: boolean;
       notes?: string;
     }>;
-    // Add GearSetupFormData compatibility fields
-    max_stages?: number;
-    foh_consoles?: any[];
-    mon_consoles?: any[];
   };
   onChange: (changes: any) => void;
   gearSetup?: FestivalGearSetup | null;
