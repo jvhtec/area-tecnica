@@ -37,93 +37,61 @@ export const ArtistManagementForm = ({
 
   const [isLoading, setIsLoading] = useState(false);
 
+  // Create enhanced form data with compatibility fields
+  const createFormData = (artistData?: any) => ({
+    name: artistData?.name || "",
+    stage: artistData?.stage || 1,
+    date: selectedDate,
+    show_start: artistData?.show_start || "20:00",
+    show_end: artistData?.show_end || "21:00",
+    soundcheck: artistData?.soundcheck || false,
+    soundcheck_start: artistData?.soundcheck_start || "18:00",
+    soundcheck_end: artistData?.soundcheck_end || "19:00",
+    foh_console: artistData?.foh_console || "",
+    foh_console_provided_by: artistData?.foh_console_provided_by || "festival",
+    mon_console: artistData?.mon_console || "",
+    mon_console_provided_by: artistData?.mon_console_provided_by || "festival",
+    wireless_systems: artistData?.wireless_systems || [],
+    iem_systems: artistData?.iem_systems || [],
+    wireless_provided_by: artistData?.wireless_provided_by || "festival",
+    iem_provided_by: artistData?.iem_provided_by || "festival",
+    monitors_enabled: artistData?.monitors_enabled || false,
+    monitors_quantity: artistData?.monitors_quantity || 0,
+    extras_sf: artistData?.extras_sf || false,
+    extras_df: artistData?.extras_df || false,
+    extras_djbooth: artistData?.extras_djbooth || false,
+    extras_wired: artistData?.extras_wired || "",
+    infra_cat6: artistData?.infra_cat6 || false,
+    infra_cat6_quantity: artistData?.infra_cat6_quantity || 0,
+    infra_hma: artistData?.infra_hma || false,
+    infra_hma_quantity: artistData?.infra_hma_quantity || 0,
+    infra_coax: artistData?.infra_coax || false,
+    infra_coax_quantity: artistData?.infra_coax_quantity || 0,
+    infra_opticalcon_duo: artistData?.infra_opticalcon_duo || false,
+    infra_opticalcon_duo_quantity: artistData?.infra_opticalcon_duo_quantity || 0,
+    infra_analog: artistData?.infra_analog || 0,
+    infrastructure_provided_by: artistData?.infrastructure_provided_by || "festival",
+    other_infrastructure: artistData?.other_infrastructure || "",
+    notes: artistData?.notes || "",
+    foh_tech: artistData?.foh_tech || false,
+    mon_tech: artistData?.mon_tech || false,
+    rider_missing: artistData?.rider_missing || false,
+    isaftermidnight: artistData?.isaftermidnight || false,
+    mic_kit: artistData?.mic_kit || "band",
+    wired_mics: artistData?.wired_mics || [],
+    // Add compatibility fields
+    max_stages: combinedSetup?.globalSetup?.max_stages || 3,
+    foh_consoles: combinedSetup?.globalSetup?.foh_consoles || [],
+    mon_consoles: combinedSetup?.globalSetup?.mon_consoles || []
+  });
+
+  const [formData, setFormData] = useState(createFormData(artist));
+
   useEffect(() => {
     if (artist) {
-      setFormData({
-        name: artist.name || "",
-        stage: artist.stage || 1,
-        date: selectedDate,
-        show_start: artist.show_start || "20:00",
-        show_end: artist.show_end || "21:00",
-        soundcheck: artist.soundcheck || false,
-        soundcheck_start: artist.soundcheck_start || "18:00",
-        soundcheck_end: artist.soundcheck_end || "19:00",
-        foh_console: artist.foh_console || "",
-        foh_console_provided_by: artist.foh_console_provided_by || "festival",
-        mon_console: artist.mon_console || "",
-        mon_console_provided_by: artist.mon_console_provided_by || "festival",
-        wireless_systems: artist.wireless_systems || [],
-        iem_systems: artist.iem_systems || [],
-        wireless_provided_by: artist.wireless_provided_by || "festival",
-        iem_provided_by: artist.iem_provided_by || "festival",
-        monitors_enabled: artist.monitors_enabled || false,
-        monitors_quantity: artist.monitors_quantity || 0,
-        extras_sf: artist.extras_sf || false,
-        extras_df: artist.extras_df || false,
-        extras_djbooth: artist.extras_djbooth || false,
-        extras_wired: artist.extras_wired || "",
-        infra_cat6: artist.infra_cat6 || false,
-        infra_cat6_quantity: artist.infra_cat6_quantity || 0,
-        infra_hma: artist.infra_hma || false,
-        infra_hma_quantity: artist.infra_hma_quantity || 0,
-        infra_coax: artist.infra_coax || false,
-        infra_coax_quantity: artist.infra_coax_quantity || 0,
-        infra_opticalcon_duo: artist.infra_opticalcon_duo || false,
-        infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity || 0,
-        infra_analog: artist.infra_analog || 0,
-        infrastructure_provided_by: artist.infrastructure_provided_by || "festival",
-        other_infrastructure: artist.other_infrastructure || "",
-        notes: artist.notes || "",
-        foh_tech: artist.foh_tech || false,
-        mon_tech: artist.mon_tech || false,
-        rider_missing: artist.rider_missing || false,
-        mic_kit: artist.mic_kit || "band",
-        wired_mics: artist.wired_mics || []
-      });
+      setFormData(createFormData(artist));
     }
-  }, [artist, selectedDate]);
-
-  const [formData, setFormData] = useState<ArtistFormData & { mic_kit: 'festival' | 'band'; wired_mics: WiredMic[] }>({
-    name: artist?.name || "",
-    stage: artist?.stage || 1,
-    date: selectedDate,
-    show_start: artist?.show_start || "20:00",
-    show_end: artist?.show_end || "21:00",
-    soundcheck: artist?.soundcheck || false,
-    soundcheck_start: artist?.soundcheck_start || "18:00",
-    soundcheck_end: artist?.soundcheck_end || "19:00",
-    foh_console: artist?.foh_console || "",
-    foh_console_provided_by: artist?.foh_console_provided_by || "festival",
-    mon_console: artist?.mon_console || "",
-    mon_console_provided_by: artist?.mon_console_provided_by || "festival",
-    wireless_systems: artist?.wireless_systems || [],
-    iem_systems: artist?.iem_systems || [],
-    wireless_provided_by: artist?.wireless_provided_by || "festival",
-    iem_provided_by: artist?.iem_provided_by || "festival",
-    monitors_enabled: artist?.monitors_enabled || false,
-    monitors_quantity: artist?.monitors_quantity || 0,
-    extras_sf: artist?.extras_sf || false,
-    extras_df: artist?.extras_df || false,
-    extras_djbooth: artist?.extras_djbooth || false,
-    extras_wired: artist?.extras_wired || "",
-    infra_cat6: artist?.infra_cat6 || false,
-    infra_cat6_quantity: artist?.infra_cat6_quantity || 0,
-    infra_hma: artist?.infra_hma || false,
-    infra_hma_quantity: artist?.infra_hma_quantity || 0,
-    infra_coax: artist?.infra_coax || false,
-    infra_coax_quantity: artist?.infra_coax_quantity || 0,
-    infra_opticalcon_duo: artist?.infra_opticalcon_duo || false,
-    infra_opticalcon_duo_quantity: artist?.infra_opticalcon_duo_quantity || 0,
-    infra_analog: artist?.infra_analog || 0,
-    infrastructure_provided_by: artist?.infrastructure_provided_by || "festival",
-    other_infrastructure: artist?.other_infrastructure || "",
-    notes: artist?.notes || "",
-    foh_tech: artist?.foh_tech || false,
-    mon_tech: artist?.mon_tech || false,
-    rider_missing: artist?.rider_missing || false,
-    mic_kit: artist?.mic_kit || "band",
-    wired_mics: artist?.wired_mics || []
-  });
+  }, [artist, selectedDate, combinedSetup]);
 
   useEffect(() => {
     if (artist) {
@@ -144,47 +112,7 @@ export const ArtistManagementForm = ({
               variant: "destructive",
             });
           } else if (data) {
-            setFormData({
-              name: data.name || "",
-              stage: data.stage || 1,
-              date: selectedDate,
-              show_start: data.show_start || "20:00",
-              show_end: data.show_end || "21:00",
-              soundcheck: data.soundcheck || false,
-              soundcheck_start: data.soundcheck_start || "18:00",
-              soundcheck_end: data.soundcheck_end || "19:00",
-              foh_console: data.foh_console || "",
-              foh_console_provided_by: data.foh_console_provided_by || "festival",
-              mon_console: data.mon_console || "",
-              mon_console_provided_by: data.mon_console_provided_by || "festival",
-              wireless_systems: data.wireless_systems || [],
-              iem_systems: data.iem_systems || [],
-              wireless_provided_by: data.wireless_provided_by || "festival",
-              iem_provided_by: data.iem_provided_by || "festival",
-              monitors_enabled: data.monitors_enabled || false,
-              monitors_quantity: data.monitors_quantity || 0,
-              extras_sf: data.extras_sf || false,
-              extras_df: data.extras_df || false,
-              extras_djbooth: data.extras_djbooth || false,
-              extras_wired: data.extras_wired || "",
-              infra_cat6: data.infra_cat6 || false,
-              infra_cat6_quantity: data.infra_cat6_quantity || 0,
-              infra_hma: data.infra_hma || false,
-              infra_hma_quantity: data.infra_hma_quantity || 0,
-              infra_coax: data.infra_coax || false,
-              infra_coax_quantity: data.infra_coax_quantity || 0,
-              infra_opticalcon_duo: data.infra_opticalcon_duo || false,
-              infra_opticalcon_duo_quantity: data.infra_opticalcon_duo_quantity || 0,
-              infra_analog: data.infra_analog || 0,
-              infrastructure_provided_by: data.infrastructure_provided_by || "festival",
-              other_infrastructure: data.other_infrastructure || "",
-              notes: data.notes || "",
-              foh_tech: data.foh_tech || false,
-              mon_tech: data.mon_tech || false,
-              rider_missing: data.rider_missing || false,
-              mic_kit: data.mic_kit || "band",
-              wired_mics: data.wired_mics || []
-            });
+            setFormData(createFormData(data));
           }
         } catch (error) {
           console.error("Error fetching artist:", error);
@@ -200,7 +128,7 @@ export const ArtistManagementForm = ({
 
       fetchArtist();
     }
-  }, [artist, selectedDate, toast]);
+  }, [artist, selectedDate, toast, combinedSetup]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

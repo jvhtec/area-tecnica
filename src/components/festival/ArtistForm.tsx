@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { ArtistWirelessSetupSection } from "./form/sections/ArtistWirelessSetupSection";
@@ -26,7 +27,14 @@ export const ArtistForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { models } = useEquipmentModels();
   
-  const [formData, setFormData] = useState<ArtistFormData & { mic_kit: 'festival' | 'band'; wired_mics: WiredMic[] }>({
+  const [formData, setFormData] = useState<ArtistFormData & { 
+    mic_kit: 'festival' | 'band'; 
+    wired_mics: WiredMic[];
+    foh_tech: boolean;
+    mon_tech: boolean;
+    isaftermidnight: boolean;
+    rider_missing: boolean;
+  }>({
     name: "",
     stage: 1,
     date: "",
@@ -64,7 +72,9 @@ export const ArtistForm = () => {
     other_infrastructure: "",
     notes: "",
     mic_kit: "band",
-    wired_mics: []
+    wired_mics: [],
+    isaftermidnight: false,
+    rider_missing: false
   });
 
   // Get console options from database with fallback
@@ -163,59 +173,182 @@ export const ArtistForm = () => {
         
         <form onSubmit={handleSubmit} className="space-y-8">
           <div className="grid gap-6">
-            <div className="space-y-2">
-              <Label>Artist/Band Name</Label>
-              <Input
-                type="text"
-                value={formData.name || ""}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                required
-              />
+            {/* Basic Info */}
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold">Basic Information</h2>
+              <div className="space-y-2">
+                <Label>Artist/Band Name</Label>
+                <Input
+                  type="text"
+                  value={formData.name || ""}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Show Start Time</Label>
+                  <Input
+                    type="time"
+                    value={formData.show_start || ""}
+                    onChange={(e) => setFormData(prev => ({ ...prev, show_start: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Show End Time</Label>
+                  <Input
+                    type="time"
+                    value={formData.show_end || ""}
+                    onChange={(e) => setFormData(prev => ({ ...prev, show_end: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="soundcheck"
+                    checked={formData.soundcheck}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, soundcheck: checked }))}
+                  />
+                  <Label htmlFor="soundcheck">Soundcheck Required</Label>
+                </div>
+
+                {formData.soundcheck && (
+                  <div className="grid grid-cols-2 gap-4 ml-6">
+                    <div className="space-y-2">
+                      <Label>Soundcheck Start</Label>
+                      <Input
+                        type="time"
+                        value={formData.soundcheck_start || ""}
+                        onChange={(e) => setFormData(prev => ({ ...prev, soundcheck_start: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Soundcheck End</Label>
+                      <Input
+                        type="time"
+                        value={formData.soundcheck_end || ""}
+                        onChange={(e) => setFormData(prev => ({ ...prev, soundcheck_end: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="after-midnight"
+                    checked={formData.isaftermidnight}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isaftermidnight: checked }))}
+                  />
+                  <Label htmlFor="after-midnight">Show is after midnight</Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="rider-missing"
+                    checked={formData.rider_missing}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, rider_missing: checked }))}
+                  />
+                  <Label htmlFor="rider-missing">Rider is missing</Label>
+                </div>
+              </div>
             </div>
 
             {/* FOH Console Section */}
             <div className="space-y-4">
               <h2 className="text-xl font-semibold">FOH Console</h2>
-              <div className="space-y-2">
-                <Label>Console Model</Label>
-                <Select
-                  value={formData.foh_console || ""}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, foh_console: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select console" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {fohOptions.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Console Model</Label>
+                  <Select
+                    value={formData.foh_console || ""}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, foh_console: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select console" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {fohOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Provided By</Label>
+                  <Select
+                    value={formData.foh_console_provided_by || "festival"}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, foh_console_provided_by: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="festival">Festival</SelectItem>
+                      <SelectItem value="band">Band</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="foh-tech"
+                  checked={formData.foh_tech}
+                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, foh_tech: checked }))}
+                />
+                <Label htmlFor="foh-tech">FOH Technician Required</Label>
               </div>
             </div>
 
             {/* Monitor Console Section */}
             <div className="space-y-4">
               <h2 className="text-xl font-semibold">Monitor Console</h2>
-              <div className="space-y-2">
-                <Label>Console Model</Label>
-                <Select
-                  value={formData.mon_console || ""}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, mon_console: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select console" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {monOptions.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Console Model</Label>
+                  <Select
+                    value={formData.mon_console || ""}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, mon_console: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select console" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {monOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Provided By</Label>
+                  <Select
+                    value={formData.mon_console_provided_by || "festival"}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, mon_console_provided_by: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="festival">Festival</SelectItem>
+                      <SelectItem value="band">Band</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="mon-tech"
+                  checked={formData.mon_tech}
+                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, mon_tech: checked }))}
+                />
+                <Label htmlFor="mon-tech">Monitor Technician Required</Label>
               </div>
             </div>
 
