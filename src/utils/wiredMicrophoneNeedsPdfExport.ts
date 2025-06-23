@@ -28,13 +28,14 @@ export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPd
   const pageHeight = pdf.internal.pageSize.height;
   const margin = 20;
   
-  // Festival document styling - consistent colors and fonts
-  const primaryColor = [41, 128, 185]; // Festival blue
+  // Festival document styling - consistent burgundy/red theme
+  const primaryColor = [139, 21, 33]; // Burgundy/red to match other festival documents
   const secondaryColor = [52, 73, 94]; // Dark gray
   const accentColor = [231, 76, 60]; // Red for exclusive items
-  const lightGray = [236, 240, 241];
+  const lightGray = [240, 240, 240]; // Light gray for alternating rows
+  const headerGray = [248, 249, 250]; // Very light gray for section headers
   
-  // Add logo if available - consistent with other festival documents
+  // Add logo if available - consistent positioning with other festival documents
   let logoHeight = 0;
   if (data.logoUrl) {
     try {
@@ -56,7 +57,7 @@ export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPd
   // Header styling - consistent with other festival documents
   const headerY = logoHeight > 0 ? 50 : 25;
   
-  // Main title
+  // Main title with burgundy background
   pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   pdf.rect(0, headerY, pageWidth, 25, 'F');
   
@@ -65,20 +66,20 @@ export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPd
   pdf.setFont('helvetica', 'bold');
   pdf.text('Wired Microphone Requirements', pageWidth / 2, headerY + 16, { align: 'center' });
   
-  // Job title
+  // Job title with consistent styling
   pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
   pdf.setFontSize(14);
   pdf.setFont('helvetica', 'normal');
   pdf.text(data.jobTitle, pageWidth / 2, headerY + 35, { align: 'center' });
   
-  // Stage filter info with consistent styling
+  // Stage filter info with light gray background
   const stageText = data.selectedStages.length === 1 
     ? `Stage ${data.selectedStages[0]}`
     : data.selectedStages.length > 1 
       ? `Stages ${data.selectedStages.join(', ')}`
       : 'All Stages';
   
-  pdf.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
+  pdf.setFillColor(headerGray[0], headerGray[1], headerGray[2]);
   pdf.rect(margin, headerY + 45, pageWidth - (margin * 2), 15, 'F');
   
   pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
@@ -94,21 +95,27 @@ export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPd
     pdf.setFont('helvetica', 'normal');
     pdf.text('No wired microphone requirements found for the selected stages.', margin, yPosition);
     
-    // Footer
+    // Footer with consistent styling
     const timestamp = new Date().toLocaleString();
     pdf.setFontSize(8);
     pdf.setTextColor(128, 128, 128);
+    pdf.setDrawColor(200, 200, 200);
+    pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
     pdf.text(`Generated on ${timestamp}`, margin, pageHeight - 10);
+    pdf.text(`${data.jobTitle} - Wired Microphone Requirements`, pageWidth - margin, pageHeight - 10, { align: 'right' });
     
     return new Blob([pdf.output('blob')], { type: 'application/pdf' });
   }
   
-  // Summary section with festival styling
-  pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  // Summary section with burgundy header styling
+  pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  pdf.rect(margin - 5, yPosition - 8, pageWidth - (margin * 2) + 10, 20, 'F');
+  
+  pdf.setTextColor(255, 255, 255);
   pdf.setFontSize(14);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('Inventory Requirements Summary', margin, yPosition);
-  yPosition += 15;
+  pdf.text('Inventory Requirements Summary', margin, yPosition + 5);
+  yPosition += 25;
   
   const summaryData = data.microphoneNeeds.map(need => [
     need.model,
@@ -127,14 +134,15 @@ export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPd
       fillColor: primaryColor,
       textColor: [255, 255, 255],
       fontSize: 11,
-      fontStyle: 'bold'
+      fontStyle: 'bold',
+      halign: 'center'
     },
     bodyStyles: { 
       fontSize: 10,
       textColor: secondaryColor
     },
     alternateRowStyles: {
-      fillColor: [248, 249, 250]
+      fillColor: lightGray
     },
     styles: { 
       cellPadding: 6,
@@ -143,7 +151,7 @@ export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPd
     },
     columnStyles: {
       0: { cellWidth: 40, fontStyle: 'bold' },
-      1: { cellWidth: 25, halign: 'center', fillColor: [233, 245, 255] },
+      1: { cellWidth: 25, halign: 'center', fillColor: [255, 248, 248] },
       2: { cellWidth: 25, halign: 'center', fillColor: [255, 235, 235] },
       3: { cellWidth: 25, halign: 'center', fillColor: [235, 255, 235] },
       4: { cellWidth: 55, fontSize: 9 }
@@ -152,12 +160,15 @@ export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPd
   
   yPosition = (pdf as any).lastAutoTable.finalY + 25;
   
-  // Detailed breakdown section
-  pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  // Detailed breakdown section with burgundy header
+  pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  pdf.rect(margin - 5, yPosition - 8, pageWidth - (margin * 2) + 10, 20, 'F');
+  
+  pdf.setTextColor(255, 255, 255);
   pdf.setFontSize(14);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('Detailed Stage Analysis', margin, yPosition);
-  yPosition += 15;
+  pdf.text('Detailed Stage Analysis', margin, yPosition + 5);
+  yPosition += 25;
   
   for (const need of data.microphoneNeeds) {
     // Check if we need a new page
@@ -166,8 +177,8 @@ export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPd
       yPosition = 30;
     }
     
-    // Model header with festival styling
-    pdf.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
+    // Model header with light gray background
+    pdf.setFillColor(headerGray[0], headerGray[1], headerGray[2]);
     pdf.rect(margin, yPosition - 5, pageWidth - (margin * 2), 20, 'F');
     
     pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
@@ -189,10 +200,11 @@ export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPd
       body: detailData,
       theme: 'grid',
       headStyles: { 
-        fillColor: [100, 100, 100],
+        fillColor: [80, 80, 80], // Dark gray for sub-headers
         textColor: [255, 255, 255],
         fontSize: 10,
-        fontStyle: 'bold'
+        fontStyle: 'bold',
+        halign: 'center'
       },
       bodyStyles: { 
         fontSize: 9,
@@ -207,7 +219,7 @@ export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPd
         lineWidth: 0.3
       },
       columnStyles: {
-        0: { cellWidth: 25, fontStyle: 'bold' },
+        0: { cellWidth: 25, fontStyle: 'bold', halign: 'center' },
         1: { cellWidth: 20, halign: 'center' },
         2: { 
           cellWidth: 20, 
@@ -229,16 +241,24 @@ export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPd
   
   // Footer with consistent festival styling
   const timestamp = new Date().toLocaleString();
-  pdf.setFontSize(8);
-  pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(128, 128, 128);
   
-  // Add a line above footer
-  pdf.setDrawColor(200, 200, 200);
-  pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
-  
-  pdf.text(`Generated on ${timestamp}`, margin, pageHeight - 10);
-  pdf.text(`${data.jobTitle} - Wired Microphone Requirements`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+  // Add footer on all pages
+  const pageCount = pdf.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    pdf.setPage(i);
+    
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(128, 128, 128);
+    
+    // Add a line above footer
+    pdf.setDrawColor(200, 200, 200);
+    pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
+    
+    pdf.text(`Generated on ${timestamp}`, margin, pageHeight - 10);
+    pdf.text(`${data.jobTitle} - Wired Microphone Requirements`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+    pdf.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+  }
   
   return new Blob([pdf.output('blob')], { type: 'application/pdf' });
 };
