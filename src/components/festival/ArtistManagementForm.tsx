@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -32,7 +33,7 @@ export const ArtistManagementForm = ({
   isSubmitting
 }: ArtistManagementFormProps) => {
   const { toast } = useToast();
-  const { combinedSetup } = useCombinedGearSetup(jobId || '', 1);
+  const { combinedSetup } = useCombinedGearSetup(jobId || '', selectedDate, 1);
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -183,8 +184,12 @@ export const ArtistManagementForm = ({
               wired_mics: data.wired_mics || []
             });
           }
+          setIsLoading(false);
         })
-        .finally(() => setIsLoading(false));
+        .catch((error) => {
+          console.error("Error fetching artist:", error);
+          setIsLoading(false);
+        });
     }
   }, [artist, selectedDate, toast]);
 
@@ -203,19 +208,19 @@ export const ArtistManagementForm = ({
         formData={formData} 
         onChange={updateFormData}
         dayStartTime={dayStartTime}
-        gearSetup={combinedSetup}
+        gearSetup={combinedSetup?.globalSetup}
       />
 
       <ConsoleSetupSection 
         formData={formData} 
         onChange={updateFormData}
-        gearSetup={combinedSetup}
+        gearSetup={combinedSetup?.globalSetup}
       />
 
       <WirelessSetupSection 
         formData={formData} 
         onChange={updateFormData}
-        gearSetup={combinedSetup}
+        gearSetup={combinedSetup?.globalSetup}
       />
 
       <MicKitSection
@@ -228,19 +233,19 @@ export const ArtistManagementForm = ({
       <MonitorSetupSection 
         formData={formData} 
         onChange={updateFormData}
-        gearSetup={combinedSetup}
+        gearSetup={combinedSetup?.globalSetup}
       />
 
       <ExtraRequirementsSection 
         formData={formData} 
         onChange={updateFormData}
-        gearSetup={combinedSetup}
+        gearSetup={combinedSetup?.globalSetup}
       />
 
       <InfrastructureSection 
         formData={formData} 
         onChange={updateFormData}
-        gearSetup={combinedSetup}
+        gearSetup={combinedSetup?.globalSetup}
       />
 
       <NotesSection 
