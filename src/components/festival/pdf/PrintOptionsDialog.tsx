@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,6 +18,8 @@ export interface PrintOptions {
   includeInfrastructureTable: boolean;
   infrastructureTableStages: number[];
   includeMissingRiderReport: boolean;
+  includeWiredMicNeeds: boolean;
+  wiredMicNeedsStages: number[];
 }
 
 interface PrintOptionsDialogProps {
@@ -49,13 +50,16 @@ export const PrintOptionsDialog = ({
     rfIemTableStages: Array.from({ length: maxStages }, (_, i) => i + 1),
     includeInfrastructureTable: true,
     infrastructureTableStages: Array.from({ length: maxStages }, (_, i) => i + 1),
-    includeMissingRiderReport: true
+    includeMissingRiderReport: true,
+    includeWiredMicNeeds: true,
+    wiredMicNeedsStages: Array.from({ length: maxStages }, (_, i) => i + 1)
   });
 
   const handleStageChange = (section: keyof PrintOptions, stageNumber: number, checked: boolean) => {
     if (section === 'gearSetupStages' || section === 'shiftScheduleStages' || 
         section === 'artistTableStages' || section === 'artistRequirementStages' || 
-        section === 'rfIemTableStages' || section === 'infrastructureTableStages') {
+        section === 'rfIemTableStages' || section === 'infrastructureTableStages' ||
+        section === 'wiredMicNeedsStages') {
       setOptions(prev => ({
         ...prev,
         [section]: checked 
@@ -74,7 +78,8 @@ export const PrintOptionsDialog = ({
       artistTableStages: allStages,
       artistRequirementStages: allStages,
       rfIemTableStages: allStages,
-      infrastructureTableStages: allStages
+      infrastructureTableStages: allStages,
+      wiredMicNeedsStages: allStages
     }));
   };
 
@@ -86,7 +91,8 @@ export const PrintOptionsDialog = ({
       artistTableStages: [],
       artistRequirementStages: [],
       rfIemTableStages: [],
-      infrastructureTableStages: []
+      infrastructureTableStages: [],
+      wiredMicNeedsStages: []
     }));
   };
 
@@ -101,6 +107,7 @@ export const PrintOptionsDialog = ({
     if (options.includeInfrastructureTable) selectedSections.push('Infrastructure');
     if (options.includeMissingRiderReport) selectedSections.push('Missing_Riders');
     if (options.includeArtistRequirements) selectedSections.push('Artist_Requirements');
+    if (options.includeWiredMicNeeds) selectedSections.push('Wired_Mics');
 
     // If only one section is selected, make it more specific
     if (selectedSections.length === 1) {
@@ -113,7 +120,8 @@ export const PrintOptionsDialog = ({
         ...(options.includeArtistTables ? options.artistTableStages : []),
         ...(options.includeArtistRequirements ? options.artistRequirementStages : []),
         ...(options.includeRfIemTable ? options.rfIemTableStages : []),
-        ...(options.includeInfrastructureTable ? options.infrastructureTableStages : [])
+        ...(options.includeInfrastructureTable ? options.infrastructureTableStages : []),
+        ...(options.includeWiredMicNeeds ? options.wiredMicNeedsStages : [])
       ]);
       
       const sortedStages = Array.from(allSelectedStages).sort((a, b) => a - b);
@@ -135,7 +143,8 @@ export const PrintOptionsDialog = ({
       ...(options.includeArtistTables ? options.artistTableStages : []),
       ...(options.includeArtistRequirements ? options.artistRequirementStages : []),
       ...(options.includeRfIemTable ? options.rfIemTableStages : []),
-      ...(options.includeInfrastructureTable ? options.infrastructureTableStages : [])
+      ...(options.includeInfrastructureTable ? options.infrastructureTableStages : []),
+      ...(options.includeWiredMicNeeds ? options.wiredMicNeedsStages : [])
     ]);
     
     const sortedStages = Array.from(allSelectedStages).sort((a, b) => a - b);
@@ -150,7 +159,7 @@ export const PrintOptionsDialog = ({
     return `${baseTitle}_Complete_Documentation.pdf`;
   };
 
-  const renderStageSelections = (section: 'gearSetupStages' | 'shiftScheduleStages' | 'artistTableStages' | 'artistRequirementStages' | 'rfIemTableStages' | 'infrastructureTableStages') => {
+  const renderStageSelections = (section: 'gearSetupStages' | 'shiftScheduleStages' | 'artistTableStages' | 'artistRequirementStages' | 'rfIemTableStages' | 'infrastructureTableStages' | 'wiredMicNeedsStages') => {
     return (
       <div className="pl-6 space-y-2">
         <p className="text-sm text-muted-foreground">Select stages:</p>
@@ -293,6 +302,23 @@ export const PrintOptionsDialog = ({
                 <Label htmlFor="infrastructure-table">Infrastructure Needs Overview</Label>
               </div>
               {options.includeInfrastructureTable && maxStages > 1 && renderStageSelections('infrastructureTableStages')}
+            </div>
+
+            <div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="wired-mic-needs"
+                  checked={options.includeWiredMicNeeds}
+                  onCheckedChange={(checked) => 
+                    setOptions(prev => ({ ...prev, includeWiredMicNeeds: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="wired-mic-needs">Wired Microphone Requirements</Label>
+              </div>
+              {options.includeWiredMicNeeds && maxStages > 1 && renderStageSelections('wiredMicNeedsStages')}
+              <div className="pl-6 text-sm text-muted-foreground">
+                Detailed microphone inventory requirements and peak usage analysis
+              </div>
             </div>
 
             <div>
