@@ -395,6 +395,30 @@ export const FestivalGearSetupForm = ({
 
   const alertVariant = isPrimaryStage ? "default" : hasStageSpecificSetup ? "info" : "default";
 
+  // Create a compatible form data object for the sections
+  const getCompatibleFormData = () => ({
+    ...setup,
+    name: "",
+    stage: stageNumber,
+    date: "",
+    show_start: "",
+    show_end: "",
+    soundcheck: false,
+    foh_console: "",
+    foh_console_provided_by: "",
+    mon_console: "",
+    mon_console_provided_by: "",
+    wireless_provided_by: "",
+    iem_provided_by: "",  
+    infrastructure_provided_by: "",
+    foh_tech: false,
+    mon_tech: false,
+    rider_missing: false,
+    isaftermidnight: false,
+    mic_kit: "band" as const,
+    wired_mics: []
+  });
+
   return (
     <form onSubmit={handleFormSubmit} className="space-y-8">
       <Alert variant={alertVariant} className={isPrimaryStage ? "bg-yellow-50" : hasStageSpecificSetup ? "bg-blue-50" : "bg-gray-50"}>
@@ -404,41 +428,41 @@ export const FestivalGearSetupForm = ({
       </Alert>
       
       <ConsoleSetupSection
-        formData={setup}
-        onChange={handleChange}
+        formData={getCompatibleFormData()}
+        onChange={(changes) => handleChange(changes)}
         gearSetup={globalSetup}
         stageNumber={stageNumber}
       />
 
       <WirelessSetupSection
-        formData={setup}
-        onChange={handleChange}
+        formData={getCompatibleFormData()}
+        onChange={(changes) => handleChange(changes)}
       />
 
       <MonitorSetupSection
-        formData={setup}
-        onChange={handleChange}
+        formData={getCompatibleFormData()}
+        onChange={(changes) => handleChange(changes)}
         gearSetup={globalSetup}
         stageNumber={stageNumber}
       />
 
       <ExtraRequirementsSection
-        formData={setup}
-        onChange={handleChange}
+        formData={getCompatibleFormData()}
+        onChange={(changes) => handleChange(changes)}
         gearSetup={globalSetup}
         stageNumber={stageNumber}
       />
 
       <InfrastructureSection
-        formData={setup}
-        onChange={handleChange}
+        formData={getCompatibleFormData()}
+        onChange={(changes) => handleChange(changes)}
         gearSetup={globalSetup}
         stageNumber={stageNumber}
       />
 
       <NotesSection
-        formData={setup}
-        onChange={handleChange}
+        formData={getCompatibleFormData()}
+        onChange={(changes) => handleChange(changes)}
       />
 
       <Button type="submit" disabled={isLoading} className="w-full">

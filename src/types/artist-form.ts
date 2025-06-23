@@ -41,6 +41,7 @@ export interface ArtistSectionProps {
     foh_tech?: boolean;
     mon_tech?: boolean;
     rider_missing?: boolean;
+    isaftermidnight?: boolean;
     mic_kit: 'festival' | 'band';
     wired_mics: WiredMic[];
     // Add GearSetupFormData compatibility fields

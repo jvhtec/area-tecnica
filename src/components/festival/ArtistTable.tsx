@@ -51,6 +51,7 @@ interface Artist {
   isaftermidnight?: boolean;
   mic_kit?: 'festival' | 'band';
   wired_mics?: Array<{ model: string; quantity: number; notes?: string }>;
+  job_id?: string;
 }
 
 interface ArtistTableProps {
@@ -63,6 +64,8 @@ interface ArtistTableProps {
   equipmentFilter: string;
   riderFilter: string;
   dayStartTime: string;
+  jobId?: string;
+  selectedDate?: string;
 }
 
 export const ArtistTable = ({
@@ -74,7 +77,9 @@ export const ArtistTable = ({
   stageFilter,
   equipmentFilter,
   riderFilter,
-  dayStartTime
+  dayStartTime,
+  jobId,
+  selectedDate
 }: ArtistTableProps) => {
   const [deletingArtistId, setDeletingArtistId] = useState<string | null>(null);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
@@ -413,7 +418,7 @@ export const ArtistTable = ({
           <ArtistFormLinkDialog
             open={linkDialogOpen}
             onOpenChange={setLinkDialogOpen}
-            artist={selectedArtist}
+            artistId={selectedArtist.id}
           />
           
           <ArtistFileDialog
@@ -425,12 +430,11 @@ export const ArtistTable = ({
           <ArtistTablePrintDialog
             open={printDialogOpen}
             onOpenChange={setPrintDialogOpen}
-            jobDates={[new Date(selectedArtist.date)]}
-            selectedDate={selectedArtist.date}
+            jobDates={selectedDate ? [new Date(selectedDate)] : []}
+            selectedDate={selectedDate || ''}
             onDateChange={() => {}}
             onStageChange={() => {}}
             onPrint={() => {
-              // Implementation for individual artist print
               console.log('Print artist:', selectedArtist);
               setPrintDialogOpen(false);
             }}
@@ -442,6 +446,8 @@ export const ArtistTable = ({
       <ArtistFormLinksDialog
         open={linksDialogOpen}
         onOpenChange={setLinksDialogOpen}
+        selectedDate={selectedDate || ''}
+        jobId={jobId || ''}
       />
     </>
   );
