@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -95,6 +96,18 @@ interface ScheduleRow {
   notes?: string;
 }
 
+// Transform PDF artist data to match the sorting function's expected format
+const transformArtistsForSorting = (artists: ArtistTablePdfData['artists'], date: string) => {
+  return artists.map((artist, index) => ({
+    id: `temp-${index}`, // Temporary ID for sorting
+    name: artist.name,
+    stage: artist.stage,
+    date: date,
+    show_start: artist.showTime.start,
+    show_end: artist.showTime.end
+  }));
+};
+
 export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     try {
@@ -154,32 +167,38 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
 
         const scheduleRows: ScheduleRow[] = [];
         
-        // Sort artists chronologically before creating schedule rows
-        const sortedArtists = sortArtistsChronologically(data.artists);
+        // Transform and sort artists chronologically
+        const transformedArtists = transformArtistsForSorting(data.artists, data.date);
+        const sortedArtists = sortArtistsChronologically(transformedArtists);
         
-        sortedArtists.forEach(artist => {
-          if (artist.soundcheck) {
+        // Create schedule rows using the sorted order
+        sortedArtists.forEach(sortedArtist => {
+          // Find the original artist data using the name and stage
+          const originalArtist = data.artists.find(artist => 
+            artist.name === sortedArtist.name && artist.stage === sortedArtist.stage
+          );
+          
+          if (!originalArtist) return;
+          
+          if (originalArtist.soundcheck) {
             scheduleRows.push({
-              name: artist.name,
-              stage: artist.stage,
-              time: artist.soundcheck,
+              name: originalArtist.name,
+              stage: originalArtist.stage,
+              time: originalArtist.soundcheck,
               isSoundcheck: true
             });
           }
           
           scheduleRows.push({
-            name: artist.name,
-            stage: artist.stage,
-            time: artist.showTime,
+            name: originalArtist.name,
+            stage: originalArtist.stage,
+            time: originalArtist.showTime,
             isSoundcheck: false,
-            technical: artist.technical,
-            extras: artist.extras,
-            notes: artist.notes
+            technical: originalArtist.technical,
+            extras: originalArtist.extras,
+            notes: originalArtist.notes
           });
         });
-
-        // Remove the old basic time sorting since we're now using chronological sorting
-        // The scheduleRows are already in the correct order from sortArtistsChronologically
 
         const tableBody = scheduleRows.map(row => {
           if (row.isSoundcheck) {
