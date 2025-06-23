@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { ArtistWirelessSetupSection } from "./form/sections/ArtistWirelessSetupSection";
 import { ArtistFormData } from "@/types/festival";
 import { useEquipmentModels } from "@/hooks/useEquipmentModels";
+import { WiredMic } from "./gear-setup/WiredMicConfig";
 
 const consoleOptions = [
   'Yamaha CL5', 'Yamaha PMx', 'Yamaha DM7','Yamaha DM3', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
@@ -25,8 +26,15 @@ export const ArtistForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { models } = useEquipmentModels();
   
-  const [formData, setFormData] = useState<Partial<ArtistFormData> & { mic_kit: 'festival' | 'band'; wired_mics: any[] }>({
+  const [formData, setFormData] = useState<ArtistFormData & { mic_kit: 'festival' | 'band'; wired_mics: WiredMic[] }>({
     name: "",
+    stage: 1,
+    date: "",
+    show_start: "20:00",
+    show_end: "21:00",
+    soundcheck: false,
+    soundcheck_start: "18:00",
+    soundcheck_end: "19:00",
     foh_console: "",
     foh_console_provided_by: "festival",
     foh_tech: false,

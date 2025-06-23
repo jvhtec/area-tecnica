@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -27,7 +28,7 @@ export const ArtistManagementForm = ({
   artist,
   jobId,
   selectedDate,
-  dayStartTime,
+  dayStartTime = "07:00",
   onSubmit,
   isSubmitting
 }: ArtistManagementFormProps) => {
@@ -212,19 +213,19 @@ export const ArtistManagementForm = ({
       <BasicInfoSection 
         formData={formData} 
         onChange={updateFormData}
-        gearSetup={combinedSetup?.globalSetup}
+        gearSetup={combinedSetup?.globalSetup || null}
       />
 
       <ConsoleSetupSection 
         formData={formData} 
         onChange={updateFormData}
-        gearSetup={combinedSetup?.globalSetup}
+        gearSetup={combinedSetup?.globalSetup || null}
       />
 
       <WirelessSetupSection 
         formData={formData} 
         onChange={updateFormData}
-        gearSetup={combinedSetup?.globalSetup}
+        gearSetup={combinedSetup?.globalSetup || null}
       />
 
       <MicKitSection
@@ -237,19 +238,19 @@ export const ArtistManagementForm = ({
       <MonitorSetupSection 
         formData={formData} 
         onChange={updateFormData}
-        gearSetup={combinedSetup?.globalSetup}
+        gearSetup={combinedSetup?.globalSetup || null}
       />
 
       <ExtraRequirementsSection 
         formData={formData} 
         onChange={updateFormData}
-        gearSetup={combinedSetup?.globalSetup}
+        gearSetup={combinedSetup?.globalSetup || null}
       />
 
       <InfrastructureSection 
         formData={formData} 
         onChange={updateFormData}
-        gearSetup={combinedSetup?.globalSetup}
+        gearSetup={combinedSetup?.globalSetup || null}
       />
 
       <NotesSection 
