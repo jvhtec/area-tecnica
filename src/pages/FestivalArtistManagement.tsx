@@ -194,6 +194,7 @@ const FestivalArtistManagement = () => {
     };
     fetchJobDetails();
   }, [jobId]);
+
   const handleAddArtist = () => {
     setSelectedArtist(null);
     setIsDialogOpen(true);
@@ -317,10 +318,13 @@ const FestivalArtistManagement = () => {
       setIsPrinting(false);
     }
   };
+
   const currentDateType = getCurrentDateType();
   const showArtistControls = currentDateType === 'show';
-  return <div className="container mx-max px-4 py-6">
-      <div className="mb-6">
+
+  return (
+    <div className="w-full py-6">
+      <div className="mb-6 px-6">
         <Button variant="ghost" onClick={() => navigate(`/festival-management/${jobId}`)} className="mb-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Festival Management
@@ -331,7 +335,7 @@ const FestivalArtistManagement = () => {
         </div>
       </div>
 
-      <Card>
+      <Card className="mx-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             Artist Management
@@ -366,8 +370,8 @@ const FestivalArtistManagement = () => {
               </Button>}
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+        <CardContent className="p-0">
+          <div className="space-y-4 p-6">
             {showArtistControls && <ArtistTableFilters searchTerm={searchTerm} onSearchChange={setSearchTerm} stageFilter="all" // Hide stage filter since it's now in date navigation
           onStageFilterChange={() => {}} // No-op since handled by date navigation
           equipmentFilter={equipmentFilter} onEquipmentFilterChange={setEquipmentFilter} riderFilter={riderFilter} onRiderFilterChange={setRiderFilter} />}
@@ -375,19 +379,21 @@ const FestivalArtistManagement = () => {
             {jobDates.length > 0 ? <FestivalDateNavigation jobDates={jobDates} selectedDate={selectedDate} onDateChange={setSelectedDate} dateTypes={dateTypes} jobId={jobId || ''} onTypeChange={() => refetchDateTypes()} dayStartTime={dayStartTime} showStageFilter={showArtistControls} selectedStage={stageFilter} onStageChange={setStageFilter} maxStages={maxStages} /> : null}
 
             {/* Content for selected date */}
-            {selectedDate && (isShowDate(new Date(selectedDate)) ? <ArtistTable 
-                artists={artists} 
-                isLoading={artistsLoading} 
-                onEditArtist={handleEditArtist} 
-                onDeleteArtist={handleDeleteArtist} 
-                searchTerm={searchTerm} 
-                stageFilter={stageFilter} 
-                equipmentFilter={equipmentFilter} 
-                riderFilter={riderFilter} 
-                dayStartTime={dayStartTime} 
-                jobId={jobId}
-                selectedDate={selectedDate}
-              /> : <div className="p-8 text-center text-muted-foreground border rounded-md">
+            {selectedDate && (isShowDate(new Date(selectedDate)) ? <div className="w-full">
+                <ArtistTable 
+                  artists={artists} 
+                  isLoading={artistsLoading} 
+                  onEditArtist={handleEditArtist} 
+                  onDeleteArtist={handleDeleteArtist} 
+                  searchTerm={searchTerm} 
+                  stageFilter={stageFilter} 
+                  equipmentFilter={equipmentFilter} 
+                  riderFilter={riderFilter} 
+                  dayStartTime={dayStartTime} 
+                  jobId={jobId}
+                  selectedDate={selectedDate}
+                />
+              </div> : <div className="p-8 text-center text-muted-foreground border rounded-md">
                   <p>This is not configured as a show date.</p>
                   <p>Artist management is only available on show dates.</p>
                   <p className="mt-2 text-sm">Right-click on the date tab to change its type.</p>
@@ -399,7 +405,8 @@ const FestivalArtistManagement = () => {
       {showArtistControls && <ArtistManagementDialog open={isDialogOpen} onOpenChange={handleArtistDialogClose} artist={selectedArtist} jobId={jobId} selectedDate={selectedDate} dayStartTime={dayStartTime} />}
 
       <ArtistTablePrintDialog open={isPrintDialogOpen} onOpenChange={setIsPrintDialogOpen} jobDates={jobDates} selectedDate={printDate} onDateChange={setPrintDate} onStageChange={setPrintStage} onPrint={handlePrintTable} isLoading={isPrinting} />
-    </div>;
+    </div>
+  );
 };
 
 export default FestivalArtistManagement;

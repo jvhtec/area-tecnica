@@ -323,10 +323,11 @@ export const ArtistTable = ({
         </div>
       </div>;
   }
-  return <>
+  return (
+    <>
       <div className="w-full space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between py-4">
+        <div className="flex items-center justify-between py-4 px-2">
           <h2 className="text-2xl font-semibold leading-none tracking-tight">
             Artist Schedule ({sortedFilteredArtists.length} artists)
           </h2>
@@ -336,127 +337,150 @@ export const ArtistTable = ({
           </Button>
         </div>
 
-        {/* Table */}
-        <div className="rounded-md border w-full overflow-x-auto">
-          <Table className="w-full">
+        {/* Table - Remove container constraints and use full width */}
+        <div className="w-full overflow-x-auto">
+          <Table className="w-full min-w-full">
             <TableHeader>
               <TableRow>
-                <TableHead>Artist</TableHead>
-                <TableHead className="whitespace-nowrap">Stage</TableHead>
-                <TableHead className="whitespace-nowrap">Show Time</TableHead>
-                <TableHead>Soundcheck</TableHead>
-                <TableHead>Consoles</TableHead>
-                <TableHead>Wireless/IEM</TableHead>
-                <TableHead>
+                <TableHead className="min-w-[140px]">Artist</TableHead>
+                <TableHead className="min-w-[80px]">Stage</TableHead>
+                <TableHead className="min-w-[100px]">Show Time</TableHead>
+                <TableHead className="min-w-[100px]">Soundcheck</TableHead>
+                <TableHead className="min-w-[200px]">Consoles</TableHead>
+                <TableHead className="min-w-[180px]">Wireless/IEM</TableHead>
+                <TableHead className="min-w-[140px]">
                   <div className="flex items-center gap-1">
                     <Mic className="h-4 w-4" />
                     Microphones
                   </div>
                 </TableHead>
-                <TableHead>Monitors</TableHead>
-                <TableHead>Extras</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead className="min-w-[80px]">Monitors</TableHead>
+                <TableHead className="min-w-[80px]">Extras</TableHead>
+                <TableHead className="min-w-[80px]">Status</TableHead>
+                <TableHead className="min-w-[200px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedFilteredArtists.map(artist => <TableRow key={artist.id}>
-                  <TableCell>
+              {sortedFilteredArtists.map(artist => (
+                <TableRow key={artist.id}>
+                  <TableCell className="min-w-[140px]">
                     <div className="space-y-1">
                       <div className="font-medium">{artist.name}</div>
                       {artist.isaftermidnight && <Badge variant="outline" className="text-xs bg-blue-700">After Midnight</Badge>}
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="min-w-[80px]">
                     <Badge variant="outline">{getStageDisplayName(artist.stage)}</Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="min-w-[100px]">
                     <div className="text-sm">
                       {artist.show_start} - {artist.show_end}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    {artist.soundcheck ? <div className="text-sm">
+                  <TableCell className="min-w-[100px]">
+                    {artist.soundcheck ? (
+                      <div className="text-sm">
                         <Badge variant="secondary">Yes</Badge>
                         <div className="text-xs text-muted-foreground">
                           {artist.soundcheck_start} - {artist.soundcheck_end}
                         </div>
-                      </div> : <Badge variant="outline">No</Badge>}
+                      </div>
+                    ) : (
+                      <Badge variant="outline">No</Badge>
+                    )}
                   </TableCell>
                   
-                  <TableCell>
+                  <TableCell className="min-w-[200px]">
                     <div className="text-sm space-y-1">
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 flex-wrap">
                         <span>FOH: {artist.foh_console || "Not specified"}</span>
-                        {artist.foh_console_provided_by && <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.foh_console_provided_by)}`}>
+                        {artist.foh_console_provided_by && (
+                          <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.foh_console_provided_by)}`}>
                             {artist.foh_console_provided_by}
-                          </Badge>}
+                          </Badge>
+                        )}
                         {artist.foh_tech && <Badge variant="outline" className="text-xs">Tech</Badge>}
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 flex-wrap">
                         <span>MON: {artist.mon_console || "Not specified"}</span>
-                        {artist.mon_console_provided_by && <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
+                        {artist.mon_console_provided_by && (
+                          <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
                             {artist.mon_console_provided_by}
-                          </Badge>}
+                          </Badge>
+                        )}
                         {artist.mon_tech && <Badge variant="outline" className="text-xs">Tech</Badge>}
                       </div>
                     </div>
                   </TableCell>
                   
-                  <TableCell>
+                  <TableCell className="min-w-[180px]">
                     <div className="text-sm space-y-1">
-                      {artist.wireless_systems && artist.wireless_systems.length > 0 && <div className="flex items-center gap-1">
+                      {artist.wireless_systems && artist.wireless_systems.length > 0 && (
+                        <div className="flex items-center gap-1 flex-wrap">
                           <div className="text-xs" title={formatWirelessSystems(artist.wireless_systems)}>
                             Wireless: {formatWirelessSystems(artist.wireless_systems)}
                           </div>
-                          {artist.wireless_provided_by && <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.wireless_provided_by)}`}>
+                          {artist.wireless_provided_by && (
+                            <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.wireless_provided_by)}`}>
                               {artist.wireless_provided_by}
-                            </Badge>}
-                        </div>}
-                      {artist.iem_systems && artist.iem_systems.length > 0 && <div className="flex items-center gap-1">
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                      {artist.iem_systems && artist.iem_systems.length > 0 && (
+                        <div className="flex items-center gap-1 flex-wrap">
                           <div className="text-xs" title={formatWirelessSystems(artist.iem_systems, true)}>
                             IEM: {formatWirelessSystems(artist.iem_systems, true)}
                           </div>
-                          {artist.iem_provided_by && <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.iem_provided_by)}`}>
+                          {artist.iem_provided_by && (
+                            <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.iem_provided_by)}`}>
                               {artist.iem_provided_by}
-                            </Badge>}
-                        </div>}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </TableCell>
 
-                  <TableCell>
+                  <TableCell className="min-w-[140px]">
                     <div className="text-sm space-y-1">
                       <Badge variant={artist.mic_kit === 'festival' ? 'default' : 'secondary'}>
                         {artist.mic_kit === 'festival' ? 'Festival' : 'Band'}
                       </Badge>
-                      {artist.mic_kit === 'festival' && artist.wired_mics && artist.wired_mics.length > 0 && <div className="text-xs text-muted-foreground max-w-32 truncate" title={formatWiredMics(artist.wired_mics)}>
+                      {artist.mic_kit === 'festival' && artist.wired_mics && artist.wired_mics.length > 0 && (
+                        <div className="text-xs text-muted-foreground max-w-32 truncate" title={formatWiredMics(artist.wired_mics)}>
                           {formatWiredMics(artist.wired_mics)}
-                        </div>}
+                        </div>
+                      )}
                     </div>
                   </TableCell>
 
-                  <TableCell>
-                    {artist.monitors_enabled ? <div className="text-sm">
+                  <TableCell className="min-w-[80px]">
+                    {artist.monitors_enabled ? (
+                      <div className="text-sm">
                         <Badge variant="secondary">{artist.monitors_quantity}x</Badge>
-                      </div> : <Badge variant="outline">None</Badge>}
+                      </div>
+                    ) : (
+                      <Badge variant="outline">None</Badge>
+                    )}
                   </TableCell>
                   
-                  <TableCell>
-                    <div className="text-xs space-y-1">
+                  <TableCell className="min-w-[80px]">
+                    <div className="text-xs space-y-1 flex flex-wrap gap-1">
                       {artist.extras_sf && <Badge variant="outline" className="text-xs">SF</Badge>}
                       {artist.extras_df && <Badge variant="outline" className="text-xs">DF</Badge>}
                       {artist.extras_djbooth && <Badge variant="outline" className="text-xs">DJ</Badge>}
                     </div>
                   </TableCell>
                   
-                  <TableCell>
+                  <TableCell className="min-w-[80px]">
                     <Badge variant={artist.rider_missing ? "destructive" : "default"}>
                       {artist.rider_missing ? "Missing" : "Complete"}
                     </Badge>
                   </TableCell>
                   
-                  <TableCell>
-                    <div className="flex items-center gap-1">
+                  <TableCell className="min-w-[200px]">
+                    <div className="flex items-center gap-1 flex-wrap">
                       <Button variant="ghost" size="icon" onClick={() => handleGenerateLink(artist)} title="Generate form link">
                         <Link className="h-4 w-4" />
                       </Button>
@@ -474,22 +498,28 @@ export const ArtistTable = ({
                       </Button>
                     </div>
                   </TableCell>
-                </TableRow>)}
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </div>
 
-        {sortedFilteredArtists.length === 0 && !isLoading && <div className="text-center py-8 text-muted-foreground">
+        {sortedFilteredArtists.length === 0 && !isLoading && (
+          <div className="text-center py-8 text-muted-foreground">
             No artists found matching the current filters.
-          </div>}
+          </div>
+        )}
       </div>
 
-      {selectedArtist && <>
+      {selectedArtist && (
+        <>
           <ArtistFormLinkDialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen} artistId={selectedArtist.id} artistName={selectedArtist.name} />
           
           <ArtistFileDialog open={fileDialogOpen} onOpenChange={setFileDialogOpen} artistId={selectedArtist.id} />
-        </>}
+        </>
+      )}
 
       <ArtistFormLinksDialog open={linksDialogOpen} onOpenChange={setLinksDialogOpen} selectedDate={selectedDate || ''} jobId={jobId || ''} />
-    </>;
+    </>
+  );
 };
