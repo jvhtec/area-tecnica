@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -128,26 +127,89 @@ export const ArtistForm = () => {
         throw new Error('This form has already been submitted');
       }
 
+      // Ensure wired_mics is properly serialized
+      const submissionData = {
+        ...formData,
+        wired_mics: JSON.stringify(formData.wired_mics || [])
+      };
+
+      console.log('Submitting form data:', submissionData);
+
       // Create form submission using the actual form ID
       const { error: submissionError } = await supabase
         .from('festival_artist_form_submissions')
         .insert({
           form_id: formInfo.id,
           artist_id: formInfo.artist_id,
-          form_data: formData,
+          form_data: submissionData,
           status: 'submitted',
           submitted_at: new Date().toISOString(),
         });
 
-      if (submissionError) throw submissionError;
+      if (submissionError) {
+        console.error('Submission error:', submissionError);
+        throw submissionError;
+      }
+
+      // Update the artist record with the form data
+      const { error: updateError } = await supabase
+        .from('festival_artists')
+        .update({
+          name: formData.name,
+          stage: formData.stage,
+          date: formData.date,
+          show_start: formData.show_start,
+          show_end: formData.show_end,
+          soundcheck: formData.soundcheck,
+          soundcheck_start: formData.soundcheck_start,
+          soundcheck_end: formData.soundcheck_end,
+          foh_console: formData.foh_console,
+          foh_console_provided_by: formData.foh_console_provided_by,
+          foh_tech: formData.foh_tech,
+          mon_console: formData.mon_console,
+          mon_console_provided_by: formData.mon_console_provided_by,
+          mon_tech: formData.mon_tech,
+          wireless_systems: formData.wireless_systems,
+          wireless_provided_by: formData.wireless_provided_by,
+          iem_systems: formData.iem_systems,
+          iem_provided_by: formData.iem_provided_by,
+          monitors_enabled: formData.monitors_enabled,
+          monitors_quantity: formData.monitors_quantity,
+          extras_sf: formData.extras_sf,
+          extras_df: formData.extras_df,
+          extras_djbooth: formData.extras_djbooth,
+          extras_wired: formData.extras_wired,
+          infra_cat6: formData.infra_cat6,
+          infra_cat6_quantity: formData.infra_cat6_quantity,
+          infra_hma: formData.infra_hma,
+          infra_hma_quantity: formData.infra_hma_quantity,
+          infra_coax: formData.infra_coax,
+          infra_coax_quantity: formData.infra_coax_quantity,
+          infra_analog: formData.infra_analog,
+          infra_opticalcon_duo: formData.infra_opticalcon_duo,
+          infra_opticalcon_duo_quantity: formData.infra_opticalcon_duo_quantity,
+          infrastructure_provided_by: formData.infrastructure_provided_by,
+          other_infrastructure: formData.other_infrastructure,
+          notes: formData.notes,
+          isaftermidnight: formData.isaftermidnight,
+          rider_missing: formData.rider_missing,
+          mic_kit: formData.mic_kit,
+          wired_mics: formData.wired_mics, // This should be stored as JSONB
+        })
+        .eq('id', formInfo.artist_id);
+
+      if (updateError) {
+        console.error('Update error:', updateError);
+        throw updateError;
+      }
 
       // Mark the form as completed
-      const { error: updateError } = await supabase
+      const { error: updateFormError } = await supabase
         .from('festival_artist_forms')
         .update({ status: 'completed' })
         .eq('id', formInfo.id);
 
-      if (updateError) throw updateError;
+      if (updateFormError) throw updateFormError;
 
       toast({
         title: "Success",
