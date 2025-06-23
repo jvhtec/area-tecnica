@@ -1,9 +1,7 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { WirelessSystem, IEMSystem } from '@/types/festival-equipment';
-import { sortArtistsChronologically } from './artistSorting';
 
 // Helper functions for wireless and IEM quantity calculations
 export const getWirelessSummary = (data: { 
@@ -96,6 +94,40 @@ interface ScheduleRow {
   notes?: string;
 }
 
+// Helper function to sort schedule rows chronologically by their actual event times
+const sortScheduleRowsChronologically = (scheduleRows: ScheduleRow[]) => {
+  return scheduleRows.sort((a, b) => {
+    // First sort by stage
+    if (a.stage !== b.stage) {
+      return a.stage - b.stage;
+    }
+
+    // Then sort by event start time within the same stage
+    const aTime = a.time.start || '';
+    const bTime = b.time.start || '';
+
+    // Handle events that cross midnight (early morning events)
+    const aHour = aTime ? parseInt(aTime.split(':')[0], 10) : 0;
+    const bHour = bTime ? parseInt(bTime.split(':')[0], 10) : 0;
+
+    // If event starts between 00:00-06:59, treat it as next day for sorting
+    const adjustedATime = aHour >= 0 && aHour < 7 ? `${aHour + 24}${aTime.substring(aTime.indexOf(':'))}` : aTime;
+    const adjustedBTime = bHour >= 0 && bHour < 7 ? `${bHour + 24}${bTime.substring(bTime.indexOf(':'))}` : bTime;
+    
+    if (adjustedATime < adjustedBTime) return -1;
+    if (adjustedATime > adjustedBTime) return 1;
+
+    // If times are equal, soundchecks come before shows
+    if (adjustedATime === adjustedBTime) {
+      if (a.isSoundcheck && !b.isSoundcheck) return -1;
+      if (!a.isSoundcheck && b.isSoundcheck) return 1;
+    }
+
+    // Fallback to artist name
+    return (a.name || '').localeCompare(b.name || '');
+  });
+};
+
 // Transform PDF artist data to match the sorting function's expected format
 const transformArtistsForSorting = (artists: ArtistTablePdfData['artists'], date: string) => {
   return artists.map((artist, index) => ({
@@ -165,42 +197,36 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
           doc.text(format(new Date(data.date), 'dd/MM/yyyy'), pageWidth / 2, 18, { align: 'center' });
         }
 
+        // Create all schedule events (soundchecks and shows) first
         const scheduleRows: ScheduleRow[] = [];
         
-        // Transform and sort artists chronologically
-        const transformedArtists = transformArtistsForSorting(data.artists, data.date);
-        const sortedArtists = sortArtistsChronologically(transformedArtists);
-        
-        // Create schedule rows using the sorted order
-        sortedArtists.forEach(sortedArtist => {
-          // Find the original artist data using the name and stage
-          const originalArtist = data.artists.find(artist => 
-            artist.name === sortedArtist.name && artist.stage === sortedArtist.stage
-          );
-          
-          if (!originalArtist) return;
-          
-          if (originalArtist.soundcheck) {
+        data.artists.forEach(artist => {
+          // Add soundcheck if exists
+          if (artist.soundcheck) {
             scheduleRows.push({
-              name: originalArtist.name,
-              stage: originalArtist.stage,
-              time: originalArtist.soundcheck,
+              name: artist.name,
+              stage: artist.stage,
+              time: artist.soundcheck,
               isSoundcheck: true
             });
           }
           
+          // Add show
           scheduleRows.push({
-            name: originalArtist.name,
-            stage: originalArtist.stage,
-            time: originalArtist.showTime,
+            name: artist.name,
+            stage: artist.stage,
+            time: artist.showTime,
             isSoundcheck: false,
-            technical: originalArtist.technical,
-            extras: originalArtist.extras,
-            notes: originalArtist.notes
+            technical: artist.technical,
+            extras: artist.extras,
+            notes: artist.notes
           });
         });
 
-        const tableBody = scheduleRows.map(row => {
+        // Sort all events chronologically by their actual event times
+        const sortedScheduleRows = sortScheduleRowsChronologically(scheduleRows);
+
+        const tableBody = sortedScheduleRows.map(row => {
           if (row.isSoundcheck) {
             return [
               `${row.name} (Soundcheck)`,
@@ -296,7 +322,7 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
           },
           didParseCell: function(data) {
             if (data.row.index === -1) return;
-            const rowData = scheduleRows[data.row.index];
+            const rowData = sortedScheduleRows[data.row.index];
             if (rowData.isSoundcheck) {
               data.cell.styles.fillColor = [254, 247, 205];
             }
