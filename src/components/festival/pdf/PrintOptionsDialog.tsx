@@ -328,7 +328,7 @@ export const PrintOptionsDialog = ({
                 />
                 <Label htmlFor="infrastructure-table">Infrastructure Needs Overview</Label>
               </div>
-              {options.includeInfrastructureTable && maxStages > 1 && !options.generateIndividualStagePDFS && renderStageSelections('infrastructureTableStages')}
+              {options.includeInfrastructureTable && maxStages > 1 && !options.generateIndividualStagePDFs && renderStageSelections('infrastructureTableStages')}
             </div>
 
             <div>
