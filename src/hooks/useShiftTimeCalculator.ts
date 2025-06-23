@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { format, parseISO, addHours, setHours, setMinutes } from "date-fns";
@@ -148,14 +149,11 @@ export const useShiftTimeCalculator = (jobId: string, date: string, stage?: numb
     const totalMinutes = latestMinutes - earliestMinutes;
     const overlapMinutes = 60; // 1 hour overlap
     
-    // Simple correct formula:
-    // Shift Duration = (totalMinutes + overlapMinutes) / numberOfShifts
-    // Start Interval = (totalMinutes - overlapMinutes) / (numberOfShifts - 1)
-    
+    // Calculate shift duration first
     const shiftDurationMinutes = Math.ceil((totalMinutes + overlapMinutes) / numberOfShifts);
-    const shiftStartInterval = numberOfShifts > 1 ? 
-      Math.ceil((totalMinutes - overlapMinutes) / (numberOfShifts - 1)) : 
-      totalMinutes;
+    
+    // For proper overlap, each shift should start (shiftDuration - overlap) after the previous shift
+    const shiftStartInterval = shiftDurationMinutes - overlapMinutes;
 
     const shifts: CalculatedShift[] = [];
 
