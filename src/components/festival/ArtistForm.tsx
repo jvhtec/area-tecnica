@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -194,7 +195,7 @@ export const ArtistForm = () => {
           isaftermidnight: formData.isaftermidnight,
           rider_missing: formData.rider_missing,
           mic_kit: formData.mic_kit,
-          wired_mics: formData.wired_mics, // This should be stored as JSONB
+          wired_mics: JSON.stringify(formData.wired_mics || []), // Properly serialize as JSON
         })
         .eq('id', formInfo.artist_id);
 
