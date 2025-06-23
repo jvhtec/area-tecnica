@@ -199,7 +199,7 @@ export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> =>
         doc.text(`${data.jobTitle} - Artist Schedule`, pageWidth / 2, 12, { align: 'center' });
         
         if (data.stage) {
-          const stageDisplayName = getStageDisplayName(parseInt(data.stage));
+          const stageDisplayName = data.stageNames?.[parseInt(data.stage)] || `Stage ${data.stage}`;
           doc.text(`${stageDisplayName} - ${format(new Date(data.date), 'dd/MM/yyyy')}`, pageWidth / 2, 18, { align: 'center' });
         } else {
           doc.text(format(new Date(data.date), 'dd/MM/yyyy'), pageWidth / 2, 18, { align: 'center' });
