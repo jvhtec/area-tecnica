@@ -1,4 +1,5 @@
 
+
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -326,16 +327,16 @@ export const ArtistTable = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <Table>
+          <div className="rounded-md border overflow-x-auto">
+            <Table className="min-w-max">
               <TableHeader>
                 <TableRow>
                   <TableHead>Artist</TableHead>
                   <TableHead>Stage</TableHead>
                   <TableHead>Show Time</TableHead>
                   <TableHead>Soundcheck</TableHead>
-                  <TableHead>Consoles</TableHead>
-                  <TableHead>Wireless/IEM</TableHead>
+                  <TableHead className="max-w-48">Consoles</TableHead>
+                  <TableHead className="max-w-48">Wireless/IEM</TableHead>
                   <TableHead>
                     <div className="flex items-center gap-1">
                       <Mic className="h-4 w-4" />
@@ -563,3 +564,4 @@ export const ArtistTable = ({
     </>
   );
 };
+
