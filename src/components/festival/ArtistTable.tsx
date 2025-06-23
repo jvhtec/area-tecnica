@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -88,6 +89,39 @@ export const ArtistTable = ({
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
   const [printingArtistId, setPrintingArtistId] = useState<string | null>(null);
 
+  // Helper function to sort artists chronologically with proper after-midnight handling
+  const sortArtistsChronologically = (artists: Artist[]) => {
+    return artists.sort((a, b) => {
+      // First sort by date
+      if (a.date !== b.date) {
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
+      }
+      
+      // Then sort by stage within the same date
+      if (a.stage !== b.stage) {
+        return a.stage - b.stage;
+      }
+      
+      // Finally sort by show time within the same date and stage
+      const aTime = a.show_start || '';
+      const bTime = b.show_start || '';
+      
+      // Handle shows that cross midnight (early morning shows)
+      const aHour = aTime ? parseInt(aTime.split(':')[0], 10) : 0;
+      const bHour = bTime ? parseInt(bTime.split(':')[0], 10) : 0;
+      
+      // If show starts between 00:00-06:59, treat it as next day for sorting
+      const adjustedATime = aHour >= 0 && aHour < 7 ? `${aHour + 24}${aTime.substring(aTime.indexOf(':'))}` : aTime;
+      const adjustedBTime = bHour >= 0 && bHour < 7 ? `${bHour + 24}${bTime.substring(bTime.indexOf(':'))}` : bTime;
+      
+      if (adjustedATime < adjustedBTime) return -1;
+      if (adjustedATime > adjustedBTime) return 1;
+      
+      // Fallback to artist name
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  };
+
   // Filtering logic
   const isTimeAfterDayStart = (time: string, date: string) => {
     const [hours, minutes] = dayStartTime.split(':').map(Number);
@@ -111,6 +145,9 @@ export const ArtistTable = ({
 
     return matchesSearch && matchesStage && matchesEquipment && matchesRider;
   });
+
+  // Apply chronological sorting to filtered artists
+  const sortedFilteredArtists = sortArtistsChronologically(filteredArtists);
 
   const handleDeleteClick = async (artist: Artist) => {
     if (window.confirm(`Are you sure you want to delete ${artist.name}?`)) {
@@ -261,7 +298,7 @@ export const ArtistTable = ({
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className="w-full max-w-none">
         <CardContent className="flex items-center justify-center py-8">
           <Loader2 className="h-8 w-8 animate-spin" />
           <span className="ml-2">Loading artists...</span>
@@ -272,10 +309,10 @@ export const ArtistTable = ({
 
   return (
     <>
-      <Card>
+      <Card className="w-full max-w-none">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Artist Schedule ({filteredArtists.length} artists)</span>
+            <span>Artist Schedule ({sortedFilteredArtists.length} artists)</span>
             <div className="flex gap-2">
               <Button 
                 variant="outline" 
@@ -312,7 +349,7 @@ export const ArtistTable = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredArtists.map((artist) => (
+                {sortedFilteredArtists.map((artist) => (
                   <TableRow key={artist.id}>
                     <TableCell>
                       <div className="space-y-1">
@@ -492,7 +529,7 @@ export const ArtistTable = ({
             </Table>
           </div>
 
-          {filteredArtists.length === 0 && !isLoading && (
+          {sortedFilteredArtists.length === 0 && !isLoading && (
             <div className="text-center py-8 text-muted-foreground">
               No artists found matching the current filters.
             </div>
