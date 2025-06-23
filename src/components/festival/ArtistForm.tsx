@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { ArtistWirelessSetupSection } from "./form/sections/ArtistWirelessSetupSection";
+import { MicKitSection } from "./form/sections/MicKitSection";
 import { ArtistFormData } from "@/types/festival";
 import { useEquipmentModels } from "@/hooks/useEquipmentModels";
 import { WiredMic } from "./gear-setup/WiredMicConfig";
@@ -352,6 +353,14 @@ export const ArtistForm = () => {
                 <Label htmlFor="mon-tech">Monitor Technician Required</Label>
               </div>
             </div>
+
+            {/* Microphone Kit Section */}
+            <MicKitSection
+              micKit={formData.mic_kit}
+              wiredMics={formData.wired_mics}
+              onMicKitChange={(provider) => setFormData(prev => ({ ...prev, mic_kit: provider }))}
+              onWiredMicsChange={(mics) => setFormData(prev => ({ ...prev, wired_mics: mics }))}
+            />
 
             {/* RF & Wireless Setup Section */}
             <ArtistWirelessSetupSection
