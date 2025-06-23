@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -158,7 +157,6 @@ export const ArtistForm = () => {
         .update({
           name: formData.name,
           stage: formData.stage,
-          date: formData.date,
           show_start: formData.show_start,
           show_end: formData.show_end,
           soundcheck: formData.soundcheck,
