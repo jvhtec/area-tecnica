@@ -129,6 +129,9 @@ export const useShiftTimeCalculator = (jobId: string, date: string, stage?: numb
       }
     });
 
+    // Add 30-minute buffer before first soundcheck
+    earliestMinutes -= 30;
+
     // Add 4 hours for teardown if it's the last day
     if (isLastDay) {
       latestMinutes += 4 * 60;
@@ -137,14 +140,17 @@ export const useShiftTimeCalculator = (jobId: string, date: string, stage?: numb
     const totalMinutes = latestMinutes - earliestMinutes;
     const overlapMinutes = 60; // 1 hour overlap
     
-    // Calculate shift duration with overlap
-    const shiftDurationMinutes = Math.ceil(totalMinutes / numberOfShifts) + overlapMinutes;
-    const actualShiftInterval = Math.ceil((totalMinutes - overlapMinutes) / (numberOfShifts - 1));
+    // Calculate shift duration: divide total time evenly among shifts
+    const baseShiftDuration = Math.ceil(totalMinutes / numberOfShifts);
+    const shiftDurationMinutes = baseShiftDuration + overlapMinutes;
+    
+    // Calculate the actual interval between shift starts (accounting for overlaps)
+    const shiftStartInterval = Math.ceil((totalMinutes - overlapMinutes * (numberOfShifts - 1)) / numberOfShifts);
 
     const shifts: CalculatedShift[] = [];
 
     for (let i = 0; i < numberOfShifts; i++) {
-      const shiftStartMinutes = earliestMinutes + (i * actualShiftInterval);
+      const shiftStartMinutes = earliestMinutes + (i * shiftStartInterval);
       const shiftEndMinutes = shiftStartMinutes + shiftDurationMinutes;
 
       const shift: CalculatedShift = {
@@ -218,12 +224,20 @@ export const useShiftTimeCalculator = (jobId: string, date: string, stage?: numb
       }
     });
 
-    const earliest = minutesToTime(earliestMinutes);
-    const latest = minutesToTime(latestMinutes);
+    // Add 30-minute buffer before first soundcheck
+    const bufferedEarliestMinutes = earliestMinutes - 30;
+    
+    // Add teardown time if last day
+    const finalLatestMinutes = isLastDay ? latestMinutes + 4 * 60 : latestMinutes;
+    
+    const totalHours = Math.round((finalLatestMinutes - bufferedEarliestMinutes) / 60 * 10) / 10;
+    
+    const earliest = minutesToTime(bufferedEarliestMinutes);
+    const latest = minutesToTime(finalLatestMinutes);
     const teardownText = isLastDay ? " + 4h teardown" : "";
     const stageText = stage ? ` (Stage ${stage})` : "";
     
-    return `${earliest} → ${latest}${teardownText}${stageText}`;
+    return `${earliest} → ${latest}${teardownText}${stageText} | Total: ${totalHours}h`;
   };
 
   return {

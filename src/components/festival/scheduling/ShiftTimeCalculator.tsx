@@ -76,7 +76,11 @@ export const ShiftTimeCalculator = ({ jobId, date, stage, onApplyTimes }: ShiftT
 
                 {calculatedShifts.length > 0 && (
                   <div className="space-y-3">
-                    <div className="text-sm font-medium">Suggested Shifts (with 1h overlap)</div>
+                    <div className="text-sm font-medium">
+                      Suggested Shifts (with 1h overlap) - Total: {
+                        Math.round(calculatedShifts.reduce((total, shift) => total + shift.duration, 0) * 10) / 10
+                      }h
+                    </div>
                     <div className="space-y-2 max-h-40 overflow-y-auto">
                       {calculatedShifts.map((shift, index) => (
                         <div key={index} className="border rounded-lg p-3 space-y-2">
