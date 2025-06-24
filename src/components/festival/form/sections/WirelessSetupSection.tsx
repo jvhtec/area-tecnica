@@ -5,15 +5,27 @@ import { ArtistSectionProps } from "@/types/artist-form";
 
 export const WirelessSetupSection = ({ formData, onChange }: ArtistSectionProps) => {
   const handleWirelessChange = (systems: any[]) => {
+    console.log('WirelessSetupSection: Wireless systems changed:', systems);
     onChange({ 
       wireless_systems: systems
     });
   };
 
   const handleIEMChange = (systems: any[]) => {
+    console.log('WirelessSetupSection: IEM systems changed:', systems);
     onChange({ 
       iem_systems: systems
     });
+  };
+
+  const handleWirelessProviderChange = (provider: string) => {
+    console.log('WirelessSetupSection: Wireless provider changed:', provider);
+    onChange({ wireless_provided_by: provider });
+  };
+
+  const handleIEMProviderChange = (provider: string) => {
+    console.log('WirelessSetupSection: IEM provider changed:', provider);
+    onChange({ iem_provided_by: provider });
   };
 
   return (
@@ -30,7 +42,7 @@ export const WirelessSetupSection = ({ formData, onChange }: ArtistSectionProps)
           />
           <ProviderSelector
             value={formData.wireless_provided_by || "festival"}
-            onChange={(provider) => onChange({ wireless_provided_by: provider })}
+            onChange={handleWirelessProviderChange}
             label="Wireless Systems Provided By"
             id="wireless-provider"
           />
@@ -46,7 +58,7 @@ export const WirelessSetupSection = ({ formData, onChange }: ArtistSectionProps)
           />
           <ProviderSelector
             value={formData.iem_provided_by || "festival"}
-            onChange={(provider) => onChange({ iem_provided_by: provider })}
+            onChange={handleIEMProviderChange}
             label="IEM Systems Provided By"
             id="iem-provider"
           />

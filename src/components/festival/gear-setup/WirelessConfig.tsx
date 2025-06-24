@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,37 +34,47 @@ export const WirelessConfig = ({
   };
 
   const updateSystem = (index: number, field: keyof WirelessSetup, value: string | number) => {
-    onChange(
-      systems.map((system, i) => {
-        if (i !== index) return system;
+    console.log('Updating system:', { index, field, value, currentSystems: systems });
+    
+    const updatedSystems = systems.map((system, i) => {
+      if (i !== index) return system;
+      
+      const updatedSystem = { ...system };
+      
+      // Handle numeric fields
+      if (field === 'quantity_hh' || field === 'quantity_bp') {
+        const numericValue = typeof value === 'string' ? parseInt(value) || 0 : value;
+        updatedSystem[field as 'quantity_hh' | 'quantity_bp'] = numericValue;
         
-        const updatedSystem = { ...system };
-        
-        // Handle numeric fields
-        if (field === 'quantity_hh' || field === 'quantity_bp') {
-          const numericValue = typeof value === 'string' ? parseInt(value) || 0 : value;
-          updatedSystem[field as 'quantity_hh' | 'quantity_bp'] = numericValue;
-          
-          if (isIEM) {
-            // For IEM systems, quantity equals channels (quantity_hh)
-            if (field === 'quantity_hh') {
-              updatedSystem.quantity = numericValue;
-            }
-          } else {
-            // For wireless systems, quantity is the sum of handhelds and bodypacks
-            updatedSystem.quantity = (updatedSystem.quantity_hh || 0) + (updatedSystem.quantity_bp || 0);
+        if (isIEM) {
+          // For IEM systems, quantity equals channels (quantity_hh)
+          if (field === 'quantity_hh') {
+            updatedSystem.quantity = numericValue;
           }
-        } else if (field === 'provided_by') {
-          // Ensure provided_by is strictly typed as 'festival' | 'band'
-          updatedSystem.provided_by = value as 'festival' | 'band';
         } else {
-          // Handle non-numeric fields (model, band)
-          updatedSystem[field as 'model' | 'band'] = value as string;
+          // For wireless systems, quantity is the sum of handhelds and bodypacks
+          updatedSystem.quantity = (updatedSystem.quantity_hh || 0) + (updatedSystem.quantity_bp || 0);
         }
-        
-        return updatedSystem;
-      })
-    );
+      } else if (field === 'provided_by') {
+        // Ensure provided_by is properly validated and typed
+        if (value === 'festival' || value === 'band') {
+          updatedSystem.provided_by = value;
+          console.log('Updated provided_by to:', value);
+        } else {
+          console.warn('Invalid provided_by value:', value, 'defaulting to festival');
+          updatedSystem.provided_by = 'festival';
+        }
+      } else {
+        // Handle non-numeric fields (model, band)
+        updatedSystem[field as 'model' | 'band'] = value as string;
+      }
+      
+      console.log('Updated system:', updatedSystem);
+      return updatedSystem;
+    });
+    
+    console.log('Calling onChange with updated systems:', updatedSystems);
+    onChange(updatedSystems);
   };
 
   const options = isIEM ? IEM_SYSTEMS : WIRELESS_SYSTEMS;
@@ -161,7 +172,10 @@ export const WirelessConfig = ({
               <Label>Provided By</Label>
               <RadioGroup
                 value={system.provided_by || 'festival'}
-                onValueChange={(value: 'festival' | 'band') => updateSystem(index, 'provided_by', value)}
+                onValueChange={(value: 'festival' | 'band') => {
+                  console.log('RadioGroup onValueChange called with:', value);
+                  updateSystem(index, 'provided_by', value);
+                }}
                 className="flex space-x-4 mt-1"
               >
                 <div className="flex items-center space-x-2">
