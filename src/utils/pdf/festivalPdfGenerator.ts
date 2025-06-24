@@ -1,8 +1,10 @@
+
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { PrintOptions } from '@/components/festival/pdf/PrintOptionsDialog';
 import { supabase } from '@/lib/supabase';
-import { getLogoUrl, mergePDFs } from './pdfUtils';
+import { fetchJobLogo } from './logoUtils';
+import { mergePDFs } from './pdfMerge';
 import { generateCoverPage } from './coverPageGenerator';
 import { exportWiredMicrophoneMatrixFromArtists } from '../wiredMicrophoneMatrixDirectExport';
 
@@ -19,16 +21,14 @@ export const generateAndMergeFestivalPDFs = async (
   const pdfsToMerge: Blob[] = [];
 
   try {
-    // Generate cover page
-    if (options.includeCoverPage) {
-      console.log('\n📃 GENERATING COVER PAGE');
-      const coverPageBlob = await generateCoverPage(jobId, jobTitle);
-      console.log('✅ Cover page generated, size:', coverPageBlob.size);
-      pdfsToMerge.push(coverPageBlob);
-    }
+    // Generate cover page - using a basic cover since includeCoverPage doesn't exist in PrintOptions
+    console.log('\n📃 GENERATING COVER PAGE');
+    const coverPageBlob = await generateCoverPage(jobId, jobTitle);
+    console.log('✅ Cover page generated, size:', coverPageBlob.size);
+    pdfsToMerge.push(coverPageBlob);
 
     // Generate wired microphone matrix if requested
-    if (options.includeWiredMicrophoneMatrix) {
+    if (options.includeWiredMicNeeds) {
       console.log('\n🎤 GENERATING WIRED MICROPHONE MATRIX');
       
       // Fetch artists with proper date filtering
@@ -61,7 +61,7 @@ export const generateAndMergeFestivalPDFs = async (
         const datesInData = [...new Set(artists.map(a => a.date).filter(Boolean))];
         console.log('📅 DATES IN FETCHED ARTISTS:', datesInData);
 
-        const logoUrl = await getLogoUrl(jobId);
+        const logoUrl = await fetchJobLogo(jobId);
         const matrixBlob = await exportWiredMicrophoneMatrixFromArtists(
           artists,
           jobTitle,
