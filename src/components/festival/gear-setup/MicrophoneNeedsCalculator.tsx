@@ -10,26 +10,12 @@ import { supabase } from "@/lib/supabase";
 import { WiredMic } from "./WiredMicConfig";
 import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArtistsByDateAndStage } from "@/utils/wiredMicrophoneNeedsPdfExport";
 
-interface MicrophoneNeed {
-  model: string;
-  maxQuantity: number;
-  exclusiveQuantity: number;
-  sharedQuantity: number;
-  stages: Array<{
-    stage: number;
-    quantity: number;
-    isExclusive: boolean;
-    artists: string[];
-  }>;
-}
-
 interface MicrophoneNeedsCalculatorProps {
   jobId: string;
 }
 
 export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorProps) => {
   const [open, setOpen] = useState(false);
-  const [calculatedNeeds, setCalculatedNeeds] = useState<MicrophoneNeed[]>([]);
 
   const { data: artists = [], isLoading } = useQuery({
     queryKey: ['festival-artists-mics', jobId],
@@ -65,7 +51,6 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
         .eq('job_id', jobId)
         .maybeSingle();
       
-      // Don't throw error if no logo found
       return {
         title: job.title,
         logoUrl: logo?.file_path || undefined
@@ -74,199 +59,32 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
     enabled: open && !!jobId
   });
 
-  const calculateMicrophoneNeeds = () => {
-    const microphoneMap = new Map<string, MicrophoneNeed>();
+  // Filter artists with valid wired microphone data
+  const validArtists = artists.filter(artist => 
+    artist.wired_mics && 
+    Array.isArray(artist.wired_mics) && 
+    artist.wired_mics.length > 0
+  );
 
-    // Group artists by stage and date
-    const stageGroups = new Map<string, typeof artists>();
-    
-    artists.forEach(artist => {
-      const key = `${artist.stage}-${artist.date}`;
-      if (!stageGroups.has(key)) {
-        stageGroups.set(key, []);
+  // Get unique microphone models for preview
+  const getMicrophoneModels = () => {
+    const models = new Set<string>();
+    validArtists.forEach(artist => {
+      if (artist.wired_mics && Array.isArray(artist.wired_mics)) {
+        artist.wired_mics.forEach((mic: WiredMic) => {
+          if (mic.model && mic.quantity > 0) {
+            models.add(mic.model);
+          }
+        });
       }
-      stageGroups.get(key)!.push(artist);
     });
-
-    // Process each stage group
-    stageGroups.forEach((stageArtists, stageKey) => {
-      const [stage, date] = stageKey.split('-');
-      
-      // Sort artists by show time for consecutive show detection
-      const sortedArtists = stageArtists.sort((a, b) => {
-        return (a.show_start || '').localeCompare(b.show_start || '');
-      });
-
-      // Track microphone usage across the day
-      const micUsageByTime = new Map<string, Array<{
-        artist: string;
-        mics: WiredMic[];
-        startTime: string;
-        endTime: string;
-        exclusive: boolean;
-        showIndex: number;
-      }>>();
-
-      sortedArtists.forEach((artist, index) => {
-        if (!artist.wired_mics || !Array.isArray(artist.wired_mics)) return;
-
-        const wiredMics = artist.wired_mics as WiredMic[];
-        wiredMics.forEach(mic => {
-          if (!mic.model || !mic.quantity) return;
-
-          const usage = {
-            artist: artist.name,
-            mics: [mic],
-            startTime: artist.show_start || '',
-            endTime: artist.show_end || '',
-            exclusive: mic.exclusive_use || false,
-            showIndex: index
-          };
-
-          if (!micUsageByTime.has(mic.model)) {
-            micUsageByTime.set(mic.model, []);
-          }
-          micUsageByTime.get(mic.model)!.push(usage);
-        });
-      });
-
-      // Calculate peak requirements for each microphone model
-      micUsageByTime.forEach((usages, model) => {
-        let maxQuantity = 0;
-        let exclusiveQuantity = 0;
-        let sharedQuantity = 0;
-
-        // Check for overlapping and consecutive shows
-        for (let i = 0; i < usages.length; i++) {
-          let currentQuantity = 0;
-          let currentExclusive = 0;
-          let currentShared = 0;
-          const artistsAtTime: string[] = [];
-
-          for (let j = 0; j < usages.length; j++) {
-            const usage = usages[j];
-            const isOverlapping = i === j || isTimeOverlapping(
-              usages[i].startTime, usages[i].endTime,
-              usage.startTime, usage.endTime
-            );
-            
-            // Shows are consecutive if their indices are adjacent in the sorted array
-            const isConsecutiveShow = Math.abs(usages[i].showIndex - usage.showIndex) === 1;
-
-            if (isOverlapping || isConsecutiveShow) {
-              const micQuantity = usage.mics[0]?.quantity || 0;
-              currentQuantity += micQuantity;
-              artistsAtTime.push(usage.artist);
-
-              if (usage.exclusive) {
-                currentExclusive += micQuantity;
-              } else {
-                // For shared mics, they can't be shared if ANY show in the time window is exclusive
-                // or if shows are consecutive (they need separate mic sets)
-                const hasExclusiveInWindow = usages.some(u => u.exclusive && (
-                  isTimeOverlapping(usage.startTime, usage.endTime, u.startTime, u.endTime) ||
-                  Math.abs(usage.showIndex - u.showIndex) === 1
-                ));
-                
-                // Also can't share if any show is consecutive to this one
-                const hasConsecutiveShow = usages.some(u => 
-                  Math.abs(usage.showIndex - u.showIndex) === 1 &&
-                  (isTimeOverlapping(usage.startTime, usage.endTime, u.startTime, u.endTime) ||
-                   isConsecutiveShow)
-                );
-                
-                if (!hasExclusiveInWindow && !hasConsecutiveShow) {
-                  currentShared = Math.max(currentShared, micQuantity);
-                } else {
-                  // If can't be shared, treat as exclusive for counting
-                  currentExclusive += micQuantity;
-                }
-              }
-            }
-          }
-
-          maxQuantity = Math.max(maxQuantity, currentExclusive + currentShared);
-          exclusiveQuantity = Math.max(exclusiveQuantity, currentExclusive);
-          sharedQuantity = Math.max(sharedQuantity, currentShared);
-        }
-
-        // Update or create microphone need entry
-        if (!microphoneMap.has(model)) {
-          microphoneMap.set(model, {
-            model,
-            maxQuantity: 0,
-            exclusiveQuantity: 0,
-            sharedQuantity: 0,
-            stages: []
-          });
-        }
-
-        const need = microphoneMap.get(model)!;
-        need.maxQuantity = Math.max(need.maxQuantity, maxQuantity);
-        need.exclusiveQuantity = Math.max(need.exclusiveQuantity, exclusiveQuantity);
-        need.sharedQuantity = Math.max(need.sharedQuantity, sharedQuantity);
-        
-        need.stages.push({
-          stage: parseInt(stage),
-          quantity: maxQuantity,
-          isExclusive: exclusiveQuantity > 0,
-          artists: [...new Set(usages.map(u => u.artist))]
-        });
-      });
-    });
-
-    setCalculatedNeeds(Array.from(microphoneMap.values()));
+    return Array.from(models).sort();
   };
 
-  const isTimeOverlapping = (start1: string, end1: string, start2: string, end2: string): boolean => {
-    return start1 < end2 && start2 < end1;
-  };
+  const exportMatrixPDF = async () => {
+    if (!jobDetails || validArtists.length === 0) return;
 
-  const isConsecutive = (start1: string, end1: string, start2: string, end2: string): boolean => {
-    // Consider shows consecutive if there's less than 30 minutes between them
-    const end1Time = new Date(`2000-01-01T${end1}`);
-    const start2Time = new Date(`2000-01-01T${start2}`);
-    const diff = start2Time.getTime() - end1Time.getTime();
-    return diff > 0 && diff <= 30 * 60 * 1000; // 30 minutes in milliseconds
-  };
-
-  const exportNeeds = () => {
-    const exportData = calculatedNeeds.map(need => ({
-      'Microphone Model': need.model,
-      'Total Required': need.maxQuantity,
-      'Exclusive Use': need.exclusiveQuantity,
-      'Shared Use': need.sharedQuantity,
-      'Stages': need.stages.map(s => `Stage ${s.stage} (${s.quantity})`).join(', ')
-    }));
-
-    const csv = [
-      Object.keys(exportData[0] || {}).join(','),
-      ...exportData.map(row => Object.values(row).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'microphone-needs.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const exportNeedsPDF = async () => {
-    if (!jobDetails || artists.length === 0) return;
-
-    // Use the new matrix-based approach for PDF export
-    const filteredArtists = artists.filter(artist => 
-      artist.mic_kit === 'festival' &&
-      artist.wired_mics &&
-      Array.isArray(artist.wired_mics) &&
-      artist.wired_mics.length > 0
-    );
-
-    if (filteredArtists.length === 0) return;
-
-    const artistsByDateAndStage = organizeArtistsByDateAndStage(filteredArtists);
+    const artistsByDateAndStage = organizeArtistsByDateAndStage(validArtists);
 
     const matrixData: WiredMicrophoneMatrixData = {
       jobTitle: jobDetails.title,
@@ -287,105 +105,138 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
     }
   };
 
-  const handleCalculate = () => {
-    setOpen(true);
-    if (artists.length > 0) {
-      calculateMicrophoneNeeds();
-    }
-  };
+  const microphoneModels = getMicrophoneModels();
 
   return (
     <>
       <Button
-        onClick={handleCalculate}
+        onClick={() => setOpen(true)}
         variant="outline"
         className="w-full"
       >
         <Calculator className="h-4 w-4 mr-2" />
-        Calculate Microphone Needs
+        Wired Microphone Matrix
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
-              <span>Microphone Requirements Calculator</span>
+              <span>Wired Microphone Requirements Matrix</span>
               <div className="flex gap-2">
-                {calculatedNeeds.length > 0 && (
-                  <>
-                    <Button onClick={exportNeeds} variant="outline" size="sm">
-                      <Download className="h-4 w-4 mr-2" />
-                      Export CSV
-                    </Button>
-                    <Button onClick={exportNeedsPDF} variant="outline" size="sm">
-                      <FileText className="h-4 w-4 mr-2" />
-                      Export PDF
-                    </Button>
-                  </>
+                {validArtists.length > 0 && (
+                  <Button onClick={exportMatrixPDF} variant="outline" size="sm">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Export Matrix PDF
+                  </Button>
                 )}
-                <Button onClick={calculateMicrophoneNeeds} size="sm" disabled={isLoading}>
-                  Recalculate
-                </Button>
               </div>
             </DialogTitle>
           </DialogHeader>
 
           {isLoading ? (
             <div className="text-center py-8">Loading artist data...</div>
-          ) : calculatedNeeds.length === 0 ? (
+          ) : validArtists.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No microphone requirements found. Make sure artists have wired microphones configured with festival kit selected.
+              No artists found with wired microphone requirements using festival kit.
+              <br />
+              Make sure artists have wired microphones configured with festival kit selected.
             </div>
           ) : (
             <div className="space-y-6">
               <div className="text-sm text-muted-foreground">
-                This calculator analyzes all artists using festival microphone kits and determines peak requirements 
-                based on show schedules, exclusive use flags, and prevents sharing between consecutive shows.
+                This matrix shows all artists using festival wired microphones. The PDF export will calculate 
+                peak requirements considering show schedules and microphone sharing constraints.
               </div>
 
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Microphone Model</TableHead>
-                    <TableHead>Total Required</TableHead>
-                    <TableHead>Exclusive Use</TableHead>
-                    <TableHead>Shared Use</TableHead>
-                    <TableHead>Stage Breakdown</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {calculatedNeeds.map((need) => (
-                    <TableRow key={need.model}>
-                      <TableCell className="font-medium">{need.model}</TableCell>
-                      <TableCell>
-                        <Badge variant="default">{need.maxQuantity}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="destructive">{need.exclusiveQuantity}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{need.sharedQuantity}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          {need.stages.map((stage, idx) => (
-                            <div key={idx} className="text-xs">
-                              <Badge variant="outline" className="mr-1">
-                                Stage {stage.stage}: {stage.quantity}
-                              </Badge>
-                              {stage.isExclusive && (
-                                <Badge variant="destructive" className="text-xs">
-                                  Exclusive
-                                </Badge>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </TableCell>
+              {/* Summary Statistics */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-700">{validArtists.length}</div>
+                  <div className="text-sm text-blue-600">Artists with Wired Mics</div>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-green-700">{microphoneModels.length}</div>
+                  <div className="text-sm text-green-600">Microphone Models</div>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-purple-700">
+                    {new Set(validArtists.map(a => `${a.date}-${a.stage}`)).size}
+                  </div>
+                  <div className="text-sm text-purple-600">Date/Stage Combinations</div>
+                </div>
+              </div>
+
+              {/* Microphone Models Overview */}
+              {microphoneModels.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Microphone Models Required</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {microphoneModels.map((model) => (
+                      <Badge key={model} variant="outline" className="text-sm">
+                        {model}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Artists Preview Table */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Artists Included in Matrix</h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Artist</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Stage</TableHead>
+                      <TableHead>Show Time</TableHead>
+                      <TableHead>Microphones</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {validArtists.map((artist) => (
+                      <TableRow key={artist.id}>
+                        <TableCell className="font-medium">{artist.name}</TableCell>
+                        <TableCell>{artist.date}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">Stage {artist.stage}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {artist.show_start && artist.show_end ? 
+                            `${artist.show_start} - ${artist.show_end}` : 'TBD'
+                          }
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            {artist.wired_mics && Array.isArray(artist.wired_mics) ? 
+                              artist.wired_mics.map((mic: WiredMic, idx: number) => (
+                                <div key={idx} className="text-xs">
+                                  <Badge variant="secondary" className="mr-1">
+                                    {mic.quantity}x {mic.model}
+                                  </Badge>
+                                  {mic.exclusive_use && (
+                                    <Badge variant="destructive" className="text-xs">
+                                      Exclusive
+                                    </Badge>
+                                  )}
+                                </div>
+                              )) : null
+                            }
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                <div className="text-sm text-yellow-800">
+                  <strong>Note:</strong> The matrix PDF will calculate exact peak requirements by analyzing 
+                  show schedules, exclusive use requirements, and sharing constraints across all dates and stages.
+                </div>
+              </div>
             </div>
           )}
         </DialogContent>
