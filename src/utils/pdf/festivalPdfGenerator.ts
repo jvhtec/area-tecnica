@@ -68,9 +68,32 @@ export const generateAndMergeFestivalPDFs = async (
       console.log('\n📅 GENERATING SHIFT SCHEDULES');
       
       try {
+        // Fetch shifts data for each stage
         for (const stage of options.shiftScheduleStages) {
           console.log(`Generating shifts for stage ${stage}`);
-          const shiftsBlob = await exportShiftsTablePDFLegacy(jobId, jobTitle, stage, logoUrl);
+          
+          // Fetch shifts for this stage
+          const { data: shifts } = await supabase
+            .from('festival_shifts')
+            .select(`
+              *,
+              assignments:festival_shift_assignments(
+                *,
+                profiles(first_name, last_name)
+              )
+            `)
+            .eq('job_id', jobId)
+            .eq('stage', stage);
+
+          const pdfData: ShiftsTablePdfData = {
+            jobTitle,
+            date: new Date().toISOString().split('T')[0],
+            jobId,
+            shifts: shifts || [],
+            logoUrl
+          };
+
+          const shiftsBlob = await exportShiftsTablePDF(pdfData);
           pdfsToMerge.push(shiftsBlob);
           sections.push({ title: `Stage ${stage} Staff Schedules`, pageCount: 1 });
         }
@@ -104,7 +127,7 @@ export const generateAndMergeFestivalPDFs = async (
       try {
         for (const stage of options.artistRequirementStages) {
           console.log(`Generating artist requirements for stage ${stage}`);
-          const artistReqBlob = await exportArtistPDF(jobId, jobTitle, stage, logoUrl); // Fixed function name
+          const artistReqBlob = await exportArtistPDF(jobId, jobTitle, stage, logoUrl);
           pdfsToMerge.push(artistReqBlob);
           sections.push({ title: `Stage ${stage} Artist Requirements`, pageCount: 3 });
         }

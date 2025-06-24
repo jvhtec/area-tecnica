@@ -25,12 +25,12 @@ export const exportShiftsTablePDF = async (
     try {
       const logoResponse = await fetch(pdfData.logoUrl);
       const logoImageData = await logoResponse.arrayBuffer();
-      let logoImage;
+      const logoUint8Array = new Uint8Array(logoImageData);
       
       if (pdfData.logoUrl.toLowerCase().endsWith('.png')) {
-        logoImage = await pdf.addImage(logoImageData, 'PNG', pageWidth - 60, 10, 40, 30);
+        pdf.addImage(logoUint8Array, 'PNG', pageWidth - 60, 10, 40, 30);
       } else {
-        logoImage = await pdf.addImage(logoImageData, 'JPEG', pageWidth - 60, 10, 40, 30);
+        pdf.addImage(logoUint8Array, 'JPEG', pageWidth - 60, 10, 40, 30);
       }
     } catch (error) {
       console.error('Error adding logo to shifts PDF:', error);
@@ -88,22 +88,4 @@ export const exportShiftsTablePDF = async (
   }
 
   return new Blob([pdf.output('blob')], { type: 'application/pdf' });
-};
-
-// Legacy function signature for backward compatibility
-export const exportShiftsTablePDFLegacy = async (
-  jobId: string,
-  jobTitle: string,
-  stage: number,
-  logoUrl?: string
-): Promise<Blob> => {
-  const pdfData: ShiftsTablePdfData = {
-    jobId,
-    jobTitle,
-    date: new Date().toISOString().split('T')[0],
-    shifts: [],
-    logoUrl
-  };
-  
-  return exportShiftsTablePDF(pdfData);
 };

@@ -43,3 +43,12 @@ export const exportGearSetupPDF = async (
 
   return new Blob([pdf.output('blob')], { type: 'application/pdf' });
 };
+
+// Add the missing function that's expected by FestivalGearManagement
+export const generateStageGearPDF = async (
+  jobId: string,
+  stageNumber: number,
+  stageName: string
+): Promise<Blob> => {
+  return exportGearSetupPDF(jobId, stageName, stageNumber);
+};
