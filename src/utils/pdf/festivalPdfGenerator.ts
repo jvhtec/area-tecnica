@@ -11,7 +11,7 @@ import { exportWiredMicrophoneMatrixFromArtists } from '../wiredMicrophoneMatrix
 import { exportGearSetupPDF } from '../gearSetupPdfExport';
 import { exportShiftsTablePDF, ShiftsTablePdfData } from '../shiftsTablePdfExport';
 import { exportArtistTablePDF } from '../artistTablePdfExport';
-import { exportArtistPDF } from '../artistPdfExport';
+import { exportArtistPDF, ArtistPdfData } from '../artistPdfExport';
 import { exportRfIemTablePDF } from '../rfIemTablePdfExport';
 import { exportInfrastructureTablePDF } from '../infrastructureTablePdfExport';
 import { exportMissingRiderReportPDF } from '../missingRiderReportPdfExport';
@@ -133,15 +133,105 @@ export const generateAndMergeFestivalPDFs = async (
       try {
         for (const stage of options.artistRequirementStages) {
           console.log(`Generating artist requirements for stage ${stage}`);
-          const artistReqData = {
-            jobId,
-            jobTitle,
-            stage,
-            logoUrl
-          };
-          const artistReqBlob = await exportArtistPDF(artistReqData);
-          pdfsToMerge.push(artistReqBlob);
-          sections.push({ title: `Stage ${stage} Artist Requirements`, pageCount: 3 });
+          
+          // Fetch artists for this stage
+          const { data: artists, error } = await supabase
+            .from('festival_artists')
+            .select('*')
+            .eq('job_id', jobId)
+            .eq('stage', stage)
+            .order('date', { ascending: true })
+            .order('name', { ascending: true });
+
+          if (error) {
+            console.error('Error fetching artists:', error);
+            continue;
+          }
+
+          if (!artists || artists.length === 0) {
+            console.log(`No artists found for stage ${stage}`);
+            continue;
+          }
+
+          // Generate PDF for each artist
+          for (const artist of artists) {
+            console.log(`Generating requirements for artist: ${artist.name}`);
+            
+            const artistPdfData: ArtistPdfData = {
+              name: artist.name,
+              stage: artist.stage || stage,
+              date: artist.date || new Date().toISOString().split('T')[0],
+              schedule: {
+                show: {
+                  start: artist.show_start || '00:00',
+                  end: artist.show_end || '00:00'
+                },
+                soundcheck: artist.soundcheck ? {
+                  start: artist.soundcheck_start || '00:00',
+                  end: artist.soundcheck_end || '00:00'
+                } : undefined
+              },
+              technical: {
+                fohTech: artist.foh_tech || false,
+                monTech: artist.mon_tech || false,
+                fohConsole: {
+                  model: artist.foh_console || 'TBD',
+                  providedBy: artist.foh_console_provided_by || 'festival'
+                },
+                monConsole: {
+                  model: artist.mon_console || 'TBD',
+                  providedBy: artist.mon_console_provided_by || 'festival'
+                },
+                wireless: {
+                  systems: artist.wireless_systems || [],
+                  providedBy: artist.wireless_provided_by || 'festival'
+                },
+                iem: {
+                  systems: artist.iem_systems || [],
+                  providedBy: artist.iem_provided_by || 'festival'
+                },
+                monitors: {
+                  enabled: artist.monitors_enabled || false,
+                  quantity: artist.monitors_quantity || 0
+                }
+              },
+              infrastructure: {
+                providedBy: artist.infrastructure_provided_by || 'festival',
+                cat6: {
+                  enabled: artist.infra_cat6 || false,
+                  quantity: artist.infra_cat6_quantity || 0
+                },
+                hma: {
+                  enabled: artist.infra_hma || false,
+                  quantity: artist.infra_hma_quantity || 0
+                },
+                coax: {
+                  enabled: artist.infra_coax || false,
+                  quantity: artist.infra_coax_quantity || 0
+                },
+                opticalconDuo: {
+                  enabled: artist.infra_opticalcon_duo || false,
+                  quantity: artist.infra_opticalcon_duo_quantity || 0
+                },
+                analog: artist.infra_analog || 0,
+                other: artist.other_infrastructure || ''
+              },
+              extras: {
+                sideFill: artist.extras_sf || false,
+                drumFill: artist.extras_df || false,
+                djBooth: artist.extras_djbooth || false,
+                wired: artist.extras_wired || ''
+              },
+              notes: artist.notes || '',
+              logoUrl,
+              wiredMics: artist.wired_mics || []
+            };
+
+            const artistReqBlob = await exportArtistPDF(artistPdfData);
+            pdfsToMerge.push(artistReqBlob);
+          }
+          
+          sections.push({ title: `Stage ${stage} Artist Requirements`, pageCount: artists.length * 3 });
         }
         console.log('✅ Artist requirements generated');
       } catch (error) {
