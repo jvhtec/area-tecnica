@@ -133,7 +133,13 @@ export const generateAndMergeFestivalPDFs = async (
       try {
         for (const stage of options.artistRequirementStages) {
           console.log(`Generating artist requirements for stage ${stage}`);
-          const artistReqBlob = await exportArtistPDF(jobId, jobTitle, stage, logoUrl);
+          const artistReqData = {
+            jobId,
+            jobTitle,
+            stage,
+            logoUrl
+          };
+          const artistReqBlob = await exportArtistPDF(artistReqData);
           pdfsToMerge.push(artistReqBlob);
           sections.push({ title: `Stage ${stage} Artist Requirements`, pageCount: 3 });
         }
