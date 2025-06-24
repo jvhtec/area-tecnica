@@ -83,8 +83,8 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
       pdf.text(`${dateStr} - Stage ${stage}`, pageWidth / 2, yPosition + 8, { align: 'center' });
       yPosition += 30;
       
-      // Generate matrix data
-      const matrixData = generateMatrixData(artists);
+      // Generate matrix data with smart calculations
+      const matrixData = generateSmartMatrixData(artists);
       
       if (matrixData.micModels.length === 0) {
         pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
@@ -94,29 +94,36 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
         continue;
       }
       
+      // Add explanation note
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'italic');
+      pdf.setTextColor(100, 100, 100);
+      pdf.text('Note: Individual cells show artist requirements. Total column shows peak concurrent usage needed.', margin, yPosition);
+      yPosition += 20;
+      
       // Create table headers
-      const headers = ['Microphone Model', ...matrixData.artistNames, 'Total'];
+      const headers = ['Microphone Model', ...matrixData.artistNames, 'Peak Need'];
       
       // Create table body
       const tableBody = matrixData.micModels.map(micModel => {
         const row = [micModel];
-        let totalQuantity = 0;
         
         matrixData.artistNames.forEach(artistName => {
-          const quantity = matrixData.matrix[micModel]?.[artistName] || 0;
+          const quantity = matrixData.individualMatrix[micModel]?.[artistName] || 0;
           row.push(quantity.toString());
-          totalQuantity += quantity;
         });
         
-        row.push(totalQuantity.toString());
+        // Use the smart calculated peak concurrent quantity
+        const peakQuantity = matrixData.peakConcurrentMatrix[micModel] || 0;
+        row.push(peakQuantity.toString());
         return row;
       });
       
       // Calculate available width and column sizing
       const availableWidth = pageWidth - (margin * 2);
       const micModelColumnWidth = Math.min(availableWidth * 0.25, 150);
-      const totalColumnWidth = 60;
-      const artistColumnsWidth = availableWidth - micModelColumnWidth - totalColumnWidth;
+      const peakColumnWidth = 80;
+      const artistColumnsWidth = availableWidth - micModelColumnWidth - peakColumnWidth;
       const artistColumnWidth = Math.max(artistColumnsWidth / matrixData.artistNames.length, 60);
       
       // Generate table
@@ -156,9 +163,10 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
             halign: 'left'
           },
           [headers.length - 1]: {
-            cellWidth: totalColumnWidth,
-            fillColor: [255, 248, 248],
-            fontStyle: 'bold'
+            cellWidth: peakColumnWidth,
+            fillColor: [255, 240, 240],
+            fontStyle: 'bold',
+            textColor: [139, 21, 33]
           }
         },
         didParseCell: function(data: any) {
@@ -200,18 +208,19 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
   return new Blob([pdf.output('blob')], { type: 'application/pdf' });
 };
 
-interface MatrixData {
+interface SmartMatrixData {
   micModels: string[];
   artistNames: string[];
-  matrix: Record<string, Record<string, number>>;
+  individualMatrix: Record<string, Record<string, number>>;
+  peakConcurrentMatrix: Record<string, number>;
 }
 
-const generateMatrixData = (artists: any[]): MatrixData => {
+const generateSmartMatrixData = (artists: any[]): SmartMatrixData => {
   const micModelsSet = new Set<string>();
   const artistNamesSet = new Set<string>();
-  const matrix: Record<string, Record<string, number>> = {};
+  const individualMatrix: Record<string, Record<string, number>> = {};
   
-  // Process each artist to build the matrix
+  // First pass: Build individual requirements matrix
   artists.forEach(artist => {
     if (!artist.wired_mics || !Array.isArray(artist.wired_mics)) return;
     
@@ -226,19 +235,93 @@ const generateMatrixData = (artists: any[]): MatrixData => {
       
       micModelsSet.add(micModel);
       
-      if (!matrix[micModel]) {
-        matrix[micModel] = {};
+      if (!individualMatrix[micModel]) {
+        individualMatrix[micModel] = {};
       }
       
-      matrix[micModel][artistName] = (matrix[micModel][artistName] || 0) + quantity;
+      individualMatrix[micModel][artistName] = (individualMatrix[micModel][artistName] || 0) + quantity;
     });
   });
+  
+  // Second pass: Calculate peak concurrent usage using smart logic
+  const peakConcurrentMatrix: Record<string, number> = {};
+  
+  // Sort artists by show time for consecutive show detection
+  const sortedArtists = artists.sort((a, b) => {
+    return (a.show_start || '').localeCompare(b.show_start || '');
+  });
+
+  // Group microphone usage by model and calculate peak concurrent needs
+  for (const micModel of micModelsSet) {
+    const micUsageByTime = [];
+    
+    sortedArtists.forEach((artist, index) => {
+      if (!artist.wired_mics || !Array.isArray(artist.wired_mics)) return;
+      
+      const relevantMics = artist.wired_mics.filter((mic: any) => mic.model === micModel);
+      if (relevantMics.length === 0) return;
+      
+      const totalQuantityForModel = relevantMics.reduce((sum: number, mic: any) => 
+        sum + (parseInt(mic.quantity) || 0), 0
+      );
+      
+      if (totalQuantityForModel > 0) {
+        micUsageByTime.push({
+          artist: artist.name,
+          quantity: totalQuantityForModel,
+          startTime: artist.show_start || '',
+          endTime: artist.show_end || '',
+          exclusive: relevantMics.some((mic: any) => mic.exclusive_use),
+          showIndex: index
+        });
+      }
+    });
+    
+    // Calculate peak concurrent usage for this mic model
+    let maxConcurrent = 0;
+    
+    for (let i = 0; i < micUsageByTime.length; i++) {
+      let currentConcurrent = 0;
+      
+      for (let j = 0; j < micUsageByTime.length; j++) {
+        const usage1 = micUsageByTime[i];
+        const usage2 = micUsageByTime[j];
+        
+        const isOverlapping = i === j || isTimeOverlapping(
+          usage1.startTime, usage1.endTime,
+          usage2.startTime, usage2.endTime
+        );
+        
+        // Shows are consecutive if their indices are adjacent
+        const isConsecutive = Math.abs(usage1.showIndex - usage2.showIndex) === 1;
+        
+        if (isOverlapping || isConsecutive) {
+          // For overlapping or consecutive shows, mics can't be shared
+          currentConcurrent += usage2.quantity;
+        } else if (i === j) {
+          // Same show, count normally
+          currentConcurrent += usage2.quantity;
+        }
+        // For non-overlapping, non-consecutive shows, mics can be reused (don't add to concurrent)
+      }
+      
+      maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+    }
+    
+    peakConcurrentMatrix[micModel] = maxConcurrent;
+  }
   
   return {
     micModels: Array.from(micModelsSet).sort(),
     artistNames: Array.from(artistNamesSet).sort(),
-    matrix
+    individualMatrix,
+    peakConcurrentMatrix
   };
+};
+
+const isTimeOverlapping = (start1: string, end1: string, start2: string, end2: string): boolean => {
+  if (!start1 || !end1 || !start2 || !end2) return false;
+  return start1 < end2 && start2 < end1;
 };
 
 // Helper function to organize artists by date and stage
