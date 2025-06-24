@@ -9,9 +9,9 @@ import { generateCoverPage } from './coverPageGenerator';
 import { generateTableOfContents } from './tocGenerator';
 import { exportWiredMicrophoneMatrixFromArtists } from '../wiredMicrophoneMatrixDirectExport';
 import { exportGearSetupPDF } from '../gearSetupPdfExport';
-import { exportShiftsTablePDF } from '../shiftsTablePdfExport';
+import { exportShiftsTablePDF, exportShiftsTablePDFLegacy } from '../shiftsTablePdfExport';
 import { exportArtistTablePDF } from '../artistTablePdfExport';
-import { exportArtistsPDF } from '../artistPdfExport';
+import { exportArtistPDF } from '../artistPdfExport'; // Fixed import name
 import { exportRfIemTablePDF } from '../rfIemTablePdfExport';
 import { exportInfrastructureTablePDF } from '../infrastructureTablePdfExport';
 import { exportMissingRiderReportPDF } from '../missingRiderReportPdfExport';
@@ -70,7 +70,7 @@ export const generateAndMergeFestivalPDFs = async (
       try {
         for (const stage of options.shiftScheduleStages) {
           console.log(`Generating shifts for stage ${stage}`);
-          const shiftsBlob = await exportShiftsTablePDF(jobId, jobTitle, stage, logoUrl);
+          const shiftsBlob = await exportShiftsTablePDFLegacy(jobId, jobTitle, stage, logoUrl);
           pdfsToMerge.push(shiftsBlob);
           sections.push({ title: `Stage ${stage} Staff Schedules`, pageCount: 1 });
         }
@@ -104,7 +104,7 @@ export const generateAndMergeFestivalPDFs = async (
       try {
         for (const stage of options.artistRequirementStages) {
           console.log(`Generating artist requirements for stage ${stage}`);
-          const artistReqBlob = await exportArtistsPDF(jobId, jobTitle, stage, logoUrl);
+          const artistReqBlob = await exportArtistPDF(jobId, jobTitle, stage, logoUrl); // Fixed function name
           pdfsToMerge.push(artistReqBlob);
           sections.push({ title: `Stage ${stage} Artist Requirements`, pageCount: 3 });
         }

@@ -62,8 +62,10 @@ export const generateCoverPage = async (
       }
     }
 
-    if (jobData?.locations) {
-      venueText = jobData.locations.name || jobData.locations.formatted_address || "";
+    // Fix locations property access
+    if (jobData?.locations && typeof jobData.locations === 'object') {
+      const location = jobData.locations as { name?: string; formatted_address?: string };
+      venueText = location.name || location.formatted_address || "";
     }
     
     // Header with burgundy background
