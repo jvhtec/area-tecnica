@@ -308,35 +308,40 @@ const generateFixedMatrixData = (artists: any[]): FixedMatrixData => {
   const artistNamesSet = new Set<string>();
   const individualMatrix: Record<string, Record<string, number>> = {};
   
-  // STEP 1: Build individual requirements - FIXED: NO ACCUMULATION
+  // STEP 1: Build individual requirements - ULTRA FIXED: Complete isolation per artist
   artists.forEach((artist, index) => {
     const artistName = artist.name || `Artist ${index + 1}`;
     artistNamesSet.add(artistName);
     
-    console.log(`🎯 Processing artist: ${artistName}`);
-    console.log(`🎯 Raw wired_mics:`, artist.wired_mics);
+    console.log(`🎯 ===== Processing artist: ${artistName} =====`);
+    console.log(`🎯 Raw wired_mics:`, JSON.stringify(artist.wired_mics, null, 2));
     
     if (!artist.wired_mics || !Array.isArray(artist.wired_mics)) {
       console.log(`🎯 No valid wired_mics array for ${artistName}`);
       return;
     }
     
-    // FIXED: Create a temporary accumulator for this artist to handle multiple entries of same mic model
+    // ULTRA FIXED: Completely isolated processing per artist
     const artistMicRequirements: Record<string, number> = {};
     
     // Process each mic entry for this artist
     artist.wired_mics.forEach((micEntry: any, entryIndex: number) => {
-      console.log(`🎯 Processing mic entry ${entryIndex} for ${artistName}:`, micEntry);
+      console.log(`🎯 Processing mic entry ${entryIndex} for ${artistName}:`, JSON.stringify(micEntry, null, 2));
+      
+      if (!micEntry || typeof micEntry !== 'object') {
+        console.log(`🎯 Skipping invalid mic entry ${entryIndex} - not an object`);
+        return;
+      }
       
       if (!micEntry.model || micEntry.quantity === undefined || micEntry.quantity === null) {
-        console.log(`🎯 Skipping invalid mic entry ${entryIndex}`);
+        console.log(`🎯 Skipping invalid mic entry ${entryIndex} - missing model or quantity`);
         return;
       }
       
       const micModel = String(micEntry.model).trim();
       const quantity = parseInt(String(micEntry.quantity)) || 0;
       
-      console.log(`🎯 Valid mic: ${micModel} = ${quantity} for ${artistName}`);
+      console.log(`🎯 Parsed: ${micModel} = ${quantity} for ${artistName}`);
       
       if (quantity <= 0) {
         console.log(`🎯 Skipping zero/negative quantity for ${micModel}`);
@@ -345,32 +350,44 @@ const generateFixedMatrixData = (artists: any[]): FixedMatrixData => {
       
       micModelsSet.add(micModel);
       
-      // Accumulate within this artist's requirements (for multiple entries of same model)
-      artistMicRequirements[micModel] = (artistMicRequirements[micModel] || 0) + quantity;
+      // ULTRA SAFE: Accumulate within this artist's requirements only
+      if (!artistMicRequirements[micModel]) {
+        artistMicRequirements[micModel] = 0;
+      }
+      artistMicRequirements[micModel] += quantity;
+      console.log(`🎯 Artist ${artistName} temp total for ${micModel}: ${artistMicRequirements[micModel]}`);
     });
     
-    // FIXED: Now set the final requirements for this artist (no cross-artist accumulation)
+    // ULTRA SAFE: Set final requirements for this artist with complete isolation
     Object.entries(artistMicRequirements).forEach(([micModel, totalQuantity]) => {
+      console.log(`🎯 Setting final requirement: ${micModel}[${artistName}] = ${totalQuantity}`);
+      
+      // Initialize mic model if not exists
       if (!individualMatrix[micModel]) {
         individualMatrix[micModel] = {};
+        console.log(`🎯 Created new mic model entry: ${micModel}`);
       }
       
-      // CRITICAL FIX: Direct assignment, no accumulation across artists
+      // ULTRA CRITICAL: Absolutely no accumulation - direct assignment only
       individualMatrix[micModel][artistName] = totalQuantity;
-      console.log(`🎯 FINAL: Set ${micModel}[${artistName}] = ${totalQuantity}`);
+      console.log(`🎯 ✅ CONFIRMED: ${micModel}[${artistName}] = ${individualMatrix[micModel][artistName]}`);
     });
+    
+    console.log(`🎯 ===== Completed artist: ${artistName} =====`);
   });
   
-  console.log('🎯 Individual matrix final state (FIXED):');
+  console.log('🎯 ===== INDIVIDUAL MATRIX FINAL STATE =====');
   Object.entries(individualMatrix).forEach(([micModel, artistMap]) => {
     const entries = Object.entries(artistMap).map(([artist, qty]) => `${artist}=${qty}`);
-    console.log(`🎯 ${micModel}: ${entries.join(', ')}`);
+    const total = Object.values(artistMap).reduce((sum, qty) => sum + qty, 0);
+    console.log(`🎯 ${micModel}: ${entries.join(', ')} [SUM: ${total}]`);
   });
+  console.log('🎯 ===== END INDIVIDUAL MATRIX =====');
   
-  // STEP 2: Calculate peak concurrent usage - FIXED: Timeline-based analysis
+  // STEP 2: Calculate peak concurrent usage - ULTRA FIXED: Timeline-based analysis with debugging
   const peakConcurrentMatrix: Record<string, number> = {};
   
-  console.log('🎯 Calculating peak concurrent usage with timeline analysis...');
+  console.log('🎯 ===== CALCULATING PEAK CONCURRENT USAGE =====');
   
   // Convert show times to minutes for easier calculation
   const parseTimeToMinutes = (timeStr: string): number => {
@@ -396,33 +413,76 @@ const generateFixedMatrixData = (artists: any[]): FixedMatrixData => {
   
   // For each microphone model, find the peak concurrent usage
   micModelsSet.forEach(micModel => {
+    console.log(`🎯 ===== PROCESSING PEAK FOR: ${micModel} =====`);
+    
     let maxConcurrentUsage = 0;
     
-    // Create timeline events (start/end of each artist's performance)
-    const events: Array<{time: number, type: 'start' | 'end', artist: string, micQuantity: number}> = [];
-    
-    artistTimelines.forEach(artist => {
-      // Calculate this artist's requirement for this mic model
-      let artistMicQuantity = 0;
-      artist.micRequirements.forEach((micEntry: any) => {
-        if (String(micEntry.model).trim() === micModel) {
-          artistMicQuantity += parseInt(String(micEntry.quantity)) || 0;
+    // ULTRA SAFE: Use individual matrix values directly for simple case
+    if (artistTimelines.length === 0) {
+      console.log(`🎯 No timeline data, using individual matrix sum for ${micModel}`);
+      const artistRequirements = individualMatrix[micModel] || {};
+      maxConcurrentUsage = Object.values(artistRequirements).reduce((sum, qty) => sum + qty, 0);
+      console.log(`🎯 Simple sum for ${micModel}: ${maxConcurrentUsage}`);
+    } else {
+      // Create timeline events (start/end of each artist's performance)
+      const events: Array<{time: number, type: 'start' | 'end', artist: string, micQuantity: number}> = [];
+      
+      artistTimelines.forEach(artist => {
+        // Get this artist's requirement from the individual matrix (NOT from raw data)
+        const artistMicQuantity = individualMatrix[micModel]?.[artist.name] || 0;
+        
+        console.log(`🎯 Artist ${artist.name} requires ${artistMicQuantity} units of ${micModel}`);
+        
+        if (artistMicQuantity > 0) {
+          events.push({
+            time: artist.startMinutes,
+            type: 'start',
+            artist: artist.name,
+            micQuantity: artistMicQuantity
+          });
+          events.push({
+            time: artist.endMinutes,
+            type: 'end',
+            artist: artist.name,
+            micQuantity: artistMicQuantity
+          });
         }
       });
       
-      if (artistMicQuantity > 0) {
-        events.push({
-          time: artist.startMinutes,
-          type: 'start',
-          artist: artist.name,
-          micQuantity: artistMicQuantity
-        });
-        events.push({
-          time: artist.endMinutes,
-          type: 'end',
-          artist: artist.name,
-          micQuantity: artistMicQuantity
-        });
+      // Sort events by time, with 'end' events before 'start' events at the same time
+      events.sort((a, b) => {
+        if (a.time !== b.time) return a.time - b.time;
+        return a.type === 'end' ? -1 : 1; // End events first at same time
+      });
+      
+      console.log(`🎯 Timeline events for ${micModel}:`, events);
+      
+      // Process events to find peak usage
+      let currentUsage = 0;
+      events.forEach(event => {
+        if (event.type === 'start') {
+          currentUsage += event.micQuantity;
+          maxConcurrentUsage = Math.max(maxConcurrentUsage, currentUsage);
+          console.log(`🎯 ${micModel} - Time ${event.time}: START ${event.artist} (+${event.micQuantity}) -> Current: ${currentUsage}, Max: ${maxConcurrentUsage}`);
+        } else {
+          currentUsage -= event.micQuantity;
+          console.log(`🎯 ${micModel} - Time ${event.time}: END ${event.artist} (-${event.micQuantity}) -> Current: ${currentUsage}`);
+        }
+      });
+      
+      // ULTRA SAFE: Fallback to individual matrix sum if timeline gives zero
+      if (maxConcurrentUsage === 0 && Object.keys(individualMatrix[micModel] || {}).length > 0) {
+        console.log(`🎯 Timeline gave zero for ${micModel}, using individual matrix fallback`);
+        const artistRequirements = individualMatrix[micModel] || {};
+        maxConcurrentUsage = Object.values(artistRequirements).reduce((sum, qty) => sum + qty, 0);
+        console.log(`🎯 Fallback sum for ${micModel}: ${maxConcurrentUsage}`);
+      }
+    }
+    
+    peakConcurrentMatrix[micModel] = maxConcurrentUsage;
+    console.log(`🎯 ✅ FINAL Peak for ${micModel}: ${maxConcurrentUsage}`);
+    console.log(`🎯 ===== END PEAK FOR: ${micModel} =====`);
+  });
       }
     });
     
