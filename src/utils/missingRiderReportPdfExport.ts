@@ -1,88 +1,156 @@
 
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { supabase } from '@/lib/supabase';
+import { format } from 'date-fns';
 
-export const exportMissingRiderReportPDF = async (
-  jobId: string,
-  jobTitle: string,
-  logoUrl?: string
-): Promise<Blob> => {
-  console.log('Generating missing rider report PDF');
+export interface MissingRiderArtist {
+  name: string;
+  stage: number;
+  date: string;
+  showTime: {
+    start: string;
+    end: string;
+  };
+}
+
+export interface MissingRiderReportData {
+  jobTitle: string;
+  logoUrl?: string;
+  artists: MissingRiderArtist[];
+}
+
+export const exportMissingRiderReportPDF = async (data: MissingRiderReportData): Promise<Blob> => {
+  const doc = new jsPDF();
   
-  const pdf = new jsPDF();
-  const pageWidth = pdf.internal.pageSize.width;
-  let yPosition = 20;
-
-  // Header
-  pdf.setFontSize(16);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('Missing Rider Report', pageWidth / 2, yPosition, { align: 'center' });
-  yPosition += 20;
-
-  pdf.setFontSize(14);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text(jobTitle, pageWidth / 2, yPosition, { align: 'center' });
-  yPosition += 30;
-
-  try {
-    // Fetch artists with missing riders
-    const { data: artists, error } = await supabase
-      .from('festival_artists')
-      .select('name, stage, date')
-      .eq('job_id', jobId)
-      .eq('rider_missing', true)
-      .order('date', { ascending: true })
-      .order('stage', { ascending: true })
-      .order('name', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching missing rider data:', error);
-      pdf.text('Error loading missing rider data', 20, yPosition);
-      return new Blob([pdf.output('blob')], { type: 'application/pdf' });
+  // Set up fonts and colors
+  const primaryColor = '#2563eb';
+  const textColor = '#1f2937';
+  const warningColor = '#dc2626';
+  
+  let yPosition = 30;
+  
+  // Add logo if available
+  if (data.logoUrl) {
+    try {
+      const logoResponse = await fetch(data.logoUrl);
+      if (logoResponse.ok) {
+        const logoBlob = await logoResponse.blob();
+        const logoDataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(logoBlob);
+        });
+        
+        doc.addImage(logoDataUrl, 'JPEG', 20, 10, 30, 15);
+        yPosition = 40;
+      }
+    } catch (error) {
+      console.warn('Could not load logo for missing rider report:', error);
     }
-
-    if (!artists || artists.length === 0) {
-      pdf.setFontSize(12);
-      pdf.text('✅ All artists have submitted their technical riders.', 20, yPosition);
-      yPosition += 20;
-      pdf.text('No missing riders to report.', 20, yPosition);
-    } else {
-      pdf.setFontSize(12);
-      pdf.text(`⚠️ ${artists.length} artists have missing technical riders:`, 20, yPosition);
-      yPosition += 30;
-
-      // Create table with missing riders
-      const tableData = artists.map(artist => [
-        artist.name,
-        `Stage ${artist.stage || 'TBD'}`,
-        artist.date || 'TBD'
-      ]);
-
-      (pdf as any).autoTable({
-        startY: yPosition,
-        head: [['Artist Name', 'Stage', 'Date']],
-        body: tableData,
-        theme: 'grid',
-        headStyles: { 
-          fillColor: [220, 53, 69],
-          textColor: [255, 255, 255],
-          fontSize: 10,
-          fontStyle: 'bold'
-        },
-        bodyStyles: { 
-          fontSize: 10,
-          textColor: [33, 37, 41]
-        },
-        alternateRowStyles: {
-          fillColor: [248, 249, 250]
-        }
-      });
-    }
-  } catch (error) {
-    console.error('Error generating missing rider report:', error);
-    pdf.text('Error generating missing rider report', 20, yPosition);
   }
-
-  return new Blob([pdf.output('blob')], { type: 'application/pdf' });
+  
+  // Header
+  doc.setFontSize(24);
+  doc.setTextColor(primaryColor);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Missing Rider Report', 20, yPosition);
+  
+  yPosition += 15;
+  
+  // Job title
+  doc.setFontSize(16);
+  doc.setTextColor(textColor);
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.jobTitle, 20, yPosition);
+  
+  yPosition += 10;
+  
+  // Generated date
+  doc.setFontSize(10);
+  doc.setTextColor('#6b7280');
+  doc.text(`Generated on: ${format(new Date(), 'PPP')}`, 20, yPosition);
+  
+  yPosition += 20;
+  
+  // Warning message
+  doc.setFontSize(12);
+  doc.setTextColor(warningColor);
+  doc.setFont('helvetica', 'bold');
+  doc.text('The following artists have missing technical riders:', 20, yPosition);
+  
+  yPosition += 15;
+  
+  if (data.artists.length === 0) {
+    doc.setFontSize(12);
+    doc.setTextColor('#059669');
+    doc.setFont('helvetica', 'normal');
+    doc.text('All artists have complete technical riders!', 20, yPosition);
+  } else {
+    // Create table data
+    const tableData = data.artists.map(artist => [
+      artist.name,
+      `Stage ${artist.stage}`,
+      format(new Date(artist.date), 'EEE, MMM d'),
+      `${artist.showTime.start} - ${artist.showTime.end}`
+    ]);
+    
+    // Add table
+    (doc as any).autoTable({
+      startY: yPosition,
+      head: [['Artist Name', 'Stage', 'Date', 'Show Time']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: {
+        fillColor: [125, 1, 1], // Red color for missing riders
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 11
+      },
+      bodyStyles: {
+        textColor: [31, 41, 55],
+        fontSize: 10
+      },
+      alternateRowStyles: {
+        fillColor: [254, 242, 242] // Light red background
+      },
+      margin: { left: 20, right: 20 },
+      columnStyles: {
+        0: { cellWidth: 60 }, // Artist Name
+        1: { cellWidth: 30 }, // Stage
+        2: { cellWidth: 40 }, // Date
+        3: { cellWidth: 50 }  // Show Time
+      }
+    });
+    
+    // Add footer with action items
+    const finalY = (doc as any).lastAutoTable.finalY + 20;
+    
+    doc.setFontSize(11);
+    doc.setTextColor(textColor);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Action Required:', 20, finalY);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    
+    const actionItems = [
+      '• Contact the listed artists to request their technical riders',
+      '• Follow up with artist management or booking agents',
+      '• Ensure all riders are received before production planning',
+      '• Update the system once riders are received'
+    ];
+    
+    actionItems.forEach((item, index) => {
+      doc.text(item, 25, finalY + 10 + (index * 6));
+    });
+  }
+  
+  // Add footer
+  doc.setFontSize(8);
+  doc.setTextColor('#9ca3af');
+  doc.text(`Page 1 of 1 - Generated by Festival Management System`, 20, 280);
+  
+  return new Promise((resolve) => {
+    resolve(doc.output('blob'));
+  });
 };
