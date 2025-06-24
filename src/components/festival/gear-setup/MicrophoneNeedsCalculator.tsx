@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -7,7 +8,7 @@ import { Calculator, Download, FileText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { WiredMic } from "./WiredMicConfig";
-import { exportWiredMicrophoneNeedsPDF, WiredMicrophoneNeed } from "@/utils/wiredMicrophoneNeedsPdfExport";
+import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArtistsByDateAndStage } from "@/utils/wiredMicrophoneNeedsPdfExport";
 
 interface MicrophoneNeed {
   model: string;
@@ -253,30 +254,32 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
   };
 
   const exportNeedsPDF = async () => {
-    if (!jobDetails || calculatedNeeds.length === 0) return;
+    if (!jobDetails || artists.length === 0) return;
 
-    // Transform calculatedNeeds to match the PDF export format
-    const transformedNeeds: WiredMicrophoneNeed[] = calculatedNeeds.map(need => ({
-      model: need.model,
-      maxQuantity: need.maxQuantity,
-      exclusiveQuantity: need.exclusiveQuantity,
-      sharedQuantity: need.sharedQuantity,
-      stages: need.stages
-    }));
+    // Use the new matrix-based approach for PDF export
+    const filteredArtists = artists.filter(artist => 
+      artist.mic_kit === 'festival' &&
+      artist.wired_mics &&
+      Array.isArray(artist.wired_mics) &&
+      artist.wired_mics.length > 0
+    );
 
-    const pdfData = {
+    if (filteredArtists.length === 0) return;
+
+    const artistsByDateAndStage = organizeArtistsByDateAndStage(filteredArtists);
+
+    const matrixData: WiredMicrophoneMatrixData = {
       jobTitle: jobDetails.title,
       logoUrl: jobDetails.logoUrl,
-      microphoneNeeds: transformedNeeds,
-      selectedStages: [...new Set(calculatedNeeds.flatMap(need => need.stages.map(s => s.stage)))]
+      artistsByDateAndStage
     };
 
     try {
-      const pdfBlob = await exportWiredMicrophoneNeedsPDF(pdfData);
+      const pdfBlob = await exportWiredMicrophoneMatrixPDF(matrixData);
       const url = URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${jobDetails.title}_Wired_Microphone_Requirements.pdf`;
+      a.download = `${jobDetails.title}_Wired_Microphone_Matrix.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (error) {
