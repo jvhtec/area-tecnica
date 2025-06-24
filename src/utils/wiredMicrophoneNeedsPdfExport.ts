@@ -1,6 +1,6 @@
+
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { exportWiredMicrophoneMatrixPDF, organizeArtistsByDateAndStage, WiredMicrophoneMatrixData } from './wiredMicrophoneMatrixPdfExport';
 
 export interface WiredMicrophoneNeed {
   model: string;
@@ -23,29 +23,289 @@ export interface WiredMicrophoneNeedsPdfData {
 }
 
 export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPdfData): Promise<Blob> => {
-  // Use the new matrix format instead of the old summary format
-  const artistsByDateAndStage = organizeArtistsByDateAndStage(
-    data.microphoneNeeds.flatMap(need => 
-      need.stages.flatMap(stage => 
-        stage.artists.map(artistName => ({
-          name: artistName,
-          date: `${new Date().getFullYear()}-01-01`, // You may need to pass actual dates
-          stage: stage.stage,
-          wired_mics: [{ model: need.model, quantity: stage.quantity }]
-        }))
-      )
-    )
-  );
+  // Use landscape orientation for better table space utilization
+  const pdf = new jsPDF('landscape', 'pt', 'a4');
+  const pageWidth = pdf.internal.pageSize.width;
+  const pageHeight = pdf.internal.pageSize.height;
+  const margin = 10; // Reduced from 20 for more usable space
+  
+  // Festival document styling - consistent burgundy/red theme
+  const primaryColor = [139, 21, 33]; // Burgundy/red to match other festival documents
+  const secondaryColor = [52, 73, 94]; // Dark gray
+  const accentColor = [231, 76, 60]; // Red for exclusive items
+  const lightGray = [240, 240, 240]; // Light gray for alternating rows
+  const headerGray = [248, 249, 250]; // Very light gray for section headers
+  
+  // Add logo if available - consistent positioning with other festival documents
+  let logoHeight = 0;
+  if (data.logoUrl) {
+    try {
+      const logoResponse = await fetch(data.logoUrl);
+      const logoBlob = await logoResponse.blob();
+      const logoDataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(logoBlob);
+      });
+      
+      logoHeight = 25;
+      pdf.addImage(logoDataUrl, 'PNG', margin, 15, 50, logoHeight);
+    } catch (error) {
+      console.error('Error loading logo:', error);
+    }
+  }
+  
+  // Header styling - consistent with other festival documents
+  const headerY = logoHeight > 0 ? 50 : 25;
+  
+  // Main title with burgundy background
+  pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  pdf.rect(0, headerY, pageWidth, 25, 'F');
+  
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(18);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Wired Microphone Requirements', pageWidth / 2, headerY + 16, { align: 'center' });
+  
+  // Job title with consistent styling
+  pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  pdf.setFontSize(14);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text(data.jobTitle, pageWidth / 2, headerY + 35, { align: 'center' });
+  
+  // Stage filter info with light gray background
+  const stageText = data.selectedStages.length === 1 
+    ? `Stage ${data.selectedStages[0]}`
+    : data.selectedStages.length > 1 
+      ? `Stages ${data.selectedStages.join(', ')}`
+      : 'All Stages';
+  
+  pdf.setFillColor(headerGray[0], headerGray[1], headerGray[2]);
+  pdf.rect(margin, headerY + 45, pageWidth - (margin * 2), 15, 'F');
+  
+  pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  pdf.setFontSize(11);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text(`Report Scope: ${stageText}`, pageWidth / 2, headerY + 55, { align: 'center' });
+  
+  let yPosition = headerY + 75;
+  
+  if (data.microphoneNeeds.length === 0) {
+    pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('No wired microphone requirements found for the selected stages.', margin, yPosition);
+    
+    // Footer with consistent styling
+    const timestamp = new Date().toLocaleString();
+    pdf.setFontSize(8);
+    pdf.setTextColor(128, 128, 128);
+    pdf.setDrawColor(200, 200, 200);
+    pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
+    pdf.text(`Generated on ${timestamp}`, margin, pageHeight - 10);
+    pdf.text(`${data.jobTitle} - Wired Microphone Requirements`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+    
+    return new Blob([pdf.output('blob')], { type: 'application/pdf' });
+  }
+  
+  // Summary section with burgundy header styling
+  pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  pdf.rect(margin - 5, yPosition - 8, pageWidth - (margin * 2) + 10, 20, 'F');
+  
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(14);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Inventory Requirements Summary', margin, yPosition + 5);
+  yPosition += 25;
+  
+  const summaryData = data.microphoneNeeds.map(need => [
+    need.model,
+    need.maxQuantity.toString(),
+    need.exclusiveQuantity.toString(),
+    need.sharedQuantity.toString(),
+    need.stages.map(s => `Stage ${s.stage}: ${s.quantity}`).join(', ')
+  ]);
 
-  const matrixData: WiredMicrophoneMatrixData = {
-    jobTitle: data.jobTitle,
-    logoUrl: data.logoUrl,
-    artistsByDateAndStage
-  };
-
-  return await exportWiredMicrophoneMatrixPDF(matrixData);
+  // Calculate available width for dynamic column sizing
+  const availableWidth = pageWidth - (margin * 2);
+  
+  (pdf as any).autoTable({
+    startY: yPosition,
+    head: [['Microphone Model', 'Total Required', 'Exclusive Use', 'Shared Use', 'Stage Distribution']],
+    body: summaryData,
+    theme: 'grid',
+    headStyles: { 
+      fillColor: primaryColor,
+      textColor: [255, 255, 255],
+      fontSize: 11,
+      fontStyle: 'bold',
+      halign: 'center'
+    },
+    bodyStyles: { 
+      fontSize: 10,
+      textColor: secondaryColor,
+      cellPadding: 4
+    },
+    alternateRowStyles: {
+      fillColor: lightGray
+    },
+    styles: { 
+      cellPadding: 4,
+      lineColor: [200, 200, 200],
+      lineWidth: 0.5,
+      overflow: 'linebreak'
+    },
+    // Use percentage-based widths for better space utilization
+    columnStyles: {
+      0: { 
+        cellWidth: availableWidth * 0.25, // 25% for microphone model
+        fontStyle: 'bold'
+      },
+      1: { 
+        cellWidth: availableWidth * 0.12, // 12% for total required
+        halign: 'center', 
+        fillColor: [255, 248, 248] 
+      },
+      2: { 
+        cellWidth: availableWidth * 0.12, // 12% for exclusive use
+        halign: 'center', 
+        fillColor: [255, 235, 235] 
+      },
+      3: { 
+        cellWidth: availableWidth * 0.12, // 12% for shared use
+        halign: 'center', 
+        fillColor: [235, 255, 235] 
+      },
+      4: { 
+        cellWidth: availableWidth * 0.39, // 39% for stage distribution (much wider)
+        fontSize: 9,
+        overflow: 'linebreak'
+      }
+    },
+    margin: { left: margin, right: margin }
+  });
+  
+  yPosition = (pdf as any).lastAutoTable.finalY + 25;
+  
+  // Detailed breakdown section with burgundy header
+  pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  pdf.rect(margin - 5, yPosition - 8, pageWidth - (margin * 2) + 10, 20, 'F');
+  
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(14);
+  pdf.setFont('helvetica', 'bold');
+  pdf.text('Detailed Stage Analysis', margin, yPosition + 5);
+  yPosition += 25;
+  
+  for (const need of data.microphoneNeeds) {
+    // Check if we need a new page
+    if (yPosition > pageHeight - 100) {
+      pdf.addPage();
+      yPosition = 30;
+    }
+    
+    // Model header with light gray background
+    pdf.setFillColor(headerGray[0], headerGray[1], headerGray[2]);
+    pdf.rect(margin, yPosition - 5, pageWidth - (margin * 2), 20, 'F');
+    
+    pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`${need.model} - Stage Requirements`, margin + 5, yPosition + 8);
+    yPosition += 25;
+    
+    const detailData = need.stages.map(stage => [
+      `Stage ${stage.stage}`,
+      stage.quantity.toString(),
+      stage.isExclusive ? 'Yes' : 'No',
+      stage.artists.join(', ')
+    ]);
+    
+    (pdf as any).autoTable({
+      startY: yPosition,
+      head: [['Stage', 'Quantity', 'Exclusive', 'Artists Using This Model']],
+      body: detailData,
+      theme: 'grid',
+      headStyles: { 
+        fillColor: [80, 80, 80], // Dark gray for sub-headers
+        textColor: [255, 255, 255],
+        fontSize: 10,
+        fontStyle: 'bold',
+        halign: 'center'
+      },
+      bodyStyles: { 
+        fontSize: 9,
+        textColor: secondaryColor,
+        cellPadding: 4
+      },
+      alternateRowStyles: {
+        fillColor: [252, 252, 252]
+      },
+      styles: { 
+        cellPadding: 4,
+        lineColor: [200, 200, 200],
+        lineWidth: 0.3,
+        overflow: 'linebreak'
+      },
+      // Optimized column widths for better space usage
+      columnStyles: {
+        0: { 
+          cellWidth: availableWidth * 0.15, // 15% for stage
+          fontStyle: 'bold', 
+          halign: 'center' 
+        },
+        1: { 
+          cellWidth: availableWidth * 0.12, // 12% for quantity
+          halign: 'center' 
+        },
+        2: { 
+          cellWidth: availableWidth * 0.12, // 12% for exclusive
+          halign: 'center',
+          didParseCell: function(data: any) {
+            if (data.cell.text[0] === 'Yes') {
+              data.cell.styles.fillColor = [255, 235, 235];
+              data.cell.styles.textColor = accentColor;
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+        },
+        3: { 
+          cellWidth: availableWidth * 0.61, // 61% for artists (much wider)
+          fontSize: 8,
+          overflow: 'linebreak'
+        }
+      },
+      margin: { left: margin, right: margin }
+    });
+    
+    yPosition = (pdf as any).lastAutoTable.finalY + 20;
+  }
+  
+  // Footer with consistent festival styling
+  const timestamp = new Date().toLocaleString();
+  
+  // Add footer on all pages
+  const pageCount = pdf.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    pdf.setPage(i);
+    
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(128, 128, 128);
+    
+    // Add a line above footer
+    pdf.setDrawColor(200, 200, 200);
+    pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
+    
+    pdf.text(`Generated on ${timestamp}`, margin, pageHeight - 10);
+    pdf.text(`${data.jobTitle} - Wired Microphone Requirements`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+    pdf.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+  }
+  
+  return new Blob([pdf.output('blob')], { type: 'application/pdf' });
 };
 
+// Function to calculate microphone needs (extracted from calculator component)
 export const calculateWiredMicrophoneNeeds = (artists: any[]): WiredMicrophoneNeed[] => {
   const microphoneMap = new Map<string, WiredMicrophoneNeed>();
 
