@@ -22,20 +22,19 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
   
   let isFirstPage = true;
   
-  console.log('🔍 DEBUGGING: Processing dates:', Array.from(data.artistsByDateAndStage.keys()));
-  console.log('🔍 DEBUGGING: Total dates found:', data.artistsByDateAndStage.size);
+  console.log('🔍 DEBUG: Starting PDF generation with data:', {
+    totalDates: data.artistsByDateAndStage.size,
+    dates: Array.from(data.artistsByDateAndStage.keys())
+  });
   
   // Process each date
   for (const [date, stagesMap] of data.artistsByDateAndStage.entries()) {
-    console.log(`🔍 DEBUGGING: Processing date: ${date}`);
-    console.log(`🔍 DEBUGGING: Stages for ${date}:`, Array.from(stagesMap.keys()));
-    console.log(`🔍 DEBUGGING: Total stages for ${date}:`, stagesMap.size);
+    console.log(`🔍 DEBUG: Processing date: ${date} with ${stagesMap.size} stages`);
     
     // Process each stage within the date
     for (const [stage, artists] of stagesMap.entries()) {
-      console.log(`🔍 DEBUGGING: Processing stage ${stage} on ${date}`);
-      console.log(`🔍 DEBUGGING: Artists count for stage ${stage}:`, artists.length);
-      console.log(`🔍 DEBUGGING: Artist names:`, artists.map(a => a.name));
+      console.log(`🔍 DEBUG: Processing ${date} Stage ${stage} with ${artists.length} artists:`, 
+        artists.map(a => ({ name: a.name, wiredMicsCount: a.wired_mics?.length || 0 })));
       
       if (!isFirstPage) {
         pdf.addPage();
@@ -95,19 +94,17 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
       yPosition += 30;
       
       // Generate matrix data with FIXED calculations
-      const matrixData = generateFixedMatrixData(artists);
+      const matrixData = generateCorrectedMatrixData(artists);
       
-      console.log(`🔍 DEBUGGING: Matrix data for ${date} stage ${stage}:`, {
+      console.log(`🔍 DEBUG: Matrix data for ${date} Stage ${stage}:`, {
         micModels: matrixData.micModels,
+        artistCount: matrixData.artistNames.length,
         artistNames: matrixData.artistNames,
-        individualMatrixSample: Object.keys(matrixData.individualMatrix).slice(0, 2).reduce((acc, key) => {
-          acc[key] = matrixData.individualMatrix[key];
-          return acc;
-        }, {} as any),
-        peakConcurrentSample: Object.keys(matrixData.peakConcurrentMatrix).slice(0, 2).reduce((acc, key) => {
-          acc[key] = matrixData.peakConcurrentMatrix[key];
-          return acc;
-        }, {} as any)
+        sampleIndividualData: Object.entries(matrixData.individualMatrix).slice(0, 2).map(([model, artists]) => ({
+          model,
+          artists: Object.entries(artists).slice(0, 3)
+        })),
+        samplePeakData: Object.entries(matrixData.peakConcurrentMatrix).slice(0, 3)
       });
       
       if (matrixData.micModels.length === 0) {
@@ -232,53 +229,49 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
   return new Blob([pdf.output('blob')], { type: 'application/pdf' });
 };
 
-interface FixedMatrixData {
+interface CorrectedMatrixData {
   micModels: string[];
   artistNames: string[];
   individualMatrix: Record<string, Record<string, number>>;
   peakConcurrentMatrix: Record<string, number>;
 }
 
-const generateFixedMatrixData = (artists: any[]): FixedMatrixData => {
+const generateCorrectedMatrixData = (artists: any[]): CorrectedMatrixData => {
   const micModelsSet = new Set<string>();
   const artistNamesSet = new Set<string>();
   const individualMatrix: Record<string, Record<string, number>> = {};
   
-  console.log('🔍 DEBUGGING: generateFixedMatrixData called with artists:', artists.length);
-  console.log('🔍 DEBUGGING: Artists data:', artists.map(a => ({ 
-    name: a.name, 
-    wiredMicsLength: a.wired_mics?.length || 0,
-    wiredMicsRaw: a.wired_mics,
-    showStart: a.show_start,
-    showEnd: a.show_end
-  })));
+  console.log('🔍 DEBUG: generateCorrectedMatrixData called with:', {
+    artistCount: artists.length,
+    artistsWithWiredMics: artists.filter(a => a.wired_mics && a.wired_mics.length > 0).length
+  });
   
-  // FIRST PASS: Build individual requirements matrix using RAW DATABASE VALUES
-  artists.forEach(artist => {
+  // FIRST PASS: Build individual requirements matrix - FIXED VERSION
+  artists.forEach((artist, artistIndex) => {
     if (!artist.wired_mics || !Array.isArray(artist.wired_mics)) {
-      console.log(`🔍 DEBUGGING: Artist ${artist.name} has no wired_mics or invalid format`);
+      console.log(`🔍 DEBUG: Artist #${artistIndex} ${artist.name} has no wired mics or invalid format`);
       return;
     }
     
     const artistName = artist.name || 'Unknown Artist';
     artistNamesSet.add(artistName);
     
-    console.log(`🔍 DEBUGGING: Processing ${artistName} with ${artist.wired_mics.length} mic entries`);
+    console.log(`🔍 DEBUG: Processing artist #${artistIndex}: ${artistName} with ${artist.wired_mics.length} wired mic entries`);
     
     // Process each microphone entry for this artist
     artist.wired_mics.forEach((mic: any, micIndex: number) => {
       if (!mic.model || mic.quantity === undefined || mic.quantity === null) {
-        console.log(`🔍 DEBUGGING: Skipping invalid mic #${micIndex} for ${artistName}:`, mic);
+        console.log(`🔍 DEBUG: Skipping invalid mic entry #${micIndex} for ${artistName}:`, mic);
         return;
       }
       
       const micModel = mic.model.trim();
       const rawQuantity = parseInt(String(mic.quantity)) || 0;
       
-      console.log(`🔍 DEBUGGING: ${artistName} - mic #${micIndex}: model="${micModel}", rawQuantity=${rawQuantity}`);
+      console.log(`🔍 DEBUG: ${artistName} mic #${micIndex}: model="${micModel}", quantity=${rawQuantity}`);
       
       if (rawQuantity <= 0) {
-        console.log(`🔍 DEBUGGING: Skipping zero quantity mic for ${artistName}: ${micModel}`);
+        console.log(`🔍 DEBUG: Skipping zero/negative quantity for ${artistName}: ${micModel}`);
         return;
       }
       
@@ -289,22 +282,25 @@ const generateFixedMatrixData = (artists: any[]): FixedMatrixData => {
         individualMatrix[micModel] = {};
       }
       
-      // CRITICAL FIX: Use raw quantity directly from database - NO CALCULATIONS!
+      // CRITICAL FIX: Use DIRECT ASSIGNMENT instead of += accumulation
+      // Each artist should have exactly what's in the database
       if (!individualMatrix[micModel][artistName]) {
-        individualMatrix[micModel][artistName] = 0;
+        individualMatrix[micModel][artistName] = rawQuantity;
+        console.log(`🔍 DEBUG: SET individual matrix: ${micModel}[${artistName}] = ${rawQuantity} (new entry)`);
+      } else {
+        // If artist has multiple entries for same mic model, ADD them
+        individualMatrix[micModel][artistName] += rawQuantity;
+        console.log(`🔍 DEBUG: ADDED to individual matrix: ${micModel}[${artistName}] = ${individualMatrix[micModel][artistName]} (was ${individualMatrix[micModel][artistName] - rawQuantity}, added ${rawQuantity})`);
       }
-      individualMatrix[micModel][artistName] += rawQuantity;
-      
-      console.log(`🔍 DEBUGGING: Set individual matrix: ${micModel}[${artistName}] = ${individualMatrix[micModel][artistName]}`);
     });
   });
   
-  console.log('🔍 DEBUGGING: Individual matrix after first pass:');
-  Object.keys(individualMatrix).forEach(micModel => {
-    console.log(`🔍 DEBUGGING: ${micModel}:`, individualMatrix[micModel]);
+  console.log('🔍 DEBUG: Individual matrix after processing all artists:');
+  Object.entries(individualMatrix).forEach(([micModel, artistData]) => {
+    console.log(`🔍 DEBUG: ${micModel}:`, Object.entries(artistData).map(([artist, qty]) => `${artist}=${qty}`).join(', '));
   });
   
-  // SECOND PASS: Calculate peak concurrent usage using timeline approach
+  // SECOND PASS: Calculate peak concurrent usage using improved timeline approach
   const peakConcurrentMatrix: Record<string, number> = {};
   
   // Sort artists by show time for timeline analysis
@@ -314,15 +310,16 @@ const generateFixedMatrixData = (artists: any[]): FixedMatrixData => {
     return timeA.localeCompare(timeB);
   });
   
-  console.log('🔍 DEBUGGING: Sorted artists for timeline:', sortedArtists.map(a => ({ 
-    name: a.name, 
-    start: a.show_start, 
-    end: a.show_end 
-  })));
+  console.log('🔍 DEBUG: Timeline analysis for peak calculation:', 
+    sortedArtists.map(a => ({ 
+      name: a.name, 
+      start: a.show_start, 
+      end: a.show_end 
+    })));
   
   // For each microphone model, calculate peak concurrent usage
   for (const micModel of micModelsSet) {
-    console.log(`🔍 DEBUGGING: Calculating peak concurrent for ${micModel}:`);
+    console.log(`🔍 DEBUG: Calculating peak concurrent for ${micModel}`);
     
     // Create timeline events for this mic model
     const events: Array<{ 
@@ -333,101 +330,58 @@ const generateFixedMatrixData = (artists: any[]): FixedMatrixData => {
     }> = [];
     
     sortedArtists.forEach(artist => {
-      if (!artist.wired_mics || !Array.isArray(artist.wired_mics)) return;
+      const artistName = artist.name || 'Unknown Artist';
+      const artistQuantity = individualMatrix[micModel]?.[artistName] || 0;
       
-      // Find all mics of this model for this artist and sum their quantities
-      let totalQuantityForModel = 0;
-      artist.wired_mics.forEach((mic: any) => {
-        if (mic.model && mic.model.trim() === micModel) {
-          totalQuantityForModel += parseInt(String(mic.quantity)) || 0;
-        }
-      });
-      
-      console.log(`🔍 DEBUGGING: ${artist.name}: ${totalQuantityForModel} x ${micModel} from ${artist.show_start} to ${artist.show_end}`);
-      
-      if (totalQuantityForModel > 0 && artist.show_start && artist.show_end) {
+      if (artistQuantity > 0 && artist.show_start && artist.show_end) {
         events.push({
           time: artist.show_start,
-          quantity: totalQuantityForModel,
+          quantity: artistQuantity,
           type: 'start',
-          artist: artist.name
+          artist: artistName
         });
         events.push({
           time: artist.show_end,
-          quantity: totalQuantityForModel,
+          quantity: artistQuantity,
           type: 'end',
-          artist: artist.name
+          artist: artistName
         });
+        
+        console.log(`🔍 DEBUG: ${micModel} timeline: ${artistName} needs ${artistQuantity} from ${artist.show_start} to ${artist.show_end}`);
       }
     });
     
-    // Sort events by time
-    events.sort((a, b) => a.time.localeCompare(b.time));
-    console.log(`🔍 DEBUGGING: Timeline events for ${micModel}:`, events);
+    // Sort events by time, with 'end' events before 'start' events at the same time
+    events.sort((a, b) => {
+      const timeCompare = a.time.localeCompare(b.time);
+      if (timeCompare !== 0) return timeCompare;
+      // At same time: process 'end' before 'start' to handle back-to-back shows
+      return a.type === 'end' ? -1 : 1;
+    });
+    
+    console.log(`🔍 DEBUG: ${micModel} sorted timeline events:`, events);
     
     // Calculate peak concurrent usage using timeline sweep
     let currentUsage = 0;
     let peakUsage = 0;
-    let peakTime = '';
+    let peakDetails = '';
     
     events.forEach(event => {
       if (event.type === 'start') {
         currentUsage += event.quantity;
         if (currentUsage > peakUsage) {
           peakUsage = currentUsage;
-          peakTime = event.time;
+          peakDetails = `at ${event.time} (${event.artist} started)`;
         }
-        console.log(`🔍 DEBUGGING: ${event.time}: +${event.quantity} (${event.artist}) -> ${currentUsage} total`);
+        console.log(`🔍 DEBUG: ${event.time}: +${event.quantity} (${event.artist} start) -> current: ${currentUsage}`);
       } else {
         currentUsage -= event.quantity;
-        console.log(`🔍 DEBUGGING: ${event.time}: -${event.quantity} (${event.artist}) -> ${currentUsage} total`);
+        console.log(`🔍 DEBUG: ${event.time}: -${event.quantity} (${event.artist} end) -> current: ${currentUsage}`);
       }
     });
     
-    // Handle consecutive shows (back-to-back performances)
-    let consecutiveAdjustment = 0;
-    for (let i = 0; i < sortedArtists.length - 1; i++) {
-      const current = sortedArtists[i];
-      const next = sortedArtists[i + 1];
-      
-      // Check if shows are consecutive (current end = next start)
-      if (current.show_end === next.show_start) {
-        let currentQuantity = 0;
-        let nextQuantity = 0;
-        
-        // Sum quantities for current artist
-        if (current.wired_mics && Array.isArray(current.wired_mics)) {
-          current.wired_mics.forEach((mic: any) => {
-            if (mic.model && mic.model.trim() === micModel) {
-              currentQuantity += parseInt(String(mic.quantity)) || 0;
-            }
-          });
-        }
-        
-        // Sum quantities for next artist
-        if (next.wired_mics && Array.isArray(next.wired_mics)) {
-          next.wired_mics.forEach((mic: any) => {
-            if (mic.model && mic.model.trim() === micModel) {
-              nextQuantity += parseInt(String(mic.quantity)) || 0;
-            }
-          });
-        }
-        
-        if (currentQuantity > 0 && nextQuantity > 0) {
-          // For consecutive shows, we need separate mic sets (no sharing possible)
-          const consecutiveNeed = currentQuantity + nextQuantity;
-          consecutiveAdjustment = Math.max(consecutiveAdjustment, consecutiveNeed);
-          
-          console.log(`🔍 DEBUGGING: Consecutive shows ${current.name} -> ${next.name}: need ${consecutiveNeed} mics`);
-        }
-      }
-    }
-    
-    // Final peak is the maximum of timeline peak and consecutive adjustment
-    const finalPeak = Math.max(peakUsage, consecutiveAdjustment);
-    peakConcurrentMatrix[micModel] = finalPeak;
-    
-    console.log(`🔍 DEBUGGING: Final peak for ${micModel}: ${finalPeak} (timeline: ${peakUsage}, consecutive: ${consecutiveAdjustment}) at ${peakTime}`);
+    peakConcurrentMatrix[micModel] = peakUsage;
+    console.log(`🔍 DEBUG: Peak for ${micModel}: ${peakUsage} ${peakDetails}`);
   }
   
   const result = {
@@ -437,17 +391,11 @@ const generateFixedMatrixData = (artists: any[]): FixedMatrixData => {
     peakConcurrentMatrix
   };
   
-  console.log('🔍 DEBUGGING: Final matrix result:', {
-    micModels: result.micModels,
-    artistNames: result.artistNames,
-    individualMatrixSample: Object.keys(result.individualMatrix).slice(0, 2).reduce((acc, key) => {
-      acc[key] = result.individualMatrix[key];
-      return acc;
-    }, {} as any),
-    peakConcurrentSample: Object.keys(result.peakConcurrentMatrix).slice(0, 2).reduce((acc, key) => {
-      acc[key] = result.peakConcurrentMatrix[key];
-      return acc;
-    }, {} as any)
+  console.log('🔍 DEBUG: Final matrix result summary:', {
+    micModelCount: result.micModels.length,
+    artistCount: result.artistNames.length,
+    individualMatrixKeys: Object.keys(result.individualMatrix),
+    peakMatrixKeys: Object.keys(result.peakConcurrentMatrix)
   });
   
   return result;
@@ -457,38 +405,41 @@ const generateFixedMatrixData = (artists: any[]): FixedMatrixData => {
 export const organizeArtistsByDateAndStage = (artists: any[]): Map<string, Map<number, any[]>> => {
   const organized = new Map<string, Map<number, any[]>>();
   
-  console.log('🔍 DEBUGGING: organizeArtistsByDateAndStage called with:', artists.length, 'artists');
+  console.log('🔍 DEBUG: organizeArtistsByDateAndStage called with:', {
+    totalArtists: artists.length,
+    artistsWithDates: artists.filter(a => a.date).length
+  });
   
   artists.forEach((artist, index) => {
     const date = artist.date;
     const stage = artist.stage || 1;
     
-    console.log(`🔍 DEBUGGING: Artist #${index}: ${artist.name}, date=${date}, stage=${stage}`);
+    console.log(`🔍 DEBUG: Artist #${index}: ${artist.name}, date=${date}, stage=${stage}`);
     
     if (!date) {
-      console.log(`🔍 DEBUGGING: Skipping artist ${artist.name} - no date`);
+      console.log(`🔍 DEBUG: Skipping artist ${artist.name} - no date`);
       return;
     }
     
     if (!organized.has(date)) {
       organized.set(date, new Map());
-      console.log(`🔍 DEBUGGING: Created new date entry: ${date}`);
+      console.log(`🔍 DEBUG: Created new date entry: ${date}`);
     }
     
     if (!organized.get(date)!.has(stage)) {
       organized.get(date)!.set(stage, []);
-      console.log(`🔍 DEBUGGING: Created new stage entry: ${date} -> stage ${stage}`);
+      console.log(`🔍 DEBUG: Created new stage entry: ${date} -> stage ${stage}`);
     }
     
     organized.get(date)!.get(stage)!.push(artist);
-    console.log(`🔍 DEBUGGING: Added ${artist.name} to ${date} stage ${stage}`);
+    console.log(`🔍 DEBUG: Added ${artist.name} to ${date} stage ${stage} (now ${organized.get(date)!.get(stage)!.length} artists)`);
   });
   
-  console.log('🔍 DEBUGGING: Final organized structure:'); 
+  console.log('🔍 DEBUG: Final organized structure summary:'); 
   Array.from(organized.entries()).forEach(([date, stages]) => {
-    console.log(`🔍 DEBUGGING: Date ${date}:`);
-    Array.from(stages.entries()).forEach(([stage, artists]) => {
-      console.log(`🔍 DEBUGGING:   Stage ${stage}: ${artists.length} artists (${artists.map(a => a.name).join(', ')})`);
+    console.log(`🔍 DEBUG: Date ${date}:`);
+    Array.from(stages.entries()).forEach(([stage, stageArtists]) => {
+      console.log(`🔍 DEBUG:   Stage ${stage}: ${stageArtists.length} artists (${stageArtists.map(a => a.name).join(', ')})`);
     });
   });
   
