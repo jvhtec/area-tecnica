@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -340,21 +339,26 @@ const generateSimplifiedMatrixData = (artists: any[]): SimplifiedMatrixData => {
   return result;
 };
 
-// Helper function to organize artists by date and stage - simplified
+// Helper function to organize artists by date and stage - fixed date handling
 export const organizeArtistsByDateAndStage = (artists: any[]): Map<string, Map<number, any[]>> => {
   const organized = new Map<string, Map<number, any[]>>();
   
-  console.log('\n🗂️ ORGANIZING ARTISTS BY DATE/STAGE');
+  console.log('\n🗂️ ORGANIZING ARTISTS BY DATE/STAGE - FIXED VERSION');
   console.log(`📋 Input: ${artists.length} artists`);
+  
+  // Log all unique dates first
+  const allDates = artists.map(a => a.date).filter(Boolean);
+  const uniqueDates = [...new Set(allDates)];
+  console.log('📅 ALL DATES IN INPUT:', uniqueDates);
   
   artists.forEach((artist, index) => {
     const date = artist.date;
     const stage = artist.stage || 1;
     
-    console.log(`📌 Artist ${index}: ${artist.name} -> Date: "${date}", Stage: ${stage}`);
+    console.log(`📌 Artist ${index}: "${artist.name}" -> Date: "${date}", Stage: ${stage}`);
     
     if (!date) {
-      console.warn(`⚠️ Skipping ${artist.name} - no date`);
+      console.warn(`⚠️ Skipping "${artist.name}" - no date field`);
       return;
     }
     
@@ -371,9 +375,13 @@ export const organizeArtistsByDateAndStage = (artists: any[]): Map<string, Map<n
   
   console.log('\n📊 ORGANIZATION COMPLETE:');
   Array.from(organized.entries()).forEach(([date, stages]) => {
-    console.log(`📅 ${date}: ${stages.size} stages`);
+    console.log(`📅 Date "${date}": ${stages.size} stages`);
     Array.from(stages.entries()).forEach(([stage, stageArtists]) => {
-      console.log(`  🎪 Stage ${stage}: ${stageArtists.length} artists (${stageArtists.map(a => a.name).join(', ')})`);
+      console.log(`  🎪 Stage ${stage}: ${stageArtists.length} artists`);
+      stageArtists.forEach(artist => {
+        const wiredMicCount = artist.wired_mics?.length || 0;
+        console.log(`    👤 ${artist.name}: ${wiredMicCount} wired mics`);
+      });
     });
   });
   

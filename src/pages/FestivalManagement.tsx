@@ -198,7 +198,9 @@ const FestivalManagement = () => {
     
     setIsPrinting(true);
     try {
-      console.log("Starting documentation print process with options:", options);
+      console.log("🖨️ PRINT DEBUG: Starting documentation print process");
+      console.log("📊 Print options:", options);
+      console.log("📅 Available job dates:", jobDates);
       
       let result: { blob: Blob; filename: string };
       
@@ -231,7 +233,7 @@ const FestivalManagement = () => {
           : 'Documentation generated successfully'
       });
     } catch (error: any) {
-      console.error('Error generating documentation:', error);
+      console.error('❌ PRINT ERROR:', error);
       toast({
         title: "Error",
         description: `Failed to generate documentation: ${error.message}`,
