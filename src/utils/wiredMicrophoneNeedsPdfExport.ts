@@ -2,290 +2,211 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
-export interface WiredMicrophoneNeed {
-  model: string;
-  maxQuantity: number;
-  exclusiveQuantity: number;
-  sharedQuantity: number;
-  stages: Array<{
-    stage: number;
-    quantity: number;
-    isExclusive: boolean;
-    artists: string[];
-  }>;
-}
-
-export interface WiredMicrophoneNeedsPdfData {
-  jobTitle: string;
+export interface WiredMicrophoneMatrixData {
+  jobTitle: string;  
   logoUrl?: string;
-  microphoneNeeds: WiredMicrophoneNeed[];
-  selectedStages: number[];
+  artistsByDateAndStage: Map<string, Map<number, any[]>>;
 }
 
-export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPdfData): Promise<Blob> => {
-  // Use landscape orientation for better table space utilization
+export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrixData): Promise<Blob> => {
   const pdf = new jsPDF('landscape', 'pt', 'a4');
   const pageWidth = pdf.internal.pageSize.width;
   const pageHeight = pdf.internal.pageSize.height;
-  const margin = 10; // Reduced from 20 for more usable space
+  const margin = 20;
   
-  // Festival document styling - consistent burgundy/red theme
-  const primaryColor = [139, 21, 33]; // Burgundy/red to match other festival documents
+  // Festival document styling
+  const primaryColor = [139, 21, 33]; // Burgundy/red
   const secondaryColor = [52, 73, 94]; // Dark gray
-  const accentColor = [231, 76, 60]; // Red for exclusive items
-  const lightGray = [240, 240, 240]; // Light gray for alternating rows
-  const headerGray = [248, 249, 250]; // Very light gray for section headers
+  const lightGray = [240, 240, 240];
+  const headerGray = [248, 249, 250];
   
-  // Add logo if available - consistent positioning with other festival documents
-  let logoHeight = 0;
-  if (data.logoUrl) {
-    try {
-      const logoResponse = await fetch(data.logoUrl);
-      const logoBlob = await logoResponse.blob();
-      const logoDataUrl = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(logoBlob);
-      });
-      
-      logoHeight = 25;
-      pdf.addImage(logoDataUrl, 'PNG', margin, 15, 50, logoHeight);
-    } catch (error) {
-      console.error('Error loading logo:', error);
-    }
-  }
+  let isFirstPage = true;
   
-  // Header styling - consistent with other festival documents
-  const headerY = logoHeight > 0 ? 50 : 25;
-  
-  // Main title with burgundy background
-  pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  pdf.rect(0, headerY, pageWidth, 25, 'F');
-  
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(18);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('Wired Microphone Requirements', pageWidth / 2, headerY + 16, { align: 'center' });
-  
-  // Job title with consistent styling
-  pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  pdf.setFontSize(14);
-  pdf.setFont('helvetica', 'normal');
-  pdf.text(data.jobTitle, pageWidth / 2, headerY + 35, { align: 'center' });
-  
-  // Stage filter info with light gray background
-  const stageText = data.selectedStages.length === 1 
-    ? `Stage ${data.selectedStages[0]}`
-    : data.selectedStages.length > 1 
-      ? `Stages ${data.selectedStages.join(', ')}`
-      : 'All Stages';
-  
-  pdf.setFillColor(headerGray[0], headerGray[1], headerGray[2]);
-  pdf.rect(margin, headerY + 45, pageWidth - (margin * 2), 15, 'F');
-  
-  pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  pdf.setFontSize(11);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text(`Report Scope: ${stageText}`, pageWidth / 2, headerY + 55, { align: 'center' });
-  
-  let yPosition = headerY + 75;
-  
-  if (data.microphoneNeeds.length === 0) {
-    pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    pdf.setFontSize(12);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('No wired microphone requirements found for the selected stages.', margin, yPosition);
-    
-    // Footer with consistent styling
-    const timestamp = new Date().toLocaleString();
-    pdf.setFontSize(8);
-    pdf.setTextColor(128, 128, 128);
-    pdf.setDrawColor(200, 200, 200);
-    pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
-    pdf.text(`Generated on ${timestamp}`, margin, pageHeight - 10);
-    pdf.text(`${data.jobTitle} - Wired Microphone Requirements`, pageWidth - margin, pageHeight - 10, { align: 'right' });
-    
-    return new Blob([pdf.output('blob')], { type: 'application/pdf' });
-  }
-  
-  // Summary section with burgundy header styling
-  pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  pdf.rect(margin - 5, yPosition - 8, pageWidth - (margin * 2) + 10, 20, 'F');
-  
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(14);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('Inventory Requirements Summary', margin, yPosition + 5);
-  yPosition += 25;
-  
-  const summaryData = data.microphoneNeeds.map(need => [
-    need.model,
-    need.maxQuantity.toString(),
-    need.exclusiveQuantity.toString(),
-    need.sharedQuantity.toString(),
-    need.stages.map(s => `Stage ${s.stage}: ${s.quantity}`).join(', ')
-  ]);
-
-  // Calculate available width for dynamic column sizing
-  const availableWidth = pageWidth - (margin * 2);
-  
-  (pdf as any).autoTable({
-    startY: yPosition,
-    head: [['Microphone Model', 'Total Required', 'Exclusive Use', 'Shared Use', 'Stage Distribution']],
-    body: summaryData,
-    theme: 'grid',
-    headStyles: { 
-      fillColor: primaryColor,
-      textColor: [255, 255, 255],
-      fontSize: 11,
-      fontStyle: 'bold',
-      halign: 'center'
-    },
-    bodyStyles: { 
-      fontSize: 10,
-      textColor: secondaryColor,
-      cellPadding: 4
-    },
-    alternateRowStyles: {
-      fillColor: lightGray
-    },
-    styles: { 
-      cellPadding: 4,
-      lineColor: [200, 200, 200],
-      lineWidth: 0.5,
-      overflow: 'linebreak'
-    },
-    // Use percentage-based widths for better space utilization
-    columnStyles: {
-      0: { 
-        cellWidth: availableWidth * 0.25, // 25% for microphone model
-        fontStyle: 'bold'
-      },
-      1: { 
-        cellWidth: availableWidth * 0.12, // 12% for total required
-        halign: 'center', 
-        fillColor: [255, 248, 248] 
-      },
-      2: { 
-        cellWidth: availableWidth * 0.12, // 12% for exclusive use
-        halign: 'center', 
-        fillColor: [255, 235, 235] 
-      },
-      3: { 
-        cellWidth: availableWidth * 0.12, // 12% for shared use
-        halign: 'center', 
-        fillColor: [235, 255, 235] 
-      },
-      4: { 
-        cellWidth: availableWidth * 0.39, // 39% for stage distribution (much wider)
-        fontSize: 9,
-        overflow: 'linebreak'
-      }
-    },
-    margin: { left: margin, right: margin }
+  console.log('🚀 FRESH START: Starting simplified PDF generation');
+  console.log('📊 Input data:', {
+    totalDates: data.artistsByDateAndStage.size,
+    dateStructure: Array.from(data.artistsByDateAndStage.entries()).map(([date, stages]) => ({
+      date,
+      stageCount: stages.size,
+      totalArtists: Array.from(stages.values()).reduce((sum, artists) => sum + artists.length, 0)
+    }))
   });
   
-  yPosition = (pdf as any).lastAutoTable.finalY + 25;
-  
-  // Detailed breakdown section with burgundy header
-  pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  pdf.rect(margin - 5, yPosition - 8, pageWidth - (margin * 2) + 10, 20, 'F');
-  
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(14);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('Detailed Stage Analysis', margin, yPosition + 5);
-  yPosition += 25;
-  
-  for (const need of data.microphoneNeeds) {
-    // Check if we need a new page
-    if (yPosition > pageHeight - 100) {
-      pdf.addPage();
-      yPosition = 30;
-    }
-    
-    // Model header with light gray background
-    pdf.setFillColor(headerGray[0], headerGray[1], headerGray[2]);
-    pdf.rect(margin, yPosition - 5, pageWidth - (margin * 2), 20, 'F');
-    
-    pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    pdf.setFontSize(12);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(`${need.model} - Stage Requirements`, margin + 5, yPosition + 8);
-    yPosition += 25;
-    
-    const detailData = need.stages.map(stage => [
-      `Stage ${stage.stage}`,
-      stage.quantity.toString(),
-      stage.isExclusive ? 'Yes' : 'No',
-      stage.artists.join(', ')
-    ]);
-    
-    (pdf as any).autoTable({
-      startY: yPosition,
-      head: [['Stage', 'Quantity', 'Exclusive', 'Artists Using This Model']],
-      body: detailData,
-      theme: 'grid',
-      headStyles: { 
-        fillColor: [80, 80, 80], // Dark gray for sub-headers
-        textColor: [255, 255, 255],
-        fontSize: 10,
-        fontStyle: 'bold',
-        halign: 'center'
-      },
-      bodyStyles: { 
-        fontSize: 9,
-        textColor: secondaryColor,
-        cellPadding: 4
-      },
-      alternateRowStyles: {
-        fillColor: [252, 252, 252]
-      },
-      styles: { 
-        cellPadding: 4,
-        lineColor: [200, 200, 200],
-        lineWidth: 0.3,
-        overflow: 'linebreak'
-      },
-      // Optimized column widths for better space usage
-      columnStyles: {
-        0: { 
-          cellWidth: availableWidth * 0.15, // 15% for stage
-          fontStyle: 'bold', 
-          halign: 'center' 
-        },
-        1: { 
-          cellWidth: availableWidth * 0.12, // 12% for quantity
-          halign: 'center' 
-        },
-        2: { 
-          cellWidth: availableWidth * 0.12, // 12% for exclusive
+  // Process each date and stage
+  for (const [date, stagesMap] of data.artistsByDateAndStage.entries()) {
+    for (const [stage, artists] of stagesMap.entries()) {
+      console.log(`\n📋 Processing: ${date} - Stage ${stage} (${artists.length} artists)`);
+      
+      if (!isFirstPage) {
+        pdf.addPage();
+      }
+      isFirstPage = false;
+      
+      let yPosition = 20;
+      
+      // Add logo if available
+      if (data.logoUrl && yPosition === 20) {
+        try {
+          const logoResponse = await fetch(data.logoUrl);
+          const logoBlob = await logoResponse.blob();
+          const logoDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(logoBlob);
+          });
+          
+          pdf.addImage(logoDataUrl, 'PNG', margin, yPosition, 50, 25);
+          yPosition += 35;
+        } catch (error) {
+          console.error('❌ Logo loading error:', error);
+        }
+      }
+      
+      // Header with burgundy background
+      pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      pdf.rect(0, yPosition, pageWidth, 25, 'F');
+      
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Wired Microphone Requirements Matrix', pageWidth / 2, yPosition + 16, { align: 'center' });
+      yPosition += 35;
+      
+      // Job title
+      pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+      pdf.setFontSize(14);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(data.jobTitle, pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 20;
+      
+      // Date and stage header
+      const formattedDate = formatDateSimply(date);
+      pdf.setFillColor(headerGray[0], headerGray[1], headerGray[2]);
+      pdf.rect(margin, yPosition - 5, pageWidth - (margin * 2), 20, 'F');
+      
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`${formattedDate} - Stage ${stage}`, pageWidth / 2, yPosition + 8, { align: 'center' });
+      yPosition += 30;
+      
+      // Generate matrix data with simple approach
+      const matrixData = generateSimplifiedMatrixData(artists);
+      
+      console.log('📊 Matrix generated:', {
+        micModels: matrixData.micModels,
+        artists: matrixData.artistNames,
+        sampleData: matrixData.micModels.slice(0, 2).map(model => ({
+          model,
+          artistValues: matrixData.artistNames.slice(0, 3).map(artist => 
+            `${artist}: ${matrixData.individualMatrix[model]?.[artist] || 0}`
+          ),
+          peak: matrixData.peakMatrix[model]
+        }))
+      });
+      
+      if (matrixData.micModels.length === 0) {
+        pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text('No wired microphone requirements for this stage.', margin, yPosition);
+        continue;
+      }
+      
+      // Add note
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'italic');
+      pdf.setTextColor(100, 100, 100);
+      pdf.text('Individual cells show exact quantities per artist. Peak shows maximum concurrent usage.', margin, yPosition);
+      yPosition += 20;
+      
+      // Create table
+      const headers = ['Microphone Model', ...matrixData.artistNames, 'Peak Need'];
+      const tableBody = matrixData.micModels.map(micModel => {
+        const row = [micModel];
+        
+        // Add individual artist quantities
+        matrixData.artistNames.forEach(artistName => {
+          const quantity = matrixData.individualMatrix[micModel]?.[artistName] || 0;
+          row.push(quantity.toString());
+        });
+        
+        // Add peak quantity
+        const peakQuantity = matrixData.peakMatrix[micModel] || 0;
+        row.push(peakQuantity.toString());
+        return row;
+      });
+      
+      // Table styling
+      const availableWidth = pageWidth - (margin * 2);
+      const micModelColumnWidth = Math.min(availableWidth * 0.25, 150);
+      const peakColumnWidth = 80;
+      const artistColumnsWidth = availableWidth - micModelColumnWidth - peakColumnWidth;
+      const artistColumnWidth = Math.max(artistColumnsWidth / matrixData.artistNames.length, 60);
+      
+      // Generate table
+      (pdf as any).autoTable({
+        startY: yPosition,
+        head: [headers],
+        body: tableBody,
+        theme: 'grid',
+        headStyles: { 
+          fillColor: primaryColor,
+          textColor: [255, 255, 255],
+          fontSize: 10,
+          fontStyle: 'bold',
           halign: 'center',
-          didParseCell: function(data: any) {
-            if (data.cell.text[0] === 'Yes') {
-              data.cell.styles.fillColor = [255, 235, 235];
-              data.cell.styles.textColor = accentColor;
+          valign: 'middle'
+        },
+        bodyStyles: { 
+          fontSize: 9,
+          textColor: secondaryColor,
+          cellPadding: 3,
+          halign: 'center',
+          valign: 'middle'
+        },
+        alternateRowStyles: {
+          fillColor: lightGray
+        },
+        styles: { 
+          cellPadding: 3,
+          lineColor: [200, 200, 200],
+          lineWidth: 0.5,
+          overflow: 'linebreak'
+        },
+        columnStyles: {
+          0: { 
+            cellWidth: micModelColumnWidth,
+            fontStyle: 'bold',
+            halign: 'left'
+          },
+          [headers.length - 1]: {
+            cellWidth: peakColumnWidth,
+            fillColor: [255, 240, 240],
+            fontStyle: 'bold',
+            textColor: [139, 21, 33]
+          }
+        },
+        didParseCell: function(data: any) {
+          // Style artist columns
+          if (data.column.index > 0 && data.column.index < headers.length - 1) {
+            data.cell.styles.cellWidth = artistColumnWidth;
+            
+            // Highlight non-zero quantities
+            if (data.section === 'body' && parseInt(data.cell.text[0]) > 0) {
+              data.cell.styles.fillColor = [235, 255, 235];
               data.cell.styles.fontStyle = 'bold';
             }
           }
         },
-        3: { 
-          cellWidth: availableWidth * 0.61, // 61% for artists (much wider)
-          fontSize: 8,
-          overflow: 'linebreak'
-        }
-      },
-      margin: { left: margin, right: margin }
-    });
-    
-    yPosition = (pdf as any).lastAutoTable.finalY + 20;
+        margin: { left: margin, right: margin }
+      });
+    }
   }
   
-  // Footer with consistent festival styling
-  const timestamp = new Date().toLocaleString();
-  
   // Add footer on all pages
+  const timestamp = new Date().toLocaleString();
   const pageCount = pdf.getNumberOfPages();
+  
   for (let i = 1; i <= pageCount; i++) {
     pdf.setPage(i);
     
@@ -293,163 +214,177 @@ export const exportWiredMicrophoneNeedsPDF = async (data: WiredMicrophoneNeedsPd
     pdf.setFont('helvetica', 'normal');
     pdf.setTextColor(128, 128, 128);
     
-    // Add a line above footer
     pdf.setDrawColor(200, 200, 200);
     pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
     
     pdf.text(`Generated on ${timestamp}`, margin, pageHeight - 10);
-    pdf.text(`${data.jobTitle} - Wired Microphone Requirements`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+    pdf.text(`${data.jobTitle} - Wired Microphone Matrix`, pageWidth - margin, pageHeight - 10, { align: 'right' });
     pdf.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
   }
   
   return new Blob([pdf.output('blob')], { type: 'application/pdf' });
 };
 
-// Function to calculate microphone needs (extracted from calculator component)
-export const calculateWiredMicrophoneNeeds = (artists: any[]): WiredMicrophoneNeed[] => {
-  const microphoneMap = new Map<string, WiredMicrophoneNeed>();
-
-  // Group artists by stage and date
-  const stageGroups = new Map<string, typeof artists>();
+// Simple date formatting - no complex timezone handling
+const formatDateSimply = (dateString: string): string => {
+  console.log(`📅 Formatting date: "${dateString}"`);
   
-  artists.forEach(artist => {
-    const key = `${artist.stage}-${artist.date}`;
-    if (!stageGroups.has(key)) {
-      stageGroups.set(key, []);
-    }
-    stageGroups.get(key)!.push(artist);
-  });
-
-  // Process each stage group
-  stageGroups.forEach((stageArtists, stageKey) => {
-    const [stage, date] = stageKey.split('-');
+  // Handle YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    const [year, month, day] = dateString.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     
-    // Sort artists by show time for consecutive show detection
-    const sortedArtists = stageArtists.sort((a, b) => {
-      return (a.show_start || '').localeCompare(b.show_start || '');
-    });
-
-    // Track microphone usage across the day
-    const micUsageByTime = new Map<string, Array<{
-      artist: string;
-      mics: any[];
-      startTime: string;
-      endTime: string;
-      exclusive: boolean;
-      showIndex: number;
-    }>>();
-
-    sortedArtists.forEach((artist, index) => {
-      if (!artist.wired_mics || !Array.isArray(artist.wired_mics)) return;
-
-      const wiredMics = artist.wired_mics;
-      wiredMics.forEach((mic: any) => {
-        if (!mic.model || !mic.quantity) return;
-
-        const usage = {
-          artist: artist.name,
-          mics: [mic],
-          startTime: artist.show_start || '',
-          endTime: artist.show_end || '',
-          exclusive: mic.exclusive_use || false,
-          showIndex: index
-        };
-
-        if (!micUsageByTime.has(mic.model)) {
-          micUsageByTime.set(mic.model, []);
-        }
-        micUsageByTime.get(mic.model)!.push(usage);
-      });
-    });
-
-    // Calculate peak requirements for each microphone model
-    micUsageByTime.forEach((usages, model) => {
-      let maxQuantity = 0;
-      let exclusiveQuantity = 0;
-      let sharedQuantity = 0;
-
-      // Check for overlapping and consecutive shows
-      for (let i = 0; i < usages.length; i++) {
-        let currentQuantity = 0;
-        let currentExclusive = 0;
-        let currentShared = 0;
-        const artistsAtTime: string[] = [];
-
-        for (let j = 0; j < usages.length; j++) {
-          const usage = usages[j];
-          const isOverlapping = i === j || isTimeOverlapping(
-            usages[i].startTime, usages[i].endTime,
-            usage.startTime, usage.endTime
-          );
-          
-          // Shows are consecutive if their indices are adjacent in the sorted array
-          const isConsecutiveShow = Math.abs(usages[i].showIndex - usage.showIndex) === 1;
-
-          if (isOverlapping || isConsecutiveShow) {
-            const micQuantity = usage.mics[0]?.quantity || 0;
-            currentQuantity += micQuantity;
-            artistsAtTime.push(usage.artist);
-
-            if (usage.exclusive) {
-              currentExclusive += micQuantity;
-            } else {
-              // For shared mics, they can't be shared if ANY show in the time window is exclusive
-              // or if shows are consecutive (they need separate mic sets)
-              const hasExclusiveInWindow = usages.some(u => u.exclusive && (
-                isTimeOverlapping(usage.startTime, usage.endTime, u.startTime, u.endTime) ||
-                Math.abs(usage.showIndex - u.showIndex) === 1
-              ));
-              
-              // Also can't share if any show is consecutive to this one
-              const hasConsecutiveShow = usages.some(u => 
-                Math.abs(usage.showIndex - u.showIndex) === 1 &&
-                (isTimeOverlapping(usage.startTime, usage.endTime, u.startTime, u.endTime) ||
-                 isConsecutiveShow)
-              );
-              
-              if (!hasExclusiveInWindow && !hasConsecutiveShow) {
-                currentShared = Math.max(currentShared, micQuantity);
-              } else {
-                // If can't be shared, treat as exclusive for counting
-                currentExclusive += micQuantity;
-              }
-            }
-          }
-        }
-
-        maxQuantity = Math.max(maxQuantity, currentExclusive + currentShared);
-        exclusiveQuantity = Math.max(exclusiveQuantity, currentExclusive);
-        sharedQuantity = Math.max(sharedQuantity, currentShared);
-      }
-
-      // Update or create microphone need entry
-      if (!microphoneMap.has(model)) {
-        microphoneMap.set(model, {
-          model,
-          maxQuantity: 0,
-          exclusiveQuantity: 0,
-          sharedQuantity: 0,
-          stages: []
-        });
-      }
-
-      const need = microphoneMap.get(model)!;
-      need.maxQuantity = Math.max(need.maxQuantity, maxQuantity);
-      need.exclusiveQuantity = Math.max(need.exclusiveQuantity, exclusiveQuantity);
-      need.sharedQuantity = Math.max(need.sharedQuantity, sharedQuantity);
-      
-      need.stages.push({
-        stage: parseInt(stage),
-        quantity: maxQuantity,
-        isExclusive: exclusiveQuantity > 0,
-        artists: [...new Set(usages.map(u => u.artist))]
-      });
-    });
-  });
-
-  return Array.from(microphoneMap.values());
+    const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                   'July', 'August', 'September', 'October', 'November', 'December'];
+    
+    const formatted = `${weekdays[date.getDay()]}, ${months[date.getMonth()]} ${parseInt(day)}, ${year}`;
+    console.log(`📅 Formatted: "${dateString}" -> "${formatted}"`);
+    return formatted;
+  }
+  
+  return dateString; // Fallback to original
 };
 
-const isTimeOverlapping = (start1: string, end1: string, start2: string, end2: string): boolean => {
-  return start1 < end2 && start2 < end1;
+interface SimplifiedMatrixData {
+  micModels: string[];
+  artistNames: string[];
+  individualMatrix: Record<string, Record<string, number>>;
+  peakMatrix: Record<string, number>;
+}
+
+// Completely simplified matrix generation - direct database mapping
+const generateSimplifiedMatrixData = (artists: any[]): SimplifiedMatrixData => {
+  console.log('\n🔄 SIMPLIFIED MATRIX GENERATION START');
+  console.log('🎭 Artists input:', artists.map(a => ({
+    name: a.name,
+    wiredMicsCount: a.wired_mics?.length || 0,
+    wiredMicsPreview: a.wired_mics?.slice(0, 2)
+  })));
+  
+  const micModelsSet = new Set<string>();
+  const artistNamesSet = new Set<string>();
+  const individualMatrix: Record<string, Record<string, number>> = {};
+  
+  // Step 1: Direct database mapping - no accumulation bugs
+  artists.forEach((artist, artistIndex) => {
+    const artistName = artist.name || `Artist ${artistIndex + 1}`;
+    artistNamesSet.add(artistName);
+    
+    console.log(`\n👤 Processing artist: ${artistName}`);
+    console.log(`🎤 Raw wired_mics:`, artist.wired_mics);
+    
+    if (!artist.wired_mics || !Array.isArray(artist.wired_mics)) {
+      console.log(`⚠️ No wired_mics array for ${artistName}`);
+      return;
+    }
+    
+    // Process each mic entry directly
+    artist.wired_mics.forEach((micEntry: any, micIndex: number) => {
+      console.log(`🎤 Processing mic ${micIndex}:`, micEntry);
+      
+      if (!micEntry || typeof micEntry !== 'object') {
+        console.log(`❌ Invalid mic entry ${micIndex}`);
+        return;
+      }
+      
+      const micModel = String(micEntry.model || '').trim();
+      const quantity = parseInt(String(micEntry.quantity || 0));
+      
+      if (!micModel || quantity <= 0) {
+        console.log(`❌ Invalid mic: model="${micModel}", quantity=${quantity}`);
+        return;
+      }
+      
+      console.log(`✅ VALID MIC: ${artistName} needs ${quantity}x ${micModel}`);
+      
+      micModelsSet.add(micModel);
+      
+      // Initialize if needed
+      if (!individualMatrix[micModel]) {
+        individualMatrix[micModel] = {};
+      }
+      
+      // CRITICAL FIX: Direct assignment, no accumulation
+      individualMatrix[micModel][artistName] = quantity;
+      
+      console.log(`📝 STORED: ${micModel}[${artistName}] = ${quantity}`);
+    });
+  });
+  
+  // Step 2: Simple peak calculation - just sum all requirements
+  const peakMatrix: Record<string, number> = {};
+  
+  console.log('\n⚡ CALCULATING PEAKS');
+  micModelsSet.forEach(micModel => {
+    const artistRequirements = individualMatrix[micModel] || {};
+    const peak = Object.values(artistRequirements).reduce((sum, qty) => sum + (qty || 0), 0);
+    peakMatrix[micModel] = peak;
+    
+    console.log(`📊 Peak for ${micModel}: ${peak} (from ${Object.entries(artistRequirements).map(([artist, qty]) => `${artist}:${qty}`).join(', ')})`);
+  });
+  
+  const result = {
+    micModels: Array.from(micModelsSet).sort(),
+    artistNames: Array.from(artistNamesSet).sort(),
+    individualMatrix,
+    peakMatrix
+  };
+  
+  console.log('\n🎯 FINAL SIMPLIFIED RESULT:');
+  console.log(`🎤 Mic models (${result.micModels.length}):`, result.micModels);
+  console.log(`👥 Artists (${result.artistNames.length}):`, result.artistNames);
+  console.log('📊 Individual matrix sample:', Object.entries(result.individualMatrix).slice(0, 2));
+  console.log('⚡ Peak matrix sample:', Object.entries(result.peakMatrix).slice(0, 3));
+  
+  return result;
+};
+
+// Helper function to organize artists by date and stage - fixed date handling
+export const organizeArtistsByDateAndStage = (artists: any[]): Map<string, Map<number, any[]>> => {
+  const organized = new Map<string, Map<number, any[]>>();
+  
+  console.log('\n🗂️ ORGANIZING ARTISTS BY DATE/STAGE - FIXED VERSION');
+  console.log(`📋 Input: ${artists.length} artists`);
+  
+  // Log all unique dates first
+  const allDates = artists.map(a => a.date).filter(Boolean);
+  const uniqueDates = [...new Set(allDates)];
+  console.log('📅 ALL DATES IN INPUT:', uniqueDates);
+  
+  artists.forEach((artist, index) => {
+    const date = artist.date;
+    const stage = artist.stage || 1;
+    
+    console.log(`📌 Artist ${index}: "${artist.name}" -> Date: "${date}", Stage: ${stage}`);
+    
+    if (!date) {
+      console.warn(`⚠️ Skipping "${artist.name}" - no date field`);
+      return;
+    }
+    
+    // Initialize structures
+    if (!organized.has(date)) {
+      organized.set(date, new Map());
+    }
+    if (!organized.get(date)!.has(stage)) {
+      organized.get(date)!.set(stage, []);
+    }
+    
+    organized.get(date)!.get(stage)!.push(artist);
+  });
+  
+  console.log('\n📊 ORGANIZATION COMPLETE:');
+  Array.from(organized.entries()).forEach(([date, stages]) => {
+    console.log(`📅 Date "${date}": ${stages.size} stages`);
+    Array.from(stages.entries()).forEach(([stage, stageArtists]) => {
+      console.log(`  🎪 Stage ${stage}: ${stageArtists.length} artists`);
+      stageArtists.forEach(artist => {
+        const wiredMicCount = artist.wired_mics?.length || 0;
+        console.log(`    👤 ${artist.name}: ${wiredMicCount} wired mics`);
+      });
+    });
+  });
+  
+  return organized;
 };

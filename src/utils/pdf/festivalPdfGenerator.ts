@@ -5,13 +5,13 @@ import { exportShiftsTablePDF, ShiftsTablePdfData } from '../shiftsTablePdfExpor
 import { exportRfIemTablePDF, RfIemTablePdfData } from '../rfIemTablePdfExport';
 import { exportInfrastructureTablePDF, InfrastructureTablePdfData } from '../infrastructureTablePdfExport';
 import { exportMissingRiderReportPDF, MissingRiderReportData } from '../missingRiderReportPdfExport';
-import { exportWiredMicrophoneNeedsPDF, WiredMicrophoneNeedsPdfData, calculateWiredMicrophoneNeeds } from '../wiredMicrophoneNeedsPdfExport';
 import { generateStageGearPDF } from '../gearSetupPdfExport';
 import { fetchLogoUrl } from './logoUtils';
 import { generateCoverPage } from './coverPageGenerator';
 import { generateTableOfContents } from './tocGenerator';
 import { mergePDFs } from './pdfMerge';
 import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
+import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArtistsByDateAndStage } from '../wiredMicrophoneNeedsPdfExport';
 
 // Helper function to sort artists chronologically across all dates
 const sortArtistsChronologically = (artists: any[]) => {
@@ -80,7 +80,7 @@ export const generateAndMergeFestivalPDFs = async (
   let rfIemTablePdf: Blob | null = null;
   let infrastructureTablePdf: Blob | null = null;
   let missingRiderReportPdf: Blob | null = null;
-  let wiredMicNeedsPdf: Blob | null = null;
+  let wiredMicMatrixPdf: Blob | null = null;
   
   try {
     const { data: artists, error: artistError } = await supabase
@@ -597,7 +597,7 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
-    // Generate Wired Microphone Needs PDF if option is selected
+    // Generate Wired Microphone Matrix PDF if option is selected - UPDATED APPROACH
     if (options.includeWiredMicNeeds && artists && artists.length > 0) {
       const filteredArtists = artists.filter(artist => 
         options.wiredMicNeedsStages.includes(Number(artist.stage)) &&
@@ -607,23 +607,23 @@ export const generateAndMergeFestivalPDFs = async (
         artist.wired_mics.length > 0
       );
       
-      console.log(`Generating Wired Microphone Needs PDF with ${filteredArtists.length} artists`);
+      console.log(`Generating Wired Microphone Matrix PDF with ${filteredArtists.length} artists`);
       
       if (filteredArtists.length > 0) {
-        const microphoneNeeds = calculateWiredMicrophoneNeeds(filteredArtists);
+        // Use the new matrix-based approach
+        const artistsByDateAndStage = organizeArtistsByDateAndStage(filteredArtists);
         
-        const wiredMicData: WiredMicrophoneNeedsPdfData = {
+        const wiredMicMatrixData: WiredMicrophoneMatrixData = {
           jobTitle,
           logoUrl,
-          microphoneNeeds,
-          selectedStages: options.wiredMicNeedsStages
+          artistsByDateAndStage
         };
         
         try {
-          wiredMicNeedsPdf = await exportWiredMicrophoneNeedsPDF(wiredMicData);
-          console.log(`Generated Wired Microphone Needs PDF, size: ${wiredMicNeedsPdf.size} bytes`);
+          wiredMicMatrixPdf = await exportWiredMicrophoneMatrixPDF(wiredMicMatrixData);
+          console.log(`Generated Wired Microphone Matrix PDF, size: ${wiredMicMatrixPdf.size} bytes`);
         } catch (err) {
-          console.error('Error generating Wired Microphone Needs PDF:', err);
+          console.error('Error generating Wired Microphone Matrix PDF:', err);
         }
       }
     }
@@ -645,8 +645,8 @@ export const generateAndMergeFestivalPDFs = async (
     if (options.includeInfrastructureTable && infrastructureTablePdf) {
       tocSections.push({ title: "Infrastructure Needs Overview", pageCount: 1 });
     }
-    if (options.includeWiredMicNeeds && wiredMicNeedsPdf) {
-      tocSections.push({ title: "Wired Microphone Requirements", pageCount: 1 });
+    if (options.includeWiredMicNeeds && wiredMicMatrixPdf) {
+      tocSections.push({ title: "Wired Microphone Requirements Matrix", pageCount: 1 });
     }
     if (options.includeMissingRiderReport && missingRiderReportPdf) {
       tocSections.push({ title: "Missing Rider Report", pageCount: 1 });
@@ -669,7 +669,7 @@ export const generateAndMergeFestivalPDFs = async (
       ...(options.includeArtistTables ? artistTablePdfs : []),   // 3. Artist Schedule Tables
       ...(options.includeRfIemTable && rfIemTablePdf ? [rfIemTablePdf] : []),  // 4. RF and IEM Overview
       ...(options.includeInfrastructureTable && infrastructureTablePdf ? [infrastructureTablePdf] : []),  // 5. Infrastructure Needs Overview
-      ...(options.includeWiredMicNeeds && wiredMicNeedsPdf ? [wiredMicNeedsPdf] : []),  // 6. Wired Microphone Requirements
+      ...(options.includeWiredMicNeeds && wiredMicMatrixPdf ? [wiredMicMatrixPdf] : []),  // 6. Wired Microphone Matrix
       ...(options.includeMissingRiderReport && missingRiderReportPdf ? [missingRiderReportPdf] : []),  // 7. Missing Rider Report
       ...(options.includeArtistRequirements ? individualArtistPdfs : [])  // 8. Individual Artist Requirements
     ];
