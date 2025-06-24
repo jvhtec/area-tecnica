@@ -22,10 +22,16 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
   
   let isFirstPage = true;
   
+  console.log('Processing dates:', Array.from(data.artistsByDateAndStage.keys()));
+  
   // Process each date
   for (const [date, stagesMap] of data.artistsByDateAndStage.entries()) {
+    console.log(`Processing date: ${date}, stages:`, Array.from(stagesMap.keys()));
+    
     // Process each stage within the date
     for (const [stage, artists] of stagesMap.entries()) {
+      console.log(`Processing stage ${stage} on ${date}, artists:`, artists.length);
+      
       if (!isFirstPage) {
         pdf.addPage();
       }
@@ -83,8 +89,10 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
       pdf.text(`${dateStr} - Stage ${stage}`, pageWidth / 2, yPosition + 8, { align: 'center' });
       yPosition += 30;
       
-      // Generate matrix data with smart calculations
-      const matrixData = generateSmartMatrixData(artists);
+      // Generate matrix data with corrected calculations
+      const matrixData = generateCorrectMatrixData(artists);
+      
+      console.log('Matrix data for stage:', stage, matrixData);
       
       if (matrixData.micModels.length === 0) {
         pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
@@ -113,7 +121,7 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
           row.push(quantity.toString());
         });
         
-        // Use the smart calculated peak concurrent quantity
+        // Use the corrected peak concurrent quantity
         const peakQuantity = matrixData.peakConcurrentMatrix[micModel] || 0;
         row.push(peakQuantity.toString());
         return row;
@@ -208,19 +216,21 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
   return new Blob([pdf.output('blob')], { type: 'application/pdf' });
 };
 
-interface SmartMatrixData {
+interface CorrectMatrixData {
   micModels: string[];
   artistNames: string[];
   individualMatrix: Record<string, Record<string, number>>;
   peakConcurrentMatrix: Record<string, number>;
 }
 
-const generateSmartMatrixData = (artists: any[]): SmartMatrixData => {
+const generateCorrectMatrixData = (artists: any[]): CorrectMatrixData => {
   const micModelsSet = new Set<string>();
   const artistNamesSet = new Set<string>();
   const individualMatrix: Record<string, Record<string, number>> = {};
   
-  // First pass: Build individual requirements matrix
+  console.log('Processing artists for matrix:', artists.map(a => ({ name: a.name, wiredMics: a.wired_mics })));
+  
+  // First pass: Build individual requirements matrix (this should be correct)
   artists.forEach(artist => {
     if (!artist.wired_mics || !Array.isArray(artist.wired_mics)) return;
     
@@ -233,6 +243,8 @@ const generateSmartMatrixData = (artists: any[]): SmartMatrixData => {
       const micModel = mic.model;
       const quantity = parseInt(mic.quantity) || 0;
       
+      console.log(`Artist ${artistName} needs ${quantity} ${micModel}`);
+      
       micModelsSet.add(micModel);
       
       if (!individualMatrix[micModel]) {
@@ -243,19 +255,22 @@ const generateSmartMatrixData = (artists: any[]): SmartMatrixData => {
     });
   });
   
-  // Second pass: Calculate peak concurrent usage using smart logic
+  // Second pass: Calculate peak concurrent usage using timeline approach
   const peakConcurrentMatrix: Record<string, number> = {};
   
-  // Sort artists by show time for consecutive show detection
-  const sortedArtists = artists.sort((a, b) => {
+  // Sort artists by show time
+  const sortedArtists = [...artists].sort((a, b) => {
     return (a.show_start || '').localeCompare(b.show_start || '');
   });
-
-  // Group microphone usage by model and calculate peak concurrent needs
+  
+  console.log('Sorted artists:', sortedArtists.map(a => ({ name: a.name, start: a.show_start, end: a.show_end })));
+  
+  // For each microphone model, calculate peak concurrent usage
   for (const micModel of micModelsSet) {
-    const micUsageByTime = [];
+    // Create timeline events for this mic model
+    const events: Array<{ time: string; quantity: number; type: 'start' | 'end'; artist: string }> = [];
     
-    sortedArtists.forEach((artist, index) => {
+    sortedArtists.forEach(artist => {
       if (!artist.wired_mics || !Array.isArray(artist.wired_mics)) return;
       
       const relevantMics = artist.wired_mics.filter((mic: any) => mic.model === micModel);
@@ -265,72 +280,87 @@ const generateSmartMatrixData = (artists: any[]): SmartMatrixData => {
         sum + (parseInt(mic.quantity) || 0), 0
       );
       
-      if (totalQuantityForModel > 0) {
-        micUsageByTime.push({
-          artist: artist.name,
+      if (totalQuantityForModel > 0 && artist.show_start && artist.show_end) {
+        events.push({
+          time: artist.show_start,
           quantity: totalQuantityForModel,
-          startTime: artist.show_start || '',
-          endTime: artist.show_end || '',
-          exclusive: relevantMics.some((mic: any) => mic.exclusive_use),
-          showIndex: index
+          type: 'start',
+          artist: artist.name
+        });
+        events.push({
+          time: artist.show_end,
+          quantity: totalQuantityForModel,
+          type: 'end',
+          artist: artist.name
         });
       }
     });
     
-    // Calculate peak concurrent usage for this mic model
-    let maxConcurrent = 0;
+    // Sort events by time
+    events.sort((a, b) => a.time.localeCompare(b.time));
     
-    for (let i = 0; i < micUsageByTime.length; i++) {
-      let currentConcurrent = 0;
-      
-      for (let j = 0; j < micUsageByTime.length; j++) {
-        const usage1 = micUsageByTime[i];
-        const usage2 = micUsageByTime[j];
-        
-        const isOverlapping = i === j || isTimeOverlapping(
-          usage1.startTime, usage1.endTime,
-          usage2.startTime, usage2.endTime
-        );
-        
-        // Shows are consecutive if their indices are adjacent
-        const isConsecutive = Math.abs(usage1.showIndex - usage2.showIndex) === 1;
-        
-        if (isOverlapping || isConsecutive) {
-          // For overlapping or consecutive shows, mics can't be shared
-          currentConcurrent += usage2.quantity;
-        } else if (i === j) {
-          // Same show, count normally
-          currentConcurrent += usage2.quantity;
-        }
-        // For non-overlapping, non-consecutive shows, mics can be reused (don't add to concurrent)
+    // Calculate peak concurrent usage
+    let currentUsage = 0;
+    let peakUsage = 0;
+    
+    events.forEach(event => {
+      if (event.type === 'start') {
+        currentUsage += event.quantity;
+        peakUsage = Math.max(peakUsage, currentUsage);
+      } else {
+        currentUsage -= event.quantity;
       }
+    });
+    
+    // Handle consecutive shows - check if any shows are back-to-back
+    let consecutiveAdjustment = 0;
+    for (let i = 0; i < sortedArtists.length - 1; i++) {
+      const current = sortedArtists[i];
+      const next = sortedArtists[i + 1];
       
-      maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+      if (current.show_end === next.show_start) {
+        // Back-to-back shows - check if both use this mic model
+        const currentMics = current.wired_mics?.filter((mic: any) => mic.model === micModel) || [];
+        const nextMics = next.wired_mics?.filter((mic: any) => mic.model === micModel) || [];
+        
+        if (currentMics.length > 0 && nextMics.length > 0) {
+          const currentQuantity = currentMics.reduce((sum: number, mic: any) => sum + (parseInt(mic.quantity) || 0), 0);
+          const nextQuantity = nextMics.reduce((sum: number, mic: any) => sum + (parseInt(mic.quantity) || 0), 0);
+          
+          // For consecutive shows, we need separate mic sets
+          consecutiveAdjustment = Math.max(consecutiveAdjustment, currentQuantity + nextQuantity);
+        }
+      }
     }
     
-    peakConcurrentMatrix[micModel] = maxConcurrent;
+    peakConcurrentMatrix[micModel] = Math.max(peakUsage, consecutiveAdjustment);
+    
+    console.log(`${micModel}: peak concurrent = ${peakConcurrentMatrix[micModel]} (timeline peak: ${peakUsage}, consecutive adjustment: ${consecutiveAdjustment})`);
   }
   
-  return {
+  const result = {
     micModels: Array.from(micModelsSet).sort(),
     artistNames: Array.from(artistNamesSet).sort(),
     individualMatrix,
     peakConcurrentMatrix
   };
-};
-
-const isTimeOverlapping = (start1: string, end1: string, start2: string, end2: string): boolean => {
-  if (!start1 || !end1 || !start2 || !end2) return false;
-  return start1 < end2 && start2 < end1;
+  
+  console.log('Final matrix result:', result);
+  
+  return result;
 };
 
 // Helper function to organize artists by date and stage
 export const organizeArtistsByDateAndStage = (artists: any[]): Map<string, Map<number, any[]>> => {
   const organized = new Map<string, Map<number, any[]>>();
   
+  console.log('Organizing artists by date and stage:', artists.length, 'artists');
+  
   artists.forEach(artist => {
     const date = artist.date;
     const stage = artist.stage || 1;
+    
+    console.log(`Artist ${artist.name}: date=${date}, stage=${stage}`);
     
     if (!organized.has(date)) {
       organized.set(date, new Map());
@@ -342,6 +372,16 @@ export const organizeArtistsByDateAndStage = (artists: any[]): Map<string, Map<n
     
     organized.get(date)!.get(stage)!.push(artist);
   });
+  
+  console.log('Organized structure:', 
+    Array.from(organized.entries()).map(([date, stages]) => ({
+      date,
+      stages: Array.from(stages.entries()).map(([stage, artists]) => ({
+        stage,
+        artistCount: artists.length
+      }))
+    }))
+  );
   
   return organized;
 };
