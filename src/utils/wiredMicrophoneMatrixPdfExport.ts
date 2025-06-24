@@ -22,28 +22,20 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
   
   let isFirstPage = true;
   
-  console.log('🎯 COMPLETE REWRITE: Starting PDF generation');
-  console.log('🎯 Input data structure:', {
+  console.log('🚀 FRESH START: Starting simplified PDF generation');
+  console.log('📊 Input data:', {
     totalDates: data.artistsByDateAndStage.size,
-    allDates: Array.from(data.artistsByDateAndStage.keys()),
-    dateStageStructure: Array.from(data.artistsByDateAndStage.entries()).map(([date, stages]) => ({
+    dateStructure: Array.from(data.artistsByDateAndStage.entries()).map(([date, stages]) => ({
       date,
-      stages: Array.from(stages.keys()),
-      artistCounts: Array.from(stages.entries()).map(([stage, artists]) => ({
-        stage,
-        count: artists.length,
-        names: artists.map(a => a.name)
-      }))
+      stageCount: stages.size,
+      totalArtists: Array.from(stages.values()).reduce((sum, artists) => sum + artists.length, 0)
     }))
   });
   
-  // Process each date
+  // Process each date and stage
   for (const [date, stagesMap] of data.artistsByDateAndStage.entries()) {
-    console.log(`🎯 Processing date: "${date}"`);
-    
-    // Process each stage within the date
     for (const [stage, artists] of stagesMap.entries()) {
-      console.log(`🎯 Processing Stage ${stage} with ${artists.length} artists`);
+      console.log(`\n📋 Processing: ${date} - Stage ${stage} (${artists.length} artists)`);
       
       if (!isFirstPage) {
         pdf.addPage();
@@ -52,7 +44,7 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
       
       let yPosition = 20;
       
-      // Add logo if available and on first section
+      // Add logo if available
       if (data.logoUrl && yPosition === 20) {
         try {
           const logoResponse = await fetch(data.logoUrl);
@@ -66,7 +58,7 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
           pdf.addImage(logoDataUrl, 'PNG', margin, yPosition, 50, 25);
           yPosition += 35;
         } catch (error) {
-          console.error('Error loading logo:', error);
+          console.error('❌ Logo loading error:', error);
         }
       }
       
@@ -87,10 +79,8 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
       pdf.text(data.jobTitle, pageWidth / 2, yPosition, { align: 'center' });
       yPosition += 20;
       
-      // Date formatting
-      const formattedDate = formatDateProperly(date);
-      console.log(`🎯 Date formatting: "${date}" -> "${formattedDate}"`);
-      
+      // Date and stage header
+      const formattedDate = formatDateSimply(date);
       pdf.setFillColor(headerGray[0], headerGray[1], headerGray[2]);
       pdf.rect(margin, yPosition - 5, pageWidth - (margin * 2), 20, 'F');
       
@@ -99,17 +89,19 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
       pdf.text(`${formattedDate} - Stage ${stage}`, pageWidth / 2, yPosition + 8, { align: 'center' });
       yPosition += 30;
       
-      // Generate matrix data with completely fixed logic
-      const matrixData = generateCompletelyFixedMatrixData(artists);
+      // Generate matrix data with simple approach
+      const matrixData = generateSimplifiedMatrixData(artists);
       
-      console.log(`🎯 Matrix data generated:`, {
-        micModelCount: matrixData.micModels.length,
-        artistCount: matrixData.artistNames.length,
-        individualMatrixSample: Object.entries(matrixData.individualMatrix).slice(0, 3).map(([model, artistMap]) => ({
+      console.log('📊 Matrix generated:', {
+        micModels: matrixData.micModels,
+        artists: matrixData.artistNames,
+        sampleData: matrixData.micModels.slice(0, 2).map(model => ({
           model,
-          artistEntries: Object.entries(artistMap).slice(0, 3)
-        })),
-        peakMatrixSample: Object.entries(matrixData.peakConcurrentMatrix).slice(0, 3)
+          artistValues: matrixData.artistNames.slice(0, 3).map(artist => 
+            `${artist}: ${matrixData.individualMatrix[model]?.[artist] || 0}`
+          ),
+          peak: matrixData.peakMatrix[model]
+        }))
       });
       
       if (matrixData.micModels.length === 0) {
@@ -120,31 +112,31 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
         continue;
       }
       
-      // Add explanation note
+      // Add note
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'italic');
       pdf.setTextColor(100, 100, 100);
-      pdf.text('Note: Individual cells show exact database quantities per artist. Peak column shows maximum concurrent usage considering exclusive items.', margin, yPosition);
+      pdf.text('Individual cells show exact quantities per artist. Peak shows maximum concurrent usage.', margin, yPosition);
       yPosition += 20;
       
-      // Create table headers
+      // Create table
       const headers = ['Microphone Model', ...matrixData.artistNames, 'Peak Need'];
-      
-      // Create table body
       const tableBody = matrixData.micModels.map(micModel => {
         const row = [micModel];
         
+        // Add individual artist quantities
         matrixData.artistNames.forEach(artistName => {
           const quantity = matrixData.individualMatrix[micModel]?.[artistName] || 0;
           row.push(quantity.toString());
         });
         
-        const peakQuantity = matrixData.peakConcurrentMatrix[micModel] || 0;
+        // Add peak quantity
+        const peakQuantity = matrixData.peakMatrix[micModel] || 0;
         row.push(peakQuantity.toString());
         return row;
       });
       
-      // Calculate available width and column sizing
+      // Table styling
       const availableWidth = pageWidth - (margin * 2);
       const micModelColumnWidth = Math.min(availableWidth * 0.25, 150);
       const peakColumnWidth = 80;
@@ -233,341 +225,155 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
   return new Blob([pdf.output('blob')], { type: 'application/pdf' });
 };
 
-// Date formatting function
-const formatDateProperly = (dateString: string): string => {
-  console.log(`🎯 formatDateProperly called with: "${dateString}"`);
+// Simple date formatting - no complex timezone handling
+const formatDateSimply = (dateString: string): string => {
+  console.log(`📅 Formatting date: "${dateString}"`);
   
-  try {
-    // Handle YYYY-MM-DD format directly without Date constructor timezone issues
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-      const [yearStr, monthStr, dayStr] = dateString.split('-');
-      const year = parseInt(yearStr, 10);
-      const month = parseInt(monthStr, 10);
-      const day = parseInt(dayStr, 10);
-      
-      console.log(`🎯 Parsed date parts: year=${year}, month=${month}, day=${day}`);
-      
-      // Validate ranges
-      if (year < 1900 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) {
-        console.error(`🎯 Invalid date parts detected`);
-        return dateString;
-      }
-      
-      // Create date using UTC to avoid timezone issues
-      const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
-      
-      // Format manually to avoid timezone issues
-      const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const months = ['January', 'February', 'March', 'April', 'May', 'June', 
-                     'July', 'August', 'September', 'October', 'November', 'December'];
-      
-      const weekday = weekdays[date.getUTCDay()];
-      const monthName = months[date.getUTCMonth()];
-      
-      const formatted = `${weekday}, ${monthName} ${day}, ${year}`;
-      console.log(`🎯 Successfully formatted: "${dateString}" -> "${formatted}"`);
-      return formatted;
-    }
+  // Handle YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    const [year, month, day] = dateString.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     
-    // Fallback for other formats
-    console.log(`🎯 Using fallback formatting for: ${dateString}`);
-    return dateString;
+    const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                   'July', 'August', 'September', 'October', 'November', 'December'];
     
-  } catch (error) {
-    console.error(`🎯 Error in formatDateProperly:`, error);
-    return dateString;
+    const formatted = `${weekdays[date.getDay()]}, ${months[date.getMonth()]} ${parseInt(day)}, ${year}`;
+    console.log(`📅 Formatted: "${dateString}" -> "${formatted}"`);
+    return formatted;
   }
+  
+  return dateString; // Fallback to original
 };
 
-interface FixedMatrixData {
+interface SimplifiedMatrixData {
   micModels: string[];
   artistNames: string[];
   individualMatrix: Record<string, Record<string, number>>;
-  peakConcurrentMatrix: Record<string, number>;
+  peakMatrix: Record<string, number>;
 }
 
-// COMPLETELY REWRITTEN: Matrix data generation with exact database mapping
-const generateCompletelyFixedMatrixData = (artists: any[]): FixedMatrixData => {
-  console.log('🎯 ===== COMPLETELY REWRITTEN MATRIX GENERATION =====');
-  console.log('🎯 Processing artists:', {
-    artistCount: artists.length,
-    artistDetails: artists.map(a => ({
-      name: a.name,
-      wiredMics: a.wired_mics,
-      showStart: a.show_start,
-      showEnd: a.show_end,
-      isAfterMidnight: a.isaftermidnight
-    }))
-  });
+// Completely simplified matrix generation - direct database mapping
+const generateSimplifiedMatrixData = (artists: any[]): SimplifiedMatrixData => {
+  console.log('\n🔄 SIMPLIFIED MATRIX GENERATION START');
+  console.log('🎭 Artists input:', artists.map(a => ({
+    name: a.name,
+    wiredMicsCount: a.wired_mics?.length || 0,
+    wiredMicsPreview: a.wired_mics?.slice(0, 2)
+  })));
   
   const micModelsSet = new Set<string>();
   const artistNamesSet = new Set<string>();
   const individualMatrix: Record<string, Record<string, number>> = {};
   
-  // STEP 1: Build individual requirements - EXACT DATABASE MAPPING ONLY
-  artists.forEach((artist, index) => {
-    const artistName = artist.name || `Artist ${index + 1}`;
+  // Step 1: Direct database mapping - no accumulation bugs
+  artists.forEach((artist, artistIndex) => {
+    const artistName = artist.name || `Artist ${artistIndex + 1}`;
     artistNamesSet.add(artistName);
     
-    console.log(`🎯 ===== PROCESSING ARTIST: ${artistName} =====`);
-    console.log(`🎯 Raw database wired_mics:`, JSON.stringify(artist.wired_mics, null, 2));
+    console.log(`\n👤 Processing artist: ${artistName}`);
+    console.log(`🎤 Raw wired_mics:`, artist.wired_mics);
     
     if (!artist.wired_mics || !Array.isArray(artist.wired_mics)) {
-      console.log(`🎯 No wired_mics array for ${artistName} - skipping`);
+      console.log(`⚠️ No wired_mics array for ${artistName}`);
       return;
     }
     
-    // Process each mic entry EXACTLY as stored in database
-    artist.wired_mics.forEach((micEntry: any, entryIndex: number) => {
-      console.log(`🎯 Processing mic entry ${entryIndex}:`, JSON.stringify(micEntry, null, 2));
+    // Process each mic entry directly
+    artist.wired_mics.forEach((micEntry: any, micIndex: number) => {
+      console.log(`🎤 Processing mic ${micIndex}:`, micEntry);
       
       if (!micEntry || typeof micEntry !== 'object') {
-        console.log(`🎯 Invalid mic entry ${entryIndex} - not an object`);
+        console.log(`❌ Invalid mic entry ${micIndex}`);
         return;
       }
       
-      if (!micEntry.model || micEntry.quantity === undefined || micEntry.quantity === null) {
-        console.log(`🎯 Invalid mic entry ${entryIndex} - missing model or quantity`);
+      const micModel = String(micEntry.model || '').trim();
+      const quantity = parseInt(String(micEntry.quantity || 0));
+      
+      if (!micModel || quantity <= 0) {
+        console.log(`❌ Invalid mic: model="${micModel}", quantity=${quantity}`);
         return;
       }
       
-      const micModel = String(micEntry.model).trim();
-      const quantity = parseInt(String(micEntry.quantity)) || 0;
-      
-      if (quantity <= 0) {
-        console.log(`🎯 Zero quantity for ${micModel} - skipping`);
-        return;
-      }
-      
-      console.log(`🎯 DATABASE VALUE: ${artistName} needs ${quantity} of ${micModel}`);
+      console.log(`✅ VALID MIC: ${artistName} needs ${quantity}x ${micModel}`);
       
       micModelsSet.add(micModel);
       
-      // Initialize mic model entry if needed
+      // Initialize if needed
       if (!individualMatrix[micModel]) {
         individualMatrix[micModel] = {};
       }
       
-      // CRITICAL: Store EXACT database value per artist
-      if (!individualMatrix[micModel][artistName]) {
-        individualMatrix[micModel][artistName] = 0;
-      }
-      individualMatrix[micModel][artistName] += quantity;
+      // CRITICAL FIX: Direct assignment, no accumulation
+      individualMatrix[micModel][artistName] = quantity;
       
-      console.log(`🎯 STORED IN MATRIX: ${micModel}[${artistName}] = ${individualMatrix[micModel][artistName]}`);
+      console.log(`📝 STORED: ${micModel}[${artistName}] = ${quantity}`);
     });
-    
-    console.log(`🎯 ===== COMPLETED ARTIST: ${artistName} =====`);
   });
   
-  // VERIFICATION: Log the complete individual matrix
-  console.log('🎯 ===== INDIVIDUAL MATRIX VERIFICATION =====');
-  Object.entries(individualMatrix).forEach(([micModel, artistMap]) => {
-    const entries = Object.entries(artistMap).map(([artist, qty]) => `${artist}=${qty}`);
-    console.log(`🎯 ${micModel}: ${entries.join(', ')}`);
-  });
-  console.log('🎯 ===== END INDIVIDUAL MATRIX VERIFICATION =====');
+  // Step 2: Simple peak calculation - just sum all requirements
+  const peakMatrix: Record<string, number> = {};
   
-  // STEP 2: Calculate peak concurrent usage with exclusive use logic
-  const peakConcurrentMatrix: Record<string, number> = {};
-  
-  console.log('🎯 ===== CALCULATING PEAK CONCURRENT USAGE =====');
-  
-  // Enhanced time parsing with after-midnight handling
-  const parseTimeToMinutes = (timeStr: string, isAfterMidnight: boolean = false): number => {
-    if (!timeStr) return 0;
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    const totalMinutes = (hours || 0) * 60 + (minutes || 0);
-    // Add 24 hours if it's an after-midnight show
-    return isAfterMidnight ? totalMinutes + 1440 : totalMinutes;
-  };
-  
-  // Prepare artist timeline data with enhanced parsing
-  const artistTimelines = artists.map(artist => ({
-    name: artist.name,
-    startMinutes: parseTimeToMinutes(artist.show_start, artist.isaftermidnight),
-    endMinutes: parseTimeToMinutes(artist.show_end, artist.isaftermidnight),
-    isAfterMidnight: artist.isaftermidnight,
-    wiredMics: artist.wired_mics || []
-  })).filter(artist => artist.startMinutes > 0 && artist.endMinutes > artist.startMinutes);
-  
-  console.log('🎯 Artist timelines with after-midnight handling:', artistTimelines.map(a => ({
-    name: a.name,
-    start: a.startMinutes,
-    end: a.endMinutes,
-    duration: a.endMinutes - a.startMinutes,
-    isAfterMidnight: a.isAfterMidnight
-  })));
-  
-  // For each microphone model, find the peak concurrent usage
+  console.log('\n⚡ CALCULATING PEAKS');
   micModelsSet.forEach(micModel => {
-    console.log(`🎯 ===== CALCULATING PEAK FOR: ${micModel} =====`);
+    const artistRequirements = individualMatrix[micModel] || {};
+    const peak = Object.values(artistRequirements).reduce((sum, qty) => sum + (qty || 0), 0);
+    peakMatrix[micModel] = peak;
     
-    let maxConcurrentUsage = 0;
-    
-    if (artistTimelines.length === 0) {
-      // No timeline data - use simple sum
-      console.log(`🎯 No timeline data for ${micModel}, using sum`);
-      const artistRequirements = individualMatrix[micModel] || {};
-      maxConcurrentUsage = Object.values(artistRequirements).reduce((sum, qty) => sum + qty, 0);
-      console.log(`🎯 Sum-based peak for ${micModel}: ${maxConcurrentUsage}`);
-    } else {
-      // Create timeline events with exclusive use consideration
-      const events: Array<{
-        time: number, 
-        type: 'start' | 'end', 
-        artist: string, 
-        micQuantity: number,
-        isExclusive: boolean
-      }> = [];
-      
-      artistTimelines.forEach(artist => {
-        // Get exact quantity from individual matrix
-        const artistMicQuantity = individualMatrix[micModel]?.[artist.name] || 0;
-        
-        if (artistMicQuantity > 0) {
-          // Check if this artist has exclusive use for this mic model
-          const micEntry = artist.wiredMics.find((mic: any) => 
-            String(mic.model).trim() === micModel
-          );
-          const isExclusive = micEntry?.exclusive_use === true;
-          
-          console.log(`🎯 ${artist.name} uses ${artistMicQuantity}x ${micModel} (exclusive: ${isExclusive})`);
-          
-          events.push({
-            time: artist.startMinutes,
-            type: 'start',
-            artist: artist.name,
-            micQuantity: artistMicQuantity,
-            isExclusive
-          });
-          events.push({
-            time: artist.endMinutes,
-            type: 'end',
-            artist: artist.name,
-            micQuantity: artistMicQuantity,
-            isExclusive
-          });
-        }
-      });
-      
-      // Sort events by time, with 'end' events before 'start' events at the same time
-      events.sort((a, b) => {
-        if (a.time !== b.time) return a.time - b.time;
-        return a.type === 'end' ? -1 : 1;
-      });
-      
-      console.log(`🎯 Timeline events for ${micModel}:`, events);
-      
-      // Process events considering exclusive use
-      let currentUsage = 0;
-      let currentExclusiveUsers: string[] = [];
-      
-      events.forEach(event => {
-        if (event.type === 'start') {
-          if (event.isExclusive) {
-            // Exclusive user takes all - others must wait
-            currentUsage = event.micQuantity;
-            currentExclusiveUsers = [event.artist];
-            console.log(`🎯 ${micModel} - Time ${event.time}: EXCLUSIVE START ${event.artist} (${event.micQuantity}) -> Current: ${currentUsage}`);
-          } else if (currentExclusiveUsers.length === 0) {
-            // Only add if no exclusive users active
-            currentUsage += event.micQuantity;
-            console.log(`🎯 ${micModel} - Time ${event.time}: SHARED START ${event.artist} (+${event.micQuantity}) -> Current: ${currentUsage}`);
-          } else {
-            console.log(`🎯 ${micModel} - Time ${event.time}: BLOCKED START ${event.artist} (exclusive user active)`);
-          }
-          maxConcurrentUsage = Math.max(maxConcurrentUsage, currentUsage);
-        } else {
-          // End event
-          if (event.isExclusive && currentExclusiveUsers.includes(event.artist)) {
-            currentUsage = 0;
-            currentExclusiveUsers = [];
-            console.log(`🎯 ${micModel} - Time ${event.time}: EXCLUSIVE END ${event.artist} -> Current: ${currentUsage}`);
-          } else if (!event.isExclusive && currentExclusiveUsers.length === 0) {
-            currentUsage -= event.micQuantity;
-            console.log(`🎯 ${micModel} - Time ${event.time}: SHARED END ${event.artist} (-${event.micQuantity}) -> Current: ${currentUsage}`);
-          }
-        }
-      });
-      
-      // Fallback if timeline calculation gives zero but we have requirements
-      if (maxConcurrentUsage === 0 && Object.keys(individualMatrix[micModel] || {}).length > 0) {
-        console.log(`🎯 Timeline gave zero for ${micModel}, using individual matrix fallback`);
-        const artistRequirements = individualMatrix[micModel] || {};
-        maxConcurrentUsage = Object.values(artistRequirements).reduce((sum, qty) => sum + qty, 0);
-        console.log(`🎯 Fallback peak for ${micModel}: ${maxConcurrentUsage}`);
-      }
-    }
-    
-    peakConcurrentMatrix[micModel] = maxConcurrentUsage;
-    console.log(`🎯 ✅ FINAL PEAK for ${micModel}: ${maxConcurrentUsage}`);
-    console.log(`🎯 ===== END PEAK FOR: ${micModel} =====`);
+    console.log(`📊 Peak for ${micModel}: ${peak} (from ${Object.entries(artistRequirements).map(([artist, qty]) => `${artist}:${qty}`).join(', ')})`);
   });
   
   const result = {
     micModels: Array.from(micModelsSet).sort(),
     artistNames: Array.from(artistNamesSet).sort(),
     individualMatrix,
-    peakConcurrentMatrix
+    peakMatrix
   };
   
-  console.log('🎯 ===== FINAL MATRIX RESULT =====');
-  console.log('🎯 Mic models:', result.micModels);
-  console.log('🎯 Artists:', result.artistNames);
-  console.log('🎯 Individual matrix sample:', Object.entries(result.individualMatrix).slice(0, 2));
-  console.log('🎯 Peak matrix sample:', Object.entries(result.peakConcurrentMatrix).slice(0, 3));
-  console.log('🎯 ===== END FINAL MATRIX RESULT =====');
+  console.log('\n🎯 FINAL SIMPLIFIED RESULT:');
+  console.log(`🎤 Mic models (${result.micModels.length}):`, result.micModels);
+  console.log(`👥 Artists (${result.artistNames.length}):`, result.artistNames);
+  console.log('📊 Individual matrix sample:', Object.entries(result.individualMatrix).slice(0, 2));
+  console.log('⚡ Peak matrix sample:', Object.entries(result.peakMatrix).slice(0, 3));
   
   return result;
 };
 
-// Helper function to organize artists by date and stage with better debugging
+// Helper function to organize artists by date and stage - simplified
 export const organizeArtistsByDateAndStage = (artists: any[]): Map<string, Map<number, any[]>> => {
   const organized = new Map<string, Map<number, any[]>>();
   
-  console.log('🎯 organizeArtistsByDateAndStage called with:', {
-    totalArtists: artists.length,
-    sampleArtists: artists.slice(0, 5).map(a => ({
-      name: a.name,
-      date: a.date,
-      stage: a.stage,
-      wiredMicsCount: a.wired_mics?.length || 0,
-      showStart: a.show_start,
-      showEnd: a.show_end
-    }))
-  });
+  console.log('\n🗂️ ORGANIZING ARTISTS BY DATE/STAGE');
+  console.log(`📋 Input: ${artists.length} artists`);
   
   artists.forEach((artist, index) => {
     const date = artist.date;
     const stage = artist.stage || 1;
     
-    console.log(`🎯 Processing artist ${index}: ${artist.name}, date="${date}", stage=${stage}`);
+    console.log(`📌 Artist ${index}: ${artist.name} -> Date: "${date}", Stage: ${stage}`);
     
     if (!date) {
-      console.warn(`🎯 WARNING: Skipping artist ${artist.name} - missing date`);
+      console.warn(`⚠️ Skipping ${artist.name} - no date`);
       return;
     }
     
+    // Initialize structures
     if (!organized.has(date)) {
-      console.log(`🎯 Creating new date entry: ${date}`);
       organized.set(date, new Map());
     }
-    
     if (!organized.get(date)!.has(stage)) {
-      console.log(`🎯 Creating new stage entry: ${date} - Stage ${stage}`);
       organized.get(date)!.set(stage, []);
     }
     
     organized.get(date)!.get(stage)!.push(artist);
-    console.log(`🎯 Added ${artist.name} to ${date} - Stage ${stage}`);
   });
   
-  console.log('🎯 Organization complete - Final structure:');
+  console.log('\n📊 ORGANIZATION COMPLETE:');
   Array.from(organized.entries()).forEach(([date, stages]) => {
-    console.log(`🎯 📅 Date ${date}: ${stages.size} stages`);
+    console.log(`📅 ${date}: ${stages.size} stages`);
     Array.from(stages.entries()).forEach(([stage, stageArtists]) => {
-      console.log(`🎯   🎪 Stage ${stage}: ${stageArtists.length} artists - ${stageArtists.map(a => a.name).join(', ')}`);
+      console.log(`  🎪 Stage ${stage}: ${stageArtists.length} artists (${stageArtists.map(a => a.name).join(', ')})`);
     });
   });
   
