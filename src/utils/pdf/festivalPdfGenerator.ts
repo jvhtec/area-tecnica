@@ -9,9 +9,9 @@ import { generateCoverPage } from './coverPageGenerator';
 import { generateTableOfContents } from './tocGenerator';
 import { exportWiredMicrophoneMatrixFromArtists } from '../wiredMicrophoneMatrixDirectExport';
 import { exportGearSetupPDF } from '../gearSetupPdfExport';
-import { exportShiftsTablePDF, exportShiftsTablePDFLegacy } from '../shiftsTablePdfExport';
+import { exportShiftsTablePDF, ShiftsTablePdfData } from '../shiftsTablePdfExport';
 import { exportArtistTablePDF } from '../artistTablePdfExport';
-import { exportArtistPDF } from '../artistPdfExport'; // Fixed import name
+import { exportArtistPDF } from '../artistPdfExport';
 import { exportRfIemTablePDF } from '../rfIemTablePdfExport';
 import { exportInfrastructureTablePDF } from '../infrastructureTablePdfExport';
 import { exportMissingRiderReportPDF } from '../missingRiderReportPdfExport';
@@ -110,7 +110,13 @@ export const generateAndMergeFestivalPDFs = async (
       try {
         for (const stage of options.artistTableStages) {
           console.log(`Generating artist table for stage ${stage}`);
-          const artistTableBlob = await exportArtistTablePDF(jobId, jobTitle, stage, logoUrl);
+          const artistTableData = {
+            jobId,
+            jobTitle,
+            stage,
+            logoUrl
+          };
+          const artistTableBlob = await exportArtistTablePDF(artistTableData);
           pdfsToMerge.push(artistTableBlob);
           sections.push({ title: `Stage ${stage} Artist Schedule`, pageCount: 1 });
         }
