@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -482,39 +483,6 @@ const generateFixedMatrixData = (artists: any[]): FixedMatrixData => {
     peakConcurrentMatrix[micModel] = maxConcurrentUsage;
     console.log(`🎯 ✅ FINAL Peak for ${micModel}: ${maxConcurrentUsage}`);
     console.log(`🎯 ===== END PEAK FOR: ${micModel} =====`);
-  });
-      }
-    });
-    
-    // Sort events by time, with 'end' events before 'start' events at the same time
-    events.sort((a, b) => {
-      if (a.time !== b.time) return a.time - b.time;
-      return a.type === 'end' ? -1 : 1; // End events first at same time
-    });
-    
-    // Process events to find peak usage
-    let currentUsage = 0;
-    events.forEach(event => {
-      if (event.type === 'start') {
-        currentUsage += event.micQuantity;
-        maxConcurrentUsage = Math.max(maxConcurrentUsage, currentUsage);
-      } else {
-        currentUsage -= event.micQuantity;
-      }
-      console.log(`🎯 ${micModel} - Time ${event.time}: ${event.type} ${event.artist} (${event.micQuantity}) -> Current: ${currentUsage}, Max: ${maxConcurrentUsage}`);
-    });
-    
-    // Fallback: if no timeline data available, use simple sum
-    if (events.length === 0) {
-      console.log(`🎯 No timeline data for ${micModel}, using simple sum fallback`);
-      artistNamesSet.forEach(artistName => {
-        const artistUsage = individualMatrix[micModel]?.[artistName] || 0;
-        maxConcurrentUsage += artistUsage;
-      });
-    }
-    
-    peakConcurrentMatrix[micModel] = maxConcurrentUsage;
-    console.log(`🎯 FINAL Peak for ${micModel}: ${maxConcurrentUsage}`);
   });
   
   const result = {
