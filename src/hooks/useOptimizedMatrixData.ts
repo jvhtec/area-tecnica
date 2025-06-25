@@ -15,6 +15,24 @@ interface MatrixJob {
   job_type: string;
 }
 
+// Define the assignment type with proper job structure
+interface AssignmentWithJob {
+  job_id: string;
+  technician_id: string;
+  sound_role?: string;
+  lights_role?: string;
+  video_role?: string;
+  status: string;
+  assigned_at: string;
+  job: {
+    id: string;
+    title: string;
+    start_time: string;
+    end_time: string;
+    color?: string;
+  };
+}
+
 interface OptimizedMatrixDataProps {
   technicians: Array<{ id: string; first_name: string; last_name: string; email: string; department: string; role: string; }>;
   dates: Date[];
@@ -35,7 +53,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   // Optimized assignments query with selective fields - exclude declined assignments
   const { data: allAssignments = [], isLoading: assignmentsLoading } = useQuery({
     queryKey: ['optimized-matrix-assignments', jobIds],
-    queryFn: async () => {
+    queryFn: async (): Promise<AssignmentWithJob[]> => {
       if (jobIds.length === 0) return [];
       
       const { data, error } = await supabase
@@ -48,7 +66,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           video_role,
           status,
           assigned_at,
-          jobs!inner (
+          job:jobs!inner (
             id,
             title,
             start_time,
@@ -60,7 +78,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
         .neq('status', 'declined'); // Filter out declined assignments
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as AssignmentWithJob[];
     },
     enabled: jobIds.length > 0,
     staleTime: 30 * 1000, // 30 seconds for faster updates
@@ -111,11 +129,11 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     const assignmentMap = new Map();
     
     allAssignments.forEach(assignment => {
-      if (!assignment.jobs) return;
+      if (!assignment.job) return;
       
-      // assignment.jobs is a single job object, not an array
-      const jobStart = new Date(assignment.jobs.start_time);
-      const jobEnd = new Date(assignment.jobs.end_time);
+      // assignment.job is a single job object from the inner join
+      const jobStart = new Date(assignment.job.start_time);
+      const jobEnd = new Date(assignment.job.end_time);
       
       dates.forEach(date => {
         if (isWithinInterval(date, { start: jobStart, end: jobEnd }) || 
