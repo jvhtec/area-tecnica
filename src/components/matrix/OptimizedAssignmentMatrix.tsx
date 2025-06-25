@@ -27,6 +27,7 @@ interface OptimizedAssignmentMatrixProps {
     end_time: string;
     color?: string;
     status: string;
+    job_type: string;
   }>;
 }
 
