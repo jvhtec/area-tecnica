@@ -22,6 +22,7 @@ interface OptimizedMatrixCellProps {
   onSelect: (selected: boolean) => void;
   onClick: (action: 'select-job' | 'assign' | 'unavailable' | 'confirm' | 'decline') => void;
   onPrefetch?: () => void;
+  onOptimisticUpdate?: (status: string) => void;
 }
 
 export const OptimizedMatrixCell = memo(({ 
@@ -34,7 +35,8 @@ export const OptimizedMatrixCell = memo(({
   isSelected, 
   onSelect, 
   onClick,
-  onPrefetch
+  onPrefetch,
+  onOptimisticUpdate
 }: OptimizedMatrixCellProps) => {
   const isTodayCell = isToday(date);
   const isWeekendCell = isWeekend(date);
@@ -60,8 +62,13 @@ export const OptimizedMatrixCell = memo(({
 
   const handleStatusClick = useCallback((e: React.MouseEvent, action: 'confirm' | 'decline') => {
     e.stopPropagation();
+    
+    // Optimistic update
+    onOptimisticUpdate?.(action === 'confirm' ? 'confirmed' : 'declined');
+    
+    // Then trigger actual update
     onClick(action);
-  }, [onClick]);
+  }, [onClick, onOptimisticUpdate]);
 
   const getCellBackground = () => {
     if (isSelected) return 'bg-blue-100 dark:bg-blue-900/30';

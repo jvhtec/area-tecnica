@@ -51,7 +51,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       return data || [];
     },
     enabled: jobIds.length > 0,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 1 * 60 * 1000, // 1 minute - faster updates
     gcTime: 5 * 60 * 1000, // 5 minutes cache
   });
 
@@ -72,7 +72,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       return data || [];
     },
     enabled: technicianIds.length > 0 && !!dateRange.start && !!dateRange.end,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 1 * 60 * 1000, // 1 minute - faster updates
     gcTime: 5 * 60 * 1000, // 5 minutes cache
   });
 
@@ -134,6 +134,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     };
   }, [availabilityData]);
 
+  // Fixed getJobsForDate function - accessing properties on individual job objects
   const getJobsForDate = useMemo(() => {
     const jobsByDate = new Map();
     
@@ -155,6 +156,33 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     };
   }, [jobs, dates]);
 
+  // Optimistic update functions
+  const updateAssignmentOptimistically = (technicianId: string, jobId: string, newStatus: string) => {
+    const queryKey = ['optimized-matrix-assignments', jobIds];
+    const oldData = queryClient.getQueryData(queryKey);
+    
+    if (oldData) {
+      const updatedData = (oldData as any[]).map(assignment => {
+        if (assignment.technician_id === technicianId && assignment.job_id === jobId) {
+          return { ...assignment, status: newStatus, response_time: new Date().toISOString() };
+        }
+        return assignment;
+      });
+      
+      queryClient.setQueryData(queryKey, updatedData);
+    }
+  };
+
+  // Invalidate specific queries for real-time updates
+  const invalidateAssignmentQueries = () => {
+    queryClient.invalidateQueries({ 
+      queryKey: ['optimized-matrix-assignments'] 
+    });
+    queryClient.invalidateQueries({ 
+      queryKey: ['matrix-assignments'] 
+    });
+  };
+
   return {
     allAssignments,
     availabilityData,
@@ -163,5 +191,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     getAvailabilityForCell,
     getJobsForDate,
     prefetchTechnicianData,
+    updateAssignmentOptimistically,
+    invalidateAssignmentQueries,
   };
 };

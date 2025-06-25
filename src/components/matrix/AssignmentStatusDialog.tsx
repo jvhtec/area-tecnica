@@ -63,18 +63,20 @@ export const AssignmentStatusDialog = ({
     setIsSubmitting(true);
 
     try {
+      const newStatus = action === 'confirm' ? 'confirmed' : 'declined';
+      
       console.log('Updating assignment status:', {
         job_id: assignment.job_id,
         technician_id: technicianId,
         current_status: assignment.status,
-        new_status: action === 'confirm' ? 'confirmed' : 'declined'
+        new_status: newStatus
       });
 
       // Use the composite primary key (job_id, technician_id) to update the assignment
       const { data, error } = await supabase
         .from('job_assignments')
         .update({
-          status: action === 'confirm' ? 'confirmed' : 'declined',
+          status: newStatus,
           response_time: new Date().toISOString(),
         })
         .eq('job_id', assignment.job_id)
@@ -88,13 +90,35 @@ export const AssignmentStatusDialog = ({
 
       console.log('Update successful:', data);
 
+      // Immediately update the query cache with the new status
+      const assignmentQueries = [
+        ['optimized-matrix-assignments'],
+        ['matrix-assignments'],
+        ['job-assignments', assignment.job_id]
+      ];
+
+      assignmentQueries.forEach(queryKey => {
+        queryClient.setQueryData(queryKey, (oldData: any) => {
+          if (!oldData) return oldData;
+          
+          if (Array.isArray(oldData)) {
+            return oldData.map((item: any) => {
+              if (item.job_id === assignment.job_id && item.technician_id === technicianId) {
+                return { ...item, status: newStatus, response_time: new Date().toISOString() };
+              }
+              return item;
+            });
+          }
+          return oldData;
+        });
+      });
+
       // Invalidate relevant queries to refresh the UI
-      await queryClient.invalidateQueries({ 
-        queryKey: ['matrix-assignments'] 
-      });
-      await queryClient.invalidateQueries({ 
-        queryKey: ['job-assignments', assignment.job_id] 
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] }),
+        queryClient.invalidateQueries({ queryKey: ['matrix-assignments'] }),
+        queryClient.invalidateQueries({ queryKey: ['job-assignments', assignment.job_id] })
+      ]);
 
       const statusText = action === 'confirm' ? 'confirmed' : 'declined';
       toast.success(

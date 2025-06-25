@@ -60,6 +60,8 @@ export const OptimizedAssignmentMatrix = ({ technicians, dates, jobs }: Optimize
     getAvailabilityForCell,
     getJobsForDate,
     prefetchTechnicianData,
+    updateAssignmentOptimistically,
+    invalidateAssignmentQueries,
     isLoading
   } = useOptimizedMatrixData({ technicians, dates, jobs });
 
@@ -143,11 +145,17 @@ export const OptimizedAssignmentMatrix = ({ technicians, dates, jobs }: Optimize
   const closeDialogs = useCallback(() => {
     setCellAction(null);
     setSelectedCells(new Set());
-  }, []);
+    // Invalidate queries when closing dialogs to refresh data
+    invalidateAssignmentQueries();
+  }, [invalidateAssignmentQueries]);
 
   const handleCellPrefetch = useCallback((technicianId: string) => {
     prefetchTechnicianData(technicianId);
   }, [prefetchTechnicianData]);
+
+  const handleOptimisticUpdate = useCallback((technicianId: string, jobId: string, status: string) => {
+    updateAssignmentOptimistically(technicianId, jobId, status);
+  }, [updateAssignmentOptimistically]);
 
   // Auto-scroll to today
   useEffect(() => {
@@ -314,6 +322,7 @@ export const OptimizedAssignmentMatrix = ({ technicians, dates, jobs }: Optimize
                         onSelect={(selected) => handleCellSelect(technician.id, date, selected)}
                         onClick={(action) => handleCellClick(technician.id, date, action)}
                         onPrefetch={() => handleCellPrefetch(technician.id)}
+                        onOptimisticUpdate={(status) => assignment && handleOptimisticUpdate(technician.id, assignment.job_id, status)}
                       />
                     </div>
                   );
