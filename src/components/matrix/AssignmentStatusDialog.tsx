@@ -15,7 +15,7 @@ import { Loader2, Calendar, Check, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface AssignmentStatusDialogProps {
   open: boolean;
@@ -36,6 +36,7 @@ export const AssignmentStatusDialog = ({
 }: AssignmentStatusDialogProps) => {
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const queryClient = useQueryClient();
 
   // Get technician details
   const { data: technician } = useQuery({
@@ -62,36 +63,50 @@ export const AssignmentStatusDialog = ({
     setIsSubmitting(true);
 
     try {
-      console.log('Updating assignment:', {
+      console.log('Updating assignment status:', {
         job_id: assignment.job_id,
         technician_id: technicianId,
-        new_status: action
+        current_status: assignment.status,
+        new_status: action === 'confirm' ? 'confirmed' : 'declined'
       });
 
-      // Update using the composite key (job_id, technician_id)
-      const { error } = await supabase
+      // Use the composite primary key (job_id, technician_id) to update the assignment
+      const { data, error } = await supabase
         .from('job_assignments')
         .update({
-          status: action,
+          status: action === 'confirm' ? 'confirmed' : 'declined',
           response_time: new Date().toISOString(),
         })
         .eq('job_id', assignment.job_id)
-        .eq('technician_id', technicianId);
+        .eq('technician_id', technicianId)
+        .select();
 
       if (error) {
-        console.error('Database error:', error);
+        console.error('Database error details:', error);
         throw error;
       }
 
+      console.log('Update successful:', data);
+
+      // Invalidate relevant queries to refresh the UI
+      await queryClient.invalidateQueries({ 
+        queryKey: ['matrix-assignments'] 
+      });
+      await queryClient.invalidateQueries({ 
+        queryKey: ['job-assignments', assignment.job_id] 
+      });
+
+      const statusText = action === 'confirm' ? 'confirmed' : 'declined';
       toast.success(
-        action === 'confirm' 
-          ? `Assignment confirmed for ${technician?.first_name} ${technician?.last_name}`
-          : `Assignment declined for ${technician?.first_name} ${technician?.last_name}`
+        `Assignment ${statusText} for ${technician?.first_name} ${technician?.last_name}`
       );
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating assignment status:', error);
-      toast.error('Failed to update assignment status');
+      
+      // More detailed error message
+      const errorMessage = error?.message || 'Unknown database error';
+      toast.error(`Failed to update assignment status: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }

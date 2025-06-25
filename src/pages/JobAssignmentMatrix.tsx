@@ -95,9 +95,9 @@ export default function JobAssignmentMatrix() {
   const years = [selectedYear - 1, selectedYear, selectedYear + 1];
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="h-screen flex flex-col bg-background">
       {/* Header */}
-      <div className="border-b bg-card p-4">
+      <div className="flex-shrink-0 border-b bg-card p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Calendar className="h-6 w-6" />

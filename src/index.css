@@ -97,26 +97,128 @@
   background: transparent;
 }
 
-/* Matrix specific styles */
-.matrix-container {
+/* Assignment Matrix Layout */
+.matrix-layout {
   position: relative;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
 }
 
-.matrix-sticky-corner {
-  position: sticky;
+/* Fixed Corner Header */
+.matrix-corner {
+  position: absolute;
   top: 0;
   left: 0;
+  z-index: 50;
+  background: hsl(var(--card));
+  border-right: 1px solid hsl(var(--border));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+/* Fixed Date Headers Row */
+.matrix-date-headers {
+  position: absolute;
+  top: 0;
+  right: 0;
   z-index: 40;
+  background: hsl(var(--card));
+  border-bottom: 1px solid hsl(var(--border));
+  overflow: hidden;
 }
 
-.matrix-sticky-header {
-  position: sticky;
-  top: 0;
-  z-index: 30;
+.matrix-date-scroll {
+  display: flex;
+  height: 100%;
 }
 
-.matrix-sticky-sidebar {
-  position: sticky;
+/* Fixed Technician Column */
+.matrix-technician-column {
+  position: absolute;
   left: 0;
-  z-index: 20;
+  bottom: 0;
+  z-index: 30;
+  background: hsl(var(--card));
+  border-right: 1px solid hsl(var(--border));
+  overflow: hidden;
+}
+
+.matrix-technician-scroll {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+
+.matrix-technician-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.matrix-technician-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.matrix-technician-scroll::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+
+/* Main Scrollable Area */
+.matrix-main-area {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  background: hsl(var(--background));
+  overflow: hidden;
+}
+
+.matrix-main-scroll {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+
+.matrix-main-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.matrix-main-scroll::-webkit-scrollbar-track {
+  background: hsl(var(--muted) / 0.1);
+}
+
+.matrix-main-scroll::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 4px;
+}
+
+.matrix-main-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Grid Layout */
+.matrix-grid {
+  position: relative;
+  background: hsl(var(--background));
+}
+
+.matrix-row {
+  position: absolute;
+  width: 100%;
+}
+
+.matrix-cell-wrapper {
+  position: absolute;
+  border-right: 1px solid hsl(var(--border));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .matrix-layout {
+    font-size: 0.875rem;
+  }
 }
