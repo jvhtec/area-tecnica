@@ -1,10 +1,10 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { TechnicianRow } from './TechnicianRow';
 import { MatrixCell } from './MatrixCell';
 import { DateHeader } from './DateHeader';
 import { AssignJobDialog } from './AssignJobDialog';
+import { AssignmentStatusDialog } from './AssignmentStatusDialog';
 import { MarkUnavailableDialog } from './MarkUnavailableDialog';
 import { useJobAssignmentsRealtime } from '@/hooks/useJobAssignmentsRealtime';
 import { useQuery } from '@tanstack/react-query';
@@ -31,9 +31,10 @@ interface AssignmentMatrixProps {
 }
 
 interface CellAction {
-  type: 'assign' | 'unavailable';
+  type: 'assign' | 'unavailable' | 'confirm' | 'decline';
   technicianId: string;
   date: Date;
+  assignment?: any;
 }
 
 export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixProps) => {
@@ -113,8 +114,9 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     );
   };
 
-  const handleCellClick = (technicianId: string, date: Date, action: 'assign' | 'unavailable') => {
-    setCellAction({ type: action, technicianId, date });
+  const handleCellClick = (technicianId: string, date: Date, action: 'assign' | 'unavailable' | 'confirm' | 'decline') => {
+    const assignment = getAssignmentForCell(technicianId, date);
+    setCellAction({ type: action, technicianId, date, assignment });
   };
 
   const handleCellSelect = (technicianId: string, date: Date, selected: boolean) => {
@@ -228,6 +230,19 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
           availableJobs={jobs.filter(job => 
             isSameDay(new Date(job.start_time), cellAction.date)
           )}
+          existingAssignment={cellAction.assignment}
+        />
+      )}
+
+      {/* Status Change Dialogs */}
+      {(cellAction?.type === 'confirm' || cellAction?.type === 'decline') && (
+        <AssignmentStatusDialog
+          open={true}
+          onClose={closeDialogs}
+          technicianId={cellAction.technicianId}
+          date={cellAction.date}
+          assignment={cellAction.assignment}
+          action={cellAction.type}
         />
       )}
 

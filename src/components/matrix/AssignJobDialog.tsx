@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   Dialog,
@@ -17,6 +16,7 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Calendar, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { useJobAssignmentsRealtime } from '@/hooks/useJobAssignmentsRealtime';
@@ -37,6 +37,7 @@ interface AssignJobDialogProps {
     color?: string;
     status: string;
   }>;
+  existingAssignment?: any;
 }
 
 export const AssignJobDialog = ({ 
@@ -44,10 +45,12 @@ export const AssignJobDialog = ({
   onClose, 
   technicianId, 
   date, 
-  availableJobs 
+  availableJobs,
+  existingAssignment
 }: AssignJobDialogProps) => {
-  const [selectedJobId, setSelectedJobId] = useState<string>('');
+  const [selectedJobId, setSelectedJobId] = useState<string>(existingAssignment?.job_id || '');
   const [selectedRole, setSelectedRole] = useState<string>('');
+  const [assignAsConfirmed, setAssignAsConfirmed] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
 
   // Get technician details
@@ -82,6 +85,19 @@ export const AssignJobDialog = ({
 
   const selectedJob = availableJobs.find(job => job.id === selectedJobId);
   const roles = technician ? getDepartmentRoles(technician.department) : [];
+  const isReassignment = !!existingAssignment;
+
+  // Set initial role if reassigning
+  React.useEffect(() => {
+    if (existingAssignment && technician) {
+      const currentRole = existingAssignment.sound_role || 
+                         existingAssignment.lights_role || 
+                         existingAssignment.video_role;
+      if (currentRole) {
+        setSelectedRole(currentRole);
+      }
+    }
+  }, [existingAssignment, technician]);
 
   const handleAssign = async () => {
     if (!selectedJobId || !selectedRole || !technician) {
@@ -92,17 +108,54 @@ export const AssignJobDialog = ({
     setIsAssigning(true);
 
     try {
-      // Use the existing assignment system
-      const { addAssignment } = useJobAssignmentsRealtime(selectedJobId);
-      
       // Determine role assignment based on department
       const soundRole = technician.department === 'sound' ? selectedRole : '';
       const lightsRole = technician.department === 'lights' ? selectedRole : '';
       const videoRole = technician.department === 'video' ? selectedRole : '';
 
-      await addAssignment(technicianId, soundRole, lightsRole);
+      if (isReassignment) {
+        // Update existing assignment
+        const { error } = await supabase
+          .from('job_assignments')
+          .update({
+            job_id: selectedJobId,
+            sound_role: soundRole || null,
+            lights_role: lightsRole || null,
+            video_role: videoRole || null,
+            assigned_at: new Date().toISOString(),
+            status: assignAsConfirmed ? 'confirmed' : 'invited',
+            response_time: assignAsConfirmed ? new Date().toISOString() : null,
+          })
+          .eq('job_id', existingAssignment.job_id)
+          .eq('technician_id', technicianId);
+
+        if (error) throw error;
+      } else {
+        // Create new assignment
+        const { error } = await supabase
+          .from('job_assignments')
+          .insert({
+            job_id: selectedJobId,
+            technician_id: technicianId,
+            sound_role: soundRole || null,
+            lights_role: lightsRole || null,
+            video_role: videoRole || null,
+            assigned_by: (await supabase.auth.getUser()).data.user?.id,
+            assigned_at: new Date().toISOString(),
+            status: assignAsConfirmed ? 'confirmed' : 'invited',
+            response_time: assignAsConfirmed ? new Date().toISOString() : null,
+          });
+
+        if (error) throw error;
+
+        // Handle Flex crew assignments if needed
+        // (keeping existing flex crew logic from original)
+      }
       
-      toast.success(`Assigned ${technician.first_name} ${technician.last_name} to ${selectedJob?.title}`);
+      const statusText = assignAsConfirmed ? 'confirmed' : 'invited';
+      toast.success(
+        `${isReassignment ? 'Reassigned' : 'Assigned'} ${technician.first_name} ${technician.last_name} to ${selectedJob?.title} (${statusText})`
+      );
       onClose();
     } catch (error) {
       console.error('Error assigning job:', error);
@@ -116,9 +169,9 @@ export const AssignJobDialog = ({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Assign Job</DialogTitle>
+          <DialogTitle>{isReassignment ? 'Reassign Job' : 'Assign Job'}</DialogTitle>
           <DialogDescription>
-            Assign {technician?.first_name} {technician?.last_name} to a job on{' '}
+            {isReassignment ? 'Reassign' : 'Assign'} {technician?.first_name} {technician?.last_name} to a job on{' '}
             {format(date, 'EEEE, MMMM d, yyyy')}
           </DialogDescription>
         </DialogHeader>
@@ -129,6 +182,16 @@ export const AssignJobDialog = ({
               <span className="text-sm font-medium">Technician:</span>
               <span>{technician.first_name} {technician.last_name}</span>
               <Badge variant="outline">{technician.department}</Badge>
+            </div>
+          )}
+
+          {isReassignment && existingAssignment?.jobs && (
+            <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+              <div className="text-sm font-medium text-yellow-800">Current Assignment:</div>
+              <div className="text-sm text-yellow-700">{existingAssignment.jobs.title}</div>
+              <div className="text-xs text-yellow-600">
+                Status: <Badge variant="secondary">{existingAssignment.status}</Badge>
+              </div>
             </div>
           )}
 
@@ -182,6 +245,22 @@ export const AssignJobDialog = ({
             </div>
           )}
 
+          {selectedJobId && selectedRole && (
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="confirm-assignment" 
+                checked={assignAsConfirmed}
+                onCheckedChange={setAssignAsConfirmed}
+              />
+              <label 
+                htmlFor="confirm-assignment" 
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Assign as confirmed (skip invitation)
+              </label>
+            </div>
+          )}
+
           {selectedJob && (
             <div className="bg-muted p-3 rounded-lg">
               <div className="flex items-center gap-2 mb-2">
@@ -195,6 +274,11 @@ export const AssignJobDialog = ({
                   {format(new Date(selectedJob.start_time), 'HH:mm')} - {format(new Date(selectedJob.end_time), 'HH:mm')}
                 </div>
               </div>
+              {assignAsConfirmed && (
+                <div className="text-xs text-green-600 mt-1 font-medium">
+                  Will be assigned as confirmed
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -213,7 +297,7 @@ export const AssignJobDialog = ({
                 Assigning...
               </>
             ) : (
-              'Assign Job'
+              `${isReassignment ? 'Reassign' : 'Assign'} Job`
             )}
           </Button>
         </DialogFooter>

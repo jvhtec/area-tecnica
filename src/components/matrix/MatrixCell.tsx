@@ -4,7 +4,7 @@ import { format, isSameDay, isToday, isWeekend } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar, User, X, Plus } from 'lucide-react';
+import { Calendar, User, X, Plus, Check, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface MatrixCellProps {
@@ -21,7 +21,7 @@ interface MatrixCellProps {
   height: number;
   isSelected: boolean;
   onSelect: (selected: boolean) => void;
-  onClick: (action: 'assign' | 'unavailable') => void;
+  onClick: (action: 'assign' | 'unavailable' | 'confirm' | 'decline') => void;
 }
 
 export const MatrixCell = ({
@@ -44,6 +44,12 @@ export const MatrixCell = ({
   const isTodayCell = isToday(date);
   const isWeekendCell = isWeekend(date);
 
+  // Assignment status
+  const assignmentStatus = assignment?.status || 'invited';
+  const isInvited = assignmentStatus === 'invited';
+  const isConfirmed = assignmentStatus === 'confirmed';
+  const isDeclined = assignmentStatus === 'declined';
+
   const getCellClasses = () => {
     return cn(
       'border-r border-b transition-all duration-200 cursor-pointer relative group',
@@ -51,12 +57,47 @@ export const MatrixCell = ({
       {
         'bg-green-50 hover:bg-green-100': isAvailable && !isWeekendCell,
         'bg-gray-50 hover:bg-gray-100': isAvailable && isWeekendCell,
-        'bg-blue-50 border-blue-200 hover:bg-blue-100': isAssigned,
-        'bg-red-50 border-red-200 hover:bg-red-100': isUnavailable,
+        'bg-yellow-50 border-yellow-200 hover:bg-yellow-100': isInvited,
+        'bg-green-100 border-green-200 hover:bg-green-150': isConfirmed,
+        'bg-red-50 border-red-200 hover:bg-red-100': isDeclined,
+        'bg-red-50 border-red-200 hover:bg-red-100': isUnavailable && !isAssigned,
         'ring-2 ring-blue-500 ring-inset': isSelected,
         'ring-2 ring-orange-400 ring-inset': isTodayCell && !isSelected,
       }
     );
+  };
+
+  const getStatusBadge = () => {
+    if (!isAssigned) return null;
+    
+    const statusConfig = {
+      invited: { label: 'Invited', variant: 'secondary', color: 'text-yellow-700' },
+      confirmed: { label: 'Confirmed', variant: 'default', color: 'text-green-700' },
+      declined: { label: 'Declined', variant: 'destructive', color: 'text-red-700' }
+    };
+    
+    const config = statusConfig[assignmentStatus] || statusConfig.invited;
+    
+    return (
+      <Badge variant={config.variant} className={`text-xs ${config.color}`}>
+        {config.label}
+      </Badge>
+    );
+  };
+
+  const getStatusIcon = () => {
+    if (!isAssigned) return null;
+    
+    switch (assignmentStatus) {
+      case 'confirmed':
+        return <Check className="h-3 w-3 text-green-600" />;
+      case 'declined':
+        return <X className="h-3 w-3 text-red-600" />;
+      case 'invited':
+        return <AlertCircle className="h-3 w-3 text-yellow-600" />;
+      default:
+        return null;
+    }
   };
 
   const getRoleForDepartment = () => {
@@ -81,8 +122,17 @@ export const MatrixCell = ({
       // Multi-select mode
       onSelect(!isSelected);
     } else if (isAssigned) {
-      // If assigned, show options to reassign or remove
-      onClick('assign');
+      // Handle based on assignment status
+      if (isInvited) {
+        // Show confirm/decline/reassign options
+        onClick('assign'); // This will show the status management dialog
+      } else if (isConfirmed) {
+        // Show reassign options
+        onClick('assign');
+      } else if (isDeclined) {
+        // Show reassign options
+        onClick('assign');
+      }
     } else {
       // If not assigned, show assign/unavailable options
       onClick('assign');
@@ -92,6 +142,16 @@ export const MatrixCell = ({
   const handleRightClick = (e: React.MouseEvent) => {
     e.preventDefault();
     onClick('unavailable');
+  };
+
+  const handleQuickConfirm = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onClick('confirm');
+  };
+
+  const handleQuickDecline = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onClick('decline');
   };
 
   const role = getRoleForDepartment();
@@ -107,21 +167,25 @@ export const MatrixCell = ({
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
         >
-          <div className="p-1 h-full flex flex-col justify-center items-center text-xs">
+          <div className="p-1 h-full flex flex-col justify-center items-center text-xs relative">
             {isAssigned && assignment?.jobs && (
               <>
-                <div className="font-medium text-center truncate w-full text-blue-700">
+                <div className="font-medium text-center truncate w-full mb-1">
                   {assignment.jobs.title}
                 </div>
                 {role && (
-                  <Badge variant="secondary" className="text-xs mt-1">
+                  <div className="text-xs text-muted-foreground truncate w-full text-center mb-1">
                     {role}
-                  </Badge>
+                  </div>
                 )}
+                <div className="flex items-center gap-1">
+                  {getStatusIcon()}
+                  {getStatusBadge()}
+                </div>
               </>
             )}
             
-            {isUnavailable && (
+            {isUnavailable && !isAssigned && (
               <div className="text-red-600 font-medium text-center">
                 Unavailable
                 {availability?.reason && (
@@ -135,6 +199,30 @@ export const MatrixCell = ({
             {isAvailable && isHovered && (
               <div className="absolute inset-0 flex items-center justify-center bg-accent/80 rounded">
                 <Plus className="h-4 w-4 text-accent-foreground" />
+              </div>
+            )}
+
+            {/* Quick action buttons for invited assignments */}
+            {isInvited && isHovered && (
+              <div className="absolute inset-0 flex items-center justify-center gap-1 bg-yellow-100/90 rounded">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 w-6 p-0 bg-green-500 hover:bg-green-600 text-white border-green-500"
+                  onClick={handleQuickConfirm}
+                  title="Quick Confirm"
+                >
+                  <Check className="h-3 w-3" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 w-6 p-0 bg-red-500 hover:bg-red-600 text-white border-red-500"
+                  onClick={handleQuickDecline}
+                  title="Quick Decline"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
               </div>
             )}
           </div>
@@ -165,10 +253,20 @@ export const MatrixCell = ({
               {role && (
                 <div className="text-xs text-muted-foreground">Role: {role}</div>
               )}
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs text-muted-foreground">Status:</span>
+                {getStatusIcon()}
+                {getStatusBadge()}
+              </div>
+              {assignment.response_time && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  Response: {format(new Date(assignment.response_time), 'MMM d, HH:mm')}
+                </div>
+              )}
             </div>
           )}
 
-          {isUnavailable && (
+          {isUnavailable && !isAssigned && (
             <div className="border-t pt-2">
               <div className="font-medium text-sm text-red-600">Unavailable</div>
               {availability?.reason && (
@@ -179,23 +277,67 @@ export const MatrixCell = ({
             </div>
           )}
 
-          <div className="border-t pt-2 flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onClick('assign')}
-              className="flex-1"
-            >
-              {isAssigned ? 'Reassign' : 'Assign Job'}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onClick('unavailable')}
-              className="flex-1"
-            >
-              Mark Unavailable
-            </Button>
+          <div className="border-t pt-2 flex gap-2 flex-wrap">
+            {isAvailable && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onClick('assign')}
+                  className="flex-1"
+                >
+                  Assign Job
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onClick('unavailable')}
+                  className="flex-1"
+                >
+                  Mark Unavailable
+                </Button>
+              </>
+            )}
+
+            {isInvited && (
+              <>
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={() => onClick('confirm')}
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                >
+                  Confirm
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => onClick('decline')}
+                  className="flex-1"
+                >
+                  Decline
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onClick('assign')}
+                  className="w-full mt-1"
+                >
+                  Reassign
+                </Button>
+              </>
+            )}
+
+            {(isConfirmed || isDeclined) && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onClick('assign')}
+                className="flex-1"
+              >
+                Reassign
+              </Button>
+            )}
           </div>
         </div>
       </PopoverContent>
