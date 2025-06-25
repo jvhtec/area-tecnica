@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { format, isSameDay, isWithinInterval } from 'date-fns';
 import { TechnicianRow } from './TechnicianRow';
@@ -48,7 +47,6 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
   const dateHeadersRef = useRef<HTMLDivElement>(null);
   const mainScrollRef = useRef<HTMLDivElement>(null);
   const [hasScrolledToToday, setHasScrolledToToday] = useState(false);
-  const syncTimeoutRef = useRef<number>();
   
   // Increased cell width for better content space
   const CELL_WIDTH = 160;
@@ -150,91 +148,32 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     });
   };
 
-  // IMPROVED: Smooth scroll synchronization with performance optimization
+  // FIXED: Simplified scroll synchronization without complex bounds checking
   const syncScrollPositions = useCallback((scrollLeft: number, scrollTop: number) => {
-    // Use requestAnimationFrame for smoother sync
+    // Direct sync without bounds checking for smoother performance
     requestAnimationFrame(() => {
-      // Sync horizontal scroll with date headers
-      if (dateHeadersRef.current) {
-        const dateHeaders = dateHeadersRef.current;
-        const maxScrollLeft = Math.max(0, dateHeaders.scrollWidth - dateHeaders.clientWidth);
-        const clampedScrollLeft = Math.min(scrollLeft, maxScrollLeft);
-        
-        if (Math.abs(dateHeaders.scrollLeft - clampedScrollLeft) > 1) {
-          dateHeaders.scrollLeft = clampedScrollLeft;
-        }
+      // Horizontal sync with date headers
+      if (dateHeadersRef.current && Math.abs(dateHeadersRef.current.scrollLeft - scrollLeft) > 1) {
+        dateHeadersRef.current.scrollLeft = scrollLeft;
       }
       
-      // Sync vertical scroll with technician column
-      if (technicianScrollRef.current) {
-        const techScroll = technicianScrollRef.current;
-        const maxScrollTop = Math.max(0, techScroll.scrollHeight - techScroll.clientHeight);
-        const clampedScrollTop = Math.min(scrollTop, maxScrollTop);
-        
-        if (Math.abs(techScroll.scrollTop - clampedScrollTop) > 1) {
-          techScroll.scrollTop = clampedScrollTop;
-        }
+      // Vertical sync with technician column
+      if (technicianScrollRef.current && Math.abs(technicianScrollRef.current.scrollTop - scrollTop) > 1) {
+        technicianScrollRef.current.scrollTop = scrollTop;
       }
     });
   }, []);
 
-  // IMPROVED: Main scroll handler with debouncing and error handling
+  // FIXED: Simplified main scroll handler
   const handleMainScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const scrollLeft = e.currentTarget.scrollLeft;
     const scrollTop = e.currentTarget.scrollTop;
     
-    // Clear any pending sync operations
-    if (syncTimeoutRef.current) {
-      clearTimeout(syncTimeoutRef.current);
-    }
-    
-    // Immediate sync for smooth user experience
+    // Immediate sync for responsive feel
     syncScrollPositions(scrollLeft, scrollTop);
-    
-    // Debounced sync as backup
-    syncTimeoutRef.current = window.setTimeout(() => {
-      syncScrollPositions(scrollLeft, scrollTop);
-    }, 16); // ~60fps
   }, [syncScrollPositions]);
 
-  // IMPROVED: Setup scroll containers with precise dimensions
-  useEffect(() => {
-    if (dateHeadersRef.current && mainScrollRef.current && technicianScrollRef.current) {
-      const dateHeadersElement = dateHeadersRef.current;
-      const mainScrollElement = mainScrollRef.current;
-      const techScrollElement = technicianScrollRef.current;
-      
-      // Ensure identical scrollable widths
-      const targetScrollWidth = matrixWidth;
-      
-      // Set up date headers container
-      dateHeadersElement.style.width = `${mainScrollElement.clientWidth}px`;
-      
-      // Ensure technician scroll height matches main scroll area
-      const targetScrollHeight = matrixHeight;
-      techScrollElement.style.height = `${mainScrollElement.clientHeight}px`;
-      
-      console.log('Scroll containers setup:', {
-        matrixWidth: targetScrollWidth,
-        matrixHeight: targetScrollHeight,
-        dateHeadersClientWidth: dateHeadersElement.clientWidth,
-        dateHeadersScrollWidth: dateHeadersElement.scrollWidth,
-        mainScrollClientWidth: mainScrollElement.clientWidth,
-        mainScrollScrollWidth: mainScrollElement.scrollWidth,
-        techScrollClientHeight: techScrollElement.clientHeight,
-        techScrollScrollHeight: techScrollElement.scrollHeight
-      });
-    }
-  }, [dates.length, technicians.length, CELL_WIDTH, CELL_HEIGHT, matrixWidth, matrixHeight]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
-      }
-    };
-  }, []);
+  // REMOVED: Complex dimension setup useEffect that was causing issues
 
   const handleCellClick = (technicianId: string, date: Date, action: 'select-job' | 'assign' | 'unavailable' | 'confirm' | 'decline') => {
     const assignment = getAssignmentForCell(technicianId, date);
@@ -320,15 +259,14 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         </div>
       </div>
 
-      {/* IMPROVED: Date Headers with precise scrolling */}
+      {/* FIXED: Date Headers with proper positioning and natural sizing */}
       <div 
         ref={dateHeadersRef}
         className="matrix-date-headers"
         style={{ 
-          left: TECHNICIAN_WIDTH, 
+          left: TECHNICIAN_WIDTH,
           height: HEADER_HEIGHT,
-          width: `calc(100% - ${TECHNICIAN_WIDTH}px)`,
-          minWidth: `calc(100% - ${TECHNICIAN_WIDTH}px)`
+          width: `calc(100% - ${TECHNICIAN_WIDTH}px)`
         }}
       >
         {dates.map((date, index) => (
@@ -361,7 +299,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         </div>
       </div>
 
-      {/* Main Scrollable Matrix Area */}
+      {/* FIXED: Main Scrollable Matrix Area with proper positioning */}
       <div 
         className="matrix-main-area"
         style={{ 

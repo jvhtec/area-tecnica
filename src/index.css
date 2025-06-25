@@ -116,21 +116,18 @@
   border-bottom: 1px solid hsl(var(--border));
 }
 
-/* IMPROVED: Date Headers with precise scrolling and dimensions */
+/* FIXED: Date Headers with consistent positioning */
 .matrix-date-headers {
   position: absolute;
   top: 0;
-  right: 0;
   z-index: 40;
   background: hsl(var(--card));
   border-bottom: 1px solid hsl(var(--border));
   overflow-x: auto;
   overflow-y: hidden;
-  /* Hide scrollbar but keep functionality */
   scrollbar-width: none;
   -ms-overflow-style: none;
   display: flex;
-  /* Ensure smooth scrolling */
   scroll-behavior: smooth;
 }
 
@@ -138,14 +135,7 @@
   display: none;
 }
 
-/* Remove the separate scroll container - not needed */
-.matrix-date-scroll {
-  display: flex;
-  height: 100%;
-  flex-shrink: 0;
-}
-
-/* Fixed Technician Column with improved sync */
+/* Fixed Technician Column */
 .matrix-technician-column {
   position: absolute;
   left: 0;
@@ -162,7 +152,6 @@
   overflow-x: hidden;
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
-  /* Ensure smooth scrolling */
   scroll-behavior: smooth;
 }
 
@@ -179,10 +168,9 @@
   border-radius: 3px;
 }
 
-/* Main Scrollable Area with improved performance */
+/* FIXED: Main Scrollable Area with consistent positioning */
 .matrix-main-area {
   position: absolute;
-  right: 0;
   bottom: 0;
   background: hsl(var(--background));
   overflow: hidden;
@@ -195,8 +183,6 @@
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
   scroll-behavior: smooth;
-  /* Improve scrolling performance */
-  will-change: scroll-position;
 }
 
 .matrix-main-scroll::-webkit-scrollbar {
@@ -217,18 +203,16 @@
   background-color: hsl(var(--muted-foreground) / 0.5);
 }
 
-/* Grid Layout with improved positioning */
+/* Grid Layout */
 .matrix-grid {
   position: relative;
   background: hsl(var(--background));
-  /* Optimize for large grids */
   contain: layout style paint;
 }
 
 .matrix-row {
   position: absolute;
   width: 100%;
-  /* Optimize row rendering */
   contain: layout style;
 }
 
@@ -236,7 +220,6 @@
   position: absolute;
   border-right: 1px solid hsl(var(--border));
   border-bottom: 1px solid hsl(var(--border));
-  /* Optimize cell rendering */
   contain: layout style paint;
 }
 
