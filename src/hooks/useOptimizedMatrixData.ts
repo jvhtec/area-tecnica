@@ -3,19 +3,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useMemo } from 'react';
 import { format, isWithinInterval, isSameDay } from 'date-fns';
+import { Job } from '@/types/job';
 
 interface OptimizedMatrixDataProps {
   technicians: Array<{ id: string; first_name: string; last_name: string; email: string; department: string; role: string; }>;
   dates: Date[];
-  jobs: Array<{ 
-    id: string; 
-    title: string; 
-    start_time: string; 
-    end_time: string; 
-    color?: string; 
-    status: string;
-    job_type: string;
-  }>;
+  jobs: Job[];
 }
 
 export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMatrixDataProps) => {
@@ -142,16 +135,14 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     };
   }, [availabilityData]);
 
-  // Fixed getJobsForDate function with proper type assertion
+  // Fixed getJobsForDate function with proper typing
   const getJobsForDate = useMemo(() => {
     const jobsByDate = new Map();
     
     dates.forEach(date => {
-      const dateJobs = jobs.filter(job => {
-        // Type assertion to fix TypeScript inference issue
-        const jobData = job as { start_time: string; end_time: string };
-        const jobStart = new Date(jobData.start_time);
-        const jobEnd = new Date(jobData.end_time);
+      const dateJobs = jobs.filter((job: Job) => {
+        const jobStart = new Date(job.start_time);
+        const jobEnd = new Date(job.end_time);
         
         return isWithinInterval(date, { start: jobStart, end: jobEnd }) || 
                isSameDay(date, jobStart) || 
