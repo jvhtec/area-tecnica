@@ -59,8 +59,7 @@ export const MatrixCell = ({
         'bg-gray-50 hover:bg-gray-100': isAvailable && isWeekendCell,
         'bg-yellow-50 border-yellow-200 hover:bg-yellow-100': isInvited,
         'bg-green-100 border-green-200 hover:bg-green-150': isConfirmed,
-        'bg-red-50 border-red-200 hover:bg-red-100': isDeclined,
-        'bg-red-50 border-red-200 hover:bg-red-100': isUnavailable && !isAssigned,
+        'bg-red-50 border-red-200 hover:bg-red-100': isDeclined || (isUnavailable && !isAssigned),
         'ring-2 ring-blue-500 ring-inset': isSelected,
         'ring-2 ring-orange-400 ring-inset': isTodayCell && !isSelected,
       }

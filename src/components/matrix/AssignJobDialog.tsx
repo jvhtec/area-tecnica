@@ -165,6 +165,11 @@ export const AssignJobDialog = ({
     }
   };
 
+  const handleCheckboxChange = (checked: boolean | "indeterminate") => {
+    // Convert CheckedState to boolean, treating "indeterminate" as false
+    setAssignAsConfirmed(checked === true);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
@@ -250,7 +255,7 @@ export const AssignJobDialog = ({
               <Checkbox 
                 id="confirm-assignment" 
                 checked={assignAsConfirmed}
-                onCheckedChange={setAssignAsConfirmed}
+                onCheckedChange={handleCheckboxChange}
               />
               <label 
                 htmlFor="confirm-assignment" 
