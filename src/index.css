@@ -97,7 +97,7 @@
   background: transparent;
 }
 
-/* Assignment Matrix Layout */
+/* Assignment Matrix Layout - Fixed positioning for main app sidebar */
 .matrix-layout {
   position: relative;
   height: 100%;
@@ -107,24 +107,31 @@
 
 /* Fixed Corner Header */
 .matrix-corner {
-  position: absolute;
-  top: 0;
-  left: 0;
+  position: fixed;
+  top: 104px; /* After main header */
+  left: 280px; /* After main sidebar */
   z-index: 50;
   background: hsl(var(--card));
   border-right: 1px solid hsl(var(--border));
   border-bottom: 1px solid hsl(var(--border));
 }
 
-/* Fixed Date Headers Row */
+/* Fixed Date Headers Row - Now scrollable horizontally */
 .matrix-date-headers {
-  position: absolute;
-  top: 0;
+  position: fixed;
+  top: 104px; /* After main header */
   right: 0;
   z-index: 40;
   background: hsl(var(--card));
   border-bottom: 1px solid hsl(var(--border));
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none; /* Hide scrollbar */
+  -ms-overflow-style: none; /* Hide scrollbar for IE */
+}
+
+.matrix-date-headers::-webkit-scrollbar {
+  display: none; /* Hide scrollbar for Chrome/Safari */
 }
 
 .matrix-date-scroll {
@@ -134,68 +141,46 @@
 
 /* Fixed Technician Column */
 .matrix-technician-column {
-  position: absolute;
-  left: 0;
-  bottom: 0;
+  position: fixed;
+  left: 280px; /* After main sidebar */
   z-index: 30;
   background: hsl(var(--card));
   border-right: 1px solid hsl(var(--border));
-  overflow: hidden;
-}
-
-.matrix-technician-scroll {
-  height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  scrollbar-width: none; /* Hide scrollbar */
+  -ms-overflow-style: none; /* Hide scrollbar for IE */
 }
 
-.matrix-technician-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-
-.matrix-technician-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.matrix-technician-scroll::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--muted-foreground) / 0.3);
-  border-radius: 3px;
+.matrix-technician-column::-webkit-scrollbar {
+  display: none; /* Hide scrollbar for Chrome/Safari */
 }
 
 /* Main Scrollable Area */
 .matrix-main-area {
-  position: absolute;
+  position: fixed;
   right: 0;
-  bottom: 0;
   background: hsl(var(--background));
-  overflow: hidden;
-}
-
-.matrix-main-scroll {
-  width: 100%;
-  height: 100%;
   overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
 }
 
-.matrix-main-scroll::-webkit-scrollbar {
+.matrix-main-area::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-.matrix-main-scroll::-webkit-scrollbar-track {
+.matrix-main-area::-webkit-scrollbar-track {
   background: hsl(var(--muted) / 0.1);
 }
 
-.matrix-main-scroll::-webkit-scrollbar-thumb {
+.matrix-main-area::-webkit-scrollbar-thumb {
   background-color: hsl(var(--muted-foreground) / 0.3);
   border-radius: 4px;
 }
 
-.matrix-main-scroll::-webkit-scrollbar-thumb:hover {
+.matrix-main-area::-webkit-scrollbar-thumb:hover {
   background-color: hsl(var(--muted-foreground) / 0.5);
 }
 
@@ -220,5 +205,13 @@
 @media (max-width: 768px) {
   .matrix-layout {
     font-size: 0.875rem;
+  }
+  
+  .matrix-corner {
+    left: 20px; /* Adjust for mobile sidebar */
+  }
+  
+  .matrix-technician-column {
+    left: 20px; /* Adjust for mobile sidebar */
   }
 }
