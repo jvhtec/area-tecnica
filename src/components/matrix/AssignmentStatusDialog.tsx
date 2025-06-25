@@ -54,7 +54,7 @@ export const AssignmentStatusDialog = ({
   });
 
   const handleSubmit = async () => {
-    if (!assignment) {
+    if (!assignment?.job_id) {
       toast.error('No assignment found');
       return;
     }
@@ -62,17 +62,26 @@ export const AssignmentStatusDialog = ({
     setIsSubmitting(true);
 
     try {
+      console.log('Updating assignment:', {
+        job_id: assignment.job_id,
+        technician_id: technicianId,
+        new_status: action
+      });
+
+      // Update using the composite key (job_id, technician_id)
       const { error } = await supabase
         .from('job_assignments')
         .update({
           status: action,
           response_time: new Date().toISOString(),
-          // Could add notes field in future if needed
         })
         .eq('job_id', assignment.job_id)
         .eq('technician_id', technicianId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
 
       toast.success(
         action === 'confirm' 

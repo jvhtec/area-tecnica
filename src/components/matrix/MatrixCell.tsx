@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { format, isSameDay, isToday, isWeekend } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -37,14 +38,14 @@ export const MatrixCell = ({
   const [isHovered, setIsHovered] = useState(false);
 
   // Determine cell status and styling
-  const isAssigned = !!assignment;
+  const isAssigned = !!assignment?.jobs; // Only consider assigned if there's actually a job
   const isUnavailable = availability?.status === 'unavailable';
   const isAvailable = !isAssigned && !isUnavailable;
   const isTodayCell = isToday(date);
   const isWeekendCell = isWeekend(date);
 
-  // Assignment status
-  const assignmentStatus = assignment?.status || 'invited';
+  // Assignment status - only valid if there's actually a job
+  const assignmentStatus = assignment?.jobs ? (assignment?.status || 'invited') : null;
   const isInvited = assignmentStatus === 'invited';
   const isConfirmed = assignmentStatus === 'confirmed';
   const isDeclined = assignmentStatus === 'declined';
@@ -52,13 +53,18 @@ export const MatrixCell = ({
   const getCellClasses = () => {
     return cn(
       'border-r border-b transition-all duration-200 cursor-pointer relative group',
-      'hover:bg-accent/50 hover:border-accent-foreground/20',
+      'hover:border-accent-foreground/20',
       {
-        'bg-green-50 hover:bg-green-100': isAvailable && !isWeekendCell,
-        'bg-gray-50 hover:bg-gray-100': isAvailable && isWeekendCell,
-        'bg-yellow-50 border-yellow-200 hover:bg-yellow-100': isInvited,
-        'bg-green-100 border-green-200 hover:bg-green-150': isConfirmed,
-        'bg-red-50 border-red-200 hover:bg-red-100': isDeclined || (isUnavailable && !isAssigned),
+        // Available cells - theme-aware colors
+        'bg-background hover:bg-accent/30': isAvailable && !isWeekendCell,
+        'bg-muted/50 hover:bg-muted/70': isAvailable && isWeekendCell,
+        
+        // Assignment status colors - theme-aware
+        'bg-yellow-50 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-800 hover:bg-yellow-100 dark:hover:bg-yellow-950/50': isInvited,
+        'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-950/50': isConfirmed,
+        'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-950/50': isDeclined || (isUnavailable && !isAssigned),
+        
+        // Selection and today highlighting
         'ring-2 ring-blue-500 ring-inset': isSelected,
         'ring-2 ring-orange-400 ring-inset': isTodayCell && !isSelected,
       }
@@ -69,9 +75,9 @@ export const MatrixCell = ({
     if (!isAssigned) return null;
     
     const statusConfig = {
-      invited: { label: 'Invited', variant: 'secondary', color: 'text-yellow-700' },
-      confirmed: { label: 'Confirmed', variant: 'default', color: 'text-green-700' },
-      declined: { label: 'Declined', variant: 'destructive', color: 'text-red-700' }
+      invited: { label: 'Invited', variant: 'secondary', color: 'text-yellow-700 dark:text-yellow-300' },
+      confirmed: { label: 'Confirmed', variant: 'default', color: 'text-green-700 dark:text-green-300' },
+      declined: { label: 'Declined', variant: 'destructive', color: 'text-red-700 dark:text-red-300' }
     };
     
     const config = statusConfig[assignmentStatus] || statusConfig.invited;
@@ -88,11 +94,11 @@ export const MatrixCell = ({
     
     switch (assignmentStatus) {
       case 'confirmed':
-        return <Check className="h-3 w-3 text-green-600" />;
+        return <Check className="h-3 w-3 text-green-600 dark:text-green-400" />;
       case 'declined':
-        return <X className="h-3 w-3 text-red-600" />;
+        return <X className="h-3 w-3 text-red-600 dark:text-red-400" />;
       case 'invited':
-        return <AlertCircle className="h-3 w-3 text-yellow-600" />;
+        return <AlertCircle className="h-3 w-3 text-yellow-600 dark:text-yellow-400" />;
       default:
         return null;
     }
@@ -119,11 +125,11 @@ export const MatrixCell = ({
     if (e.ctrlKey || e.metaKey) {
       // Multi-select mode
       onSelect(!isSelected);
-    } else if (isAssigned) {
-      // Handle based on assignment status
+    } else if (isAssigned && assignment?.jobs) {
+      // Handle based on assignment status - only if there's actually a job
       if (isInvited) {
         // Show confirm/decline/reassign options
-        onClick('assign'); // This will show the status management dialog
+        onClick('assign');
       } else if (isConfirmed) {
         // Show reassign options
         onClick('assign');
@@ -187,10 +193,10 @@ export const MatrixCell = ({
             )}
             
             {isUnavailable && !isAssigned && (
-              <div className="text-red-600 font-medium text-center">
+              <div className="text-red-600 dark:text-red-400 font-medium text-center">
                 Unavailable
                 {availability?.reason && (
-                  <div className="text-xs text-red-500 truncate w-full mt-1">
+                  <div className="text-xs text-red-500 dark:text-red-400 truncate w-full mt-1">
                     {availability.reason}
                   </div>
                 )}
@@ -203,9 +209,9 @@ export const MatrixCell = ({
               </div>
             )}
 
-            {/* Quick action buttons for invited assignments */}
-            {isInvited && isHovered && (
-              <div className="absolute inset-0 flex items-center justify-center gap-1 bg-yellow-100/90 rounded">
+            {/* Quick action buttons for invited assignments - only if there's actually a job */}
+            {isInvited && assignment?.jobs && isHovered && (
+              <div className="absolute inset-0 flex items-center justify-center gap-1 bg-yellow-100/90 dark:bg-yellow-950/90 rounded">
                 <Button
                   size="sm"
                   variant="outline"
@@ -300,7 +306,7 @@ export const MatrixCell = ({
               </>
             )}
 
-            {isInvited && (
+            {isInvited && assignment?.jobs && (
               <>
                 <Button
                   size="sm"
@@ -329,7 +335,7 @@ export const MatrixCell = ({
               </>
             )}
 
-            {(isConfirmed || isDeclined) && (
+            {(isConfirmed || isDeclined) && assignment?.jobs && (
               <Button
                 size="sm"
                 variant="outline"

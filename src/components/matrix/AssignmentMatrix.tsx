@@ -46,6 +46,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
   const [hasScrolledToToday, setHasScrolledToToday] = useState(false);
   const CELL_WIDTH = 120;
   const CELL_HEIGHT = 60;
+  const SIDEBAR_WIDTH = 256; // 64 * 4 = 256px (w-64 in Tailwind)
 
   // Get all job assignments for all jobs that might have assignments
   const jobIds = jobs.map(job => job.id);
@@ -151,7 +152,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     setSelectedCells(new Set());
   };
 
-  // Enhanced scroll to today with proper timing
+  // Fixed auto-scroll to today functionality
   useEffect(() => {
     if (hasScrolledToToday || !scrollContainerRef.current || dates.length === 0) return;
 
@@ -161,14 +162,35 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
       
       if (todayIndex !== -1 && scrollContainerRef.current) {
         const container = scrollContainerRef.current;
-        const scrollPosition = todayIndex * CELL_WIDTH - (container.clientWidth / 2);
-        container.scrollLeft = Math.max(0, scrollPosition);
-        setHasScrolledToToday(true);
+        
+        // Wait for next frame to ensure container is properly rendered
+        requestAnimationFrame(() => {
+          if (!container) return;
+          
+          const containerWidth = container.clientWidth;
+          const totalWidth = dates.length * CELL_WIDTH;
+          
+          // Calculate scroll position to center today's date
+          let scrollPosition = (todayIndex * CELL_WIDTH) - (containerWidth / 2) + (CELL_WIDTH / 2);
+          
+          // Ensure we don't scroll past the boundaries
+          scrollPosition = Math.max(0, Math.min(scrollPosition, totalWidth - containerWidth));
+          
+          container.scrollLeft = scrollPosition;
+          setHasScrolledToToday(true);
+          
+          console.log('Auto-scrolled to today:', {
+            todayIndex,
+            scrollPosition,
+            containerWidth,
+            totalWidth
+          });
+        });
       }
     };
 
-    // Use a small delay to ensure the component is fully rendered
-    const timeoutId = setTimeout(scrollToToday, 100);
+    // Use a longer delay to ensure everything is rendered
+    const timeoutId = setTimeout(scrollToToday, 200);
     
     return () => clearTimeout(timeoutId);
   }, [dates, hasScrolledToToday]);
