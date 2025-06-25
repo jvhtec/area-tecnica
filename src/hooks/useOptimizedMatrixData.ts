@@ -142,14 +142,16 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     };
   }, [availabilityData]);
 
-  // Fixed getJobsForDate function - properly iterate through jobs array
+  // Fixed getJobsForDate function with proper type assertion
   const getJobsForDate = useMemo(() => {
     const jobsByDate = new Map();
     
     dates.forEach(date => {
       const dateJobs = jobs.filter(job => {
-        const jobStart = new Date(job.start_time);
-        const jobEnd = new Date(job.end_time);
+        // Type assertion to fix TypeScript inference issue
+        const jobData = job as { start_time: string; end_time: string };
+        const jobStart = new Date(jobData.start_time);
+        const jobEnd = new Date(jobData.end_time);
         
         return isWithinInterval(date, { start: jobStart, end: jobEnd }) || 
                isSameDay(date, jobStart) || 
