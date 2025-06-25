@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { format, isSameDay, isWithinInterval } from 'date-fns';
 import { TechnicianRow } from './TechnicianRow';
@@ -54,6 +53,10 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
   const CELL_HEIGHT = 60;
   const TECHNICIAN_WIDTH = 256;
   const HEADER_HEIGHT = 80;
+
+  // Calculate matrix dimensions
+  const matrixWidth = dates.length * CELL_WIDTH;
+  const matrixHeight = technicians.length * CELL_HEIGHT;
 
   // Get all job assignments for all jobs that might have assignments
   const jobIds = jobs.map(job => job.id);
@@ -145,41 +148,41 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     });
   };
 
-  // Enhanced sync scroll handlers with debugging
+  // Fixed scroll synchronization
   const handleMainScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const scrollLeft = e.currentTarget.scrollLeft;
     const scrollTop = e.currentTarget.scrollTop;
     
-    console.log('Main scroll event:', { scrollLeft, scrollTop });
+    console.log('Main scroll event:', { scrollLeft, scrollTop, matrixWidth });
     
+    // Sync horizontal scroll with date headers
     if (dateScrollRef.current) {
       dateScrollRef.current.scrollLeft = scrollLeft;
-      console.log('Date header scroll updated to:', scrollLeft);
+      console.log('Date header scroll synced to:', scrollLeft);
     }
+    
+    // Sync vertical scroll with technician column
     if (technicianScrollRef.current) {
       technicianScrollRef.current.scrollTop = scrollTop;
     }
   };
 
-  // Ensure proper dimensions for scroll containers
+  // Ensure proper dimensions and scroll setup
   useEffect(() => {
     if (dateScrollRef.current && mainScrollRef.current) {
-      const mainWidth = dates.length * CELL_WIDTH;
       const dateScrollElement = dateScrollRef.current;
       const mainScrollElement = mainScrollRef.current;
       
-      // Ensure the date scroll container has the correct width
-      if (dateScrollElement.scrollWidth !== mainWidth) {
-        console.log('Adjusting date scroll width:', { 
-          expected: mainWidth, 
-          actual: dateScrollElement.scrollWidth 
-        });
-      }
+      console.log('Setting up scroll containers:', {
+        matrixWidth,
+        dateScrollWidth: dateScrollElement.scrollWidth,
+        mainScrollWidth: mainScrollElement.scrollWidth
+      });
       
-      // Force a layout update
-      dateScrollElement.style.width = `${mainScrollElement.offsetWidth}px`;
+      // Force scroll container dimensions
+      dateScrollElement.style.width = `${mainScrollElement.clientWidth}px`;
     }
-  }, [dates.length, CELL_WIDTH]);
+  }, [dates.length, CELL_WIDTH, matrixWidth]);
 
   const handleCellClick = (technicianId: string, date: Date, action: 'select-job' | 'assign' | 'unavailable' | 'confirm' | 'decline') => {
     const assignment = getAssignmentForCell(technicianId, date);
@@ -230,24 +233,17 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         let scrollPosition = (todayIndex * CELL_WIDTH) - (containerWidth / 2) + (CELL_WIDTH / 2);
         
         // Ensure we don't scroll past the boundaries
-        const maxScroll = (dates.length * CELL_WIDTH) - containerWidth;
+        const maxScroll = matrixWidth - containerWidth;
         scrollPosition = Math.max(0, Math.min(scrollPosition, maxScroll));
         
         container.scrollLeft = scrollPosition;
         setHasScrolledToToday(true);
-        
-        console.log('Auto-scrolled to today:', {
-          todayIndex,
-          scrollPosition,
-          containerWidth,
-          maxScroll
-        });
       }
     };
 
     const timeoutId = setTimeout(scrollToToday, 300);
     return () => clearTimeout(timeoutId);
-  }, [dates, hasScrolledToToday, CELL_WIDTH]);
+  }, [dates, hasScrolledToToday, CELL_WIDTH, matrixWidth]);
 
   // Get technician name for dialogs
   const getCurrentTechnician = () => {
@@ -272,18 +268,23 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         </div>
       </div>
 
-      {/* Fixed Date Headers Row */}
+      {/* Fixed Date Headers Row - Fixed dimensions and layout */}
       <div 
         className="matrix-date-headers"
         style={{ 
           left: TECHNICIAN_WIDTH, 
-          height: HEADER_HEIGHT 
+          height: HEADER_HEIGHT,
+          width: `calc(100% - ${TECHNICIAN_WIDTH}px)`
         }}
       >
         <div 
           ref={dateScrollRef}
           className="matrix-date-scroll"
-          style={{ width: dates.length * CELL_WIDTH }}
+          style={{ 
+            width: matrixWidth,
+            minWidth: matrixWidth,
+            height: '100%'
+          }}
         >
           {dates.map((date, index) => (
             <DateHeader
@@ -301,7 +302,8 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         className="matrix-technician-column"
         style={{ 
           width: TECHNICIAN_WIDTH, 
-          top: HEADER_HEIGHT 
+          top: HEADER_HEIGHT,
+          height: `calc(100% - ${HEADER_HEIGHT}px)`
         }}
       >
         <div ref={technicianScrollRef} className="matrix-technician-scroll">
@@ -320,7 +322,9 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         className="matrix-main-area"
         style={{ 
           left: TECHNICIAN_WIDTH, 
-          top: HEADER_HEIGHT 
+          top: HEADER_HEIGHT,
+          width: `calc(100% - ${TECHNICIAN_WIDTH}px)`,
+          height: `calc(100% - ${HEADER_HEIGHT}px)`
         }}
       >
         <div 
@@ -331,8 +335,8 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
           <div 
             className="matrix-grid"
             style={{ 
-              width: dates.length * CELL_WIDTH,
-              height: technicians.length * CELL_HEIGHT
+              width: matrixWidth,
+              height: matrixHeight
             }}
           >
             {technicians.map((technician, techIndex) => (

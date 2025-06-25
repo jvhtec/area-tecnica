@@ -41,28 +41,33 @@ export const DateHeader = ({ date, width, jobs = [] }: DateHeaderProps) => {
           className={cn(
             'border-r text-center text-xs font-medium bg-card cursor-pointer',
             'flex flex-col justify-center items-center relative transition-colors',
-            'hover:bg-accent/50',
+            'hover:bg-accent/50 flex-shrink-0',
             {
               'bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300': isTodayHeader,
               'bg-muted/50 text-muted-foreground': isWeekendHeader && !isTodayHeader,
               'ring-2 ring-blue-500/30 ring-inset': hasJobs,
             }
           )}
-          style={{ width }}
+          style={{ 
+            width: `${width}px`,
+            minWidth: `${width}px`,
+            maxWidth: `${width}px`,
+            height: '100%'
+          }}
         >
-          <div className="font-semibold">
+          <div className="font-semibold text-xs">
             {format(date, 'EEE')}
           </div>
-          <div className={cn('text-lg font-bold', {
+          <div className={cn('text-base font-bold leading-tight', {
             'text-orange-700 dark:text-orange-300': isTodayHeader
           })}>
             {format(date, 'd')}
           </div>
-          <div className="text-xs text-muted-foreground">
+          <div className="text-xs text-muted-foreground leading-tight">
             {format(date, 'MMM')}
           </div>
           {format(date, 'd') === '1' && (
-            <div className="text-xs text-muted-foreground mt-1">
+            <div className="text-xs text-muted-foreground mt-0.5 leading-tight">
               {format(date, 'yyyy')}
             </div>
           )}
@@ -73,20 +78,20 @@ export const DateHeader = ({ date, width, jobs = [] }: DateHeaderProps) => {
               {jobColors.slice(0, 3).map((color, index) => (
                 <div
                   key={index}
-                  className="w-2 h-2 rounded-full border border-white dark:border-gray-800"
+                  className="w-1.5 h-1.5 rounded-full border border-white dark:border-gray-800"
                   style={{ backgroundColor: color }}
                 />
               ))}
               {jobColors.length > 3 && (
-                <div className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-600 border border-white dark:border-gray-800" />
+                <div className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-600 border border-white dark:border-gray-800" />
               )}
             </div>
           )}
           
           {/* Job count badge */}
           {hasJobs && (
-            <div className="absolute top-1 right-1">
-              <Badge variant="secondary" className="text-xs px-1 py-0 h-4 min-w-4">
+            <div className="absolute top-0.5 right-0.5">
+              <Badge variant="secondary" className="text-xs px-1 py-0 h-3 min-w-3 text-xs leading-none">
                 {jobs.length}
               </Badge>
             </div>
