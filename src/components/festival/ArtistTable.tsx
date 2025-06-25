@@ -11,6 +11,7 @@ import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
 import { sortArtistsChronologically } from "@/utils/artistSorting";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Artist {
   id: string;
@@ -48,7 +49,20 @@ interface Artist {
     notes?: string;
   }>;
   job_id?: string;
+  // Infrastructure fields
+  infra_cat6?: boolean;
+  infra_cat6_quantity?: number;
+  infra_hma?: boolean;
+  infra_hma_quantity?: number;
+  infra_coax?: boolean;
+  infra_coax_quantity?: number;
+  infra_opticalcon_duo?: boolean;
+  infra_opticalcon_duo_quantity?: number;
+  infra_analog?: number;
+  other_infrastructure?: string;
+  infrastructure_provided_by?: string;
 }
+
 interface ArtistTableProps {
   artists: Artist[];
   isLoading: boolean;
@@ -62,6 +76,7 @@ interface ArtistTableProps {
   jobId?: string;
   selectedDate?: string;
 }
+
 export const ArtistTable = ({
   artists,
   isLoading,
@@ -143,6 +158,38 @@ export const ArtistTable = ({
       // Fallback to artist name
       return (a.name || '').localeCompare(b.name || '');
     });
+  };
+
+  // Helper function to format infrastructure requirements
+  const formatInfrastructure = (artist: Artist) => {
+    const infraItems: string[] = [];
+    
+    if (artist.infra_cat6 && artist.infra_cat6_quantity) {
+      infraItems.push(`${artist.infra_cat6_quantity}x CAT6`);
+    }
+    if (artist.infra_hma && artist.infra_hma_quantity) {
+      infraItems.push(`${artist.infra_hma_quantity}x HMA`);
+    }
+    if (artist.infra_coax && artist.infra_coax_quantity) {
+      infraItems.push(`${artist.infra_coax_quantity}x Coax`);
+    }
+    if (artist.infra_opticalcon_duo && artist.infra_opticalcon_duo_quantity) {
+      infraItems.push(`${artist.infra_opticalcon_duo_quantity}x OpticalCON DUO`);
+    }
+    if (artist.infra_analog && artist.infra_analog > 0) {
+      infraItems.push(`${artist.infra_analog}x Analog`);
+    }
+    if (artist.other_infrastructure) {
+      infraItems.push(artist.other_infrastructure);
+    }
+    
+    return infraItems.length > 0 ? infraItems.join(", ") : "None";
+  };
+
+  // Helper function to truncate notes for display
+  const formatNotes = (notes?: string) => {
+    if (!notes || notes.trim() === '') return "No notes";
+    return notes.length > 50 ? `${notes.substring(0, 50)}...` : notes;
   };
 
   // Filtering logic
@@ -325,191 +372,243 @@ export const ArtistTable = ({
   }
   return (
     <>
-      <div className="w-full space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between py-4 px-2">
-          <h2 className="text-2xl font-semibold leading-none tracking-tight">
-            Artist Schedule ({sortedFilteredArtists.length} artists)
-          </h2>
-          <Button variant="outline" size="sm" onClick={handleViewLinks}>
-            <ExternalLink className="h-4 w-4 mr-2" />
-            View All Links
-          </Button>
-        </div>
-
-        {/* Table - Remove container constraints and use full width */}
-        <div className="w-full overflow-x-auto">
-          <Table className="w-full min-w-full">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-[140px]">Artist</TableHead>
-                <TableHead className="min-w-[80px]">Stage</TableHead>
-                <TableHead className="min-w-[100px]">Show Time</TableHead>
-                <TableHead className="min-w-[100px]">Soundcheck</TableHead>
-                <TableHead className="min-w-[200px]">Consoles</TableHead>
-                <TableHead className="min-w-[180px]">Wireless/IEM</TableHead>
-                <TableHead className="min-w-[140px]">
-                  <div className="flex items-center gap-1">
-                    <Mic className="h-4 w-4" />
-                    Microphones
-                  </div>
-                </TableHead>
-                <TableHead className="min-w-[80px]">Monitors</TableHead>
-                <TableHead className="min-w-[80px]">Extras</TableHead>
-                <TableHead className="min-w-[80px]">Status</TableHead>
-                <TableHead className="min-w-[200px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedFilteredArtists.map(artist => (
-                <TableRow key={artist.id}>
-                  <TableCell className="min-w-[140px]">
-                    <div className="space-y-1">
-                      <div className="font-medium">{artist.name}</div>
-                      {artist.isaftermidnight && <Badge variant="outline" className="text-xs bg-blue-700">After Midnight</Badge>}
-                    </div>
-                  </TableCell>
-                  <TableCell className="min-w-[80px]">
-                    <Badge variant="outline">{getStageDisplayName(artist.stage)}</Badge>
-                  </TableCell>
-                  <TableCell className="min-w-[100px]">
-                    <div className="text-sm">
-                      {artist.show_start} - {artist.show_end}
-                    </div>
-                  </TableCell>
-                  <TableCell className="min-w-[100px]">
-                    {artist.soundcheck ? (
-                      <div className="text-sm">
-                        <Badge variant="secondary">Yes</Badge>
-                        <div className="text-xs text-muted-foreground">
-                          {artist.soundcheck_start} - {artist.soundcheck_end}
-                        </div>
-                      </div>
-                    ) : (
-                      <Badge variant="outline">No</Badge>
-                    )}
-                  </TableCell>
-                  
-                  <TableCell className="min-w-[200px]">
-                    <div className="text-sm space-y-1">
-                      <div className="flex items-center gap-1 flex-wrap">
-                        <span>FOH: {artist.foh_console || "Not specified"}</span>
-                        {artist.foh_console_provided_by && (
-                          <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.foh_console_provided_by)}`}>
-                            {artist.foh_console_provided_by}
-                          </Badge>
-                        )}
-                        {artist.foh_tech && <Badge variant="outline" className="text-xs">Tech</Badge>}
-                      </div>
-                      <div className="flex items-center gap-1 flex-wrap">
-                        <span>MON: {artist.mon_console || "Not specified"}</span>
-                        {artist.mon_console_provided_by && (
-                          <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
-                            {artist.mon_console_provided_by}
-                          </Badge>
-                        )}
-                        {artist.mon_tech && <Badge variant="outline" className="text-xs">Tech</Badge>}
-                      </div>
-                    </div>
-                  </TableCell>
-                  
-                  <TableCell className="min-w-[180px]">
-                    <div className="text-sm space-y-1">
-                      {artist.wireless_systems && artist.wireless_systems.length > 0 && (
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <div className="text-xs" title={formatWirelessSystems(artist.wireless_systems)}>
-                            Wireless: {formatWirelessSystems(artist.wireless_systems)}
-                          </div>
-                          {artist.wireless_provided_by && (
-                            <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.wireless_provided_by)}`}>
-                              {artist.wireless_provided_by}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-                      {artist.iem_systems && artist.iem_systems.length > 0 && (
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <div className="text-xs" title={formatWirelessSystems(artist.iem_systems, true)}>
-                            IEM: {formatWirelessSystems(artist.iem_systems, true)}
-                          </div>
-                          {artist.iem_provided_by && (
-                            <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.iem_provided_by)}`}>
-                              {artist.iem_provided_by}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
-
-                  <TableCell className="min-w-[140px]">
-                    <div className="text-sm space-y-1">
-                      <Badge variant={artist.mic_kit === 'festival' ? 'default' : 'secondary'}>
-                        {artist.mic_kit === 'festival' ? 'Festival' : 'Band'}
-                      </Badge>
-                      {artist.mic_kit === 'festival' && artist.wired_mics && artist.wired_mics.length > 0 && (
-                        <div className="text-xs text-muted-foreground max-w-32 truncate" title={formatWiredMics(artist.wired_mics)}>
-                          {formatWiredMics(artist.wired_mics)}
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
-
-                  <TableCell className="min-w-[80px]">
-                    {artist.monitors_enabled ? (
-                      <div className="text-sm">
-                        <Badge variant="secondary">{artist.monitors_quantity}x</Badge>
-                      </div>
-                    ) : (
-                      <Badge variant="outline">None</Badge>
-                    )}
-                  </TableCell>
-                  
-                  <TableCell className="min-w-[80px]">
-                    <div className="text-xs space-y-1 flex flex-wrap gap-1">
-                      {artist.extras_sf && <Badge variant="outline" className="text-xs">SF</Badge>}
-                      {artist.extras_df && <Badge variant="outline" className="text-xs">DF</Badge>}
-                      {artist.extras_djbooth && <Badge variant="outline" className="text-xs">DJ</Badge>}
-                    </div>
-                  </TableCell>
-                  
-                  <TableCell className="min-w-[80px]">
-                    <Badge variant={artist.rider_missing ? "destructive" : "default"}>
-                      {artist.rider_missing ? "Missing" : "Complete"}
-                    </Badge>
-                  </TableCell>
-                  
-                  <TableCell className="min-w-[200px]">
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <Button variant="ghost" size="icon" onClick={() => handleGenerateLink(artist)} title="Generate form link">
-                        <Link className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleManageFiles(artist)} title="Manage files/riders">
-                        <FileText className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handlePrintArtist(artist)} disabled={printingArtistId === artist.id} title="Print artist details">
-                        {printingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => onEditArtist(artist)} title="Edit artist">
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(artist)} disabled={deletingArtistId === artist.id} title="Delete artist">
-                        {deletingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-
-        {sortedFilteredArtists.length === 0 && !isLoading && (
-          <div className="text-center py-8 text-muted-foreground">
-            No artists found matching the current filters.
+      <TooltipProvider>
+        <div className="w-full space-y-4">
+          {/* Header */}
+          <div className="flex items-center justify-between py-4 px-2">
+            <h2 className="text-2xl font-semibold leading-none tracking-tight">
+              Artist Schedule ({sortedFilteredArtists.length} artists)
+            </h2>
+            <Button variant="outline" size="sm" onClick={handleViewLinks}>
+              <ExternalLink className="h-4 w-4 mr-2" />
+              View All Links
+            </Button>
           </div>
-        )}
-      </div>
+
+          {/* Table - Remove container constraints and use full width */}
+          <div className="w-full overflow-x-auto">
+            <Table className="w-full min-w-full">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-[140px]">Artist</TableHead>
+                  <TableHead className="min-w-[80px]">Stage</TableHead>
+                  <TableHead className="min-w-[100px]">Show Time</TableHead>
+                  <TableHead className="min-w-[100px]">Soundcheck</TableHead>
+                  <TableHead className="min-w-[200px]">Consoles</TableHead>
+                  <TableHead className="min-w-[180px]">Wireless/IEM</TableHead>
+                  <TableHead className="min-w-[140px]">
+                    <div className="flex items-center gap-1">
+                      <Mic className="h-4 w-4" />
+                      Microphones
+                    </div>
+                  </TableHead>
+                  <TableHead className="min-w-[80px]">Monitors</TableHead>
+                  <TableHead className="min-w-[160px]">Infrastructure</TableHead>
+                  <TableHead className="min-w-[80px]">Extras</TableHead>
+                  <TableHead className="min-w-[120px]">Notes</TableHead>
+                  <TableHead className="min-w-[80px]">Status</TableHead>
+                  <TableHead className="min-w-[200px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedFilteredArtists.map(artist => (
+                  <TableRow key={artist.id}>
+                    <TableCell className="min-w-[140px]">
+                      <div className="space-y-1">
+                        <div className="font-medium">{artist.name}</div>
+                        {artist.isaftermidnight && <Badge variant="outline" className="text-xs bg-blue-700">After Midnight</Badge>}
+                      </div>
+                    </TableCell>
+                    <TableCell className="min-w-[80px]">
+                      <Badge variant="outline">{getStageDisplayName(artist.stage)}</Badge>
+                    </TableCell>
+                    <TableCell className="min-w-[100px]">
+                      <div className="text-sm">
+                        {artist.show_start} - {artist.show_end}
+                      </div>
+                    </TableCell>
+                    <TableCell className="min-w-[100px]">
+                      {artist.soundcheck ? (
+                        <div className="text-sm">
+                          <Badge variant="secondary">Yes</Badge>
+                          <div className="text-xs text-muted-foreground">
+                            {artist.soundcheck_start} - {artist.soundcheck_end}
+                          </div>
+                        </div>
+                      ) : (
+                        <Badge variant="outline">No</Badge>
+                      )}
+                    </TableCell>
+                    
+                    <TableCell className="min-w-[200px]">
+                      <div className="text-sm space-y-1">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span>FOH: {artist.foh_console || "Not specified"}</span>
+                          {artist.foh_console_provided_by && (
+                            <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.foh_console_provided_by)}`}>
+                              {artist.foh_console_provided_by}
+                            </Badge>
+                          )}
+                          {artist.foh_tech && <Badge variant="outline" className="text-xs">Tech</Badge>}
+                        </div>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span>MON: {artist.mon_console || "Not specified"}</span>
+                          {artist.mon_console_provided_by && (
+                            <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
+                              {artist.mon_console_provided_by}
+                            </Badge>
+                          )}
+                          {artist.mon_tech && <Badge variant="outline" className="text-xs">Tech</Badge>}
+                        </div>
+                      </div>
+                    </TableCell>
+                    
+                    <TableCell className="min-w-[180px]">
+                      <div className="text-sm space-y-1">
+                        {artist.wireless_systems && artist.wireless_systems.length > 0 && (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <div className="text-xs" title={formatWirelessSystems(artist.wireless_systems)}>
+                              Wireless: {formatWirelessSystems(artist.wireless_systems)}
+                            </div>
+                            {artist.wireless_provided_by && (
+                              <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.wireless_provided_by)}`}>
+                                {artist.wireless_provided_by}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                        {artist.iem_systems && artist.iem_systems.length > 0 && (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <div className="text-xs" title={formatWirelessSystems(artist.iem_systems, true)}>
+                              IEM: {formatWirelessSystems(artist.iem_systems, true)}
+                            </div>
+                            {artist.iem_provided_by && (
+                              <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.iem_provided_by)}`}>
+                                {artist.iem_provided_by}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="min-w-[140px]">
+                      <div className="text-sm space-y-1">
+                        <Badge variant={artist.mic_kit === 'festival' ? 'default' : 'secondary'}>
+                          {artist.mic_kit === 'festival' ? 'Festival' : 'Band'}
+                        </Badge>
+                        {artist.mic_kit === 'festival' && artist.wired_mics && artist.wired_mics.length > 0 && (
+                          <div className="text-xs text-muted-foreground max-w-32 truncate" title={formatWiredMics(artist.wired_mics)}>
+                            {formatWiredMics(artist.wired_mics)}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="min-w-[80px]">
+                      {artist.monitors_enabled ? (
+                        <div className="text-sm">
+                          <Badge variant="secondary">{artist.monitors_quantity}x</Badge>
+                        </div>
+                      ) : (
+                        <Badge variant="outline">None</Badge>
+                      )}
+                    </TableCell>
+
+                    {/* New Infrastructure Column */}
+                    <TableCell className="min-w-[160px]">
+                      <div className="text-sm space-y-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="text-xs text-muted-foreground max-w-36 truncate cursor-help">
+                              {formatInfrastructure(artist)}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="max-w-sm">
+                              <p className="font-medium">Infrastructure Requirements:</p>
+                              <p>{formatInfrastructure(artist)}</p>
+                              {artist.infrastructure_provided_by && (
+                                <p className="text-xs mt-1">Provided by: {artist.infrastructure_provided_by}</p>
+                              )}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                        {artist.infrastructure_provided_by && (
+                          <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.infrastructure_provided_by)}`}>
+                            {artist.infrastructure_provided_by}
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    
+                    <TableCell className="min-w-[80px]">
+                      <div className="text-xs space-y-1 flex flex-wrap gap-1">
+                        {artist.extras_sf && <Badge variant="outline" className="text-xs">SF</Badge>}
+                        {artist.extras_df && <Badge variant="outline" className="text-xs">DF</Badge>}
+                        {artist.extras_djbooth && <Badge variant="outline" className="text-xs">DJ</Badge>}
+                      </div>
+                    </TableCell>
+
+                    {/* New Notes Column */}
+                    <TableCell className="min-w-[120px]">
+                      {artist.notes && artist.notes.trim() !== '' ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="text-xs text-muted-foreground max-w-28 truncate cursor-help">
+                              {formatNotes(artist.notes)}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="max-w-sm">
+                              <p className="font-medium">Notes:</p>
+                              <p className="whitespace-pre-wrap">{artist.notes}</p>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No notes</span>
+                      )}
+                    </TableCell>
+                    
+                    <TableCell className="min-w-[80px]">
+                      <Badge variant={artist.rider_missing ? "destructive" : "default"}>
+                        {artist.rider_missing ? "Missing" : "Complete"}
+                      </Badge>
+                    </TableCell>
+                    
+                    <TableCell className="min-w-[200px]">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <Button variant="ghost" size="icon" onClick={() => handleGenerateLink(artist)} title="Generate form link">
+                          <Link className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleManageFiles(artist)} title="Manage files/riders">
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handlePrintArtist(artist)} disabled={printingArtistId === artist.id} title="Print artist details">
+                          {printingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => onEditArtist(artist)} title="Edit artist">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(artist)} disabled={deletingArtistId === artist.id} title="Delete artist">
+                          {deletingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {sortedFilteredArtists.length === 0 && !isLoading && (
+            <div className="text-center py-8 text-muted-foreground">
+              No artists found matching the current filters.
+            </div>
+          )}
+        </div>
+      </TooltipProvider>
 
       {selectedArtist && (
         <>
