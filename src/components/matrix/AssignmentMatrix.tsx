@@ -3,6 +3,7 @@ import { format, isSameDay } from 'date-fns';
 import { TechnicianRow } from './TechnicianRow';
 import { MatrixCell } from './MatrixCell';
 import { DateHeader } from './DateHeader';
+import { SelectJobDialog } from './SelectJobDialog';
 import { AssignJobDialog } from './AssignJobDialog';
 import { AssignmentStatusDialog } from './AssignmentStatusDialog';
 import { MarkUnavailableDialog } from './MarkUnavailableDialog';
@@ -31,16 +32,18 @@ interface AssignmentMatrixProps {
 }
 
 interface CellAction {
-  type: 'assign' | 'unavailable' | 'confirm' | 'decline';
+  type: 'select-job' | 'assign' | 'unavailable' | 'confirm' | 'decline';
   technicianId: string;
   date: Date;
   assignment?: any;
+  selectedJobId?: string;
 }
 
 export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixProps) => {
   const [cellAction, setCellAction] = useState<CellAction | null>(null);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [hasScrolledToToday, setHasScrolledToToday] = useState(false);
   const CELL_WIDTH = 120;
   const CELL_HEIGHT = 60;
 
@@ -114,9 +117,20 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     );
   };
 
-  const handleCellClick = (technicianId: string, date: Date, action: 'assign' | 'unavailable' | 'confirm' | 'decline') => {
+  const handleCellClick = (technicianId: string, date: Date, action: 'select-job' | 'assign' | 'unavailable' | 'confirm' | 'decline') => {
     const assignment = getAssignmentForCell(technicianId, date);
     setCellAction({ type: action, technicianId, date, assignment });
+  };
+
+  const handleJobSelected = (jobId: string) => {
+    if (cellAction?.type === 'select-job') {
+      // Close job selection dialog and open assignment dialog with pre-selected job
+      setCellAction({
+        ...cellAction,
+        type: 'assign',
+        selectedJobId: jobId
+      });
+    }
   };
 
   const handleCellSelect = (technicianId: string, date: Date, selected: boolean) => {
@@ -137,16 +151,35 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     setSelectedCells(new Set());
   };
 
-  // Scroll to today's date on mount
+  // Enhanced scroll to today with proper timing
   useEffect(() => {
-    const today = new Date();
-    const todayIndex = dates.findIndex(date => isSameDay(date, today));
+    if (hasScrolledToToday || !scrollContainerRef.current || dates.length === 0) return;
+
+    const scrollToToday = () => {
+      const today = new Date();
+      const todayIndex = dates.findIndex(date => isSameDay(date, today));
+      
+      if (todayIndex !== -1 && scrollContainerRef.current) {
+        const container = scrollContainerRef.current;
+        const scrollPosition = todayIndex * CELL_WIDTH - (container.clientWidth / 2);
+        container.scrollLeft = Math.max(0, scrollPosition);
+        setHasScrolledToToday(true);
+      }
+    };
+
+    // Use a small delay to ensure the component is fully rendered
+    const timeoutId = setTimeout(scrollToToday, 100);
     
-    if (todayIndex !== -1 && scrollContainerRef.current) {
-      const scrollPosition = todayIndex * CELL_WIDTH - (scrollContainerRef.current.clientWidth / 2);
-      scrollContainerRef.current.scrollLeft = Math.max(0, scrollPosition);
-    }
-  }, [dates]);
+    return () => clearTimeout(timeoutId);
+  }, [dates, hasScrolledToToday]);
+
+  // Get technician name for dialogs
+  const getCurrentTechnician = () => {
+    if (!cellAction?.technicianId) return null;
+    return technicians.find(t => t.id === cellAction.technicianId);
+  };
+
+  const currentTechnician = getCurrentTechnician();
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -220,6 +253,20 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         </div>
       </div>
 
+      {/* Job Selection Dialog */}
+      {cellAction?.type === 'select-job' && currentTechnician && (
+        <SelectJobDialog
+          open={true}
+          onClose={closeDialogs}
+          onJobSelected={handleJobSelected}
+          technicianName={`${currentTechnician.first_name} ${currentTechnician.last_name}`}
+          date={cellAction.date}
+          availableJobs={jobs.filter(job => 
+            isSameDay(new Date(job.start_time), cellAction.date)
+          )}
+        />
+      )}
+
       {/* Assignment Dialog */}
       {cellAction?.type === 'assign' && (
         <AssignJobDialog
@@ -231,6 +278,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
             isSameDay(new Date(job.start_time), cellAction.date)
           )}
           existingAssignment={cellAction.assignment}
+          preSelectedJobId={cellAction.selectedJobId}
         />
       )}
 

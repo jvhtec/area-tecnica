@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format, isSameDay, isToday, isWeekend } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -21,7 +20,7 @@ interface MatrixCellProps {
   height: number;
   isSelected: boolean;
   onSelect: (selected: boolean) => void;
-  onClick: (action: 'assign' | 'unavailable' | 'confirm' | 'decline') => void;
+  onClick: (action: 'select-job' | 'assign' | 'unavailable' | 'confirm' | 'decline') => void;
 }
 
 export const MatrixCell = ({
@@ -132,9 +131,12 @@ export const MatrixCell = ({
         // Show reassign options
         onClick('assign');
       }
+    } else if (isAvailable) {
+      // If available, show job selection first
+      onClick('select-job');
     } else {
-      // If not assigned, show assign/unavailable options
-      onClick('assign');
+      // For unavailable cells, show unavailable options
+      onClick('unavailable');
     }
   };
 
@@ -173,7 +175,7 @@ export const MatrixCell = ({
                   {assignment.jobs.title}
                 </div>
                 {role && (
-                  <div className="text-xs text-muted-foreground truncate w-full text-center mb-1">
+                  <div className="text-xs text-muted-foreground truncate w-full mb-1">
                     {role}
                   </div>
                 )}
@@ -282,10 +284,10 @@ export const MatrixCell = ({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => onClick('assign')}
+                  onClick={() => onClick('select-job')}
                   className="flex-1"
                 >
-                  Assign Job
+                  Select Job
                 </Button>
                 <Button
                   size="sm"

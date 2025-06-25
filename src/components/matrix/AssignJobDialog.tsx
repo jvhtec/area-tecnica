@@ -38,6 +38,7 @@ interface AssignJobDialogProps {
     status: string;
   }>;
   existingAssignment?: any;
+  preSelectedJobId?: string;
 }
 
 export const AssignJobDialog = ({ 
@@ -46,9 +47,10 @@ export const AssignJobDialog = ({
   technicianId, 
   date, 
   availableJobs,
-  existingAssignment
+  existingAssignment,
+  preSelectedJobId
 }: AssignJobDialogProps) => {
-  const [selectedJobId, setSelectedJobId] = useState<string>(existingAssignment?.job_id || '');
+  const [selectedJobId, setSelectedJobId] = useState<string>(preSelectedJobId || existingAssignment?.job_id || '');
   const [selectedRole, setSelectedRole] = useState<string>('');
   const [assignAsConfirmed, setAssignAsConfirmed] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
@@ -98,6 +100,13 @@ export const AssignJobDialog = ({
       }
     }
   }, [existingAssignment, technician]);
+
+  // Update selected job when preSelectedJobId changes
+  React.useEffect(() => {
+    if (preSelectedJobId) {
+      setSelectedJobId(preSelectedJobId);
+    }
+  }, [preSelectedJobId]);
 
   const handleAssign = async () => {
     if (!selectedJobId || !selectedRole || !technician) {
@@ -200,35 +209,37 @@ export const AssignJobDialog = ({
             </div>
           )}
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Select Job</label>
-            <Select value={selectedJobId} onValueChange={setSelectedJobId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a job..." />
-              </SelectTrigger>
-              <SelectContent>
-                {availableJobs.length === 0 ? (
-                  <div className="p-2 text-sm text-muted-foreground">
-                    No jobs available for this date
-                  </div>
-                ) : (
-                  availableJobs.map((job) => (
-                    <SelectItem key={job.id} value={job.id}>
-                      <div className="flex items-center gap-2">
-                        <div>
-                          <div className="font-medium">{job.title}</div>
-                          <div className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {format(new Date(job.start_time), 'HH:mm')} - {format(new Date(job.end_time), 'HH:mm')}
+          {!preSelectedJobId && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Select Job</label>
+              <Select value={selectedJobId} onValueChange={setSelectedJobId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a job..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableJobs.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground">
+                      No jobs available for this date
+                    </div>
+                  ) : (
+                    availableJobs.map((job) => (
+                      <SelectItem key={job.id} value={job.id}>
+                        <div className="flex items-center gap-2">
+                          <div>
+                            <div className="font-medium">{job.title}</div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {format(new Date(job.start_time), 'HH:mm')} - {format(new Date(job.end_time), 'HH:mm')}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {selectedJobId && technician && (
             <div className="space-y-2">
