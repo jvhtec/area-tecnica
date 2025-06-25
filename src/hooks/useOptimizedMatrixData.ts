@@ -7,7 +7,15 @@ import { format, isWithinInterval, isSameDay } from 'date-fns';
 interface OptimizedMatrixDataProps {
   technicians: Array<{ id: string; first_name: string; last_name: string; email: string; department: string; role: string; }>;
   dates: Date[];
-  jobs: Array<{ id: string; title: string; start_time: string; end_time: string; color?: string; status: string; }>;
+  jobs: Array<{ 
+    id: string; 
+    title: string; 
+    start_time: string; 
+    end_time: string; 
+    color?: string; 
+    status: string;
+    job_type: string;
+  }>;
 }
 
 export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMatrixDataProps) => {

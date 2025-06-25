@@ -67,7 +67,7 @@ export default function JobAssignmentMatrix() {
     );
   }, [technicians, searchTerm]);
 
-  // Optimized jobs query
+  // Optimized jobs query - excluding dry hire jobs
   const { data: yearJobs = [], isLoading: isLoadingJobs } = useQuery({
     queryKey: ['optimized-matrix-jobs', selectedYear],
     queryFn: async () => {
@@ -77,11 +77,12 @@ export default function JobAssignmentMatrix() {
       const { data, error } = await supabase
         .from('jobs')
         .select(`
-          id, title, start_time, end_time, color, status,
+          id, title, start_time, end_time, color, status, job_type,
           job_departments!inner(department)
         `)
         .gte('start_time', startDate.toISOString())
         .lte('end_time', endDate.toISOString())
+        .neq('job_type', 'dryhire')
         .order('start_time', { ascending: true });
 
       if (error) throw error;
@@ -165,7 +166,7 @@ export default function JobAssignmentMatrix() {
               {filteredTechnicians.length} technicians
             </Badge>
             <Badge variant="outline">
-              {yearJobs.length} jobs
+              {yearJobs.length} jobs (excluding dry hire)
             </Badge>
           </div>
         </div>
