@@ -3,10 +3,9 @@ import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Filter, Users, RefreshCw } from 'lucide-react';
-import { AssignmentMatrix } from '@/components/matrix/AssignmentMatrix';
+import { OptimizedAssignmentMatrix } from '@/components/matrix/OptimizedAssignmentMatrix';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { addDays, format, startOfYear, endOfYear } from 'date-fns';
@@ -32,9 +31,9 @@ export default function JobAssignmentMatrix() {
     return dates;
   }, [selectedYear]);
 
-  // Fetch technicians with profiles
+  // Optimized technicians query
   const { data: technicians = [], isLoading: isLoadingTechnicians } = useQuery({
-    queryKey: ['matrix-technicians', selectedDepartment],
+    queryKey: ['optimized-matrix-technicians', selectedDepartment],
     queryFn: async () => {
       let query = supabase
         .from('profiles')
@@ -45,27 +44,32 @@ export default function JobAssignmentMatrix() {
         query = query.eq('department', selectedDepartment);
       }
 
-      const { data, error } = await query.order('department', { ascending: true })
+      const { data, error } = await query
+        .order('department', { ascending: true })
         .order('last_name', { ascending: true });
 
       if (error) throw error;
       return data || [];
-    }
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   });
 
   // Filter technicians based on search term
   const filteredTechnicians = useMemo(() => {
     if (!searchTerm) return technicians;
     
+    const searchLower = searchTerm.toLowerCase();
     return technicians.filter(tech => 
-      `${tech.first_name} ${tech.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tech.email?.toLowerCase().includes(searchTerm.toLowerCase())
+      `${tech.first_name} ${tech.last_name}`.toLowerCase().includes(searchLower) ||
+      tech.email?.toLowerCase().includes(searchLower) ||
+      tech.department?.toLowerCase().includes(searchLower)
     );
   }, [technicians, searchTerm]);
 
-  // Fetch jobs data for the year
+  // Optimized jobs query
   const { data: yearJobs = [], isLoading: isLoadingJobs } = useQuery({
-    queryKey: ['matrix-jobs', selectedYear],
+    queryKey: ['optimized-matrix-jobs', selectedYear],
     queryFn: async () => {
       const startDate = startOfYear(new Date(selectedYear, 0, 1));
       const endDate = endOfYear(new Date(selectedYear, 0, 1));
@@ -82,12 +86,13 @@ export default function JobAssignmentMatrix() {
 
       if (error) throw error;
       return data || [];
-    }
+    },
+    staleTime: 3 * 60 * 1000, // 3 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   });
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    // Trigger refetch of all queries
     setTimeout(() => setIsRefreshing(false), 1000);
   };
 
@@ -171,12 +176,12 @@ export default function JobAssignmentMatrix() {
         {isLoadingTechnicians || isLoadingJobs ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-2" />
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2" />
               <p className="text-muted-foreground">Loading assignment matrix...</p>
             </div>
           </div>
         ) : (
-          <AssignmentMatrix
+          <OptimizedAssignmentMatrix
             technicians={filteredTechnicians}
             dates={dateRange}
             jobs={yearJobs}
