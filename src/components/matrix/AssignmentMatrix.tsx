@@ -42,11 +42,15 @@ interface CellAction {
 export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixProps) => {
   const [cellAction, setCellAction] = useState<CellAction | null>(null);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const dateHeaderScrollRef = useRef<HTMLDivElement>(null);
+  const matrixScrollRef = useRef<HTMLDivElement>(null);
+  const technicianScrollRef = useRef<HTMLDivElement>(null);
   const [hasScrolledToToday, setHasScrolledToToday] = useState(false);
+  
   const CELL_WIDTH = 120;
   const CELL_HEIGHT = 60;
-  const SIDEBAR_WIDTH = 256; // 64 * 4 = 256px (w-64 in Tailwind)
+  const SIDEBAR_WIDTH = 256;
+  const HEADER_HEIGHT = 80;
 
   // Get all job assignments for all jobs that might have assignments
   const jobIds = jobs.map(job => job.id);
@@ -118,6 +122,25 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     );
   };
 
+  // Get jobs for a specific date
+  const getJobsForDate = (date: Date) => {
+    return jobs.filter(job => isSameDay(new Date(job.start_time), date));
+  };
+
+  // Sync horizontal scroll between header and matrix
+  const handleMatrixScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (dateHeaderScrollRef.current) {
+      dateHeaderScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
+    }
+  };
+
+  // Sync vertical scroll between technician list and matrix
+  const handleTechnicianScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (matrixScrollRef.current) {
+      matrixScrollRef.current.scrollTop = e.currentTarget.scrollTop;
+    }
+  };
+
   const handleCellClick = (technicianId: string, date: Date, action: 'select-job' | 'assign' | 'unavailable' | 'confirm' | 'decline') => {
     const assignment = getAssignmentForCell(technicianId, date);
     setCellAction({ type: action, technicianId, date, assignment });
@@ -125,7 +148,6 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
 
   const handleJobSelected = (jobId: string) => {
     if (cellAction?.type === 'select-job') {
-      // Close job selection dialog and open assignment dialog with pre-selected job
       setCellAction({
         ...cellAction,
         type: 'assign',
@@ -154,20 +176,20 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
 
   // Fixed auto-scroll to today functionality
   useEffect(() => {
-    if (hasScrolledToToday || !scrollContainerRef.current || dates.length === 0) return;
+    if (hasScrolledToToday || !matrixScrollRef.current || !dateHeaderScrollRef.current || dates.length === 0) return;
 
     const scrollToToday = () => {
       const today = new Date();
       const todayIndex = dates.findIndex(date => isSameDay(date, today));
       
-      if (todayIndex !== -1 && scrollContainerRef.current) {
-        const container = scrollContainerRef.current;
+      if (todayIndex !== -1 && matrixScrollRef.current && dateHeaderScrollRef.current) {
+        const matrixContainer = matrixScrollRef.current;
+        const headerContainer = dateHeaderScrollRef.current;
         
-        // Wait for next frame to ensure container is properly rendered
         requestAnimationFrame(() => {
-          if (!container) return;
+          if (!matrixContainer || !headerContainer) return;
           
-          const containerWidth = container.clientWidth;
+          const containerWidth = matrixContainer.clientWidth;
           const totalWidth = dates.length * CELL_WIDTH;
           
           // Calculate scroll position to center today's date
@@ -176,7 +198,9 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
           // Ensure we don't scroll past the boundaries
           scrollPosition = Math.max(0, Math.min(scrollPosition, totalWidth - containerWidth));
           
-          container.scrollLeft = scrollPosition;
+          // Sync scroll for both containers
+          matrixContainer.scrollLeft = scrollPosition;
+          headerContainer.scrollLeft = scrollPosition;
           setHasScrolledToToday(true);
           
           console.log('Auto-scrolled to today:', {
@@ -189,9 +213,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
       }
     };
 
-    // Use a longer delay to ensure everything is rendered
-    const timeoutId = setTimeout(scrollToToday, 200);
-    
+    const timeoutId = setTimeout(scrollToToday, 300);
     return () => clearTimeout(timeoutId);
   }, [dates, hasScrolledToToday]);
 
@@ -205,18 +227,21 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Header Row */}
-      <div className="flex border-b bg-card sticky top-0 z-20">
-        {/* Fixed technician header */}
-        <div className="w-64 border-r bg-card p-4 flex items-center justify-center font-semibold">
+      {/* Fixed Header Layout */}
+      <div className="flex border-b bg-card z-30 relative">
+        {/* Fixed corner header */}
+        <div 
+          className="border-r bg-card p-4 flex items-center justify-center font-semibold sticky left-0 z-40"
+          style={{ width: SIDEBAR_WIDTH, height: HEADER_HEIGHT }}
+        >
           Technicians
         </div>
         
-        {/* Scrollable date headers */}
+        {/* Fixed date headers - horizontally scrollable */}
         <div 
-          ref={scrollContainerRef}
-          className="flex-1 overflow-x-auto overflow-y-hidden"
-          style={{ scrollbarGutter: 'stable' }}
+          ref={dateHeaderScrollRef}
+          className="flex-1 overflow-x-auto overflow-y-hidden scrollbar-thin"
+          style={{ height: HEADER_HEIGHT }}
         >
           <div className="flex" style={{ width: dates.length * CELL_WIDTH }}>
             {dates.map((date, index) => (
@@ -224,6 +249,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
                 key={index}
                 date={date}
                 width={CELL_WIDTH}
+                jobs={getJobsForDate(date)}
               />
             ))}
           </div>
@@ -232,8 +258,13 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
 
       {/* Matrix Body */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Fixed technician column */}
-        <div className="w-64 border-r bg-card overflow-y-auto">
+        {/* Fixed technician column - vertically scrollable */}
+        <div 
+          ref={technicianScrollRef}
+          className="border-r bg-card overflow-y-auto overflow-x-hidden sticky left-0 z-20 scrollbar-thin"
+          style={{ width: SIDEBAR_WIDTH }}
+          onScroll={handleTechnicianScroll}
+        >
           {technicians.map((technician) => (
             <TechnicianRow
               key={technician.id}
@@ -244,7 +275,11 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         </div>
 
         {/* Scrollable matrix cells */}
-        <div className="flex-1 overflow-auto">
+        <div 
+          ref={matrixScrollRef}
+          className="flex-1 overflow-auto scrollbar-thin"
+          onScroll={handleMatrixScroll}
+        >
           <div style={{ width: dates.length * CELL_WIDTH }}>
             {technicians.map((technician) => (
               <div key={technician.id} className="flex border-b" style={{ height: CELL_HEIGHT }}>
