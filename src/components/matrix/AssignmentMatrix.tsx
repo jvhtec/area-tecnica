@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { format, isSameDay } from 'date-fns';
+import { format, isSameDay, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { TechnicianRow } from './TechnicianRow';
 import { MatrixCell } from './MatrixCell';
 import { DateHeader } from './DateHeader';
@@ -49,7 +49,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
   const mainScrollRef = useRef<HTMLDivElement>(null);
   const [hasScrolledToToday, setHasScrolledToToday] = useState(false);
   
-  const CELL_WIDTH = 120;
+  const CELL_WIDTH = 140; // Increased from 120px for better content fit
   const CELL_HEIGHT = 60;
   const TECHNICIAN_WIDTH = 256;
   const HEADER_HEIGHT = 80;
@@ -107,13 +107,20 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     enabled: technicians.length > 0 && dates.length > 0
   });
 
-  // Get assignment for a specific technician and date
+  // Fix: Get assignment for a specific technician and date - check date range
   const getAssignmentForCell = (technicianId: string, date: Date) => {
-    return allAssignments.find(assignment => 
-      assignment.technician_id === technicianId && 
-      assignment.jobs &&
-      isSameDay(new Date(assignment.jobs.start_time), date)
-    );
+    return allAssignments.find(assignment => {
+      if (assignment.technician_id !== technicianId || !assignment.jobs) {
+        return false;
+      }
+      
+      // Check if the date falls within the job's date range
+      const jobStart = startOfDay(new Date(assignment.jobs.start_time));
+      const jobEnd = endOfDay(new Date(assignment.jobs.end_time));
+      const checkDate = startOfDay(date);
+      
+      return isWithinInterval(checkDate, { start: jobStart, end: jobEnd });
+    });
   };
 
   // Get availability status for a specific technician and date
@@ -124,21 +131,39 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     );
   };
 
-  // Get jobs for a specific date
+  // Get jobs for a specific date - improved to check date ranges
   const getJobsForDate = (date: Date) => {
-    return jobs.filter(job => isSameDay(new Date(job.start_time), date));
+    return jobs.filter(job => {
+      const jobStart = startOfDay(new Date(job.start_time));
+      const jobEnd = endOfDay(new Date(job.end_time));
+      const checkDate = startOfDay(date);
+      
+      return isWithinInterval(checkDate, { start: jobStart, end: jobEnd });
+    });
   };
 
-  // Sync scroll handlers
+  // Improved scroll synchronization
   const handleMainScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const scrollLeft = e.currentTarget.scrollLeft;
     const scrollTop = e.currentTarget.scrollTop;
     
-    if (dateScrollRef.current) {
+    // Sync horizontal scroll with date headers
+    if (dateScrollRef.current && dateScrollRef.current.scrollLeft !== scrollLeft) {
       dateScrollRef.current.scrollLeft = scrollLeft;
     }
-    if (technicianScrollRef.current) {
+    
+    // Sync vertical scroll with technician column
+    if (technicianScrollRef.current && technicianScrollRef.current.scrollTop !== scrollTop) {
       technicianScrollRef.current.scrollTop = scrollTop;
+    }
+  };
+
+  // Handle date header scroll to sync with main matrix
+  const handleDateScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const scrollLeft = e.currentTarget.scrollLeft;
+    
+    if (mainScrollRef.current && mainScrollRef.current.scrollLeft !== scrollLeft) {
+      mainScrollRef.current.scrollLeft = scrollLeft;
     }
   };
 
@@ -175,7 +200,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     setSelectedCells(new Set());
   };
 
-  // Auto-scroll to today
+  // Auto-scroll to today - improved to sync both containers
   useEffect(() => {
     if (hasScrolledToToday || !mainScrollRef.current || dates.length === 0) return;
 
@@ -195,6 +220,12 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         scrollPosition = Math.max(0, Math.min(scrollPosition, maxScroll));
         
         container.scrollLeft = scrollPosition;
+        
+        // Also sync the date header scroll
+        if (dateScrollRef.current) {
+          dateScrollRef.current.scrollLeft = scrollPosition;
+        }
+        
         setHasScrolledToToday(true);
         
         console.log('Auto-scrolled to today:', {
@@ -233,18 +264,20 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         </div>
       </div>
 
-      {/* Fixed Date Headers Row */}
+      {/* Fixed Date Headers Row - Improved scrolling */}
       <div 
         className="matrix-date-headers"
         style={{ 
           left: TECHNICIAN_WIDTH, 
-          height: HEADER_HEIGHT 
+          height: HEADER_HEIGHT,
+          right: 0
         }}
       >
         <div 
           ref={dateScrollRef}
           className="matrix-date-scroll"
           style={{ width: dates.length * CELL_WIDTH }}
+          onScroll={handleDateScroll}
         >
           {dates.map((date, index) => (
             <DateHeader
@@ -281,7 +314,9 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         className="matrix-main-area"
         style={{ 
           left: TECHNICIAN_WIDTH, 
-          top: HEADER_HEIGHT 
+          top: HEADER_HEIGHT,
+          right: 0,
+          bottom: 0
         }}
       >
         <div 

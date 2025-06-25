@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format, isSameDay, isToday, isWeekend } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -83,7 +82,7 @@ export const MatrixCell = ({
     const config = statusConfig[assignmentStatus] || statusConfig.invited;
     
     return (
-      <Badge variant={config.variant} className={`text-xs ${config.color}`}>
+      <Badge variant={config.variant} className={`text-xs px-1 py-0 h-4 ${config.color}`}>
         {config.label}
       </Badge>
     );
@@ -174,18 +173,29 @@ export const MatrixCell = ({
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
         >
-          <div className="p-1 h-full flex flex-col justify-center items-center text-xs relative">
+          <div className="p-1.5 h-full flex flex-col justify-center items-center text-xs relative overflow-hidden">
             {isAssigned && assignment?.jobs && (
               <>
-                <div className="font-medium text-center truncate w-full mb-1">
+                <div 
+                  className="font-medium text-center w-full mb-1 leading-tight"
+                  title={assignment.jobs.title}
+                  style={{
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    lineHeight: '1.2',
+                    maxHeight: '2.4em'
+                  }}
+                >
                   {assignment.jobs.title}
                 </div>
                 {role && (
-                  <div className="text-xs text-muted-foreground truncate w-full mb-1">
+                  <div className="text-xs text-muted-foreground truncate w-full mb-1 text-center">
                     {role}
                   </div>
                 )}
-                <div className="flex items-center gap-1">
+                <div className="flex items-center justify-center gap-1 flex-wrap">
                   {getStatusIcon()}
                   {getStatusBadge()}
                 </div>
@@ -194,7 +204,7 @@ export const MatrixCell = ({
             
             {isUnavailable && !isAssigned && (
               <div className="text-red-600 dark:text-red-400 font-medium text-center">
-                Unavailable
+                <div className="text-xs">Unavailable</div>
                 {availability?.reason && (
                   <div className="text-xs text-red-500 dark:text-red-400 truncate w-full mt-1">
                     {availability.reason}
