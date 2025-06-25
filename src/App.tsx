@@ -31,6 +31,7 @@ import FestivalArtistManagement from '@/pages/FestivalArtistManagement';
 import LightsDisponibilidad from '@/pages/LightsDisponibilidad';
 import LightsMemoriaTecnica from '@/pages/LightsMemoriaTecnica';
 import VideoMemoriaTecnica from '@/pages/VideoMemoriaTecnica';
+import JobAssignmentMatrix from '@/pages/JobAssignmentMatrix';
 import { EquipmentManagement } from '@/pages/EquipmentManagement';
 import { ArtistRequirementsForm } from '@/components/festival/ArtistRequirementsForm';
 import { FormSubmitted } from '@/components/festival/FormSubmitted';
@@ -73,6 +74,7 @@ export default function App() {
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/project-management" element={<ProjectManagement />} />
                     <Route path="/equipment-management" element={<EquipmentManagement />} />
+                    <Route path="/job-assignment-matrix" element={<JobAssignmentMatrix />} />
                     <Route path="/tours" element={<Tours />} />
                     <Route path="/festivals" element={<Festivals />} />
                     

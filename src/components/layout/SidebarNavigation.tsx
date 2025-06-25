@@ -1,4 +1,3 @@
-
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +11,8 @@ import {
   ClipboardList,
   Tent,
   Calendar,
-  MapPin
+  MapPin,
+  Grid3X3
 } from "lucide-react";
 
 interface SidebarNavigationProps {
@@ -102,6 +102,21 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
           </Button>
         </Link>
 
+        {/* Job Assignment Matrix - Only for management users */}
+        {isManagementUser && (
+          <Link to="/job-assignment-matrix">
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-2 ${
+                location.pathname === "/job-assignment-matrix" ? "bg-accent" : ""
+              }`}
+            >
+              <Grid3X3 className="h-4 w-4" />
+              <span>Assignment Matrix</span>
+            </Button>
+          </Link>
+        )}
+
         {/* Department Pages - Show for Management and House Techs */}
         {(isManagementUser || userRole === 'house_tech') && (
           <>
@@ -177,7 +192,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
         )}
 
         {/* Department Page for House Techs - specific to their department */}
-        {userRole === 'house_tech' && userDepartment && (
+        {userRole === 'house_tech' && userDepartment && !isManagementUser && (
           <Link to={`/${userDepartment.toLowerCase()}`}>
             <Button
               variant="ghost"
