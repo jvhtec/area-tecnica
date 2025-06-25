@@ -32,7 +32,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     end: dates[dates.length - 1]
   }), [dates]);
 
-  // Optimized assignments query with selective fields
+  // Optimized assignments query with selective fields - exclude declined assignments
   const { data: allAssignments = [], isLoading: assignmentsLoading } = useQuery({
     queryKey: ['optimized-matrix-assignments', jobIds],
     queryFn: async () => {
@@ -56,7 +56,8 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
             color
           )
         `)
-        .in('job_id', jobIds);
+        .in('job_id', jobIds)
+        .neq('status', 'declined'); // Filter out declined assignments
 
       if (error) throw error;
       return data || [];
@@ -150,7 +151,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     const jobsByDate = new Map<string, MatrixJob[]>();
     
     dates.forEach(date => {
-      const dateJobs = jobs.filter((job) => {
+      const dateJobs = jobs.filter((job: MatrixJob) => {
         const jobStart = new Date(job.start_time);
         const jobEnd = new Date(job.end_time);
         
