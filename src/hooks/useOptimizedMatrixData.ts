@@ -113,6 +113,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     allAssignments.forEach(assignment => {
       if (!assignment.jobs) return;
       
+      // assignment.jobs is a single job object, not an array
       const jobStart = new Date(assignment.jobs.start_time);
       const jobEnd = new Date(assignment.jobs.end_time);
       
