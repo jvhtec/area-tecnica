@@ -116,7 +116,7 @@
   border-bottom: 1px solid hsl(var(--border));
 }
 
-/* Fixed Date Headers Row - NOW SCROLLABLE */
+/* IMPROVED: Date Headers with precise scrolling and dimensions */
 .matrix-date-headers {
   position: absolute;
   top: 0;
@@ -130,6 +130,8 @@
   scrollbar-width: none;
   -ms-overflow-style: none;
   display: flex;
+  /* Ensure smooth scrolling */
+  scroll-behavior: smooth;
 }
 
 .matrix-date-headers::-webkit-scrollbar {
@@ -143,7 +145,7 @@
   flex-shrink: 0;
 }
 
-/* Fixed Technician Column */
+/* Fixed Technician Column with improved sync */
 .matrix-technician-column {
   position: absolute;
   left: 0;
@@ -160,6 +162,8 @@
   overflow-x: hidden;
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  /* Ensure smooth scrolling */
+  scroll-behavior: smooth;
 }
 
 .matrix-technician-scroll::-webkit-scrollbar {
@@ -175,7 +179,7 @@
   border-radius: 3px;
 }
 
-/* Main Scrollable Area */
+/* Main Scrollable Area with improved performance */
 .matrix-main-area {
   position: absolute;
   right: 0;
@@ -191,6 +195,8 @@
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
   scroll-behavior: smooth;
+  /* Improve scrolling performance */
+  will-change: scroll-position;
 }
 
 .matrix-main-scroll::-webkit-scrollbar {
@@ -211,21 +217,27 @@
   background-color: hsl(var(--muted-foreground) / 0.5);
 }
 
-/* Grid Layout */
+/* Grid Layout with improved positioning */
 .matrix-grid {
   position: relative;
   background: hsl(var(--background));
+  /* Optimize for large grids */
+  contain: layout style paint;
 }
 
 .matrix-row {
   position: absolute;
   width: 100%;
+  /* Optimize row rendering */
+  contain: layout style;
 }
 
 .matrix-cell-wrapper {
   position: absolute;
   border-right: 1px solid hsl(var(--border));
   border-bottom: 1px solid hsl(var(--border));
+  /* Optimize cell rendering */
+  contain: layout style paint;
 }
 
 /* Responsive adjustments */

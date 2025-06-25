@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { format, isSameDay, isWithinInterval } from 'date-fns';
 import { TechnicianRow } from './TechnicianRow';
 import { MatrixCell } from './MatrixCell';
@@ -47,6 +48,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
   const dateHeadersRef = useRef<HTMLDivElement>(null);
   const mainScrollRef = useRef<HTMLDivElement>(null);
   const [hasScrolledToToday, setHasScrolledToToday] = useState(false);
+  const syncTimeoutRef = useRef<number>();
   
   // Increased cell width for better content space
   const CELL_WIDTH = 160;
@@ -148,41 +150,91 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     });
   };
 
-  // FIXED: Simplified scroll synchronization - directly target the date headers container
-  const handleMainScroll = (e: React.UIEvent<HTMLDivElement>) => {
+  // IMPROVED: Smooth scroll synchronization with performance optimization
+  const syncScrollPositions = useCallback((scrollLeft: number, scrollTop: number) => {
+    // Use requestAnimationFrame for smoother sync
+    requestAnimationFrame(() => {
+      // Sync horizontal scroll with date headers
+      if (dateHeadersRef.current) {
+        const dateHeaders = dateHeadersRef.current;
+        const maxScrollLeft = Math.max(0, dateHeaders.scrollWidth - dateHeaders.clientWidth);
+        const clampedScrollLeft = Math.min(scrollLeft, maxScrollLeft);
+        
+        if (Math.abs(dateHeaders.scrollLeft - clampedScrollLeft) > 1) {
+          dateHeaders.scrollLeft = clampedScrollLeft;
+        }
+      }
+      
+      // Sync vertical scroll with technician column
+      if (technicianScrollRef.current) {
+        const techScroll = technicianScrollRef.current;
+        const maxScrollTop = Math.max(0, techScroll.scrollHeight - techScroll.clientHeight);
+        const clampedScrollTop = Math.min(scrollTop, maxScrollTop);
+        
+        if (Math.abs(techScroll.scrollTop - clampedScrollTop) > 1) {
+          techScroll.scrollTop = clampedScrollTop;
+        }
+      }
+    });
+  }, []);
+
+  // IMPROVED: Main scroll handler with debouncing and error handling
+  const handleMainScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const scrollLeft = e.currentTarget.scrollLeft;
     const scrollTop = e.currentTarget.scrollTop;
     
-    console.log('Main scroll event:', { scrollLeft, scrollTop });
-    
-    // Sync horizontal scroll with date headers - directly set on the headers container
-    if (dateHeadersRef.current) {
-      dateHeadersRef.current.scrollLeft = scrollLeft;
-      console.log('Date headers scrolled to:', scrollLeft);
+    // Clear any pending sync operations
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
     }
     
-    // Sync vertical scroll with technician column
-    if (technicianScrollRef.current) {
-      technicianScrollRef.current.scrollTop = scrollTop;
-    }
-  };
+    // Immediate sync for smooth user experience
+    syncScrollPositions(scrollLeft, scrollTop);
+    
+    // Debounced sync as backup
+    syncTimeoutRef.current = window.setTimeout(() => {
+      syncScrollPositions(scrollLeft, scrollTop);
+    }, 16); // ~60fps
+  }, [syncScrollPositions]);
 
-  // Ensure proper dimensions and scroll setup
+  // IMPROVED: Setup scroll containers with precise dimensions
   useEffect(() => {
-    if (dateHeadersRef.current && mainScrollRef.current) {
+    if (dateHeadersRef.current && mainScrollRef.current && technicianScrollRef.current) {
       const dateHeadersElement = dateHeadersRef.current;
       const mainScrollElement = mainScrollRef.current;
+      const techScrollElement = technicianScrollRef.current;
       
-      console.log('Setting up scroll containers:', {
-        matrixWidth,
-        dateHeadersWidth: dateHeadersElement.scrollWidth,
-        mainScrollWidth: mainScrollElement.scrollWidth
-      });
+      // Ensure identical scrollable widths
+      const targetScrollWidth = matrixWidth;
       
-      // Force scroll container dimensions
+      // Set up date headers container
       dateHeadersElement.style.width = `${mainScrollElement.clientWidth}px`;
+      
+      // Ensure technician scroll height matches main scroll area
+      const targetScrollHeight = matrixHeight;
+      techScrollElement.style.height = `${mainScrollElement.clientHeight}px`;
+      
+      console.log('Scroll containers setup:', {
+        matrixWidth: targetScrollWidth,
+        matrixHeight: targetScrollHeight,
+        dateHeadersClientWidth: dateHeadersElement.clientWidth,
+        dateHeadersScrollWidth: dateHeadersElement.scrollWidth,
+        mainScrollClientWidth: mainScrollElement.clientWidth,
+        mainScrollScrollWidth: mainScrollElement.scrollWidth,
+        techScrollClientHeight: techScrollElement.clientHeight,
+        techScrollScrollHeight: techScrollElement.scrollHeight
+      });
     }
-  }, [dates.length, CELL_WIDTH, matrixWidth]);
+  }, [dates.length, technicians.length, CELL_WIDTH, CELL_HEIGHT, matrixWidth, matrixHeight]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleCellClick = (technicianId: string, date: Date, action: 'select-job' | 'assign' | 'unavailable' | 'confirm' | 'decline') => {
     const assignment = getAssignmentForCell(technicianId, date);
@@ -268,14 +320,15 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         </div>
       </div>
 
-      {/* FIXED: Date Headers - Simplified structure that can actually scroll */}
+      {/* IMPROVED: Date Headers with precise scrolling */}
       <div 
         ref={dateHeadersRef}
         className="matrix-date-headers"
         style={{ 
           left: TECHNICIAN_WIDTH, 
           height: HEADER_HEIGHT,
-          width: `calc(100% - ${TECHNICIAN_WIDTH}px)`
+          width: `calc(100% - ${TECHNICIAN_WIDTH}px)`,
+          minWidth: `calc(100% - ${TECHNICIAN_WIDTH}px)`
         }}
       >
         {dates.map((date, index) => (
