@@ -150,7 +150,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     const jobsByDate = new Map<string, MatrixJob[]>();
     
     dates.forEach(date => {
-      const dateJobs = jobs.filter((job: MatrixJob) => {
+      const dateJobs = jobs.filter((job) => {
         const jobStart = new Date(job.start_time);
         const jobEnd = new Date(job.end_time);
         

@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { TechnicianRow } from './TechnicianRow';
@@ -48,7 +49,7 @@ export const OptimizedAssignmentMatrix = ({ technicians, dates, jobs }: Optimize
   const technicianScrollRef = useRef<HTMLDivElement>(null);
   const dateHeadersRef = useRef<HTMLDivElement>(null);
   const mainScrollRef = useRef<HTMLDivElement>(null);
-  const [hasScrolledToToday, setHasScrolledToToday] = useState(false);
+  const [scrollAttempts, setScrollAttempts] = useState(0);
   const syncInProgressRef = useRef(false);
   
   // Cell dimensions
@@ -160,30 +161,78 @@ export const OptimizedAssignmentMatrix = ({ technicians, dates, jobs }: Optimize
     updateAssignmentOptimistically(technicianId, jobId, status);
   }, [updateAssignmentOptimistically]);
 
-  // Auto-scroll to today
-  useEffect(() => {
-    if (hasScrolledToToday || !mainScrollRef.current || dates.length === 0) return;
+  // Improved auto-scroll to today with retry mechanism
+  const scrollToToday = useCallback(() => {
+    if (!mainScrollRef.current || dates.length === 0) {
+      console.log('Auto-scroll: Container not ready or no dates');
+      return false;
+    }
 
-    const scrollToToday = () => {
-      const today = new Date();
-      const todayIndex = dates.findIndex(date => isSameDay(date, today));
+    const today = new Date();
+    const todayIndex = dates.findIndex(date => isSameDay(date, today));
+    
+    console.log('Auto-scroll: Today index:', todayIndex, 'Total dates:', dates.length);
+    
+    if (todayIndex === -1) {
+      console.log('Auto-scroll: Today not found in dates array');
+      return false;
+    }
+
+    const container = mainScrollRef.current;
+    const containerWidth = container.clientWidth;
+    
+    console.log('Auto-scroll: Container width:', containerWidth);
+    
+    if (containerWidth === 0) {
+      console.log('Auto-scroll: Container not properly sized yet');
+      return false;
+    }
+    
+    let scrollPosition = (todayIndex * CELL_WIDTH) - (containerWidth / 2) + (CELL_WIDTH / 2);
+    const maxScroll = matrixWidth - containerWidth;
+    scrollPosition = Math.max(0, Math.min(scrollPosition, maxScroll));
+    
+    console.log('Auto-scroll: Calculated position:', scrollPosition, 'Max scroll:', maxScroll);
+    
+    container.scrollLeft = scrollPosition;
+    
+    // Verify the scroll actually happened
+    requestAnimationFrame(() => {
+      const actualScrollLeft = container.scrollLeft;
+      console.log('Auto-scroll: Actual scroll position:', actualScrollLeft);
+      if (Math.abs(actualScrollLeft - scrollPosition) < 5) {
+        console.log('Auto-scroll: Successfully scrolled to today');
+        return true;
+      }
+    });
+    
+    return true;
+  }, [dates, CELL_WIDTH, matrixWidth]);
+
+  // Auto-scroll to today with retry mechanism
+  useEffect(() => {
+    if (isLoading || dates.length === 0) return;
+
+    const attemptScroll = () => {
+      const success = scrollToToday();
       
-      if (todayIndex !== -1 && mainScrollRef.current) {
-        const container = mainScrollRef.current;
-        const containerWidth = container.clientWidth;
-        
-        let scrollPosition = (todayIndex * CELL_WIDTH) - (containerWidth / 2) + (CELL_WIDTH / 2);
-        const maxScroll = matrixWidth - containerWidth;
-        scrollPosition = Math.max(0, Math.min(scrollPosition, maxScroll));
-        
-        container.scrollLeft = scrollPosition;
-        setHasScrolledToToday(true);
+      if (!success && scrollAttempts < 5) {
+        console.log(`Auto-scroll attempt ${scrollAttempts + 1} failed, retrying...`);
+        setScrollAttempts(prev => prev + 1);
+        setTimeout(attemptScroll, 100 * (scrollAttempts + 1)); // Increasing delay
+      } else if (success) {
+        console.log('Auto-scroll: Successfully completed');
+        setScrollAttempts(0);
+      } else {
+        console.log('Auto-scroll: Max attempts reached, giving up');
       }
     };
 
-    const timeoutId = setTimeout(scrollToToday, 100);
+    // Initial attempt with a small delay to ensure DOM is ready
+    const timeoutId = setTimeout(attemptScroll, 50);
+    
     return () => clearTimeout(timeoutId);
-  }, [dates, hasScrolledToToday, CELL_WIDTH, matrixWidth]);
+  }, [scrollToToday, isLoading, dates.length, scrollAttempts]);
 
   const getCurrentTechnician = useCallback(() => {
     if (!cellAction?.technicianId) return null;
