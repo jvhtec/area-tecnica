@@ -3,12 +3,22 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useMemo } from 'react';
 import { format, isWithinInterval, isSameDay } from 'date-fns';
-import { Job } from '@/types/job';
+
+// Define the specific job type that matches what's passed from JobAssignmentMatrix
+interface MatrixJob {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  color?: string;
+  status: string;
+  job_type: string;
+}
 
 interface OptimizedMatrixDataProps {
   technicians: Array<{ id: string; first_name: string; last_name: string; email: string; department: string; role: string; }>;
   dates: Date[];
-  jobs: Job[];
+  jobs: MatrixJob[];
 }
 
 export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMatrixDataProps) => {
@@ -137,10 +147,10 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
 
   // Fixed getJobsForDate function with proper typing
   const getJobsForDate = useMemo(() => {
-    const jobsByDate = new Map();
+    const jobsByDate = new Map<string, MatrixJob[]>();
     
     dates.forEach(date => {
-      const dateJobs = jobs.filter((job: Job) => {
+      const dateJobs = jobs.filter((job: MatrixJob) => {
         const jobStart = new Date(job.start_time);
         const jobEnd = new Date(job.end_time);
         
@@ -152,7 +162,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       jobsByDate.set(format(date, 'yyyy-MM-dd'), dateJobs);
     });
     
-    return (date: Date) => {
+    return (date: Date): MatrixJob[] => {
       return jobsByDate.get(format(date, 'yyyy-MM-dd')) || [];
     };
   }, [jobs, dates]);

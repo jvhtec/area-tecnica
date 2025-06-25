@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { TechnicianRow } from './TechnicianRow';
@@ -10,6 +9,17 @@ import { AssignmentStatusDialog } from './AssignmentStatusDialog';
 import { MarkUnavailableDialog } from './MarkUnavailableDialog';
 import { useOptimizedMatrixData } from '@/hooks/useOptimizedMatrixData';
 
+// Define the specific job type that matches what's passed from JobAssignmentMatrix
+interface MatrixJob {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  color?: string;
+  status: string;
+  job_type: string;
+}
+
 interface OptimizedAssignmentMatrixProps {
   technicians: Array<{
     id: string;
@@ -20,15 +30,7 @@ interface OptimizedAssignmentMatrixProps {
     role: string;
   }>;
   dates: Date[];
-  jobs: Array<{
-    id: string;
-    title: string;
-    start_time: string;
-    end_time: string;
-    color?: string;
-    status: string;
-    job_type: string;
-  }>;
+  jobs: MatrixJob[];
 }
 
 interface CellAction {
