@@ -134,7 +134,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     };
   }, [availabilityData]);
 
-  // Fixed getJobsForDate function - accessing properties on individual job objects
+  // Fixed getJobsForDate function - properly iterate through jobs array
   const getJobsForDate = useMemo(() => {
     const jobsByDate = new Map();
     
