@@ -97,18 +97,12 @@
   background: transparent;
 }
 
-/* Assignment Matrix Layout - Improved Grid System */
+/* Assignment Matrix Layout */
 .matrix-layout {
   position: relative;
   height: 100%;
   width: 100%;
   overflow: hidden;
-  display: grid;
-  grid-template-areas: 
-    "corner header"
-    "sidebar content";
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto 1fr;
 }
 
 /* Fixed Corner Header */
@@ -120,38 +114,29 @@
   background: hsl(var(--card));
   border-right: 1px solid hsl(var(--border));
   border-bottom: 1px solid hsl(var(--border));
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-/* Fixed Date Headers Row - Improved Layout */
+/* Fixed Date Headers Row */
 .matrix-date-headers {
   position: absolute;
   top: 0;
+  right: 0;
   z-index: 40;
   background: hsl(var(--card));
   border-bottom: 1px solid hsl(var(--border));
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.matrix-date-headers::-webkit-scrollbar {
-  display: none;
+  overflow: hidden;
 }
 
 .matrix-date-scroll {
   display: flex;
   height: 100%;
-  min-width: 100%;
 }
 
 /* Fixed Technician Column */
 .matrix-technician-column {
   position: absolute;
   left: 0;
+  bottom: 0;
   z-index: 30;
   background: hsl(var(--card));
   border-right: 1px solid hsl(var(--border));
@@ -179,9 +164,11 @@
   border-radius: 3px;
 }
 
-/* Main Scrollable Area - Improved */
+/* Main Scrollable Area */
 .matrix-main-area {
   position: absolute;
+  right: 0;
+  bottom: 0;
   background: hsl(var(--background));
   overflow: hidden;
 }
