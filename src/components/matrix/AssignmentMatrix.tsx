@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { TechnicianRow } from './TechnicianRow';
@@ -128,17 +129,14 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     return jobs.filter(job => isSameDay(new Date(job.start_time), date));
   };
 
-  // Fixed scroll synchronization
+  // Sync scroll handlers
   const handleMainScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const scrollLeft = e.currentTarget.scrollLeft;
     const scrollTop = e.currentTarget.scrollTop;
     
-    // Sync date headers horizontal scroll
     if (dateScrollRef.current) {
       dateScrollRef.current.scrollLeft = scrollLeft;
     }
-    
-    // Sync technician column vertical scroll
     if (technicianScrollRef.current) {
       technicianScrollRef.current.scrollTop = scrollTop;
     }
@@ -177,18 +175,17 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     setSelectedCells(new Set());
   };
 
-  // Enhanced auto-scroll to today with proper sync
+  // Auto-scroll to today
   useEffect(() => {
-    if (hasScrolledToToday || !mainScrollRef.current || !dateScrollRef.current || dates.length === 0) return;
+    if (hasScrolledToToday || !mainScrollRef.current || dates.length === 0) return;
 
     const scrollToToday = () => {
       const today = new Date();
       const todayIndex = dates.findIndex(date => isSameDay(date, today));
       
-      if (todayIndex !== -1 && mainScrollRef.current && dateScrollRef.current) {
-        const mainContainer = mainScrollRef.current;
-        const dateContainer = dateScrollRef.current;
-        const containerWidth = mainContainer.clientWidth;
+      if (todayIndex !== -1 && mainScrollRef.current) {
+        const container = mainScrollRef.current;
+        const containerWidth = container.clientWidth;
         
         // Calculate scroll position to center today's date
         let scrollPosition = (todayIndex * CELL_WIDTH) - (containerWidth / 2) + (CELL_WIDTH / 2);
@@ -197,13 +194,10 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         const maxScroll = (dates.length * CELL_WIDTH) - containerWidth;
         scrollPosition = Math.max(0, Math.min(scrollPosition, maxScroll));
         
-        // Sync both containers
-        mainContainer.scrollLeft = scrollPosition;
-        dateContainer.scrollLeft = scrollPosition;
-        
+        container.scrollLeft = scrollPosition;
         setHasScrolledToToday(true);
         
-        console.log('Auto-scrolled to today with sync:', {
+        console.log('Auto-scrolled to today:', {
           todayIndex,
           scrollPosition,
           containerWidth,
@@ -212,7 +206,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
       }
     };
 
-    const timeoutId = setTimeout(scrollToToday, 500);
+    const timeoutId = setTimeout(scrollToToday, 300);
     return () => clearTimeout(timeoutId);
   }, [dates, hasScrolledToToday]);
 
@@ -239,16 +233,15 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         </div>
       </div>
 
-      {/* Fixed Date Headers Row - Now properly scrollable */}
+      {/* Fixed Date Headers Row */}
       <div 
         className="matrix-date-headers"
         style={{ 
           left: TECHNICIAN_WIDTH, 
-          height: HEADER_HEIGHT,
-          width: `calc(100vw - ${TECHNICIAN_WIDTH}px - 280px)` // Account for main sidebar
+          height: HEADER_HEIGHT 
         }}
       >
-        <div
+        <div 
           ref={dateScrollRef}
           className="matrix-date-scroll"
           style={{ width: dates.length * CELL_WIDTH }}
@@ -269,11 +262,10 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         className="matrix-technician-column"
         style={{ 
           width: TECHNICIAN_WIDTH, 
-          top: 104 + HEADER_HEIGHT,
-          height: `calc(100vh - 104px - ${HEADER_HEIGHT}px)` // Account for main header
+          top: HEADER_HEIGHT 
         }}
       >
-        <div ref={technicianScrollRef}>
+        <div ref={technicianScrollRef} className="matrix-technician-scroll">
           {technicians.map((technician) => (
             <TechnicianRow
               key={technician.id}
@@ -288,19 +280,13 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
       <div 
         className="matrix-main-area"
         style={{ 
-          left: TECHNICIAN_WIDTH + 280, // Account for main sidebar
-          top: 104 + HEADER_HEIGHT, // Account for main header
-          width: `calc(100vw - ${TECHNICIAN_WIDTH}px - 280px)`,
-          height: `calc(100vh - 104px - ${HEADER_HEIGHT}px)`
+          left: TECHNICIAN_WIDTH, 
+          top: HEADER_HEIGHT 
         }}
       >
         <div 
           ref={mainScrollRef}
-          style={{ 
-            width: dates.length * CELL_WIDTH,
-            height: technicians.length * CELL_HEIGHT,
-            overflow: 'auto'
-          }}
+          className="matrix-main-scroll"
           onScroll={handleMainScroll}
         >
           <div 
