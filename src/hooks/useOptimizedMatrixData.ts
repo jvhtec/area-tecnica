@@ -51,8 +51,8 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       return data || [];
     },
     enabled: jobIds.length > 0,
-    staleTime: 1 * 60 * 1000, // 1 minute - faster updates
-    gcTime: 5 * 60 * 1000, // 5 minutes cache
+    staleTime: 30 * 1000, // 30 seconds for faster updates
+    gcTime: 2 * 60 * 1000, // 2 minutes cache
   });
 
   // Optimized availability query with date filtering
@@ -72,8 +72,8 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       return data || [];
     },
     enabled: technicianIds.length > 0 && !!dateRange.start && !!dateRange.end,
-    staleTime: 1 * 60 * 1000, // 1 minute - faster updates
-    gcTime: 5 * 60 * 1000, // 5 minutes cache
+    staleTime: 30 * 1000, // 30 seconds for faster updates
+    gcTime: 2 * 60 * 1000, // 2 minutes cache
   });
 
   // Preload technician data for dialogs
@@ -90,7 +90,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
         if (error) throw error;
         return data;
       },
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 2 * 60 * 1000, // 2 minutes
     });
   };
 
@@ -174,13 +174,12 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   };
 
   // Invalidate specific queries for real-time updates
-  const invalidateAssignmentQueries = () => {
-    queryClient.invalidateQueries({ 
-      queryKey: ['optimized-matrix-assignments'] 
-    });
-    queryClient.invalidateQueries({ 
-      queryKey: ['matrix-assignments'] 
-    });
+  const invalidateAssignmentQueries = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] }),
+      queryClient.invalidateQueries({ queryKey: ['matrix-assignments'] }),
+      queryClient.invalidateQueries({ queryKey: ['job-assignments'] })
+    ]);
   };
 
   return {
