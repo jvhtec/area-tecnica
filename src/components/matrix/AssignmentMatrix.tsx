@@ -44,7 +44,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
   const matrixContainerRef = useRef<HTMLDivElement>(null);
   const technicianScrollRef = useRef<HTMLDivElement>(null);
-  const dateScrollRef = useRef<HTMLDivElement>(null);
+  const dateHeadersRef = useRef<HTMLDivElement>(null);
   const mainScrollRef = useRef<HTMLDivElement>(null);
   const [hasScrolledToToday, setHasScrolledToToday] = useState(false);
   
@@ -148,17 +148,17 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     });
   };
 
-  // Fixed scroll synchronization
+  // FIXED: Simplified scroll synchronization - directly target the date headers container
   const handleMainScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const scrollLeft = e.currentTarget.scrollLeft;
     const scrollTop = e.currentTarget.scrollTop;
     
-    console.log('Main scroll event:', { scrollLeft, scrollTop, matrixWidth });
+    console.log('Main scroll event:', { scrollLeft, scrollTop });
     
-    // Sync horizontal scroll with date headers
-    if (dateScrollRef.current) {
-      dateScrollRef.current.scrollLeft = scrollLeft;
-      console.log('Date header scroll synced to:', scrollLeft);
+    // Sync horizontal scroll with date headers - directly set on the headers container
+    if (dateHeadersRef.current) {
+      dateHeadersRef.current.scrollLeft = scrollLeft;
+      console.log('Date headers scrolled to:', scrollLeft);
     }
     
     // Sync vertical scroll with technician column
@@ -169,18 +169,18 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
 
   // Ensure proper dimensions and scroll setup
   useEffect(() => {
-    if (dateScrollRef.current && mainScrollRef.current) {
-      const dateScrollElement = dateScrollRef.current;
+    if (dateHeadersRef.current && mainScrollRef.current) {
+      const dateHeadersElement = dateHeadersRef.current;
       const mainScrollElement = mainScrollRef.current;
       
       console.log('Setting up scroll containers:', {
         matrixWidth,
-        dateScrollWidth: dateScrollElement.scrollWidth,
+        dateHeadersWidth: dateHeadersElement.scrollWidth,
         mainScrollWidth: mainScrollElement.scrollWidth
       });
       
       // Force scroll container dimensions
-      dateScrollElement.style.width = `${mainScrollElement.clientWidth}px`;
+      dateHeadersElement.style.width = `${mainScrollElement.clientWidth}px`;
     }
   }, [dates.length, CELL_WIDTH, matrixWidth]);
 
@@ -268,8 +268,9 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         </div>
       </div>
 
-      {/* Fixed Date Headers Row - Fixed dimensions and layout */}
+      {/* FIXED: Date Headers - Simplified structure that can actually scroll */}
       <div 
+        ref={dateHeadersRef}
         className="matrix-date-headers"
         style={{ 
           left: TECHNICIAN_WIDTH, 
@@ -277,24 +278,14 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
           width: `calc(100% - ${TECHNICIAN_WIDTH}px)`
         }}
       >
-        <div 
-          ref={dateScrollRef}
-          className="matrix-date-scroll"
-          style={{ 
-            width: matrixWidth,
-            minWidth: matrixWidth,
-            height: '100%'
-          }}
-        >
-          {dates.map((date, index) => (
-            <DateHeader
-              key={index}
-              date={date}
-              width={CELL_WIDTH}
-              jobs={getJobsForDate(date)}
-            />
-          ))}
-        </div>
+        {dates.map((date, index) => (
+          <DateHeader
+            key={index}
+            date={date}
+            width={CELL_WIDTH}
+            jobs={getJobsForDate(date)}
+          />
+        ))}
       </div>
 
       {/* Fixed Technician Names Column */}
