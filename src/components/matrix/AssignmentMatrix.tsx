@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { format, isSameDay, isWithinInterval } from 'date-fns';
 import { TechnicianRow } from './TechnicianRow';
@@ -47,8 +48,9 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
   const dateHeadersRef = useRef<HTMLDivElement>(null);
   const mainScrollRef = useRef<HTMLDivElement>(null);
   const [hasScrolledToToday, setHasScrolledToToday] = useState(false);
+  const syncInProgressRef = useRef(false);
   
-  // Increased cell width for better content space
+  // Cell dimensions
   const CELL_WIDTH = 160;
   const CELL_HEIGHT = 60;
   const TECHNICIAN_WIDTH = 256;
@@ -92,7 +94,6 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     enabled: jobIds.length > 0
   });
 
-  // Fetch availability schedules for the date range
   const { data: availabilityData = [] } = useQuery({
     queryKey: ['matrix-availability', technicians.map(t => t.id), dates[0], dates[dates.length - 1]],
     queryFn: async () => {
@@ -121,14 +122,12 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
       const jobStart = new Date(assignment.jobs.start_time);
       const jobEnd = new Date(assignment.jobs.end_time);
       
-      // Check if the date falls within the job's date range
       return isWithinInterval(date, { start: jobStart, end: jobEnd }) || 
              isSameDay(date, jobStart) || 
              isSameDay(date, jobEnd);
     });
   };
 
-  // Get availability status for a specific technician and date
   const getAvailabilityForCell = (technicianId: string, date: Date) => {
     return availabilityData.find(availability =>
       availability.user_id === technicianId &&
@@ -136,7 +135,6 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     );
   };
 
-  // Get jobs for a specific date
   const getJobsForDate = (date: Date) => {
     return jobs.filter(job => {
       const jobStart = new Date(job.start_time);
@@ -148,29 +146,61 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     });
   };
 
-  // FIXED: Simplified scroll synchronization without complex bounds checking
-  const syncScrollPositions = useCallback((scrollLeft: number, scrollTop: number) => {
-    // Direct sync without bounds checking for smoother performance
+  // Improved scroll synchronization with proper debouncing
+  const syncScrollPositions = useCallback((scrollLeft: number, scrollTop: number, source: string) => {
+    if (syncInProgressRef.current) return;
+    
+    syncInProgressRef.current = true;
+    
     requestAnimationFrame(() => {
-      // Horizontal sync with date headers
-      if (dateHeadersRef.current && Math.abs(dateHeadersRef.current.scrollLeft - scrollLeft) > 1) {
-        dateHeadersRef.current.scrollLeft = scrollLeft;
-      }
-      
-      // Vertical sync with technician column
-      if (technicianScrollRef.current && Math.abs(technicianScrollRef.current.scrollTop - scrollTop) > 1) {
-        technicianScrollRef.current.scrollTop = scrollTop;
+      try {
+        // Sync horizontal scroll
+        if (source !== 'dateHeaders' && dateHeadersRef.current) {
+          dateHeadersRef.current.scrollLeft = scrollLeft;
+        }
+        if (source !== 'main' && mainScrollRef.current) {
+          mainScrollRef.current.scrollLeft = scrollLeft;
+        }
+        
+        // Sync vertical scroll
+        if (source !== 'technician' && technicianScrollRef.current) {
+          technicianScrollRef.current.scrollTop = scrollTop;
+        }
+        if (source !== 'main' && mainScrollRef.current) {
+          mainScrollRef.current.scrollTop = scrollTop;
+        }
+      } finally {
+        syncInProgressRef.current = false;
       }
     });
   }, []);
 
-  // FIXED: Simplified main scroll handler
+  // Main scroll handler
   const handleMainScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (syncInProgressRef.current) return;
+    
     const scrollLeft = e.currentTarget.scrollLeft;
     const scrollTop = e.currentTarget.scrollTop;
     
-    // Immediate sync for responsive feel
-    syncScrollPositions(scrollLeft, scrollTop);
+    syncScrollPositions(scrollLeft, scrollTop, 'main');
+  }, [syncScrollPositions]);
+
+  // Date headers scroll handler
+  const handleDateHeadersScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (syncInProgressRef.current) return;
+    
+    const scrollLeft = e.currentTarget.scrollLeft;
+    
+    syncScrollPositions(scrollLeft, mainScrollRef.current?.scrollTop || 0, 'dateHeaders');
+  }, [syncScrollPositions]);
+
+  // Technician scroll handler
+  const handleTechnicianScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (syncInProgressRef.current) return;
+    
+    const scrollTop = e.currentTarget.scrollTop;
+    
+    syncScrollPositions(mainScrollRef.current?.scrollLeft || 0, scrollTop, 'technician');
   }, [syncScrollPositions]);
 
   // REMOVED: Complex dimension setup useEffect that was causing issues
@@ -220,10 +250,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         const container = mainScrollRef.current;
         const containerWidth = container.clientWidth;
         
-        // Calculate scroll position to center today's date
         let scrollPosition = (todayIndex * CELL_WIDTH) - (containerWidth / 2) + (CELL_WIDTH / 2);
-        
-        // Ensure we don't scroll past the boundaries
         const maxScroll = matrixWidth - containerWidth;
         scrollPosition = Math.max(0, Math.min(scrollPosition, maxScroll));
         
@@ -236,7 +263,6 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     return () => clearTimeout(timeoutId);
   }, [dates, hasScrolledToToday, CELL_WIDTH, matrixWidth]);
 
-  // Get technician name for dialogs
   const getCurrentTechnician = () => {
     if (!cellAction?.technicianId) return null;
     return technicians.find(t => t.id === cellAction.technicianId);
@@ -259,7 +285,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         </div>
       </div>
 
-      {/* FIXED: Date Headers with proper positioning and natural sizing */}
+      {/* Date Headers - Fixed positioning and dimensions */}
       <div 
         ref={dateHeadersRef}
         className="matrix-date-headers"
@@ -268,15 +294,18 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
           height: HEADER_HEIGHT,
           width: `calc(100% - ${TECHNICIAN_WIDTH}px)`
         }}
+        onScroll={handleDateHeadersScroll}
       >
-        {dates.map((date, index) => (
-          <DateHeader
-            key={index}
-            date={date}
-            width={CELL_WIDTH}
-            jobs={getJobsForDate(date)}
-          />
-        ))}
+        <div style={{ width: matrixWidth, height: '100%', display: 'flex' }}>
+          {dates.map((date, index) => (
+            <DateHeader
+              key={index}
+              date={date}
+              width={CELL_WIDTH}
+              jobs={getJobsForDate(date)}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Fixed Technician Names Column */}
@@ -288,18 +317,24 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
           height: `calc(100% - ${HEADER_HEIGHT}px)`
         }}
       >
-        <div ref={technicianScrollRef} className="matrix-technician-scroll">
-          {technicians.map((technician) => (
-            <TechnicianRow
-              key={technician.id}
-              technician={technician}
-              height={CELL_HEIGHT}
-            />
-          ))}
+        <div 
+          ref={technicianScrollRef} 
+          className="matrix-technician-scroll"
+          onScroll={handleTechnicianScroll}
+        >
+          <div style={{ height: matrixHeight }}>
+            {technicians.map((technician) => (
+              <TechnicianRow
+                key={technician.id}
+                technician={technician}
+                height={CELL_HEIGHT}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* FIXED: Main Scrollable Matrix Area with proper positioning */}
+      {/* Main Scrollable Matrix Area */}
       <div 
         className="matrix-main-area"
         style={{ 
@@ -385,7 +420,6 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         />
       )}
 
-      {/* Assignment Dialog */}
       {cellAction?.type === 'assign' && (
         <AssignJobDialog
           open={true}
@@ -405,7 +439,6 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         />
       )}
 
-      {/* Status Change Dialogs */}
       {(cellAction?.type === 'confirm' || cellAction?.type === 'decline') && (
         <AssignmentStatusDialog
           open={true}
@@ -417,7 +450,6 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         />
       )}
 
-      {/* Unavailability Dialog */}
       {cellAction?.type === 'unavailable' && (
         <MarkUnavailableDialog
           open={true}

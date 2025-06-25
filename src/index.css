@@ -116,7 +116,7 @@
   border-bottom: 1px solid hsl(var(--border));
 }
 
-/* FIXED: Date Headers with consistent positioning */
+/* Date Headers - Simplified and consistent */
 .matrix-date-headers {
   position: absolute;
   top: 0;
@@ -127,8 +127,6 @@
   overflow-y: hidden;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  display: flex;
-  scroll-behavior: smooth;
 }
 
 .matrix-date-headers::-webkit-scrollbar {
@@ -139,7 +137,6 @@
 .matrix-technician-column {
   position: absolute;
   left: 0;
-  bottom: 0;
   z-index: 30;
   background: hsl(var(--card));
   border-right: 1px solid hsl(var(--border));
@@ -152,7 +149,6 @@
   overflow-x: hidden;
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
-  scroll-behavior: smooth;
 }
 
 .matrix-technician-scroll::-webkit-scrollbar {
@@ -168,10 +164,9 @@
   border-radius: 3px;
 }
 
-/* FIXED: Main Scrollable Area with consistent positioning */
+/* Main Scrollable Area - Simplified */
 .matrix-main-area {
   position: absolute;
-  bottom: 0;
   background: hsl(var(--background));
   overflow: hidden;
 }
@@ -182,7 +177,6 @@
   overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
-  scroll-behavior: smooth;
 }
 
 .matrix-main-scroll::-webkit-scrollbar {
