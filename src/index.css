@@ -124,7 +124,16 @@
   z-index: 40;
   background: hsl(var(--card));
   border-bottom: 1px solid hsl(var(--border));
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.matrix-date-headers::-webkit-scrollbar {
+  display: none;
+}
+
+.matrix-date-headers {
+  scrollbar-width: none;
 }
 
 .matrix-date-scroll {
@@ -170,7 +179,7 @@
   right: 0;
   bottom: 0;
   background: hsl(var(--background));
-  overflow: hidden;
+  overflow: auto;
 }
 
 .matrix-main-scroll {

@@ -1,6 +1,5 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { format, isSameDay } from 'date-fns';
+import { format, isSameDay, isWithinInterval } from 'date-fns';
 import { TechnicianRow } from './TechnicianRow';
 import { MatrixCell } from './MatrixCell';
 import { DateHeader } from './DateHeader';
@@ -49,7 +48,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
   const mainScrollRef = useRef<HTMLDivElement>(null);
   const [hasScrolledToToday, setHasScrolledToToday] = useState(false);
   
-  const CELL_WIDTH = 120;
+  const CELL_WIDTH = 140;
   const CELL_HEIGHT = 60;
   const TECHNICIAN_WIDTH = 256;
   const HEADER_HEIGHT = 80;
@@ -109,11 +108,19 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
 
   // Get assignment for a specific technician and date
   const getAssignmentForCell = (technicianId: string, date: Date) => {
-    return allAssignments.find(assignment => 
-      assignment.technician_id === technicianId && 
-      assignment.jobs &&
-      isSameDay(new Date(assignment.jobs.start_time), date)
-    );
+    return allAssignments.find(assignment => {
+      if (assignment.technician_id !== technicianId || !assignment.jobs) {
+        return false;
+      }
+      
+      const jobStart = new Date(assignment.jobs.start_time);
+      const jobEnd = new Date(assignment.jobs.end_time);
+      
+      // Check if the date falls within the job's date range
+      return isWithinInterval(date, { start: jobStart, end: jobEnd }) || 
+             isSameDay(date, jobStart) || 
+             isSameDay(date, jobEnd);
+    });
   };
 
   // Get availability status for a specific technician and date
@@ -126,7 +133,14 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
 
   // Get jobs for a specific date
   const getJobsForDate = (date: Date) => {
-    return jobs.filter(job => isSameDay(new Date(job.start_time), date));
+    return jobs.filter(job => {
+      const jobStart = new Date(job.start_time);
+      const jobEnd = new Date(job.end_time);
+      
+      return isWithinInterval(date, { start: jobStart, end: jobEnd }) || 
+             isSameDay(date, jobStart) || 
+             isSameDay(date, jobEnd);
+    });
   };
 
   // Sync scroll handlers
@@ -349,9 +363,14 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
           onJobSelected={handleJobSelected}
           technicianName={`${currentTechnician.first_name} ${currentTechnician.last_name}`}
           date={cellAction.date}
-          availableJobs={jobs.filter(job => 
-            isSameDay(new Date(job.start_time), cellAction.date)
-          )}
+          availableJobs={jobs.filter(job => {
+            const jobStart = new Date(job.start_time);
+            const jobEnd = new Date(job.end_time);
+            
+            return isWithinInterval(cellAction.date, { start: jobStart, end: jobEnd }) || 
+                   isSameDay(cellAction.date, jobStart) || 
+                   isSameDay(cellAction.date, jobEnd);
+          })}
         />
       )}
 
@@ -362,9 +381,14 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
           onClose={closeDialogs}
           technicianId={cellAction.technicianId}
           date={cellAction.date}
-          availableJobs={jobs.filter(job => 
-            isSameDay(new Date(job.start_time), cellAction.date)
-          )}
+          availableJobs={jobs.filter(job => {
+            const jobStart = new Date(job.start_time);
+            const jobEnd = new Date(job.end_time);
+            
+            return isWithinInterval(cellAction.date, { start: jobStart, end: jobEnd }) || 
+                   isSameDay(cellAction.date, jobStart) || 
+                   isSameDay(cellAction.date, jobEnd);
+          })}
           existingAssignment={cellAction.assignment}
           preSelectedJobId={cellAction.selectedJobId}
         />
