@@ -1,4 +1,3 @@
-
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useMemo } from 'react';
@@ -66,7 +65,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           video_role,
           status,
           assigned_at,
-          job:jobs!inner (
+          jobs!job_id (
             id,
             title,
             start_time,
@@ -78,7 +77,20 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
         .neq('status', 'declined'); // Filter out declined assignments
 
       if (error) throw error;
-      return (data || []) as AssignmentWithJob[];
+      
+      // Transform the data to match our interface
+      const transformedData = (data || []).map(item => ({
+        job_id: item.job_id,
+        technician_id: item.technician_id,
+        sound_role: item.sound_role,
+        lights_role: item.lights_role,
+        video_role: item.video_role,
+        status: item.status,
+        assigned_at: item.assigned_at,
+        job: Array.isArray(item.jobs) ? item.jobs[0] : item.jobs
+      })).filter(item => item.job); // Filter out items without job data
+      
+      return transformedData as AssignmentWithJob[];
     },
     enabled: jobIds.length > 0,
     staleTime: 30 * 1000, // 30 seconds for faster updates
