@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { format, isSameDay, isWithinInterval } from 'date-fns';
 import { TechnicianRow } from './TechnicianRow';
@@ -48,7 +49,8 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
   const mainScrollRef = useRef<HTMLDivElement>(null);
   const [hasScrolledToToday, setHasScrolledToToday] = useState(false);
   
-  const CELL_WIDTH = 140;
+  // Increased cell width for better content space
+  const CELL_WIDTH = 160;
   const CELL_HEIGHT = 60;
   const TECHNICIAN_WIDTH = 256;
   const HEADER_HEIGHT = 80;
@@ -143,18 +145,41 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     });
   };
 
-  // Sync scroll handlers
+  // Enhanced sync scroll handlers with debugging
   const handleMainScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const scrollLeft = e.currentTarget.scrollLeft;
     const scrollTop = e.currentTarget.scrollTop;
     
+    console.log('Main scroll event:', { scrollLeft, scrollTop });
+    
     if (dateScrollRef.current) {
       dateScrollRef.current.scrollLeft = scrollLeft;
+      console.log('Date header scroll updated to:', scrollLeft);
     }
     if (technicianScrollRef.current) {
       technicianScrollRef.current.scrollTop = scrollTop;
     }
   };
+
+  // Ensure proper dimensions for scroll containers
+  useEffect(() => {
+    if (dateScrollRef.current && mainScrollRef.current) {
+      const mainWidth = dates.length * CELL_WIDTH;
+      const dateScrollElement = dateScrollRef.current;
+      const mainScrollElement = mainScrollRef.current;
+      
+      // Ensure the date scroll container has the correct width
+      if (dateScrollElement.scrollWidth !== mainWidth) {
+        console.log('Adjusting date scroll width:', { 
+          expected: mainWidth, 
+          actual: dateScrollElement.scrollWidth 
+        });
+      }
+      
+      // Force a layout update
+      dateScrollElement.style.width = `${mainScrollElement.offsetWidth}px`;
+    }
+  }, [dates.length, CELL_WIDTH]);
 
   const handleCellClick = (technicianId: string, date: Date, action: 'select-job' | 'assign' | 'unavailable' | 'confirm' | 'decline') => {
     const assignment = getAssignmentForCell(technicianId, date);
@@ -222,7 +247,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
 
     const timeoutId = setTimeout(scrollToToday, 300);
     return () => clearTimeout(timeoutId);
-  }, [dates, hasScrolledToToday]);
+  }, [dates, hasScrolledToToday, CELL_WIDTH]);
 
   // Get technician name for dialogs
   const getCurrentTechnician = () => {

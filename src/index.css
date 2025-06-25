@@ -116,7 +116,7 @@
   border-bottom: 1px solid hsl(var(--border));
 }
 
-/* Fixed Date Headers Row */
+/* Fixed Date Headers Row - Enhanced for better scrolling */
 .matrix-date-headers {
   position: absolute;
   top: 0;
@@ -126,19 +126,26 @@
   border-bottom: 1px solid hsl(var(--border));
   overflow-x: auto;
   overflow-y: hidden;
+  /* Ensure scrolling works properly */
+  will-change: scroll-position;
 }
 
+/* Hide scrollbar but keep functionality */
 .matrix-date-headers::-webkit-scrollbar {
-  display: none;
+  height: 0;
+  background: transparent;
 }
 
 .matrix-date-headers {
   scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .matrix-date-scroll {
   display: flex;
   height: 100%;
+  /* Ensure the scroll container can be scrolled */
+  min-width: 100%;
 }
 
 /* Fixed Technician Column */
@@ -173,13 +180,15 @@
   border-radius: 3px;
 }
 
-/* Main Scrollable Area */
+/* Main Scrollable Area - Enhanced */
 .matrix-main-area {
   position: absolute;
   right: 0;
   bottom: 0;
   background: hsl(var(--background));
   overflow: auto;
+  /* Ensure proper scrolling behavior */
+  will-change: scroll-position;
 }
 
 .matrix-main-scroll {
@@ -188,6 +197,8 @@
   overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  /* Smooth scrolling for better UX */
+  scroll-behavior: smooth;
 }
 
 .matrix-main-scroll::-webkit-scrollbar {
