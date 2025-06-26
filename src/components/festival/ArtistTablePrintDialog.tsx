@@ -118,16 +118,31 @@ export const ArtistTablePrintDialog = ({
   }, [jobId]);
 
   const handleTablePrint = async () => {
+    console.log('ArtistTablePrintDialog handleTablePrint called');
+    console.log('onPrint prop:', !!onPrint);
+    
     if (onPrint) {
+      console.log('Using external onPrint function');
       await onPrint();
       return;
     }
 
+    console.log('Using internal PDF generation');
     setIsGenerating(true);
     
     try {
+      // Filter artists based on selected criteria
+      const filteredArtists = artists.filter(artist => {
+        const matchesStage = stageFilter === 'all' || !stageFilter || artist.stage?.toString() === stageFilter;
+        const matchesDate = artist.date === selectedDate;
+        return matchesStage && matchesDate;
+      });
+
+      console.log('Filtered artists in dialog:', filteredArtists.length);
+      console.log('Sample artist in dialog:', filteredArtists[0]);
+
       // Transform artists data for PDF
-      const transformedArtists = artists.map(artist => ({
+      const transformedArtists = filteredArtists.map(artist => ({
         name: artist.name,
         stage: artist.stage,
         showTime: {
@@ -168,7 +183,6 @@ export const ArtistTablePrintDialog = ({
           djBooth: artist.extras_djbooth
         },
         notes: artist.notes,
-        // Add missing fields
         micKit: artist.mic_kit || 'band',
         wiredMics: artist.wired_mics || [],
         infrastructure: {
@@ -196,21 +210,26 @@ export const ArtistTablePrintDialog = ({
         logoUrl: logoUrl
       };
 
+      console.log('PDF data in dialog:', pdfData);
+
       const blob = await exportArtistTablePDF(pdfData);
       
       // Create download link
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Artist_Schedule_${selectedDate}.pdf`;
+      const stageName = stageFilter && stageFilter !== 'all' ? (stageNames?.[parseInt(stageFilter)] || `stage${stageFilter}`) : '';
+      a.download = `artist_schedule_${selectedDate}${stageName ? `_${stageName.replace(/[^a-zA-Z0-9]/g, '_')}` : ''}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
       toast.success('Artist schedule PDF generated successfully');
+      setDialogOpen(false);
     } catch (error) {
       console.error('Error generating artist schedule PDF:', error);
+      console.error('Error stack:', error.stack);
       toast.error('Failed to generate PDF');
     } finally {
       setIsGenerating(false);

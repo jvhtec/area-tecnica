@@ -332,6 +332,7 @@ const FestivalArtistManagement = () => {
     setIsPrinting(true);
     
     console.log('Starting PDF print with logo URL:', logoUrl);
+    console.log('Artists data before filtering:', artists);
     
     try {
       const filteredArtists = artists.filter(artist => {
@@ -341,78 +342,91 @@ const FestivalArtistManagement = () => {
       });
 
       console.log('Filtered artists for PDF:', filteredArtists.length);
+      console.log('Sample artist data:', filteredArtists[0]);
+
+      const transformedArtists = filteredArtists.map(artist => {
+        const wirelessSystems = artist.wireless_systems || [];
+        const iemSystems = artist.iem_systems || [];
+        
+        console.log('Transforming artist:', artist.name, {
+          micKit: artist.mic_kit,
+          wiredMics: artist.wired_mics,
+          infrastructure: artist.infra_cat6,
+          riderMissing: artist.rider_missing
+        });
+        
+        return {
+          name: artist.name,
+          stage: artist.stage,
+          showTime: {
+            start: artist.show_start,
+            end: artist.show_end
+          },
+          soundcheck: artist.soundcheck ? {
+            start: artist.soundcheck_start,
+            end: artist.soundcheck_end
+          } : undefined,
+          technical: {
+            fohTech: artist.foh_tech,
+            monTech: artist.mon_tech,
+            fohConsole: {
+              model: artist.foh_console,
+              providedBy: artist.foh_console_provided_by
+            },
+            monConsole: {
+              model: artist.mon_console,
+              providedBy: artist.mon_console_provided_by
+            },
+            wireless: {
+              systems: wirelessSystems,
+              providedBy: artist.wireless_provided_by
+            },
+            iem: {
+              systems: iemSystems,
+              providedBy: artist.iem_provided_by
+            },
+            monitors: {
+              enabled: artist.monitors_enabled,
+              quantity: artist.monitors_quantity
+            }
+          },
+          extras: {
+            sideFill: artist.extras_sf,
+            drumFill: artist.extras_df,
+            djBooth: artist.extras_djbooth
+          },
+          notes: artist.notes,
+          micKit: artist.mic_kit || 'band',
+          wiredMics: artist.wired_mics || [],
+          infrastructure: {
+            infra_cat6: artist.infra_cat6,
+            infra_cat6_quantity: artist.infra_cat6_quantity,
+            infra_hma: artist.infra_hma,
+            infra_hma_quantity: artist.infra_hma_quantity,
+            infra_coax: artist.infra_coax,
+            infra_coax_quantity: artist.infra_coax_quantity,
+            infra_opticalcon_duo: artist.infra_opticalcon_duo,
+            infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity,
+            infra_analog: artist.infra_analog,
+            other_infrastructure: artist.other_infrastructure,
+            infrastructure_provided_by: artist.infrastructure_provided_by
+          },
+          riderMissing: artist.rider_missing || false
+        };
+      });
 
       const data = {
         jobTitle: jobTitle,
         date: printDate,
         stage: printStage,
         stageNames: stageNames,
-        artists: filteredArtists.map(artist => {
-          const wirelessSystems = artist.wireless_systems || [];
-          const iemSystems = artist.iem_systems || [];
-          return {
-            name: artist.name,
-            stage: artist.stage,
-            showTime: {
-              start: artist.show_start,
-              end: artist.show_end
-            },
-            soundcheck: artist.soundcheck ? {
-              start: artist.soundcheck_start,
-              end: artist.soundcheck_end
-            } : undefined,
-            technical: {
-              fohTech: artist.foh_tech,
-              monTech: artist.mon_tech,
-              fohConsole: {
-                model: artist.foh_console,
-                providedBy: artist.foh_console_provided_by
-              },
-              monConsole: {
-                model: artist.mon_console,
-                providedBy: artist.mon_console_provided_by
-              },
-              wireless: {
-                systems: wirelessSystems,
-                providedBy: artist.wireless_provided_by
-              },
-              iem: {
-                systems: iemSystems,
-                providedBy: artist.iem_provided_by
-              },
-              monitors: {
-                enabled: artist.monitors_enabled,
-                quantity: artist.monitors_quantity
-              }
-            },
-            extras: {
-              sideFill: artist.extras_sf,
-              drumFill: artist.extras_df,
-              djBooth: artist.extras_djbooth
-            },
-            notes: artist.notes,
-            micKit: artist.mic_kit || 'band',
-            wiredMics: artist.wired_mics || [],
-            infrastructure: {
-              infra_cat6: artist.infra_cat6,
-              infra_cat6_quantity: artist.infra_cat6_quantity,
-              infra_hma: artist.infra_hma,
-              infra_hma_quantity: artist.infra_hma_quantity,
-              infra_coax: artist.infra_coax,
-              infra_coax_quantity: artist.infra_coax_quantity,
-              infra_opticalcon_duo: artist.infra_opticalcon_duo,
-              infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity,
-              infra_analog: artist.infra_analog,
-              other_infrastructure: artist.other_infrastructure,
-              infrastructure_provided_by: artist.infrastructure_provided_by
-            },
-            riderMissing: artist.rider_missing || false
-          };
-        }),
+        artists: transformedArtists,
         logoUrl: logoUrl || null
       };
 
+      console.log('Final PDF data structure:', data);
       console.log('PDF data prepared, generating blob...');
+      
       const blob = await exportArtistTablePDF(data);
       
       const url = URL.createObjectURL(blob);
@@ -432,6 +446,7 @@ const FestivalArtistManagement = () => {
       setIsPrintDialogOpen(false);
     } catch (error) {
       console.error('Error generating PDF:', error);
+      console.error('Error stack:', error.stack);
       toast({
         title: "Error",
         description: "Could not generate PDF",
@@ -580,7 +595,7 @@ const FestivalArtistManagement = () => {
         jobDates={jobDates}
         onDateChange={setPrintDate}
         onStageChange={setPrintStage}
-        onPrint={handlePrintTable}
+        onPrint={undefined}
         isLoading={isPrinting}
       />
     </div>
