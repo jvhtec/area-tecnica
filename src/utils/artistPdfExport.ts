@@ -478,7 +478,7 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
     yPosition += splitNotes.length * 5 + 10;
   }
 
-  // === COMPANY LOGO ===
+  // === COMPANY LOGO (CENTERED AT BOTTOM) ===
   console.log("Attempting to load Sector Pro logo");
   const sectorImg = await loadImageSafely('/sector pro logo.png', 'Sector Pro logo');
   if (sectorImg) {
@@ -487,15 +487,16 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
       const ratio = sectorImg.width / sectorImg.height;
       const logoHeight = logoWidth / ratio;
       
+      // Center horizontally at bottom of page
       doc.addImage(
         sectorImg, 
         'PNG', 
-        pageWidth - logoWidth - 10,
+        pageWidth / 2 - logoWidth / 2,  // Center horizontally
         pageHeight - logoHeight - 10,
         logoWidth,
         logoHeight
       );
-      console.log("Sector Pro logo added successfully");
+      console.log("Sector Pro logo added successfully at bottom center");
     } catch (error) {
       console.error('Error adding Sector Pro logo to PDF:', error);
     }
@@ -508,18 +509,26 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
         const ratio = altSectorImg.width / altSectorImg.height;
         const logoHeight = logoWidth / ratio;
         
-        doc.addImage(altSectorImg, 'PNG', pageWidth - logoWidth - 10, pageHeight - logoHeight - 10, logoWidth, logoHeight);
-        console.log("Alternative Sector Pro logo added successfully");
+        // Center horizontally at bottom of page
+        doc.addImage(
+          altSectorImg, 
+          'PNG', 
+          pageWidth / 2 - logoWidth / 2,  // Center horizontally
+          pageHeight - logoHeight - 10, 
+          logoWidth, 
+          logoHeight
+        );
+        console.log("Alternative Sector Pro logo added successfully at bottom center");
       } catch (error) {
         console.error('Error adding alternative Sector Pro logo to PDF:', error);
       }
     }
   }
 
-  // Footer with date
+  // Footer with date (moved to left to avoid overlap with centered logo)
   doc.setFontSize(8);
   doc.setTextColor(51, 51, 51);
-  doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
+  doc.text(`Generated: ${createdDate}`, 10, pageHeight - 10);
   
   console.log('Individual artist PDF generation completed');
   return doc.output('blob');
