@@ -4,7 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Calculator, Clock, Users } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Calculator, Clock, Users, Settings } from "lucide-react";
 import { useShiftTimeCalculator } from "@/hooks/useShiftTimeCalculator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -18,9 +20,35 @@ interface ShiftTimeCalculatorProps {
 export const ShiftTimeCalculator = ({ jobId, date, stage, onApplyTimes }: ShiftTimeCalculatorProps) => {
   const [numberOfShifts, setNumberOfShifts] = useState<number>(3);
   const [isOpen, setIsOpen] = useState(false);
-  const { artists, isLoading, calculateOptimalShifts, getScheduleSummary } = useShiftTimeCalculator(jobId, date, stage);
+  const [configOpen, setConfigOpen] = useState(false);
+  
+  // Configuration parameters with defaults
+  const [startTimeBuffer, setStartTimeBuffer] = useState<number>(30); // minutes
+  const [teardownTime, setTeardownTime] = useState<number>(4); // hours
+  
+  const { artists, isLoading, calculateOptimalShifts, getScheduleSummary } = useShiftTimeCalculator(
+    jobId, 
+    date, 
+    stage, 
+    startTimeBuffer, 
+    teardownTime
+  );
 
   const calculatedShifts = calculateOptimalShifts(numberOfShifts);
+
+  const handleStartTimeBufferChange = (value: string) => {
+    const numValue = parseInt(value);
+    if (!isNaN(numValue) && numValue >= 0 && numValue <= 120) {
+      setStartTimeBuffer(numValue);
+    }
+  };
+
+  const handleTeardownTimeChange = (value: string) => {
+    const numValue = parseInt(value);
+    if (!isNaN(numValue) && numValue >= 0 && numValue <= 8) {
+      setTeardownTime(numValue);
+    }
+  };
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -41,6 +69,55 @@ export const ShiftTimeCalculator = ({ jobId, date, stage, onApplyTimes }: ShiftT
           </CardHeader>
           
           <CardContent className="space-y-4">
+            {/* Configuration Section */}
+            <Collapsible open={configOpen} onOpenChange={setConfigOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" type="button" className="w-full justify-start">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Configuration
+                  {(startTimeBuffer !== 30 || teardownTime !== 4) && (
+                    <Badge variant="secondary" className="ml-2 text-xs">Custom</Badge>
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+              
+              <CollapsibleContent className="mt-3 space-y-3 border rounded-lg p-3 bg-muted/20">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="start-buffer" className="text-xs">
+                      Start Time Buffer (minutes)
+                    </Label>
+                    <Input
+                      id="start-buffer"
+                      type="number"
+                      min="0"
+                      max="120"
+                      value={startTimeBuffer}
+                      onChange={(e) => handleStartTimeBufferChange(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="teardown-time" className="text-xs">
+                      Teardown Time (hours)
+                    </Label>
+                    <Input
+                      id="teardown-time"
+                      type="number"
+                      min="0"
+                      max="8"
+                      value={teardownTime}
+                      onChange={(e) => handleTeardownTimeChange(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Buffer time is added before first soundcheck. Teardown time is added after last show on festival's final day.
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
             {isLoading ? (
               <div className="text-sm text-muted-foreground">Loading artist schedule...</div>
             ) : (

@@ -22,7 +22,13 @@ interface CalculatedShift {
   overlap?: string;
 }
 
-export const useShiftTimeCalculator = (jobId: string, date: string, stage?: number) => {
+export const useShiftTimeCalculator = (
+  jobId: string, 
+  date: string, 
+  stage?: number, 
+  startTimeBufferMinutes: number = 30, 
+  teardownHours: number = 4
+) => {
   const [artists, setArtists] = useState<ArtistSchedule[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLastDay, setIsLastDay] = useState(false);
@@ -138,12 +144,12 @@ export const useShiftTimeCalculator = (jobId: string, date: string, stage?: numb
       }
     });
 
-    // Add 30-minute buffer before first soundcheck
-    earliestMinutes -= 30;
+    // Add configurable buffer before first soundcheck
+    earliestMinutes -= startTimeBufferMinutes;
 
-    // Add 4 hours for teardown if it's the last day
+    // Add configurable teardown time if it's the last day
     if (isLastDay) {
-      latestMinutes += 4 * 60;
+      latestMinutes += teardownHours * 60;
     }
 
     const totalMinutes = latestMinutes - earliestMinutes;
@@ -241,20 +247,23 @@ export const useShiftTimeCalculator = (jobId: string, date: string, stage?: numb
       }
     });
 
-    // Add 30-minute buffer before first soundcheck
-    const bufferedEarliestMinutes = earliestMinutes - 30;
+    // Add configurable buffer before first soundcheck
+    const bufferedEarliestMinutes = earliestMinutes - startTimeBufferMinutes;
     
-    // Add teardown time if last day
-    const finalLatestMinutes = isLastDay ? latestMinutes + 4 * 60 : latestMinutes;
+    // Add configurable teardown time if last day
+    const finalLatestMinutes = isLastDay ? latestMinutes + teardownHours * 60 : latestMinutes;
     
     const totalHours = Math.round((finalLatestMinutes - bufferedEarliestMinutes) / 60 * 10) / 10;
     
     const earliest = minutesToTime(bufferedEarliestMinutes);
     const latest = minutesToTime(finalLatestMinutes);
-    const teardownText = isLastDay ? " + 4h teardown" : "";
+    
+    // Show buffer and teardown info if they're not defaults
+    const bufferText = startTimeBufferMinutes !== 30 ? ` (${startTimeBufferMinutes}m buffer)` : '';
+    const teardownText = isLastDay ? ` + ${teardownHours}h teardown` : "";
     const stageText = stage ? ` (Stage ${stage})` : "";
     
-    return `${earliest} → ${latest}${teardownText}${stageText} | Total: ${totalHours}h`;
+    return `${earliest}${bufferText} → ${latest}${teardownText}${stageText} | Total: ${totalHours}h`;
   };
 
   return {
