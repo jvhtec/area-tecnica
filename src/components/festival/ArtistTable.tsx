@@ -339,7 +339,9 @@ export const ArtistTable = ({
       },
       notes: artist.notes || '',
       wiredMics: artist.wired_mics || [],
-      logoUrl: logoUrl
+      logoUrl: logoUrl,
+      micKit: artist.mic_kit || 'band',
+      riderMissing: artist.rider_missing || false
     };
   };
 

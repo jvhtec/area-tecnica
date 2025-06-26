@@ -93,6 +93,27 @@ interface ScheduleRow {
     djBooth: boolean;
   };
   notes?: string;
+  // Add missing fields
+  micKit?: string;
+  wiredMics?: Array<{
+    model: string;
+    quantity: number;
+    exclusive_use?: boolean;
+  }>;
+  infrastructure?: {
+    infra_cat6?: boolean;
+    infra_cat6_quantity?: number;
+    infra_hma?: boolean;
+    infra_hma_quantity?: number;
+    infra_coax?: boolean;
+    infra_coax_quantity?: number;
+    infra_opticalcon_duo?: boolean;
+    infra_opticalcon_duo_quantity?: number;
+    infra_analog?: number;
+    other_infrastructure?: string;
+    infrastructure_provided_by?: string;
+  };
+  riderMissing?: boolean;
 }
 
 // Helper function to sort schedule rows chronologically by their actual event times
@@ -136,7 +157,7 @@ const transformArtistsForSorting = (artists: ArtistTablePdfData['artists'], date
 };
 
 // Enhanced image loading with better error handling and debugging
-const loadImageWithFallback = async (src: string, description: string): Promise<HTMLImageElement | null> => {
+const loadImageWithFallback = async (src: string, description: string): Promise<HTMLImageImage | null> => {
   console.log(`Attempting to load ${description}:`, src);
   
   return new Promise((resolve) => {
@@ -162,6 +183,48 @@ const loadImageWithFallback = async (src: string, description: string): Promise<
     
     img.src = src;
   });
+};
+
+// Helper function to format wired microphones for PDF display
+const formatWiredMicsForPdf = (mics: Array<{
+  model: string;
+  quantity: number;
+  exclusive_use?: boolean;
+}> = []) => {
+  if (mics.length === 0) return "None";
+  return mics.map(mic => {
+    const exclusiveIndicator = mic.exclusive_use ? " (E)" : "";
+    return `${mic.quantity}x ${mic.model}${exclusiveIndicator}`;
+  }).join(", ");
+};
+
+// Helper function to format infrastructure requirements for PDF
+const formatInfrastructureForPdf = (artist: any) => {
+  const infraItems: string[] = [];
+  
+  if (artist.infra_cat6 && artist.infra_cat6_quantity) {
+    infraItems.push(`${artist.infra_cat6_quantity}x CAT6`);
+  }
+  if (artist.infra_hma && artist.infra_hma_quantity) {
+    infraItems.push(`${artist.infra_hma_quantity}x HMA`);
+  }
+  if (artist.infra_coax && artist.infra_coax_quantity) {
+    infraItems.push(`${artist.infra_coax_quantity}x Coax`);
+  }
+  if (artist.infra_opticalcon_duo && artist.infra_opticalcon_duo_quantity) {
+    infraItems.push(`${artist.infra_opticalcon_duo_quantity}x OpticalCON DUO`);
+  }
+  if (artist.infra_analog && artist.infra_analog > 0) {
+    infraItems.push(`${artist.infra_analog}x Analog`);
+  }
+  if (artist.other_infrastructure) {
+    infraItems.push(artist.other_infrastructure);
+  }
+  
+  const infraText = infraItems.length > 0 ? infraItems.join(", ") : "None";
+  const providerText = artist.infrastructure_provided_by ? `\n(${artist.infrastructure_provided_by})` : "";
+  
+  return infraText + providerText;
 };
 
 export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Blob> => {
@@ -255,7 +318,12 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       isSoundcheck: false,
       technical: artist.technical,
       extras: artist.extras,
-      notes: artist.notes
+      notes: artist.notes,
+      // Add missing fields for PDF
+      micKit: artist.micKit,
+      wiredMics: artist.wiredMics,
+      infrastructure: artist.infrastructure,
+      riderMissing: artist.riderMissing
     });
   });
 
@@ -268,11 +336,11 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
         `${row.name} (Soundcheck)`,
         getStageDisplayName(row.stage),
         `${row.time.start}-${row.time.end}`,
-        '', '', '', '', '', ''
+        '', '', '', '', '', '', '', '', ''
       ];
     }
     
-    if (!row.technical) return ['', '', '', '', '', '', '', '', ''];
+    if (!row.technical) return ['', '', '', '', '', '', '', '', '', '', '', ''];
     
     const wirelessSummary = getWirelessSummary(row.technical.wireless);
     const iemSummary = getIEMSummary(row.technical.iem);
@@ -315,24 +383,32 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       `FOH: ${row.technical.fohConsole.model}\n(${row.technical.fohConsole.providedBy})\n\nMON: ${row.technical.monConsole.model}\n(${row.technical.monConsole.providedBy})`,
       `FOH: ${row.technical.fohTech ? 'Y' : 'N'}\nMON: ${row.technical.monTech ? 'Y' : 'N'}`,
       `Wireless:\nHH: ${wirelessSummary.hh} (${wirelessProviderInfo})\nBP: ${wirelessSummary.bp}\n\nIEM:\nCH: ${iemSummary.channels}\nBP: ${iemSummary.bodypacks} (${iemProviderInfo})`,
+      // Add Mic Kit column
+      row.micKit || 'Band',
+      // Add Wired Mics column
+      formatWiredMicsForPdf(row.wiredMics),
       row.technical.monitors.enabled ? `Monitors: ${row.technical.monitors.quantity}` : '-',
+      // Add Infrastructure column
+      formatInfrastructureForPdf(row.infrastructure),
       [
         row.extras?.sideFill ? 'SF' : '',
         row.extras?.drumFill ? 'DF' : '',
         row.extras?.djBooth ? 'DJ' : ''
       ].filter(Boolean).join(', ') || '-',
+      // Add Rider Status column
+      row.riderMissing ? 'Missing' : 'Complete',
       row.notes || '-'
     ];
   });
 
   autoTable(doc, {
     startY: 25,
-    head: [['Artist', 'Stage', 'Time', 'Consoles', 'Tech', 'RF/IEM', 'Monitors', 'Extras', 'Notes']],
+    head: [['Artist', 'Stage', 'Time', 'Consoles', 'Tech', 'RF/IEM', 'Mic Kit', 'Wired Mics', 'Monitors', 'Infrastructure', 'Extras', 'Rider', 'Notes']],
     body: tableBody,
     theme: 'grid',
     styles: {
-      fontSize: 8,
-      cellPadding: 3,
+      fontSize: 7,
+      cellPadding: 2,
       overflow: 'linebreak',
       lineWidth: 0.1,
       valign: 'middle'
@@ -340,27 +416,42 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     headStyles: {
       fillColor: [125, 1, 1],
       textColor: [0, 0, 0],
-      fontSize: 8,
+      fontSize: 7,
       fontStyle: 'bold',
       halign: 'left',
-      cellPadding: 4
+      cellPadding: 3
     },
     columnStyles: {
-      0: { cellWidth: 30 },
-      1: { cellWidth: 15 },
-      2: { cellWidth: 25 },
-      3: { cellWidth: 35, cellPadding: 4 },
-      4: { cellWidth: 20, cellPadding: 4 },
-      5: { cellWidth: 35, cellPadding: 4 },
-      6: { cellWidth: 20 },
-      7: { cellWidth: 20 },
-      8: { cellWidth: 'auto' }
+      0: { cellWidth: 22 },  // Artist
+      1: { cellWidth: 12 },  // Stage
+      2: { cellWidth: 18 },  // Time
+      3: { cellWidth: 28 },  // Consoles
+      4: { cellWidth: 15 },  // Tech
+      5: { cellWidth: 28 },  // RF/IEM
+      6: { cellWidth: 12 },  // Mic Kit
+      7: { cellWidth: 20 },  // Wired Mics
+      8: { cellWidth: 15 },  // Monitors
+      9: { cellWidth: 25 },  // Infrastructure
+      10: { cellWidth: 15 }, // Extras
+      11: { cellWidth: 12 }, // Rider
+      12: { cellWidth: 'auto' } // Notes
     },
     didParseCell: function(data) {
       if (data.row.index === -1) return;
       const rowData = sortedScheduleRows[data.row.index];
       if (rowData.isSoundcheck) {
         data.cell.styles.fillColor = [254, 247, 205];
+      }
+      
+      // Color rider status column
+      if (data.column.index === 11 && !rowData.isSoundcheck) {
+        if (rowData.riderMissing) {
+          data.cell.styles.fillColor = [254, 226, 226]; // Light red for missing
+          data.cell.styles.textColor = [185, 28, 28]; // Dark red text
+        } else {
+          data.cell.styles.fillColor = [220, 252, 231]; // Light green for complete
+          data.cell.styles.textColor = [22, 101, 52]; // Dark green text
+        }
       }
     }
   });
