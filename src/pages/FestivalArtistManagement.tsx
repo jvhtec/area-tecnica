@@ -553,10 +553,15 @@ const FestivalArtistManagement = () => {
       )}
 
       <ArtistTablePrintDialog
+        artists={artists}
+        jobTitle={jobTitle}
+        selectedDate={printDate}
+        stageFilter={printStage}
+        jobId={jobId}
+        stageNames={stageNames}
         open={isPrintDialogOpen}
         onOpenChange={setIsPrintDialogOpen}
         jobDates={jobDates}
-        selectedDate={printDate}
         onDateChange={setPrintDate}
         onStageChange={setPrintStage}
         onPrint={handlePrintTable}
