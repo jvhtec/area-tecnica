@@ -118,7 +118,6 @@ const FestivalArtistManagement = () => {
     }
   }, [dateTypeData]);
 
-  // Fetch stage names
   const { data: stageNamesData } = useQuery({
     queryKey: ['festival-stages', jobId],
     queryFn: async () => {
@@ -149,19 +148,20 @@ const FestivalArtistManagement = () => {
     }
   }, [stageNamesData]);
 
-  // Enhanced real-time subscription that invalidates queries
   useRealtimeSubscription({
     table: "festival_artists",
     filter: `job_id=eq.${jobId}`,
     queryKey: ["festival-artists", jobId, selectedDate]
   });
+
   useEffect(() => {
     const fetchJobDetails = async () => {
       if (!jobId) return;
-      const {
-        data,
-        error
-      } = await supabase.from("jobs").select("title, start_time, end_time").eq("id", jobId).single();
+      const { data, error } = await supabase
+        .from("jobs")
+        .select("title, start_time, end_time")
+        .eq("id", jobId)
+        .single();
       if (error) {
         console.error("Error fetching job details:", error);
       } else {
@@ -169,23 +169,19 @@ const FestivalArtistManagement = () => {
         const startDate = new Date(data.start_time);
         const endDate = new Date(data.end_time);
         if (isValid(startDate) && isValid(endDate)) {
-          const dates = eachDayOfInterval({
-            start: startDate,
-            end: endDate
-          });
+          const dates = eachDayOfInterval({ start: startDate, end: endDate });
           setJobDates(dates);
           const formattedDate = format(dates[0], 'yyyy-MM-dd');
           setSelectedDate(formattedDate);
         }
       }
 
-      // Fetch max stages for stage filtering
-      const {
-        data: gearSetups,
-        error: gearError
-      } = await supabase.from("festival_gear_setups").select("max_stages").eq("job_id", jobId).order("created_at", {
-        ascending: false
-      }).limit(1);
+      const { data: gearSetups, error: gearError } = await supabase
+        .from("festival_gear_setups")
+        .select("max_stages")
+        .eq("job_id", jobId)
+        .order("created_at", { ascending: false })
+        .limit(1);
       if (gearError) {
         console.error("Error fetching gear setup:", gearError);
       } else if (gearSetups && gearSetups.length > 0) {
@@ -195,11 +191,12 @@ const FestivalArtistManagement = () => {
     fetchJobDetails();
   }, [jobId]);
 
-  // Enhanced logo fetching
   const { data: logoData } = useQuery({
     queryKey: ['festival-logo', jobId],
     queryFn: async () => {
       if (!jobId) return null;
+      
+      console.log('Fetching logo for job:', jobId);
       
       // Try to get festival logo first
       const { data: festivalLogo, error: festivalError } = await supabase
@@ -210,6 +207,8 @@ const FestivalArtistManagement = () => {
         
       if (festivalError) {
         console.error('Error fetching festival logo:', festivalError);
+      } else {
+        console.log('Festival logo query result:', festivalLogo);
       }
       
       if (festivalLogo?.file_path) {
@@ -218,8 +217,17 @@ const FestivalArtistManagement = () => {
           .getPublicUrl(festivalLogo.file_path);
           
         if (publicUrlData?.publicUrl) {
-          console.log('Found festival logo URL:', publicUrlData.publicUrl);
-          return publicUrlData.publicUrl;
+          console.log('Generated festival logo URL:', publicUrlData.publicUrl);
+          // Test if the URL is accessible
+          try {
+            const response = await fetch(publicUrlData.publicUrl, { method: 'HEAD' });
+            console.log('Festival logo URL test response:', response.status, response.statusText);
+            if (response.ok) {
+              return publicUrlData.publicUrl;
+            }
+          } catch (error) {
+            console.error('Festival logo URL not accessible:', error);
+          }
         }
       }
       
@@ -235,6 +243,8 @@ const FestivalArtistManagement = () => {
         return null;
       }
       
+      console.log('Job tour data:', jobData);
+      
       if (jobData?.tour_id) {
         const { data: tourLogo, error: tourLogoError } = await supabase
           .from('tour_logos')
@@ -247,24 +257,37 @@ const FestivalArtistManagement = () => {
           return null;
         }
         
+        console.log('Tour logo query result:', tourLogo);
+        
         if (tourLogo?.file_path) {
           const { data: publicUrlData } = supabase.storage
             .from('tour-logos')
             .getPublicUrl(tourLogo.file_path);
             
           if (publicUrlData?.publicUrl) {
-            console.log('Found tour logo URL:', publicUrlData.publicUrl);
-            return publicUrlData.publicUrl;
+            console.log('Generated tour logo URL:', publicUrlData.publicUrl);
+            // Test if the URL is accessible
+            try {
+              const response = await fetch(publicUrlData.publicUrl, { method: 'HEAD' });
+              console.log('Tour logo URL test response:', response.status, response.statusText);
+              if (response.ok) {
+                return publicUrlData.publicUrl;
+              }
+            } catch (error) {
+              console.error('Tour logo URL not accessible:', error);
+            }
           }
         }
       }
       
+      console.log('No accessible logo found');
       return null;
     },
     enabled: !!jobId
   });
 
   useEffect(() => {
+    console.log('Logo data updated:', logoData);
     if (logoData) {
       setLogoUrl(logoData);
     }
@@ -274,35 +297,42 @@ const FestivalArtistManagement = () => {
     setSelectedArtist(null);
     setIsDialogOpen(true);
   };
+  
   const handleEditArtist = (artist: any) => {
     setSelectedArtist(artist);
     setIsDialogOpen(true);
   };
+  
   const handleDeleteArtist = async (artist: any) => {
     deleteArtist(artist.id);
   };
+  
   const handleArtistDialogClose = (wasUpdated: boolean = false) => {
     setIsDialogOpen(false);
     setSelectedArtist(null);
-
-    // Invalidate artists query if there was an update
     if (wasUpdated) {
       invalidateArtists();
     }
   };
+  
   const isShowDate = (date: Date) => {
     const formattedDate = format(date, 'yyyy-MM-dd');
     const key = `${jobId}-${formattedDate}`;
     return dateTypes[key] === 'show';
   };
+  
   const getCurrentDateType = () => {
     if (!selectedDate || !jobId) return null;
     const key = `${jobId}-${selectedDate}`;
     return dateTypes[key];
   };
+
   const handlePrintTable = async () => {
     if (!jobId) return;
     setIsPrinting(true);
+    
+    console.log('Starting PDF print with logo URL:', logoUrl);
+    
     try {
       const filteredArtists = artists.filter(artist => {
         const matchesStage = !printStage || artist.stage?.toString() === printStage;
@@ -310,11 +340,13 @@ const FestivalArtistManagement = () => {
         return matchesStage && matchesDate;
       });
 
+      console.log('Filtered artists for PDF:', filteredArtists.length);
+
       const data = {
         jobTitle: jobTitle,
         date: printDate,
         stage: printStage,
-        stageNames: stageNames, // Pass stage names to PDF
+        stageNames: stageNames,
         artists: filteredArtists.map(artist => {
           const wirelessSystems = artist.wireless_systems || [];
           const iemSystems = artist.iem_systems || [];
@@ -342,13 +374,10 @@ const FestivalArtistManagement = () => {
               },
               wireless: {
                 systems: wirelessSystems,
-                hh: artist.wireless_quantity_hh,
-                bp: artist.wireless_quantity_bp,
                 providedBy: artist.wireless_provided_by
               },
               iem: {
                 systems: iemSystems,
-                quantity: artist.iem_quantity,
                 providedBy: artist.iem_provided_by
               },
               monitors: {
@@ -364,11 +393,12 @@ const FestivalArtistManagement = () => {
             notes: artist.notes
           };
         }),
-        logoUrl: logoUrl || null // Ensure logo URL is passed
+        logoUrl: logoUrl || null
       };
 
-      console.log('Generating PDF with logo URL:', logoUrl);
+      console.log('PDF data prepared, generating blob...');
       const blob = await exportArtistTablePDF(data);
+      
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -378,6 +408,7 @@ const FestivalArtistManagement = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      
       toast({
         title: "Success",
         description: "PDF generated successfully"
@@ -431,56 +462,106 @@ const FestivalArtistManagement = () => {
           </CardTitle>
           <div className="flex items-center gap-2">
             <Button onClick={() => {
-            setPrintDate(selectedDate);
-            setIsPrintDialogOpen(true);
-          }}>
+              setPrintDate(selectedDate);
+              setIsPrintDialogOpen(true);
+            }}>
               <Printer className="h-4 w-4 mr-2" />
               Print Schedule
             </Button>
-            {showArtistControls ? <Button onClick={handleAddArtist}>
+            {showArtistControls ? (
+              <Button onClick={handleAddArtist}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Artist
-              </Button> : <Button disabled title="Artists can only be added on show dates">
+              </Button>
+            ) : (
+              <Button disabled title="Artists can only be added on show dates">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Artist
-              </Button>}
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="space-y-4 p-6">
-            {showArtistControls && <ArtistTableFilters searchTerm={searchTerm} onSearchChange={setSearchTerm} stageFilter="all" // Hide stage filter since it's now in date navigation
-          onStageFilterChange={() => {}} // No-op since handled by date navigation
-          equipmentFilter={equipmentFilter} onEquipmentFilterChange={setEquipmentFilter} riderFilter={riderFilter} onRiderFilterChange={setRiderFilter} />}
+            {showArtistControls && (
+              <ArtistTableFilters
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                stageFilter="all"
+                onStageFilterChange={() => {}}
+                equipmentFilter={equipmentFilter}
+                onEquipmentFilterChange={setEquipmentFilter}
+                riderFilter={riderFilter}
+                onRiderFilterChange={setRiderFilter}
+              />
+            )}
             
-            {jobDates.length > 0 ? <FestivalDateNavigation jobDates={jobDates} selectedDate={selectedDate} onDateChange={setSelectedDate} dateTypes={dateTypes} jobId={jobId || ''} onTypeChange={() => refetchDateTypes()} dayStartTime={dayStartTime} showStageFilter={showArtistControls} selectedStage={stageFilter} onStageChange={setStageFilter} maxStages={maxStages} /> : null}
+            {jobDates.length > 0 ? (
+              <FestivalDateNavigation
+                jobDates={jobDates}
+                selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
+                dateTypes={dateTypes}
+                jobId={jobId || ''}
+                onTypeChange={() => refetchDateTypes()}
+                dayStartTime={dayStartTime}
+                showStageFilter={showArtistControls}
+                selectedStage={stageFilter}
+                onStageChange={setStageFilter}
+                maxStages={maxStages}
+              />
+            ) : null}
 
-            {/* Content for selected date */}
-            {selectedDate && (isShowDate(new Date(selectedDate)) ? <div className="w-full">
-                <ArtistTable 
-                  artists={artists} 
-                  isLoading={artistsLoading} 
-                  onEditArtist={handleEditArtist} 
-                  onDeleteArtist={handleDeleteArtist} 
-                  searchTerm={searchTerm} 
-                  stageFilter={stageFilter} 
-                  equipmentFilter={equipmentFilter} 
-                  riderFilter={riderFilter} 
-                  dayStartTime={dayStartTime} 
-                  jobId={jobId}
-                  selectedDate={selectedDate}
-                />
-              </div> : <div className="p-8 text-center text-muted-foreground border rounded-md">
+            {selectedDate && (
+              isShowDate(new Date(selectedDate)) ? (
+                <div className="w-full">
+                  <ArtistTable 
+                    artists={artists} 
+                    isLoading={artistsLoading} 
+                    onEditArtist={handleEditArtist} 
+                    onDeleteArtist={handleDeleteArtist} 
+                    searchTerm={searchTerm} 
+                    stageFilter={stageFilter} 
+                    equipmentFilter={equipmentFilter} 
+                    riderFilter={riderFilter} 
+                    dayStartTime={dayStartTime} 
+                    jobId={jobId}
+                    selectedDate={selectedDate}
+                  />
+                </div>
+              ) : (
+                <div className="p-8 text-center text-muted-foreground border rounded-md">
                   <p>This is not configured as a show date.</p>
                   <p>Artist management is only available on show dates.</p>
                   <p className="mt-2 text-sm">Right-click on the date tab to change its type.</p>
-                </div>)}
+                </div>
+              )
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {showArtistControls && <ArtistManagementDialog open={isDialogOpen} onOpenChange={handleArtistDialogClose} artist={selectedArtist} jobId={jobId} selectedDate={selectedDate} dayStartTime={dayStartTime} />}
+      {showArtistControls && (
+        <ArtistManagementDialog
+          open={isDialogOpen}
+          onOpenChange={handleArtistDialogClose}
+          artist={selectedArtist}
+          jobId={jobId}
+          selectedDate={selectedDate}
+          dayStartTime={dayStartTime}
+        />
+      )}
 
-      <ArtistTablePrintDialog open={isPrintDialogOpen} onOpenChange={setIsPrintDialogOpen} jobDates={jobDates} selectedDate={printDate} onDateChange={setPrintDate} onStageChange={setPrintStage} onPrint={handlePrintTable} isLoading={isPrinting} />
+      <ArtistTablePrintDialog
+        open={isPrintDialogOpen}
+        onOpenChange={setIsPrintDialogOpen}
+        jobDates={jobDates}
+        selectedDate={printDate}
+        onDateChange={setPrintDate}
+        onStageChange={setPrintStage}
+        onPrint={handlePrintTable}
+        isLoading={isPrinting}
+      />
     </div>
   );
 };
