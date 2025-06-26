@@ -195,6 +195,81 @@ const FestivalArtistManagement = () => {
     fetchJobDetails();
   }, [jobId]);
 
+  // Enhanced logo fetching
+  const { data: logoData } = useQuery({
+    queryKey: ['festival-logo', jobId],
+    queryFn: async () => {
+      if (!jobId) return null;
+      
+      // Try to get festival logo first
+      const { data: festivalLogo, error: festivalError } = await supabase
+        .from('festival_logos')
+        .select('file_path')
+        .eq('job_id', jobId)
+        .maybeSingle();
+        
+      if (festivalError) {
+        console.error('Error fetching festival logo:', festivalError);
+      }
+      
+      if (festivalLogo?.file_path) {
+        const { data: publicUrlData } = supabase.storage
+          .from('festival-logos')
+          .getPublicUrl(festivalLogo.file_path);
+          
+        if (publicUrlData?.publicUrl) {
+          console.log('Found festival logo URL:', publicUrlData.publicUrl);
+          return publicUrlData.publicUrl;
+        }
+      }
+      
+      // Fallback: Check if it's a tour job and get tour logo
+      const { data: jobData, error: jobError } = await supabase
+        .from('jobs')
+        .select('tour_id')
+        .eq('id', jobId)
+        .maybeSingle();
+        
+      if (jobError) {
+        console.error('Error fetching job data:', jobError);
+        return null;
+      }
+      
+      if (jobData?.tour_id) {
+        const { data: tourLogo, error: tourLogoError } = await supabase
+          .from('tour_logos')
+          .select('file_path')
+          .eq('tour_id', jobData.tour_id)
+          .maybeSingle();
+          
+        if (tourLogoError) {
+          console.error('Error fetching tour logo:', tourLogoError);
+          return null;
+        }
+        
+        if (tourLogo?.file_path) {
+          const { data: publicUrlData } = supabase.storage
+            .from('tour-logos')
+            .getPublicUrl(tourLogo.file_path);
+            
+          if (publicUrlData?.publicUrl) {
+            console.log('Found tour logo URL:', publicUrlData.publicUrl);
+            return publicUrlData.publicUrl;
+          }
+        }
+      }
+      
+      return null;
+    },
+    enabled: !!jobId
+  });
+
+  useEffect(() => {
+    if (logoData) {
+      setLogoUrl(logoData);
+    }
+  }, [logoData]);
+
   const handleAddArtist = () => {
     setSelectedArtist(null);
     setIsDialogOpen(true);
@@ -289,9 +364,10 @@ const FestivalArtistManagement = () => {
             notes: artist.notes
           };
         }),
-        logoUrl
+        logoUrl: logoUrl || null // Ensure logo URL is passed
       };
 
+      console.log('Generating PDF with logo URL:', logoUrl);
       const blob = await exportArtistTablePDF(data);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

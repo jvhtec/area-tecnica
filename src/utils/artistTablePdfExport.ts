@@ -1,8 +1,8 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { WirelessSystem, IEMSystem } from '@/types/festival-equipment';
+import { fetchJobLogo } from '@/utils/pdf/logoUtils';
 
 // Helper functions for wireless and IEM quantity calculations
 export const getWirelessSummary = (data: { 
@@ -142,262 +142,309 @@ const transformArtistsForSorting = (artists: ArtistTablePdfData['artists'], date
   }));
 };
 
-export const exportArtistTablePDF = (data: ArtistTablePdfData): Promise<Blob> => {
+// Helper function to load image with better error handling and CORS support
+const loadImageSafely = (src: string): Promise<HTMLImageElement> => {
   return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    img.onload = () => {
+      console.log(`Successfully loaded image: ${src}`);
+      resolve(img);
+    };
+    
+    img.onerror = (e) => {
+      console.error(`Failed to load image: ${src}`, e);
+      reject(new Error(`Failed to load image: ${src}`));
+    };
+    
+    // Add timeout to prevent hanging
+    setTimeout(() => {
+      if (!img.complete) {
+        console.error(`Image loading timeout: ${src}`);
+        reject(new Error(`Image loading timeout: ${src}`));
+      }
+    }, 10000); // 10 second timeout
+    
+    img.src = src;
+  });
+};
+
+export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Blob> => {
+  const doc = new jsPDF({ orientation: 'landscape' });
+  const pageWidth = doc.internal.pageSize.width;
+  const pageHeight = doc.internal.pageSize.height;
+  const createdDate = format(new Date(), 'dd/MM/yyyy');
+
+  // Helper function to get stage display name
+  const getStageDisplayName = (stageNumber: number) => {
+    return data.stageNames?.[stageNumber] || `Stage ${stageNumber}`;
+  };
+
+  doc.setFillColor(125, 1, 1);
+  doc.rect(0, 0, pageWidth, 20, 'F');
+
+  // Enhanced logo loading with fallback
+  const loadFestivalLogo = async (): Promise<void> => {
+    if (!data.logoUrl) {
+      console.log("No festival logo URL provided");
+      return;
+    }
+
     try {
-      const doc = new jsPDF({ orientation: 'landscape' });
-      const pageWidth = doc.internal.pageSize.width;
-      const pageHeight = doc.internal.pageSize.height;
-      const createdDate = format(new Date(), 'dd/MM/yyyy');
-
-      // Helper function to get stage display name
-      const getStageDisplayName = (stageNumber: number) => {
-        return data.stageNames?.[stageNumber] || `Stage ${stageNumber}`;
-      };
-
-      doc.setFillColor(125, 1, 1);
-      doc.rect(0, 0, pageWidth, 20, 'F');
-
-      const loadLogoPromise = data.logoUrl 
-        ? new Promise<void>((resolveLogoLoad) => {
-            console.log("Attempting to load logo from URL:", data.logoUrl);
-            const img = new Image();
-            img.crossOrigin = 'Anonymous';
-            img.onload = () => {
-              try {
-                console.log("Logo loaded successfully, dimensions:", img.width, "x", img.height);
-                const maxHeight = 18;
-                const ratio = img.width / img.height;
-                const logoHeight = Math.min(maxHeight, img.height);
-                const logoWidth = logoHeight * ratio;
-                
-                doc.addImage(
-                  img, 
-                  'JPEG', 
-                  5, 
-                  1,
-                  logoWidth,
-                  logoHeight
-                );
-                resolveLogoLoad();
-              } catch (err) {
-                console.error('Error adding logo to PDF:', err);
-                resolveLogoLoad();
-              }
-            };
-            img.onerror = (e) => {
-              console.error('Error loading logo image:', e);
-              resolveLogoLoad();
-            };
-            img.src = data.logoUrl;
-          })
-        : Promise.resolve();
-
-      loadLogoPromise.then(() => {
-        doc.setFontSize(14);
-        doc.setTextColor(255, 255, 255);
-        doc.text(`${data.jobTitle} - Artist Schedule`, pageWidth / 2, 12, { align: 'center' });
-        
-        if (data.stage) {
-          const stageDisplayName = data.stageNames?.[parseInt(data.stage)] || `Stage ${data.stage}`;
-          doc.text(`${stageDisplayName} - ${format(new Date(data.date), 'dd/MM/yyyy')}`, pageWidth / 2, 18, { align: 'center' });
-        } else {
-          doc.text(format(new Date(data.date), 'dd/MM/yyyy'), pageWidth / 2, 18, { align: 'center' });
-        }
-
-        // Create all schedule events (soundchecks and shows) first
-        const scheduleRows: ScheduleRow[] = [];
-        
-        data.artists.forEach(artist => {
-          // Add soundcheck if exists
-          if (artist.soundcheck) {
-            scheduleRows.push({
-              name: artist.name,
-              stage: artist.stage,
-              time: artist.soundcheck,
-              isSoundcheck: true
-            });
-          }
-          
-          // Add show
-          scheduleRows.push({
-            name: artist.name,
-            stage: artist.stage,
-            time: artist.showTime,
-            isSoundcheck: false,
-            technical: artist.technical,
-            extras: artist.extras,
-            notes: artist.notes
-          });
-        });
-
-        // Sort all events chronologically by their actual event times
-        const sortedScheduleRows = sortScheduleRowsChronologically(scheduleRows);
-
-        const tableBody = sortedScheduleRows.map(row => {
-          if (row.isSoundcheck) {
-            return [
-              `${row.name} (Soundcheck)`,
-              getStageDisplayName(row.stage),
-              `${row.time.start}-${row.time.end}`,
-              '', '', '', '', '', ''
-            ];
-          }
-          
-          if (!row.technical) return ['', '', '', '', '', '', '', '', ''];
-          
-          const wirelessSummary = getWirelessSummary(row.technical.wireless);
-          const iemSummary = getIEMSummary(row.technical.iem);
-          
-          // Get provider information from each system if available
-          let wirelessProviderInfo = '';
-          if (row.technical.wireless.systems && row.technical.wireless.systems.length > 0) {
-            const providers = new Set<string>();
-            row.technical.wireless.systems.forEach(system => {
-              if (system.provided_by) {
-                providers.add(system.provided_by);
-              } else if (row.technical.wireless.providedBy) {
-                providers.add(row.technical.wireless.providedBy);
-              }
-            });
-            wirelessProviderInfo = Array.from(providers).join('/') || row.technical.wireless.providedBy || 'festival';
-          } else {
-            wirelessProviderInfo = row.technical.wireless.providedBy || 'festival';
-          }
-          
-          let iemProviderInfo = '';
-          if (row.technical.iem.systems && row.technical.iem.systems.length > 0) {
-            const providers = new Set<string>();
-            row.technical.iem.systems.forEach(system => {
-              if (system.provided_by) {
-                providers.add(system.provided_by);
-              } else if (row.technical.iem.providedBy) {
-                providers.add(row.technical.iem.providedBy);
-              }
-            });
-            iemProviderInfo = Array.from(providers).join('/') || row.technical.iem.providedBy || 'festival';
-          } else {
-            iemProviderInfo = row.technical.iem.providedBy || 'festival';
-          }
-          
-          return [
-            row.name,
-            getStageDisplayName(row.stage),
-            `${row.time.start}-${row.time.end}`,
-            `FOH: ${row.technical.fohConsole.model}\n(${row.technical.fohConsole.providedBy})\n\nMON: ${row.technical.monConsole.model}\n(${row.technical.monConsole.providedBy})`,
-            `FOH: ${row.technical.fohTech ? 'Y' : 'N'}\nMON: ${row.technical.monTech ? 'Y' : 'N'}`,
-            `Wireless:\nHH: ${wirelessSummary.hh} (${wirelessProviderInfo})\nBP: ${wirelessSummary.bp}\n\nIEM:\nCH: ${iemSummary.channels}\nBP: ${iemSummary.bodypacks} (${iemProviderInfo})`,
-            row.technical.monitors.enabled ? `Monitors: ${row.technical.monitors.quantity}` : '-',
-            [
-              row.extras.sideFill ? 'SF' : '',
-              row.extras.drumFill ? 'DF' : '',
-              row.extras.djBooth ? 'DJ' : ''
-            ].filter(Boolean).join(', ') || '-',
-            row.notes || '-'
-          ];
-        });
-
-        autoTable(doc, {
-          startY: 25,
-          head: [['Artist', 'Stage', 'Time', 'Consoles', 'Tech', 'RF/IEM', 'Monitors', 'Extras', 'Notes']],
-          body: tableBody,
-          theme: 'grid',
-          styles: {
-            fontSize: 8,
-            cellPadding: 3,
-            overflow: 'linebreak',
-            lineWidth: 0.1,
-            valign: 'middle'
-          },
-          headStyles: {
-            fillColor: [125, 1, 1],
-            textColor: [0, 0, 0],
-            fontSize: 8,
-            fontStyle: 'bold',
-            halign: 'left',
-            cellPadding: 4
-          },
-          columnStyles: {
-            0: { cellWidth: 30 },
-            1: { cellWidth: 15 },
-            2: { cellWidth: 25 },
-            3: { cellWidth: 35, cellPadding: 4 },
-            4: { cellWidth: 20, cellPadding: 4 },
-            5: { cellWidth: 35, cellPadding: 4 },
-            6: { cellWidth: 20 },
-            7: { cellWidth: 20 },
-            8: { cellWidth: 'auto' }
-          },
-          didParseCell: function(data) {
-            if (data.row.index === -1) return;
-            const rowData = sortedScheduleRows[data.row.index];
-            if (rowData.isSoundcheck) {
-              data.cell.styles.fillColor = [254, 247, 205];
-            }
-          }
-        });
-
-        try {
-          const sectorLogoPath = '/sector pro logo.png';
-          console.log("Attempting to add Sector Pro logo from:", sectorLogoPath);
-          
-          const sectorImg = new Image();
-          sectorImg.onload = () => {
-            try {
-              const logoWidth = 30;
-              const ratio = sectorImg.width / sectorImg.height;
-              const logoHeight = logoWidth / ratio;
-              
-              doc.addImage(
-                sectorImg, 
-                'PNG', 
-                pageWidth/2 - logoWidth/2,
-                pageHeight - logoHeight - 10,
-                logoWidth,
-                logoHeight
-              );
-              
-              doc.setFontSize(8);
-              doc.setTextColor(51, 51, 51);
-              doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
-              
-              const blob = doc.output('blob');
-              resolve(blob);
-            } catch (err) {
-              console.error('Error adding Sector Pro logo to PDF:', err);
-              doc.setFontSize(8);
-              doc.setTextColor(51, 51, 51);
-              doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
-              const blob = doc.output('blob');
-              resolve(blob);
-            }
-          };
-          
-          sectorImg.onerror = () => {
-            console.error('Failed to load Sector Pro logo');
-            doc.setFontSize(8);
-            doc.setTextColor(51, 51, 51);
-            doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
-            const blob = doc.output('blob');
-            resolve(blob);
-          };
-          
-          sectorImg.src = sectorLogoPath;
-        } catch (logoErr) {
-          console.error('Error trying to add Sector Pro logo:', logoErr);
-          doc.setFontSize(8);
-          doc.setTextColor(51, 51, 51);
-          doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
-          const blob = doc.output('blob');
-          resolve(blob);
-        }
-      }).catch(err => {
-        console.error("Error in PDF generation:", err);
-        reject(err);
-      });
+      console.log("Attempting to load festival logo from URL:", data.logoUrl);
+      
+      // Try to load the provided logo URL
+      const img = await loadImageSafely(data.logoUrl);
+      
+      const maxHeight = 18;
+      const ratio = img.width / img.height;
+      const logoHeight = Math.min(maxHeight, img.height);
+      const logoWidth = logoHeight * ratio;
+      
+      doc.addImage(
+        img, 
+        'JPEG', 
+        5, 
+        1,
+        logoWidth,
+        logoHeight
+      );
+      
+      console.log("Festival logo added successfully");
     } catch (error) {
-      console.error("Exception in PDF export:", error);
-      reject(error);
+      console.error('Error loading festival logo:', error);
+      
+      // Try fallback logo
+      try {
+        console.log("Attempting to load fallback logo");
+        const fallbackImg = await loadImageSafely('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png');
+        
+        const maxHeight = 18;
+        const ratio = fallbackImg.width / fallbackImg.height;
+        const logoHeight = Math.min(maxHeight, fallbackImg.height);
+        const logoWidth = logoHeight * ratio;
+        
+        doc.addImage(
+          fallbackImg, 
+          'PNG', 
+          5, 
+          1,
+          logoWidth,
+          logoHeight
+        );
+        
+        console.log("Fallback logo added successfully");
+      } catch (fallbackError) {
+        console.error('Error loading fallback logo:', fallbackError);
+        // Continue without logo
+      }
+    }
+  };
+
+  // Load festival logo
+  await loadFestivalLogo();
+
+  doc.setFontSize(14);
+  doc.setTextColor(255, 255, 255);
+  doc.text(`${data.jobTitle} - Artist Schedule`, pageWidth / 2, 12, { align: 'center' });
+  
+  if (data.stage) {
+    const stageDisplayName = data.stageNames?.[parseInt(data.stage)] || `Stage ${data.stage}`;
+    doc.text(`${stageDisplayName} - ${format(new Date(data.date), 'dd/MM/yyyy')}`, pageWidth / 2, 18, { align: 'center' });
+  } else {
+    doc.text(format(new Date(data.date), 'dd/MM/yyyy'), pageWidth / 2, 18, { align: 'center' });
+  }
+
+  // Create all schedule events (soundchecks and shows) first
+  const scheduleRows: ScheduleRow[] = [];
+  
+  data.artists.forEach(artist => {
+    // Add soundcheck if exists
+    if (artist.soundcheck) {
+      scheduleRows.push({
+        name: artist.name,
+        stage: artist.stage,
+        time: artist.soundcheck,
+        isSoundcheck: true
+      });
+    }
+    
+    // Add show
+    scheduleRows.push({
+      name: artist.name,
+      stage: artist.stage,
+      time: artist.showTime,
+      isSoundcheck: false,
+      technical: artist.technical,
+      extras: artist.extras,
+      notes: artist.notes
+    });
+  });
+
+  // Sort all events chronologically by their actual event times
+  const sortedScheduleRows = sortScheduleRowsChronologically(scheduleRows);
+
+  const tableBody = sortedScheduleRows.map(row => {
+    if (row.isSoundcheck) {
+      return [
+        `${row.name} (Soundcheck)`,
+        getStageDisplayName(row.stage),
+        `${row.time.start}-${row.time.end}`,
+        '', '', '', '', '', ''
+      ];
+    }
+    
+    if (!row.technical) return ['', '', '', '', '', '', '', '', ''];
+    
+    const wirelessSummary = getWirelessSummary(row.technical.wireless);
+    const iemSummary = getIEMSummary(row.technical.iem);
+    
+    // Get provider information from each system if available
+    let wirelessProviderInfo = '';
+    if (row.technical.wireless.systems && row.technical.wireless.systems.length > 0) {
+      const providers = new Set<string>();
+      row.technical.wireless.systems.forEach(system => {
+        if (system.provided_by) {
+          providers.add(system.provided_by);
+        } else if (row.technical.wireless.providedBy) {
+          providers.add(row.technical.wireless.providedBy);
+        }
+      });
+      wirelessProviderInfo = Array.from(providers).join('/') || row.technical.wireless.providedBy || 'festival';
+    } else {
+      wirelessProviderInfo = row.technical.wireless.providedBy || 'festival';
+    }
+    
+    let iemProviderInfo = '';
+    if (row.technical.iem.systems && row.technical.iem.systems.length > 0) {
+      const providers = new Set<string>();
+      row.technical.iem.systems.forEach(system => {
+        if (system.provided_by) {
+          providers.add(system.provided_by);
+        } else if (row.technical.iem.providedBy) {
+          providers.add(row.technical.iem.providedBy);
+        }
+      });
+      iemProviderInfo = Array.from(providers).join('/') || row.technical.iem.providedBy || 'festival';
+    } else {
+      iemProviderInfo = row.technical.iem.providedBy || 'festival';
+    }
+    
+    return [
+      row.name,
+      getStageDisplayName(row.stage),
+      `${row.time.start}-${row.time.end}`,
+      `FOH: ${row.technical.fohConsole.model}\n(${row.technical.fohConsole.providedBy})\n\nMON: ${row.technical.monConsole.model}\n(${row.technical.monConsole.providedBy})`,
+      `FOH: ${row.technical.fohTech ? 'Y' : 'N'}\nMON: ${row.technical.monTech ? 'Y' : 'N'}`,
+      `Wireless:\nHH: ${wirelessSummary.hh} (${wirelessProviderInfo})\nBP: ${wirelessSummary.bp}\n\nIEM:\nCH: ${iemSummary.channels}\nBP: ${iemSummary.bodypacks} (${iemProviderInfo})`,
+      row.technical.monitors.enabled ? `Monitors: ${row.technical.monitors.quantity}` : '-',
+      [
+        row.extras.sideFill ? 'SF' : '',
+        row.extras.drumFill ? 'DF' : '',
+        row.extras.djBooth ? 'DJ' : ''
+      ].filter(Boolean).join(', ') || '-',
+      row.notes || '-'
+    ];
+  });
+
+  autoTable(doc, {
+    startY: 25,
+    head: [['Artist', 'Stage', 'Time', 'Consoles', 'Tech', 'RF/IEM', 'Monitors', 'Extras', 'Notes']],
+    body: tableBody,
+    theme: 'grid',
+    styles: {
+      fontSize: 8,
+      cellPadding: 3,
+      overflow: 'linebreak',
+      lineWidth: 0.1,
+      valign: 'middle'
+    },
+    headStyles: {
+      fillColor: [125, 1, 1],
+      textColor: [0, 0, 0],
+      fontSize: 8,
+      fontStyle: 'bold',
+      halign: 'left',
+      cellPadding: 4
+    },
+    columnStyles: {
+      0: { cellWidth: 30 },
+      1: { cellWidth: 15 },
+      2: { cellWidth: 25 },
+      3: { cellWidth: 35, cellPadding: 4 },
+      4: { cellWidth: 20, cellPadding: 4 },
+      5: { cellWidth: 35, cellPadding: 4 },
+      6: { cellWidth: 20 },
+      7: { cellWidth: 20 },
+      8: { cellWidth: 'auto' }
+    },
+    didParseCell: function(data) {
+      if (data.row.index === -1) return;
+      const rowData = sortedScheduleRows[data.row.index];
+      if (rowData.isSoundcheck) {
+        data.cell.styles.fillColor = [254, 247, 205];
+      }
     }
   });
+
+  // Enhanced Sector Pro logo loading with better error handling
+  const loadSectorProLogo = async (): Promise<void> => {
+    try {
+      console.log("Attempting to add Sector Pro logo");
+      
+      const sectorImg = await loadImageSafely('/sector pro logo.png');
+      
+      const logoWidth = 30;
+      const ratio = sectorImg.width / sectorImg.height;
+      const logoHeight = logoWidth / ratio;
+      
+      doc.addImage(
+        sectorImg, 
+        'PNG', 
+        pageWidth/2 - logoWidth/2,
+        pageHeight - logoHeight - 10,
+        logoWidth,
+        logoHeight
+      );
+      
+      console.log("Sector Pro logo added successfully");
+    } catch (error) {
+      console.error('Error loading Sector Pro logo:', error);
+      
+      // Try alternative logo path
+      try {
+        console.log("Trying alternative Sector Pro logo path");
+        const altSectorImg = await loadImageSafely('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png');
+        
+        const logoWidth = 30;
+        const ratio = altSectorImg.width / altSectorImg.height;
+        const logoHeight = logoWidth / ratio;
+        
+        doc.addImage(
+          altSectorImg, 
+          'PNG', 
+          pageWidth/2 - logoWidth/2,
+          pageHeight - logoHeight - 10,
+          logoWidth,
+          logoHeight
+        );
+        
+        console.log("Alternative Sector Pro logo added successfully");
+      } catch (altError) {
+        console.error('Error loading alternative Sector Pro logo:', altError);
+        // Continue without logo
+      }
+    }
+  };
+
+  // Load Sector Pro logo
+  await loadSectorProLogo();
+
+  // Add generation date
+  doc.setFontSize(8);
+  doc.setTextColor(51, 51, 51);
+  doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
+
+  return doc.output('blob');
 };
