@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -72,6 +73,10 @@ interface ArtistTablePrintDialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   jobDates?: Date[];
+  onDateChange?: (date: string) => void;
+  onStageChange?: (stage: string) => void;
+  onPrint?: () => Promise<void>;
+  isLoading?: boolean;
 }
 
 export const ArtistTablePrintDialog = ({
@@ -83,7 +88,11 @@ export const ArtistTablePrintDialog = ({
   stageNames,
   open,
   onOpenChange,
-  jobDates
+  jobDates,
+  onDateChange,
+  onStageChange,
+  onPrint,
+  isLoading
 }: ArtistTablePrintDialogProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -109,6 +118,11 @@ export const ArtistTablePrintDialog = ({
   }, [jobId]);
 
   const handleTablePrint = async () => {
+    if (onPrint) {
+      await onPrint();
+      return;
+    }
+
     setIsGenerating(true);
     
     try {
@@ -231,8 +245,8 @@ export const ArtistTablePrintDialog = ({
             <Input id="username" value={selectedDate} className="col-span-3" disabled />
           </div>
         </div>
-        <Button onClick={handleTablePrint} disabled={isGenerating}>
-          {isGenerating ? (
+        <Button onClick={handleTablePrint} disabled={isGenerating || isLoading}>
+          {(isGenerating || isLoading) ? (
             <>
               Generating <Loader2 className="ml-2 h-4 w-4 animate-spin" />
             </>
