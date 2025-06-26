@@ -69,6 +69,8 @@ interface ArtistTablePrintDialogProps {
   stageFilter: string;
   jobId?: string;
   stageNames?: Record<number, string>;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export const ArtistTablePrintDialog = ({
@@ -77,11 +79,17 @@ export const ArtistTablePrintDialog = ({
   selectedDate,
   stageFilter,
   jobId,
-  stageNames
+  stageNames,
+  open,
+  onOpenChange
 }: ArtistTablePrintDialogProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
+
+  // Use external open state if provided, otherwise use internal state
+  const dialogOpen = open !== undefined ? open : isDialogOpen;
+  const setDialogOpen = onOpenChange || setIsDialogOpen;
 
   useEffect(() => {
     const fetchLogo = async () => {
@@ -194,7 +202,7 @@ export const ArtistTablePrintDialog = ({
   };
 
   return (
-    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       <DialogTrigger asChild>
         <Button variant="outline">
           Print Table

@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -63,6 +64,27 @@ export interface ArtistTablePdfData {
       djBooth: boolean;
     };
     notes?: string;
+    micKit?: 'festival' | 'band';
+    wiredMics?: Array<{
+      model: string;
+      quantity: number;
+      exclusive_use?: boolean;
+      notes?: string;
+    }>;
+    infrastructure?: {
+      infra_cat6?: boolean;
+      infra_cat6_quantity?: number;
+      infra_hma?: boolean;
+      infra_hma_quantity?: number;
+      infra_coax?: boolean;
+      infra_coax_quantity?: number;
+      infra_opticalcon_duo?: boolean;
+      infra_opticalcon_duo_quantity?: number;
+      infra_analog?: number;
+      other_infrastructure?: string;
+      infrastructure_provided_by?: string;
+    };
+    riderMissing?: boolean;
   }[];
   logoUrl?: string;
 }
@@ -93,7 +115,6 @@ interface ScheduleRow {
     djBooth: boolean;
   };
   notes?: string;
-  // Add missing fields
   micKit?: string;
   wiredMics?: Array<{
     model: string;
@@ -157,7 +178,7 @@ const transformArtistsForSorting = (artists: ArtistTablePdfData['artists'], date
 };
 
 // Enhanced image loading with better error handling and debugging
-const loadImageWithFallback = async (src: string, description: string): Promise<HTMLImageImage | null> => {
+const loadImageWithFallback = async (src: string, description: string): Promise<HTMLImageElement | null> => {
   console.log(`Attempting to load ${description}:`, src);
   
   return new Promise((resolve) => {
@@ -319,7 +340,6 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       technical: artist.technical,
       extras: artist.extras,
       notes: artist.notes,
-      // Add missing fields for PDF
       micKit: artist.micKit,
       wiredMics: artist.wiredMics,
       infrastructure: artist.infrastructure,
