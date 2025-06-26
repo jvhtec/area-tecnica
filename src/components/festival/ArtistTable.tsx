@@ -12,6 +12,7 @@ import { sortArtistsChronologically } from "@/utils/artistSorting";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 
 interface Artist {
   id: string;
@@ -257,7 +258,20 @@ export const ArtistTable = ({
     };
     return colors[provider as keyof typeof colors] || "bg-gray-100 text-gray-800";
   };
-  const transformArtistDataForPdf = (artist: Artist): ArtistPdfData => {
+
+  // Helper function to transform artist data for PDF with logo URL
+  const transformArtistDataForPdf = async (artist: Artist): Promise<ArtistPdfData> => {
+    let logoUrl: string | undefined;
+    
+    if (jobId) {
+      try {
+        logoUrl = await fetchJobLogo(jobId);
+        console.log('Fetched logo URL for PDF:', logoUrl);
+      } catch (error) {
+        console.error('Error fetching logo for PDF:', error);
+      }
+    }
+
     return {
       name: artist.name,
       stage: artist.stage,
@@ -297,26 +311,25 @@ export const ArtistTable = ({
         }
       },
       infrastructure: {
-        providedBy: 'festival',
-        // Default value
+        providedBy: artist.infrastructure_provided_by || 'festival',
         cat6: {
-          enabled: false,
-          quantity: 0
+          enabled: artist.infra_cat6 || false,
+          quantity: artist.infra_cat6_quantity || 0
         },
         hma: {
-          enabled: false,
-          quantity: 0
+          enabled: artist.infra_hma || false,
+          quantity: artist.infra_hma_quantity || 0
         },
         coax: {
-          enabled: false,
-          quantity: 0
+          enabled: artist.infra_coax || false,
+          quantity: artist.infra_coax_quantity || 0
         },
         opticalconDuo: {
-          enabled: false,
-          quantity: 0
+          enabled: artist.infra_opticalcon_duo || false,
+          quantity: artist.infra_opticalcon_duo_quantity || 0
         },
-        analog: 0,
-        other: ''
+        analog: artist.infra_analog || 0,
+        other: artist.other_infrastructure || ''
       },
       extras: {
         sideFill: artist.extras_sf,
@@ -325,13 +338,15 @@ export const ArtistTable = ({
         wired: ''
       },
       notes: artist.notes || '',
-      wiredMics: artist.wired_mics || []
+      wiredMics: artist.wired_mics || [],
+      logoUrl: logoUrl
     };
   };
+
   const handlePrintArtist = async (artist: Artist) => {
     setPrintingArtistId(artist.id);
     try {
-      const pdfData = transformArtistDataForPdf(artist);
+      const pdfData = await transformArtistDataForPdf(artist);
       const blob = await exportArtistPDF(pdfData);
 
       // Create download link
@@ -343,6 +358,7 @@ export const ArtistTable = ({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      
       toast.success(`PDF generated for ${artist.name}`);
     } catch (error) {
       console.error('Error generating PDF:', error);
