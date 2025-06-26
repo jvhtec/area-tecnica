@@ -78,6 +78,8 @@ export interface ArtistPdfData {
     exclusive_use?: boolean;
     notes?: string;
   }>;
+  micKit?: 'festival' | 'band';
+  riderMissing?: boolean;
 }
 
 // Helper functions to process wireless and IEM data

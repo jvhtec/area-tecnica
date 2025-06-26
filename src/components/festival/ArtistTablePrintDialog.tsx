@@ -71,6 +71,7 @@ interface ArtistTablePrintDialogProps {
   stageNames?: Record<number, string>;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  jobDates?: Date[];
 }
 
 export const ArtistTablePrintDialog = ({
@@ -81,7 +82,8 @@ export const ArtistTablePrintDialog = ({
   jobId,
   stageNames,
   open,
-  onOpenChange
+  onOpenChange,
+  jobDates
 }: ArtistTablePrintDialogProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
