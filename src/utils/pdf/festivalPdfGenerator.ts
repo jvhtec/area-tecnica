@@ -351,7 +351,23 @@ export const generateAndMergeFestivalPDFs = async (
                     drumFill: Boolean(artist.extras_df || false),
                     djBooth: Boolean(artist.extras_djbooth || false)
                   },
-                  notes: String(artist.notes || '')
+                  notes: String(artist.notes || ''),
+                  micKit: artist.mic_kit || 'band',
+                  wiredMics: artist.wired_mics || [],
+                  infrastructure: {
+                    infra_cat6: artist.infra_cat6,
+                    infra_cat6_quantity: artist.infra_cat6_quantity,
+                    infra_hma: artist.infra_hma,
+                    infra_hma_quantity: artist.infra_hma_quantity,
+                    infra_coax: artist.infra_coax,
+                    infra_coax_quantity: artist.infra_coax_quantity,
+                    infra_opticalcon_duo: artist.infra_opticalcon_duo,
+                    infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity,
+                    infra_analog: artist.infra_analog,
+                    other_infrastructure: artist.other_infrastructure,
+                    infrastructure_provided_by: artist.infrastructure_provided_by
+                  },
+                  riderMissing: Boolean(artist.rider_missing || false)
                 };
               }),
               logoUrl
