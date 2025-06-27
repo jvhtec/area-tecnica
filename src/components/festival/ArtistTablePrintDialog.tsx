@@ -370,7 +370,9 @@ export const ArtistTablePrintDialog = ({
             <Checkbox 
               id="gear-conflicts" 
               checked={includeGearConflicts}
-              onCheckedChange={setIncludeGearConflicts}
+              onCheckedChange={(checked) => {
+                setIncludeGearConflicts(checked === true);
+              }}
             />
             <Label htmlFor="gear-conflicts" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
               Include gear conflicts summary
