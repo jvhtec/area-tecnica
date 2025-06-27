@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -202,33 +203,33 @@ export const ArtistTablePrintDialog = ({
         // Run gear comparison for this artist
         const stageSetup = stageGearSetups[artist.stage] || null;
         
-        // Transform artist to match ArtistRequirements interface
+        // Transform artist to match ArtistRequirements interface with proper type casting
         const artistRequirements = {
           name: artist.name,
           stage: artist.stage,
           foh_console: artist.foh_console,
-          foh_console_provided_by: artist.foh_console_provided_by,
+          foh_console_provided_by: (artist.foh_console_provided_by as 'festival' | 'band' | 'mixed') || 'festival',
           mon_console: artist.mon_console,
-          mon_console_provided_by: artist.mon_console_provided_by,
+          mon_console_provided_by: (artist.mon_console_provided_by as 'festival' | 'band' | 'mixed') || 'festival',
           wireless_systems: artist.wireless_systems || [],
-          wireless_provided_by: artist.wireless_provided_by,
+          wireless_provided_by: (artist.wireless_provided_by as 'festival' | 'band' | 'mixed') || 'festival',
           iem_systems: artist.iem_systems || [],
-          iem_provided_by: artist.iem_provided_by,
+          iem_provided_by: (artist.iem_provided_by as 'festival' | 'band' | 'mixed') || 'festival',
           monitors_enabled: artist.monitors_enabled,
           monitors_quantity: artist.monitors_quantity,
           extras_sf: artist.extras_sf,
           extras_df: artist.extras_df,
           extras_djbooth: artist.extras_djbooth,
-          infra_cat6: artist.infra_cat6 || false,
-          infra_cat6_quantity: artist.infra_cat6_quantity || 0,
-          infra_hma: artist.infra_hma || false,
-          infra_hma_quantity: artist.infra_hma_quantity || 0,
-          infra_coax: artist.infra_coax || false,
-          infra_coax_quantity: artist.infra_coax_quantity || 0,
-          infra_opticalcon_duo: artist.infra_opticalcon_duo || false,
-          infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity || 0,
-          infra_analog: artist.infra_analog || 0,
-          infrastructure_provided_by: artist.infrastructure_provided_by
+          infra_cat6: artist.infra_cat6,
+          infra_cat6_quantity: artist.infra_cat6_quantity,
+          infra_hma: artist.infra_hma,
+          infra_hma_quantity: artist.infra_hma_quantity,
+          infra_coax: artist.infra_coax,
+          infra_coax_quantity: artist.infra_coax_quantity,
+          infra_opticalcon_duo: artist.infra_opticalcon_duo,
+          infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity,
+          infra_analog: artist.infra_analog,
+          infrastructure_provided_by: (artist.infrastructure_provided_by as 'festival' | 'band' | 'mixed') || 'festival'
         };
         
         const gearComparison = compareArtistRequirements(artistRequirements, festivalGearSetup, stageSetup);
