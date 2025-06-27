@@ -212,7 +212,8 @@ const formatWirelessSystemsForPdf = (systems: any[] = [], providedBy: string = "
 
 const formatConsolesWithTech = (console: { model: string; providedBy: string }, techRequired: boolean, position: string) => {
   const techIndicator = techRequired ? " + Tech" : "";
-  return `${position}: ${console.model} (${console.providedBy})${techIndicator}`;
+  const providerDisplay = console.providedBy === "mixed" ? "(Mixed)" : `(${console.providedBy})`;
+  return `${position}: ${console.model} ${providerDisplay}${techIndicator}`;
 };
 
 export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Blob> => {
@@ -289,7 +290,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       monTech: artist.technical.monTech
     });
 
-    // Format microphones column with simplified mixed provider support
+    // Format microphones column with enhanced mixed provider support
     let microphonesDisplay = '';
     if (artist.micKit === 'mixed') {
       microphonesDisplay = `Kit: Mixed\nFestival: ${formatWiredMicsForPdf(artist.wiredMics, artist.micKit)}`;
@@ -301,7 +302,6 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
 
     return [
       artist.name,
-      data.stageNames?.[artist.stage] || `Stage ${artist.stage}`,
       `${artist.showTime.start} - ${artist.showTime.end}`,
       artist.soundcheck ? `${artist.soundcheck.start} - ${artist.soundcheck.end}` : 'No',
       `${formatConsolesWithTech(artist.technical.fohConsole, artist.technical.fohTech, 'FOH')}\n${formatConsolesWithTech(artist.technical.monConsole, artist.technical.monTech, 'MON')}`,
@@ -322,7 +322,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
   console.log('Table data prepared:', tableData.length, 'rows');
 
   autoTable(doc, {
-    head: [['Artist', 'Stage', 'Show\nTime', 'Sound\ncheck', 'Consoles', 'Wireless/IEM', 'Microphones', 'Mons', 'Infra', 'Extras', 'Notes', 'Rider']],
+    head: [['Artist', 'Show\nTime', 'Sound\ncheck', 'Consoles', 'Wireless/IEM', 'Microphones', 'Mons', 'Infra', 'Extras', 'Notes', 'Rider']],
     body: tableData,
     startY: 40,
     theme: 'grid',
@@ -338,22 +338,21 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       fontStyle: 'bold',
     },
     columnStyles: {
-      0: { cellWidth: 25 }, // Artist
-      1: { cellWidth: 15 }, // Stage
-      2: { cellWidth: 20 }, // Show Time
-      3: { cellWidth: 20 }, // Soundcheck
-      4: { cellWidth: 40 }, // Consoles
-      5: { cellWidth: 35 }, // Wireless/IEM
-      6: { cellWidth: 30 }, // Microphones
-      7: { cellWidth: 15 }, // Monitors
-      8: { cellWidth: 25 }, // Infrastructure
-      9: { cellWidth: 15 }, // Extras
-      10: { cellWidth: 25 }, // Notes
-      11: { cellWidth: 15 }, // Rider Status
+      0: { cellWidth: 30 }, // Artist (increased from 25)
+      1: { cellWidth: 22 }, // Show Time (increased from 20)
+      2: { cellWidth: 22 }, // Soundcheck (increased from 20)  
+      3: { cellWidth: 45 }, // Consoles (increased from 40)
+      4: { cellWidth: 40 }, // Wireless/IEM (increased from 35)
+      5: { cellWidth: 35 }, // Microphones (increased from 30)
+      6: { cellWidth: 15 }, // Monitors
+      7: { cellWidth: 30 }, // Infrastructure (increased from 25)
+      8: { cellWidth: 15 }, // Extras
+      9: { cellWidth: 30 }, // Notes (increased from 25)
+      10: { cellWidth: 15 }, // Rider Status
     },
     didParseCell: (data) => {
-      // Make "Missing" text red in the Rider Status column (column 11)
-      if (data.column.index === 11 && data.cell.text[0] === 'Missing') {
+      // Make "Missing" text red in the Rider Status column (column 10, was 11)
+      if (data.column.index === 10 && data.cell.text[0] === 'Missing') {
         data.cell.styles.textColor = [255, 0, 0]; // Red color
       }
     },

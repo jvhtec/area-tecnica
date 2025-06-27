@@ -25,13 +25,13 @@ interface Artist {
   soundcheck_start?: string;
   soundcheck_end?: string;
   foh_console: string;
-  foh_console_provided_by?: string;
+  foh_console_provided_by?: 'festival' | 'band' | 'mixed';
   mon_console: string;
-  mon_console_provided_by?: string;
+  mon_console_provided_by?: 'festival' | 'band' | 'mixed';
   wireless_systems: any[];
-  wireless_provided_by?: string;
+  wireless_provided_by?: 'festival' | 'band' | 'mixed';
   iem_systems: any[];
-  iem_provided_by?: string;
+  iem_provided_by?: 'festival' | 'band' | 'mixed';
   monitors_enabled: boolean;
   monitors_quantity: number;
   extras_sf: boolean;
@@ -42,7 +42,7 @@ interface Artist {
   foh_tech?: boolean;
   mon_tech?: boolean;
   isaftermidnight?: boolean;
-  mic_kit?: 'festival' | 'band';
+  mic_kit?: 'festival' | 'band' | 'mixed';
   wired_mics?: Array<{
     model: string;
     quantity: number;
@@ -61,7 +61,7 @@ interface Artist {
   infra_opticalcon_duo_quantity?: number;
   infra_analog?: number;
   other_infrastructure?: string;
-  infrastructure_provided_by?: string;
+  infrastructure_provided_by?: 'festival' | 'band' | 'mixed';
 }
 
 interface ArtistTableProps {
@@ -254,6 +254,7 @@ export const ArtistTable = ({
     const colors = {
       festival: "bg-blue-100 text-blue-800",
       band: "bg-green-100 text-green-800",
+      mixed: "bg-purple-100 text-purple-800",
       artist: "bg-orange-100 text-orange-800"
     };
     return colors[provider as keyof typeof colors] || "bg-gray-100 text-gray-800";
@@ -512,10 +513,18 @@ export const ArtistTable = ({
 
                     <TableCell className="min-w-[140px]">
                       <div className="text-sm space-y-1">
-                        <Badge variant={artist.mic_kit === 'festival' ? 'default' : 'secondary'}>
-                          {artist.mic_kit === 'festival' ? 'Festival' : 'Band'}
+                        <Badge variant={
+                          artist.mic_kit === 'festival' ? 'default' : 
+                          artist.mic_kit === 'mixed' ? 'secondary' : 
+                          'outline'
+                        } className={
+                          artist.mic_kit === 'mixed' ? 'bg-purple-100 text-purple-800' : ''
+                        }>
+                          {artist.mic_kit === 'festival' ? 'Festival' : 
+                           artist.mic_kit === 'mixed' ? 'Mixed' : 
+                           'Band'}
                         </Badge>
-                        {artist.mic_kit === 'festival' && artist.wired_mics && artist.wired_mics.length > 0 && (
+                        {(artist.mic_kit === 'festival' || artist.mic_kit === 'mixed') && artist.wired_mics && artist.wired_mics.length > 0 && (
                           <div className="text-xs text-muted-foreground max-w-32 truncate" title={formatWiredMics(artist.wired_mics)}>
                             {formatWiredMics(artist.wired_mics)}
                           </div>
@@ -533,7 +542,7 @@ export const ArtistTable = ({
                       )}
                     </TableCell>
 
-                    {/* New Infrastructure Column */}
+                    {/* Infrastructure Column */}
                     <TableCell className="min-w-[160px]">
                       <div className="text-sm space-y-1">
                         <Tooltip>
@@ -568,7 +577,7 @@ export const ArtistTable = ({
                       </div>
                     </TableCell>
 
-                    {/* New Notes Column */}
+                    {/* Notes Column */}
                     <TableCell className="min-w-[120px]">
                       {artist.notes && artist.notes.trim() !== '' ? (
                         <Tooltip>
