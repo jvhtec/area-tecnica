@@ -291,16 +291,18 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
   // === RF & WIRELESS ===
   const wirelessRows: any[] = [];
   
-  // Process wireless systems
+  // Process wireless systems with individual provider information
   if (data.technical.wireless.systems && data.technical.wireless.systems.length > 0) {
     data.technical.wireless.systems.forEach(system => {
+      const systemProvider = system.provided_by || data.technical.wireless.providedBy;
+      
       if (system.quantity_hh && system.quantity_hh > 0) {
         wirelessRows.push([
           'Handheld',
           system.quantity_hh,
           system.model,
           system.band || '-',
-          system.provided_by || data.technical.wireless.providedBy || 'festival' 
+          systemProvider
         ]);
       }
       if (system.quantity_bp && system.quantity_bp > 0) {
@@ -309,7 +311,7 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
           system.quantity_bp,
           system.model,
           system.band || '-',
-          system.provided_by || data.technical.wireless.providedBy || 'festival'
+          systemProvider
         ]);
       }
     });
@@ -335,16 +337,18 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
     }
   }
 
-  // Process IEM systems
+  // Process IEM systems with individual provider information
   if (data.technical.iem.systems && data.technical.iem.systems.length > 0) {
     data.technical.iem.systems.forEach(system => {
+      const systemProvider = system.provided_by || data.technical.iem.providedBy;
+      
       if (system.quantity_hh && system.quantity_hh > 0) {
         wirelessRows.push([
           'IEM Channels',
           system.quantity_hh,
           system.model,
           system.band || '-',
-          system.provided_by || data.technical.iem.providedBy || 'festival'
+          systemProvider
         ]);
       }
       if (system.quantity_bp && system.quantity_bp > 0) {
@@ -353,7 +357,7 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
           system.quantity_bp,
           system.model,
           system.band || '-',
-          system.provided_by || data.technical.iem.providedBy || 'festival'
+          systemProvider
         ]);
       }
     });

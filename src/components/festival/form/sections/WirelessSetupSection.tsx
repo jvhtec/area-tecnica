@@ -2,8 +2,51 @@
 import { WirelessConfig } from "../../gear-setup/WirelessConfig";
 import { ProviderSelector } from "../shared/ProviderSelector";
 import { ArtistSectionProps } from "@/types/artist-form";
+import { useEffect } from "react";
 
 export const WirelessSetupSection = ({ formData, onChange }: ArtistSectionProps) => {
+  // Auto-detect mixed providers for wireless systems
+  const detectWirelessProvider = (systems: any[]) => {
+    if (!systems || systems.length === 0) return "festival";
+    
+    const providers = systems.map(system => system.provided_by || "festival");
+    const uniqueProviders = [...new Set(providers)];
+    
+    if (uniqueProviders.length > 1) {
+      return "mixed";
+    }
+    
+    return uniqueProviders[0] || "festival";
+  };
+
+  // Auto-detect mixed providers for IEM systems
+  const detectIEMProvider = (systems: any[]) => {
+    if (!systems || systems.length === 0) return "festival";
+    
+    const providers = systems.map(system => system.provided_by || "festival");
+    const uniqueProviders = [...new Set(providers)];
+    
+    if (uniqueProviders.length > 1) {
+      return "mixed";
+    }
+    
+    return uniqueProviders[0] || "festival";
+  };
+
+  // Auto-update provider when systems change
+  useEffect(() => {
+    const detectedWirelessProvider = detectWirelessProvider(formData.wireless_systems || []);
+    const detectedIEMProvider = detectIEMProvider(formData.iem_systems || []);
+    
+    if (detectedWirelessProvider !== formData.wireless_provided_by) {
+      onChange({ wireless_provided_by: detectedWirelessProvider });
+    }
+    
+    if (detectedIEMProvider !== formData.iem_provided_by) {
+      onChange({ iem_provided_by: detectedIEMProvider });
+    }
+  }, [formData.wireless_systems, formData.iem_systems]);
+
   const handleWirelessChange = (systems: any[]) => {
     console.log('WirelessSetupSection: Wireless systems changed:', systems);
     onChange({ 
@@ -45,6 +88,7 @@ export const WirelessSetupSection = ({ formData, onChange }: ArtistSectionProps)
             onChange={handleWirelessProviderChange}
             label="Wireless Systems Provided By"
             id="wireless-provider"
+            showMixed={true}
           />
         </div>
         
@@ -61,6 +105,7 @@ export const WirelessSetupSection = ({ formData, onChange }: ArtistSectionProps)
             onChange={handleIEMProviderChange}
             label="IEM Systems Provided By"
             id="iem-provider"
+            showMixed={true}
           />
         </div>
       </div>

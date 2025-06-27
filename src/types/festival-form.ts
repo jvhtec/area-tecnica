@@ -14,6 +14,7 @@ export interface ProviderSelectorProps {
   onChange: (value: string) => void;
   label: string;
   id: string;
+  showMixed?: boolean;
 }
 
 export interface QuantityInputProps {

@@ -3,7 +3,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { ProviderSelectorProps } from "@/types/festival-form";
 
-export const ProviderSelector = ({ value, onChange, label, id }: ProviderSelectorProps) => {
+export const ProviderSelector = ({ value, onChange, label, id, showMixed = false }: ProviderSelectorProps) => {
   return (
     <div className="flex items-center justify-between">
       <h4 className="font-medium">{label}</h4>
@@ -20,6 +20,12 @@ export const ProviderSelector = ({ value, onChange, label, id }: ProviderSelecto
           <RadioGroupItem value="band" id={`${id}-band`} />
           <Label htmlFor={`${id}-band`}>Band</Label>
         </div>
+        {showMixed && (
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="mixed" id={`${id}-mixed`} />
+            <Label htmlFor={`${id}-mixed`}>Mixed</Label>
+          </div>
+        )}
       </RadioGroup>
     </div>
   );

@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -163,25 +162,56 @@ const formatWiredMicsForPdf = (mics: Array<{ model: string; quantity: number; ex
   }).join(", ");
 };
 
-const formatWirelessSystemsForPdf = (systems: any[] = [], isIEM = false) => {
+const formatWirelessSystemsForPdf = (systems: any[] = [], providedBy: string = "festival", isIEM = false) => {
   if (systems.length === 0) return "None";
-  return systems.map(system => {
-    if (isIEM) {
-      const channels = system.quantity_hh || system.quantity || 0;
-      const beltpacks = system.quantity_bp || 0;
-      return `${system.model}: ${channels} ch${beltpacks > 0 ? `, ${beltpacks} bp` : ''}`;
-    } else {
-      const hh = system.quantity_hh || 0;
-      const bp = system.quantity_bp || 0;
-      const total = hh + bp;
-      if (hh > 0 && bp > 0) {
-        return `${system.model}: ${hh}x HH, ${bp}x BP`;
-      } else if (total > 0) {
-        return `${system.model}: ${total}x`;
+  
+  if (providedBy === "mixed") {
+    // Show individual system providers when mixed
+    return systems.map(system => {
+      const provider = system.provided_by || "festival";
+      const providerLabel = provider === "festival" ? "(F)" : "(B)";
+      
+      if (isIEM) {
+        const channels = system.quantity_hh || system.quantity || 0;
+        const beltpacks = system.quantity_bp || 0;
+        return `${system.model}: ${channels} ch${beltpacks > 0 ? `, ${beltpacks} bp` : ''} ${providerLabel}`;
+      } else {
+        const hh = system.quantity_hh || 0;
+        const bp = system.quantity_bp || 0;
+        const total = hh + bp;
+        if (hh > 0 && bp > 0) {
+          return `${system.model}: ${hh}x HH, ${bp}x BP ${providerLabel}`;
+        } else if (total > 0) {
+          return `${system.model}: ${total}x ${providerLabel}`;
+        }
+        return `${system.model} ${providerLabel}`;
       }
-      return system.model;
-    }
-  }).join("; ");
+    }).join("; ");
+  } else {
+    // Original formatting for single provider
+    return systems.map(system => {
+      if (isIEM) {
+        const channels = system.quantity_hh || system.quantity || 0;
+        const beltpacks = system.quantity_bp || 0;
+        return `${system.model}: ${channels} ch${beltpacks > 0 ? `, ${beltpacks} bp` : ''}`;
+      } else {
+        const hh = system.quantity_hh || 0;
+        const bp = system.quantity_bp || 0;
+        const total = hh + bp;
+        if (hh > 0 && bp > 0) {
+          return `${system.model}: ${hh}x HH, ${bp}x BP`;
+        } else if (total > 0) {
+          return `${system.model}: ${total}x`;
+        }
+        return system.model;
+      }
+    }).join("; ");
+  }
+};
+
+const formatConsolesWithTech = (console: { model: string; providedBy: string }, techRequired: boolean, position: string) => {
+  const techIndicator = techRequired ? " + Tech" : "";
+  return `${position}: ${console.model} (${console.providedBy})${techIndicator}`;
 };
 
 export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Blob> => {
@@ -253,7 +283,9 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     console.log(`Processing artist: ${artist.name}`, {
       infrastructure: artist.infrastructure,
       micKit: artist.micKit,
-      wiredMics: artist.wiredMics?.length || 0
+      wiredMics: artist.wiredMics?.length || 0,
+      fohTech: artist.technical.fohTech,
+      monTech: artist.technical.monTech
     });
 
     return [
@@ -261,8 +293,8 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       data.stageNames?.[artist.stage] || `Stage ${artist.stage}`,
       `${artist.showTime.start} - ${artist.showTime.end}`,
       artist.soundcheck ? `${artist.soundcheck.start} - ${artist.soundcheck.end}` : 'No',
-      `FOH: ${artist.technical.fohConsole.model} (${artist.technical.fohConsole.providedBy})\nMON: ${artist.technical.monConsole.model} (${artist.technical.monConsole.providedBy})`,
-      `Wireless: ${formatWirelessSystemsForPdf(artist.technical.wireless.systems)}\nIEM: ${formatWirelessSystemsForPdf(artist.technical.iem.systems, true)}`,
+      `${formatConsolesWithTech(artist.technical.fohConsole, artist.technical.fohTech, 'FOH')}\n${formatConsolesWithTech(artist.technical.monConsole, artist.technical.monTech, 'MON')}`,
+      `Wireless: ${formatWirelessSystemsForPdf(artist.technical.wireless.systems, artist.technical.wireless.providedBy)}\nIEM: ${formatWirelessSystemsForPdf(artist.technical.iem.systems, artist.technical.iem.providedBy, true)}`,
       `Kit: ${artist.micKit}\n${artist.micKit === 'festival' ? formatWiredMicsForPdf(artist.wiredMics) : 'Band provides'}`,
       artist.technical.monitors.enabled ? `${artist.technical.monitors.quantity}x` : 'None',
       formatInfrastructureForPdf(artist.infrastructure),
@@ -296,14 +328,14 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     },
     columnStyles: {
       0: { cellWidth: 25 }, // Artist
-      1: { cellWidth: 15 }, // Stage - reduced from 20 to 15
-      2: { cellWidth: 20 }, // Show Time - reduced from 25 to 20
-      3: { cellWidth: 20 }, // Soundcheck - reduced from 25 to 20
+      1: { cellWidth: 15 }, // Stage
+      2: { cellWidth: 20 }, // Show Time
+      3: { cellWidth: 20 }, // Soundcheck
       4: { cellWidth: 40 }, // Consoles
       5: { cellWidth: 35 }, // Wireless/IEM
       6: { cellWidth: 30 }, // Microphones
       7: { cellWidth: 15 }, // Monitors
-      8: { cellWidth: 25 }, // Infrastructure - reduced from 30 to 25
+      8: { cellWidth: 25 }, // Infrastructure
       9: { cellWidth: 15 }, // Extras
       10: { cellWidth: 25 }, // Notes
       11: { cellWidth: 15 }, // Rider Status
