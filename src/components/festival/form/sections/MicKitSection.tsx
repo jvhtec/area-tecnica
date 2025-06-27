@@ -2,7 +2,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProviderSelector } from "../shared/ProviderSelector";
 import { WiredMicConfig, WiredMic } from "../../gear-setup/WiredMicConfig";
-import { useEffect } from "react";
 
 interface MicKitSectionProps {
   micKit: 'festival' | 'band' | 'mixed';
@@ -17,29 +16,6 @@ export const MicKitSection = ({
   onMicKitChange,
   onWiredMicsChange
 }: MicKitSectionProps) => {
-  // Auto-detect mixed providers for wired mics
-  const detectWiredMicProvider = (mics: WiredMic[]) => {
-    if (!mics || mics.length === 0) return "festival";
-    
-    const providers = mics.map(mic => mic.provided_by || "festival");
-    const uniqueProviders = [...new Set(providers)];
-    
-    if (uniqueProviders.length > 1) {
-      return "mixed";
-    }
-    
-    return uniqueProviders[0] || "festival";
-  };
-
-  // Auto-update provider when wired mics change
-  useEffect(() => {
-    const detectedProvider = detectWiredMicProvider(wiredMics);
-    
-    if (detectedProvider !== micKit) {
-      onMicKitChange(detectedProvider);
-    }
-  }, [wiredMics]);
-
   return (
     <Card>
       <CardHeader>
@@ -58,8 +34,8 @@ export const MicKitSection = ({
           <WiredMicConfig
             mics={wiredMics}
             onChange={onWiredMicsChange}
-            label="Required Wired Microphones"
-            showProvider={micKit === 'mixed'}
+            label={micKit === 'mixed' ? "Festival-Provided Wired Microphones" : "Required Wired Microphones"}
+            showProvider={false}
           />
         )}
 
@@ -74,8 +50,8 @@ export const MicKitSection = ({
         {micKit === 'mixed' && (
           <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
             <p className="text-sm text-blue-700">
-              Mixed microphone setup: Some microphones provided by festival, others by band. 
-              Individual provider settings are configured per microphone below.
+              Mixed microphone setup: Enter only the microphones that the festival will provide. 
+              The band will provide any additional microphones they need.
             </p>
           </div>
         )}

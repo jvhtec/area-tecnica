@@ -67,7 +67,6 @@ export interface ArtistTablePdfData {
       quantity: number;
       exclusive_use?: boolean;
       notes?: string;
-      provided_by?: 'festival' | 'band';
     }>;
     infrastructure: {
       infra_cat6?: boolean;
@@ -155,24 +154,13 @@ const formatInfrastructureForPdf = (infrastructure: any) => {
   }
 };
 
-const formatWiredMicsForPdf = (mics: Array<{ model: string; quantity: number; exclusive_use?: boolean; notes?: string; provided_by?: string }> = [], micKit: string = 'band') => {
+const formatWiredMicsForPdf = (mics: Array<{ model: string; quantity: number; exclusive_use?: boolean; notes?: string }> = [], micKit: string = 'band') => {
   if (mics.length === 0) return "None";
   
-  if (micKit === "mixed") {
-    // Show individual mic providers when mixed
-    return mics.map(mic => {
-      const provider = mic.provided_by || "festival";
-      const providerLabel = provider === "festival" ? "(F)" : "(B)";
-      const exclusiveIndicator = mic.exclusive_use ? " (E)" : "";
-      return `${mic.quantity}x ${mic.model}${exclusiveIndicator} ${providerLabel}`;
-    }).join(", ");
-  } else {
-    // Original formatting for single provider
-    return mics.map(mic => {
-      const exclusiveIndicator = mic.exclusive_use ? " (E)" : "";
-      return `${mic.quantity}x ${mic.model}${exclusiveIndicator}`;
-    }).join(", ");
-  }
+  return mics.map(mic => {
+    const exclusiveIndicator = mic.exclusive_use ? " (E)" : "";
+    return `${mic.quantity}x ${mic.model}${exclusiveIndicator}`;
+  }).join(", ");
 };
 
 const formatWirelessSystemsForPdf = (systems: any[] = [], providedBy: string = "festival", isIEM = false) => {
@@ -301,10 +289,10 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       monTech: artist.technical.monTech
     });
 
-    // Format microphones column with mixed provider support
+    // Format microphones column with simplified mixed provider support
     let microphonesDisplay = '';
     if (artist.micKit === 'mixed') {
-      microphonesDisplay = `Kit: Mixed\n${formatWiredMicsForPdf(artist.wiredMics, artist.micKit)}`;
+      microphonesDisplay = `Kit: Mixed\nFestival: ${formatWiredMicsForPdf(artist.wiredMics, artist.micKit)}`;
     } else if (artist.micKit === 'festival') {
       microphonesDisplay = `Kit: Festival\n${formatWiredMicsForPdf(artist.wiredMics, artist.micKit)}`;
     } else {

@@ -69,7 +69,6 @@ interface ArtistManagementFormData {
     quantity: number;
     exclusive_use?: boolean;
     notes?: string;
-    provided_by?: 'festival' | 'band';
   }>;
 }
 

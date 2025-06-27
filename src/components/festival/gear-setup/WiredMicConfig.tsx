@@ -5,14 +5,12 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Minus } from "lucide-react";
 import { EquipmentSelect } from "../form/shared/EquipmentSelect";
-import { ProviderSelector } from "../form/shared/ProviderSelector";
 
 export interface WiredMic {
   model: string;
   quantity: number;
   exclusive_use?: boolean;
   notes?: string;
-  provided_by?: 'festival' | 'band';
 }
 
 interface WiredMicConfigProps {
@@ -32,8 +30,7 @@ export const WiredMicConfig = ({
     onChange([...mics, { 
       model: '', 
       quantity: 1, 
-      exclusive_use: false,
-      provided_by: 'festival'
+      exclusive_use: false
     }]);
   };
 
@@ -104,18 +101,6 @@ export const WiredMicConfig = ({
               <Minus className="h-4 w-4" />
             </Button>
           </div>
-          
-          {showProvider && (
-            <div className="mt-3">
-              <ProviderSelector
-                value={mic.provided_by || 'festival'}
-                onChange={(provider) => updateMic(index, 'provided_by', provider as 'festival' | 'band')}
-                label="Provided By"
-                id={`mic-provider-${index}`}
-                showMixed={false}
-              />
-            </div>
-          )}
         </div>
       ))}
 
