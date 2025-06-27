@@ -186,7 +186,37 @@ export const ArtistTable = ({
     
     artists.forEach(artist => {
       const stageSetup = stageGearSetups[artist.stage] || null;
-      const comparison = compareArtistRequirements(artist, festivalGearSetup, stageSetup);
+      
+      // Transform artist to match ArtistRequirements interface
+      const artistRequirements = {
+        name: artist.name,
+        stage: artist.stage,
+        foh_console: artist.foh_console,
+        foh_console_provided_by: artist.foh_console_provided_by,
+        mon_console: artist.mon_console,
+        mon_console_provided_by: artist.mon_console_provided_by,
+        wireless_systems: artist.wireless_systems || [],
+        wireless_provided_by: artist.wireless_provided_by,
+        iem_systems: artist.iem_systems || [],
+        iem_provided_by: artist.iem_provided_by,
+        monitors_enabled: artist.monitors_enabled,
+        monitors_quantity: artist.monitors_quantity,
+        extras_sf: artist.extras_sf,
+        extras_df: artist.extras_df,
+        extras_djbooth: artist.extras_djbooth,
+        infra_cat6: artist.infra_cat6 || false,
+        infra_cat6_quantity: artist.infra_cat6_quantity || 0,
+        infra_hma: artist.infra_hma || false,
+        infra_hma_quantity: artist.infra_hma_quantity || 0,
+        infra_coax: artist.infra_coax || false,
+        infra_coax_quantity: artist.infra_coax_quantity || 0,
+        infra_opticalcon_duo: artist.infra_opticalcon_duo || false,
+        infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity || 0,
+        infra_analog: artist.infra_analog || 0,
+        infrastructure_provided_by: artist.infrastructure_provided_by
+      };
+      
+      const comparison = compareArtistRequirements(artistRequirements, festivalGearSetup, stageSetup);
       comparisons[artist.id] = comparison;
     });
 
@@ -420,12 +450,7 @@ export const ArtistTable = ({
     try {
       const pdfData = await transformArtistDataForPdf(artist);
       
-      // Add gear comparison data to PDF
-      const comparison = gearComparisons[artist.id];
-      if (comparison) {
-        pdfData.gearComparison = comparison;
-      }
-      
+      // Remove the gearComparison assignment as it doesn't exist in ArtistPdfData
       const blob = await exportArtistPDF(pdfData);
 
       // Create download link

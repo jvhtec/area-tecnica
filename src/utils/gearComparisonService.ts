@@ -19,23 +19,28 @@ interface ArtistRequirements {
   name: string;
   stage: number;
   foh_console: string;
+  foh_console_provided_by?: 'festival' | 'band' | 'mixed';
   mon_console: string;
+  mon_console_provided_by?: 'festival' | 'band' | 'mixed';
   wireless_systems: WirelessSetup[];
+  wireless_provided_by?: 'festival' | 'band' | 'mixed';
   iem_systems: WirelessSetup[];
+  iem_provided_by?: 'festival' | 'band' | 'mixed';
   monitors_enabled: boolean;
   monitors_quantity: number;
   extras_sf: boolean;
   extras_df: boolean;
   extras_djbooth: boolean;
-  infra_cat6: boolean;
-  infra_cat6_quantity: number;
-  infra_hma: boolean;
-  infra_hma_quantity: number;
-  infra_coax: boolean;
-  infra_coax_quantity: number;
-  infra_opticalcon_duo: boolean;
-  infra_opticalcon_duo_quantity: number;
-  infra_analog: number;
+  infra_cat6?: boolean;
+  infra_cat6_quantity?: number;
+  infra_hma?: boolean;
+  infra_hma_quantity?: number;
+  infra_coax?: boolean;
+  infra_coax_quantity?: number;
+  infra_opticalcon_duo?: boolean;
+  infra_opticalcon_duo_quantity?: number;
+  infra_analog?: number;
+  infrastructure_provided_by?: 'festival' | 'band' | 'mixed';
 }
 
 interface AvailableGear {
@@ -108,127 +113,171 @@ export const compareArtistRequirements = (
 
   // Check FOH Console availability
   if (artist.foh_console && artist.foh_console.trim() !== '') {
-    const availableFohConsole = availableGear.foh_consoles.find(
-      console => console.model.toLowerCase() === artist.foh_console.toLowerCase()
-    );
+    const providedBy = artist.foh_console_provided_by || 'festival';
     
-    if (!availableFohConsole) {
+    if (providedBy === 'band') {
       mismatches.push({
         type: 'console',
-        severity: 'error',
-        message: `FOH Console "${artist.foh_console}" not available`,
-        details: `Available: ${availableGear.foh_consoles.map(c => c.model).join(', ') || 'None'}`
+        severity: 'warning',
+        message: `Band bringing FOH Console "${artist.foh_console}"`
       });
-    } else if (availableFohConsole.quantity < 1) {
-      mismatches.push({
-        type: 'console',
-        severity: 'error',
-        message: `FOH Console "${artist.foh_console}" out of stock`,
-        details: `Available quantity: ${availableFohConsole.quantity}`
-      });
+    } else {
+      const availableFohConsole = availableGear.foh_consoles.find(
+        console => console.model.toLowerCase() === artist.foh_console.toLowerCase()
+      );
+      
+      if (!availableFohConsole) {
+        mismatches.push({
+          type: 'console',
+          severity: 'error',
+          message: `FOH Console "${artist.foh_console}" not available`,
+          details: `Available: ${availableGear.foh_consoles.map(c => c.model).join(', ') || 'None'}`
+        });
+      } else if (availableFohConsole.quantity < 1) {
+        mismatches.push({
+          type: 'console',
+          severity: 'error',
+          message: `FOH Console "${artist.foh_console}" out of stock`,
+          details: `Available quantity: ${availableFohConsole.quantity}`
+        });
+      }
     }
   }
 
   // Check Monitor Console availability
   if (artist.mon_console && artist.mon_console.trim() !== '') {
-    const availableMonConsole = availableGear.mon_consoles.find(
-      console => console.model.toLowerCase() === artist.mon_console.toLowerCase()
-    );
+    const providedBy = artist.mon_console_provided_by || 'festival';
     
-    if (!availableMonConsole) {
+    if (providedBy === 'band') {
       mismatches.push({
         type: 'console',
-        severity: 'error',
-        message: `Monitor Console "${artist.mon_console}" not available`,
-        details: `Available: ${availableGear.mon_consoles.map(c => c.model).join(', ') || 'None'}`
+        severity: 'warning',
+        message: `Band bringing Monitor Console "${artist.mon_console}"`
       });
-    } else if (availableMonConsole.quantity < 1) {
-      mismatches.push({
-        type: 'console',
-        severity: 'error',
-        message: `Monitor Console "${artist.mon_console}" out of stock`,
-        details: `Available quantity: ${availableMonConsole.quantity}`
-      });
+    } else {
+      const availableMonConsole = availableGear.mon_consoles.find(
+        console => console.model.toLowerCase() === artist.mon_console.toLowerCase()
+      );
+      
+      if (!availableMonConsole) {
+        mismatches.push({
+          type: 'console',
+          severity: 'error',
+          message: `Monitor Console "${artist.mon_console}" not available`,
+          details: `Available: ${availableGear.mon_consoles.map(c => c.model).join(', ') || 'None'}`
+        });
+      } else if (availableMonConsole.quantity < 1) {
+        mismatches.push({
+          type: 'console',
+          severity: 'error',
+          message: `Monitor Console "${artist.mon_console}" out of stock`,
+          details: `Available quantity: ${availableMonConsole.quantity}`
+        });
+      }
     }
   }
 
   // Check Wireless Systems
-  artist.wireless_systems?.forEach(artistWireless => {
-    const availableWireless = availableGear.wireless_systems.find(
-      w => w.model.toLowerCase() === artistWireless.model.toLowerCase()
-    );
+  if (artist.wireless_systems && artist.wireless_systems.length > 0) {
+    const providedBy = artist.wireless_provided_by || 'festival';
     
-    if (!availableWireless) {
+    if (providedBy === 'band') {
       mismatches.push({
         type: 'wireless',
-        severity: 'error',
-        message: `Wireless system "${artistWireless.model}" not available`,
-        details: `Available: ${availableGear.wireless_systems.map(w => w.model).join(', ') || 'None'}`
+        severity: 'warning',
+        message: `Band bringing wireless systems`
       });
     } else {
-      const requiredHH = artistWireless.quantity_hh || 0;
-      const requiredBP = artistWireless.quantity_bp || 0;
-      const availableHH = availableWireless.quantity_hh || 0;
-      const availableBP = availableWireless.quantity_bp || 0;
-      
-      if (requiredHH > availableHH) {
-        mismatches.push({
-          type: 'wireless',
-          severity: 'error',
-          message: `Insufficient wireless handheld units for "${artistWireless.model}"`,
-          details: `Required: ${requiredHH}, Available: ${availableHH}`
-        });
-      }
-      
-      if (requiredBP > availableBP) {
-        mismatches.push({
-          type: 'wireless',
-          severity: 'error',
-          message: `Insufficient wireless beltpack units for "${artistWireless.model}"`,
-          details: `Required: ${requiredBP}, Available: ${availableBP}`
-        });
-      }
+      artist.wireless_systems.forEach(artistWireless => {
+        const availableWireless = availableGear.wireless_systems.find(
+          w => w.model.toLowerCase() === artistWireless.model.toLowerCase()
+        );
+        
+        if (!availableWireless) {
+          mismatches.push({
+            type: 'wireless',
+            severity: 'error',
+            message: `Wireless system "${artistWireless.model}" not available`,
+            details: `Available: ${availableGear.wireless_systems.map(w => w.model).join(', ') || 'None'}`
+          });
+        } else {
+          const requiredHH = artistWireless.quantity_hh || 0;
+          const requiredBP = artistWireless.quantity_bp || 0;
+          const availableHH = availableWireless.quantity_hh || 0;
+          const availableBP = availableWireless.quantity_bp || 0;
+          
+          if (requiredHH > availableHH) {
+            mismatches.push({
+              type: 'wireless',
+              severity: 'error',
+              message: `Insufficient wireless handheld units for "${artistWireless.model}"`,
+              details: `Required: ${requiredHH}, Available: ${availableHH}`
+            });
+          }
+          
+          if (requiredBP > availableBP) {
+            mismatches.push({
+              type: 'wireless',
+              severity: 'error',
+              message: `Insufficient wireless beltpack units for "${artistWireless.model}"`,
+              details: `Required: ${requiredBP}, Available: ${availableBP}`
+            });
+          }
+        }
+      });
     }
-  });
+  }
 
   // Check IEM Systems
-  artist.iem_systems?.forEach(artistIEM => {
-    const availableIEM = availableGear.iem_systems.find(
-      iem => iem.model.toLowerCase() === artistIEM.model.toLowerCase()
-    );
+  if (artist.iem_systems && artist.iem_systems.length > 0) {
+    const providedBy = artist.iem_provided_by || 'festival';
     
-    if (!availableIEM) {
+    if (providedBy === 'band') {
       mismatches.push({
         type: 'iem',
-        severity: 'error',
-        message: `IEM system "${artistIEM.model}" not available`,
-        details: `Available: ${availableGear.iem_systems.map(iem => iem.model).join(', ') || 'None'}`
+        severity: 'warning',
+        message: `Band bringing IEM systems`
       });
     } else {
-      const requiredChannels = artistIEM.quantity_hh || artistIEM.quantity || 0;
-      const requiredBP = artistIEM.quantity_bp || 0;
-      const availableChannels = availableIEM.quantity_hh || availableIEM.quantity || 0;
-      const availableBP = availableIEM.quantity_bp || 0;
-      
-      if (requiredChannels > availableChannels) {
-        mismatches.push({
-          type: 'iem',
-          severity: 'error',
-          message: `Insufficient IEM channels for "${artistIEM.model}"`,
-          details: `Required: ${requiredChannels}, Available: ${availableChannels}`
-        });
-      }
-      
-      if (requiredBP > availableBP) {
-        mismatches.push({
-          type: 'iem',
-          severity: 'error',
-          message: `Insufficient IEM beltpacks for "${artistIEM.model}"`,
-          details: `Required: ${requiredBP}, Available: ${availableBP}`
-        });
-      }
+      artist.iem_systems.forEach(artistIEM => {
+        const availableIEM = availableGear.iem_systems.find(
+          iem => iem.model.toLowerCase() === artistIEM.model.toLowerCase()
+        );
+        
+        if (!availableIEM) {
+          mismatches.push({
+            type: 'iem',
+            severity: 'error',
+            message: `IEM system "${artistIEM.model}" not available`,
+            details: `Available: ${availableGear.iem_systems.map(iem => iem.model).join(', ') || 'None'}`
+          });
+        } else {
+          const requiredChannels = artistIEM.quantity_hh || artistIEM.quantity || 0;
+          const requiredBP = artistIEM.quantity_bp || 0;
+          const availableChannels = availableIEM.quantity_hh || availableIEM.quantity || 0;
+          const availableBP = availableIEM.quantity_bp || 0;
+          
+          if (requiredChannels > availableChannels) {
+            mismatches.push({
+              type: 'iem',
+              severity: 'error',
+              message: `Insufficient IEM channels for "${artistIEM.model}"`,
+              details: `Required: ${requiredChannels}, Available: ${availableChannels}`
+            });
+          }
+          
+          if (requiredBP > availableBP) {
+            mismatches.push({
+              type: 'iem',
+              severity: 'error',
+              message: `Insufficient IEM beltpacks for "${artistIEM.model}"`,
+              details: `Required: ${requiredBP}, Available: ${availableBP}`
+            });
+          }
+        }
+      });
     }
-  });
+  }
 
   // Check Monitor quantity
   if (artist.monitors_enabled && artist.monitors_quantity > availableGear.available_monitors) {
@@ -266,49 +315,59 @@ export const compareArtistRequirements = (
   }
 
   // Check Infrastructure
-  if (artist.infra_cat6 && artist.infra_cat6_quantity > availableGear.available_cat6_runs) {
+  const infraProvidedBy = artist.infrastructure_provided_by || 'festival';
+  
+  if (infraProvidedBy === 'band') {
     mismatches.push({
       type: 'infrastructure',
-      severity: 'error',
-      message: `Insufficient CAT6 runs`,
-      details: `Required: ${artist.infra_cat6_quantity}, Available: ${availableGear.available_cat6_runs}`
+      severity: 'warning',
+      message: `Band bringing infrastructure`
     });
-  }
+  } else {
+    if (artist.infra_cat6 && (artist.infra_cat6_quantity || 0) > availableGear.available_cat6_runs) {
+      mismatches.push({
+        type: 'infrastructure',
+        severity: 'error',
+        message: `Insufficient CAT6 runs`,
+        details: `Required: ${artist.infra_cat6_quantity || 0}, Available: ${availableGear.available_cat6_runs}`
+      });
+    }
 
-  if (artist.infra_hma && artist.infra_hma_quantity > availableGear.available_hma_runs) {
-    mismatches.push({
-      type: 'infrastructure',
-      severity: 'error',
-      message: `Insufficient HMA runs`,
-      details: `Required: ${artist.infra_hma_quantity}, Available: ${availableGear.available_hma_runs}`
-    });
-  }
+    if (artist.infra_hma && (artist.infra_hma_quantity || 0) > availableGear.available_hma_runs) {
+      mismatches.push({
+        type: 'infrastructure',
+        severity: 'error',
+        message: `Insufficient HMA runs`,
+        details: `Required: ${artist.infra_hma_quantity || 0}, Available: ${availableGear.available_hma_runs}`
+      });
+    }
 
-  if (artist.infra_coax && artist.infra_coax_quantity > availableGear.available_coax_runs) {
-    mismatches.push({
-      type: 'infrastructure',
-      severity: 'error',
-      message: `Insufficient Coax runs`,
-      details: `Required: ${artist.infra_coax_quantity}, Available: ${availableGear.available_coax_runs}`
-    });
-  }
+    if (artist.infra_coax && (artist.infra_coax_quantity || 0) > availableGear.available_coax_runs) {
+      mismatches.push({
+        type: 'infrastructure',
+        severity: 'error',
+        message: `Insufficient Coax runs`,
+        details: `Required: ${artist.infra_coax_quantity || 0}, Available: ${availableGear.available_coax_runs}`
+      });
+    }
 
-  if (artist.infra_opticalcon_duo && artist.infra_opticalcon_duo_quantity > availableGear.available_opticalcon_duo_runs) {
-    mismatches.push({
-      type: 'infrastructure',
-      severity: 'error',
-      message: `Insufficient OpticalCON DUO runs`,
-      details: `Required: ${artist.infra_opticalcon_duo_quantity}, Available: ${availableGear.available_opticalcon_duo_runs}`
-    });
-  }
+    if (artist.infra_opticalcon_duo && (artist.infra_opticalcon_duo_quantity || 0) > availableGear.available_opticalcon_duo_runs) {
+      mismatches.push({
+        type: 'infrastructure',
+        severity: 'error',
+        message: `Insufficient OpticalCON DUO runs`,
+        details: `Required: ${artist.infra_opticalcon_duo_quantity || 0}, Available: ${availableGear.available_opticalcon_duo_runs}`
+      });
+    }
 
-  if (artist.infra_analog > availableGear.available_analog_runs) {
-    mismatches.push({
-      type: 'infrastructure',
-      severity: 'error',
-      message: `Insufficient analog runs`,
-      details: `Required: ${artist.infra_analog}, Available: ${availableGear.available_analog_runs}`
-    });
+    if ((artist.infra_analog || 0) > availableGear.available_analog_runs) {
+      mismatches.push({
+        type: 'infrastructure',
+        severity: 'error',
+        message: `Insufficient analog runs`,
+        details: `Required: ${artist.infra_analog || 0}, Available: ${availableGear.available_analog_runs}`
+      });
+    }
   }
 
   return {
