@@ -250,14 +250,14 @@ export const ArtistTable = ({
       }
     }).join("; ");
   };
-  const getProviderBadge = (provider: string) => {
+  const getProviderBadge = (provider: 'festival' | 'band' | 'mixed') => {
     const colors = {
       festival: "bg-blue-100 text-blue-800",
       band: "bg-green-100 text-green-800",
       mixed: "bg-purple-100 text-purple-800",
       artist: "bg-orange-100 text-orange-800"
     };
-    return colors[provider as keyof typeof colors] || "bg-gray-100 text-gray-800";
+    return colors[provider] || "bg-gray-100 text-gray-800";
   };
 
   // Helper function to transform artist data for PDF with logo URL
