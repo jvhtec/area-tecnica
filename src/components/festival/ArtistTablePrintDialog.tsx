@@ -49,6 +49,7 @@ interface Artist {
     exclusive_use?: boolean;
     notes?: string;
   }>;
+  date?: string; // Added missing date property
   // Infrastructure fields
   infra_cat6?: boolean;
   infra_cat6_quantity?: number;
@@ -119,87 +120,106 @@ export const ArtistTablePrintDialog = ({
 
   const handleTablePrint = async () => {
     console.log('ArtistTablePrintDialog handleTablePrint called');
-    console.log('onPrint prop:', !!onPrint);
+    console.log('Artists received:', artists.length);
+    console.log('Selected date:', selectedDate);
+    console.log('Stage filter:', stageFilter);
     
-    if (onPrint) {
-      console.log('Using external onPrint function');
-      await onPrint();
-      return;
-    }
-
-    console.log('Using internal PDF generation');
     setIsGenerating(true);
     
     try {
       // Filter artists based on selected criteria
+      // Since artists are already filtered by date in the parent component,
+      // we mainly need to filter by stage
       const filteredArtists = artists.filter(artist => {
         const matchesStage = stageFilter === 'all' || !stageFilter || artist.stage?.toString() === stageFilter;
-        const matchesDate = artist.date === selectedDate;
-        return matchesStage && matchesDate;
+        console.log(`Artist ${artist.name}: stage=${artist.stage}, filter=${stageFilter}, matches=${matchesStage}`);
+        return matchesStage;
       });
 
-      console.log('Filtered artists in dialog:', filteredArtists.length);
-      console.log('Sample artist in dialog:', filteredArtists[0]);
+      console.log('Filtered artists count:', filteredArtists.length);
+      
+      if (filteredArtists.length === 0) {
+        console.warn('No artists match the filter criteria');
+        toast.error('No artists found for the selected criteria');
+        return;
+      }
+
+      console.log('Sample filtered artist:', filteredArtists[0]);
 
       // Transform artists data for PDF
-      const transformedArtists = filteredArtists.map(artist => ({
-        name: artist.name,
-        stage: artist.stage,
-        showTime: {
-          start: artist.show_start,
-          end: artist.show_end
-        },
-        soundcheck: artist.soundcheck ? {
-          start: artist.soundcheck_start || '',
-          end: artist.soundcheck_end || ''
-        } : undefined,
-        technical: {
-          fohTech: artist.foh_tech || false,
-          monTech: artist.mon_tech || false,
-          fohConsole: {
-            model: artist.foh_console,
-            providedBy: artist.foh_console_provided_by || 'festival'
+      const transformedArtists = filteredArtists.map(artist => {
+        console.log(`Transforming artist: ${artist.name}`, {
+          micKit: artist.mic_kit,
+          wiredMics: artist.wired_mics?.length || 0,
+          infrastructure: {
+            cat6: artist.infra_cat6,
+            hma: artist.infra_hma,
+            coax: artist.infra_coax,
+            opticalcon: artist.infra_opticalcon_duo,
+            analog: artist.infra_analog
           },
-          monConsole: {
-            model: artist.mon_console,
-            providedBy: artist.mon_console_provided_by || 'festival'
+          riderMissing: artist.rider_missing
+        });
+
+        return {
+          name: artist.name,
+          stage: artist.stage,
+          showTime: {
+            start: artist.show_start,
+            end: artist.show_end
           },
-          wireless: {
-            systems: artist.wireless_systems || [],
-            providedBy: artist.wireless_provided_by || 'festival'
+          soundcheck: artist.soundcheck ? {
+            start: artist.soundcheck_start || '',
+            end: artist.soundcheck_end || ''
+          } : undefined,
+          technical: {
+            fohTech: artist.foh_tech || false,
+            monTech: artist.mon_tech || false,
+            fohConsole: {
+              model: artist.foh_console,
+              providedBy: artist.foh_console_provided_by || 'festival'
+            },
+            monConsole: {
+              model: artist.mon_console,
+              providedBy: artist.mon_console_provided_by || 'festival'
+            },
+            wireless: {
+              systems: artist.wireless_systems || [],
+              providedBy: artist.wireless_provided_by || 'festival'
+            },
+            iem: {
+              systems: artist.iem_systems || [],
+              providedBy: artist.iem_provided_by || 'festival'
+            },
+            monitors: {
+              enabled: artist.monitors_enabled,
+              quantity: artist.monitors_quantity
+            }
           },
-          iem: {
-            systems: artist.iem_systems || [],
-            providedBy: artist.iem_provided_by || 'festival'
+          extras: {
+            sideFill: artist.extras_sf,
+            drumFill: artist.extras_df,
+            djBooth: artist.extras_djbooth
           },
-          monitors: {
-            enabled: artist.monitors_enabled,
-            quantity: artist.monitors_quantity
-          }
-        },
-        extras: {
-          sideFill: artist.extras_sf,
-          drumFill: artist.extras_df,
-          djBooth: artist.extras_djbooth
-        },
-        notes: artist.notes,
-        micKit: artist.mic_kit || 'band',
-        wiredMics: artist.wired_mics || [],
-        infrastructure: {
-          infra_cat6: artist.infra_cat6,
-          infra_cat6_quantity: artist.infra_cat6_quantity,
-          infra_hma: artist.infra_hma,
-          infra_hma_quantity: artist.infra_hma_quantity,
-          infra_coax: artist.infra_coax,
-          infra_coax_quantity: artist.infra_coax_quantity,
-          infra_opticalcon_duo: artist.infra_opticalcon_duo,
-          infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity,
-          infra_analog: artist.infra_analog,
-          other_infrastructure: artist.other_infrastructure,
-          infrastructure_provided_by: artist.infrastructure_provided_by
-        },
-        riderMissing: artist.rider_missing || false
-      }));
+          notes: artist.notes,
+          micKit: artist.mic_kit || 'band',
+          wiredMics: artist.wired_mics || [],
+          infrastructure: {
+            infra_cat6: artist.infra_cat6,
+            infra_cat6_quantity: artist.infra_cat6_quantity,
+            infra_hma: artist.infra_hma,
+            infra_hma_quantity: artist.infra_hma_quantity,
+            infra_coax: artist.infra_coax,
+            infra_coax_quantity: artist.infra_coax_quantity,
+            infra_opticalcon_duo: artist.infra_opticalcon_duo,
+            infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity,
+            infra_analog: artist.infra_analog,
+            other_infrastructure: artist.other_infrastructure,
+            infrastructure_provided_by: artist.infrastructure_provided_by
+          },
+          riderMissing: artist.rider_missing || false
+        };
+      });
 
       const pdfData: ArtistTablePdfData = {
         jobTitle: jobTitle || 'Festival Schedule',
@@ -210,9 +230,18 @@ export const ArtistTablePrintDialog = ({
         logoUrl: logoUrl
       };
 
-      console.log('PDF data in dialog:', pdfData);
+      console.log('PDF data structure:', {
+        jobTitle: pdfData.jobTitle,
+        date: pdfData.date,
+        stage: pdfData.stage,
+        artistCount: pdfData.artists.length,
+        logoUrl: !!pdfData.logoUrl,
+        sampleArtist: pdfData.artists[0]
+      });
 
+      console.log('Calling exportArtistTablePDF...');
       const blob = await exportArtistTablePDF(pdfData);
+      console.log('PDF blob generated successfully, size:', blob.size);
       
       // Create download link
       const url = URL.createObjectURL(blob);
