@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { GearMismatch } from './gearComparisonService';
 
 // Local interfaces for internal PDF generation use
 interface WirelessSystemDetail {
@@ -82,6 +83,7 @@ export interface ArtistTablePdfData {
       infrastructure_provided_by?: string;
     };
     riderMissing: boolean;
+    gearMismatches?: GearMismatch[];
   }>;
   logoUrl?: string;
 }
@@ -216,6 +218,23 @@ const formatConsolesWithTech = (console: { model: string; providedBy: string }, 
   return `${position}: ${console.model} ${providerDisplay}${techIndicator}`;
 };
 
+const formatGearMismatchesForPdf = (mismatches: GearMismatch[] = []) => {
+  if (mismatches.length === 0) return "✓ OK";
+  
+  const errors = mismatches.filter(m => m.severity === 'error');
+  const warnings = mismatches.filter(m => m.severity === 'warning');
+  
+  const parts: string[] = [];
+  if (errors.length > 0) {
+    parts.push(`❌ ${errors.length} Error${errors.length !== 1 ? 's' : ''}`);
+  }
+  if (warnings.length > 0) {
+    parts.push(`⚠️ ${warnings.length} Warning${warnings.length !== 1 ? 's' : ''}`);
+  }
+  
+  return parts.join('\n');
+};
+
 export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Blob> => {
   console.log('exportArtistTablePDF called with data:', data);
   
@@ -287,7 +306,8 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       micKit: artist.micKit,
       wiredMics: artist.wiredMics?.length || 0,
       fohTech: artist.technical.fohTech,
-      monTech: artist.technical.monTech
+      monTech: artist.technical.monTech,
+      gearMismatches: artist.gearMismatches?.length || 0
     });
 
     // Format microphones column with enhanced mixed provider support
@@ -315,14 +335,15 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
         artist.extras.djBooth ? 'DJ' : ''
       ].filter(Boolean).join(', ') || 'None',
       artist.notes || 'No notes',
-      artist.riderMissing ? 'Missing' : 'Complete'
+      artist.riderMissing ? 'Missing' : 'Complete',
+      formatGearMismatchesForPdf(artist.gearMismatches)
     ];
   });
 
   console.log('Table data prepared:', tableData.length, 'rows');
 
   autoTable(doc, {
-    head: [['Artist', 'Show\nTime', 'Sound\ncheck', 'Consoles', 'Wireless/IEM', 'Microphones', 'Mons', 'Infra', 'Extras', 'Notes', 'Rider']],
+    head: [['Artist', 'Show\nTime', 'Sound\ncheck', 'Consoles', 'Wireless/IEM', 'Microphones', 'Mons', 'Infra', 'Extras', 'Notes', 'Rider', 'Gear\nStatus']],
     body: tableData,
     startY: 40,
     theme: 'grid',
@@ -338,26 +359,77 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       fontStyle: 'bold',
     },
     columnStyles: {
-      0: { cellWidth: 30 }, // Artist (increased from 25)
-      1: { cellWidth: 20 }, // Show Time (increased from 20)
-      2: { cellWidth: 20 }, // Soundcheck (increased from 20)  
-      3: { cellWidth: 40 }, // Consoles (increased from 40)
-      4: { cellWidth: 40 }, // Wireless/IEM (increased from 35)
-      5: { cellWidth: 35 }, // Microphones (increased from 30)
-      6: { cellWidth: 15 }, // Monitors
-      7: { cellWidth: 15 }, // Infrastructure (increased from 25)
-      8: { cellWidth: 15 }, // Extras
-      9: { cellWidth: 30 }, // Notes (increased from 25)
-      10: { cellWidth: 18 }, // Rider Status
+      0: { cellWidth: 25 }, // Artist
+      1: { cellWidth: 18 }, // Show Time
+      2: { cellWidth: 18 }, // Soundcheck
+      3: { cellWidth: 35 }, // Consoles
+      4: { cellWidth: 35 }, // Wireless/IEM
+      5: { cellWidth: 30 }, // Microphones
+      6: { cellWidth: 12 }, // Monitors
+      7: { cellWidth: 20 }, // Infrastructure
+      8: { cellWidth: 12 }, // Extras
+      9: { cellWidth: 25 }, // Notes
+      10: { cellWidth: 15 }, // Rider Status
+      11: { cellWidth: 20 }, // Gear Status (new column)
     },
     didParseCell: (data) => {
-      // Make "Missing" text red in the Rider Status column (column 10, was 11)
+      // Make "Missing" text red in the Rider Status column (column 10)
       if (data.column.index === 10 && data.cell.text[0] === 'Missing') {
         data.cell.styles.textColor = [255, 0, 0]; // Red color
+      }
+      
+      // Color code gear status column (column 11)
+      if (data.column.index === 11) {
+        const cellText = data.cell.text[0];
+        if (cellText.includes('❌')) {
+          data.cell.styles.textColor = [255, 0, 0]; // Red for errors
+        } else if (cellText.includes('⚠️')) {
+          data.cell.styles.textColor = [255, 165, 0]; // Orange for warnings
+        } else if (cellText.includes('✓')) {
+          data.cell.styles.textColor = [0, 128, 0]; // Green for OK
+        }
       }
     },
     margin: { left: 10, right: 10 },
   });
+
+  // Add gear conflicts summary if there are any
+  const artistsWithConflicts = data.artists.filter(a => a.gearMismatches && a.gearMismatches.length > 0);
+  if (artistsWithConflicts.length > 0) {
+    let currentY = (doc as any).lastAutoTable.finalY + 20;
+    
+    // Add summary header
+    doc.setFontSize(14);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Gear Conflicts Summary', 10, currentY);
+    currentY += 10;
+    
+    // Add conflicts details
+    doc.setFontSize(10);
+    artistsWithConflicts.forEach(artist => {
+      const errors = artist.gearMismatches?.filter(m => m.severity === 'error') || [];
+      const warnings = artist.gearMismatches?.filter(m => m.severity === 'warning') || [];
+      
+      if (errors.length > 0 || warnings.length > 0) {
+        doc.setTextColor(0, 0, 0);
+        doc.text(`${artist.name}:`, 10, currentY);
+        currentY += 5;
+        
+        [...errors, ...warnings].forEach(mismatch => {
+          const color = mismatch.severity === 'error' ? [255, 0, 0] : [255, 165, 0];
+          doc.setTextColor(color[0], color[1], color[2]);
+          doc.text(`  • ${mismatch.message}`, 15, currentY);
+          if (mismatch.details) {
+            currentY += 4;
+            doc.setTextColor(100, 100, 100);
+            doc.text(`    ${mismatch.details}`, 20, currentY);
+          }
+          currentY += 5;
+        });
+        currentY += 3;
+      }
+    });
+  }
 
   // === COMPANY LOGO (CENTERED AT BOTTOM) ===
   console.log("Attempting to load Sector Pro logo");

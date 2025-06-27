@@ -13,6 +13,9 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { exportArtistTablePDF, ArtistTablePdfData } from "@/utils/artistTablePdfExport";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
+import { compareArtistRequirements } from "@/utils/gearComparisonService";
+import { supabase } from "@/lib/supabase";
+import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 
 interface Artist {
   name: string;
@@ -144,6 +147,43 @@ export const ArtistTablePrintDialog = ({
 
       console.log('Sample filtered artist:', filteredArtists[0]);
 
+      // Fetch gear setup data for comparison
+      let festivalGearSetup: FestivalGearSetup | null = null;
+      const stageGearSetups: Record<number, StageGearSetup> = {};
+
+      if (jobId) {
+        try {
+          const { data: mainSetup, error: mainError } = await supabase
+            .from('festival_gear_setups')
+            .select('*')
+            .eq('job_id', jobId)
+            .single();
+
+          if (mainError && mainError.code !== 'PGRST116') {
+            console.error('Error fetching festival gear setup:', mainError);
+          } else {
+            festivalGearSetup = mainSetup;
+
+            if (mainSetup) {
+              const { data: stageSetups, error: stageError } = await supabase
+                .from('festival_stage_gear_setups')
+                .select('*')
+                .eq('gear_setup_id', mainSetup.id);
+
+              if (stageError) {
+                console.error('Error fetching stage gear setups:', stageError);
+              } else {
+                stageSetups?.forEach(setup => {
+                  stageGearSetups[setup.stage_number] = setup;
+                });
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching gear setups:', error);
+        }
+      }
+
       // Transform artists data for PDF
       const transformedArtists = filteredArtists.map(artist => {
         console.log(`Transforming artist: ${artist.name}`, {
@@ -158,6 +198,10 @@ export const ArtistTablePrintDialog = ({
           },
           riderMissing: artist.rider_missing
         });
+
+        // Run gear comparison for this artist
+        const stageSetup = stageGearSetups[artist.stage] || null;
+        const gearComparison = compareArtistRequirements(artist, festivalGearSetup, stageSetup);
 
         return {
           name: artist.name,
@@ -215,7 +259,8 @@ export const ArtistTablePrintDialog = ({
             other_infrastructure: artist.other_infrastructure,
             infrastructure_provided_by: artist.infrastructure_provided_by
           },
-          riderMissing: artist.rider_missing || false
+          riderMissing: artist.rider_missing || false,
+          gearMismatches: gearComparison.mismatches
         };
       });
 
@@ -234,7 +279,8 @@ export const ArtistTablePrintDialog = ({
         stage: pdfData.stage,
         artistCount: pdfData.artists.length,
         logoUrl: !!pdfData.logoUrl,
-        sampleArtist: pdfData.artists[0]
+        sampleArtist: pdfData.artists[0],
+        artistsWithGearIssues: pdfData.artists.filter(a => a.gearMismatches && a.gearMismatches.length > 0).length
       });
 
       console.log('Calling exportArtistTablePDF...');

@@ -13,6 +13,9 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
+import { compareArtistRequirements, ArtistGearComparison } from "@/utils/gearComparisonService";
+import { GearMismatchIndicator } from "./GearMismatchIndicator";
+import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 
 interface Artist {
   id: string;
@@ -98,6 +101,9 @@ export const ArtistTable = ({
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
   const [printingArtistId, setPrintingArtistId] = useState<string | null>(null);
   const [stageNames, setStageNames] = useState<Record<number, string>>({});
+  const [gearComparisons, setGearComparisons] = useState<Record<string, ArtistGearComparison>>({});
+  const [festivalGearSetup, setFestivalGearSetup] = useState<FestivalGearSetup | null>(null);
+  const [stageGearSetups, setStageGearSetups] = useState<Record<number, StageGearSetup>>({});
 
   // Fetch custom stage names
   useEffect(() => {
@@ -123,6 +129,69 @@ export const ArtistTable = ({
     
     fetchStageNames();
   }, [jobId]);
+
+  // Fetch festival gear setup and stage-specific setups
+  useEffect(() => {
+    const fetchGearSetups = async () => {
+      if (!jobId) return;
+
+      try {
+        // Fetch main festival gear setup
+        const { data: mainSetup, error: mainError } = await supabase
+          .from('festival_gear_setups')
+          .select('*')
+          .eq('job_id', jobId)
+          .single();
+
+        if (mainError && mainError.code !== 'PGRST116') {
+          console.error('Error fetching festival gear setup:', mainError);
+          return;
+        }
+
+        setFestivalGearSetup(mainSetup);
+
+        // Fetch stage-specific setups if main setup exists
+        if (mainSetup) {
+          const { data: stageSetups, error: stageError } = await supabase
+            .from('festival_stage_gear_setups')
+            .select('*')
+            .eq('gear_setup_id', mainSetup.id);
+
+          if (stageError) {
+            console.error('Error fetching stage gear setups:', stageError);
+          } else {
+            const stageSetupsMap: Record<number, StageGearSetup> = {};
+            stageSetups?.forEach(setup => {
+              stageSetupsMap[setup.stage_number] = setup;
+            });
+            setStageGearSetups(stageSetupsMap);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching gear setups:', error);
+      }
+    };
+
+    fetchGearSetups();
+  }, [jobId]);
+
+  // Run gear comparison for all artists when gear setups or artists change
+  useEffect(() => {
+    if (!festivalGearSetup || artists.length === 0) {
+      setGearComparisons({});
+      return;
+    }
+
+    const comparisons: Record<string, ArtistGearComparison> = {};
+    
+    artists.forEach(artist => {
+      const stageSetup = stageGearSetups[artist.stage] || null;
+      const comparison = compareArtistRequirements(artist, festivalGearSetup, stageSetup);
+      comparisons[artist.id] = comparison;
+    });
+
+    setGearComparisons(comparisons);
+  }, [artists, festivalGearSetup, stageGearSetups]);
 
   // Helper function to get stage display name
   const getStageDisplayName = (stageNumber: number) => {
@@ -350,6 +419,13 @@ export const ArtistTable = ({
     setPrintingArtistId(artist.id);
     try {
       const pdfData = await transformArtistDataForPdf(artist);
+      
+      // Add gear comparison data to PDF
+      const comparison = gearComparisons[artist.id];
+      if (comparison) {
+        pdfData.gearComparison = comparison;
+      }
+      
       const blob = await exportArtistPDF(pdfData);
 
       // Create download link
@@ -426,205 +502,221 @@ export const ArtistTable = ({
                   <TableHead className="min-w-[80px]">Extras</TableHead>
                   <TableHead className="min-w-[120px]">Notes</TableHead>
                   <TableHead className="min-w-[80px]">Status</TableHead>
+                  <TableHead className="min-w-[100px]">Gear Status</TableHead>
                   <TableHead className="min-w-[200px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedFilteredArtists.map(artist => (
-                  <TableRow key={artist.id}>
-                    <TableCell className="min-w-[140px]">
-                      <div className="space-y-1">
-                        <div className="font-medium">{artist.name}</div>
-                        {artist.isaftermidnight && <Badge variant="outline" className="text-xs bg-blue-700">After Midnight</Badge>}
-                      </div>
-                    </TableCell>
-                    <TableCell className="min-w-[80px]">
-                      <Badge variant="outline">{getStageDisplayName(artist.stage)}</Badge>
-                    </TableCell>
-                    <TableCell className="min-w-[100px]">
-                      <div className="text-sm">
-                        {artist.show_start} - {artist.show_end}
-                      </div>
-                    </TableCell>
-                    <TableCell className="min-w-[100px]">
-                      {artist.soundcheck ? (
+                {sortedFilteredArtists.map(artist => {
+                  const gearComparison = gearComparisons[artist.id];
+                  
+                  return (
+                    <TableRow key={artist.id}>
+                      <TableCell className="min-w-[140px]">
+                        <div className="space-y-1">
+                          <div className="font-medium">{artist.name}</div>
+                          {artist.isaftermidnight && <Badge variant="outline" className="text-xs bg-blue-700">After Midnight</Badge>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="min-w-[80px]">
+                        <Badge variant="outline">{getStageDisplayName(artist.stage)}</Badge>
+                      </TableCell>
+                      <TableCell className="min-w-[100px]">
                         <div className="text-sm">
-                          <Badge variant="secondary">Yes</Badge>
-                          <div className="text-xs text-muted-foreground">
-                            {artist.soundcheck_start} - {artist.soundcheck_end}
-                          </div>
+                          {artist.show_start} - {artist.show_end}
                         </div>
-                      ) : (
-                        <Badge variant="outline">No</Badge>
-                      )}
-                    </TableCell>
-                    
-                    <TableCell className="min-w-[200px]">
-                      <div className="text-sm space-y-1">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <span>FOH: {artist.foh_console || "Not specified"}</span>
-                          {artist.foh_console_provided_by && (
-                            <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.foh_console_provided_by)}`}>
-                              {artist.foh_console_provided_by}
-                            </Badge>
-                          )}
-                          {artist.foh_tech && <Badge variant="outline" className="text-xs">Tech</Badge>}
-                        </div>
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <span>MON: {artist.mon_console || "Not specified"}</span>
-                          {artist.mon_console_provided_by && (
-                            <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
-                              {artist.mon_console_provided_by}
-                            </Badge>
-                          )}
-                          {artist.mon_tech && <Badge variant="outline" className="text-xs">Tech</Badge>}
-                        </div>
-                      </div>
-                    </TableCell>
-                    
-                    <TableCell className="min-w-[180px]">
-                      <div className="text-sm space-y-1">
-                        {artist.wireless_systems && artist.wireless_systems.length > 0 && (
-                          <div className="flex items-center gap-1 flex-wrap">
-                            <div className="text-xs" title={formatWirelessSystems(artist.wireless_systems)}>
-                              Wireless: {formatWirelessSystems(artist.wireless_systems)}
+                      </TableCell>
+                      <TableCell className="min-w-[100px]">
+                        {artist.soundcheck ? (
+                          <div className="text-sm">
+                            <Badge variant="secondary">Yes</Badge>
+                            <div className="text-xs text-muted-foreground">
+                              {artist.soundcheck_start} - {artist.soundcheck_end}
                             </div>
-                            {artist.wireless_provided_by && (
-                              <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.wireless_provided_by)}`}>
-                                {artist.wireless_provided_by === 'mixed' ? 'Mixed' : artist.wireless_provided_by}
+                          </div>
+                        ) : (
+                          <Badge variant="outline">No</Badge>
+                        )}
+                      </TableCell>
+                      
+                      <TableCell className="min-w-[200px]">
+                        <div className="text-sm space-y-1">
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <span>FOH: {artist.foh_console || "Not specified"}</span>
+                            {artist.foh_console_provided_by && (
+                              <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.foh_console_provided_by)}`}>
+                                {artist.foh_console_provided_by}
                               </Badge>
                             )}
+                            {artist.foh_tech && <Badge variant="outline" className="text-xs">Tech</Badge>}
                           </div>
-                        )}
-                        {artist.iem_systems && artist.iem_systems.length > 0 && (
                           <div className="flex items-center gap-1 flex-wrap">
-                            <div className="text-xs" title={formatWirelessSystems(artist.iem_systems, true)}>
-                              IEM: {formatWirelessSystems(artist.iem_systems, true)}
-                            </div>
-                            {artist.iem_provided_by && (
-                              <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.iem_provided_by)}`}>
-                                {artist.iem_provided_by === 'mixed' ? 'Mixed' : artist.iem_provided_by}
+                            <span>MON: {artist.mon_console || "Not specified"}</span>
+                            {artist.mon_console_provided_by && (
+                              <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
+                                {artist.mon_console_provided_by}
                               </Badge>
                             )}
+                            {artist.mon_tech && <Badge variant="outline" className="text-xs">Tech</Badge>}
                           </div>
-                        )}
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="min-w-[140px]">
-                      <div className="text-sm space-y-1">
-                        <Badge variant={
-                          artist.mic_kit === 'festival' ? 'default' : 
-                          artist.mic_kit === 'mixed' ? 'secondary' : 
-                          'outline'
-                        } className={
-                          artist.mic_kit === 'mixed' ? 'bg-purple-100 text-purple-800' : ''
-                        }>
-                          {artist.mic_kit === 'festival' ? 'Festival' : 
-                           artist.mic_kit === 'mixed' ? 'Mixed' : 
-                           'Band'}
-                        </Badge>
-                        {(artist.mic_kit === 'festival' || artist.mic_kit === 'mixed') && artist.wired_mics && artist.wired_mics.length > 0 && (
-                          <div className="text-xs text-muted-foreground max-w-32 truncate" title={formatWiredMics(artist.wired_mics)}>
-                            {formatWiredMics(artist.wired_mics)}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="min-w-[80px]">
-                      {artist.monitors_enabled ? (
-                        <div className="text-sm">
-                          <Badge variant="secondary">{artist.monitors_quantity}x</Badge>
                         </div>
-                      ) : (
-                        <Badge variant="outline">None</Badge>
-                      )}
-                    </TableCell>
-
-                    {/* Infrastructure Column */}
-                    <TableCell className="min-w-[160px]">
-                      <div className="text-sm space-y-1">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="text-xs text-muted-foreground max-w-36 truncate cursor-help">
-                              {formatInfrastructure(artist)}
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="max-w-sm">
-                              <p className="font-medium">Infrastructure Requirements:</p>
-                              <p>{formatInfrastructure(artist)}</p>
-                              {artist.infrastructure_provided_by && (
-                                <p className="text-xs mt-1">Provided by: {artist.infrastructure_provided_by}</p>
+                      </TableCell>
+                      
+                      <TableCell className="min-w-[180px]">
+                        <div className="text-sm space-y-1">
+                          {artist.wireless_systems && artist.wireless_systems.length > 0 && (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <div className="text-xs" title={formatWirelessSystems(artist.wireless_systems)}>
+                                Wireless: {formatWirelessSystems(artist.wireless_systems)}
+                              </div>
+                              {artist.wireless_provided_by && (
+                                <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.wireless_provided_by)}`}>
+                                  {artist.wireless_provided_by === 'mixed' ? 'Mixed' : artist.wireless_provided_by}
+                                </Badge>
                               )}
                             </div>
-                          </TooltipContent>
-                        </Tooltip>
-                        {artist.infrastructure_provided_by && (
-                          <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.infrastructure_provided_by)}`}>
-                            {artist.infrastructure_provided_by}
+                          )}
+                          {artist.iem_systems && artist.iem_systems.length > 0 && (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <div className="text-xs" title={formatWirelessSystems(artist.iem_systems, true)}>
+                                IEM: {formatWirelessSystems(artist.iem_systems, true)}
+                              </div>
+                              {artist.iem_provided_by && (
+                                <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.iem_provided_by)}`}>
+                                  {artist.iem_provided_by === 'mixed' ? 'Mixed' : artist.iem_provided_by}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="min-w-[140px]">
+                        <div className="text-sm space-y-1">
+                          <Badge variant={
+                            artist.mic_kit === 'festival' ? 'default' : 
+                            artist.mic_kit === 'mixed' ? 'secondary' : 
+                            'outline'
+                          } className={
+                            artist.mic_kit === 'mixed' ? 'bg-purple-100 text-purple-800' : ''
+                          }>
+                            {artist.mic_kit === 'festival' ? 'Festival' : 
+                             artist.mic_kit === 'mixed' ? 'Mixed' : 
+                             'Band'}
+                          </Badge>
+                          {(artist.mic_kit === 'festival' || artist.mic_kit === 'mixed') && artist.wired_mics && artist.wired_mics.length > 0 && (
+                            <div className="text-xs text-muted-foreground max-w-32 truncate" title={formatWiredMics(artist.wired_mics)}>
+                              {formatWiredMics(artist.wired_mics)}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="min-w-[80px]">
+                        {artist.monitors_enabled ? (
+                          <div className="text-sm">
+                            <Badge variant="secondary">{artist.monitors_quantity}x</Badge>
+                          </div>
+                        ) : (
+                          <Badge variant="outline">None</Badge>
+                        )}
+                      </TableCell>
+
+                      {/* Infrastructure Column */}
+                      <TableCell className="min-w-[160px]">
+                        <div className="text-sm space-y-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="text-xs text-muted-foreground max-w-36 truncate cursor-help">
+                                {formatInfrastructure(artist)}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="max-w-sm">
+                                <p className="font-medium">Infrastructure Requirements:</p>
+                                <p>{formatInfrastructure(artist)}</p>
+                                {artist.infrastructure_provided_by && (
+                                  <p className="text-xs mt-1">Provided by: {artist.infrastructure_provided_by}</p>
+                                )}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                          {artist.infrastructure_provided_by && (
+                            <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.infrastructure_provided_by)}`}>
+                              {artist.infrastructure_provided_by}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      
+                      <TableCell className="min-w-[80px]">
+                        <div className="text-xs space-y-1 flex flex-wrap gap-1">
+                          {artist.extras_sf && <Badge variant="outline" className="text-xs">SF</Badge>}
+                          {artist.extras_df && <Badge variant="outline" className="text-xs">DF</Badge>}
+                          {artist.extras_djbooth && <Badge variant="outline" className="text-xs">DJ</Badge>}
+                        </div>
+                      </TableCell>
+
+                      {/* Notes Column */}
+                      <TableCell className="min-w-[120px]">
+                        {artist.notes && artist.notes.trim() !== '' ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="text-xs text-muted-foreground max-w-28 truncate cursor-help">
+                                {formatNotes(artist.notes)}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="max-w-sm">
+                                <p className="font-medium">Notes:</p>
+                                <p className="whitespace-pre-wrap">{artist.notes}</p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No notes</span>
+                        )}
+                      </TableCell>
+                      
+                      <TableCell className="min-w-[80px]">
+                        <Badge variant={artist.rider_missing ? "destructive" : "default"}>
+                          {artist.rider_missing ? "Missing" : "Complete"}
+                        </Badge>
+                      </TableCell>
+
+                      {/* New Gear Status Column */}
+                      <TableCell className="min-w-[100px]">
+                        {gearComparison ? (
+                          <GearMismatchIndicator mismatches={gearComparison.mismatches} compact />
+                        ) : (
+                          <Badge variant="outline" className="text-xs">
+                            No Setup
                           </Badge>
                         )}
-                      </div>
-                    </TableCell>
-                    
-                    <TableCell className="min-w-[80px]">
-                      <div className="text-xs space-y-1 flex flex-wrap gap-1">
-                        {artist.extras_sf && <Badge variant="outline" className="text-xs">SF</Badge>}
-                        {artist.extras_df && <Badge variant="outline" className="text-xs">DF</Badge>}
-                        {artist.extras_djbooth && <Badge variant="outline" className="text-xs">DJ</Badge>}
-                      </div>
-                    </TableCell>
-
-                    {/* Notes Column */}
-                    <TableCell className="min-w-[120px]">
-                      {artist.notes && artist.notes.trim() !== '' ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="text-xs text-muted-foreground max-w-28 truncate cursor-help">
-                              {formatNotes(artist.notes)}
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="max-w-sm">
-                              <p className="font-medium">Notes:</p>
-                              <p className="whitespace-pre-wrap">{artist.notes}</p>
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">No notes</span>
-                      )}
-                    </TableCell>
-                    
-                    <TableCell className="min-w-[80px]">
-                      <Badge variant={artist.rider_missing ? "destructive" : "default"}>
-                        {artist.rider_missing ? "Missing" : "Complete"}
-                      </Badge>
-                    </TableCell>
-                    
-                    <TableCell className="min-w-[200px]">
-                      <div className="flex items-center gap-1 flex-wrap">
-                        <Button variant="ghost" size="icon" onClick={() => handleGenerateLink(artist)} title="Generate form link">
-                          <Link className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleManageFiles(artist)} title="Manage files/riders">
-                          <FileText className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handlePrintArtist(artist)} disabled={printingArtistId === artist.id} title="Print artist details">
-                          {printingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => onEditArtist(artist)} title="Edit artist">
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(artist)} disabled={deletingArtistId === artist.id} title="Delete artist">
-                          {deletingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      
+                      <TableCell className="min-w-[200px]">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <Button variant="ghost" size="icon" onClick={() => handleGenerateLink(artist)} title="Generate form link">
+                            <Link className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleManageFiles(artist)} title="Manage files/riders">
+                            <FileText className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handlePrintArtist(artist)} disabled={printingArtistId === artist.id} title="Print artist details">
+                            {printingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => onEditArtist(artist)} title="Edit artist">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(artist)} disabled={deletingArtistId === artist.id} title="Delete artist">
+                            {deletingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
