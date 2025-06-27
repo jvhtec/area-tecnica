@@ -13,6 +13,7 @@ import { InfrastructureSection } from "./form/sections/InfrastructureSection";
 import { NotesSection } from "./form/sections/NotesSection";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MicrophoneNeedsCalculator } from "./gear-setup/MicrophoneNeedsCalculator";
+import { FestivalConsoleSetupSection } from "./form/sections/FestivalConsoleSetupSection";
 
 interface FestivalGearSetupFormProps {
   jobId: string;
@@ -428,10 +429,9 @@ export const FestivalGearSetupForm = ({
         </AlertDescription>
       </Alert>
       
-      <ConsoleSetupSection
-        formData={getCompatibleFormData()}
+      <FestivalConsoleSetupSection
+        formData={setup}
         onChange={(changes) => handleChange(changes)}
-        gearSetup={globalSetup}
       />
 
       <WirelessSetupSection
