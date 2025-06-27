@@ -345,10 +345,10 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       4: { cellWidth: 40 }, // Wireless/IEM (increased from 35)
       5: { cellWidth: 35 }, // Microphones (increased from 30)
       6: { cellWidth: 15 }, // Monitors
-      7: { cellWidth: 30 }, // Infrastructure (increased from 25)
+      7: { cellWidth: 15 }, // Infrastructure (increased from 25)
       8: { cellWidth: 15 }, // Extras
       9: { cellWidth: 30 }, // Notes (increased from 25)
-      10: { cellWidth: 15 }, // Rider Status
+      10: { cellWidth: 18 }, // Rider Status
     },
     didParseCell: (data) => {
       // Make "Missing" text red in the Rider Status column (column 10, was 11)
