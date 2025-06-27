@@ -78,7 +78,7 @@ export interface ArtistPdfData {
     exclusive_use?: boolean;
     notes?: string;
   }>;
-  micKit?: 'festival' | 'band';
+  micKit?: 'festival' | 'band' | 'mixed';
   riderMissing?: boolean;
 }
 
