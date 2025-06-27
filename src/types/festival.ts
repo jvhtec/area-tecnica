@@ -37,7 +37,7 @@ export interface FestivalGearSetup {
   updated_at?: string;
 }
 
-export type ProviderType = 'festival' | 'band';
+export type ProviderType = 'festival' | 'band' | 'mixed';
 
 export interface ArtistFormData {
   readonly name: string;
