@@ -491,7 +491,7 @@ export const ArtistTable = ({
                             </div>
                             {artist.wireless_provided_by && (
                               <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.wireless_provided_by)}`}>
-                                {artist.wireless_provided_by}
+                                {artist.wireless_provided_by === 'mixed' ? 'Mixed' : artist.wireless_provided_by}
                               </Badge>
                             )}
                           </div>
@@ -503,7 +503,7 @@ export const ArtistTable = ({
                             </div>
                             {artist.iem_provided_by && (
                               <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.iem_provided_by)}`}>
-                                {artist.iem_provided_by}
+                                {artist.iem_provided_by === 'mixed' ? 'Mixed' : artist.iem_provided_by}
                               </Badge>
                             )}
                           </div>
