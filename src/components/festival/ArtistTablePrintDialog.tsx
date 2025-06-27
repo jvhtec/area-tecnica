@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { exportArtistTablePDF, ArtistTablePdfData } from "@/utils/artistTablePdfExport";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
-import { supabase } from "@/utils/supabase";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Artist {
   name: string;

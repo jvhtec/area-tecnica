@@ -1,4 +1,3 @@
-
 interface ConflictResult {
   hasConflict: boolean;
   conflictType: 'unavailable' | 'insufficient' | 'model_mismatch' | 'provider_mismatch';
@@ -241,4 +240,4 @@ export const detectArtistConflicts = (
   };
 };
 
-export { ArtistConflicts, ConflictResult };
+export type { ArtistConflicts, ConflictResult };
