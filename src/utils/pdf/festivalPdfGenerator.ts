@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabase';
 import { exportArtistTablePDF, ArtistTablePdfData } from '../artistTablePdfExport';
 import { exportShiftsTablePDF, ShiftsTablePdfData } from '../shiftsTablePdfExport';
@@ -11,6 +12,59 @@ import { generateTableOfContents } from './tocGenerator';
 import { mergePDFs } from './pdfMerge';
 import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArtistsByDateAndStage } from '../wiredMicrophoneNeedsPdfExport';
+
+// Define the missing interface for individual artist PDFs
+interface ArtistPdfData {
+  name: string;
+  stage: number;
+  date: string;
+  schedule: {
+    show: { start: string; end: string };
+    soundcheck?: { start: string; end: string };
+  };
+  technical: {
+    fohTech: boolean;
+    monTech: boolean;
+    fohConsole: { model: string; providedBy: string };
+    monConsole: { model: string; providedBy: string };
+    wireless: {
+      systems: any[];
+      providedBy: string;
+      model: string;
+      handhelds: number;
+      bodypacks: number;
+      band: string;
+    };
+    iem: {
+      systems: any[];
+      providedBy: string;
+      model: string;
+      quantity: number;
+      band: string;
+    };
+    monitors: {
+      enabled: boolean;
+      quantity: number;
+    };
+  };
+  infrastructure: {
+    providedBy: string;
+    cat6: { enabled: boolean; quantity: number };
+    hma: { enabled: boolean; quantity: number };
+    coax: { enabled: boolean; quantity: number };
+    opticalconDuo: { enabled: boolean; quantity: number };
+    analog: number;
+    other: string;
+  };
+  extras: {
+    sideFill: boolean;
+    drumFill: boolean;
+    djBooth: boolean;
+    wired: string;
+  };
+  notes?: string;
+  logoUrl?: string;
+}
 
 // Helper function to sort artists chronologically across all dates
 const sortArtistsChronologically = (artists: any[]) => {
@@ -479,7 +533,7 @@ export const generateAndMergeFestivalPDFs = async (
             logoUrl
           };
           
-          const pdf = await exportArtistPDF(artistData);
+          const pdf = await exportArtistTablePDF(artistData);
           console.log(`Generated PDF for artist ${artist.name}, size: ${pdf.size} bytes`);
           if (pdf && pdf.size > 0) {
             individualArtistPdfs.push(pdf);
