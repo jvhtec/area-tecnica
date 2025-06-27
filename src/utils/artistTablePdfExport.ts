@@ -220,17 +220,17 @@ const formatConsolesWithTech = (console: { model: string; providedBy: string }, 
 };
 
 const formatGearMismatchesForPdf = (mismatches: GearMismatch[] = []) => {
-  if (mismatches.length === 0) return "OK";
+  if (mismatches.length === 0) return "✓ OK";
   
   const errors = mismatches.filter(m => m.severity === 'error');
   const warnings = mismatches.filter(m => m.severity === 'warning');
   
   const parts: string[] = [];
   if (errors.length > 0) {
-    parts.push(`${errors.length} Error${errors.length !== 1 ? 's' : ''}`);
+    parts.push(`❌ ${errors.length} Error${errors.length !== 1 ? 's' : ''}`);
   }
   if (warnings.length > 0) {
-    parts.push(`${warnings.length} Warning${warnings.length !== 1 ? 's' : ''}`);
+    parts.push(`⚠️ ${warnings.length} Warning${warnings.length !== 1 ? 's' : ''}`);
   }
   
   return parts.join('\n');
@@ -371,7 +371,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       8: { cellWidth: 12 }, // Extras
       9: { cellWidth: 25 }, // Notes
       10: { cellWidth: 15 }, // Rider Status
-      11: { cellWidth: 20 }, // Gear Status
+      11: { cellWidth: 20 }, // Gear Status (new column)
     },
     didParseCell: (data) => {
       // Make "Missing" text red in the Rider Status column (column 10)
@@ -382,11 +382,11 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       // Color code gear status column (column 11)
       if (data.column.index === 11) {
         const cellText = data.cell.text[0];
-        if (cellText.includes('Error')) {
+        if (cellText.includes('❌')) {
           data.cell.styles.textColor = [255, 0, 0]; // Red for errors
-        } else if (cellText.includes('Warning')) {
+        } else if (cellText.includes('⚠️')) {
           data.cell.styles.textColor = [255, 165, 0]; // Orange for warnings
-        } else if (cellText === 'OK') {
+        } else if (cellText.includes('✓')) {
           data.cell.styles.textColor = [0, 128, 0]; // Green for OK
         }
       }
@@ -397,13 +397,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
   // Add gear conflicts summary if there are any
   const artistsWithConflicts = data.artists.filter(a => a.gearMismatches && a.gearMismatches.length > 0);
   if (artistsWithConflicts.length > 0) {
-    let currentY = (doc as any).lastAutoTable.finalY + 15;
-    
-    // Check if we need a new page for the summary
-    if (currentY > pageHeight - 60) {
-      doc.addPage();
-      currentY = 20;
-    }
+    let currentY = (doc as any).lastAutoTable.finalY + 20;
     
     // Add summary header
     doc.setFontSize(14);
@@ -412,54 +406,26 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     currentY += 10;
     
     // Add conflicts details
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     artistsWithConflicts.forEach(artist => {
       const errors = artist.gearMismatches?.filter(m => m.severity === 'error') || [];
       const warnings = artist.gearMismatches?.filter(m => m.severity === 'warning') || [];
       
       if (errors.length > 0 || warnings.length > 0) {
-        // Check if we need space for this artist's conflicts
-        const neededSpace = 8 + (errors.length + warnings.length) * 6;
-        if (currentY + neededSpace > pageHeight - 20) {
-          doc.addPage();
-          currentY = 20;
-        }
-        
         doc.setTextColor(0, 0, 0);
         doc.text(`${artist.name}:`, 10, currentY);
-        currentY += 6;
+        currentY += 5;
         
         [...errors, ...warnings].forEach(mismatch => {
           const color = mismatch.severity === 'error' ? [255, 0, 0] : [255, 165, 0];
           doc.setTextColor(color[0], color[1], color[2]);
-          
-          // Wrap long text to prevent overflow
-          const maxWidth = pageWidth - 30;
-          const messageLines = doc.splitTextToSize(`• ${mismatch.message}`, maxWidth);
-          
-          messageLines.forEach((line: string, index: number) => {
-            if (currentY > pageHeight - 15) {
-              doc.addPage();
-              currentY = 20;
-            }
-            doc.text(line, 15, currentY);
-            if (index < messageLines.length - 1) currentY += 4;
-          });
-          currentY += 5;
-          
+          doc.text(`  • ${mismatch.message}`, 15, currentY);
           if (mismatch.details) {
-            doc.setTextColor(100, 100, 100);
-            const detailLines = doc.splitTextToSize(mismatch.details, maxWidth - 10);
-            detailLines.forEach((line: string, index: number) => {
-              if (currentY > pageHeight - 15) {
-                doc.addPage();
-                currentY = 20;
-              }
-              doc.text(line, 20, currentY);
-              if (index < detailLines.length - 1) currentY += 4;
-            });
             currentY += 4;
+            doc.setTextColor(100, 100, 100);
+            doc.text(`    ${mismatch.details}`, 20, currentY);
           }
+          currentY += 5;
         });
         currentY += 3;
       }
