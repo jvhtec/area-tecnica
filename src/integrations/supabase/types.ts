@@ -3676,7 +3676,7 @@ export type Database = {
         | "form_submissions"
         | "gear_movements"
       project_status: "pending" | "in_progress" | "completed" | "cancelled"
-      provider_type: "festival" | "band"
+      provider_type: "festival" | "band" | "mixed"
       room_type: "single" | "double"
       task_status: "not_started" | "in_progress" | "completed"
       transport_type: "trailer" | "9m" | "8m" | "6m" | "4m" | "furgoneta" | "rv"
@@ -3851,7 +3851,7 @@ export const Constants = {
         "gear_movements",
       ],
       project_status: ["pending", "in_progress", "completed", "cancelled"],
-      provider_type: ["festival", "band"],
+      provider_type: ["festival", "band", "mixed"],
       room_type: ["single", "double"],
       task_status: ["not_started", "in_progress", "completed"],
       transport_type: ["trailer", "9m", "8m", "6m", "4m", "furgoneta", "rv"],

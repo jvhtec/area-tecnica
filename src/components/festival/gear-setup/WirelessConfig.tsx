@@ -2,12 +2,11 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Minus, Signal } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Minus } from "lucide-react";
 import { WirelessConfigProps } from "@/types/festival-gear";
-import { WirelessSetup } from "@/types/festival";
-import { EquipmentSelect } from "../form/shared/EquipmentSelect";
+import { useEquipmentModels } from "@/hooks/useEquipmentModels";
 import { WIRELESS_SYSTEMS, IEM_SYSTEMS } from "@/types/festival-equipment";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export const WirelessConfig = ({ 
   systems, 
@@ -17,14 +16,16 @@ export const WirelessConfig = ({
   isIEM = false,
   hideProvidedBy = false
 }: WirelessConfigProps) => {
+  const { models } = useEquipmentModels();
+
   const addSystem = () => {
-    const newSystem: WirelessSetup = {
+    const newSystem = {
       model: '',
-      quantity: 0,
       quantity_hh: 0,
       quantity_bp: 0,
       band: '',
-      provided_by: 'festival'
+      notes: '',
+      provided_by: 'festival' as const
     };
     onChange([...systems, newSystem]);
   };
@@ -33,70 +34,25 @@ export const WirelessConfig = ({
     onChange(systems.filter((_, i) => i !== index));
   };
 
-  const updateSystem = (index: number, field: keyof WirelessSetup, value: string | number) => {
-    console.log('Updating system:', { index, field, value, currentSystems: systems });
-    
-    const updatedSystems = systems.map((system, i) => {
-      if (i !== index) return system;
-      
-      const updatedSystem = { ...system };
-      
-      // Handle numeric fields
-      if (field === 'quantity_hh' || field === 'quantity_bp') {
-        const numericValue = typeof value === 'string' ? parseInt(value) || 0 : value;
-        updatedSystem[field as 'quantity_hh' | 'quantity_bp'] = numericValue;
-        
-        if (isIEM) {
-          // For IEM systems, quantity equals channels (quantity_hh)
-          if (field === 'quantity_hh') {
-            updatedSystem.quantity = numericValue;
-          }
-        } else {
-          // For wireless systems, quantity is the sum of handhelds and bodypacks
-          updatedSystem.quantity = (updatedSystem.quantity_hh || 0) + (updatedSystem.quantity_bp || 0);
-        }
-      } else if (field === 'provided_by') {
-        // Ensure provided_by is properly validated and typed
-        if (value === 'festival' || value === 'band') {
-          updatedSystem.provided_by = value;
-          console.log('Updated provided_by to:', value);
-        } else {
-          console.warn('Invalid provided_by value:', value, 'defaulting to festival');
-          updatedSystem.provided_by = 'festival';
-        }
-      } else {
-        // Handle non-numeric fields (model, band)
-        updatedSystem[field as 'model' | 'band'] = value as string;
-      }
-      
-      console.log('Updated system:', updatedSystem);
-      return updatedSystem;
-    });
-    
-    console.log('Calling onChange with updated systems:', updatedSystems);
+  const updateSystem = (index: number, field: string, value: string | number) => {
+    const updatedSystems = systems.map((system, i) => 
+      i === index ? { ...system, [field]: value } : system
+    );
     onChange(updatedSystems);
   };
 
-  const options = isIEM ? IEM_SYSTEMS : WIRELESS_SYSTEMS;
-  const quantityTypeLabels = isIEM ? {
-    hh: "Channels",
-    bp: "Bodypacks"
-  } : {
-    hh: "Handheld",
-    bp: "Bodypacks"
-  };
-
-  const getCategory = () => {
-    return isIEM ? 'iem' : 'wireless';
-  };
+  // Get system options from database with fallback
+  const systemOptions = models
+    .filter(model => model.category === (isIEM ? 'iem' : 'wireless'))
+    .map(model => model.name);
+  
+  const fallbackOptions = isIEM ? IEM_SYSTEMS : WIRELESS_SYSTEMS;
+  const options = systemOptions.length > 0 ? systemOptions : fallbackOptions;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Signal className="h-4 w-4" />
-          <Label>{label}</Label>
-        </div>
+        <Label className="text-sm font-medium">{label}</Label>
         <Button
           type="button"
           variant="outline"
@@ -109,88 +65,104 @@ export const WirelessConfig = ({
       </div>
 
       {systems.map((system, index) => (
-        <div key={index} className="space-y-4 p-4 border rounded-lg">
-          <div className="flex gap-4 items-start">
-            <div className="flex-1">
-              <EquipmentSelect
+        <div key={index} className="space-y-3 p-4 border rounded-lg">
+          <div className="grid grid-cols-12 gap-3 items-start">
+            <div className="col-span-4">
+              <Label className="text-xs">Model</Label>
+              <Select
                 value={system.model}
-                onChange={(value) => updateSystem(index, 'model', value)}
-                options={[]}
-                fallbackOptions={options}
-                placeholder="Select system"
-                category={getCategory()}
-              />
+                onValueChange={(value) => updateSystem(index, 'model', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select system" />
+                </SelectTrigger>
+                <SelectContent>
+                  {options.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => removeSystem(index)}
-            >
-              <Minus className="h-4 w-4" />
-            </Button>
-          </div>
 
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <Label>{quantityTypeLabels.hh}</Label>
+            {includeQuantityTypes && (
+              <>
+                <div className="col-span-2">
+                  <Label className="text-xs">{isIEM ? 'Channels' : 'HH'}</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={system.quantity_hh || 0}
+                    onChange={(e) => updateSystem(index, 'quantity_hh', parseInt(e.target.value) || 0)}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs">{isIEM ? 'Bodypacks' : 'BP'}</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={system.quantity_bp || 0}
+                    onChange={(e) => updateSystem(index, 'quantity_bp', parseInt(e.target.value) || 0)}
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="col-span-2">
+              <Label className="text-xs">Band</Label>
               <Input
-                type="number"
-                min="0"
-                value={system.quantity_hh || 0}
-                onChange={(e) => {
-                  updateSystem(index, 'quantity_hh', e.target.value);
-                }}
-                placeholder={`${quantityTypeLabels.hh} Qty`}
+                value={system.band || ''}
+                onChange={(e) => updateSystem(index, 'band', e.target.value)}
+                placeholder="Band"
               />
             </div>
-            <div className="flex-1">
-              <Label>{quantityTypeLabels.bp}</Label>
-              <Input
-                type="number"
-                min="0"
-                value={system.quantity_bp || 0}
-                onChange={(e) => {
-                  updateSystem(index, 'quantity_bp', e.target.value);
-                }}
-                placeholder={`${quantityTypeLabels.bp} Qty`}
-              />
+
+            {!hideProvidedBy && (
+              <div className="col-span-2">
+                <Label className="text-xs">Provider</Label>
+                <Select
+                  value={system.provided_by || 'festival'}
+                  onValueChange={(value) => updateSystem(index, 'provided_by', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="festival">Festival</SelectItem>
+                    <SelectItem value="band">Band</SelectItem>
+                    <SelectItem value="mixed">Mixed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="col-span-1 flex justify-end">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => removeSystem(index)}
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
             </div>
           </div>
 
           <div>
-            <Label>Frequency Band</Label>
+            <Label className="text-xs">Notes</Label>
             <Input
-              value={system.band || ''}
-              onChange={(e) => updateSystem(index, 'band', e.target.value)}
-              placeholder="e.g., G50, H50"
+              value={system.notes || ''}
+              onChange={(e) => updateSystem(index, 'notes', e.target.value)}
+              placeholder="Additional notes"
             />
           </div>
-          
-          {!hideProvidedBy && (
-            <div>
-              <Label>Provided By</Label>
-              <RadioGroup
-                value={system.provided_by || 'festival'}
-                onValueChange={(value: 'festival' | 'band') => {
-                  console.log('RadioGroup onValueChange called with:', value);
-                  updateSystem(index, 'provided_by', value);
-                }}
-                className="flex space-x-4 mt-1"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="festival" id={`${index}-festival`} />
-                  <Label htmlFor={`${index}-festival`}>Festival</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="band" id={`${index}-band`} />
-                  <Label htmlFor={`${index}-band`}>Band</Label>
-                </div>
-              </RadioGroup>
-            </div>
-          )}
         </div>
       ))}
+
+      {systems.length === 0 && (
+        <p className="text-sm text-muted-foreground">No systems added yet.</p>
+      )}
     </div>
   );
 };

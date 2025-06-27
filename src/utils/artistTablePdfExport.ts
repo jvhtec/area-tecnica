@@ -170,7 +170,7 @@ const formatWirelessSystemsForPdf = (systems: any[] = [], providedBy: string = "
     // Show individual system providers when mixed
     return systems.map(system => {
       const provider = system.provided_by || "festival";
-      const providerLabel = provider === "festival" ? "(F)" : "(B)";
+      const providerLabel = provider === "festival" ? "(F)" : provider === "band" ? "(B)" : "(M)";
       
       if (isIEM) {
         const channels = system.quantity_hh || system.quantity || 0;
