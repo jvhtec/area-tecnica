@@ -339,9 +339,9 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     },
     columnStyles: {
       0: { cellWidth: 30 }, // Artist (increased from 25)
-      1: { cellWidth: 22 }, // Show Time (increased from 20)
-      2: { cellWidth: 22 }, // Soundcheck (increased from 20)  
-      3: { cellWidth: 45 }, // Consoles (increased from 40)
+      1: { cellWidth: 20 }, // Show Time (increased from 20)
+      2: { cellWidth: 20 }, // Soundcheck (increased from 20)  
+      3: { cellWidth: 40 }, // Consoles (increased from 40)
       4: { cellWidth: 40 }, // Wireless/IEM (increased from 35)
       5: { cellWidth: 35 }, // Microphones (increased from 30)
       6: { cellWidth: 15 }, // Monitors
