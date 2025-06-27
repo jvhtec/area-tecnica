@@ -72,6 +72,35 @@ export const generateAndMergeFestivalPDFs = async (
     const stage = stageNames?.find(s => s.number === stageNumber);
     return stage?.name || `Stage ${stageNumber}`;
   };
+
+  // Fetch stage setup data for conflict detection
+  const { data: stageSetups, error: stageSetupsError } = await supabase
+    .from("festival_stage_gear_setups")
+    .select(`
+      stage_number,
+      foh_consoles,
+      mon_consoles,
+      wireless_systems,
+      iem_systems,
+      monitors_quantity,
+      infra_cat6_quantity,
+      infra_hma_quantity,
+      infra_coax_quantity,
+      infra_opticalcon_duo_quantity,
+      infra_analog,
+      extras_sf,
+      extras_df,
+      extras_djbooth
+    `)
+    .eq("gear_setup_id", `(SELECT id FROM festival_gear_setups WHERE job_id = '${jobId}' LIMIT 1)`);
+
+  let stageSetupsMap: Record<number, any> = {};
+  if (!stageSetupsError && stageSetups) {
+    stageSetupsMap = stageSetups.reduce((acc, setup) => {
+      acc[setup.stage_number] = setup;
+      return acc;
+    }, {} as Record<number, any>);
+  }
   
   const gearPdfs: Blob[] = [];
   const shiftPdfs: Blob[] = [];
@@ -370,11 +399,12 @@ export const generateAndMergeFestivalPDFs = async (
                   riderMissing: Boolean(artist.rider_missing || false)
                 };
               }),
-              logoUrl
+              logoUrl,
+              stageSetups: stageSetupsMap // Pass stage setup data for conflict detection
             };
             
             try {
-              console.log(`Generating table PDF for ${date} ${stageName}`);
+              console.log(`Generating table PDF for ${date} ${stageName} with conflict detection`);
               const pdf = await exportArtistTablePDF(tableData);
               console.log(`Generated table PDF, size: ${pdf.size} bytes`);
               if (pdf && pdf.size > 0) {

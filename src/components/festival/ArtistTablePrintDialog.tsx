@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -15,6 +14,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { exportArtistTablePDF, ArtistTablePdfData } from "@/utils/artistTablePdfExport";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
+import { supabase } from "@/utils/supabase";
 
 interface Artist {
   name: string;
@@ -98,24 +98,55 @@ export const ArtistTablePrintDialog = ({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
+  const [stageSetups, setStageSetups] = useState<Record<number, any>>({});
 
   // Use external open state if provided, otherwise use internal state
   const dialogOpen = open !== undefined ? open : isDialogOpen;
   const setDialogOpen = onOpenChange || setIsDialogOpen;
 
   useEffect(() => {
-    const fetchLogo = async () => {
+    const fetchData = async () => {
       if (jobId) {
         try {
+          // Fetch logo
           const url = await fetchJobLogo(jobId);
           setLogoUrl(url);
+
+          // Fetch stage setup data for conflict detection
+          const { data: stageSetupData } = await supabase
+            .from("festival_stage_gear_setups")
+            .select(`
+              stage_number,
+              foh_consoles,
+              mon_consoles,
+              wireless_systems,
+              iem_systems,
+              monitors_quantity,
+              infra_cat6_quantity,
+              infra_hma_quantity,
+              infra_coax_quantity,
+              infra_opticalcon_duo_quantity,
+              infra_analog,
+              extras_sf,
+              extras_df,
+              extras_djbooth
+            `)
+            .eq("gear_setup_id", `(SELECT id FROM festival_gear_setups WHERE job_id = '${jobId}' LIMIT 1)`);
+
+          if (stageSetupData) {
+            const setupsMap = stageSetupData.reduce((acc, setup) => {
+              acc[setup.stage_number] = setup;
+              return acc;
+            }, {} as Record<number, any>);
+            setStageSetups(setupsMap);
+          }
         } catch (error) {
-          console.error('Error fetching logo:', error);
+          console.error('Error fetching data:', error);
         }
       }
     };
 
-    fetchLogo();
+    fetchData();
   }, [jobId]);
 
   const handleTablePrint = async () => {
@@ -227,19 +258,21 @@ export const ArtistTablePrintDialog = ({
         stage: stageFilter !== 'all' ? stageFilter : undefined,
         stageNames: stageNames,
         artists: transformedArtists,
-        logoUrl: logoUrl
+        logoUrl: logoUrl,
+        stageSetups: stageSetups // Pass stage setup data for conflict detection
       };
 
-      console.log('PDF data structure:', {
+      console.log('PDF data structure with conflict detection:', {
         jobTitle: pdfData.jobTitle,
         date: pdfData.date,
         stage: pdfData.stage,
         artistCount: pdfData.artists.length,
         logoUrl: !!pdfData.logoUrl,
+        hasStageSetups: Object.keys(stageSetups).length > 0,
         sampleArtist: pdfData.artists[0]
       });
 
-      console.log('Calling exportArtistTablePDF...');
+      console.log('Calling exportArtistTablePDF with conflict detection...');
       const blob = await exportArtistTablePDF(pdfData);
       console.log('PDF blob generated successfully, size:', blob.size);
       

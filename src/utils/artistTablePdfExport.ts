@@ -1,6 +1,6 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { detectArtistConflicts, StageSetupData, ArtistConflicts } from './pdf/conflictDetection';
 
 // Local interfaces for internal PDF generation use
 interface WirelessSystemDetail {
@@ -85,6 +85,7 @@ export interface ArtistTablePdfData {
     riderMissing: boolean;
   }>;
   logoUrl?: string;
+  stageSetups?: Record<number, StageSetupData>; // New: stage setup data for conflict detection
 }
 
 // Enhanced image loading function
@@ -116,8 +117,8 @@ const loadImageSafely = async (src: string, description: string): Promise<HTMLIm
   });
 };
 
-// Fixed infrastructure formatting function
-const formatInfrastructureForPdf = (infrastructure: any) => {
+// Enhanced infrastructure formatting with conflict detection
+const formatInfrastructureForPdf = (infrastructure: any, conflicts?: ArtistConflicts['infrastructure']) => {
   console.log('formatInfrastructureForPdf called with:', infrastructure);
   
   if (!infrastructure) {
@@ -129,19 +130,29 @@ const formatInfrastructureForPdf = (infrastructure: any) => {
   
   try {
     if (infrastructure.infra_cat6 && infrastructure.infra_cat6_quantity) {
-      infraItems.push(`${infrastructure.infra_cat6_quantity}x CAT6`);
+      const hasConflict = conflicts?.cat6?.hasConflict;
+      const item = `${infrastructure.infra_cat6_quantity}x CAT6`;
+      infraItems.push(hasConflict ? `⚠️${item}` : item);
     }
     if (infrastructure.infra_hma && infrastructure.infra_hma_quantity) {
-      infraItems.push(`${infrastructure.infra_hma_quantity}x HMA`);
+      const hasConflict = conflicts?.hma?.hasConflict;
+      const item = `${infrastructure.infra_hma_quantity}x HMA`;
+      infraItems.push(hasConflict ? `⚠️${item}` : item);
     }
     if (infrastructure.infra_coax && infrastructure.infra_coax_quantity) {
-      infraItems.push(`${infrastructure.infra_coax_quantity}x Coax`);
+      const hasConflict = conflicts?.coax?.hasConflict;
+      const item = `${infrastructure.infra_coax_quantity}x Coax`;
+      infraItems.push(hasConflict ? `⚠️${item}` : item);
     }
     if (infrastructure.infra_opticalcon_duo && infrastructure.infra_opticalcon_duo_quantity) {
-      infraItems.push(`${infrastructure.infra_opticalcon_duo_quantity}x OpticalCON DUO`);
+      const hasConflict = conflicts?.opticalconDuo?.hasConflict;
+      const item = `${infrastructure.infra_opticalcon_duo_quantity}x OpticalCON DUO`;
+      infraItems.push(hasConflict ? `⚠️${item}` : item);
     }
     if (infrastructure.infra_analog && infrastructure.infra_analog > 0) {
-      infraItems.push(`${infrastructure.infra_analog}x Analog`);
+      const hasConflict = conflicts?.analog?.hasConflict;
+      const item = `${infrastructure.infra_analog}x Analog`;
+      infraItems.push(hasConflict ? `⚠️${item}` : item);
     }
     if (infrastructure.other_infrastructure) {
       infraItems.push(infrastructure.other_infrastructure);
@@ -155,33 +166,78 @@ const formatInfrastructureForPdf = (infrastructure: any) => {
   }
 };
 
+// Enhanced console formatting with conflict detection
+const formatConsoleForPdf = (console: { model: string; providedBy: string }, conflict?: any) => {
+  const hasConflict = conflict?.hasConflict;
+  const base = `${console.model} (${console.providedBy})`;
+  return hasConflict ? `⚠️${base}` : base;
+};
+
+// Enhanced wireless systems formatting with conflict detection
+const formatWirelessSystemsForPdf = (systems: any[] = [], conflicts: any[] = [], isIEM = false) => {
+  if (systems.length === 0) return "None";
+  
+  return systems.map((system, index) => {
+    const conflict = conflicts[index];
+    const hasConflict = conflict?.hasConflict;
+    
+    let systemText = '';
+    if (isIEM) {
+      const channels = system.quantity_hh || system.quantity || 0;
+      const beltpacks = system.quantity_bp || 0;
+      systemText = `${system.model}: ${channels} ch${beltpacks > 0 ? `, ${beltpacks} bp` : ''}`;
+    } else {
+      const hh = system.quantity_hh || 0;
+      const bp = system.quantity_bp || 0;
+      const total = hh + bp;
+      if (hh > 0 && bp > 0) {
+        systemText = `${system.model}: ${hh}x HH, ${bp}x BP`;
+      } else if (total > 0) {
+        systemText = `${system.model}: ${total}x`;
+      } else {
+        systemText = system.model;
+      }
+    }
+    
+    return hasConflict ? `⚠️${systemText}` : systemText;
+  }).join("; ");
+};
+
+// Enhanced monitor formatting with conflict detection
+const formatMonitorsForPdf = (monitors: { enabled: boolean; quantity: number }, conflict?: any) => {
+  if (!monitors.enabled) return 'None';
+  
+  const hasConflict = conflict?.hasConflict;
+  const base = `${monitors.quantity}x`;
+  return hasConflict ? `⚠️${base}` : base;
+};
+
+// Enhanced extras formatting with conflict detection
+const formatExtrasForPdf = (extras: any, conflicts?: ArtistConflicts['extras']) => {
+  const items: string[] = [];
+  
+  if (extras.sideFill) {
+    const hasConflict = conflicts?.sideFill?.hasConflict;
+    items.push(hasConflict ? '⚠️SF' : 'SF');
+  }
+  if (extras.drumFill) {
+    const hasConflict = conflicts?.drumFill?.hasConflict;
+    items.push(hasConflict ? '⚠️DF' : 'DF');
+  }
+  if (extras.djBooth) {
+    const hasConflict = conflicts?.djBooth?.hasConflict;
+    items.push(hasConflict ? '⚠️DJ' : 'DJ');
+  }
+  
+  return items.length > 0 ? items.join(', ') : 'None';
+};
+
 const formatWiredMicsForPdf = (mics: Array<{ model: string; quantity: number; exclusive_use?: boolean; notes?: string }> = []) => {
   if (mics.length === 0) return "None";
   return mics.map(mic => {
     const exclusiveIndicator = mic.exclusive_use ? " (E)" : "";
     return `${mic.quantity}x ${mic.model}${exclusiveIndicator}`;
   }).join(", ");
-};
-
-const formatWirelessSystemsForPdf = (systems: any[] = [], isIEM = false) => {
-  if (systems.length === 0) return "None";
-  return systems.map(system => {
-    if (isIEM) {
-      const channels = system.quantity_hh || system.quantity || 0;
-      const beltpacks = system.quantity_bp || 0;
-      return `${system.model}: ${channels} ch${beltpacks > 0 ? `, ${beltpacks} bp` : ''}`;
-    } else {
-      const hh = system.quantity_hh || 0;
-      const bp = system.quantity_bp || 0;
-      const total = hh + bp;
-      if (hh > 0 && bp > 0) {
-        return `${system.model}: ${hh}x HH, ${bp}x BP`;
-      } else if (total > 0) {
-        return `${system.model}: ${total}x`;
-      }
-      return system.model;
-    }
-  }).join("; ");
 };
 
 export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Blob> => {
@@ -256,21 +312,21 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       wiredMics: artist.wiredMics?.length || 0
     });
 
+    // Detect conflicts for this artist
+    const stageSetup = data.stageSetups?.[artist.stage];
+    const conflicts = detectArtistConflicts(artist, stageSetup || null);
+
     return [
       artist.name,
       data.stageNames?.[artist.stage] || `Stage ${artist.stage}`,
       `${artist.showTime.start} - ${artist.showTime.end}`,
       artist.soundcheck ? `${artist.soundcheck.start} - ${artist.soundcheck.end}` : 'No',
-      `FOH: ${artist.technical.fohConsole.model} (${artist.technical.fohConsole.providedBy})\nMON: ${artist.technical.monConsole.model} (${artist.technical.monConsole.providedBy})`,
-      `Wireless: ${formatWirelessSystemsForPdf(artist.technical.wireless.systems)}\nIEM: ${formatWirelessSystemsForPdf(artist.technical.iem.systems, true)}`,
+      `FOH: ${formatConsoleForPdf(artist.technical.fohConsole, conflicts.fohConsole)}\nMON: ${formatConsoleForPdf(artist.technical.monConsole, conflicts.monConsole)}`,
+      `Wireless: ${formatWirelessSystemsForPdf(artist.technical.wireless.systems, conflicts.wireless)}\nIEM: ${formatWirelessSystemsForPdf(artist.technical.iem.systems, conflicts.iem, true)}`,
       `Kit: ${artist.micKit}\n${artist.micKit === 'festival' ? formatWiredMicsForPdf(artist.wiredMics) : 'Band provides'}`,
-      artist.technical.monitors.enabled ? `${artist.technical.monitors.quantity}x` : 'None',
-      formatInfrastructureForPdf(artist.infrastructure),
-      [
-        artist.extras.sideFill ? 'SF' : '',
-        artist.extras.drumFill ? 'DF' : '',
-        artist.extras.djBooth ? 'DJ' : ''
-      ].filter(Boolean).join(', ') || 'None',
+      formatMonitorsForPdf(artist.technical.monitors, conflicts.monitors),
+      formatInfrastructureForPdf(artist.infrastructure, conflicts.infrastructure),
+      formatExtrasForPdf(artist.extras, conflicts.extras),
       artist.notes || 'No notes',
       artist.riderMissing ? 'Missing' : 'Complete'
     ];
@@ -296,14 +352,14 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     },
     columnStyles: {
       0: { cellWidth: 25 }, // Artist
-      1: { cellWidth: 15 }, // Stage - reduced from 20 to 15
-      2: { cellWidth: 20 }, // Show Time - reduced from 25 to 20
-      3: { cellWidth: 20 }, // Soundcheck - reduced from 25 to 20
+      1: { cellWidth: 15 }, // Stage
+      2: { cellWidth: 20 }, // Show Time
+      3: { cellWidth: 20 }, // Soundcheck
       4: { cellWidth: 40 }, // Consoles
       5: { cellWidth: 35 }, // Wireless/IEM
       6: { cellWidth: 30 }, // Microphones
       7: { cellWidth: 15 }, // Monitors
-      8: { cellWidth: 25 }, // Infrastructure - reduced from 30 to 25
+      8: { cellWidth: 25 }, // Infrastructure
       9: { cellWidth: 15 }, // Extras
       10: { cellWidth: 25 }, // Notes
       11: { cellWidth: 15 }, // Rider Status
@@ -312,6 +368,11 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       // Make "Missing" text red in the Rider Status column (column 11)
       if (data.column.index === 11 && data.cell.text[0] === 'Missing') {
         data.cell.styles.textColor = [255, 0, 0]; // Red color
+      }
+      
+      // Make conflict indicators (⚠️) red in all other columns
+      if (data.column.index !== 11 && data.cell.text[0] && data.cell.text[0].includes('⚠️')) {
+        data.cell.styles.textColor = [255, 0, 0]; // Red color for conflicts
       }
     },
     margin: { left: 10, right: 10 },
