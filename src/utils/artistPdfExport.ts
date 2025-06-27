@@ -1,33 +1,81 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { WirelessSystem, IEMSystem } from '@/types/festival-equipment';
+import { ArtistGearComparison, GearMismatch } from './gearComparisonService';
 
-export interface ArtistTechnicalInfo {
-  fohTech: boolean;
-  monTech: boolean;
-  fohConsole: { model: string; providedBy: string };
-  monConsole: { model: string; providedBy: string };
-  wireless: {
-    systems?: WirelessSystem[];
-    model?: string;
-    providedBy: string;
-    handhelds?: number;
-    bodypacks?: number;
-    band?: string;
-    hh?: number;
-    bp?: number;
+export interface ArtistPdfData {
+  name: string;
+  stage: number;
+  date: string;
+  schedule: {
+    show: {
+      start: string;
+      end: string;
+    };
+    soundcheck?: {
+      start: string;
+      end: string;
+    };
   };
-  iem: {
-    systems?: IEMSystem[];
-    model?: string;
-    providedBy: string;
-    quantity?: number;
-    band?: string;
+  technical: {
+    fohTech: boolean;
+    monTech: boolean;
+    fohConsole: {
+      model: string;
+      providedBy: string;
+    };
+    monConsole: {
+      model: string;
+      providedBy: string;
+    };
+    wireless: {
+      systems: any[];
+      providedBy: string;
+    };
+    iem: {
+      systems: any[];
+      providedBy: string;
+    };
+    monitors: {
+      enabled: boolean;
+      quantity: number;
+    };
   };
-  monitors: {
-    enabled: boolean;
+  infrastructure: {
+    providedBy: string;
+    cat6: {
+      enabled: boolean;
+      quantity: number;
+    };
+    hma: {
+      enabled: boolean;
+      quantity: number;
+    };
+    coax: {
+      enabled: boolean;
+      quantity: number;
+    };
+    opticalconDuo: {
+      enabled: boolean;
+      quantity: number;
+    };
+    analog: number;
+    other: string;
+  };
+  extras: {
+    sideFill: boolean;
+    drumFill: boolean;
+    djBooth: boolean;
+    wired: string;
+  };
+  notes: string;
+  wiredMics: Array<{
+    model: string;
     quantity: number;
-  };
+  }>;
+  logoUrl?: string;
+  micKit: 'festival' | 'band' | 'mixed';
+  riderMissing: boolean;
+  gearComparison?: ArtistGearComparison;
 }
 
 // Local interfaces for internal PDF generation use
@@ -44,60 +92,77 @@ interface IEMSystemDetail {
   band?: string;
 }
 
-export interface ArtistInfrastructure {
-  providedBy: string;
-  cat6: { enabled: boolean; quantity: number };
-  hma: { enabled: boolean; quantity: number };
-  coax: { enabled: boolean; quantity: number };
-  opticalconDuo: { enabled: boolean; quantity: number };
-  analog: number;
-  other: string;
-}
-
-export interface ArtistPdfData {
-  name: string;
-  stage: number;
+export interface ArtistTablePdfData {
+  jobTitle: string;
   date: string;
-  schedule: {
-    show: { start: string; end: string };
-    soundcheck?: { start: string; end: string };
-  };
-  technical: ArtistTechnicalInfo;
-  infrastructure: ArtistInfrastructure;
-  extras: {
-    sideFill: boolean;
-    drumFill: boolean;
-    djBooth: boolean;
-    wired: string;
-  };
-  notes?: string;
-  logoUrl?: string;
-  wiredMics?: Array<{
-    model: string;
-    quantity: number;
-    exclusive_use?: boolean;
+  stage?: string;
+  stageNames?: Record<number, string>;
+  artists: Array<{
+    name: string;
+    stage: number;
+    showTime: {
+      start: string;
+      end: string;
+    };
+    soundcheck?: {
+      start: string;
+      end: string;
+    };
+    technical: {
+      fohTech: boolean;
+      monTech: boolean;
+      fohConsole: {
+        model: string;
+        providedBy: string;
+      };
+      monConsole: {
+        model: string;
+        providedBy: string;
+      };
+      wireless: {
+        systems: any[];
+        providedBy: string;
+      };
+      iem: {
+        systems: any[];
+        providedBy: string;
+      };
+      monitors: {
+        enabled: boolean;
+        quantity: number;
+      };
+    };
+    extras: {
+      sideFill: boolean;
+      drumFill: boolean;
+      djBooth: boolean;
+    };
     notes?: string;
+    micKit: 'festival' | 'band' | 'mixed';
+    wiredMics: Array<{
+      model: string;
+      quantity: number;
+      exclusive_use?: boolean;
+      notes?: string;
+    }>;
+    infrastructure: {
+      infra_cat6?: boolean;
+      infra_cat6_quantity?: number;
+      infra_hma?: boolean;
+      infra_hma_quantity?: number;
+      infra_coax?: boolean;
+      infra_coax_quantity?: number;
+      infra_opticalcon_duo?: boolean;
+      infra_opticalcon_duo_quantity?: number;
+      infra_analog?: number;
+      other_infrastructure?: string;
+      infrastructure_provided_by?: string;
+    };
+    riderMissing: boolean;
+    gearMismatches?: GearMismatch[];
   }>;
-  micKit?: 'festival' | 'band' | 'mixed';
-  riderMissing?: boolean;
+  logoUrl?: string;
 }
-
-// Helper functions to process wireless and IEM data
-const getWirelessSummary = (systems: WirelessSystem[] = []) => {
-  const totalHH = systems.reduce((sum, system) => sum + (system.quantity_hh || 0), 0);
-  const totalBP = systems.reduce((sum, system) => sum + (system.quantity_bp || 0), 0);
-  return { hh: totalHH, bp: totalBP };
-};
-
-const getIEMSummary = (systems: IEMSystem[] = []) => {
-  const totalChannels = systems.reduce((sum, system) => sum + (system.quantity_hh || 0), 0);
-  const totalBodpacks = systems.reduce((sum, system) => sum + (system.quantity_bp || 0), 0);
-  return { 
-    channels: totalChannels, 
-    bodypacks: totalBodpacks,
-    total: totalChannels // For backward compatibility
-  };
-};
 
 // Enhanced image loading function
 const loadImageSafely = async (src: string, description: string): Promise<HTMLImageElement | null> => {
@@ -128,8 +193,128 @@ const loadImageSafely = async (src: string, description: string): Promise<HTMLIm
   });
 };
 
-export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
-  const doc = new jsPDF();
+// Fixed infrastructure formatting function
+const formatInfrastructureForPdf = (infrastructure: any) => {
+  console.log('formatInfrastructureForPdf called with:', infrastructure);
+  
+  if (!infrastructure) {
+    console.log('No infrastructure data provided');
+    return 'None';
+  }
+
+  const infraItems: string[] = [];
+  
+  try {
+    if (infrastructure.infra_cat6 && infrastructure.infra_cat6_quantity) {
+      infraItems.push(`${infrastructure.infra_cat6_quantity}x CAT6`);
+    }
+    if (infrastructure.infra_hma && infrastructure.infra_hma_quantity) {
+      infraItems.push(`${infrastructure.infra_hma_quantity}x HMA`);
+    }
+    if (infrastructure.infra_coax && infrastructure.infra_coax_quantity) {
+      infraItems.push(`${infrastructure.infra_coax_quantity}x Coax`);
+    }
+    if (infrastructure.infra_opticalcon_duo && infrastructure.infra_opticalcon_duo_quantity) {
+      infraItems.push(`${infrastructure.infra_opticalcon_duo_quantity}x OpticalCON DUO`);
+    }
+    if (infrastructure.infra_analog && infrastructure.infra_analog > 0) {
+      infraItems.push(`${infrastructure.infra_analog}x Analog`);
+    }
+    if (infrastructure.other_infrastructure) {
+      infraItems.push(infrastructure.other_infrastructure);
+    }
+    
+    console.log('Infrastructure items found:', infraItems);
+    return infraItems.length > 0 ? infraItems.join(", ") : "None";
+  } catch (error) {
+    console.error('Error formatting infrastructure:', error);
+    return 'Error formatting infrastructure';
+  }
+};
+
+const formatWiredMicsForPdf = (mics: Array<{ model: string; quantity: number; exclusive_use?: boolean; notes?: string }> = [], micKit: string = 'band') => {
+  if (mics.length === 0) return "None";
+  
+  return mics.map(mic => {
+    const exclusiveIndicator = mic.exclusive_use ? " (E)" : "";
+    return `${mic.quantity}x ${mic.model}${exclusiveIndicator}`;
+  }).join(", ");
+};
+
+const formatWirelessSystemsForPdf = (systems: any[] = [], providedBy: string = "festival", isIEM = false) => {
+  if (systems.length === 0) return "None";
+  
+  if (providedBy === "mixed") {
+    // Show individual system providers when mixed
+    return systems.map(system => {
+      const provider = system.provided_by || "festival";
+      const providerLabel = provider === "festival" ? "(F)" : "(B)";
+      
+      if (isIEM) {
+        const channels = system.quantity_hh || system.quantity || 0;
+        const beltpacks = system.quantity_bp || 0;
+        return `${system.model}: ${channels} ch${beltpacks > 0 ? `, ${beltpacks} bp` : ''} ${providerLabel}`;
+      } else {
+        const hh = system.quantity_hh || 0;
+        const bp = system.quantity_bp || 0;
+        const total = hh + bp;
+        if (hh > 0 && bp > 0) {
+          return `${system.model}: ${hh}x HH, ${bp}x BP ${providerLabel}`;
+        } else if (total > 0) {
+          return `${system.model}: ${total}x ${providerLabel}`;
+        }
+        return `${system.model} ${providerLabel}`;
+      }
+    }).join("; ");
+  } else {
+    // Original formatting for single provider
+    return systems.map(system => {
+      if (isIEM) {
+        const channels = system.quantity_hh || system.quantity || 0;
+        const beltpacks = system.quantity_bp || 0;
+        return `${system.model}: ${channels} ch${beltpacks > 0 ? `, ${beltpacks} bp` : ''}`;
+      } else {
+        const hh = system.quantity_hh || 0;
+        const bp = system.quantity_bp || 0;
+        const total = hh + bp;
+        if (hh > 0 && bp > 0) {
+          return `${system.model}: ${hh}x HH, ${bp}x BP`;
+        } else if (total > 0) {
+          return `${system.model}: ${total}x`;
+        }
+        return system.model;
+      }
+    }).join("; ");
+  }
+};
+
+const formatConsolesWithTech = (console: { model: string; providedBy: string }, techRequired: boolean, position: string) => {
+  const techIndicator = techRequired ? " + Tech" : "";
+  const providerDisplay = console.providedBy === "mixed" ? "(Mixed)" : `(${console.providedBy})`;
+  return `${position}: ${console.model} ${providerDisplay}${techIndicator}`;
+};
+
+const formatGearMismatchesForPdf = (mismatches: GearMismatch[] = []) => {
+  if (mismatches.length === 0) return "✓ OK";
+  
+  const errors = mismatches.filter(m => m.severity === 'error');
+  const warnings = mismatches.filter(m => m.severity === 'warning');
+  
+  const parts: string[] = [];
+  if (errors.length > 0) {
+    parts.push(`❌ ${errors.length} Error${errors.length !== 1 ? 's' : ''}`);
+  }
+  if (warnings.length > 0) {
+    parts.push(`⚠️ ${warnings.length} Warning${warnings.length !== 1 ? 's' : ''}`);
+  }
+  
+  return parts.join('\n');
+};
+
+export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Blob> => {
+  console.log('exportArtistTablePDF called with data:', data);
+  
+  const doc = new jsPDF('landscape');
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
   const createdDate = new Date().toLocaleDateString('en-GB');
@@ -180,308 +365,146 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
     }
   }
 
-  // Add title and date
+  // Add title
   doc.setFontSize(18);
   doc.setTextColor(255, 255, 255);
-  doc.text(`${data.name} - Stage ${data.stage}`, pageWidth / 2, 15, { align: 'center' });
+  const titleText = `${data.jobTitle} - Artist Schedule`;
+  const stageText = data.stage && data.stage !== 'all' ? ` - ${data.stageNames?.[parseInt(data.stage)] || `Stage ${data.stage}`}` : '';
+  doc.text(`${titleText}${stageText}`, pageWidth / 2, 15, { align: 'center' });
+  
   doc.setFontSize(12);
   doc.text(new Date(data.date).toLocaleDateString('en-GB'), pageWidth / 2, 25, { align: 'center' });
 
-  let yPosition = 40;
+  // === ARTIST TABLE ===
+  const tableData = data.artists.map(artist => {
+    console.log(`Processing artist: ${artist.name}`, {
+      infrastructure: artist.infrastructure,
+      micKit: artist.micKit,
+      wiredMics: artist.wiredMics?.length || 0,
+      fohTech: artist.technical.fohTech,
+      monTech: artist.technical.monTech,
+      gearMismatches: artist.gearMismatches?.length || 0
+    });
 
-  // === SCHEDULE SECTION ===
-  doc.setFontSize(12);
-  doc.setTextColor(125, 1, 1);
-  doc.text("Schedule", 14, yPosition);
-  yPosition += 8;
+    // Format microphones column with enhanced mixed provider support
+    let microphonesDisplay = '';
+    if (artist.micKit === 'mixed') {
+      microphonesDisplay = `Kit: Mixed\nFestival: ${formatWiredMicsForPdf(artist.wiredMics, artist.micKit)}`;
+    } else if (artist.micKit === 'festival') {
+      microphonesDisplay = `Kit: Festival\n${formatWiredMicsForPdf(artist.wiredMics, artist.micKit)}`;
+    } else {
+      microphonesDisplay = `Kit: Band\nBand provides`;
+    }
 
-  doc.setFontSize(9);
-  doc.setTextColor(51, 51, 51);
-  doc.text(`Show Time: ${data.schedule.show.start} - ${data.schedule.show.end}`, 14, yPosition);
-  yPosition += 6;
-  if (data.schedule.soundcheck) {
-    doc.text(`Soundcheck: ${data.schedule.soundcheck.start} - ${data.schedule.soundcheck.end}`, 14, yPosition);
-    yPosition += 6;
-  }
-  yPosition += 4;
+    return [
+      artist.name,
+      `${artist.showTime.start} - ${artist.showTime.end}`,
+      artist.soundcheck ? `${artist.soundcheck.start} - ${artist.soundcheck.end}` : 'No',
+      `${formatConsolesWithTech(artist.technical.fohConsole, artist.technical.fohTech, 'FOH')}\n${formatConsolesWithTech(artist.technical.monConsole, artist.technical.monTech, 'MON')}`,
+      `Wireless: ${formatWirelessSystemsForPdf(artist.technical.wireless.systems, artist.technical.wireless.providedBy)}\nIEM: ${formatWirelessSystemsForPdf(artist.technical.iem.systems, artist.technical.iem.providedBy, true)}`,
+      microphonesDisplay,
+      artist.technical.monitors.enabled ? `${artist.technical.monitors.quantity}x` : 'None',
+      formatInfrastructureForPdf(artist.infrastructure),
+      [
+        artist.extras.sideFill ? 'SF' : '',
+        artist.extras.drumFill ? 'DF' : '',
+        artist.extras.djBooth ? 'DJ' : ''
+      ].filter(Boolean).join(', ') || 'None',
+      artist.notes || 'No notes',
+      artist.riderMissing ? 'Missing' : 'Complete',
+      formatGearMismatchesForPdf(artist.gearMismatches)
+    ];
+  });
 
-  // === TECHNICAL STAFF ===
-  const technicalStaffRows = [
-    ['FOH Tech', data.technical.fohTech ? 'Yes' : 'No'],
-    ['MON Tech', data.technical.monTech ? 'Yes' : 'No']
-  ];
+  console.log('Table data prepared:', tableData.length, 'rows');
 
   autoTable(doc, {
-    head: [['Position', 'Tech Required']],
-    body: technicalStaffRows,
-    startY: yPosition,
+    head: [['Artist', 'Show\nTime', 'Sound\ncheck', 'Consoles', 'Wireless/IEM', 'Microphones', 'Mons', 'Infra', 'Extras', 'Notes', 'Rider', 'Gear\nStatus']],
+    body: tableData,
+    startY: 40,
     theme: 'grid',
     styles: {
-      fontSize: 9,
-      cellPadding: 3,
+      fontSize: 8,
+      cellPadding: 2,
+      valign: 'top',
     },
     headStyles: {
       fillColor: [125, 1, 1],
       textColor: [255, 255, 255],
+      fontSize: 9,
+      fontStyle: 'bold',
     },
     columnStyles: {
-      0: { cellWidth: 80 },
-      1: { cellWidth: 40 }
+      0: { cellWidth: 25 }, // Artist
+      1: { cellWidth: 18 }, // Show Time
+      2: { cellWidth: 18 }, // Soundcheck
+      3: { cellWidth: 35 }, // Consoles
+      4: { cellWidth: 35 }, // Wireless/IEM
+      5: { cellWidth: 30 }, // Microphones
+      6: { cellWidth: 12 }, // Monitors
+      7: { cellWidth: 20 }, // Infrastructure
+      8: { cellWidth: 12 }, // Extras
+      9: { cellWidth: 25 }, // Notes
+      10: { cellWidth: 15 }, // Rider Status
+      11: { cellWidth: 20 }, // Gear Status (new column)
     },
+    didParseCell: (data) => {
+      // Make "Missing" text red in the Rider Status column (column 10)
+      if (data.column.index === 10 && data.cell.text[0] === 'Missing') {
+        data.cell.styles.textColor = [255, 0, 0]; // Red color
+      }
+      
+      // Color code gear status column (column 11)
+      if (data.column.index === 11) {
+        const cellText = data.cell.text[0];
+        if (cellText.includes('❌')) {
+          data.cell.styles.textColor = [255, 0, 0]; // Red for errors
+        } else if (cellText.includes('⚠️')) {
+          data.cell.styles.textColor = [255, 165, 0]; // Orange for warnings
+        } else if (cellText.includes('✓')) {
+          data.cell.styles.textColor = [0, 128, 0]; // Green for OK
+        }
+      }
+    },
+    margin: { left: 10, right: 10 },
   });
 
-  yPosition = (doc as any).lastAutoTable.finalY + 8;
-
-  // === CONSOLE REQUIREMENTS ===
-  const consoleRows = [
-    ['FOH Console', data.technical.fohConsole.model, data.technical.fohConsole.providedBy],
-    ['MON Console', data.technical.monConsole.model, data.technical.monConsole.providedBy]
-  ];
-
-  autoTable(doc, {
-    head: [['Position', 'Model', 'Provided By']],
-    body: consoleRows,
-    startY: yPosition,
-    theme: 'grid',
-    styles: {
-      fontSize: 9,
-      cellPadding: 3,
-    },
-    headStyles: {
-      fillColor: [125, 1, 1],
-      textColor: [255, 255, 255],
-    },
-  });
-
-  yPosition = (doc as any).lastAutoTable.finalY + 8;
-
-  // === WIRED MICROPHONES ===
-  if (data.wiredMics && data.wiredMics.length > 0) {
-    const wiredMicRows = data.wiredMics.map(mic => [
-      mic.model,
-      mic.quantity.toString(),
-      mic.exclusive_use ? 'Yes' : 'No',
-      mic.notes || '-'
-    ]);
-
-    autoTable(doc, {
-      head: [['Microphone Model', 'Quantity', 'Exclusive Use', 'Notes']],
-      body: wiredMicRows,
-      startY: yPosition,
-      theme: 'grid',
-      styles: {
-        fontSize: 9,
-        cellPadding: 3,
-      },
-      headStyles: {
-        fillColor: [125, 1, 1],
-        textColor: [255, 255, 255],
-      },
-      columnStyles: {
-        0: { cellWidth: 60 },
-        1: { cellWidth: 25, halign: 'center' },
-        2: { cellWidth: 30, halign: 'center' },
-        3: { cellWidth: 55 }
-      }
-    });
-
-    yPosition = (doc as any).lastAutoTable.finalY + 8;
-  }
-
-  // === RF & WIRELESS ===
-  const wirelessRows: any[] = [];
-  
-  // Process wireless systems with individual provider information
-  if (data.technical.wireless.systems && data.technical.wireless.systems.length > 0) {
-    data.technical.wireless.systems.forEach(system => {
-      const systemProvider = system.provided_by || data.technical.wireless.providedBy;
+  // Add gear conflicts summary if there are any
+  const artistsWithConflicts = data.artists.filter(a => a.gearMismatches && a.gearMismatches.length > 0);
+  if (artistsWithConflicts.length > 0) {
+    let currentY = (doc as any).lastAutoTable.finalY + 20;
+    
+    // Add summary header
+    doc.setFontSize(14);
+    doc.setTextColor(0, 0, 0);
+    doc.text('Gear Conflicts Summary', 10, currentY);
+    currentY += 10;
+    
+    // Add conflicts details
+    doc.setFontSize(10);
+    artistsWithConflicts.forEach(artist => {
+      const errors = artist.gearMismatches?.filter(m => m.severity === 'error') || [];
+      const warnings = artist.gearMismatches?.filter(m => m.severity === 'warning') || [];
       
-      if (system.quantity_hh && system.quantity_hh > 0) {
-        wirelessRows.push([
-          'Handheld',
-          system.quantity_hh,
-          system.model,
-          system.band || '-',
-          systemProvider
-        ]);
-      }
-      if (system.quantity_bp && system.quantity_bp > 0) {
-        wirelessRows.push([
-          'Bodypack',
-          system.quantity_bp,
-          system.model,
-          system.band || '-',
-          systemProvider
-        ]);
-      }
-    });
-  } else if (data.technical.wireless.handhelds || data.technical.wireless.bodypacks) {
-    // Handle legacy format
-    if (data.technical.wireless.handhelds) {
-      wirelessRows.push([
-        'Handheld',
-        data.technical.wireless.handhelds,
-        data.technical.wireless.model || '-',
-        data.technical.wireless.band || '-',
-        data.technical.wireless.providedBy
-      ]);
-    }
-    if (data.technical.wireless.bodypacks) {
-      wirelessRows.push([
-        'Bodypack',
-        data.technical.wireless.bodypacks,
-        data.technical.wireless.model || '-',
-        data.technical.wireless.band || '-',
-        data.technical.wireless.providedBy
-      ]);
-    }
-  }
-
-  // Process IEM systems with individual provider information
-  if (data.technical.iem.systems && data.technical.iem.systems.length > 0) {
-    data.technical.iem.systems.forEach(system => {
-      const systemProvider = system.provided_by || data.technical.iem.providedBy;
-      
-      if (system.quantity_hh && system.quantity_hh > 0) {
-        wirelessRows.push([
-          'IEM Channels',
-          system.quantity_hh,
-          system.model,
-          system.band || '-',
-          systemProvider
-        ]);
-      }
-      if (system.quantity_bp && system.quantity_bp > 0) {
-        wirelessRows.push([
-          'IEM Bodypacks',
-          system.quantity_bp,
-          system.model,
-          system.band || '-',
-          systemProvider
-        ]);
+      if (errors.length > 0 || warnings.length > 0) {
+        doc.setTextColor(0, 0, 0);
+        doc.text(`${artist.name}:`, 10, currentY);
+        currentY += 5;
+        
+        [...errors, ...warnings].forEach(mismatch => {
+          const color = mismatch.severity === 'error' ? [255, 0, 0] : [255, 165, 0];
+          doc.setTextColor(color[0], color[1], color[2]);
+          doc.text(`  • ${mismatch.message}`, 15, currentY);
+          if (mismatch.details) {
+            currentY += 4;
+            doc.setTextColor(100, 100, 100);
+            doc.text(`    ${mismatch.details}`, 20, currentY);
+          }
+          currentY += 5;
+        });
+        currentY += 3;
       }
     });
-  } else if (data.technical.iem.quantity) {
-    // Handle legacy format
-    wirelessRows.push([
-      'IEM System',
-      data.technical.iem.quantity,
-      data.technical.iem.model || '-',
-      data.technical.iem.band || '-',
-      data.technical.iem.providedBy
-    ]);
-  }
-
-  if (wirelessRows.length > 0) {
-    autoTable(doc, {
-      head: [['Type', 'Qty', 'Model', 'Band', 'Provided By']],
-      body: wirelessRows,
-      startY: yPosition,
-      theme: 'grid',
-      styles: {
-        fontSize: 9,
-        cellPadding: 3,
-      },
-      headStyles: {
-        fillColor: [125, 1, 1],
-        textColor: [255, 255, 255],
-      },
-    });
-
-    yPosition = (doc as any).lastAutoTable.finalY + 8;
-  }
-
-  // === MONITORS ===
-  if (data.technical.monitors.enabled) {
-    const monitorRows = [
-      ['Monitors', data.technical.monitors.quantity]
-    ];
-
-    autoTable(doc, {
-      head: [['Type', 'Quantity']],
-      body: monitorRows,
-      startY: yPosition,
-      theme: 'grid',
-      styles: {
-        fontSize: 9,
-        cellPadding: 3,
-      },
-      headStyles: {
-        fillColor: [125, 1, 1],
-        textColor: [255, 255, 255],
-      },
-    });
-
-    yPosition = (doc as any).lastAutoTable.finalY + 8;
-  }
-
-  // === INFRASTRUCTURE ===
-  const infrastructureRows = [
-    data.infrastructure.cat6.enabled && ['CAT6', data.infrastructure.cat6.quantity],
-    data.infrastructure.hma.enabled && ['HMA', data.infrastructure.hma.quantity],
-    data.infrastructure.coax.enabled && ['Coax', data.infrastructure.coax.quantity],
-    data.infrastructure.opticalconDuo.enabled && ['OpticalCon Duo', data.infrastructure.opticalconDuo.quantity],
-    data.infrastructure.analog > 0 && ['Analog Lines', data.infrastructure.analog]
-  ].filter(Boolean);
-
-  if (infrastructureRows.length > 0) {
-    autoTable(doc, {
-      head: [['Type', 'Quantity']],
-      body: infrastructureRows,
-      startY: yPosition,
-      theme: 'grid',
-      styles: {
-        fontSize: 9,
-        cellPadding: 3,
-      },
-      headStyles: {
-        fillColor: [125, 1, 1],
-        textColor: [255, 255, 255],
-      },
-    });
-
-    yPosition = (doc as any).lastAutoTable.finalY + 8;
-  }
-
-  // === EXTRAS ===
-  const extraRows = [
-    data.extras.sideFill && ['Side Fill', 'Yes'],
-    data.extras.drumFill && ['Drum Fill', 'Yes'],
-    data.extras.djBooth && ['DJ Booth', 'Yes'],
-    data.extras.wired && ['Additional Wired', data.extras.wired]
-  ].filter(Boolean);
-
-  if (extraRows.length > 0) {
-    autoTable(doc, {
-      head: [['Extra Requirements', 'Details']],
-      body: extraRows,
-      startY: yPosition,
-      theme: 'grid',
-      styles: {
-        fontSize: 9,
-        cellPadding: 3,
-      },
-      headStyles: {
-        fillColor: [125, 1, 1],
-        textColor: [255, 255, 255],
-      },
-    });
-
-    yPosition = (doc as any).lastAutoTable.finalY + 8;
-  }
-
-  // === NOTES ===
-  if (data.notes) {
-    doc.setFontSize(12);
-    doc.setTextColor(125, 1, 1);
-    doc.text("Notes", 14, yPosition);
-    yPosition += 8;
-
-    doc.setFontSize(9);
-    doc.setTextColor(51, 51, 51);
-    const splitNotes = doc.splitTextToSize(data.notes, pageWidth - 28);
-    doc.text(splitNotes, 14, yPosition);
-    yPosition += splitNotes.length * 5 + 10;
   }
 
   // === COMPANY LOGO (CENTERED AT BOTTOM) ===
@@ -493,12 +516,11 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
       const ratio = sectorImg.width / sectorImg.height;
       const logoHeight = logoWidth / ratio;
       
-      // Center horizontally at bottom of page
       doc.addImage(
         sectorImg, 
         'PNG', 
-        pageWidth / 2 - logoWidth / 2,  // Center horizontally
-        pageHeight - logoHeight - 10,
+        pageWidth / 2 - logoWidth / 2,
+        pageHeight - logoHeight - 5,
         logoWidth,
         logoHeight
       );
@@ -507,7 +529,6 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
       console.error('Error adding Sector Pro logo to PDF:', error);
     }
   } else {
-    // Try alternative Sector Pro logo
     const altSectorImg = await loadImageSafely('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', 'alternative Sector Pro logo');
     if (altSectorImg) {
       try {
@@ -515,11 +536,10 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
         const ratio = altSectorImg.width / altSectorImg.height;
         const logoHeight = logoWidth / ratio;
         
-        // Center horizontally at bottom of page
         doc.addImage(
           altSectorImg, 
           'PNG', 
-          pageWidth / 2 - logoWidth / 2,  // Center horizontally
+          pageWidth / 2 - logoWidth / 2,
           pageHeight - logoHeight - 10, 
           logoWidth, 
           logoHeight
@@ -531,11 +551,11 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
     }
   }
 
-  // Footer with date (moved to left to avoid overlap with centered logo)
+  // Footer with date
   doc.setFontSize(8);
   doc.setTextColor(51, 51, 51);
   doc.text(`Generated: ${createdDate}`, 10, pageHeight - 10);
   
-  console.log('Individual artist PDF generation completed');
+  console.log('Artist table PDF generation completed');
   return doc.output('blob');
 };
