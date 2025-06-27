@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,7 +45,7 @@ interface Artist {
     exclusive_use?: boolean;
     notes?: string;
   }>;
-  date?: string; // Added missing date property
+  date?: string;
   // Infrastructure fields
   infra_cat6?: boolean;
   infra_cat6_quantity?: number;
@@ -63,11 +62,16 @@ interface Artist {
 
 interface ArtistTableProps {
   artists: Artist[];
-  jobTitle?: string;
-  date: string;
-  onArtistClick: (artist: Artist) => void;
+  isLoading: boolean;
+  onEditArtist: (artist: Artist) => void;
+  onDeleteArtist: (artist: Artist) => Promise<void>;
+  searchTerm: string;
+  stageFilter: string;
+  equipmentFilter: string;
+  riderFilter: string;
+  dayStartTime: string;
   jobId?: string;
-  stageNames?: Record<number, string>;
+  selectedDate: string;
 }
 
 const formatTime = (timeString: string | undefined): string => {
@@ -81,11 +85,16 @@ const formatTime = (timeString: string | undefined): string => {
 
 const ArtistTable = ({ 
   artists, 
-  jobTitle, 
-  date, 
-  onArtistClick, 
-  jobId, 
-  stageNames 
+  isLoading,
+  onEditArtist,
+  onDeleteArtist,
+  searchTerm,
+  stageFilter,
+  equipmentFilter,
+  riderFilter,
+  dayStartTime,
+  jobId,
+  selectedDate
 }: ArtistTableProps) => {
   const [gearComparisons, setGearComparisons] = useState<Record<string, ArtistGearComparison>>({});
   const [festivalGearSetup, setFestivalGearSetup] = useState<FestivalGearSetup | null>(null);
@@ -152,117 +161,61 @@ const ArtistTable = ({
     runGearComparisons();
   }, [artists, festivalGearSetup, stageGearSetups]);
 
-  const handleExportPDF = async () => {
-    if (!artists || artists.length === 0) {
-      toast.error("No artists to export.");
-      return;
-    }
+  const filteredArtists = artists.filter(artist => {
+    const matchesSearch = artist.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStage = stageFilter === 'all' || artist.stage.toString() === stageFilter;
+    const matchesEquipment = !equipmentFilter || 
+      artist.foh_console.toLowerCase().includes(equipmentFilter.toLowerCase()) ||
+      artist.mon_console.toLowerCase().includes(equipmentFilter.toLowerCase());
+    const matchesRider = riderFilter === 'all' || 
+      (riderFilter === 'missing' && artist.rider_missing) ||
+      (riderFilter === 'complete' && !artist.rider_missing);
+    
+    return matchesSearch && matchesStage && matchesEquipment && matchesRider;
+  });
 
-    const tableData: ArtistTablePdfData = {
-      jobTitle: jobTitle || 'Festival Schedule',
-      date: date,
-      artists: artists.map(artist => ({
-        name: artist.name,
-        stage: artist.stage,
-        showTime: {
-          start: artist.show_start,
-          end: artist.show_end
-        },
-        soundcheck: artist.soundcheck ? {
-          start: artist.soundcheck_start || '',
-          end: artist.soundcheck_end || ''
-        } : undefined,
-        technical: {
-          fohTech: artist.foh_tech || false,
-          monTech: artist.mon_tech || false,
-          fohConsole: {
-            model: artist.foh_console,
-            providedBy: artist.foh_console_provided_by || 'festival'
-          },
-          monConsole: {
-            model: artist.mon_console,
-            providedBy: artist.mon_console_provided_by || 'festival'
-          },
-          wireless: {
-            systems: artist.wireless_systems || [],
-            providedBy: artist.wireless_provided_by || 'festival'
-          },
-          iem: {
-            systems: artist.iem_systems || [],
-            providedBy: artist.iem_provided_by || 'festival'
-          },
-          monitors: {
-            enabled: artist.monitors_enabled,
-            quantity: artist.monitors_quantity
-          }
-        },
-        extras: {
-          sideFill: artist.extras_sf,
-          drumFill: artist.extras_df,
-          djBooth: artist.extras_djbooth
-        },
-        notes: artist.notes,
-        micKit: artist.mic_kit || 'band',
-        wiredMics: artist.wired_mics || [],
-        infrastructure: {
-          infra_cat6: artist.infra_cat6,
-          infra_cat6_quantity: artist.infra_cat6_quantity,
-          infra_hma: artist.infra_hma,
-          infra_hma_quantity: artist.infra_hma_quantity,
-          infra_coax: artist.infra_coax,
-          infra_coax_quantity: artist.infra_coax_quantity,
-          infra_opticalcon_duo: artist.infra_opticalcon_duo,
-          infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity,
-          infra_analog: artist.infra_analog,
-          other_infrastructure: artist.other_infrastructure,
-          infrastructure_provided_by: artist.infrastructure_provided_by
-        },
-        riderMissing: artist.rider_missing || false,
-        gearMismatches: gearComparisons[artist.id]?.mismatches || []
-      }))
-    };
-
-    try {
-      const blob = await exportArtistTablePDF(tableData);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'artist_schedule.pdf';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast.success("Artist schedule PDF generated successfully.");
-    } catch (error) {
-      console.error("Error generating artist schedule PDF:", error);
-      toast.error("Failed to generate PDF.");
-    }
-  };
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center">Loading artists...</div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Artist Schedule - {date}</CardTitle>
-      </CardHeader>
       <CardContent className="relative overflow-auto">
         <div className="grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {artists.map((artist) => (
-            <div key={artist.id} className="border rounded-md p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => onArtistClick(artist)}>
-              <h3 className="text-lg font-semibold">{artist.name}</h3>
-              <p className="text-sm text-gray-500">Stage: {stageNames?.[artist.stage] || `Stage ${artist.stage}`}</p>
-              <p className="text-sm">Show Time: {formatTime(artist.show_start)} - {formatTime(artist.show_end)}</p>
-              {gearComparisons[artist.id] && (
-                <div className="mt-2">
-                  <GearMismatchIndicator mismatches={gearComparisons[artist.id].mismatches} compact={true} />
-                </div>
-              )}
+          {filteredArtists.map((artist) => (
+            <div key={artist.id} className="border rounded-md p-4 cursor-pointer hover:shadow-md transition-shadow">
+              <div onClick={() => onEditArtist(artist)}>
+                <h3 className="text-lg font-semibold">{artist.name}</h3>
+                <p className="text-sm text-gray-500">Stage: {artist.stage}</p>
+                <p className="text-sm">Show Time: {formatTime(artist.show_start)} - {formatTime(artist.show_end)}</p>
+                {gearComparisons[artist.id] && (
+                  <div className="mt-2">
+                    <GearMismatchIndicator mismatches={gearComparisons[artist.id].mismatches} compact={true} />
+                  </div>
+                )}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => onEditArtist(artist)}>
+                  Edit
+                </Button>
+                <Button size="sm" variant="destructive" onClick={() => onDeleteArtist(artist)}>
+                  Delete
+                </Button>
+              </div>
             </div>
           ))}
         </div>
-        {/* <Button onClick={handleExportPDF} className="absolute top-2 right-2">
-          <FileText className="mr-2 h-4 w-4" />
-          Export to PDF
-        </Button> */}
+        {filteredArtists.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">
+            No artists found matching the current filters.
+          </div>
+        )}
       </CardContent>
     </Card>
   );

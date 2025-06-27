@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase';
 import { exportArtistTablePDF, ArtistTablePdfData } from '../artistTablePdfExport';
 import { exportShiftsTablePDF, ShiftsTablePdfData } from '../shiftsTablePdfExport';
@@ -417,8 +416,7 @@ export const generateAndMergeFestivalPDFs = async (
                     infra_opticalcon_duo: artist.infra_opticalcon_duo,
                     infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity,
                     infra_analog: artist.infra_analog,
-                    other_infrastructure: artist.other_infrastructure,
-                    infrastructure_provided_by: artist.infrastructure_provided_by
+                    other: String(artist.other_infrastructure || '')
                   },
                   riderMissing: Boolean(artist.rider_missing || false)
                 };
@@ -457,83 +455,71 @@ export const generateAndMergeFestivalPDFs = async (
         try {
           console.log(`Generating PDF for artist: ${artist.name}, Stage: ${artist.stage}, Time: ${artist.show_start}`);
           
-          const artistData: ArtistPdfData = {
-            name: artist.name || 'Unnamed Artist',
-            stage: artist.stage || 1,
+          // Convert ArtistPdfData to ArtistTablePdfData format
+          const artistTableData: ArtistTablePdfData = {
+            jobTitle: jobTitle || 'Festival',
             date: artist.date || '',
-            schedule: {
-              show: { 
+            artists: [{
+              name: artist.name || 'Unnamed Artist',
+              stage: artist.stage || 1,
+              showTime: { 
                 start: artist.show_start || '', 
                 end: artist.show_end || '' 
               },
               soundcheck: artist.soundcheck_start ? {
                 start: artist.soundcheck_start || '',
                 end: artist.soundcheck_end || ''
-              } : undefined
-            },
-            technical: {
-              fohTech: Boolean(artist.foh_tech || false),
-              monTech: Boolean(artist.mon_tech || false),
-              fohConsole: { 
-                model: String(artist.foh_console || ''), 
-                providedBy: String(artist.foh_console_provided_by || 'festival') 
+              } : undefined,
+              technical: {
+                fohTech: Boolean(artist.foh_tech || false),
+                monTech: Boolean(artist.mon_tech || false),
+                fohConsole: { 
+                  model: String(artist.foh_console || ''), 
+                  providedBy: String(artist.foh_console_provided_by || 'festival') 
+                },
+                monConsole: { 
+                  model: String(artist.mon_console || ''), 
+                  providedBy: String(artist.mon_console_provided_by || 'festival') 
+                },
+                wireless: {
+                  systems: artist.wireless_systems || [],
+                  providedBy: String(artist.wireless_provided_by || 'festival')
+                },
+                iem: {
+                  systems: artist.iem_systems || [],
+                  providedBy: String(artist.iem_provided_by || 'festival')
+                },
+                monitors: {
+                  enabled: Boolean(artist.monitors_enabled || false),
+                  quantity: Number(artist.monitors_quantity || 0)
+                }
               },
-              monConsole: { 
-                model: String(artist.mon_console || ''), 
-                providedBy: String(artist.mon_console_provided_by || 'festival') 
+              infrastructure: {
+                infra_cat6: artist.infra_cat6,
+                infra_cat6_quantity: artist.infra_cat6_quantity,
+                infra_hma: artist.infra_hma,
+                infra_hma_quantity: artist.infra_hma_quantity,
+                infra_coax: artist.infra_coax,
+                infra_coax_quantity: artist.infra_coax_quantity,
+                infra_opticalcon_duo: artist.infra_opticalcon_duo,
+                infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity,
+                infra_analog: artist.infra_analog,
+                other: String(artist.other_infrastructure || '')
               },
-              wireless: {
-                systems: artist.wireless_systems || [],
-                providedBy: String(artist.wireless_provided_by || 'festival'),
-                model: String(artist.wireless_model || ''),
-                handhelds: Number(artist.wireless_quantity_hh || 0),
-                bodypacks: Number(artist.wireless_quantity_bp || 0),
-                band: String(artist.wireless_band || '')
+              extras: {
+                sideFill: Boolean(artist.extras_sf || false),
+                drumFill: Boolean(artist.extras_df || false),
+                djBooth: Boolean(artist.extras_djbooth || false)
               },
-              iem: {
-                systems: artist.iem_systems || [],
-                providedBy: String(artist.iem_provided_by || 'festival'),
-                model: String(artist.iem_model || ''),
-                quantity: Number(artist.iem_quantity || 0),
-                band: String(artist.iem_band || '')
-              },
-              monitors: {
-                enabled: Boolean(artist.monitors_enabled || false),
-                quantity: Number(artist.monitors_quantity || 0)
-              }
-            },
-            infrastructure: {
-              providedBy: String(artist.infrastructure_provided_by || 'festival'),
-              cat6: { 
-                enabled: Boolean(artist.infra_cat6 || false), 
-                quantity: Number(artist.infra_cat6_quantity || 0) 
-              },
-              hma: { 
-                enabled: Boolean(artist.infra_hma || false), 
-                quantity: Number(artist.infra_hma_quantity || 0) 
-              },
-              coax: { 
-                enabled: Boolean(artist.infra_coax || false), 
-                quantity: Number(artist.infra_coax_quantity || 0) 
-              },
-              opticalconDuo: { 
-                enabled: Boolean(artist.infra_opticalcon_duo || false), 
-                quantity: Number(artist.infra_opticalcon_duo_quantity || 0) 
-              },
-              analog: Number(artist.infra_analog || 0),
-              other: String(artist.other_infrastructure || '')
-            },
-            extras: {
-              sideFill: Boolean(artist.extras_sf || false),
-              drumFill: Boolean(artist.extras_df || false),
-              djBooth: Boolean(artist.extras_djbooth || false),
-              wired: String(artist.extras_wired || '')
-            },
-            notes: artist.notes ? String(artist.notes) : undefined,
+              notes: artist.notes ? String(artist.notes) : undefined,
+              micKit: artist.mic_kit || 'band',
+              wiredMics: artist.wired_mics || [],
+              riderMissing: Boolean(artist.rider_missing || false)
+            }],
             logoUrl
           };
           
-          const pdf = await exportArtistTablePDF(artistData);
+          const pdf = await exportArtistTablePDF(artistTableData);
           console.log(`Generated PDF for artist ${artist.name}, size: ${pdf.size} bytes`);
           if (pdf && pdf.size > 0) {
             individualArtistPdfs.push(pdf);
