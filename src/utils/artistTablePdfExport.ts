@@ -279,7 +279,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
   console.log('Table data prepared:', tableData.length, 'rows');
 
   autoTable(doc, {
-    head: [['Artist', 'Stage', 'Show\nTime', 'Sound\ncheck', 'Consoles', 'Wireless/IEM', 'Microphones', 'Monitors', 'Infra', 'Extras', 'Notes', 'Rider Status']],
+    head: [['Artist', 'Stage', 'Show\nTime', 'Sound\ncheck', 'Consoles', 'Wireless/IEM', 'Microphones', 'Mons', 'Infra', 'Extras', 'Notes', 'Rider']],
     body: tableData,
     startY: 40,
     theme: 'grid',
@@ -306,7 +306,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       8: { cellWidth: 25 }, // Infrastructure - reduced from 30 to 25
       9: { cellWidth: 15 }, // Extras
       10: { cellWidth: 25 }, // Notes
-      11: { cellWidth: 20 }, // Rider Status
+      11: { cellWidth: 15 }, // Rider Status
     },
     didParseCell: (data) => {
       // Make "Missing" text red in the Rider Status column (column 11)
@@ -330,7 +330,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
         sectorImg, 
         'PNG', 
         pageWidth / 2 - logoWidth / 2,
-        pageHeight - logoHeight - 10,
+        pageHeight - logoHeight - 5,
         logoWidth,
         logoHeight
       );
