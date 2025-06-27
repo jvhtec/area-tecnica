@@ -5,23 +5,36 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Minus } from "lucide-react";
 import { EquipmentSelect } from "../form/shared/EquipmentSelect";
+import { ProviderSelector } from "../form/shared/ProviderSelector";
 
 export interface WiredMic {
   model: string;
   quantity: number;
   exclusive_use?: boolean;
   notes?: string;
+  provided_by?: 'festival' | 'band';
 }
 
 interface WiredMicConfigProps {
   mics: WiredMic[];
   onChange: (mics: WiredMic[]) => void;
   label?: string;
+  showProvider?: boolean;
 }
 
-export const WiredMicConfig = ({ mics, onChange, label = "Wired Microphones" }: WiredMicConfigProps) => {
+export const WiredMicConfig = ({ 
+  mics, 
+  onChange, 
+  label = "Wired Microphones",
+  showProvider = false 
+}: WiredMicConfigProps) => {
   const addMic = () => {
-    onChange([...mics, { model: '', quantity: 1, exclusive_use: false }]);
+    onChange([...mics, { 
+      model: '', 
+      quantity: 1, 
+      exclusive_use: false,
+      provided_by: 'festival'
+    }]);
   };
 
   const removeMic = (index: number) => {
@@ -52,43 +65,57 @@ export const WiredMicConfig = ({ mics, onChange, label = "Wired Microphones" }: 
       </div>
 
       {mics.map((mic, index) => (
-        <div key={index} className="flex gap-4 items-start">
-          <div className="flex-1">
-            <EquipmentSelect
-              value={mic.model}
-              onChange={(value) => updateMic(index, 'model', value)}
-              options={[]}
-              fallbackOptions={[]}
-              placeholder="Select microphone"
-              category="wired_mics"
-            />
+        <div key={index} className="space-y-3 p-4 border rounded-lg">
+          <div className="flex gap-4 items-start">
+            <div className="flex-1">
+              <EquipmentSelect
+                value={mic.model}
+                onChange={(value) => updateMic(index, 'model', value)}
+                options={[]}
+                fallbackOptions={[]}
+                placeholder="Select microphone"
+                category="wired_mics"
+              />
+            </div>
+            <div className="w-24">
+              <Input
+                type="number"
+                min="1"
+                value={mic.quantity}
+                onChange={(e) => updateMic(index, 'quantity', parseInt(e.target.value) || 1)}
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id={`exclusive-${index}`}
+                checked={mic.exclusive_use || false}
+                onCheckedChange={(checked) => updateMic(index, 'exclusive_use', !!checked)}
+              />
+              <Label htmlFor={`exclusive-${index}`} className="text-sm">
+                Exclusive
+              </Label>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => removeMic(index)}
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
           </div>
-          <div className="w-24">
-            <Input
-              type="number"
-              min="1"
-              value={mic.quantity}
-              onChange={(e) => updateMic(index, 'quantity', parseInt(e.target.value) || 1)}
-            />
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id={`exclusive-${index}`}
-              checked={mic.exclusive_use || false}
-              onCheckedChange={(checked) => updateMic(index, 'exclusive_use', !!checked)}
-            />
-            <Label htmlFor={`exclusive-${index}`} className="text-sm">
-              Exclusive
-            </Label>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => removeMic(index)}
-          >
-            <Minus className="h-4 w-4" />
-          </Button>
+          
+          {showProvider && (
+            <div className="mt-3">
+              <ProviderSelector
+                value={mic.provided_by || 'festival'}
+                onChange={(provider) => updateMic(index, 'provided_by', provider as 'festival' | 'band')}
+                label="Provided By"
+                id={`mic-provider-${index}`}
+                showMixed={false}
+              />
+            </div>
+          )}
         </div>
       ))}
 

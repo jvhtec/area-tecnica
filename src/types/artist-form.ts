@@ -42,12 +42,13 @@ export interface ArtistSectionProps {
     mon_tech?: boolean;
     rider_missing?: boolean;
     isaftermidnight?: boolean;
-    mic_kit: 'festival' | 'band';
+    mic_kit: 'festival' | 'band' | 'mixed';
     wired_mics: Array<{
       model: string;
       quantity: number;
       exclusive_use?: boolean;
       notes?: string;
+      provided_by?: 'festival' | 'band';
     }>;
   };
   onChange: (changes: any) => void;

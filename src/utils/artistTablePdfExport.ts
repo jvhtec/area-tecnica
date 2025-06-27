@@ -154,12 +154,24 @@ const formatInfrastructureForPdf = (infrastructure: any) => {
   }
 };
 
-const formatWiredMicsForPdf = (mics: Array<{ model: string; quantity: number; exclusive_use?: boolean; notes?: string }> = []) => {
+const formatWiredMicsForPdf = (mics: Array<{ model: string; quantity: number; exclusive_use?: boolean; notes?: string; provided_by?: string }> = [], micKit: string = 'band') => {
   if (mics.length === 0) return "None";
-  return mics.map(mic => {
-    const exclusiveIndicator = mic.exclusive_use ? " (E)" : "";
-    return `${mic.quantity}x ${mic.model}${exclusiveIndicator}`;
-  }).join(", ");
+  
+  if (micKit === "mixed") {
+    // Show individual mic providers when mixed
+    return mics.map(mic => {
+      const provider = mic.provided_by || "festival";
+      const providerLabel = provider === "festival" ? "(F)" : "(B)";
+      const exclusiveIndicator = mic.exclusive_use ? " (E)" : "";
+      return `${mic.quantity}x ${mic.model}${exclusiveIndicator} ${providerLabel}`;
+    }).join(", ");
+  } else {
+    // Original formatting for single provider
+    return mics.map(mic => {
+      const exclusiveIndicator = mic.exclusive_use ? " (E)" : "";
+      return `${mic.quantity}x ${mic.model}${exclusiveIndicator}`;
+    }).join(", ");
+  }
 };
 
 const formatWirelessSystemsForPdf = (systems: any[] = [], providedBy: string = "festival", isIEM = false) => {
@@ -288,6 +300,16 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       monTech: artist.technical.monTech
     });
 
+    // Format microphones column with mixed provider support
+    let microphonesDisplay = '';
+    if (artist.micKit === 'mixed') {
+      microphonesDisplay = `Kit: Mixed\n${formatWiredMicsForPdf(artist.wiredMics, artist.micKit)}`;
+    } else if (artist.micKit === 'festival') {
+      microphonesDisplay = `Kit: Festival\n${formatWiredMicsForPdf(artist.wiredMics, artist.micKit)}`;
+    } else {
+      microphonesDisplay = `Kit: Band\nBand provides`;
+    }
+
     return [
       artist.name,
       data.stageNames?.[artist.stage] || `Stage ${artist.stage}`,
@@ -295,7 +317,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       artist.soundcheck ? `${artist.soundcheck.start} - ${artist.soundcheck.end}` : 'No',
       `${formatConsolesWithTech(artist.technical.fohConsole, artist.technical.fohTech, 'FOH')}\n${formatConsolesWithTech(artist.technical.monConsole, artist.technical.monTech, 'MON')}`,
       `Wireless: ${formatWirelessSystemsForPdf(artist.technical.wireless.systems, artist.technical.wireless.providedBy)}\nIEM: ${formatWirelessSystemsForPdf(artist.technical.iem.systems, artist.technical.iem.providedBy, true)}`,
-      `Kit: ${artist.micKit}\n${artist.micKit === 'festival' ? formatWiredMicsForPdf(artist.wiredMics) : 'Band provides'}`,
+      microphonesDisplay,
       artist.technical.monitors.enabled ? `${artist.technical.monitors.quantity}x` : 'None',
       formatInfrastructureForPdf(artist.infrastructure),
       [
