@@ -25,15 +25,12 @@ export const ArtistManagementDialog = ({
 
   const handleSave = async (data: any) => {
     try {
-      // Remove any remaining global provider fields before saving
-      const { wireless_provided_by, iem_provided_by, ...cleanData } = data;
-      
       if (artist) {
         // Update existing artist
-        await updateArtist({ id: artist.id, ...cleanData });
+        await updateArtist({ id: artist.id, ...data });
       } else {
         // Create new artist
-        await createArtist(cleanData);
+        await createArtist(data);
       }
       
       // Close dialog and notify that there was an update
