@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase';
-import { exportArtistPDF, ArtistPdfData } from '../artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from '../artistTablePdfExport';
 import { exportShiftsTablePDF, ShiftsTablePdfData } from '../shiftsTablePdfExport';
 import { exportRfIemTablePDF, RfIemTablePdfData } from '../rfIemTablePdfExport';
