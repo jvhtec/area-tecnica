@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { GearMismatch } from './gearComparisonService';
@@ -218,21 +219,22 @@ const formatConsolesWithTech = (console: { model: string; providedBy: string }, 
   return `${position}: ${console.model} ${providerDisplay}${techIndicator}`;
 };
 
+// Simplified gear mismatch formatting without emoji icons
 const formatGearMismatchesForPdf = (mismatches: GearMismatch[] = []) => {
-  if (mismatches.length === 0) return "✓ OK";
+  if (mismatches.length === 0) return "OK";
   
   const errors = mismatches.filter(m => m.severity === 'error');
   const warnings = mismatches.filter(m => m.severity === 'warning');
   
   const parts: string[] = [];
   if (errors.length > 0) {
-    parts.push(`❌ ${errors.length} Error${errors.length !== 1 ? 's' : ''}`);
+    parts.push(`${errors.length} Error${errors.length !== 1 ? 's' : ''}`);
   }
   if (warnings.length > 0) {
-    parts.push(`⚠️ ${warnings.length} Warning${warnings.length !== 1 ? 's' : ''}`);
+    parts.push(`${warnings.length} Warning${warnings.length !== 1 ? 's' : ''}`);
   }
   
-  return parts.join('\n');
+  return parts.join(', ');
 };
 
 export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Blob> => {
@@ -378,14 +380,14 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
         data.cell.styles.textColor = [255, 0, 0]; // Red color
       }
       
-      // Color code gear status column (column 11)
+      // Color code gear status column (column 11) - now looking for text instead of icons
       if (data.column.index === 11) {
         const cellText = data.cell.text[0];
-        if (cellText.includes('❌')) {
+        if (cellText.includes('Error')) {
           data.cell.styles.textColor = [255, 0, 0]; // Red for errors
-        } else if (cellText.includes('⚠️')) {
+        } else if (cellText.includes('Warning')) {
           data.cell.styles.textColor = [255, 165, 0]; // Orange for warnings
-        } else if (cellText.includes('✓')) {
+        } else if (cellText === 'OK') {
           data.cell.styles.textColor = [0, 128, 0]; // Green for OK
         }
       }
@@ -393,10 +395,16 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     margin: { left: 10, right: 10 },
   });
 
-  // Add gear conflicts summary if there are any
+  // Add gear conflicts summary if there are any - with improved page handling
   const artistsWithConflicts = data.artists.filter(a => a.gearMismatches && a.gearMismatches.length > 0);
   if (artistsWithConflicts.length > 0) {
     let currentY = (doc as any).lastAutoTable.finalY + 20;
+    
+    // Check if we need a new page for the summary
+    if (currentY > pageHeight - 60) {
+      doc.addPage();
+      currentY = 20;
+    }
     
     // Add summary header
     doc.setFontSize(14);
@@ -404,27 +412,50 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     doc.text('Gear Conflicts Summary', 10, currentY);
     currentY += 10;
     
-    // Add conflicts details
+    // Add conflicts details with page break handling
     doc.setFontSize(10);
     artistsWithConflicts.forEach(artist => {
       const errors = artist.gearMismatches?.filter(m => m.severity === 'error') || [];
       const warnings = artist.gearMismatches?.filter(m => m.severity === 'warning') || [];
       
       if (errors.length > 0 || warnings.length > 0) {
+        // Check if we need a new page
+        if (currentY > pageHeight - 40) {
+          doc.addPage();
+          currentY = 20;
+        }
+        
         doc.setTextColor(0, 0, 0);
         doc.text(`${artist.name}:`, 10, currentY);
         currentY += 5;
         
         [...errors, ...warnings].forEach(mismatch => {
+          // Check if we need a new page for each mismatch
+          if (currentY > pageHeight - 25) {
+            doc.addPage();
+            currentY = 20;
+          }
+          
           const color = mismatch.severity === 'error' ? [255, 0, 0] : [255, 165, 0];
           doc.setTextColor(color[0], color[1], color[2]);
-          doc.text(`  • ${mismatch.message}`, 15, currentY);
+          
+          // Wrap long messages to prevent truncation
+          const wrappedMessage = doc.splitTextToSize(`• ${mismatch.message}`, pageWidth - 25);
+          doc.text(wrappedMessage, 15, currentY);
+          currentY += wrappedMessage.length * 4;
+          
           if (mismatch.details) {
-            currentY += 4;
+            if (currentY > pageHeight - 20) {
+              doc.addPage();
+              currentY = 20;
+            }
+            
             doc.setTextColor(100, 100, 100);
-            doc.text(`    ${mismatch.details}`, 20, currentY);
+            const wrappedDetails = doc.splitTextToSize(`${mismatch.details}`, pageWidth - 30);
+            doc.text(wrappedDetails, 20, currentY);
+            currentY += wrappedDetails.length * 4;
           }
-          currentY += 5;
+          currentY += 3;
         });
         currentY += 3;
       }
