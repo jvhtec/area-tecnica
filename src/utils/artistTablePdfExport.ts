@@ -61,12 +61,13 @@ export interface ArtistTablePdfData {
       djBooth: boolean;
     };
     notes?: string;
-    micKit: 'festival' | 'band';
+    micKit: 'festival' | 'band' | 'mixed';
     wiredMics: Array<{
       model: string;
       quantity: number;
       exclusive_use?: boolean;
       notes?: string;
+      provided_by?: 'festival' | 'band';
     }>;
     infrastructure: {
       infra_cat6?: boolean;

@@ -29,7 +29,7 @@ export const ArtistForm = () => {
   const { models } = useEquipmentModels();
   
   const [formData, setFormData] = useState<ArtistFormData & { 
-    mic_kit: 'festival' | 'band'; 
+    mic_kit: 'festival' | 'band' | 'mixed'; 
     wired_mics: WiredMic[];
     foh_tech: boolean;
     mon_tech: boolean;
