@@ -1,7 +1,6 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { GearMismatch, ArtistGearComparison } from './gearComparisonService';
+import { GearMismatch } from './gearComparisonService';
 
 // Local interfaces for internal PDF generation use
 interface WirelessSystemDetail {

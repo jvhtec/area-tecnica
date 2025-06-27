@@ -27,15 +27,15 @@ interface ArtistRequirements {
   extras_sf: boolean;
   extras_df: boolean;
   extras_djbooth: boolean;
-  infra_cat6?: boolean;
-  infra_cat6_quantity?: number;
-  infra_hma?: boolean;
-  infra_hma_quantity?: number;
-  infra_coax?: boolean;
-  infra_coax_quantity?: number;
-  infra_opticalcon_duo?: boolean;
-  infra_opticalcon_duo_quantity?: number;
-  infra_analog?: number;
+  infra_cat6: boolean;
+  infra_cat6_quantity: number;
+  infra_hma: boolean;
+  infra_hma_quantity: number;
+  infra_coax: boolean;
+  infra_coax_quantity: number;
+  infra_opticalcon_duo: boolean;
+  infra_opticalcon_duo_quantity: number;
+  infra_analog: number;
 }
 
 interface AvailableGear {
@@ -265,49 +265,49 @@ export const compareArtistRequirements = (
     });
   }
 
-  // Check Infrastructure (handle optional properties)
-  if (artist.infra_cat6 && (artist.infra_cat6_quantity || 0) > availableGear.available_cat6_runs) {
+  // Check Infrastructure
+  if (artist.infra_cat6 && artist.infra_cat6_quantity > availableGear.available_cat6_runs) {
     mismatches.push({
       type: 'infrastructure',
       severity: 'error',
       message: `Insufficient CAT6 runs`,
-      details: `Required: ${artist.infra_cat6_quantity || 0}, Available: ${availableGear.available_cat6_runs}`
+      details: `Required: ${artist.infra_cat6_quantity}, Available: ${availableGear.available_cat6_runs}`
     });
   }
 
-  if (artist.infra_hma && (artist.infra_hma_quantity || 0) > availableGear.available_hma_runs) {
+  if (artist.infra_hma && artist.infra_hma_quantity > availableGear.available_hma_runs) {
     mismatches.push({
       type: 'infrastructure',
       severity: 'error',
       message: `Insufficient HMA runs`,
-      details: `Required: ${artist.infra_hma_quantity || 0}, Available: ${availableGear.available_hma_runs}`
+      details: `Required: ${artist.infra_hma_quantity}, Available: ${availableGear.available_hma_runs}`
     });
   }
 
-  if (artist.infra_coax && (artist.infra_coax_quantity || 0) > availableGear.available_coax_runs) {
+  if (artist.infra_coax && artist.infra_coax_quantity > availableGear.available_coax_runs) {
     mismatches.push({
       type: 'infrastructure',
       severity: 'error',
       message: `Insufficient Coax runs`,
-      details: `Required: ${artist.infra_coax_quantity || 0}, Available: ${availableGear.available_coax_runs}`
+      details: `Required: ${artist.infra_coax_quantity}, Available: ${availableGear.available_coax_runs}`
     });
   }
 
-  if (artist.infra_opticalcon_duo && (artist.infra_opticalcon_duo_quantity || 0) > availableGear.available_opticalcon_duo_runs) {
+  if (artist.infra_opticalcon_duo && artist.infra_opticalcon_duo_quantity > availableGear.available_opticalcon_duo_runs) {
     mismatches.push({
       type: 'infrastructure',
       severity: 'error',
       message: `Insufficient OpticalCON DUO runs`,
-      details: `Required: ${artist.infra_opticalcon_duo_quantity || 0}, Available: ${availableGear.available_opticalcon_duo_runs}`
+      details: `Required: ${artist.infra_opticalcon_duo_quantity}, Available: ${availableGear.available_opticalcon_duo_runs}`
     });
   }
 
-  if ((artist.infra_analog || 0) > availableGear.available_analog_runs) {
+  if (artist.infra_analog > availableGear.available_analog_runs) {
     mismatches.push({
       type: 'infrastructure',
       severity: 'error',
       message: `Insufficient analog runs`,
-      details: `Required: ${artist.infra_analog || 0}, Available: ${availableGear.available_analog_runs}`
+      details: `Required: ${artist.infra_analog}, Available: ${availableGear.available_analog_runs}`
     });
   }
 
