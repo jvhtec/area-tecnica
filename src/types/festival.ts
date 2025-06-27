@@ -12,7 +12,7 @@ export interface WirelessSetup {
   quantity_bp?: number;
   band?: string;
   notes?: string;
-  provided_by?: 'festival' | 'band' | 'mixed';
+  provided_by?: 'festival' | 'band';
 }
 
 export interface FestivalGearSetup {
@@ -37,7 +37,7 @@ export interface FestivalGearSetup {
   updated_at?: string;
 }
 
-export type ProviderType = 'festival' | 'band' | 'mixed';
+export type ProviderType = 'festival' | 'band';
 
 export interface ArtistFormData {
   readonly name: string;
