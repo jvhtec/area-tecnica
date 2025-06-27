@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -278,7 +279,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
   console.log('Table data prepared:', tableData.length, 'rows');
 
   autoTable(doc, {
-    head: [['Artist', 'Stage', 'Show Time', 'Soundcheck', 'Consoles', 'Wireless/IEM', 'Microphones', 'Monitors', 'Infrastructure', 'Extras', 'Notes', 'Rider Status']],
+    head: [['Artist', 'Stage', 'Show\nTime', 'Sound\ncheck', 'Consoles', 'Wireless/IEM', 'Microphones', 'Monitors', 'Infra', 'Extras', 'Notes', 'Rider Status']],
     body: tableData,
     startY: 40,
     theme: 'grid',
@@ -296,16 +297,22 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     columnStyles: {
       0: { cellWidth: 25 }, // Artist
       1: { cellWidth: 15 }, // Stage - reduced from 20 to 15
-      2: { cellWidth: 25 }, // Show Time
-      3: { cellWidth: 25 }, // Soundcheck
+      2: { cellWidth: 20 }, // Show Time - reduced from 25 to 20
+      3: { cellWidth: 20 }, // Soundcheck - reduced from 25 to 20
       4: { cellWidth: 40 }, // Consoles
       5: { cellWidth: 35 }, // Wireless/IEM
       6: { cellWidth: 30 }, // Microphones
       7: { cellWidth: 15 }, // Monitors
-      8: { cellWidth: 30 }, // Infrastructure
+      8: { cellWidth: 25 }, // Infrastructure - reduced from 30 to 25
       9: { cellWidth: 15 }, // Extras
       10: { cellWidth: 25 }, // Notes
       11: { cellWidth: 20 }, // Rider Status
+    },
+    didParseCell: (data) => {
+      // Make "Missing" text red in the Rider Status column (column 11)
+      if (data.column.index === 11 && data.cell.text[0] === 'Missing') {
+        data.cell.styles.textColor = [255, 0, 0]; // Red color
+      }
     },
     margin: { left: 10, right: 10 },
   });
