@@ -1,4 +1,3 @@
-
 export interface ConsoleSetup {
   model: string;
   quantity: number;
@@ -12,7 +11,7 @@ export interface WirelessSetup {
   quantity_bp?: number;
   band?: string;
   notes?: string;
-  provided_by?: 'festival' | 'band';
+  provided_by?: 'festival' | 'band' | 'mixed';
 }
 
 export interface FestivalGearSetup {
