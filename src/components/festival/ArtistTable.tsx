@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -201,7 +202,7 @@ const ArtistTable = ({
           djBooth: artist.extras_djbooth
         },
         notes: artist.notes,
-		micKit: artist.mic_kit || 'band',
+        micKit: artist.mic_kit || 'band',
         wiredMics: artist.wired_mics || [],
         infrastructure: {
           infra_cat6: artist.infra_cat6,
@@ -217,7 +218,8 @@ const ArtistTable = ({
           infrastructure_provided_by: artist.infrastructure_provided_by
         },
         riderMissing: artist.rider_missing || false,
-      }),
+        gearMismatches: gearComparisons[artist.id]?.mismatches || []
+      }))
     };
 
     try {
