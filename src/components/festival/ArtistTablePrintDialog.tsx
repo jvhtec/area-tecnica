@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -17,6 +16,7 @@ import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { compareArtistRequirements } from "@/utils/gearComparisonService";
 import { supabase } from "@/lib/supabase";
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Artist {
   name: string;
@@ -100,6 +100,7 @@ export const ArtistTablePrintDialog = ({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
+  const [includeGearConflicts, setIncludeGearConflicts] = useState(false);
 
   // Use external open state if provided, otherwise use internal state
   const dialogOpen = open !== undefined ? open : isDialogOpen;
@@ -125,6 +126,7 @@ export const ArtistTablePrintDialog = ({
     console.log('Artists received:', artists.length);
     console.log('Selected date:', selectedDate);
     console.log('Stage filter:', stageFilter);
+    console.log('Include gear conflicts:', includeGearConflicts);
     
     setIsGenerating(true);
     
@@ -301,7 +303,8 @@ export const ArtistTablePrintDialog = ({
         stage: stageFilter !== 'all' ? stageFilter : undefined,
         stageNames: stageNames,
         artists: transformedArtists,
-        logoUrl: logoUrl
+        logoUrl: logoUrl,
+        includeGearConflicts: includeGearConflicts
       };
 
       console.log('PDF data structure:', {
@@ -311,7 +314,8 @@ export const ArtistTablePrintDialog = ({
         artistCount: pdfData.artists.length,
         logoUrl: !!pdfData.logoUrl,
         sampleArtist: pdfData.artists[0],
-        artistsWithGearIssues: pdfData.artists.filter(a => a.gearMismatches && a.gearMismatches.length > 0).length
+        artistsWithGearIssues: pdfData.artists.filter(a => a.gearMismatches && a.gearMismatches.length > 0).length,
+        includeGearConflicts: pdfData.includeGearConflicts
       });
 
       console.log('Calling exportArtistTablePDF...');
@@ -361,6 +365,16 @@ export const ArtistTablePrintDialog = ({
               Date
             </Label>
             <Input id="username" value={selectedDate} className="col-span-3" disabled />
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="gear-conflicts" 
+              checked={includeGearConflicts}
+              onCheckedChange={setIncludeGearConflicts}
+            />
+            <Label htmlFor="gear-conflicts" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+              Include gear conflicts summary
+            </Label>
           </div>
         </div>
         <Button onClick={handleTablePrint} disabled={isGenerating || isLoading}>

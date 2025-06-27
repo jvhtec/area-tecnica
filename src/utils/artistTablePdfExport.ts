@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { GearMismatch } from './gearComparisonService';
@@ -87,6 +86,7 @@ export interface ArtistTablePdfData {
     gearMismatches?: GearMismatch[];
   }>;
   logoUrl?: string;
+  includeGearConflicts?: boolean;
 }
 
 // Enhanced image loading function
@@ -395,71 +395,73 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     margin: { left: 10, right: 10 },
   });
 
-  // Add gear conflicts summary if there are any - with improved page handling
-  const artistsWithConflicts = data.artists.filter(a => a.gearMismatches && a.gearMismatches.length > 0);
-  if (artistsWithConflicts.length > 0) {
-    let currentY = (doc as any).lastAutoTable.finalY + 20;
-    
-    // Check if we need a new page for the summary
-    if (currentY > pageHeight - 60) {
-      doc.addPage();
-      currentY = 20;
-    }
-    
-    // Add summary header
-    doc.setFontSize(14);
-    doc.setTextColor(0, 0, 0);
-    doc.text('Gear Conflicts Summary', 10, currentY);
-    currentY += 10;
-    
-    // Add conflicts details with page break handling
-    doc.setFontSize(10);
-    artistsWithConflicts.forEach(artist => {
-      const errors = artist.gearMismatches?.filter(m => m.severity === 'error') || [];
-      const warnings = artist.gearMismatches?.filter(m => m.severity === 'warning') || [];
+  // Add gear conflicts summary ONLY if includeGearConflicts is true
+  if (data.includeGearConflicts) {
+    const artistsWithConflicts = data.artists.filter(a => a.gearMismatches && a.gearMismatches.length > 0);
+    if (artistsWithConflicts.length > 0) {
+      let currentY = (doc as any).lastAutoTable.finalY + 20;
       
-      if (errors.length > 0 || warnings.length > 0) {
-        // Check if we need a new page
-        if (currentY > pageHeight - 40) {
-          doc.addPage();
-          currentY = 20;
-        }
+      // Check if we need a new page for the summary
+      if (currentY > pageHeight - 60) {
+        doc.addPage();
+        currentY = 20;
+      }
+      
+      // Add summary header
+      doc.setFontSize(14);
+      doc.setTextColor(0, 0, 0);
+      doc.text('Gear Conflicts Summary', 10, currentY);
+      currentY += 10;
+      
+      // Add conflicts details with page break handling
+      doc.setFontSize(10);
+      artistsWithConflicts.forEach(artist => {
+        const errors = artist.gearMismatches?.filter(m => m.severity === 'error') || [];
+        const warnings = artist.gearMismatches?.filter(m => m.severity === 'warning') || [];
         
-        doc.setTextColor(0, 0, 0);
-        doc.text(`${artist.name}:`, 10, currentY);
-        currentY += 5;
-        
-        [...errors, ...warnings].forEach(mismatch => {
-          // Check if we need a new page for each mismatch
-          if (currentY > pageHeight - 25) {
+        if (errors.length > 0 || warnings.length > 0) {
+          // Check if we need a new page
+          if (currentY > pageHeight - 40) {
             doc.addPage();
             currentY = 20;
           }
           
-          const color = mismatch.severity === 'error' ? [255, 0, 0] : [255, 165, 0];
-          doc.setTextColor(color[0], color[1], color[2]);
+          doc.setTextColor(0, 0, 0);
+          doc.text(`${artist.name}:`, 10, currentY);
+          currentY += 5;
           
-          // Wrap long messages to prevent truncation
-          const wrappedMessage = doc.splitTextToSize(`• ${mismatch.message}`, pageWidth - 25);
-          doc.text(wrappedMessage, 15, currentY);
-          currentY += wrappedMessage.length * 4;
-          
-          if (mismatch.details) {
-            if (currentY > pageHeight - 20) {
+          [...errors, ...warnings].forEach(mismatch => {
+            // Check if we need a new page for each mismatch
+            if (currentY > pageHeight - 25) {
               doc.addPage();
               currentY = 20;
             }
             
-            doc.setTextColor(100, 100, 100);
-            const wrappedDetails = doc.splitTextToSize(`${mismatch.details}`, pageWidth - 30);
-            doc.text(wrappedDetails, 20, currentY);
-            currentY += wrappedDetails.length * 4;
-          }
+            const color = mismatch.severity === 'error' ? [255, 0, 0] : [255, 165, 0];
+            doc.setTextColor(color[0], color[1], color[2]);
+            
+            // Wrap long messages to prevent truncation
+            const wrappedMessage = doc.splitTextToSize(`• ${mismatch.message}`, pageWidth - 25);
+            doc.text(wrappedMessage, 15, currentY);
+            currentY += wrappedMessage.length * 4;
+            
+            if (mismatch.details) {
+              if (currentY > pageHeight - 20) {
+                doc.addPage();
+                currentY = 20;
+              }
+              
+              doc.setTextColor(100, 100, 100);
+              const wrappedDetails = doc.splitTextToSize(`${mismatch.details}`, pageWidth - 30);
+              doc.text(wrappedDetails, 20, currentY);
+              currentY += wrappedDetails.length * 4;
+            }
+            currentY += 3;
+          });
           currentY += 3;
-        });
-        currentY += 3;
-      }
-    });
+        }
+      });
+    }
   }
 
   // === COMPANY LOGO (CENTERED AT BOTTOM) ===
