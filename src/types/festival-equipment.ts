@@ -33,7 +33,7 @@ export interface WirelessSystem {
   quantity_hh?: number;
   quantity_bp?: number;
   band?: string;
-  provided_by?: 'festival' | 'band';
+  provided_by?: 'festival' | 'band' | 'mixed';
 }
 
 // Base interface for IEM system
@@ -43,5 +43,5 @@ export interface IEMSystem {
   quantity_hh?: number;  // Channels
   quantity_bp?: number;  // Bodypacks
   band?: string;
-  provided_by?: 'festival' | 'band';
+  provided_by?: 'festival' | 'band' | 'mixed';
 }
