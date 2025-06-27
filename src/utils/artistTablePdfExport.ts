@@ -1,62 +1,59 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { format } from 'date-fns';
-import { WirelessSystem, IEMSystem } from '@/types/festival-equipment';
 
-// Helper functions for wireless and IEM quantity calculations
-export const getWirelessSummary = (data: { 
-  systems?: WirelessSystem[]; 
-}) => {
-  if (data.systems && data.systems.length > 0) {
-    return {
-      hh: data.systems.reduce((sum: number, system: WirelessSystem) => 
-        sum + (system.quantity_hh || 0), 0),
-      bp: data.systems.reduce((sum: number, system: WirelessSystem) => 
-        sum + (system.quantity_bp || 0), 0)
-    };
-  }
-  return { hh: 0, bp: 0 };
-};
+// Local interfaces for internal PDF generation use
+interface WirelessSystemDetail {
+  quantity_hh?: number;
+  quantity_bp?: number;
+  model: string;
+  band?: string;
+}
 
-export const getIEMSummary = (data: {
-  systems?: IEMSystem[];
-}) => {
-  if (data.systems && data.systems.length > 0) {
-    return {
-      channels: data.systems.reduce((sum: number, system: IEMSystem) => 
-        sum + (system.quantity_hh || 0), 0),
-      bodypacks: data.systems.reduce((sum: number, system: IEMSystem) => 
-        sum + (system.quantity_bp || 0), 0)
-    };
-  }
-  return { channels: 0, bodypacks: 0 };
-};
+interface IEMSystemDetail {
+  quantity: number;
+  model: string;
+  band?: string;
+}
 
 export interface ArtistTablePdfData {
   jobTitle: string;
   date: string;
   stage?: string;
   stageNames?: Record<number, string>;
-  artists: {
+  artists: Array<{
     name: string;
     stage: number;
-    showTime: { start: string; end: string };
-    soundcheck?: { start: string; end: string };
+    showTime: {
+      start: string;
+      end: string;
+    };
+    soundcheck?: {
+      start: string;
+      end: string;
+    };
     technical: {
       fohTech: boolean;
       monTech: boolean;
-      fohConsole: { model: string; providedBy: string };
-      monConsole: { model: string; providedBy: string };
-      wireless: { 
-        systems: WirelessSystem[];
+      fohConsole: {
+        model: string;
+        providedBy: string;
+      };
+      monConsole: {
+        model: string;
+        providedBy: string;
+      };
+      wireless: {
+        systems: any[];
         providedBy: string;
       };
       iem: {
-        systems: IEMSystem[];
+        systems: any[];
         providedBy: string;
       };
-      monitors: { enabled: boolean; quantity: number };
+      monitors: {
+        enabled: boolean;
+        quantity: number;
+      };
     };
     extras: {
       sideFill: boolean;
@@ -64,14 +61,14 @@ export interface ArtistTablePdfData {
       djBooth: boolean;
     };
     notes?: string;
-    micKit?: 'festival' | 'band';
-    wiredMics?: Array<{
+    micKit: 'festival' | 'band';
+    wiredMics: Array<{
       model: string;
       quantity: number;
       exclusive_use?: boolean;
       notes?: string;
     }>;
-    infrastructure?: {
+    infrastructure: {
       infra_cat6?: boolean;
       infra_cat6_quantity?: number;
       infra_hma?: boolean;
@@ -84,121 +81,33 @@ export interface ArtistTablePdfData {
       other_infrastructure?: string;
       infrastructure_provided_by?: string;
     };
-    riderMissing?: boolean;
-  }[];
+    riderMissing: boolean;
+  }>;
   logoUrl?: string;
 }
 
-interface ScheduleRow {
-  name: string;
-  stage: number;
-  time: { start: string; end: string };
-  isSoundcheck: boolean;
-  technical?: {
-    fohTech: boolean;
-    monTech: boolean;
-    fohConsole: { model: string; providedBy: string };
-    monConsole: { model: string; providedBy: string };
-    wireless: { 
-      systems: WirelessSystem[];
-      providedBy: string;
-    };
-    iem: {
-      systems: IEMSystem[];
-      providedBy: string;
-    };
-    monitors: { enabled: boolean; quantity: number };
-  };
-  extras?: {
-    sideFill: boolean;
-    drumFill: boolean;
-    djBooth: boolean;
-  };
-  notes?: string;
-  micKit?: string;
-  wiredMics?: Array<{
-    model: string;
-    quantity: number;
-    exclusive_use?: boolean;
-  }>;
-  infrastructure?: {
-    infra_cat6?: boolean;
-    infra_cat6_quantity?: number;
-    infra_hma?: boolean;
-    infra_hma_quantity?: number;
-    infra_coax?: boolean;
-    infra_coax_quantity?: number;
-    infra_opticalcon_duo?: boolean;
-    infra_opticalcon_duo_quantity?: number;
-    infra_analog?: number;
-    other_infrastructure?: string;
-    infrastructure_provided_by?: string;
-  };
-  riderMissing?: boolean;
-}
-
-// Helper function to sort schedule rows chronologically by their actual event times
-const sortScheduleRowsChronologically = (scheduleRows: ScheduleRow[]) => {
-  return scheduleRows.sort((a, b) => {
-    if (a.stage !== b.stage) {
-      return a.stage - b.stage;
-    }
-
-    const aTime = a.time.start || '';
-    const bTime = b.time.start || '';
-
-    const aHour = aTime ? parseInt(aTime.split(':')[0], 10) : 0;
-    const bHour = bTime ? parseInt(bTime.split(':')[0], 10) : 0;
-
-    const adjustedATime = aHour >= 0 && aHour < 7 ? `${aHour + 24}${aTime.substring(aTime.indexOf(':'))}` : aTime;
-    const adjustedBTime = bHour >= 0 && bHour < 7 ? `${bHour + 24}${bTime.substring(bTime.indexOf(':'))}` : bTime;
-    
-    if (adjustedATime < adjustedBTime) return -1;
-    if (adjustedATime > adjustedBTime) return 1;
-
-    if (adjustedATime === adjustedBTime) {
-      if (a.isSoundcheck && !b.isSoundcheck) return -1;
-      if (!a.isSoundcheck && b.isSoundcheck) return 1;
-    }
-
-    return (a.name || '').localeCompare(b.name || '');
-  });
-};
-
-// Transform PDF artist data to match the sorting function's expected format
-const transformArtistsForSorting = (artists: ArtistTablePdfData['artists'], date: string) => {
-  return artists.map((artist, index) => ({
-    id: `temp-${index}`,
-    name: artist.name,
-    stage: artist.stage,
-    date: date,
-    show_start: artist.showTime.start,
-    show_end: artist.showTime.end
-  }));
-};
-
-// Enhanced image loading with better error handling and debugging
-const loadImageWithFallback = async (src: string, description: string): Promise<HTMLImageElement | null> => {
-  console.log(`Attempting to load ${description}:`, src);
+// Enhanced image loading function
+const loadImageSafely = async (src: string, description: string): Promise<HTMLImageElement | null> => {
+  console.log(`Loading ${description} from:`, src);
   
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     
     const timeout = setTimeout(() => {
-      console.error(`Timeout loading ${description}:`, src);
+      console.warn(`Timeout loading ${description} from:`, src);
       resolve(null);
-    }, 5000);
+    }, 10000); // 10 second timeout
     
     img.onload = () => {
       clearTimeout(timeout);
-      console.log(`Successfully loaded ${description}:`, src);
+      console.log(`Successfully loaded ${description}`);
       resolve(img);
     };
     
-    img.onerror = (e) => {
+    img.onerror = (error) => {
       clearTimeout(timeout);
-      console.error(`Failed to load ${description}:`, src, e);
+      console.error(`Failed to load ${description} from:`, src, error);
       resolve(null);
     };
     
@@ -206,12 +115,46 @@ const loadImageWithFallback = async (src: string, description: string): Promise<
   });
 };
 
-// Helper function to format wired microphones for PDF display
-const formatWiredMicsForPdf = (mics: Array<{
-  model: string;
-  quantity: number;
-  exclusive_use?: boolean;
-}> = []) => {
+// Fixed infrastructure formatting function
+const formatInfrastructureForPdf = (infrastructure: any) => {
+  console.log('formatInfrastructureForPdf called with:', infrastructure);
+  
+  if (!infrastructure) {
+    console.log('No infrastructure data provided');
+    return 'None';
+  }
+
+  const infraItems: string[] = [];
+  
+  try {
+    if (infrastructure.infra_cat6 && infrastructure.infra_cat6_quantity) {
+      infraItems.push(`${infrastructure.infra_cat6_quantity}x CAT6`);
+    }
+    if (infrastructure.infra_hma && infrastructure.infra_hma_quantity) {
+      infraItems.push(`${infrastructure.infra_hma_quantity}x HMA`);
+    }
+    if (infrastructure.infra_coax && infrastructure.infra_coax_quantity) {
+      infraItems.push(`${infrastructure.infra_coax_quantity}x Coax`);
+    }
+    if (infrastructure.infra_opticalcon_duo && infrastructure.infra_opticalcon_duo_quantity) {
+      infraItems.push(`${infrastructure.infra_opticalcon_duo_quantity}x OpticalCON DUO`);
+    }
+    if (infrastructure.infra_analog && infrastructure.infra_analog > 0) {
+      infraItems.push(`${infrastructure.infra_analog}x Analog`);
+    }
+    if (infrastructure.other_infrastructure) {
+      infraItems.push(infrastructure.other_infrastructure);
+    }
+    
+    console.log('Infrastructure items found:', infraItems);
+    return infraItems.length > 0 ? infraItems.join(", ") : "None";
+  } catch (error) {
+    console.error('Error formatting infrastructure:', error);
+    return 'Error formatting infrastructure';
+  }
+};
+
+const formatWiredMicsForPdf = (mics: Array<{ model: string; quantity: number; exclusive_use?: boolean; notes?: string }> = []) => {
   if (mics.length === 0) return "None";
   return mics.map(mic => {
     const exclusiveIndicator = mic.exclusive_use ? " (E)" : "";
@@ -219,67 +162,56 @@ const formatWiredMicsForPdf = (mics: Array<{
   }).join(", ");
 };
 
-// Helper function to format infrastructure requirements for PDF
-const formatInfrastructureForPdf = (artist: any) => {
-  const infraItems: string[] = [];
-  
-  if (artist.infra_cat6 && artist.infra_cat6_quantity) {
-    infraItems.push(`${artist.infra_cat6_quantity}x CAT6`);
-  }
-  if (artist.infra_hma && artist.infra_hma_quantity) {
-    infraItems.push(`${artist.infra_hma_quantity}x HMA`);
-  }
-  if (artist.infra_coax && artist.infra_coax_quantity) {
-    infraItems.push(`${artist.infra_coax_quantity}x Coax`);
-  }
-  if (artist.infra_opticalcon_duo && artist.infra_opticalcon_duo_quantity) {
-    infraItems.push(`${artist.infra_opticalcon_duo_quantity}x OpticalCON DUO`);
-  }
-  if (artist.infra_analog && artist.infra_analog > 0) {
-    infraItems.push(`${artist.infra_analog}x Analog`);
-  }
-  if (artist.other_infrastructure) {
-    infraItems.push(artist.other_infrastructure);
-  }
-  
-  const infraText = infraItems.length > 0 ? infraItems.join(", ") : "None";
-  const providerText = artist.infrastructure_provided_by ? `\n(${artist.infrastructure_provided_by})` : "";
-  
-  return infraText + providerText;
+const formatWirelessSystemsForPdf = (systems: any[] = [], isIEM = false) => {
+  if (systems.length === 0) return "None";
+  return systems.map(system => {
+    if (isIEM) {
+      const channels = system.quantity_hh || system.quantity || 0;
+      const beltpacks = system.quantity_bp || 0;
+      return `${system.model}: ${channels} ch${beltpacks > 0 ? `, ${beltpacks} bp` : ''}`;
+    } else {
+      const hh = system.quantity_hh || 0;
+      const bp = system.quantity_bp || 0;
+      const total = hh + bp;
+      if (hh > 0 && bp > 0) {
+        return `${system.model}: ${hh}x HH, ${bp}x BP`;
+      } else if (total > 0) {
+        return `${system.model}: ${total}x`;
+      }
+      return system.model;
+    }
+  }).join("; ");
 };
 
 export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Blob> => {
-  console.log('Starting PDF generation with data:', { logoUrl: data.logoUrl, artistCount: data.artists.length });
+  console.log('exportArtistTablePDF called with data:', data);
   
-  const doc = new jsPDF({ orientation: 'landscape' });
+  const doc = new jsPDF('landscape');
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
-  const createdDate = format(new Date(), 'dd/MM/yyyy');
+  const createdDate = new Date().toLocaleDateString('en-GB');
 
-  const getStageDisplayName = (stageNumber: number) => {
-    return data.stageNames?.[stageNumber] || `Stage ${stageNumber}`;
-  };
-
-  // Draw header background
+  // === HEADER SECTION ===
   doc.setFillColor(125, 1, 1);
-  doc.rect(0, 0, pageWidth, 20, 'F');
+  doc.rect(0, 0, pageWidth, 30, 'F');
 
-  // Load festival logo with improved error handling
+  // Load festival logo if provided
   let festivalLogoLoaded = false;
   if (data.logoUrl) {
     console.log("Attempting to load festival logo:", data.logoUrl);
     
-    const festivalImg = await loadImageWithFallback(data.logoUrl, 'festival logo');
+    const festivalImg = await loadImageSafely(data.logoUrl, 'festival logo');
     if (festivalImg) {
       try {
+        console.log("Festival logo loaded, dimensions:", festivalImg.width, "x", festivalImg.height);
         const maxHeight = 18;
         const ratio = festivalImg.width / festivalImg.height;
         const logoHeight = Math.min(maxHeight, festivalImg.height);
         const logoWidth = logoHeight * ratio;
         
-        doc.addImage(festivalImg, 'JPEG', 5, 1, logoWidth, logoHeight);
+        doc.addImage(festivalImg, 'JPEG', 5, 5, logoWidth, logoHeight);
         festivalLogoLoaded = true;
-        console.log("Festival logo added successfully");
+        console.log("Festival logo added successfully to PDF");
       } catch (error) {
         console.error('Error adding festival logo to PDF:', error);
       }
@@ -289,7 +221,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
   // If festival logo failed, try fallback logo
   if (!festivalLogoLoaded) {
     console.log("Trying fallback logo");
-    const fallbackImg = await loadImageWithFallback('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', 'fallback logo');
+    const fallbackImg = await loadImageSafely('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', 'fallback logo');
     if (fallbackImg) {
       try {
         const maxHeight = 18;
@@ -297,7 +229,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
         const logoHeight = Math.min(maxHeight, fallbackImg.height);
         const logoWidth = logoHeight * ratio;
         
-        doc.addImage(fallbackImg, 'PNG', 5, 1, logoWidth, logoHeight);
+        doc.addImage(fallbackImg, 'PNG', 5, 5, logoWidth, logoHeight);
         console.log("Fallback logo added successfully");
       } catch (error) {
         console.error('Error adding fallback logo to PDF:', error);
@@ -305,213 +237,128 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     }
   }
 
-  // Add title and date
-  doc.setFontSize(14);
+  // Add title
+  doc.setFontSize(18);
   doc.setTextColor(255, 255, 255);
-  doc.text(`${data.jobTitle} - Artist Schedule`, pageWidth / 2, 12, { align: 'center' });
+  const titleText = `${data.jobTitle} - Artist Schedule`;
+  const stageText = data.stage && data.stage !== 'all' ? ` - ${data.stageNames?.[parseInt(data.stage)] || `Stage ${data.stage}`}` : '';
+  doc.text(`${titleText}${stageText}`, pageWidth / 2, 15, { align: 'center' });
   
-  if (data.stage) {
-    const stageDisplayName = data.stageNames?.[parseInt(data.stage)] || `Stage ${data.stage}`;
-    doc.text(`${stageDisplayName} - ${format(new Date(data.date), 'dd/MM/yyyy')}`, pageWidth / 2, 18, { align: 'center' });
-  } else {
-    doc.text(format(new Date(data.date), 'dd/MM/yyyy'), pageWidth / 2, 18, { align: 'center' });
-  }
+  doc.setFontSize(12);
+  doc.text(new Date(data.date).toLocaleDateString('en-GB'), pageWidth / 2, 25, { align: 'center' });
 
-  // Create all schedule events (soundchecks and shows) first
-  const scheduleRows: ScheduleRow[] = [];
-  
-  data.artists.forEach(artist => {
-    // Add soundcheck if exists
-    if (artist.soundcheck) {
-      scheduleRows.push({
-        name: artist.name,
-        stage: artist.stage,
-        time: artist.soundcheck,
-        isSoundcheck: true
-      });
-    }
-    
-    // Add show
-    scheduleRows.push({
-      name: artist.name,
-      stage: artist.stage,
-      time: artist.showTime,
-      isSoundcheck: false,
-      technical: artist.technical,
-      extras: artist.extras,
-      notes: artist.notes,
-      micKit: artist.micKit,
-      wiredMics: artist.wiredMics,
+  // === ARTIST TABLE ===
+  const tableData = data.artists.map(artist => {
+    console.log(`Processing artist: ${artist.name}`, {
       infrastructure: artist.infrastructure,
-      riderMissing: artist.riderMissing
+      micKit: artist.micKit,
+      wiredMics: artist.wiredMics?.length || 0
     });
-  });
 
-  // Sort all events chronologically by their actual event times
-  const sortedScheduleRows = sortScheduleRowsChronologically(scheduleRows);
-
-  const tableBody = sortedScheduleRows.map(row => {
-    if (row.isSoundcheck) {
-      return [
-        `${row.name} (Soundcheck)`,
-        getStageDisplayName(row.stage),
-        `${row.time.start}-${row.time.end}`,
-        '', '', '', '', '', '', '', '', ''
-      ];
-    }
-    
-    if (!row.technical) return ['', '', '', '', '', '', '', '', '', '', '', ''];
-    
-    const wirelessSummary = getWirelessSummary(row.technical.wireless);
-    const iemSummary = getIEMSummary(row.technical.iem);
-    
-    // Get provider information from each system if available
-    let wirelessProviderInfo = '';
-    if (row.technical.wireless.systems && row.technical.wireless.systems.length > 0) {
-      const providers = new Set<string>();
-      row.technical.wireless.systems.forEach(system => {
-        if (system.provided_by) {
-          providers.add(system.provided_by);
-        } else if (row.technical.wireless.providedBy) {
-          providers.add(row.technical.wireless.providedBy);
-        }
-      });
-      wirelessProviderInfo = Array.from(providers).join('/') || row.technical.wireless.providedBy || 'festival';
-    } else {
-      wirelessProviderInfo = row.technical.wireless.providedBy || 'festival';
-    }
-    
-    let iemProviderInfo = '';
-    if (row.technical.iem.systems && row.technical.iem.systems.length > 0) {
-      const providers = new Set<string>();
-      row.technical.iem.systems.forEach(system => {
-        if (system.provided_by) {
-          providers.add(system.provided_by);
-        } else if (row.technical.iem.providedBy) {
-          providers.add(row.technical.iem.providedBy);
-        }
-      });
-      iemProviderInfo = Array.from(providers).join('/') || row.technical.iem.providedBy || 'festival';
-    } else {
-      iemProviderInfo = row.technical.iem.providedBy || 'festival';
-    }
-    
     return [
-      row.name,
-      getStageDisplayName(row.stage),
-      `${row.time.start}-${row.time.end}`,
-      `FOH: ${row.technical.fohConsole.model}\n(${row.technical.fohConsole.providedBy})\n\nMON: ${row.technical.monConsole.model}\n(${row.technical.monConsole.providedBy})`,
-      `FOH: ${row.technical.fohTech ? 'Y' : 'N'}\nMON: ${row.technical.monTech ? 'Y' : 'N'}`,
-      `Wireless:\nHH: ${wirelessSummary.hh} (${wirelessProviderInfo})\nBP: ${wirelessSummary.bp}\n\nIEM:\nCH: ${iemSummary.channels}\nBP: ${iemSummary.bodypacks} (${iemProviderInfo})`,
-      // Add Mic Kit column
-      row.micKit || 'Band',
-      // Add Wired Mics column
-      formatWiredMicsForPdf(row.wiredMics),
-      row.technical.monitors.enabled ? `Monitors: ${row.technical.monitors.quantity}` : '-',
-      // Add Infrastructure column
-      formatInfrastructureForPdf(row.infrastructure),
+      artist.name,
+      data.stageNames?.[artist.stage] || `Stage ${artist.stage}`,
+      `${artist.showTime.start} - ${artist.showTime.end}`,
+      artist.soundcheck ? `${artist.soundcheck.start} - ${artist.soundcheck.end}` : 'No',
+      `FOH: ${artist.technical.fohConsole.model} (${artist.technical.fohConsole.providedBy})\nMON: ${artist.technical.monConsole.model} (${artist.technical.monConsole.providedBy})`,
+      `Wireless: ${formatWirelessSystemsForPdf(artist.technical.wireless.systems)}\nIEM: ${formatWirelessSystemsForPdf(artist.technical.iem.systems, true)}`,
+      `Kit: ${artist.micKit}\n${artist.micKit === 'festival' ? formatWiredMicsForPdf(artist.wiredMics) : 'Band provides'}`,
+      artist.technical.monitors.enabled ? `${artist.technical.monitors.quantity}x` : 'None',
+      formatInfrastructureForPdf(artist.infrastructure),
       [
-        row.extras?.sideFill ? 'SF' : '',
-        row.extras?.drumFill ? 'DF' : '',
-        row.extras?.djBooth ? 'DJ' : ''
-      ].filter(Boolean).join(', ') || '-',
-      // Add Rider Status column
-      row.riderMissing ? 'Missing' : 'Complete',
-      row.notes || '-'
+        artist.extras.sideFill ? 'SF' : '',
+        artist.extras.drumFill ? 'DF' : '',
+        artist.extras.djBooth ? 'DJ' : ''
+      ].filter(Boolean).join(', ') || 'None',
+      artist.notes || 'No notes',
+      artist.riderMissing ? 'Missing' : 'Complete'
     ];
   });
 
+  console.log('Table data prepared:', tableData.length, 'rows');
+
   autoTable(doc, {
-    startY: 25,
-    head: [['Artist', 'Stage', 'Time', 'Consoles', 'Tech', 'RF/IEM', 'Mic Kit', 'Wired Mics', 'Monitors', 'Infrastructure', 'Extras', 'Rider', 'Notes']],
-    body: tableBody,
+    head: [['Artist', 'Stage', 'Show Time', 'Soundcheck', 'Consoles', 'Wireless/IEM', 'Microphones', 'Monitors', 'Infrastructure', 'Extras', 'Notes', 'Rider Status']],
+    body: tableData,
+    startY: 40,
     theme: 'grid',
     styles: {
-      fontSize: 7,
+      fontSize: 8,
       cellPadding: 2,
-      overflow: 'linebreak',
-      lineWidth: 0.1,
-      valign: 'middle'
+      valign: 'top',
     },
     headStyles: {
       fillColor: [125, 1, 1],
-      textColor: [0, 0, 0],
-      fontSize: 7,
+      textColor: [255, 255, 255],
+      fontSize: 9,
       fontStyle: 'bold',
-      halign: 'left',
-      cellPadding: 3
     },
     columnStyles: {
-      0: { cellWidth: 22 },  // Artist
-      1: { cellWidth: 12 },  // Stage
-      2: { cellWidth: 18 },  // Time
-      3: { cellWidth: 28 },  // Consoles
-      4: { cellWidth: 15 },  // Tech
-      5: { cellWidth: 28 },  // RF/IEM
-      6: { cellWidth: 12 },  // Mic Kit
-      7: { cellWidth: 20 },  // Wired Mics
-      8: { cellWidth: 15 },  // Monitors
-      9: { cellWidth: 25 },  // Infrastructure
-      10: { cellWidth: 15 }, // Extras
-      11: { cellWidth: 12 }, // Rider
-      12: { cellWidth: 'auto' } // Notes
+      0: { cellWidth: 25 }, // Artist
+      1: { cellWidth: 20 }, // Stage
+      2: { cellWidth: 25 }, // Show Time
+      3: { cellWidth: 25 }, // Soundcheck
+      4: { cellWidth: 40 }, // Consoles
+      5: { cellWidth: 35 }, // Wireless/IEM
+      6: { cellWidth: 30 }, // Microphones
+      7: { cellWidth: 15 }, // Monitors
+      8: { cellWidth: 30 }, // Infrastructure
+      9: { cellWidth: 15 }, // Extras
+      10: { cellWidth: 25 }, // Notes
+      11: { cellWidth: 20 }, // Rider Status
     },
-    didParseCell: function(data) {
-      if (data.row.index === -1) return;
-      const rowData = sortedScheduleRows[data.row.index];
-      if (rowData.isSoundcheck) {
-        data.cell.styles.fillColor = [254, 247, 205];
-      }
-      
-      // Color rider status column
-      if (data.column.index === 11 && !rowData.isSoundcheck) {
-        if (rowData.riderMissing) {
-          data.cell.styles.fillColor = [254, 226, 226]; // Light red for missing
-          data.cell.styles.textColor = [185, 28, 28]; // Dark red text
-        } else {
-          data.cell.styles.fillColor = [220, 252, 231]; // Light green for complete
-          data.cell.styles.textColor = [22, 101, 52]; // Dark green text
-        }
-      }
-    }
+    margin: { left: 10, right: 10 },
   });
 
-  // Load Sector Pro logo with better handling
+  // === COMPANY LOGO (CENTERED AT BOTTOM) ===
   console.log("Attempting to load Sector Pro logo");
-  const sectorImg = await loadImageWithFallback('/sector pro logo.png', 'Sector Pro logo');
+  const sectorImg = await loadImageSafely('/sector pro logo.png', 'Sector Pro logo');
   if (sectorImg) {
     try {
-      const logoWidth = 30;
+      const logoWidth = 20;
       const ratio = sectorImg.width / sectorImg.height;
       const logoHeight = logoWidth / ratio;
       
-      doc.addImage(sectorImg, 'PNG', pageWidth/2 - logoWidth/2, pageHeight - logoHeight - 10, logoWidth, logoHeight);
-      console.log("Sector Pro logo added successfully");
+      doc.addImage(
+        sectorImg, 
+        'PNG', 
+        pageWidth / 2 - logoWidth / 2,
+        pageHeight - logoHeight - 10,
+        logoWidth,
+        logoHeight
+      );
+      console.log("Sector Pro logo added successfully at bottom center");
     } catch (error) {
       console.error('Error adding Sector Pro logo to PDF:', error);
     }
   } else {
-    // Try alternative Sector Pro logo
-    const altSectorImg = await loadImageWithFallback('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', 'alternative Sector Pro logo');
+    const altSectorImg = await loadImageSafely('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', 'alternative Sector Pro logo');
     if (altSectorImg) {
       try {
-        const logoWidth = 30;
+        const logoWidth = 20;
         const ratio = altSectorImg.width / altSectorImg.height;
         const logoHeight = logoWidth / ratio;
         
-        doc.addImage(altSectorImg, 'PNG', pageWidth/2 - logoWidth/2, pageHeight - logoHeight - 10, logoWidth, logoHeight);
-        console.log("Alternative Sector Pro logo added successfully");
+        doc.addImage(
+          altSectorImg, 
+          'PNG', 
+          pageWidth / 2 - logoWidth / 2,
+          pageHeight - logoHeight - 10, 
+          logoWidth, 
+          logoHeight
+        );
+        console.log("Alternative Sector Pro logo added successfully at bottom center");
       } catch (error) {
         console.error('Error adding alternative Sector Pro logo to PDF:', error);
       }
     }
   }
 
-  // Add generation date
+  // Footer with date
   doc.setFontSize(8);
   doc.setTextColor(51, 51, 51);
-  doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
-
-  console.log('PDF generation completed');
+  doc.text(`Generated: ${createdDate}`, 10, pageHeight - 10);
+  
+  console.log('Artist table PDF generation completed');
   return doc.output('blob');
 };
