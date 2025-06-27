@@ -65,29 +65,6 @@ interface Artist {
   infrastructure_provided_by?: string;
 }
 
-interface ArtistRequirements {
-  name: string;
-  stage: number;
-  foh_console: string;
-  mon_console: string;
-  wireless_systems: any[];
-  iem_systems: any[];
-  monitors_enabled: boolean;
-  monitors_quantity: number;
-  extras_sf: boolean;
-  extras_df: boolean;
-  extras_djbooth: boolean;
-  infra_cat6: boolean;
-  infra_cat6_quantity: number;
-  infra_hma: boolean;
-  infra_hma_quantity: number;
-  infra_coax: boolean;
-  infra_coax_quantity: number;
-  infra_opticalcon_duo: boolean;
-  infra_opticalcon_duo_quantity: number;
-  infra_analog: number;
-}
-
 interface ArtistTablePrintDialogProps {
   artists: Artist[];
   jobTitle?: string;
@@ -141,31 +118,6 @@ export const ArtistTablePrintDialog = ({
 
     fetchLogo();
   }, [jobId]);
-
-  const transformArtistToRequirements = (artist: Artist): ArtistRequirements => {
-    return {
-      name: artist.name,
-      stage: artist.stage,
-      foh_console: artist.foh_console || '',
-      mon_console: artist.mon_console || '',
-      wireless_systems: artist.wireless_systems || [],
-      iem_systems: artist.iem_systems || [],
-      monitors_enabled: artist.monitors_enabled || false,
-      monitors_quantity: artist.monitors_quantity || 0,
-      extras_sf: artist.extras_sf || false,
-      extras_df: artist.extras_df || false,
-      extras_djbooth: artist.extras_djbooth || false,
-      infra_cat6: artist.infra_cat6 || false,
-      infra_cat6_quantity: artist.infra_cat6_quantity || 0,
-      infra_hma: artist.infra_hma || false,
-      infra_hma_quantity: artist.infra_hma_quantity || 0,
-      infra_coax: artist.infra_coax || false,
-      infra_coax_quantity: artist.infra_coax_quantity || 0,
-      infra_opticalcon_duo: artist.infra_opticalcon_duo || false,
-      infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity || 0,
-      infra_analog: artist.infra_analog || 0
-    };
-  };
 
   const handleTablePrint = async () => {
     console.log('ArtistTablePrintDialog handleTablePrint called');
@@ -248,9 +200,8 @@ export const ArtistTablePrintDialog = ({
         });
 
         // Run gear comparison for this artist
-        const artistRequirements = transformArtistToRequirements(artist);
         const stageSetup = stageGearSetups[artist.stage] || null;
-        const gearComparison = compareArtistRequirements(artistRequirements, festivalGearSetup, stageSetup);
+        const gearComparison = compareArtistRequirements(artist, festivalGearSetup, stageSetup);
 
         return {
           name: artist.name,
