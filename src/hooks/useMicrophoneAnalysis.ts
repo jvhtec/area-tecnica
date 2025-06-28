@@ -20,17 +20,19 @@ interface MicrophoneAnalysisResult {
     totalArtists: number;
     microphoneModels: string[];
     peakCalculationMethod: string;
+    stageNumber: number;
   };
 }
 
-export const useMicrophoneAnalysis = (jobId: string) => {
+export const useMicrophoneAnalysis = (jobId: string, stageNumber: number) => {
   return useQuery({
-    queryKey: ['microphone-analysis', jobId],
+    queryKey: ['microphone-analysis', jobId, stageNumber],
     queryFn: async (): Promise<MicrophoneAnalysisResult> => {
       const { data: artists, error } = await supabase
         .from('festival_artists')
         .select('id, name, stage, date, show_start, show_end, wired_mics, mic_kit')
         .eq('job_id', jobId)
+        .eq('stage', stageNumber)
         .eq('mic_kit', 'festival')
         .not('wired_mics', 'is', null);
       
@@ -42,7 +44,7 @@ export const useMicrophoneAnalysis = (jobId: string) => {
         artist.wired_mics.length > 0
       ) || [];
 
-      // Calculate peak requirements
+      // Calculate peak requirements for this specific stage
       const peakRequirements = calculatePeakMicrophoneRequirements(validArtists);
 
       return {
@@ -55,11 +57,12 @@ export const useMicrophoneAnalysis = (jobId: string) => {
               artist.wired_mics?.map((mic: WiredMic) => mic.model) || []
             )
           )),
-          peakCalculationMethod: 'schedule_aware_peak_analysis'
+          peakCalculationMethod: 'stage_aware_peak_analysis',
+          stageNumber
         }
       };
     },
-    enabled: !!jobId
+    enabled: !!jobId && !!stageNumber
   });
 };
 
@@ -104,7 +107,7 @@ const calculatePeakMicrophoneRequirements = (artists: ArtistMicRequirement[]): W
           model,
           quantity,
           exclusive_use: false,
-          notes: `Peak requirement calculated from ${dateArtists.length} artists`
+          notes: `Peak requirement for stage (${dateArtists.length} artists)`
         });
       } else {
         // Take the maximum quantity needed across all dates
@@ -112,7 +115,7 @@ const calculatePeakMicrophoneRequirements = (artists: ArtistMicRequirement[]): W
           micRequirements.set(model, {
             ...existing,
             quantity,
-            notes: `Peak requirement calculated from ${dateArtists.length} artists`
+            notes: `Peak requirement for stage (${dateArtists.length} artists)`
           });
         }
       }

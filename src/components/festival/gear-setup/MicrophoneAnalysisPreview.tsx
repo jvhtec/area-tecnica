@@ -15,6 +15,7 @@ interface MicrophoneAnalysisPreviewProps {
     totalArtists: number;
     microphoneModels: string[];
     peakCalculationMethod: string;
+    stageNumber: number;
   };
   onConfirm: () => void;
   isLoading?: boolean;
@@ -34,7 +35,7 @@ export const MicrophoneAnalysisPreview = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Info className="h-5 w-5" />
-            Microphone Requirements Analysis
+            Stage {analysisDetails.stageNumber} Microphone Requirements
           </DialogTitle>
         </DialogHeader>
 
@@ -42,25 +43,29 @@ export const MicrophoneAnalysisPreview = ({
           <Alert>
             <CheckCircle className="h-4 w-4" />
             <AlertDescription>
-              Analysis completed for {analysisDetails.totalArtists} artists using festival microphones.
+              Analysis completed for {analysisDetails.totalArtists} artists on Stage {analysisDetails.stageNumber} using festival microphones.
               Peak requirements calculated considering show schedules and exclusive use constraints.
             </AlertDescription>
           </Alert>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="bg-blue-50 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-blue-700">{analysisDetails.totalArtists}</div>
-              <div className="text-sm text-blue-600">Artists Analyzed</div>
+              <div className="text-2xl font-bold text-blue-700">{analysisDetails.stageNumber}</div>
+              <div className="text-sm text-blue-600">Stage Number</div>
             </div>
             <div className="bg-green-50 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-green-700">{peakRequirements.length}</div>
-              <div className="text-sm text-green-600">Mic Models Required</div>
+              <div className="text-2xl font-bold text-green-700">{analysisDetails.totalArtists}</div>
+              <div className="text-sm text-green-600">Artists Analyzed</div>
+            </div>
+            <div className="bg-purple-50 p-4 rounded-lg">
+              <div className="text-2xl font-bold text-purple-700">{peakRequirements.length}</div>
+              <div className="text-sm text-purple-600">Mic Models Required</div>
             </div>
           </div>
 
           {peakRequirements.length > 0 ? (
             <div>
-              <h3 className="text-lg font-semibold mb-3">Peak Microphone Requirements</h3>
+              <h3 className="text-lg font-semibold mb-3">Peak Microphone Requirements for Stage {analysisDetails.stageNumber}</h3>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -86,13 +91,14 @@ export const MicrophoneAnalysisPreview = ({
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              No microphone requirements found. Make sure artists have wired microphones configured with festival kit selected.
+              No microphone requirements found for Stage {analysisDetails.stageNumber}. 
+              Make sure artists on this stage have wired microphones configured with festival kit selected.
             </div>
           )}
 
           <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
             <div className="text-sm text-yellow-800">
-              <strong>Note:</strong> These requirements will be merged with your existing microphone kit. 
+              <strong>Note:</strong> These requirements are specific to Stage {analysisDetails.stageNumber} and will be merged with your existing microphone kit. 
               Quantities for existing models will be updated to the higher value.
             </div>
           </div>

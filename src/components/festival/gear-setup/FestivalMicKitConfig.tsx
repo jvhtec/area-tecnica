@@ -10,15 +10,16 @@ import { MicrophoneAnalysisPreview } from "./MicrophoneAnalysisPreview";
 
 interface FestivalMicKitConfigProps {
   jobId: string;
+  stageNumber: number;
   wiredMics: WiredMic[];
   onChange: (mics: WiredMic[]) => void;
 }
 
-export const FestivalMicKitConfig = ({ jobId, wiredMics, onChange }: FestivalMicKitConfigProps) => {
+export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }: FestivalMicKitConfigProps) => {
   const [analysisPreviewOpen, setAnalysisPreviewOpen] = useState(false);
   const [isLoadingRequirements, setIsLoadingRequirements] = useState(false);
   
-  const { data: analysisData, isLoading: isAnalyzing, refetch } = useMicrophoneAnalysis(jobId);
+  const { data: analysisData, isLoading: isAnalyzing, refetch } = useMicrophoneAnalysis(jobId, stageNumber);
 
   const handleLoadFromAnalysis = async () => {
     if (!analysisData) {
@@ -27,7 +28,7 @@ export const FestivalMicKitConfig = ({ jobId, wiredMics, onChange }: FestivalMic
     }
 
     if (analysisData.peakRequirements.length === 0) {
-      toast.error("No microphone requirements found in artist data");
+      toast.error(`No microphone requirements found for Stage ${stageNumber}`);
       return;
     }
 
@@ -59,7 +60,7 @@ export const FestivalMicKitConfig = ({ jobId, wiredMics, onChange }: FestivalMic
       const mergedMics = Array.from(existingMicsMap.values());
       onChange(mergedMics);
       
-      toast.success(`Loaded ${analysisData.peakRequirements.length} microphone types from artist analysis`);
+      toast.success(`Loaded ${analysisData.peakRequirements.length} microphone types for Stage ${stageNumber}`);
       setAnalysisPreviewOpen(false);
     } catch (error) {
       toast.error("Failed to load microphone requirements");
@@ -73,7 +74,7 @@ export const FestivalMicKitConfig = ({ jobId, wiredMics, onChange }: FestivalMic
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Festival Microphone Kit</CardTitle>
+          <CardTitle>Stage {stageNumber} Microphone Kit</CardTitle>
           <div className="flex gap-2">
             <Button 
               variant="outline" 
@@ -102,7 +103,7 @@ export const FestivalMicKitConfig = ({ jobId, wiredMics, onChange }: FestivalMic
             </div>
             <p className="mb-2">No microphones configured yet</p>
             <p className="text-sm">
-              Load microphone requirements from artist analysis or add them manually
+              Load microphone requirements from Stage {stageNumber} artist analysis or add them manually
             </p>
           </div>
         )}
@@ -114,7 +115,8 @@ export const FestivalMicKitConfig = ({ jobId, wiredMics, onChange }: FestivalMic
           analysisDetails={analysisData?.analysisDetails || {
             totalArtists: 0,
             microphoneModels: [],
-            peakCalculationMethod: ''
+            peakCalculationMethod: '',
+            stageNumber
           }}
           onConfirm={handleConfirmLoadRequirements}
           isLoading={isLoadingRequirements}
