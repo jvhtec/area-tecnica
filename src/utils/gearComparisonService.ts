@@ -1,7 +1,8 @@
+
 import { ConsoleSetup, WirelessSetup, FestivalGearSetup, StageGearSetup, WiredMicSetup } from "@/types/festival";
 
 export interface GearMismatch {
-  type: 'console' | 'wireless' | 'iem' | 'infrastructure' | 'extras' | 'monitors';
+  type: 'console' | 'wireless' | 'iem' | 'infrastructure' | 'extras' | 'monitors' | 'microphones';
   severity: 'error' | 'warning';
   message: string;
   details?: string;
@@ -120,6 +121,14 @@ export const compareArtistRequirements = (
     available_opticalcon_duo_runs: 0,
     available_analog_runs: 0
   };
+
+  // Debug logging for microphone comparison
+  console.log('=== MICROPHONE COMPARISON DEBUG ===');
+  console.log('Artist:', artist.name);
+  console.log('Artist mic_kit:', artist.mic_kit);
+  console.log('Artist wired_mics:', artist.wired_mics);
+  console.log('Available gear wired_mics:', availableGear.wired_mics);
+  console.log('Available gear wired_mics length:', availableGear.wired_mics?.length || 0);
 
   // Check FOH Console availability
   if (artist.foh_console && artist.foh_console.trim() !== '') {
@@ -289,44 +298,80 @@ export const compareArtistRequirements = (
     }
   }
 
-  // Check Wired Microphones
-  if (artist.wired_mics && artist.wired_mics.length > 0) {
-    const micKitProvider = artist.mic_kit || 'band';
-    
-    if (micKitProvider === 'band') {
+  // IMPROVED Wired Microphones Check
+  const micKitProvider = artist.mic_kit || 'band';
+  const artistHasMicRequirements = artist.wired_mics && Array.isArray(artist.wired_mics) && artist.wired_mics.length > 0;
+  const festivalHasMics = availableGear.wired_mics && Array.isArray(availableGear.wired_mics) && availableGear.wired_mics.length > 0;
+
+  console.log('Mic kit provider:', micKitProvider);
+  console.log('Artist has mic requirements:', artistHasMicRequirements);
+  console.log('Festival has mics:', festivalHasMics);
+
+  if (micKitProvider === 'band') {
+    if (artistHasMicRequirements) {
       mismatches.push({
-        type: 'wireless',
+        type: 'microphones',
+        severity: 'warning',
+        message: `Band bringing microphone kit (${artist.wired_mics?.length || 0} mic types)`
+      });
+    } else {
+      mismatches.push({
+        type: 'microphones',
         severity: 'warning',
         message: `Band bringing microphone kit`
       });
-    } else if (micKitProvider === 'festival' || micKitProvider === 'mixed') {
-      artist.wired_mics.forEach(artistMic => {
-        const availableMic = availableGear.wired_mics.find(
-          mic => mic.model.toLowerCase() === artistMic.model.toLowerCase()
-        );
-        
-        if (!availableMic) {
-          mismatches.push({
-            type: 'wireless',
-            severity: 'error',
-            message: `Wired microphone "${artistMic.model}" not available`,
-            details: `Available: ${availableGear.wired_mics.map(m => m.model).join(', ') || 'None'}`
-          });
-        } else if (availableMic.quantity < artistMic.quantity) {
-          mismatches.push({
-            type: 'wireless',
-            severity: 'error',
-            message: `Insufficient "${artistMic.model}" microphones`,
-            details: `Required: ${artistMic.quantity}, Available: ${availableMic.quantity}`
-          });
-        }
-      });
+    }
+  } else if (micKitProvider === 'festival' || micKitProvider === 'mixed') {
+    // Artist expects festival to provide microphones
+    if (artistHasMicRequirements) {
+      // Artist has specific microphone requirements
+      if (!festivalHasMics) {
+        // Festival has no microphones configured but artist expects them
+        mismatches.push({
+          type: 'microphones',
+          severity: 'error',
+          message: `Festival microphones required but none configured`,
+          details: `Artist needs ${artist.wired_mics?.length || 0} microphone types but festival has no mics available`
+        });
+      } else {
+        // Check each required microphone against available ones
+        artist.wired_mics?.forEach(artistMic => {
+          const availableMic = availableGear.wired_mics.find(
+            mic => mic.model.toLowerCase() === artistMic.model.toLowerCase()
+          );
+          
+          if (!availableMic) {
+            mismatches.push({
+              type: 'microphones',
+              severity: 'error',
+              message: `Wired microphone "${artistMic.model}" not available`,
+              details: `Available: ${availableGear.wired_mics.map(m => m.model).join(', ') || 'None'}`
+            });
+          } else if (availableMic.quantity < artistMic.quantity) {
+            mismatches.push({
+              type: 'microphones',
+              severity: 'error',
+              message: `Insufficient "${artistMic.model}" microphones`,
+              details: `Required: ${artistMic.quantity}, Available: ${availableMic.quantity}`
+            });
+          }
+        });
+      }
       
       if (micKitProvider === 'mixed') {
         mismatches.push({
-          type: 'wireless',
+          type: 'microphones',
           severity: 'warning',
           message: `Mixed microphone setup - band providing additional mics`
+        });
+      }
+    } else if (micKitProvider === 'festival') {
+      // Artist expects festival mics but has no specific requirements - this might be okay or an issue
+      if (!festivalHasMics) {
+        mismatches.push({
+          type: 'microphones',
+          severity: 'warning',
+          message: `Festival microphone kit expected but none configured`
         });
       }
     }
@@ -422,6 +467,8 @@ export const compareArtistRequirements = (
       });
     }
   }
+
+  console.log('Final mismatches for', artist.name, ':', mismatches);
 
   return {
     artistName: artist.name,

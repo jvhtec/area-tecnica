@@ -221,12 +221,15 @@ export const FestivalGearSetupForm = ({
   }, [jobId, stageNumber, toast, isPrimaryStage]);
 
   const handleChange = (changes: Partial<GearSetupFormData>) => {
-    console.log('FestivalGearSetupForm handleChange called with:', changes);
-    console.log('Previous setup state wired_mics:', setup.wired_mics);
+    console.log('=== HANDLE CHANGE DEBUG ===');
+    console.log('Changes received:', changes);
+    console.log('Current setup wired_mics before change:', setup.wired_mics);
+    console.log('New wired_mics in changes:', changes.wired_mics);
     
     setSetup(prev => {
       const newSetup = { ...prev, ...changes };
-      console.log('New setup state wired_mics:', newSetup.wired_mics);
+      console.log('New setup wired_mics after merge:', newSetup.wired_mics);
+      console.log('Full new setup:', newSetup);
       return newSetup;
     });
   };
@@ -237,11 +240,16 @@ export const FestivalGearSetupForm = ({
 
     try {
       console.log('=== FORM SUBMIT DEBUG ===');
-      console.log('Saving setup with data:', setup);
+      console.log('Current setup state:', setup);
       console.log('setup.wired_mics before save:', setup.wired_mics);
       console.log('wired_mics array length:', setup.wired_mics?.length || 0);
+      console.log('wired_mics detailed:', JSON.stringify(setup.wired_mics, null, 2));
       
       if (!jobId) throw new Error('No job ID provided');
+      
+      // Ensure wired_mics is always an array and properly serialized
+      const sanitizedWiredMics = Array.isArray(setup.wired_mics) ? setup.wired_mics : [];
+      console.log('Sanitized wired_mics for save:', sanitizedWiredMics);
       
       // STEP 1: For primary stage (stage 1), always update the global setup
       if (isPrimaryStage) {
@@ -252,7 +260,7 @@ export const FestivalGearSetupForm = ({
           mon_consoles: setup.mon_consoles,
           wireless_systems: setup.wireless_systems,
           iem_systems: setup.iem_systems,
-          wired_mics: setup.wired_mics,
+          wired_mics: sanitizedWiredMics, // Use sanitized version
           has_side_fills: setup.extras_sf,
           has_drum_fills: setup.extras_df,
           has_dj_booths: setup.extras_djbooth,
@@ -272,8 +280,11 @@ export const FestivalGearSetupForm = ({
           setupPayload['id'] = existingSetupId;
         }
 
+        console.log('=== PAYLOAD DEBUG ===');
         console.log('Payload for global setup save:', setupPayload);
         console.log('Payload wired_mics:', setupPayload.wired_mics);
+        console.log('Payload wired_mics type:', typeof setupPayload.wired_mics);
+        console.log('Payload wired_mics serialized:', JSON.stringify(setupPayload.wired_mics, null, 2));
 
         // Upsert the global setup
         const { data: globalData, error: globalError } = await supabase
@@ -288,8 +299,10 @@ export const FestivalGearSetupForm = ({
           throw globalError;
         }
 
+        console.log('=== SAVE RESPONSE DEBUG ===');
         console.log('Saved global setup response:', globalData);
         console.log('Saved global setup wired_mics:', globalData?.[0]?.wired_mics);
+        console.log('Saved global setup wired_mics type:', typeof globalData?.[0]?.wired_mics);
         
         // Update the existingSetupId with the new ID if this was a new record
         if (globalData && globalData.length > 0) {
@@ -345,7 +358,7 @@ export const FestivalGearSetupForm = ({
           mon_consoles: setup.mon_consoles,
           wireless_systems: setup.wireless_systems,
           iem_systems: setup.iem_systems,
-          wired_mics: setup.wired_mics,
+          wired_mics: sanitizedWiredMics, // Use sanitized version
           monitors_enabled: setup.monitors_enabled,
           monitors_quantity: setup.monitors_quantity,
           extras_sf: setup.extras_sf,
@@ -370,8 +383,10 @@ export const FestivalGearSetupForm = ({
           stagePayload['id'] = stageSetupId;
         }
         
+        console.log('=== STAGE PAYLOAD DEBUG ===');
         console.log('Payload for stage setup save:', stagePayload);
         console.log('Stage payload wired_mics:', stagePayload.wired_mics);
+        console.log('Stage payload wired_mics type:', typeof stagePayload.wired_mics);
         
         // Upsert the stage setup
         const { data: stageData, error: stageError } = await supabase
@@ -384,6 +399,7 @@ export const FestivalGearSetupForm = ({
           throw stageError;
         }
         
+        console.log('=== STAGE SAVE RESPONSE DEBUG ===');
         console.log('Saved stage setup response:', stageData);
         console.log('Saved stage setup wired_mics:', stageData?.[0]?.wired_mics);
         

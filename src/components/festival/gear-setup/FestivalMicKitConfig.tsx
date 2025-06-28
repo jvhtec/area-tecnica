@@ -21,8 +21,11 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }
   
   const { data: analysisData, isLoading: isAnalyzing, refetch } = useMicrophoneAnalysis(jobId, stageNumber);
 
+  console.log('=== FESTIVAL MIC KIT CONFIG DEBUG ===');
   console.log('FestivalMicKitConfig render - wiredMics:', wiredMics);
   console.log('FestivalMicKitConfig render - wiredMics length:', wiredMics?.length || 0);
+  console.log('FestivalMicKitConfig render - wiredMics type:', typeof wiredMics);
+  console.log('FestivalMicKitConfig render - wiredMics serialized:', JSON.stringify(wiredMics, null, 2));
 
   const handleLoadFromAnalysis = async () => {
     if (!analysisData) {
@@ -44,10 +47,18 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }
     setIsLoadingRequirements(true);
     
     try {
-      // Merge with existing mics, combining quantities for same models
-      const existingMicsMap = new Map(wiredMics.map(mic => [mic.model, mic]));
+      console.log('=== LOADING REQUIREMENTS DEBUG ===');
+      console.log('Analysis data peak requirements:', analysisData.peakRequirements);
+      console.log('Existing wired mics:', wiredMics);
       
-      analysisData.peakRequirements.forEach(newMic => {
+      // Ensure we're working with proper arrays
+      const existingMics = Array.isArray(wiredMics) ? wiredMics : [];
+      const newRequirements = Array.isArray(analysisData.peakRequirements) ? analysisData.peakRequirements : [];
+      
+      // Merge with existing mics, combining quantities for same models
+      const existingMicsMap = new Map(existingMics.map(mic => [mic.model, mic]));
+      
+      newRequirements.forEach(newMic => {
         if (existingMicsMap.has(newMic.model)) {
           const existing = existingMicsMap.get(newMic.model)!;
           // Take the higher quantity
@@ -61,23 +72,50 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }
       });
 
       const mergedMics = Array.from(existingMicsMap.values());
-      console.log('FestivalMicKitConfig handleConfirmLoadRequirements - calling onChange with:', mergedMics);
-      onChange(mergedMics);
       
-      toast.success(`Loaded ${analysisData.peakRequirements.length} microphone types for Stage ${stageNumber}`);
+      console.log('=== MERGED MICS DEBUG ===');
+      console.log('Merged mics result:', mergedMics);
+      console.log('Merged mics length:', mergedMics.length);
+      console.log('Calling onChange with merged mics...');
+      
+      // Ensure the data is properly serializable
+      const sanitizedMics = mergedMics.map(mic => ({
+        model: mic.model || '',
+        quantity: Number(mic.quantity) || 0,
+        exclusive_use: Boolean(mic.exclusive_use),
+        notes: mic.notes || ''
+      }));
+      
+      console.log('Sanitized mics for onChange:', sanitizedMics);
+      
+      onChange(sanitizedMics);
+      
+      toast.success(`Loaded ${newRequirements.length} microphone types for Stage ${stageNumber}`);
       setAnalysisPreviewOpen(false);
     } catch (error) {
-      toast.error("Failed to load microphone requirements");
       console.error("Error loading requirements:", error);
+      toast.error("Failed to load microphone requirements");
     } finally {
       setIsLoadingRequirements(false);
     }
   };
 
   const handleMicsChange = (newMics: WiredMic[]) => {
+    console.log('=== MICS CHANGE DEBUG ===');
     console.log('FestivalMicKitConfig handleMicsChange called with:', newMics);
-    onChange(newMics);
+    console.log('New mics length:', newMics?.length || 0);
+    console.log('New mics type:', typeof newMics);
+    console.log('New mics serialized:', JSON.stringify(newMics, null, 2));
+    
+    // Ensure we always pass a proper array
+    const sanitizedMics = Array.isArray(newMics) ? newMics : [];
+    console.log('Calling parent onChange with sanitized mics:', sanitizedMics);
+    
+    onChange(sanitizedMics);
   };
+
+  // Ensure wiredMics is always an array for rendering
+  const safeWiredMics = Array.isArray(wiredMics) ? wiredMics : [];
 
   return (
     <Card>
@@ -99,13 +137,13 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }
       </CardHeader>
       <CardContent>
         <WiredMicConfig
-          mics={wiredMics}
+          mics={safeWiredMics}
           onChange={handleMicsChange}
           label="Available Wired Microphones"
           showProvider={false}
         />
         
-        {wiredMics.length === 0 && (
+        {safeWiredMics.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
             <div className="mb-4">
               <Plus className="h-12 w-12 mx-auto opacity-50" />
