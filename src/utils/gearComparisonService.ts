@@ -1,4 +1,3 @@
-
 import { ConsoleSetup, WirelessSetup, FestivalGearSetup, StageGearSetup, WiredMicSetup } from "@/types/festival";
 
 export interface GearMismatch {
@@ -74,13 +73,31 @@ export const compareArtistRequirements = (
 ): ArtistGearComparison => {
   const mismatches: GearMismatch[] = [];
   
-  // Determine which setup to use - stage-specific takes priority
+  console.log('=== GEAR COMPARISON DEBUG START ===');
+  console.log('Artist:', artist.name, 'Stage:', artist.stage);
+  console.log('Artist mic_kit:', artist.mic_kit);
+  console.log('Artist wired_mics:', artist.wired_mics);
+  console.log('Global setup wired_mics:', globalSetup?.wired_mics);
+  console.log('Stage setup wired_mics:', stageSetup?.wired_mics);
+  
+  // Determine which setup to use - stage-specific takes priority, but fallback to global for empty arrays
+  const stageWiredMics = stageSetup?.wired_mics || [];
+  const globalWiredMics = globalSetup?.wired_mics || [];
+  
+  // Use stage mics if not empty, otherwise fallback to global mics
+  const effectiveWiredMics = stageWiredMics.length > 0 ? stageWiredMics : globalWiredMics;
+  
+  console.log('Stage wired mics length:', stageWiredMics.length);
+  console.log('Global wired mics length:', globalWiredMics.length);
+  console.log('Effective wired mics (after fallback):', effectiveWiredMics);
+  console.log('Effective wired mics length:', effectiveWiredMics.length);
+  
   const availableGear: AvailableGear = stageSetup ? {
     foh_consoles: stageSetup.foh_consoles,
     mon_consoles: stageSetup.mon_consoles,
     wireless_systems: stageSetup.wireless_systems,
     iem_systems: stageSetup.iem_systems,
-    wired_mics: stageSetup.wired_mics || [],
+    wired_mics: effectiveWiredMics, // Use effective mics with fallback logic
     available_monitors: stageSetup.monitors_quantity,
     has_side_fills: stageSetup.extras_sf,
     has_drum_fills: stageSetup.extras_df,
@@ -122,13 +139,8 @@ export const compareArtistRequirements = (
     available_analog_runs: 0
   };
 
-  // Debug logging for microphone comparison
-  console.log('=== MICROPHONE COMPARISON DEBUG ===');
-  console.log('Artist:', artist.name);
-  console.log('Artist mic_kit:', artist.mic_kit);
-  console.log('Artist wired_mics:', artist.wired_mics);
-  console.log('Available gear wired_mics:', availableGear.wired_mics);
-  console.log('Available gear wired_mics length:', availableGear.wired_mics?.length || 0);
+  console.log('Final availableGear.wired_mics:', availableGear.wired_mics);
+  console.log('Final availableGear.wired_mics length:', availableGear.wired_mics?.length || 0);
 
   // Check FOH Console availability
   if (artist.foh_console && artist.foh_console.trim() !== '') {
@@ -298,14 +310,16 @@ export const compareArtistRequirements = (
     }
   }
 
-  // IMPROVED Wired Microphones Check
+  // IMPROVED Wired Microphones Check with Enhanced Debugging
   const micKitProvider = artist.mic_kit || 'band';
   const artistHasMicRequirements = artist.wired_mics && Array.isArray(artist.wired_mics) && artist.wired_mics.length > 0;
   const festivalHasMics = availableGear.wired_mics && Array.isArray(availableGear.wired_mics) && availableGear.wired_mics.length > 0;
 
+  console.log('=== MICROPHONE CHECK DETAILS ===');
   console.log('Mic kit provider:', micKitProvider);
   console.log('Artist has mic requirements:', artistHasMicRequirements);
   console.log('Festival has mics:', festivalHasMics);
+  console.log('About to process mic comparison...');
 
   if (micKitProvider === 'band') {
     if (artistHasMicRequirements) {
@@ -322,11 +336,16 @@ export const compareArtistRequirements = (
       });
     }
   } else if (micKitProvider === 'festival' || micKitProvider === 'mixed') {
+    console.log('Processing festival/mixed mic setup...');
+    
     // Artist expects festival to provide microphones
     if (artistHasMicRequirements) {
+      console.log('Artist has specific mic requirements, checking each one...');
+      
       // Artist has specific microphone requirements
       if (!festivalHasMics) {
         // Festival has no microphones configured but artist expects them
+        console.log('Festival has no mics but artist needs them - ERROR');
         mismatches.push({
           type: 'microphones',
           severity: 'error',
@@ -334,13 +353,20 @@ export const compareArtistRequirements = (
           details: `Artist needs ${artist.wired_mics?.length || 0} microphone types but festival has no mics available`
         });
       } else {
+        console.log('Festival has mics, checking individual requirements...');
+        
         // Check each required microphone against available ones
-        artist.wired_mics?.forEach(artistMic => {
+        artist.wired_mics?.forEach((artistMic, index) => {
+          console.log(`Checking mic requirement ${index + 1}: ${artistMic.model} (qty: ${artistMic.quantity})`);
+          
           const availableMic = availableGear.wired_mics.find(
             mic => mic.model.toLowerCase() === artistMic.model.toLowerCase()
           );
           
+          console.log('Found matching available mic:', availableMic);
+          
           if (!availableMic) {
+            console.log(`ERROR: Mic "${artistMic.model}" not found in available mics`);
             mismatches.push({
               type: 'microphones',
               severity: 'error',
@@ -348,12 +374,15 @@ export const compareArtistRequirements = (
               details: `Available: ${availableGear.wired_mics.map(m => m.model).join(', ') || 'None'}`
             });
           } else if (availableMic.quantity < artistMic.quantity) {
+            console.log(`ERROR: Insufficient quantity for "${artistMic.model}"`);
             mismatches.push({
               type: 'microphones',
               severity: 'error',
               message: `Insufficient "${artistMic.model}" microphones`,
               details: `Required: ${artistMic.quantity}, Available: ${availableMic.quantity}`
             });
+          } else {
+            console.log(`OK: Mic "${artistMic.model}" available with sufficient quantity`);
           }
         });
       }
@@ -376,6 +405,9 @@ export const compareArtistRequirements = (
       }
     }
   }
+
+  console.log('=== MICROPHONE CHECK COMPLETE ===');
+  console.log('Microphone mismatches added:', mismatches.filter(m => m.type === 'microphones'));
 
   // Check Monitor quantity
   if (artist.monitors_enabled && artist.monitors_quantity > availableGear.available_monitors) {
