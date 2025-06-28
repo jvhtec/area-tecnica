@@ -14,6 +14,7 @@ import { NotesSection } from "./form/sections/NotesSection";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MicrophoneNeedsCalculator } from "./gear-setup/MicrophoneNeedsCalculator";
 import { FestivalConsoleSetupSection } from "./form/sections/FestivalConsoleSetupSection";
+import { FestivalMicKitConfig } from "./gear-setup/FestivalMicKitConfig";
 
 interface FestivalGearSetupFormProps {
   jobId: string;
@@ -34,6 +35,7 @@ export const FestivalGearSetupForm = ({
     mon_consoles: [],
     wireless_systems: [],
     iem_systems: [],
+    wired_mics: [],
     monitors_enabled: false,
     monitors_quantity: 0,
     extras_sf: false,
@@ -116,6 +118,7 @@ export const FestivalGearSetupForm = ({
                 mon_consoles: stageSetupData.mon_consoles || [],
                 wireless_systems: stageSetupData.wireless_systems || [],
                 iem_systems: stageSetupData.iem_systems || [],
+                wired_mics: stageSetupData.wired_mics || [],
                 monitors_enabled: stageSetupData.monitors_enabled || false,
                 monitors_quantity: stageSetupData.monitors_quantity || 0,
                 extras_sf: stageSetupData.extras_sf || false,
@@ -145,6 +148,7 @@ export const FestivalGearSetupForm = ({
                 mon_consoles: setupData.mon_consoles || [],
                 wireless_systems: setupData.wireless_systems || [],
                 iem_systems: setupData.iem_systems || [],
+                wired_mics: setupData.wired_mics || [],
                 monitors_enabled: setupData.available_monitors > 0,
                 monitors_quantity: setupData.available_monitors || 0,
                 extras_sf: setupData.has_side_fills || false,
@@ -175,6 +179,7 @@ export const FestivalGearSetupForm = ({
               mon_consoles: setupData.mon_consoles || [],
               wireless_systems: setupData.wireless_systems || [],
               iem_systems: setupData.iem_systems || [],
+              wired_mics: setupData.wired_mics || [],
               monitors_enabled: setupData.available_monitors > 0,
               monitors_quantity: setupData.available_monitors || 0,
               extras_sf: setupData.has_side_fills || false,
@@ -234,6 +239,7 @@ export const FestivalGearSetupForm = ({
           mon_consoles: setup.mon_consoles,
           wireless_systems: setup.wireless_systems,
           iem_systems: setup.iem_systems,
+          wired_mics: setup.wired_mics,
           has_side_fills: setup.extras_sf,
           has_drum_fills: setup.extras_df,
           has_dj_booths: setup.extras_djbooth,
@@ -324,6 +330,7 @@ export const FestivalGearSetupForm = ({
           mon_consoles: setup.mon_consoles,
           wireless_systems: setup.wireless_systems,
           iem_systems: setup.iem_systems,
+          wired_mics: setup.wired_mics,
           monitors_enabled: setup.monitors_enabled,
           monitors_quantity: setup.monitors_quantity,
           extras_sf: setup.extras_sf,
@@ -437,6 +444,11 @@ export const FestivalGearSetupForm = ({
       <WirelessSetupSection
         formData={getCompatibleFormData()}
         onChange={(changes) => handleChange(changes)}
+      />
+
+      <FestivalMicKitConfig
+        wiredMics={setup.wired_mics}
+        onChange={(wiredMics) => handleChange({ wired_mics: wiredMics })}
       />
 
       <MonitorSetupSection

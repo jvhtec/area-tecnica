@@ -1,3 +1,4 @@
+
 export interface ConsoleSetup {
   model: string;
   quantity: number;
@@ -14,6 +15,13 @@ export interface WirelessSetup {
   provided_by?: 'festival' | 'band' | 'mixed';
 }
 
+export interface WiredMicSetup {
+  model: string;
+  quantity: number;
+  exclusive_use?: boolean;
+  notes?: string;
+}
+
 export interface FestivalGearSetup {
   id: string;
   job_id: string;
@@ -22,6 +30,7 @@ export interface FestivalGearSetup {
   mon_consoles: ConsoleSetup[];
   wireless_systems: WirelessSetup[];
   iem_systems: WirelessSetup[];
+  wired_mics: WiredMicSetup[];
   available_monitors: number;
   has_side_fills: boolean;
   has_drum_fills: boolean;
@@ -95,6 +104,7 @@ export interface StageGearSetup {
   mon_consoles: ConsoleSetup[];
   wireless_systems: WirelessSetup[];
   iem_systems: WirelessSetup[];
+  wired_mics: WiredMicSetup[];
   monitors_enabled: boolean;
   monitors_quantity: number;
   extras_sf: boolean;

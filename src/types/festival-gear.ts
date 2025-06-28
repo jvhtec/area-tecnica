@@ -1,4 +1,5 @@
-import { WirelessSetup, ConsoleSetup } from "./festival";
+
+import { WirelessSetup, ConsoleSetup, WiredMicSetup } from "./festival";
 
 export interface WirelessConfigProps {
   systems: WirelessSetup[];
@@ -21,6 +22,7 @@ export interface GearSetupFormData {
   mon_consoles: ConsoleSetup[];
   wireless_systems: WirelessSetup[];
   iem_systems: WirelessSetup[];
+  wired_mics: WiredMicSetup[];
   monitors_enabled: boolean;
   monitors_quantity: number;
   extras_sf: boolean;

@@ -1,5 +1,4 @@
-
-import { ConsoleSetup, WirelessSetup, FestivalGearSetup, StageGearSetup } from "@/types/festival";
+import { ConsoleSetup, WirelessSetup, FestivalGearSetup, StageGearSetup, WiredMicSetup } from "@/types/festival";
 
 export interface GearMismatch {
   type: 'console' | 'wireless' | 'iem' | 'infrastructure' | 'extras' | 'monitors';
@@ -41,6 +40,13 @@ interface ArtistRequirements {
   infra_opticalcon_duo_quantity?: number;
   infra_analog?: number;
   infrastructure_provided_by?: 'festival' | 'band' | 'mixed';
+  mic_kit?: 'festival' | 'band' | 'mixed';
+  wired_mics?: Array<{
+    model: string;
+    quantity: number;
+    exclusive_use?: boolean;
+    notes?: string;
+  }>;
 }
 
 interface AvailableGear {
@@ -48,6 +54,7 @@ interface AvailableGear {
   mon_consoles: ConsoleSetup[];
   wireless_systems: WirelessSetup[];
   iem_systems: WirelessSetup[];
+  wired_mics: WiredMicSetup[];
   available_monitors: number;
   has_side_fills: boolean;
   has_drum_fills: boolean;
@@ -72,6 +79,7 @@ export const compareArtistRequirements = (
     mon_consoles: stageSetup.mon_consoles,
     wireless_systems: stageSetup.wireless_systems,
     iem_systems: stageSetup.iem_systems,
+    wired_mics: stageSetup.wired_mics || [],
     available_monitors: stageSetup.monitors_quantity,
     has_side_fills: stageSetup.extras_sf,
     has_drum_fills: stageSetup.extras_df,
@@ -86,6 +94,7 @@ export const compareArtistRequirements = (
     mon_consoles: globalSetup.mon_consoles,
     wireless_systems: globalSetup.wireless_systems,
     iem_systems: globalSetup.iem_systems,
+    wired_mics: globalSetup.wired_mics || [],
     available_monitors: globalSetup.available_monitors,
     has_side_fills: globalSetup.has_side_fills,
     has_drum_fills: globalSetup.has_drum_fills,
@@ -100,6 +109,7 @@ export const compareArtistRequirements = (
     mon_consoles: [],
     wireless_systems: [],
     iem_systems: [],
+    wired_mics: [],
     available_monitors: 0,
     has_side_fills: false,
     has_drum_fills: false,
@@ -276,6 +286,49 @@ export const compareArtistRequirements = (
           }
         }
       });
+    }
+  }
+
+  // Check Wired Microphones
+  if (artist.wired_mics && artist.wired_mics.length > 0) {
+    const micKitProvider = artist.mic_kit || 'band';
+    
+    if (micKitProvider === 'band') {
+      mismatches.push({
+        type: 'wireless',
+        severity: 'warning',
+        message: `Band bringing microphone kit`
+      });
+    } else if (micKitProvider === 'festival' || micKitProvider === 'mixed') {
+      artist.wired_mics.forEach(artistMic => {
+        const availableMic = availableGear.wired_mics.find(
+          mic => mic.model.toLowerCase() === artistMic.model.toLowerCase()
+        );
+        
+        if (!availableMic) {
+          mismatches.push({
+            type: 'wireless',
+            severity: 'error',
+            message: `Wired microphone "${artistMic.model}" not available`,
+            details: `Available: ${availableGear.wired_mics.map(m => m.model).join(', ') || 'None'}`
+          });
+        } else if (availableMic.quantity < artistMic.quantity) {
+          mismatches.push({
+            type: 'wireless',
+            severity: 'error',
+            message: `Insufficient "${artistMic.model}" microphones`,
+            details: `Required: ${artistMic.quantity}, Available: ${availableMic.quantity}`
+          });
+        }
+      });
+      
+      if (micKitProvider === 'mixed') {
+        mismatches.push({
+          type: 'wireless',
+          severity: 'warning',
+          message: `Mixed microphone setup - band providing additional mics`
+        });
+      }
     }
   }
 
