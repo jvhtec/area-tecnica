@@ -316,6 +316,41 @@ export const generateStageGearPDF = async (
         yPosition = (doc as any).lastAutoTable.finalY + 15;
       }
 
+      // Wired Microphones
+      if (setupToUse.wired_mics && setupToUse.wired_mics.length > 0) {
+        yPosition = checkPageBreak(60, yPosition);
+        
+        doc.setFontSize(14);
+        doc.setTextColor(125, 1, 1);
+        doc.text('Wired Microphones', 14, yPosition);
+        yPosition += 10;
+
+        const wiredMicData = setupToUse.wired_mics.map((mic: any) => [
+          mic.model || 'N/A',
+          mic.quantity?.toString() || '1',
+          mic.exclusive_use ? 'Yes' : 'No',
+          mic.notes || ''
+        ]);
+
+        autoTable(doc, {
+          startY: yPosition,
+          head: [['Model', 'Quantity', 'Exclusive Use', 'Notes']],
+          body: wiredMicData,
+          theme: 'grid',
+          headStyles: { fillColor: [125, 1, 1] },
+          margin: { left: 14, right: 14 },
+          pageBreak: 'auto',
+          showHead: 'everyPage',
+          didDrawPage: () => {
+            if (doc.internal.pages.length > 2) {
+              addPageHeader();
+            }
+          }
+        });
+
+        yPosition = (doc as any).lastAutoTable.finalY + 15;
+      }
+
       // Infrastructure
       yPosition = checkPageBreak(50, yPosition);
       
