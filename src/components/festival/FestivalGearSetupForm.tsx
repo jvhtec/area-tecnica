@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -88,6 +89,7 @@ export const FestivalGearSetupForm = ({
         
         if (setupData) {
           console.log('Found existing global setup:', setupData);
+          console.log('Global setup wired_mics:', setupData.wired_mics);
           // Store the gear setup for validation purposes
           setGlobalSetup(setupData);
           setExistingSetupId(setupData.id);
@@ -108,6 +110,7 @@ export const FestivalGearSetupForm = ({
             // If we found a stage-specific setup, use its values
             if (stageSetupData) {
               console.log('Found existing stage setup:', stageSetupData);
+              console.log('Stage setup wired_mics:', stageSetupData.wired_mics);
               setStageSetupId(stageSetupData.id);
               setHasStageSpecificSetup(true);
               
@@ -218,7 +221,14 @@ export const FestivalGearSetupForm = ({
   }, [jobId, stageNumber, toast, isPrimaryStage]);
 
   const handleChange = (changes: Partial<GearSetupFormData>) => {
-    setSetup(prev => ({ ...prev, ...changes }));
+    console.log('FestivalGearSetupForm handleChange called with:', changes);
+    console.log('Previous setup state wired_mics:', setup.wired_mics);
+    
+    setSetup(prev => {
+      const newSetup = { ...prev, ...changes };
+      console.log('New setup state wired_mics:', newSetup.wired_mics);
+      return newSetup;
+    });
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -226,7 +236,10 @@ export const FestivalGearSetupForm = ({
     setIsLoading(true);
 
     try {
+      console.log('=== FORM SUBMIT DEBUG ===');
       console.log('Saving setup with data:', setup);
+      console.log('setup.wired_mics before save:', setup.wired_mics);
+      console.log('wired_mics array length:', setup.wired_mics?.length || 0);
       
       if (!jobId) throw new Error('No job ID provided');
       
@@ -260,6 +273,7 @@ export const FestivalGearSetupForm = ({
         }
 
         console.log('Payload for global setup save:', setupPayload);
+        console.log('Payload wired_mics:', setupPayload.wired_mics);
 
         // Upsert the global setup
         const { data: globalData, error: globalError } = await supabase
@@ -275,6 +289,7 @@ export const FestivalGearSetupForm = ({
         }
 
         console.log('Saved global setup response:', globalData);
+        console.log('Saved global setup wired_mics:', globalData?.[0]?.wired_mics);
         
         // Update the existingSetupId with the new ID if this was a new record
         if (globalData && globalData.length > 0) {
@@ -356,6 +371,7 @@ export const FestivalGearSetupForm = ({
         }
         
         console.log('Payload for stage setup save:', stagePayload);
+        console.log('Stage payload wired_mics:', stagePayload.wired_mics);
         
         // Upsert the stage setup
         const { data: stageData, error: stageError } = await supabase
@@ -369,6 +385,7 @@ export const FestivalGearSetupForm = ({
         }
         
         console.log('Saved stage setup response:', stageData);
+        console.log('Saved stage setup wired_mics:', stageData?.[0]?.wired_mics);
         
         // Update the stage setup ID state
         if (stageData && stageData.length > 0) {
@@ -450,7 +467,10 @@ export const FestivalGearSetupForm = ({
         jobId={jobId}
         stageNumber={stageNumber}
         wiredMics={setup.wired_mics}
-        onChange={(wiredMics) => handleChange({ wired_mics: wiredMics })}
+        onChange={(wiredMics) => {
+          console.log('FestivalMicKitConfig onChange called with:', wiredMics);
+          handleChange({ wired_mics: wiredMics });
+        }}
       />
 
       <MonitorSetupSection

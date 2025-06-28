@@ -21,6 +21,9 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }
   
   const { data: analysisData, isLoading: isAnalyzing, refetch } = useMicrophoneAnalysis(jobId, stageNumber);
 
+  console.log('FestivalMicKitConfig render - wiredMics:', wiredMics);
+  console.log('FestivalMicKitConfig render - wiredMics length:', wiredMics?.length || 0);
+
   const handleLoadFromAnalysis = async () => {
     if (!analysisData) {
       toast.error("No analysis data available");
@@ -58,6 +61,7 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }
       });
 
       const mergedMics = Array.from(existingMicsMap.values());
+      console.log('FestivalMicKitConfig handleConfirmLoadRequirements - calling onChange with:', mergedMics);
       onChange(mergedMics);
       
       toast.success(`Loaded ${analysisData.peakRequirements.length} microphone types for Stage ${stageNumber}`);
@@ -68,6 +72,11 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }
     } finally {
       setIsLoadingRequirements(false);
     }
+  };
+
+  const handleMicsChange = (newMics: WiredMic[]) => {
+    console.log('FestivalMicKitConfig handleMicsChange called with:', newMics);
+    onChange(newMics);
   };
 
   return (
@@ -91,7 +100,7 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }
       <CardContent>
         <WiredMicConfig
           mics={wiredMics}
-          onChange={onChange}
+          onChange={handleMicsChange}
           label="Available Wired Microphones"
           showProvider={false}
         />
