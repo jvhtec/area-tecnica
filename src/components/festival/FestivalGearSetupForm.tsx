@@ -447,6 +447,7 @@ export const FestivalGearSetupForm = ({
       />
 
       <FestivalMicKitConfig
+        jobId={jobId}
         wiredMics={setup.wired_mics}
         onChange={(wiredMics) => handleChange({ wired_mics: wiredMics })}
       />

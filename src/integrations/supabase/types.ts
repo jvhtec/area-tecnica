@@ -711,6 +711,7 @@ export type Database = {
           notes: string | null
           other_infrastructure: string | null
           updated_at: string | null
+          wired_mics: Json | null
           wireless_systems: Json | null
         }
         Insert: {
@@ -734,6 +735,7 @@ export type Database = {
           notes?: string | null
           other_infrastructure?: string | null
           updated_at?: string | null
+          wired_mics?: Json | null
           wireless_systems?: Json | null
         }
         Update: {
@@ -757,6 +759,7 @@ export type Database = {
           notes?: string | null
           other_infrastructure?: string | null
           updated_at?: string | null
+          wired_mics?: Json | null
           wireless_systems?: Json | null
         }
         Relationships: [
@@ -954,6 +957,7 @@ export type Database = {
           other_infrastructure: string | null
           stage_number: number
           updated_at: string | null
+          wired_mics: Json | null
           wireless_systems: Json | null
         }
         Insert: {
@@ -982,6 +986,7 @@ export type Database = {
           other_infrastructure?: string | null
           stage_number: number
           updated_at?: string | null
+          wired_mics?: Json | null
           wireless_systems?: Json | null
         }
         Update: {
@@ -1010,6 +1015,7 @@ export type Database = {
           other_infrastructure?: string | null
           stage_number?: number
           updated_at?: string | null
+          wired_mics?: Json | null
           wireless_systems?: Json | null
         }
         Relationships: [
