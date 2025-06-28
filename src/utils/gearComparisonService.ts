@@ -80,24 +80,13 @@ export const compareArtistRequirements = (
   console.log('Global setup wired_mics:', globalSetup?.wired_mics);
   console.log('Stage setup wired_mics:', stageSetup?.wired_mics);
   
-  // Determine which setup to use - stage-specific takes priority, but fallback to global for empty arrays
-  const stageWiredMics = stageSetup?.wired_mics || [];
-  const globalWiredMics = globalSetup?.wired_mics || [];
-  
-  // Use stage mics if not empty, otherwise fallback to global mics
-  const effectiveWiredMics = stageWiredMics.length > 0 ? stageWiredMics : globalWiredMics;
-  
-  console.log('Stage wired mics length:', stageWiredMics.length);
-  console.log('Global wired mics length:', globalWiredMics.length);
-  console.log('Effective wired mics (after fallback):', effectiveWiredMics);
-  console.log('Effective wired mics length:', effectiveWiredMics.length);
-  
+  // Each stage uses only its own configured microphones - NO FALLBACK
   const availableGear: AvailableGear = stageSetup ? {
     foh_consoles: stageSetup.foh_consoles,
     mon_consoles: stageSetup.mon_consoles,
     wireless_systems: stageSetup.wireless_systems,
     iem_systems: stageSetup.iem_systems,
-    wired_mics: effectiveWiredMics, // Use effective mics with fallback logic
+    wired_mics: stageSetup.wired_mics || [], // Use stage mics only, even if empty
     available_monitors: stageSetup.monitors_quantity,
     has_side_fills: stageSetup.extras_sf,
     has_drum_fills: stageSetup.extras_df,
@@ -310,7 +299,7 @@ export const compareArtistRequirements = (
     }
   }
 
-  // IMPROVED Wired Microphones Check with Enhanced Debugging
+  // FIXED Wired Microphones Check - Stages are now independent
   const micKitProvider = artist.mic_kit || 'band';
   const artistHasMicRequirements = artist.wired_mics && Array.isArray(artist.wired_mics) && artist.wired_mics.length > 0;
   const festivalHasMics = availableGear.wired_mics && Array.isArray(availableGear.wired_mics) && availableGear.wired_mics.length > 0;
