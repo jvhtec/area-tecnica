@@ -299,18 +299,26 @@ export const compareArtistRequirements = (
     }
   }
 
-  // FIXED Wired Microphones Check - Stages are now independent
+  // DEBUGGING ENHANCED Wired Microphone Check
+  console.log('=== ENHANCED MICROPHONE DEBUG START ===');
+  
   const micKitProvider = artist.mic_kit || 'band';
+  console.log('Raw artist.mic_kit value:', artist.mic_kit);
+  console.log('Raw artist.mic_kit type:', typeof artist.mic_kit);
+  console.log('Processed micKitProvider:', micKitProvider);
+  console.log('micKitProvider type:', typeof micKitProvider);
+  console.log('micKitProvider === "band":', micKitProvider === 'band');
+  console.log('micKitProvider === "festival":', micKitProvider === 'festival');
+  
   const artistHasMicRequirements = artist.wired_mics && Array.isArray(artist.wired_mics) && artist.wired_mics.length > 0;
   const festivalHasMics = availableGear.wired_mics && Array.isArray(availableGear.wired_mics) && availableGear.wired_mics.length > 0;
 
-  console.log('=== MICROPHONE CHECK DETAILS ===');
-  console.log('Mic kit provider:', micKitProvider);
   console.log('Artist has mic requirements:', artistHasMicRequirements);
   console.log('Festival has mics:', festivalHasMics);
-  console.log('About to process mic comparison...');
+  console.log('About to enter conditional logic...');
 
   if (micKitProvider === 'band') {
+    console.log('ENTERING BAND BRANCH - This should NOT happen for Lia Kali!');
     if (artistHasMicRequirements) {
       mismatches.push({
         type: 'microphones',
@@ -325,6 +333,7 @@ export const compareArtistRequirements = (
       });
     }
   } else if (micKitProvider === 'festival' || micKitProvider === 'mixed') {
+    console.log('ENTERING FESTIVAL/MIXED BRANCH - This should happen for Lia Kali');
     console.log('Processing festival/mixed mic setup...');
     
     // Artist expects festival to provide microphones
@@ -393,6 +402,9 @@ export const compareArtistRequirements = (
         });
       }
     }
+  } else {
+    console.log('ENTERING UNKNOWN BRANCH - micKitProvider value:', micKitProvider);
+    console.log('This should not happen - unknown mic kit provider');
   }
 
   console.log('=== MICROPHONE CHECK COMPLETE ===');
