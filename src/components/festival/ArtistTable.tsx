@@ -213,7 +213,9 @@ export const ArtistTable = ({
         infra_opticalcon_duo: artist.infra_opticalcon_duo || false,
         infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity || 0,
         infra_analog: artist.infra_analog || 0,
-        infrastructure_provided_by: artist.infrastructure_provided_by
+        infrastructure_provided_by: artist.infrastructure_provided_by,
+        mic_kit: artist.mic_kit || 'band',
+        wired_mics: artist.wired_mics || []
       };
       
       const comparison = compareArtistRequirements(artistRequirements, festivalGearSetup, stageSetup);
