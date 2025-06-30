@@ -231,7 +231,9 @@ export const ArtistTablePrintDialog = ({
           infra_opticalcon_duo: artist.infra_opticalcon_duo,
           infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity,
           infra_analog: artist.infra_analog,
-          infrastructure_provided_by: (artist.infrastructure_provided_by as 'festival' | 'band' | 'mixed') || 'festival'
+          infrastructure_provided_by: (artist.infrastructure_provided_by as 'festival' | 'band' | 'mixed') || 'festival',
+          mic_kit: artist.mic_kit || 'band',
+          wired_mics: artist.wired_mics || []
         };
         
         const gearComparison = compareArtistRequirements(artistRequirements, festivalGearSetup, stageSetup);
