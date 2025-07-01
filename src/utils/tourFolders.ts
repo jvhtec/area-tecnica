@@ -67,15 +67,35 @@ export async function createTourRootFoldersManual(tourId: string): Promise<TourF
   try {
     console.log("Creating tour root folders manually using secure-flex-api for:", tourId);
     
-    // Get tour information
+    // Get tour information with tour dates
     const { data: tour, error: tourError } = await supabase
       .from("tours")
-      .select("*")
+      .select(`
+        *,
+        tour_dates (
+          id,
+          date,
+          location_id
+        )
+      `)
       .eq("id", tourId)
       .single();
 
     if (tourError || !tour) {
       throw new Error("Tour not found");
+    }
+
+    // Get date range from tour_dates if start_date/end_date are null
+    let startDate = tour.start_date;
+    let endDate = tour.end_date;
+    
+    if (!startDate || !endDate) {
+      const dates = tour.tour_dates?.map((td: any) => td.date).sort() || [];
+      if (dates.length === 0) {
+        throw new Error("No tour dates found");
+      }
+      startDate = dates[0];
+      endDate = dates[dates.length - 1];
     }
 
     const createFlexFolder = async (payload: Record<string, any>) => {
@@ -102,9 +122,9 @@ export async function createTourRootFoldersManual(tourId: string): Promise<TourF
       return data.data;
     };
 
-    const formattedStartDate = new Date(tour.start_date).toISOString().split('.')[0] + '.000Z';
-    const formattedEndDate = new Date(tour.end_date).toISOString().split('.')[0] + '.000Z';
-    const documentNumber = new Date(tour.start_date).toISOString().slice(2, 10).replace(/-/g, '');
+    const formattedStartDate = new Date(startDate).toISOString().split('.')[0] + '.000Z';
+    const formattedEndDate = new Date(endDate).toISOString().split('.')[0] + '.000Z';
+    const documentNumber = new Date(startDate).toISOString().slice(2, 10).replace(/-/g, '');
 
     const mainFolderPayload = {
       definitionId: FLEX_FOLDER_IDS.mainFolder,
