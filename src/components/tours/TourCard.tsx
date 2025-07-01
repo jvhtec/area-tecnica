@@ -12,7 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { createTourRootFolders, createTourDateFolders } from "@/utils/tourFolders";
+import { createTourRootFolders, createTourDateFolders, createTourRootFoldersManual } from "@/utils/tourFolders";
 
 interface TourCardProps {
   tour: any;
@@ -86,9 +86,9 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
     }
 
     try {
-      console.log("Creating tour root folders for tour:", tour.id);
+      console.log("Creating tour root folders manually for tour:", tour.id);
       
-      const result = await createTourRootFolders(tour.id);
+      const result = await createTourRootFoldersManual(tour.id);
 
       if (!result.success) {
         throw new Error(result.error || "Failed to create tour root folders");
@@ -96,10 +96,10 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
 
       toast({
         title: "Success",
-        description: "Tour root folders have been created successfully."
+        description: "Tour root folders have been created successfully using secure-flex-api."
       });
     } catch (error: any) {
-      console.error("Error creating tour root folders:", error);
+      console.error("Error creating tour root folders manually:", error);
       toast({
         title: "Error creating tour root folders",
         description: error.message,
