@@ -5,6 +5,7 @@ import TechnicianDashboard from "@/pages/TechnicianDashboard";
 import Personal from "@/pages/Personal";
 import VacationManagement from "@/pages/VacationManagement";
 import Tours from "@/pages/Tours";
+import Landing from "@/pages/Landing";
 import { FestivalManagementWrapper } from "@/components/festival/FestivalManagementWrapper";
 import { TourManagementWrapper } from "@/components/tours/TourManagementWrapper";
 import Auth from "@/pages/Auth";
@@ -157,6 +158,10 @@ const router = createBrowserRouter([
   {
     path: "/create-profile",
     element: <Placeholder />,
+  },
+  {
+    path: "/landing",
+    element: <Landing />,
   },
 ]);
 
