@@ -21,7 +21,7 @@ export const useArtistMutations = (jobId: string | undefined, selectedDate: stri
 
   const createArtistMutation = useMutation({
     mutationFn: async (artistData: any) => {
-      const dataToInsert = formatArtistTimeData(artistData);
+      const dataToInsert = formatArtistTimeData({ ...artistData, job_id: jobId });
       const { data, error } = await supabase
         .from("festival_artists")
         .insert([dataToInsert])
