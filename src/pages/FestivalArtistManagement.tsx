@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowLeft, Printer, Info } from "lucide-react";
+import { Plus, ArrowLeft, Printer, Info, Copy } from "lucide-react";
 import { ArtistTable } from "@/components/festival/ArtistTable";
 import { ArtistManagementDialog } from "@/components/festival/ArtistManagementDialog";
 import { ArtistTableFilters } from "@/components/festival/ArtistTableFilters";
@@ -17,6 +17,7 @@ import { exportArtistTablePDF } from "@/utils/artistTablePdfExport";
 import { useQuery } from "@tanstack/react-query";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useArtistsQuery } from "@/hooks/useArtistsQuery";
+import { CopyArtistsDialog } from "@/components/festival/CopyArtistsDialog";
 
 const DAY_START_HOUR = 7; // Festival day starts at 7:00 AM
 
@@ -43,6 +44,7 @@ const FestivalArtistManagement = () => {
   const [logoUrl, setLogoUrl] = useState("");
   const [maxStages, setMaxStages] = useState(3);
   const [stageNames, setStageNames] = useState<Record<number, string>>({});
+  const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
 
   // Use React Query for artists data
   const {
@@ -492,6 +494,15 @@ const FestivalArtistManagement = () => {
             </TooltipProvider>
           </CardTitle>
           <div className="flex items-center gap-2">
+            {showArtistControls && (
+              <Button 
+                variant="outline" 
+                onClick={() => setIsCopyDialogOpen(true)}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Copy Artists
+              </Button>
+            )}
             <Button onClick={() => {
               setPrintDate(selectedDate);
               setIsPrintDialogOpen(true);
@@ -598,6 +609,16 @@ const FestivalArtistManagement = () => {
         onPrint={undefined}
         isLoading={isPrinting}
       />
+
+      {showArtistControls && jobId && (
+        <CopyArtistsDialog
+          open={isCopyDialogOpen}
+          onOpenChange={setIsCopyDialogOpen}
+          currentJobId={jobId}
+          targetDate={selectedDate}
+          onArtistsCopied={invalidateArtists}
+        />
+      )}
     </div>
   );
 };
