@@ -152,36 +152,31 @@ export const exportFullFestivalSchedulePDF = async (data: FullFestivalSchedulePd
     startY: 45,
     theme: 'grid',
     styles: {
-      fontSize: 10,
-      cellPadding: 4,
+      fontSize: 9,
+      cellPadding: 2,
       valign: 'middle',
+      lineColor: [200, 200, 200],
+      lineWidth: 0.1,
     },
     headStyles: {
       fillColor: [125, 1, 1],
       textColor: [255, 255, 255],
-      fontSize: 11,
+      fontSize: 10,
       fontStyle: 'bold',
+      cellPadding: 3,
     },
     columnStyles: {
-      0: { cellWidth: 25, halign: 'center' }, // Date
-      1: { cellWidth: 25, halign: 'center' }, // Day
-      2: { cellWidth: 50 }, // Artist
-      3: { cellWidth: 30, halign: 'center' }, // Stage
-      4: { cellWidth: 35, halign: 'center' }, // Show Time
-      5: { cellWidth: 35, halign: 'center' }, // Soundcheck
+      0: { cellWidth: 20, halign: 'center' }, // Date
+      1: { cellWidth: 22, halign: 'center' }, // Day
+      2: { cellWidth: 60, halign: 'left' }, // Artist
+      3: { cellWidth: 25, halign: 'center' }, // Stage
+      4: { cellWidth: 30, halign: 'center' }, // Show Time
+      5: { cellWidth: 25, halign: 'center' }, // Soundcheck
     },
-    didParseCell: (data) => {
-      // Alternate row colors by date for better readability
-      if (data.row.index > 0) {
-        const currentDate = tableData[data.row.index][0];
-        const previousDate = tableData[data.row.index - 1][0];
-        
-        if (currentDate !== previousDate && data.row.index % 2 === 1) {
-          data.cell.styles.fillColor = [245, 245, 250];
-        }
-      }
+    alternateRowStyles: {
+      fillColor: [248, 249, 250],
     },
-    margin: { left: 15, right: 15 },
+    margin: { left: 10, right: 10 },
   });
 
   // Add summary information
