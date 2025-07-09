@@ -18,6 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useArtistsQuery } from "@/hooks/useArtistsQuery";
 import { CopyArtistsDialog } from "@/components/festival/CopyArtistsDialog";
+import { exportFullFestivalSchedulePDF, FullFestivalSchedulePdfData } from "@/utils/fullFestivalSchedulePdfExport";
 
 const DAY_START_HOUR = 7; // Festival day starts at 7:00 AM
 
@@ -45,6 +46,7 @@ const FestivalArtistManagement = () => {
   const [maxStages, setMaxStages] = useState(3);
   const [stageNames, setStageNames] = useState<Record<number, string>>({});
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
+  const [isFullSchedulePrinting, setIsFullSchedulePrinting] = useState(false);
 
   // Use React Query for artists data
   const {
@@ -459,6 +461,89 @@ const FestivalArtistManagement = () => {
     }
   };
 
+  const handlePrintFullSchedule = async () => {
+    if (!jobId) return;
+    setIsFullSchedulePrinting(true);
+    
+    console.log('Starting full festival schedule PDF generation');
+    
+    try {
+      // Fetch all artists for all festival dates
+      const { data: allArtists, error } = await supabase
+        .from("festival_artists")
+        .select("*")
+        .eq("job_id", jobId)
+        .not("show_start", "is", null)
+        .order("date", { ascending: true })
+        .order("show_start", { ascending: true });
+
+      if (error) {
+        console.error("Error fetching all festival artists:", error);
+        toast({
+          title: "Error",
+          description: "Could not fetch festival artists",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!allArtists || allArtists.length === 0) {
+        toast({
+          title: "No Data",
+          description: "No artists found for this festival",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      console.log('Fetched artists for full schedule:', allArtists.length);
+
+      // Transform data for PDF export
+      const scheduleData: FullFestivalSchedulePdfData = {
+        jobTitle: jobTitle,
+        artists: allArtists.map(artist => ({
+          name: artist.name,
+          date: artist.date,
+          stage: artist.stage,
+          show_start: artist.show_start,
+          show_end: artist.show_end,
+          soundcheck_start: artist.soundcheck_start,
+          soundcheck_end: artist.soundcheck_end,
+          soundcheck: artist.soundcheck
+        })),
+        stageNames: stageNames,
+        logoUrl: logoUrl || undefined
+      };
+
+      console.log('Full schedule data prepared:', scheduleData);
+      
+      const blob = await exportFullFestivalSchedulePDF(scheduleData);
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${jobTitle.replace(/[^a-zA-Z0-9]/g, '_')}_full_schedule.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Success",
+        description: "Full festival schedule PDF generated successfully"
+      });
+    } catch (error) {
+      console.error('Error generating full schedule PDF:', error);
+      toast({
+        title: "Error",
+        description: "Could not generate full schedule PDF",
+        variant: "destructive"
+      });
+    } finally {
+      setIsFullSchedulePrinting(false);
+    }
+  };
+
   const currentDateType = getCurrentDateType();
   const showArtistControls = currentDateType === 'show';
 
@@ -503,12 +588,20 @@ const FestivalArtistManagement = () => {
                 Copy Artists
               </Button>
             )}
+            <Button 
+              variant="outline"
+              onClick={handlePrintFullSchedule}
+              disabled={isFullSchedulePrinting}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              {isFullSchedulePrinting ? "Generating..." : "Print Full Schedule"}
+            </Button>
             <Button onClick={() => {
               setPrintDate(selectedDate);
               setIsPrintDialogOpen(true);
             }}>
               <Printer className="h-4 w-4 mr-2" />
-              Print Schedule
+              Print Day Schedule
             </Button>
             {showArtistControls ? (
               <Button onClick={handleAddArtist}>
