@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { exportArtistTablePDF, ArtistTablePdfData } from "@/utils/artistTablePdfExport";
+import { sortArtistsChronologically } from "@/utils/artistSorting";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { compareArtistRequirements } from "@/utils/gearComparisonService";
 import { supabase } from "@/lib/supabase";
@@ -19,21 +20,23 @@ import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 import { Checkbox } from "@/components/ui/checkbox";
 
 interface Artist {
+  id: string;
   name: string;
   stage: number;
+  date: string;
   show_start: string;
   show_end: string;
   soundcheck: boolean;
   soundcheck_start?: string;
   soundcheck_end?: string;
   foh_console: string;
-  foh_console_provided_by?: string;
+  foh_console_provided_by?: 'festival' | 'band' | 'mixed';
   mon_console: string;
-  mon_console_provided_by?: string;
+  mon_console_provided_by?: 'festival' | 'band' | 'mixed';
   wireless_systems: any[];
-  wireless_provided_by?: string;
+  wireless_provided_by?: 'festival' | 'band' | 'mixed';
   iem_systems: any[];
-  iem_provided_by?: string;
+  iem_provided_by?: 'festival' | 'band' | 'mixed';
   monitors_enabled: boolean;
   monitors_quantity: number;
   extras_sf: boolean;
@@ -44,14 +47,14 @@ interface Artist {
   foh_tech?: boolean;
   mon_tech?: boolean;
   isaftermidnight?: boolean;
-  mic_kit?: 'festival' | 'band';
+  mic_kit?: 'festival' | 'band' | 'mixed';
   wired_mics?: Array<{
     model: string;
     quantity: number;
     exclusive_use?: boolean;
     notes?: string;
   }>;
-  date?: string; // Added missing date property
+  job_id?: string;
   // Infrastructure fields
   infra_cat6?: boolean;
   infra_cat6_quantity?: number;
@@ -63,7 +66,7 @@ interface Artist {
   infra_opticalcon_duo_quantity?: number;
   infra_analog?: number;
   other_infrastructure?: string;
-  infrastructure_provided_by?: string;
+  infrastructure_provided_by?: 'festival' | 'band' | 'mixed';
 }
 
 interface ArtistTablePrintDialogProps {
@@ -140,6 +143,9 @@ export const ArtistTablePrintDialog = ({
         return matchesStage;
       });
 
+      // Sort artists chronologically using the shared utility
+      const sortedArtists = sortArtistsChronologically(filteredArtists as any) as Artist[];
+
       console.log('Filtered artists count:', filteredArtists.length);
       
       if (filteredArtists.length === 0) {
@@ -188,7 +194,7 @@ export const ArtistTablePrintDialog = ({
       }
 
       // Transform artists data for PDF
-      const transformedArtists = filteredArtists.map(artist => {
+      const transformedArtists = sortedArtists.map(artist => {
         console.log(`Transforming artist: ${artist.name}`, {
           micKit: artist.mic_kit,
           wiredMics: artist.wired_mics?.length || 0,
@@ -222,15 +228,15 @@ export const ArtistTablePrintDialog = ({
           extras_sf: artist.extras_sf,
           extras_df: artist.extras_df,
           extras_djbooth: artist.extras_djbooth,
-          infra_cat6: artist.infra_cat6,
-          infra_cat6_quantity: artist.infra_cat6_quantity,
-          infra_hma: artist.infra_hma,
-          infra_hma_quantity: artist.infra_hma_quantity,
-          infra_coax: artist.infra_coax,
-          infra_coax_quantity: artist.infra_coax_quantity,
-          infra_opticalcon_duo: artist.infra_opticalcon_duo,
-          infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity,
-          infra_analog: artist.infra_analog,
+          infra_cat6: artist.infra_cat6 || false,
+          infra_cat6_quantity: artist.infra_cat6_quantity || 0,
+          infra_hma: artist.infra_hma || false,
+          infra_hma_quantity: artist.infra_hma_quantity || 0,
+          infra_coax: artist.infra_coax || false,
+          infra_coax_quantity: artist.infra_coax_quantity || 0,
+          infra_opticalcon_duo: artist.infra_opticalcon_duo || false,
+          infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity || 0,
+          infra_analog: artist.infra_analog || 0,
           infrastructure_provided_by: (artist.infrastructure_provided_by as 'festival' | 'band' | 'mixed') || 'festival',
           mic_kit: artist.mic_kit || 'band',
           wired_mics: artist.wired_mics || []
