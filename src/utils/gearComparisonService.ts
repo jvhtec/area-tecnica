@@ -207,7 +207,68 @@ export const compareArtistRequirements = (
         severity: 'warning',
         message: `Band bringing wireless systems`
       });
+    } else if (providedBy === 'mixed') {
+      // Handle mixed setups: check each system individually
+      let hasBandSystems = false;
+      let hasFestivalSystems = false;
+      
+      artist.wireless_systems.forEach(artistWireless => {
+        const systemProvider = artistWireless.provided_by || 'festival';
+        
+        if (systemProvider === 'band') {
+          hasBandSystems = true;
+        } else {
+          hasFestivalSystems = true;
+          
+          // Only validate festival-provided systems against inventory
+          const availableWireless = availableGear.wireless_systems.find(
+            w => w.model.toLowerCase() === artistWireless.model.toLowerCase()
+          );
+          
+          if (!availableWireless) {
+            mismatches.push({
+              type: 'wireless',
+              severity: 'error',
+              message: `Wireless system "${artistWireless.model}" not available`,
+              details: `Available: ${availableGear.wireless_systems.map(w => w.model).join(', ') || 'None'}`
+            });
+          } else {
+            const requiredHH = artistWireless.quantity_hh || 0;
+            const requiredBP = artistWireless.quantity_bp || 0;
+            const availableHH = availableWireless.quantity_hh || 0;
+            const availableBP = availableWireless.quantity_bp || 0;
+            
+            if (requiredHH > availableHH) {
+              mismatches.push({
+                type: 'wireless',
+                severity: 'error',
+                message: `Insufficient wireless handheld units for "${artistWireless.model}"`,
+                details: `Required: ${requiredHH}, Available: ${availableHH}`
+              });
+            }
+            
+            if (requiredBP > availableBP) {
+              mismatches.push({
+                type: 'wireless',
+                severity: 'error',
+                message: `Insufficient wireless beltpack units for "${artistWireless.model}"`,
+                details: `Required: ${requiredBP}, Available: ${availableBP}`
+              });
+            }
+          }
+        }
+      });
+      
+      // Add informational warnings for mixed setup
+      if (hasBandSystems && hasFestivalSystems) {
+        mismatches.push({
+          type: 'wireless',
+          severity: 'warning',
+          message: `Mixed wireless setup - band providing some systems`
+        });
+      }
     } else {
+      // Festival-only setup: validate all systems
       artist.wireless_systems.forEach(artistWireless => {
         const availableWireless = availableGear.wireless_systems.find(
           w => w.model.toLowerCase() === artistWireless.model.toLowerCase()
@@ -258,7 +319,68 @@ export const compareArtistRequirements = (
         severity: 'warning',
         message: `Band bringing IEM systems`
       });
+    } else if (providedBy === 'mixed') {
+      // Handle mixed setups: check each system individually
+      let hasBandSystems = false;
+      let hasFestivalSystems = false;
+      
+      artist.iem_systems.forEach(artistIEM => {
+        const systemProvider = artistIEM.provided_by || 'festival';
+        
+        if (systemProvider === 'band') {
+          hasBandSystems = true;
+        } else {
+          hasFestivalSystems = true;
+          
+          // Only validate festival-provided systems against inventory
+          const availableIEM = availableGear.iem_systems.find(
+            iem => iem.model.toLowerCase() === artistIEM.model.toLowerCase()
+          );
+          
+          if (!availableIEM) {
+            mismatches.push({
+              type: 'iem',
+              severity: 'error',
+              message: `IEM system "${artistIEM.model}" not available`,
+              details: `Available: ${availableGear.iem_systems.map(iem => iem.model).join(', ') || 'None'}`
+            });
+          } else {
+            const requiredChannels = artistIEM.quantity_hh || artistIEM.quantity || 0;
+            const requiredBP = artistIEM.quantity_bp || 0;
+            const availableChannels = availableIEM.quantity_hh || availableIEM.quantity || 0;
+            const availableBP = availableIEM.quantity_bp || 0;
+            
+            if (requiredChannels > availableChannels) {
+              mismatches.push({
+                type: 'iem',
+                severity: 'error',
+                message: `Insufficient IEM channels for "${artistIEM.model}"`,
+                details: `Required: ${requiredChannels}, Available: ${availableChannels}`
+              });
+            }
+            
+            if (requiredBP > availableBP) {
+              mismatches.push({
+                type: 'iem',
+                severity: 'error',
+                message: `Insufficient IEM beltpacks for "${artistIEM.model}"`,
+                details: `Required: ${requiredBP}, Available: ${availableBP}`
+              });
+            }
+          }
+        }
+      });
+      
+      // Add informational warnings for mixed setup
+      if (hasBandSystems && hasFestivalSystems) {
+        mismatches.push({
+          type: 'iem',
+          severity: 'warning',
+          message: `Mixed IEM setup - band providing some systems`
+        });
+      }
     } else {
+      // Festival-only setup: validate all systems
       artist.iem_systems.forEach(artistIEM => {
         const availableIEM = availableGear.iem_systems.find(
           iem => iem.model.toLowerCase() === artistIEM.model.toLowerCase()
