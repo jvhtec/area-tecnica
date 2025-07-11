@@ -14,6 +14,29 @@ export interface ArtistGearComparison {
   hasConflicts: boolean;
 }
 
+export interface EquipmentNeeds {
+  consoles: {
+    foh: Array<{ model: string; additionalQuantity: number; requiredBy: string[] }>;
+    monitor: Array<{ model: string; additionalQuantity: number; requiredBy: string[] }>;
+  };
+  wireless: Array<{ model: string; additionalHH: number; additionalBP: number; requiredBy: string[] }>;
+  iem: Array<{ model: string; additionalChannels: number; additionalBP: number; requiredBy: string[] }>;
+  microphones: Array<{ model: string; additionalQuantity: number; requiredBy: string[] }>;
+  monitors: { additionalQuantity: number; requiredBy: string[] };
+  infrastructure: {
+    cat6: { additionalQuantity: number; requiredBy: string[] };
+    hma: { additionalQuantity: number; requiredBy: string[] };
+    coax: { additionalQuantity: number; requiredBy: string[] };
+    opticalcon_duo: { additionalQuantity: number; requiredBy: string[] };
+    analog: { additionalQuantity: number; requiredBy: string[] };
+  };
+  extras: {
+    sideFills: { additionalStages: number; requiredBy: string[] };
+    drumFills: { additionalStages: number; requiredBy: string[] };
+    djBooths: { additionalStages: number; requiredBy: string[] };
+  };
+}
+
 interface ArtistRequirements {
   name: string;
   stage: number;
@@ -633,16 +656,347 @@ export const compareArtistRequirements = (
   };
 };
 
+export const calculateEquipmentNeeds = (
+  artists: ArtistRequirements[],
+  globalSetup: FestivalGearSetup | null,
+  stageSetups: Record<number, StageGearSetup>
+): EquipmentNeeds => {
+  const needs: EquipmentNeeds = {
+    consoles: { foh: [], monitor: [] },
+    wireless: [],
+    iem: [],
+    microphones: [],
+    monitors: { additionalQuantity: 0, requiredBy: [] },
+    infrastructure: {
+      cat6: { additionalQuantity: 0, requiredBy: [] },
+      hma: { additionalQuantity: 0, requiredBy: [] },
+      coax: { additionalQuantity: 0, requiredBy: [] },
+      opticalcon_duo: { additionalQuantity: 0, requiredBy: [] },
+      analog: { additionalQuantity: 0, requiredBy: [] }
+    },
+    extras: {
+      sideFills: { additionalStages: 0, requiredBy: [] },
+      drumFills: { additionalStages: 0, requiredBy: [] },
+      djBooths: { additionalStages: 0, requiredBy: [] }
+    }
+  };
+
+  // Group artists by stage and calculate total requirements
+  const stageRequirements: Record<number, {
+    fohConsoles: Record<string, number>;
+    monConsoles: Record<string, number>;
+    wireless: Record<string, { hh: number; bp: number }>;
+    iem: Record<string, { channels: number; bp: number }>;
+    microphones: Record<string, number>;
+    monitors: number;
+    infrastructure: {
+      cat6: number;
+      hma: number;
+      coax: number;
+      opticalcon_duo: number;
+      analog: number;
+    };
+    extras: {
+      sideFills: boolean;
+      drumFills: boolean;
+      djBooths: boolean;
+    };
+  }> = {};
+
+  // Initialize stage requirements
+  artists.forEach(artist => {
+    if (!stageRequirements[artist.stage]) {
+      stageRequirements[artist.stage] = {
+        fohConsoles: {},
+        monConsoles: {},
+        wireless: {},
+        iem: {},
+        microphones: {},
+        monitors: 0,
+        infrastructure: { cat6: 0, hma: 0, coax: 0, opticalcon_duo: 0, analog: 0 },
+        extras: { sideFills: false, drumFills: false, djBooths: false }
+      };
+    }
+  });
+
+  // Calculate cumulative requirements per stage
+  artists.forEach(artist => {
+    const stageReq = stageRequirements[artist.stage];
+
+    // Only count festival-provided equipment
+    
+    // FOH Console
+    if (artist.foh_console && artist.foh_console_provided_by !== 'band') {
+      stageReq.fohConsoles[artist.foh_console] = (stageReq.fohConsoles[artist.foh_console] || 0) + 1;
+    }
+
+    // Monitor Console
+    if (artist.mon_console && artist.mon_console_provided_by !== 'band') {
+      stageReq.monConsoles[artist.mon_console] = (stageReq.monConsoles[artist.mon_console] || 0) + 1;
+    }
+
+    // Wireless (only festival-provided)
+    if (artist.wireless_systems && artist.wireless_provided_by !== 'band') {
+      artist.wireless_systems.forEach(system => {
+        if (system.provided_by !== 'band') {
+          const key = system.model;
+          if (!stageReq.wireless[key]) {
+            stageReq.wireless[key] = { hh: 0, bp: 0 };
+          }
+          stageReq.wireless[key].hh += system.quantity_hh || 0;
+          stageReq.wireless[key].bp += system.quantity_bp || 0;
+        }
+      });
+    }
+
+    // IEM (only festival-provided)
+    if (artist.iem_systems && artist.iem_provided_by !== 'band') {
+      artist.iem_systems.forEach(system => {
+        if (system.provided_by !== 'band') {
+          const key = system.model;
+          if (!stageReq.iem[key]) {
+            stageReq.iem[key] = { channels: 0, bp: 0 };
+          }
+          stageReq.iem[key].channels += system.quantity_hh || system.quantity || 0;
+          stageReq.iem[key].bp += system.quantity_bp || 0;
+        }
+      });
+    }
+
+    // Microphones (only festival-provided)
+    if (artist.wired_mics && artist.mic_kit === 'festival') {
+      artist.wired_mics.forEach(mic => {
+        stageReq.microphones[mic.model] = (stageReq.microphones[mic.model] || 0) + mic.quantity;
+      });
+    }
+
+    // Monitors
+    if (artist.monitors_enabled) {
+      stageReq.monitors += artist.monitors_quantity || 0;
+    }
+
+    // Infrastructure (only festival-provided)
+    if (artist.infrastructure_provided_by !== 'band') {
+      if (artist.infra_cat6) {
+        stageReq.infrastructure.cat6 += artist.infra_cat6_quantity || 0;
+      }
+      if (artist.infra_hma) {
+        stageReq.infrastructure.hma += artist.infra_hma_quantity || 0;
+      }
+      if (artist.infra_coax) {
+        stageReq.infrastructure.coax += artist.infra_coax_quantity || 0;
+      }
+      if (artist.infra_opticalcon_duo) {
+        stageReq.infrastructure.opticalcon_duo += artist.infra_opticalcon_duo_quantity || 0;
+      }
+      if (artist.infra_analog) {
+        stageReq.infrastructure.analog += artist.infra_analog || 0;
+      }
+    }
+
+    // Extras
+    if (artist.extras_sf) stageReq.extras.sideFills = true;
+    if (artist.extras_df) stageReq.extras.drumFills = true;
+    if (artist.extras_djbooth) stageReq.extras.djBooths = true;
+  });
+
+  // Calculate shortfalls for each stage
+  Object.entries(stageRequirements).forEach(([stageNum, requirements]) => {
+    const stage = parseInt(stageNum);
+    const stageSetup = stageSetups[stage];
+    const availableGear = stageSetup || globalSetup;
+    
+    if (!availableGear) return;
+
+    // FOH Console shortfalls
+    Object.entries(requirements.fohConsoles).forEach(([model, required]) => {
+      const available = availableGear.foh_consoles?.find(c => c.model === model)?.quantity || 0;
+      const shortage = Math.max(0, required - available);
+      if (shortage > 0) {
+        const existing = needs.consoles.foh.find(c => c.model === model);
+        if (existing) {
+          existing.additionalQuantity += shortage;
+          if (!existing.requiredBy.includes(`Stage ${stage}`)) {
+            existing.requiredBy.push(`Stage ${stage}`);
+          }
+        } else {
+          needs.consoles.foh.push({
+            model,
+            additionalQuantity: shortage,
+            requiredBy: [`Stage ${stage}`]
+          });
+        }
+      }
+    });
+
+    // Monitor Console shortfalls
+    Object.entries(requirements.monConsoles).forEach(([model, required]) => {
+      const available = availableGear.mon_consoles?.find(c => c.model === model)?.quantity || 0;
+      const shortage = Math.max(0, required - available);
+      if (shortage > 0) {
+        const existing = needs.consoles.monitor.find(c => c.model === model);
+        if (existing) {
+          existing.additionalQuantity += shortage;
+          if (!existing.requiredBy.includes(`Stage ${stage}`)) {
+            existing.requiredBy.push(`Stage ${stage}`);
+          }
+        } else {
+          needs.consoles.monitor.push({
+            model,
+            additionalQuantity: shortage,
+            requiredBy: [`Stage ${stage}`]
+          });
+        }
+      }
+    });
+
+    // Wireless shortfalls
+    Object.entries(requirements.wireless).forEach(([model, required]) => {
+      const available = availableGear.wireless_systems?.find(w => w.model === model);
+      const availableHH = available?.quantity_hh || 0;
+      const availableBP = available?.quantity_bp || 0;
+      const shortageHH = Math.max(0, required.hh - availableHH);
+      const shortageBP = Math.max(0, required.bp - availableBP);
+      
+      if (shortageHH > 0 || shortageBP > 0) {
+        const existing = needs.wireless.find(w => w.model === model);
+        if (existing) {
+          existing.additionalHH += shortageHH;
+          existing.additionalBP += shortageBP;
+          if (!existing.requiredBy.includes(`Stage ${stage}`)) {
+            existing.requiredBy.push(`Stage ${stage}`);
+          }
+        } else {
+          needs.wireless.push({
+            model,
+            additionalHH: shortageHH,
+            additionalBP: shortageBP,
+            requiredBy: [`Stage ${stage}`]
+          });
+        }
+      }
+    });
+
+    // IEM shortfalls
+    Object.entries(requirements.iem).forEach(([model, required]) => {
+      const available = availableGear.iem_systems?.find(i => i.model === model);
+      const availableChannels = available?.quantity_hh || available?.quantity || 0;
+      const availableBP = available?.quantity_bp || 0;
+      const shortageChannels = Math.max(0, required.channels - availableChannels);
+      const shortageBP = Math.max(0, required.bp - availableBP);
+      
+      if (shortageChannels > 0 || shortageBP > 0) {
+        const existing = needs.iem.find(i => i.model === model);
+        if (existing) {
+          existing.additionalChannels += shortageChannels;
+          existing.additionalBP += shortageBP;
+          if (!existing.requiredBy.includes(`Stage ${stage}`)) {
+            existing.requiredBy.push(`Stage ${stage}`);
+          }
+        } else {
+          needs.iem.push({
+            model,
+            additionalChannels: shortageChannels,
+            additionalBP: shortageBP,
+            requiredBy: [`Stage ${stage}`]
+          });
+        }
+      }
+    });
+
+    // Microphone shortfalls
+    Object.entries(requirements.microphones).forEach(([model, required]) => {
+      const available = availableGear.wired_mics?.find(m => m.model === model)?.quantity || 0;
+      const shortage = Math.max(0, required - available);
+      if (shortage > 0) {
+        const existing = needs.microphones.find(m => m.model === model);
+        if (existing) {
+          existing.additionalQuantity += shortage;
+          if (!existing.requiredBy.includes(`Stage ${stage}`)) {
+            existing.requiredBy.push(`Stage ${stage}`);
+          }
+        } else {
+          needs.microphones.push({
+            model,
+            additionalQuantity: shortage,
+            requiredBy: [`Stage ${stage}`]
+          });
+        }
+      }
+    });
+
+    // Monitor shortfalls  
+    const availableMonitors = stageSetup ? (stageSetup.monitors_quantity || 0) : (globalSetup?.available_monitors || 0);
+    const monitorShortage = Math.max(0, requirements.monitors - availableMonitors);
+    if (monitorShortage > 0) {
+      needs.monitors.additionalQuantity += monitorShortage;
+      if (!needs.monitors.requiredBy.includes(`Stage ${stage}`)) {
+        needs.monitors.requiredBy.push(`Stage ${stage}`);
+      }
+    }
+
+    // Infrastructure shortfalls
+    const infraShortages = {
+      cat6: Math.max(0, requirements.infrastructure.cat6 - (stageSetup ? (stageSetup.infra_cat6_quantity || 0) : (globalSetup?.available_cat6_runs || 0))),
+      hma: Math.max(0, requirements.infrastructure.hma - (stageSetup ? (stageSetup.infra_hma_quantity || 0) : (globalSetup?.available_hma_runs || 0))),
+      coax: Math.max(0, requirements.infrastructure.coax - (stageSetup ? (stageSetup.infra_coax_quantity || 0) : (globalSetup?.available_coax_runs || 0))),
+      opticalcon_duo: Math.max(0, requirements.infrastructure.opticalcon_duo - (stageSetup ? (stageSetup.infra_opticalcon_duo_quantity || 0) : (globalSetup?.available_opticalcon_duo_runs || 0))),
+      analog: Math.max(0, requirements.infrastructure.analog - (stageSetup ? (stageSetup.infra_analog || 0) : (globalSetup?.available_analog_runs || 0)))
+    };
+
+    Object.entries(infraShortages).forEach(([type, shortage]) => {
+      if (shortage > 0) {
+        const infraType = type as keyof typeof needs.infrastructure;
+        needs.infrastructure[infraType].additionalQuantity += shortage;
+        if (!needs.infrastructure[infraType].requiredBy.includes(`Stage ${stage}`)) {
+          needs.infrastructure[infraType].requiredBy.push(`Stage ${stage}`);
+        }
+      }
+    });
+
+    // Extras shortfalls
+    if (requirements.extras.sideFills && !(stageSetup ? stageSetup.extras_sf : globalSetup?.has_side_fills)) {
+      needs.extras.sideFills.additionalStages += 1;
+      if (!needs.extras.sideFills.requiredBy.includes(`Stage ${stage}`)) {
+        needs.extras.sideFills.requiredBy.push(`Stage ${stage}`);
+      }
+    }
+    if (requirements.extras.drumFills && !(stageSetup ? stageSetup.extras_df : globalSetup?.has_drum_fills)) {
+      needs.extras.drumFills.additionalStages += 1;
+      if (!needs.extras.drumFills.requiredBy.includes(`Stage ${stage}`)) {
+        needs.extras.drumFills.requiredBy.push(`Stage ${stage}`);
+      }
+    }
+    if (requirements.extras.djBooths && !(stageSetup ? stageSetup.extras_djbooth : globalSetup?.has_dj_booths)) {
+      needs.extras.djBooths.additionalStages += 1;
+      if (!needs.extras.djBooths.requiredBy.includes(`Stage ${stage}`)) {
+        needs.extras.djBooths.requiredBy.push(`Stage ${stage}`);
+      }
+    }
+  });
+
+  return needs;
+};
+
 export const getMismatchSummary = (comparisons: ArtistGearComparison[]) => {
-  const conflicts = comparisons.filter(c => c.hasConflicts);
-  const errors = conflicts.reduce((sum, c) => sum + c.mismatches.filter(m => m.severity === 'error').length, 0);
-  const warnings = conflicts.reduce((sum, c) => sum + c.mismatches.filter(m => m.severity === 'warning').length, 0);
+  const totalArtists = comparisons.length;
+  const artistsWithConflicts = comparisons.filter(c => c.hasConflicts).length;
+  const totalErrors = comparisons.reduce((sum, c) => sum + c.mismatches.filter(m => m.severity === 'error').length, 0);
+  const totalWarnings = comparisons.reduce((sum, c) => sum + c.mismatches.filter(m => m.severity === 'warning').length, 0);
   
+  const conflicts = comparisons
+    .filter(c => c.hasConflicts)
+    .map(c => ({
+      artist: c.artistName,
+      stage: c.stage,
+      mismatches: c.mismatches
+    }));
+
   return {
-    totalArtists: comparisons.length,
-    artistsWithConflicts: conflicts.length,
-    totalErrors: errors,
-    totalWarnings: warnings,
+    totalArtists,
+    artistsWithConflicts,
+    totalErrors,
+    totalWarnings,
     conflicts
   };
 };

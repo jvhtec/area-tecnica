@@ -14,7 +14,7 @@ import { Loader2 } from "lucide-react";
 import { exportArtistTablePDF, ArtistTablePdfData } from "@/utils/artistTablePdfExport";
 import { sortArtistsChronologically } from "@/utils/artistSorting";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
-import { compareArtistRequirements } from "@/utils/gearComparisonService";
+import { compareArtistRequirements, calculateEquipmentNeeds } from "@/utils/gearComparisonService";
 import { supabase } from "@/lib/supabase";
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 import { Checkbox } from "@/components/ui/checkbox";

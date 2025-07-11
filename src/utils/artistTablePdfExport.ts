@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { GearMismatch } from './gearComparisonService';
+import { GearMismatch, EquipmentNeeds } from './gearComparisonService';
 
 // Local interfaces for internal PDF generation use
 interface WirelessSystemDetail {
@@ -87,6 +87,7 @@ export interface ArtistTablePdfData {
   }>;
   logoUrl?: string;
   includeGearConflicts?: boolean;
+  equipmentNeeds?: EquipmentNeeds;
 }
 
 // Enhanced image loading function
@@ -235,6 +236,209 @@ const formatGearMismatchesForPdf = (mismatches: GearMismatch[] = []) => {
   }
   
   return parts.join(', ');
+};
+
+const formatEquipmentNeedsForPdf = (needs: EquipmentNeeds, doc: jsPDF, startY: number): number => {
+  let currentY = startY;
+  const pageHeight = doc.internal.pageSize.height;
+  const pageWidth = doc.internal.pageSize.width;
+
+  // Helper function to check if we need a new page
+  const checkPageBreak = (requiredSpace: number) => {
+    if (currentY + requiredSpace > pageHeight - 20) {
+      doc.addPage();
+      currentY = 20;
+    }
+  };
+
+  // Header
+  doc.setFontSize(14);
+  doc.setTextColor(0, 0, 0);
+  doc.text('Additional Equipment Needed to Cover All Riders', 10, currentY);
+  currentY += 10;
+
+  let hasAnyNeeds = false;
+
+  // Critical Equipment Section
+  doc.setFontSize(12);
+  doc.setTextColor(200, 0, 0); // Red for critical
+  
+  const criticalItems: string[] = [];
+  
+  // FOH Consoles
+  if (needs.consoles.foh.length > 0) {
+    needs.consoles.foh.forEach(console => {
+      criticalItems.push(`FOH Console - ${console.model}: ${console.additionalQuantity} additional units (${console.requiredBy.join(', ')})`);
+    });
+  }
+  
+  // Monitor Consoles
+  if (needs.consoles.monitor.length > 0) {
+    needs.consoles.monitor.forEach(console => {
+      criticalItems.push(`Monitor Console - ${console.model}: ${console.additionalQuantity} additional units (${console.requiredBy.join(', ')})`);
+    });
+  }
+  
+  // Wireless Systems
+  if (needs.wireless.length > 0) {
+    needs.wireless.forEach(wireless => {
+      const parts: string[] = [];
+      if (wireless.additionalHH > 0) parts.push(`${wireless.additionalHH} handheld`);
+      if (wireless.additionalBP > 0) parts.push(`${wireless.additionalBP} beltpack`);
+      if (parts.length > 0) {
+        criticalItems.push(`Wireless - ${wireless.model}: ${parts.join(', ')} units (${wireless.requiredBy.join(', ')})`);
+      }
+    });
+  }
+  
+  // IEM Systems
+  if (needs.iem.length > 0) {
+    needs.iem.forEach(iem => {
+      const parts: string[] = [];
+      if (iem.additionalChannels > 0) parts.push(`${iem.additionalChannels} channels`);
+      if (iem.additionalBP > 0) parts.push(`${iem.additionalBP} beltpack`);
+      if (parts.length > 0) {
+        criticalItems.push(`IEM - ${iem.model}: ${parts.join(', ')} (${iem.requiredBy.join(', ')})`);
+      }
+    });
+  }
+
+  if (criticalItems.length > 0) {
+    hasAnyNeeds = true;
+    checkPageBreak(15);
+    doc.text('CRITICAL EQUIPMENT:', 10, currentY);
+    currentY += 8;
+    
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    
+    criticalItems.forEach(item => {
+      checkPageBreak(6);
+      const wrappedText = doc.splitTextToSize(`• ${item}`, pageWidth - 25);
+      doc.text(wrappedText, 15, currentY);
+      currentY += wrappedText.length * 4 + 2;
+    });
+    currentY += 5;
+  }
+
+  // Infrastructure Section
+  const infraItems: string[] = [];
+  
+  if (needs.infrastructure.cat6.additionalQuantity > 0) {
+    infraItems.push(`CAT6 Runs: ${needs.infrastructure.cat6.additionalQuantity} additional (${needs.infrastructure.cat6.requiredBy.join(', ')})`);
+  }
+  if (needs.infrastructure.hma.additionalQuantity > 0) {
+    infraItems.push(`HMA Runs: ${needs.infrastructure.hma.additionalQuantity} additional (${needs.infrastructure.hma.requiredBy.join(', ')})`);
+  }
+  if (needs.infrastructure.coax.additionalQuantity > 0) {
+    infraItems.push(`Coax Runs: ${needs.infrastructure.coax.additionalQuantity} additional (${needs.infrastructure.coax.requiredBy.join(', ')})`);
+  }
+  if (needs.infrastructure.opticalcon_duo.additionalQuantity > 0) {
+    infraItems.push(`OpticalCON DUO Runs: ${needs.infrastructure.opticalcon_duo.additionalQuantity} additional (${needs.infrastructure.opticalcon_duo.requiredBy.join(', ')})`);
+  }
+  if (needs.infrastructure.analog.additionalQuantity > 0) {
+    infraItems.push(`Analog Runs: ${needs.infrastructure.analog.additionalQuantity} additional (${needs.infrastructure.analog.requiredBy.join(', ')})`);
+  }
+
+  if (infraItems.length > 0) {
+    hasAnyNeeds = true;
+    checkPageBreak(15);
+    doc.setFontSize(12);
+    doc.setTextColor(255, 165, 0); // Orange for infrastructure
+    doc.text('INFRASTRUCTURE:', 10, currentY);
+    currentY += 8;
+    
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    
+    infraItems.forEach(item => {
+      checkPageBreak(6);
+      const wrappedText = doc.splitTextToSize(`• ${item}`, pageWidth - 25);
+      doc.text(wrappedText, 15, currentY);
+      currentY += wrappedText.length * 4 + 2;
+    });
+    currentY += 5;
+  }
+
+  // Microphones Section
+  if (needs.microphones.length > 0) {
+    hasAnyNeeds = true;
+    checkPageBreak(15);
+    doc.setFontSize(12);
+    doc.setTextColor(0, 100, 200); // Blue for microphones
+    doc.text('MICROPHONES:', 10, currentY);
+    currentY += 8;
+    
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    
+    needs.microphones.forEach(mic => {
+      checkPageBreak(6);
+      const wrappedText = doc.splitTextToSize(`• ${mic.model}: ${mic.additionalQuantity} additional units (${mic.requiredBy.join(', ')})`, pageWidth - 25);
+      doc.text(wrappedText, 15, currentY);
+      currentY += wrappedText.length * 4 + 2;
+    });
+    currentY += 5;
+  }
+
+  // Monitors Section
+  if (needs.monitors.additionalQuantity > 0) {
+    hasAnyNeeds = true;
+    checkPageBreak(10);
+    doc.setFontSize(12);
+    doc.setTextColor(0, 150, 0); // Green for monitors
+    doc.text('MONITORS:', 10, currentY);
+    currentY += 8;
+    
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`• Additional Monitors: ${needs.monitors.additionalQuantity} units (${needs.monitors.requiredBy.join(', ')})`, 15, currentY);
+    currentY += 10;
+  }
+
+  // Extras Section
+  const extrasItems: string[] = [];
+  
+  if (needs.extras.sideFills.additionalStages > 0) {
+    extrasItems.push(`Side Fill Systems: ${needs.extras.sideFills.additionalStages} stages (${needs.extras.sideFills.requiredBy.join(', ')})`);
+  }
+  if (needs.extras.drumFills.additionalStages > 0) {
+    extrasItems.push(`Drum Fill Systems: ${needs.extras.drumFills.additionalStages} stages (${needs.extras.drumFills.requiredBy.join(', ')})`);
+  }
+  if (needs.extras.djBooths.additionalStages > 0) {
+    extrasItems.push(`DJ Booth Setups: ${needs.extras.djBooths.additionalStages} stages (${needs.extras.djBooths.requiredBy.join(', ')})`);
+  }
+
+  if (extrasItems.length > 0) {
+    hasAnyNeeds = true;
+    checkPageBreak(15);
+    doc.setFontSize(12);
+    doc.setTextColor(150, 0, 150); // Purple for extras
+    doc.text('EXTRAS:', 10, currentY);
+    currentY += 8;
+    
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    
+    extrasItems.forEach(item => {
+      checkPageBreak(6);
+      const wrappedText = doc.splitTextToSize(`• ${item}`, pageWidth - 25);
+      doc.text(wrappedText, 15, currentY);
+      currentY += wrappedText.length * 4 + 2;
+    });
+    currentY += 5;
+  }
+
+  // If no additional equipment is needed
+  if (!hasAnyNeeds) {
+    checkPageBreak(10);
+    doc.setFontSize(12);
+    doc.setTextColor(0, 150, 0); // Green
+    doc.text('All rider requirements can be satisfied with current equipment inventory.', 10, currentY);
+    currentY += 15;
+  }
+
+  return currentY;
 };
 
 export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Blob> => {
@@ -461,6 +665,23 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
           currentY += 3;
         }
       });
+      
+      // Add Equipment Needs section after conflicts summary
+      if (data.equipmentNeeds) {
+        currentY += 10;
+        currentY = formatEquipmentNeedsForPdf(data.equipmentNeeds, doc, currentY);
+      }
+    } else if (data.equipmentNeeds) {
+      // Add Equipment Needs section even if no conflicts
+      let currentY = (doc as any).lastAutoTable.finalY + 20;
+      
+      // Check if we need a new page for the equipment needs
+      if (currentY > pageHeight - 60) {
+        doc.addPage();
+        currentY = 20;
+      }
+      
+      currentY = formatEquipmentNeedsForPdf(data.equipmentNeeds, doc, currentY);
     }
   }
 
