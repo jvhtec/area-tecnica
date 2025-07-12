@@ -42,6 +42,15 @@ export const BasicInfoSection = ({ formData, onChange, gearSetup }: ArtistSectio
         </div>
       </div>
 
+      <div>
+        <Label>Date</Label>
+        <Input 
+          type="date"
+          value={formData.date || ""} 
+          onChange={(e) => onChange({ date: e.target.value })}
+        />
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Label>Show Start</Label>
