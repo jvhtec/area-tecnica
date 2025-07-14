@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
-import { Edit, Trash2, Upload, RefreshCw, Users, Loader2 } from "lucide-react";
+import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus } from "lucide-react";
 
 interface JobCardActionsProps {
   job: any;
@@ -15,11 +15,13 @@ interface JobCardActionsProps {
   canUploadDocuments: boolean;
   canManageArtists: boolean;
   isCreatingFolders?: boolean;
+  isCreatingLocalFolders?: boolean;
   currentFolderStep?: string;
   onRefreshData: (e: React.MouseEvent) => void;
   onEditButtonClick: (e: React.MouseEvent) => void;
   onDeleteClick: (e: React.MouseEvent) => void;
   onCreateFlexFolders: (e: React.MouseEvent) => void;
+  onCreateLocalFolders: (e: React.MouseEvent) => void;
   onFestivalArtistsClick: (e: React.MouseEvent) => void;
   onAssignmentDialogOpen: (e: React.MouseEvent) => void;
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -37,10 +39,12 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   canUploadDocuments,
   canManageArtists,
   isCreatingFolders = false,
+  isCreatingLocalFolders = false,
   onRefreshData,
   onEditButtonClick,
   onDeleteClick,
   onCreateFlexFolders,
+  onCreateLocalFolders,
   onFestivalArtistsClick,
   onAssignmentDialogOpen,
   handleFileUpload
@@ -125,6 +129,24 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           )}
         </Button>
       )}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onCreateLocalFolders}
+        disabled={isCreatingLocalFolders}
+        title={isCreatingLocalFolders ? "Creating local folders..." : "Create local folder structure"}
+        className={
+          isCreatingLocalFolders
+            ? "opacity-50 cursor-not-allowed"
+            : "hover:bg-accent/50"
+        }
+      >
+        {isCreatingLocalFolders ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <FolderPlus className="h-4 w-4" />
+        )}
+      </Button>
       {job.job_type !== "dryhire" && showUpload && canUploadDocuments && (
         <div className="relative">
           <input

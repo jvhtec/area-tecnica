@@ -3,6 +3,13 @@ import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Department } from "@/types/department";
+
+// File System Access API types
+declare global {
+  interface Window {
+    showDirectoryPicker(): Promise<FileSystemDirectoryHandle>;
+  }
+}
 import { useNavigate } from "react-router-dom";
 import { useFolderExistence } from "@/hooks/useFolderExistence";
 import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
@@ -60,6 +67,7 @@ export function JobCardNew({
   
   // Add folder creation loading state
   const [isCreatingFolders, setIsCreatingFolders] = useState(false);
+  const [isCreatingLocalFolders, setIsCreatingLocalFolders] = useState(false);
   
   const {
     // Styling
@@ -271,6 +279,74 @@ export function JobCardNew({
     }
   };
 
+  const createLocalFoldersHandler = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (isCreatingLocalFolders) {
+      console.log("JobCardNew: Local folder creation already in progress");
+      return;
+    }
+
+    // Check if File System Access API is supported
+    if (!('showDirectoryPicker' in window)) {
+      toast({
+        title: "Not supported",
+        description: "Your browser doesn't support local folder creation. Please use Chrome, Edge, or another Chromium-based browser.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsCreatingLocalFolders(true);
+
+      // Ask user to pick a base folder
+      const baseDirHandle = await window.showDirectoryPicker();
+
+      // Use job title as root folder name
+      const rootFolderName = job.title.replace(/[<>:"/\\|?*]/g, '_'); // Clean filename
+
+      // Create root folder
+      const rootDirHandle = await baseDirHandle.getDirectoryHandle(rootFolderName, { create: true });
+
+      // Fixed subfolders
+      const subfolders = [
+        "CAD",
+        "QT", 
+        "Material",
+        "Documentación",
+        "Rentals",
+        "Compras",
+        "Rider",
+        "Predicciones"
+      ];
+
+      for (const subfolder of subfolders) {
+        const subDirHandle = await rootDirHandle.getDirectoryHandle(subfolder, { create: true });
+        await subDirHandle.getDirectoryHandle("OLD", { create: true });
+      }
+
+      toast({
+        title: "Success!",
+        description: `Local folder structure created at "${rootFolderName}"`
+      });
+
+    } catch (error: any) {
+      console.error("JobCardNew: Error creating local folders:", error);
+      if (error.name === 'AbortError') {
+        // User cancelled, don't show error
+        return;
+      }
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create local folder structure",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreatingLocalFolders(false);
+    }
+  };
+
   const handleJobCardClick = () => {
     if (isHouseTech || isJobBeingDeleted) {
       return; // Block job card clicks for house techs or jobs being deleted
@@ -349,11 +425,13 @@ export function JobCardNew({
             canUploadDocuments={canUploadDocuments}
             canManageArtists={canManageArtists}
             isCreatingFolders={isCreatingFolders}
+            isCreatingLocalFolders={isCreatingLocalFolders}
             currentFolderStep=""
             onRefreshData={refreshData}
             onEditButtonClick={handleEditButtonClick}
             onDeleteClick={handleDeleteClick}
             onCreateFlexFolders={createFlexFoldersHandler}
+            onCreateLocalFolders={createLocalFoldersHandler}
             onFestivalArtistsClick={handleFestivalArtistsClick}
             onAssignmentDialogOpen={(e) => {
               e.stopPropagation();
