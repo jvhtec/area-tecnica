@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { FolderOpen, Check, X, Upload } from "lucide-react";
 
 const reportSections = [
   {
@@ -37,6 +38,20 @@ const reportSections = [
   }
 ];
 
+// Filename mapping for auto-import
+const FILENAME_MAPPING = {
+  'ISO_A': { section: 'SPL(A) Broadband', view: 'ISO View' },
+  'TOP_A': { section: 'SPL(A) Broadband', view: 'Top View' },
+  'ISO_C': { section: 'SPL(Z) 250-16k', view: 'ISO View' },
+  'TOP_C': { section: 'SPL(Z) 250-16k', view: 'Top View' },
+  'SUB': { section: 'SUBS SPL(Z) 32-80Hz', view: 'Top View' }
+};
+
+type MappingResult = {
+  found: { filename: string; section: string; view: string }[];
+  missing: { filename: string; section: string; view: string }[];
+};
+
 export const ReportGenerator = () => {
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
@@ -46,6 +61,8 @@ export const ReportGenerator = () => {
   const [images, setImages] = useState<{ [key: string]: File | null }>({});
   const [isoViewEnabled, setIsoViewEnabled] = useState<{ [key: string]: boolean }>({});
   const [jobLogo, setJobLogo] = useState<string | undefined>(undefined);
+  const [mappingResult, setMappingResult] = useState<MappingResult | null>(null);
+  const [showMappingPreview, setShowMappingPreview] = useState(false);
 
   useEffect(() => {
     const loadJobLogo = async () => {
@@ -76,6 +93,62 @@ export const ReportGenerator = () => {
       ...prev,
       [section]: !prev[section]
     }));
+  };
+
+  const handleFolderSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const found: { filename: string; section: string; view: string }[] = [];
+    const missing: { filename: string; section: string; view: string }[] = [];
+    const newImages: { [key: string]: File | null } = { ...images };
+    const newIsoEnabled = { ...isoViewEnabled };
+
+    // Check each expected filename
+    Object.entries(FILENAME_MAPPING).forEach(([filename, mapping]) => {
+      const matchingFile = Array.from(files).find(file => {
+        const fileBaseName = file.name.toLowerCase().split('.')[0];
+        return fileBaseName === filename.toLowerCase();
+      });
+
+      if (matchingFile) {
+        found.push({ filename: matchingFile.name, section: mapping.section, view: mapping.view });
+        const key = `${mapping.section}-${mapping.view}`;
+        newImages[key] = matchingFile;
+        
+        // Auto-enable ISO view if ISO file is found
+        if (mapping.view === 'ISO View') {
+          newIsoEnabled[mapping.section] = true;
+        }
+      } else {
+        missing.push({ filename: `${filename}.png`, section: mapping.section, view: mapping.view });
+      }
+    });
+
+    setImages(newImages);
+    setIsoViewEnabled(newIsoEnabled);
+    setMappingResult({ found, missing });
+    setShowMappingPreview(true);
+
+    // Show toast with results
+    toast({
+      title: "Auto-mapping Complete",
+      description: `Found ${found.length} files, ${missing.length} missing`,
+    });
+
+    // Reset the input
+    event.target.value = '';
+  };
+
+  const clearAutoMapping = () => {
+    setImages({});
+    setIsoViewEnabled({});
+    setMappingResult(null);
+    setShowMappingPreview(false);
+    toast({
+      title: "Mapping Cleared",
+      description: "All auto-mapped files have been cleared",
+    });
   };
 
   const addPageHeader = async (pdf: jsPDF, pageNumber: number, jobTitle: string, jobDate: string) => {
@@ -355,49 +428,135 @@ export const ReportGenerator = () => {
             />
           </div>
 
-          {reportSections.slice(1).map((section) => (
-            <div key={section.title} className="space-y-2 pb-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">{section.title}</Label>
-                {section.hasIsoView && (
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id={`iso-${section.title}`}
-                      checked={isoViewEnabled[section.title]}
-                      onCheckedChange={() => toggleIsoView(section.title)}
-                    />
-                    <Label htmlFor={`iso-${section.title}`} className="text-xs">
-                      Include ISO
-                    </Label>
-                  </div>
-                )}
-              </div>
-              
-              <div className="space-y-2">
-                <div className="space-y-1">
-                  <Label className="text-xs">Top View</Label>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleImageChange(section.title, "Top View", e.target.files?.[0] || null)}
-                    className="text-sm"
-                  />
+          {/* Auto-mapping section */}
+          <div className="space-y-3 p-4 border rounded-lg bg-muted/50">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Auto-map Images from Folder</Label>
+              {mappingResult && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearAutoMapping}
+                  className="text-xs"
+                >
+                  Clear Mapping
+                </Button>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Label htmlFor="folderSelect" className="cursor-pointer">
+                <div className="flex items-center gap-2 px-3 py-2 border rounded-md hover:bg-background transition-colors">
+                  <FolderOpen className="h-4 w-4" />
+                  <span className="text-sm">Select Folder</span>
                 </div>
+              </Label>
+              <input
+                id="folderSelect"
+                type="file"
+                {...({ webkitdirectory: "" } as any)}
+                multiple
+                onChange={handleFolderSelection}
+                className="hidden"
+              />
+            </div>
 
-                {section.hasIsoView && isoViewEnabled[section.title] && (
+            <div className="text-xs text-muted-foreground">
+              Expected files: ISO_A.png, TOP_A.png, ISO_C.png, TOP_C.png, SUB.png
+            </div>
+
+            {/* Mapping preview */}
+            {showMappingPreview && mappingResult && (
+              <div className="space-y-2">
+                <Label className="text-xs font-medium">Mapping Results:</Label>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {mappingResult.found.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2 text-xs">
+                      <Check className="h-3 w-3 text-green-600" />
+                      <span className="font-mono">{item.filename}</span>
+                      <span className="text-muted-foreground">→</span>
+                      <span>{item.section} ({item.view})</span>
+                    </div>
+                  ))}
+                  {mappingResult.missing.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2 text-xs">
+                      <X className="h-3 w-3 text-red-600" />
+                      <span className="font-mono text-muted-foreground">{item.filename}</span>
+                      <span className="text-muted-foreground">→</span>
+                      <span className="text-muted-foreground">{item.section} ({item.view})</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {reportSections.slice(1).map((section) => {
+            const topViewKey = `${section.title}-Top View`;
+            const isoViewKey = `${section.title}-ISO View`;
+            const hasTopImage = images[topViewKey];
+            const hasIsoImage = images[isoViewKey];
+
+            return (
+              <div key={section.title} className="space-y-2 pb-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">{section.title}</Label>
+                  {section.hasIsoView && (
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`iso-${section.title}`}
+                        checked={isoViewEnabled[section.title]}
+                        onCheckedChange={() => toggleIsoView(section.title)}
+                      />
+                      <Label htmlFor={`iso-${section.title}`} className="text-xs">
+                        Include ISO
+                      </Label>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="space-y-2">
                   <div className="space-y-1">
-                    <Label className="text-xs">ISO View</Label>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs">Top View</Label>
+                      {hasTopImage && <Check className="h-3 w-3 text-green-600" />}
+                    </div>
                     <Input
                       type="file"
                       accept="image/*"
-                      onChange={(e) => handleImageChange(section.title, "ISO View", e.target.files?.[0] || null)}
+                      onChange={(e) => handleImageChange(section.title, "Top View", e.target.files?.[0] || null)}
                       className="text-sm"
                     />
+                    {hasTopImage && (
+                      <div className="text-xs text-muted-foreground">
+                        📁 {hasTopImage.name}
+                      </div>
+                    )}
                   </div>
-                )}
+
+                  {section.hasIsoView && isoViewEnabled[section.title] && (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs">ISO View</Label>
+                        {hasIsoImage && <Check className="h-3 w-3 text-green-600" />}
+                      </div>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleImageChange(section.title, "ISO View", e.target.files?.[0] || null)}
+                        className="text-sm"
+                      />
+                      {hasIsoImage && (
+                        <div className="text-xs text-muted-foreground">
+                          📁 {hasIsoImage.name}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           <Button onClick={generatePDF} className="w-full mt-4">
             Generate Report
