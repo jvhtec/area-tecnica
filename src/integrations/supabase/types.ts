@@ -2465,6 +2465,7 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          custom_folder_structure: Json | null
           dark_mode: boolean | null
           department: string | null
           dni: string | null
@@ -2486,6 +2487,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          custom_folder_structure?: Json | null
           dark_mode?: boolean | null
           department?: string | null
           dni?: string | null
@@ -2507,6 +2509,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          custom_folder_structure?: Json | null
           dark_mode?: boolean | null
           department?: string | null
           dni?: string | null

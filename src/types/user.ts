@@ -8,4 +8,5 @@ export interface User {
   first_name?: string;
   last_name?: string;
   department?: string;  // Added department field
+  custom_folder_structure?: any; // Custom folder structure for local folder creation
 }

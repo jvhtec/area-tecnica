@@ -309,26 +309,65 @@ export function JobCardNew({
       // Create root folder
       const rootDirHandle = await baseDirHandle.getDirectoryHandle(rootFolderName, { create: true });
 
-      // Fixed subfolders
-      const subfolders = [
-        "CAD",
-        "QT", 
-        "Material",
-        "Documentación",
-        "Rentals",
-        "Compras",
-        "Rider",
-        "Predicciones"
-      ];
-
-      for (const subfolder of subfolders) {
-        const subDirHandle = await rootDirHandle.getDirectoryHandle(subfolder, { create: true });
-        await subDirHandle.getDirectoryHandle("OLD", { create: true });
+      // Get current user's custom folder structure or use default
+      const { data: { user } } = await supabase.auth.getUser();
+      let folderStructure = null;
+      
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('custom_folder_structure, role')
+          .eq('id', user.id)
+          .single();
+        
+        // Only use custom structure for management users
+        if (profile && (profile.role === 'admin' || profile.role === 'management') && profile.custom_folder_structure) {
+          folderStructure = profile.custom_folder_structure;
+        }
+      }
+      
+      // Default structure if no custom one exists
+      if (!folderStructure) {
+        folderStructure = [
+          "CAD",
+          "QT", 
+          "Material",
+          "Documentación",
+          "Rentals",
+          "Compras",
+          "Rider",
+          "Predicciones"
+        ];
+      }
+      
+      // Create folders based on structure
+      if (Array.isArray(folderStructure)) {
+        for (const folder of folderStructure) {
+          if (typeof folder === 'string') {
+            // Simple string structure
+            const subDirHandle = await rootDirHandle.getDirectoryHandle(folder, { create: true });
+            await subDirHandle.getDirectoryHandle("OLD", { create: true });
+          } else if (folder && typeof folder === 'object' && folder.name) {
+            // Object structure with subfolders
+            const subDirHandle = await rootDirHandle.getDirectoryHandle(folder.name, { create: true });
+            
+            // Create subfolders if they exist
+            if (folder.subfolders && Array.isArray(folder.subfolders)) {
+              for (const subfolder of folder.subfolders) {
+                await subDirHandle.getDirectoryHandle(subfolder, { create: true });
+              }
+            } else {
+              // Default to OLD subfolder if no subfolders specified
+              await subDirHandle.getDirectoryHandle("OLD", { create: true });
+            }
+          }
+        }
       }
 
+      const isCustom = user && folderStructure !== null;
       toast({
         title: "Success!",
-        description: `Local folder structure created at "${rootFolderName}"`
+        description: `${isCustom ? 'Custom' : 'Default'} folder structure created at "${rootFolderName}"`
       });
 
     } catch (error: any) {

@@ -6,6 +6,7 @@ interface UserPreferences {
   dark_mode: boolean;
   time_span: string;
   last_activity: string;
+  custom_folder_structure: any;
 }
 
 export const useUserPreferences = () => {
@@ -77,7 +78,7 @@ export const useUserPreferences = () => {
 
         const { data, error } = await supabase
           .from('profiles')
-          .select('dark_mode, time_span, last_activity')
+          .select('dark_mode, time_span, last_activity, custom_folder_structure')
           .eq('id', session.user.id)
           .maybeSingle();
 

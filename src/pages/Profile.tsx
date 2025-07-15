@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Department } from "@/types/department";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Save, UserCircle, AlertTriangle } from "lucide-react";
+import { FolderStructureEditor, type FolderStructure } from "@/components/profile/FolderStructureEditor";
 
 export const Profile = () => {
   const { toast } = useToast();
@@ -18,6 +19,7 @@ export const Profile = () => {
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
+  const [folderStructure, setFolderStructure] = useState<FolderStructure | null>(null);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -50,6 +52,7 @@ export const Profile = () => {
       }
 
       setProfile(data);
+      setFolderStructure(data.custom_folder_structure);
       setNeedsPasswordChange(user.user_metadata?.needs_password_change ?? false);
     };
 
@@ -70,6 +73,7 @@ export const Profile = () => {
           department: profile.department,
           dni: profile.dni,
           residencia: profile.residencia,
+          custom_folder_structure: folderStructure,
         })
         .eq('id', profile.id);
 
@@ -324,6 +328,14 @@ export const Profile = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Custom Folder Structure - Only for management users */}
+      {(profile.role === 'admin' || profile.role === 'management') && (
+        <FolderStructureEditor
+          value={folderStructure}
+          onChange={setFolderStructure}
+        />
+      )}
     </div>
   );
 };
