@@ -1,13 +1,11 @@
 
-import { type } from "os";
-
 export interface TravelArrangement {
   transportation_type: "van" | "sleeper_bus" | "train" | "plane" | "RV";
   pickup_address?: string;
-  pickup_time?: string;
+  pickup_time?: string; // Now proper time format HH:MM
   flight_train_number?: string;
-  departure_time?: string;
-  arrival_time?: string;
+  departure_time?: string; // Now proper time format HH:MM
+  arrival_time?: string; // Now proper time format HH:MM
   notes?: string;
 }
 
@@ -30,12 +28,48 @@ export interface EventData {
     transport: string;
     loadingDetails: string;
     unloadingDetails: string;
-    equipmentLogistics: string; // New field
+    equipmentLogistics: string;
   };
   staff: { name: string; surname1: string; surname2: string; position: string }[];
   schedule: string;
   powerRequirements: string;
   auxiliaryNeeds: string;
+}
+
+// New interfaces for enhanced functionality
+export interface HojaDeRutaEquipment {
+  id?: string;
+  equipment_category: string;
+  equipment_name: string;
+  quantity: number;
+  notes?: string;
+}
+
+export interface HojaDeRutaTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  event_type: 'corporate' | 'festival' | 'tour' | 'conference' | 'wedding' | 'other';
+  template_data: EventData;
+  is_active: boolean;
+}
+
+export interface HojaDeRutaMetadata {
+  id: string;
+  document_version: number;
+  created_by?: string;
+  approved_by?: string;
+  status: 'draft' | 'review' | 'approved' | 'final';
+  approved_at?: string;
+  created_at: string;
+  updated_at: string;
+  last_modified: string;
+  last_modified_by?: string;
+}
+
+export interface EnhancedEventData extends EventData {
+  metadata?: HojaDeRutaMetadata;
+  equipment?: HojaDeRutaEquipment[];
 }
 
 export interface ImagePreviews {

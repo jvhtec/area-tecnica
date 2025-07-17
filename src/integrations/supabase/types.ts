@@ -1264,8 +1264,12 @@ export type Database = {
       }
       hoja_de_ruta: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           auxiliary_needs: string | null
           created_at: string | null
+          created_by: string | null
+          document_version: number | null
           event_dates: string | null
           event_name: string | null
           id: string
@@ -1274,13 +1278,18 @@ export type Database = {
           last_modified_by: string | null
           power_requirements: string | null
           schedule: string | null
+          status: string | null
           updated_at: string | null
           venue_address: string | null
           venue_name: string | null
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           auxiliary_needs?: string | null
           created_at?: string | null
+          created_by?: string | null
+          document_version?: number | null
           event_dates?: string | null
           event_name?: string | null
           id?: string
@@ -1289,13 +1298,18 @@ export type Database = {
           last_modified_by?: string | null
           power_requirements?: string | null
           schedule?: string | null
+          status?: string | null
           updated_at?: string | null
           venue_address?: string | null
           venue_name?: string | null
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           auxiliary_needs?: string | null
           created_at?: string | null
+          created_by?: string | null
+          document_version?: number | null
           event_dates?: string | null
           event_name?: string | null
           id?: string
@@ -1304,6 +1318,7 @@ export type Database = {
           last_modified_by?: string | null
           power_requirements?: string | null
           schedule?: string | null
+          status?: string | null
           updated_at?: string | null
           venue_address?: string | null
           venue_name?: string | null
@@ -1350,6 +1365,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "hoja_de_ruta_contacts_hoja_de_ruta_id_fkey"
+            columns: ["hoja_de_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_de_ruta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hoja_de_ruta_equipment: {
+        Row: {
+          created_at: string | null
+          equipment_category: string
+          equipment_name: string
+          hoja_de_ruta_id: string | null
+          id: string
+          notes: string | null
+          quantity: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          equipment_category: string
+          equipment_name: string
+          hoja_de_ruta_id?: string | null
+          id?: string
+          notes?: string | null
+          quantity?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          equipment_category?: string
+          equipment_name?: string
+          hoja_de_ruta_id?: string | null
+          id?: string
+          notes?: string | null
+          quantity?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hoja_de_ruta_equipment_hoja_de_ruta_id_fkey"
             columns: ["hoja_de_ruta_id"]
             isOneToOne: false
             referencedRelation: "hoja_de_ruta"
@@ -1504,6 +1560,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      hoja_de_ruta_templates: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          event_type: string
+          id: string
+          is_active: boolean | null
+          name: string
+          template_data: Json
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          event_type: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          template_data: Json
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          event_type?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          template_data?: Json
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       hoja_de_ruta_travel: {
         Row: {
