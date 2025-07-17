@@ -33,7 +33,8 @@ import {
   ChevronDown,
   ChevronUp,
   Eye,
-  Download
+  Download,
+  FolderPlus
 } from "lucide-react";
 
 import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
@@ -43,6 +44,13 @@ import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 
 import { useFolderExistence } from "@/hooks/useFolderExistence";
+
+// File System Access API types
+declare global {
+  interface Window {
+    showDirectoryPicker(): Promise<FileSystemDirectoryHandle>;
+  }
+}
 
 export interface JobDocument {
   id: string;
@@ -89,6 +97,7 @@ export function JobCardNew({
 
   // Add state for folder creation loading
   const [isCreatingFolders, setIsCreatingFolders] = useState(false);
+  const [isCreatingLocalFolders, setIsCreatingLocalFolders] = useState(false);
 
   const borderColor = job.color ? job.color : "#7E69AB";
   const appliedBorderColor = isDark ? (job.darkColor ? job.darkColor : borderColor) : borderColor;
@@ -405,6 +414,118 @@ export function JobCardNew({
       });
     } finally {
       setIsCreatingFolders(false);
+    }
+  };
+
+  const createLocalFoldersHandler = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (isCreatingLocalFolders) {
+      console.log("Dashboard JobCardNew: Local folder creation already in progress");
+      return;
+    }
+
+    // Check if File System Access API is supported
+    if (!('showDirectoryPicker' in window)) {
+      toast({
+        title: "Not supported",
+        description: "Your browser doesn't support local folder creation. Please use Chrome, Edge, or another Chromium-based browser.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsCreatingLocalFolders(true);
+
+      // Ask user to pick a base folder
+      const baseDirHandle = await window.showDirectoryPicker();
+
+      // Format the start date as yymmdd
+      const startDate = new Date(job.start_time);
+      const formattedDate = format(startDate, "yyMMdd");
+      
+      // Use job title with date as root folder name
+      const cleanJobTitle = job.title.replace(/[<>:"/\\|?*]/g, '_'); // Clean filename
+      const rootFolderName = `${formattedDate} - ${cleanJobTitle}`;
+
+      // Create root folder
+      const rootDirHandle = await baseDirHandle.getDirectoryHandle(rootFolderName, { create: true });
+
+      // Get current user's custom folder structure or use default
+      const { data: { user } } = await supabase.auth.getUser();
+      let folderStructure = null;
+      
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('custom_folder_structure, role')
+          .eq('id', user.id)
+          .single();
+        
+        // Only use custom structure for management users
+        if (profile && (profile.role === 'admin' || profile.role === 'management') && profile.custom_folder_structure) {
+          folderStructure = profile.custom_folder_structure;
+        }
+      }
+      
+      // Default structure if no custom one exists
+      if (!folderStructure) {
+        folderStructure = [
+          "CAD",
+          "QT", 
+          "Material",
+          "Documentación",
+          "Rentals",
+          "Compras",
+          "Rider",
+          "Predicciones"
+        ];
+      }
+      
+      // Create folders based on structure
+      if (Array.isArray(folderStructure)) {
+        for (const folder of folderStructure) {
+          if (typeof folder === 'string') {
+            // Simple string structure
+            const subDirHandle = await rootDirHandle.getDirectoryHandle(folder, { create: true });
+            await subDirHandle.getDirectoryHandle("OLD", { create: true });
+          } else if (folder && typeof folder === 'object' && folder.name) {
+            // Object structure with subfolders
+            const subDirHandle = await rootDirHandle.getDirectoryHandle(folder.name, { create: true });
+            
+            // Create subfolders if they exist
+            if (folder.subfolders && Array.isArray(folder.subfolders)) {
+              for (const subfolder of folder.subfolders) {
+                await subDirHandle.getDirectoryHandle(subfolder, { create: true });
+              }
+            } else {
+              // Default to OLD subfolder if no subfolders specified
+              await subDirHandle.getDirectoryHandle("OLD", { create: true });
+            }
+          }
+        }
+      }
+
+      const isCustom = user && folderStructure !== null;
+      toast({
+        title: "Success!",
+        description: `${isCustom ? 'Custom' : 'Default'} folder structure created at "${rootFolderName}"`
+      });
+
+    } catch (error: any) {
+      console.error("Dashboard JobCardNew: Error creating local folders:", error);
+      if (error.name === 'AbortError') {
+        // User cancelled, don't show error
+        return;
+      }
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create local folder structure",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreatingLocalFolders(false);
     }
   };
 
@@ -754,6 +875,24 @@ export function JobCardNew({
                   )}
                 </Button>
               )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={createLocalFoldersHandler}
+                disabled={isCreatingLocalFolders || isJobBeingDeleted}
+                title={isCreatingLocalFolders ? "Creating local folders..." : "Create local folder structure"}
+                className={
+                  isCreatingLocalFolders || isJobBeingDeleted
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-accent/50"
+                }
+              >
+                {isCreatingLocalFolders ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FolderPlus className="h-4 w-4" />
+                )}
+              </Button>
               {job.job_type !== "dryhire" && showUpload && canUploadDocuments && (
                 <div className="relative">
                   <input

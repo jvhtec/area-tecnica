@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -70,11 +69,8 @@ export function JobCardNew({
   const [isCreatingLocalFolders, setIsCreatingLocalFolders] = useState(false);
   
   const {
-    // Styling
     appliedBorderColor,
     appliedBgColor,
-    
-    // State
     collapsed,
     assignments,
     documents,
@@ -85,26 +81,18 @@ export function JobCardNew({
     editJobDialogOpen,
     assignmentDialogOpen,
     isJobBeingDeleted,
-    
-    // Data
     soundTasks,
     personnel,
-    
-    // Permissions
     isHouseTech,
     canEditJobs,
     canManageArtists,
     canUploadDocuments,
     canCreateFlexFolders,
-    
-    // Event handlers
     toggleCollapse,
     handleEditButtonClick,
     handleFileUpload,
     handleDeleteDocument,
     refreshData,
-    
-    // Dialog handlers
     setSoundTaskDialogOpen,
     setLightsTaskDialogOpen,
     setVideoTaskDialogOpen,
@@ -137,13 +125,11 @@ export function JobCardNew({
   const handleDeleteClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
     
-    // Check if already being deleted
     if (isJobBeingDeleted) {
       console.log("JobCardNew: Job deletion already in progress");
       return;
     }
     
-    // Check permissions
     if (!["admin", "management"].includes(userRole || "")) {
       toast({
         title: "Permission denied",
@@ -160,10 +146,8 @@ export function JobCardNew({
     try {
       console.log("JobCardNew: Starting optimistic job deletion for:", job.id);
       
-      // Mark job as being deleted for immediate visual feedback
       addDeletingJob(job.id);
       
-      // Call optimistic deletion service
       const result = await deleteJobOptimistically(job.id);
       
       if (result.success) {
@@ -172,10 +156,8 @@ export function JobCardNew({
           description: result.details || "The job has been removed and cleanup is running in background."
         });
         
-        // Call the parent's onDeleteClick to handle any additional UI updates
         onDeleteClick(job.id);
         
-        // Invalidate queries to refresh the list
         await queryClient.invalidateQueries({ queryKey: ["jobs"] });
         await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
       } else {
@@ -189,7 +171,6 @@ export function JobCardNew({
         variant: "destructive"
       });
     } finally {
-      // Always remove from deletion state, even on error
       removeDeletingJob(job.id);
     }
   };
@@ -217,7 +198,6 @@ export function JobCardNew({
     try {
       setIsCreatingFolders(true);
 
-      // Double-check in the database before creating
       const { data: existingFolders } = await supabase
         .from("flex_folders")
         .select("id")
@@ -234,7 +214,6 @@ export function JobCardNew({
         return;
       }
 
-      // Use the correct ISO datetime format that works with Flex API
       const startDate = new Date(job.start_time);
       const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, "");
 
@@ -248,7 +227,6 @@ export function JobCardNew({
 
       await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber);
 
-      // Update job record to indicate folders were created
       const { error: updateError } = await supabase
         .from('jobs')
         .update({ flex_folders_created: true })
@@ -263,7 +241,6 @@ export function JobCardNew({
         description: "Flex folders have been created successfully."
       });
 
-      // Refresh queries
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       queryClient.invalidateQueries({ queryKey: ["folder-existence"] });
 
@@ -303,8 +280,13 @@ export function JobCardNew({
       // Ask user to pick a base folder
       const baseDirHandle = await window.showDirectoryPicker();
 
-      // Use job title as root folder name
-      const rootFolderName = job.title.replace(/[<>:"/\\|?*]/g, '_'); // Clean filename
+      // Format the start date as yymmdd
+      const startDate = new Date(job.start_time);
+      const formattedDate = format(startDate, "yyMMdd");
+      
+      // Use job title with date as root folder name
+      const cleanJobTitle = job.title.replace(/[<>:"/\\|?*]/g, '_'); // Clean filename
+      const rootFolderName = `${formattedDate} - ${cleanJobTitle}`;
 
       // Create root folder
       const rootDirHandle = await baseDirHandle.getDirectoryHandle(rootFolderName, { create: true });
@@ -388,7 +370,7 @@ export function JobCardNew({
 
   const handleJobCardClick = () => {
     if (isHouseTech || isJobBeingDeleted) {
-      return; // Block job card clicks for house techs or jobs being deleted
+      return;
     }
     
     if (isProjectManagementPage) {
