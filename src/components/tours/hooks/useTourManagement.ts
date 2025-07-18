@@ -89,6 +89,33 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
     }
   };
 
+  const handleDescriptionChange = async (description: string) => {
+    try {
+      console.log("Updating description for tour:", tour.id);
+      
+      const { error: tourError } = await supabase
+        .from("tours")
+        .update({ description })
+        .eq("id", tour.id);
+
+      if (tourError) {
+        console.error("Error updating tour description:", tourError);
+        throw tourError;
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["tours-with-dates"] });
+      await queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
+      toast({ title: "Tour description updated successfully" });
+    } catch (error: any) {
+      console.error("Error updating tour description:", error);
+      toast({
+        title: "Error updating tour description",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDelete = async () => {
     try {
       console.log("Starting optimistic tour deletion process for tour:", tour.id);
@@ -206,6 +233,7 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
   return {
     handleColorChange,
     handleNameChange,
+    handleDescriptionChange,
     handleDelete,
   };
 };

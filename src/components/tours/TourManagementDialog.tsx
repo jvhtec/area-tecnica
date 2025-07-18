@@ -31,7 +31,7 @@ export const TourManagementDialog = ({
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { handleColorChange, handleNameChange, handleDelete } = useTourManagement(tour, () => onOpenChange(false));
+  const { handleColorChange, handleNameChange, handleDescriptionChange, handleDelete } = useTourManagement(tour, () => onOpenChange(false));
   const [defaultsManagerOpen, setDefaultsManagerOpen] = useState(false);
   const [isUpdatingTourPack, setIsUpdatingTourPack] = useState(false);
 
@@ -120,8 +120,10 @@ export const TourManagementDialog = ({
               <TourColorSection 
                 color={tour.color} 
                 tourName={tour.name}
+                tourDescription={tour.description}
                 onColorChange={handleColorChange}
                 onNameChange={handleNameChange}
+                onDescriptionChange={handleDescriptionChange}
               />
             </div>
 
