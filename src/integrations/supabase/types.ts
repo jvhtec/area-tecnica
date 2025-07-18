@@ -3137,28 +3137,40 @@ export type Database = {
         Row: {
           created_at: string
           date: string
+          end_date: string
           flex_folders_created: boolean | null
           id: string
           is_tour_pack_only: boolean | null
           location_id: string | null
+          rehearsal_days: number | null
+          start_date: string
+          tour_date_type: Database["public"]["Enums"]["tour_date_type"] | null
           tour_id: string | null
         }
         Insert: {
           created_at?: string
           date: string
+          end_date: string
           flex_folders_created?: boolean | null
           id?: string
           is_tour_pack_only?: boolean | null
           location_id?: string | null
+          rehearsal_days?: number | null
+          start_date: string
+          tour_date_type?: Database["public"]["Enums"]["tour_date_type"] | null
           tour_id?: string | null
         }
         Update: {
           created_at?: string
           date?: string
+          end_date?: string
           flex_folders_created?: boolean | null
           id?: string
           is_tour_pack_only?: boolean | null
           location_id?: string | null
+          rehearsal_days?: number | null
+          start_date?: string
+          tour_date_type?: Database["public"]["Enums"]["tour_date_type"] | null
           tour_id?: string | null
         }
         Relationships: [
@@ -3785,6 +3797,7 @@ export type Database = {
       provider_type: "festival" | "band" | "mixed"
       room_type: "single" | "double"
       task_status: "not_started" | "in_progress" | "completed"
+      tour_date_type: "show" | "rehearsal" | "travel"
       transport_type: "trailer" | "9m" | "8m" | "6m" | "4m" | "furgoneta" | "rv"
       transportation_type: "van" | "sleeper_bus" | "train" | "plane" | "rv"
       user_role:
@@ -3972,6 +3985,7 @@ export const Constants = {
       provider_type: ["festival", "band", "mixed"],
       room_type: ["single", "double"],
       task_status: ["not_started", "in_progress", "completed"],
+      tour_date_type: ["show", "rehearsal", "travel"],
       transport_type: ["trailer", "9m", "8m", "6m", "4m", "furgoneta", "rv"],
       transportation_type: ["van", "sleeper_bus", "train", "plane", "rv"],
       user_role: [

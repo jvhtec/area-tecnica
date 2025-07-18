@@ -4,8 +4,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
 export const useTourDates = (tourId?: string) => {
-  const [dates, setDates] = useState<{ date: string; location: string }[]>([
-    { date: "", location: "" },
+  const [dates, setDates] = useState<{ 
+    date: string; 
+    location: string; 
+    tourDateType: 'show' | 'rehearsal' | 'travel';
+    startDate: string;
+    endDate: string;
+  }[]>([
+    { date: "", location: "", tourDateType: 'show', startDate: "", endDate: "" },
   ]);
   const queryClient = useQueryClient();
 
@@ -20,6 +26,10 @@ export const useTourDates = (tourId?: string) => {
         .select(`
           id,
           date,
+          start_date,
+          end_date,
+          tour_date_type,
+          rehearsal_days,
           location:locations(*)
         `)
         .eq('tour_id', tourId)
@@ -49,10 +59,16 @@ export const useTourDates = (tourId?: string) => {
   });
 
   const handleAddDate = () => {
-    const newDates = [...dates, { date: "", location: "" }];
+    const newDates = [...dates, { 
+      date: "", 
+      location: "", 
+      tourDateType: 'show' as const,
+      startDate: "",
+      endDate: ""
+    }];
     newDates.sort((a, b) => {
-      if (!a.date || !b.date) return 0;
-      return new Date(a.date).getTime() - new Date(b.date).getTime();
+      if (!a.startDate || !b.startDate) return 0;
+      return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
     });
     setDates(newDates);
   };
@@ -66,15 +82,27 @@ export const useTourDates = (tourId?: string) => {
 
   const handleDateChange = (
     index: number,
-    field: "date" | "location",
+    field: "date" | "location" | "tourDateType" | "startDate" | "endDate",
     value: string
   ) => {
     const newDates = [...dates];
     newDates[index] = { ...newDates[index], [field]: value };
-    if (field === "date") {
+    
+    // Auto-populate single date fields for backward compatibility
+    if (field === "startDate") {
+      newDates[index].date = value;
+      if (!newDates[index].endDate || newDates[index].tourDateType === 'show') {
+        newDates[index].endDate = value;
+      }
+    }
+    
+    // Sort by start date
+    if (field === "startDate" || field === "date") {
       newDates.sort((a, b) => {
-        if (!a.date || !b.date) return 0;
-        return new Date(a.date).getTime() - new Date(b.date).getTime();
+        const dateA = a.startDate || a.date;
+        const dateB = b.startDate || b.date;
+        if (!dateA || !dateB) return 0;
+        return new Date(dateA).getTime() - new Date(dateB).getTime();
       });
     }
     setDates(newDates);
