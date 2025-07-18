@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import HojaDeRutaGenerator from "@/components/project-management/Hojaderuta";
+import EnhancedHojaDeRuta from "@/components/project-management/EnhancedHojaDeRuta";
 
 const HojaDeRuta = () => {
   const navigate = useNavigate();
@@ -23,7 +23,7 @@ const HojaDeRuta = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <HojaDeRutaGenerator />
+          <EnhancedHojaDeRuta />
         </CardContent>
       </Card>
     </div>

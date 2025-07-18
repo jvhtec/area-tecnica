@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { HojaDeRutaTemplate } from '@/types/hoja-de-ruta';
 
@@ -23,7 +23,10 @@ export const useHojaDeRutaTemplates = () => {
         .order('name');
 
       if (error) throw error;
-      return data as HojaDeRutaTemplate[];
+      return data.map(item => ({
+        ...item,
+        template_data: item.template_data as any
+      })) as HojaDeRutaTemplate[];
     }
   });
 
@@ -32,7 +35,10 @@ export const useHojaDeRutaTemplates = () => {
     mutationFn: async (template: Omit<HojaDeRutaTemplate, 'id'>) => {
       const { data, error } = await supabase
         .from('hoja_de_ruta_templates')
-        .insert(template)
+        .insert({
+          ...template,
+          template_data: template.template_data as any
+        })
         .select()
         .single();
 
@@ -61,7 +67,10 @@ export const useHojaDeRutaTemplates = () => {
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<HojaDeRutaTemplate> }) => {
       const { data, error } = await supabase
         .from('hoja_de_ruta_templates')
-        .update(updates)
+        .update({
+          ...updates,
+          ...(updates.template_data && { template_data: updates.template_data as any })
+        })
         .eq('id', id)
         .select()
         .single();
