@@ -82,10 +82,52 @@ export class FlexUuidService {
   }
 
   /**
-   * Get flex UUID for tour-level folders by finding jobs within the tour
+   * Get flex UUID for tour-level folders - now checks tour table first
    */
   private static async getTourFlexUuid(tourId: string, userDepartment: string): Promise<FlexUuidResult> {
     console.log(`[FlexUuidService] Fetching tour-level UUID for tour ${tourId}, department ${userDepartment}`);
+    
+    // First, check for tour-level folder IDs in the tours table
+    const { data: tourData, error: tourError } = await supabase
+      .from('tours')
+      .select('flex_sound_folder_id, flex_lights_folder_id, flex_video_folder_id, flex_production_folder_id, flex_personnel_folder_id')
+      .eq('id', tourId)
+      .maybeSingle();
+
+    if (tourError) {
+      console.error('[FlexUuidService] Error fetching tour data:', tourError);
+      return { uuid: null, error: 'Failed to fetch tour data' };
+    }
+
+    if (tourData) {
+      // Map department to the corresponding flex folder column
+      const departmentToColumn: Record<string, string> = {
+        'sound': 'flex_sound_folder_id',
+        'lights': 'flex_lights_folder_id', 
+        'video': 'flex_video_folder_id',
+        'production': 'flex_production_folder_id',
+        'personnel': 'flex_personnel_folder_id'
+      };
+
+      const columnName = departmentToColumn[userDepartment];
+      if (columnName && tourData[columnName as keyof typeof tourData]) {
+        const folderId = tourData[columnName as keyof typeof tourData];
+        console.log(`[FlexUuidService] Found tour-level folder for ${userDepartment}: ${folderId}`);
+        return { uuid: folderId, error: null };
+      }
+
+      console.log(`[FlexUuidService] No tour-level folder found for department ${userDepartment}, falling back to job-based lookup`);
+    }
+
+    // Fallback to job-based lookup for backward compatibility
+    return await this.getTourFlexUuidFromJobs(tourId, userDepartment);
+  }
+
+  /**
+   * Get flex UUID for tour-level folders by finding jobs within the tour (fallback method)
+   */
+  private static async getTourFlexUuidFromJobs(tourId: string, userDepartment: string): Promise<FlexUuidResult> {
+    console.log(`[FlexUuidService] Falling back to job-based lookup for tour ${tourId}, department ${userDepartment}`);
     
     // Get all jobs in this tour, ordered by start time to get the first chronologically
     const { data: tourJobs, error: jobsError } = await supabase
