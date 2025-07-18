@@ -9,9 +9,9 @@ export const exportTourPDF = async (tour: any) => {
   const pageWidth = pdf.internal.pageSize.width;
   const pageHeight = pdf.internal.pageSize.height;
 
-  // Add subtle background
-  pdf.setFillColor(248, 250, 252);
-  pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+  // === HEADER SECTION === (consistent with other PDFs)
+  pdf.setFillColor(125, 1, 1); // Red header background like other PDFs
+  pdf.rect(0, 0, pageWidth, 30, 'F');
 
   // Try to load tour logo
   let logoUrl: string | undefined;
@@ -21,58 +21,22 @@ export const exportTourPDF = async (tour: any) => {
     console.warn('Could not load tour logo:', error);
   }
 
-  // Header section with improved styling
-  let startY = 30;
-  
-  // Add header background
-  pdf.setFillColor(255, 255, 255);
-  pdf.setDrawColor(226, 232, 240);
-  pdf.setLineWidth(0.5);
-  pdf.roundedRect(15, 15, pageWidth - 30, 45, 3, 3, 'FD');
-
+  // Add logo if available (positioned like other PDFs)
   if (logoUrl) {
     try {
-      // Add logo with better positioning
-      pdf.addImage(logoUrl, 'PNG', 25, 20, 35, 35);
-      
-      // Tour name with improved typography
-      pdf.setFontSize(24);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(51, 65, 85);
-      pdf.text(tour.name, 70, 35);
-      
-      // Subtitle with styling
-      pdf.setFontSize(14);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(100, 116, 139);
-      pdf.text('Tour Schedule', 70, 45);
-      
-      startY = 75;
+      pdf.addImage(logoUrl, 'PNG', 5, 5, 25, 20);
     } catch (error) {
       console.warn('Error adding logo to PDF:', error);
-      // Fallback to text-only header
-      pdf.setFontSize(24);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(51, 65, 85);
-      pdf.text(tour.name, 25, 35);
-      pdf.setFontSize(14);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(100, 116, 139);
-      pdf.text('Tour Schedule', 25, 45);
-      startY = 75;
     }
-  } else {
-    // Text-only header with improved styling
-    pdf.setFontSize(24);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(51, 65, 85);
-    pdf.text(tour.name, 25, 35);
-    pdf.setFontSize(14);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(100, 116, 139);
-    pdf.text('Tour Schedule', 25, 45);
-    startY = 75;
   }
+
+  // Header text (white text on red background)
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(18);
+  pdf.text(tour.name, pageWidth / 2, 15, { align: 'center' });
+  
+  pdf.setFontSize(12);
+  pdf.text('Tour Schedule', pageWidth / 2, 25, { align: 'center' });
 
   // Sort tour dates
   const sortedDates = tour.tour_dates?.sort((a: any, b: any) => 
@@ -87,84 +51,42 @@ export const exportTourPDF = async (tour: any) => {
     date.is_tour_pack_only ? 'Tour Pack Only' : 'Full Setup'
   ]);
 
-  // Calculate available space for table (leave space for footer)
-  const bottomMargin = 70;
-  const availableHeight = pageHeight - startY - bottomMargin;
-
-  // Add table with professional styling
+  // === ARTIST TABLE === (using consistent styling from other PDFs)
   autoTable(pdf, {
     head: [['Date', 'Day', 'Venue', 'Setup Type']],
     body: tableData,
-    startY: startY + 10,
+    startY: 40,
     theme: 'grid',
     styles: {
       fontSize: 10,
-      cellPadding: 8,
-      lineColor: [226, 232, 240],
-      lineWidth: 0.5,
+      cellPadding: 3,
+      valign: 'top',
     },
     headStyles: {
-      fillColor: [71, 85, 105],
+      fillColor: [125, 1, 1], // Same red as header
       textColor: [255, 255, 255],
-      fontStyle: 'bold',
       fontSize: 11,
-      cellPadding: 10,
+      fontStyle: 'bold',
     },
-    bodyStyles: {
-      fillColor: [255, 255, 255],
-      textColor: [51, 65, 85],
-      fontSize: 10,
-    },
-    alternateRowStyles: {
-      fillColor: [248, 250, 252],
-    },
-    margin: { 
-      top: startY + 10, 
-      bottom: bottomMargin,
-      left: 20, 
-      right: 20 
-    },
-    tableWidth: 'auto',
     columnStyles: {
-      0: { 
-        cellWidth: 35,
-        halign: 'center',
-        fontStyle: 'bold'
-      },
-      1: { 
-        cellWidth: 35,
-        halign: 'center'
-      },
-      2: { 
-        cellWidth: 'auto',
-        halign: 'left'
-      },
-      3: { 
-        cellWidth: 45,
-        halign: 'center',
-        fontSize: 9
-      }
-    }
+      0: { cellWidth: 30, halign: 'center' }, // Date
+      1: { cellWidth: 30, halign: 'center' }, // Day
+      2: { cellWidth: 'auto', halign: 'left' }, // Venue
+      3: { cellWidth: 40, halign: 'center' }, // Setup Type
+    },
+    margin: { left: 10, right: 10 },
   });
 
-  // Enhanced footer section
-  const finalY = (pdf as any).lastAutoTable.finalY || startY + 100;
-  const footerY = Math.max(finalY + 30, pageHeight - 50);
-
-  // Add footer background
-  pdf.setFillColor(248, 250, 252);
-  pdf.setDrawColor(226, 232, 240);
-  pdf.setLineWidth(0.5);
-  pdf.roundedRect(15, footerY - 10, pageWidth - 30, 25, 2, 2, 'FD');
-
-  // Footer text with better styling
-  pdf.setFontSize(9);
-  pdf.setTextColor(100, 116, 139);
-  pdf.setFont('helvetica', 'normal');
+  // === FOOTER === (consistent with other PDFs)
+  const finalY = (pdf as any).lastAutoTable.finalY || 100;
+  
+  // Footer text
+  pdf.setFontSize(10);
+  pdf.setTextColor(125, 1, 1); // Same red as header
   pdf.text(
     `Generated on ${format(new Date(), 'dd/MM/yyyy HH:mm')}`,
-    25,
-    footerY
+    10,
+    finalY + 20
   );
 
   // Function to load image as base64
