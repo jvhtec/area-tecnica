@@ -10,6 +10,7 @@ export const uploadPdfToJob = async (jobId: string, pdfBlob: Blob, fileName: str
       .replace(/^_|_$/g, ''); // Remove leading/trailing underscores
 
     console.log('Uploading PDF:', sanitizedFileName, 'to job:', jobId);
+    console.log('User authenticated:', (await supabase.auth.getUser()).data.user?.id);
     
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("job-documents")
@@ -17,6 +18,8 @@ export const uploadPdfToJob = async (jobId: string, pdfBlob: Blob, fileName: str
         cacheControl: '3600',
         upsert: false
       });
+
+    console.log('Upload result:', { uploadData, uploadError });
 
     if (uploadError) {
       console.error('Storage upload error:', uploadError);
