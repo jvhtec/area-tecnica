@@ -234,21 +234,8 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
             const subDirHandle = await rootDirHandle.getDirectoryHandle(folder, { create: true });
             await subDirHandle.getDirectoryHandle("OLD", { create: true });
           } else if (folder && typeof folder === 'object' && folder.name) {
-            // Object structure with subfolders
-            const subDirHandle = await rootDirHandle.getDirectoryHandle(folder.name, { create: true });
-            
-            // Create subfolders if they exist
-            if (folder.subfolders && Array.isArray(folder.subfolders) && folder.subfolders.length > 0) {
-              for (const subfolder of folder.subfolders) {
-                await subDirHandle.getDirectoryHandle(subfolder, { create: true });
-              }
-            } else {
-              // Default to OLD subfolder if no subfolders specified
-              await subDirHandle.getDirectoryHandle("OLD", { create: true });
-            }
-
-            // Special handling for Dates folder - create date-specific subfolders
-            if (folder.name === "03 - Dates" && tour.tour_dates && tour.tour_dates.length > 0) {
+            // Special handling for "tourdates" element
+            if (folder.name === 'tourdates' && tour.tour_dates && tour.tour_dates.length > 0) {
               const sortedDates = [...tour.tour_dates].sort((a, b) => 
                 new Date(a.start_date || a.date).getTime() - new Date(b.start_date || b.date).getTime()
               );
@@ -259,24 +246,73 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
                 
                 if (tourDate.date_type === 'rehearsal' && tourDate.end_date) {
                   const dateEnd = new Date(tourDate.end_date);
-                  dateFolderName = `${format(dateStart, "yyMMdd")}-${format(dateEnd, "yyMMdd")} - ${tourDate.location?.name || 'TBD'} - Rehearsal`;
+                  dateFolderName = `${format(dateStart, "yyMMdd")}-${format(dateEnd, "yyMMdd")} - ${tourDate.location?.name || 'TBD'}, Rehearsal`;
                 } else if (tourDate.date_type === 'travel') {
-                  dateFolderName = `${format(dateStart, "yyMMdd")} - ${tourDate.location?.name || 'TBD'} - Travel`;
+                  dateFolderName = `${format(dateStart, "yyMMdd")} - ${tourDate.location?.name || 'TBD'}, Travel`;
                 } else {
-                  dateFolderName = `${format(dateStart, "yyMMdd")} - ${tourDate.location?.name || 'TBD'} - Show`;
+                  dateFolderName = `${format(dateStart, "yyMMdd")} - ${tourDate.location?.name || 'TBD'}, Show`;
                 }
 
                 const cleanDateFolderName = dateFolderName.replace(/[<>:"/\\|?*]/g, '_');
-                const dateDirHandle = await subDirHandle.getDirectoryHandle(cleanDateFolderName, { create: true });
+                const dateDirHandle = await rootDirHandle.getDirectoryHandle(cleanDateFolderName, { create: true });
                 
-                // Create standard subfolders for each date
-                await dateDirHandle.getDirectoryHandle("Technical", { create: true });
-                await dateDirHandle.getDirectoryHandle("Logistics", { create: true });
-                await dateDirHandle.getDirectoryHandle("Documentation", { create: true });
-                
-                if (tourDate.date_type === 'rehearsal') {
-                  await dateDirHandle.getDirectoryHandle("Schedule", { create: true });
-                  await dateDirHandle.getDirectoryHandle("Notes", { create: true });
+                // Create subfolders specified in the tourdates element
+                if (folder.subfolders && Array.isArray(folder.subfolders) && folder.subfolders.length > 0) {
+                  for (const subfolder of folder.subfolders) {
+                    await dateDirHandle.getDirectoryHandle(subfolder, { create: true });
+                  }
+                } else {
+                  // Default subfolders if none specified
+                  await dateDirHandle.getDirectoryHandle("Technical", { create: true });
+                  await dateDirHandle.getDirectoryHandle("Logistics", { create: true });
+                  await dateDirHandle.getDirectoryHandle("Documentation", { create: true });
+                }
+              }
+            } else {
+              // Regular folder handling
+              const subDirHandle = await rootDirHandle.getDirectoryHandle(folder.name, { create: true });
+              
+              // Create subfolders if they exist
+              if (folder.subfolders && Array.isArray(folder.subfolders) && folder.subfolders.length > 0) {
+                for (const subfolder of folder.subfolders) {
+                  await subDirHandle.getDirectoryHandle(subfolder, { create: true });
+                }
+              } else {
+                // Default to OLD subfolder if no subfolders specified
+                await subDirHandle.getDirectoryHandle("OLD", { create: true });
+              }
+
+              // Legacy special handling for Dates folder for backward compatibility
+              if (folder.name === "03 - Dates" && tour.tour_dates && tour.tour_dates.length > 0) {
+                const sortedDates = [...tour.tour_dates].sort((a, b) => 
+                  new Date(a.start_date || a.date).getTime() - new Date(b.start_date || b.date).getTime()
+                );
+
+                for (const tourDate of sortedDates) {
+                  let dateFolderName = "";
+                  const dateStart = new Date(tourDate.start_date || tourDate.date);
+                  
+                  if (tourDate.date_type === 'rehearsal' && tourDate.end_date) {
+                    const dateEnd = new Date(tourDate.end_date);
+                    dateFolderName = `${format(dateStart, "yyMMdd")}-${format(dateEnd, "yyMMdd")} - ${tourDate.location?.name || 'TBD'} - Rehearsal`;
+                  } else if (tourDate.date_type === 'travel') {
+                    dateFolderName = `${format(dateStart, "yyMMdd")} - ${tourDate.location?.name || 'TBD'} - Travel`;
+                  } else {
+                    dateFolderName = `${format(dateStart, "yyMMdd")} - ${tourDate.location?.name || 'TBD'} - Show`;
+                  }
+
+                  const cleanDateFolderName = dateFolderName.replace(/[<>:"/\\|?*]/g, '_');
+                  const dateDirHandle = await subDirHandle.getDirectoryHandle(cleanDateFolderName, { create: true });
+                  
+                  // Create standard subfolders for each date
+                  await dateDirHandle.getDirectoryHandle("Technical", { create: true });
+                  await dateDirHandle.getDirectoryHandle("Logistics", { create: true });
+                  await dateDirHandle.getDirectoryHandle("Documentation", { create: true });
+                  
+                  if (tourDate.date_type === 'rehearsal') {
+                    await dateDirHandle.getDirectoryHandle("Schedule", { create: true });
+                    await dateDirHandle.getDirectoryHandle("Notes", { create: true });
+                  }
                 }
               }
             }

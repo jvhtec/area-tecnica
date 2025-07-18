@@ -31,7 +31,12 @@ const DEFAULT_STRUCTURE: string[] = [
   "Predicciones"
 ];
 
+const TOUR_SPECIAL_ELEMENTS = [
+  { name: "tourdates", description: "Creates folders for each tour date with naming: yymmdd - Location, show type" }
+];
+
 export const FolderStructureEditor = ({ value, onChange, title = "Custom Folder Structure", description = "Customize the folder structure that will be created in your local system." }: FolderStructureEditorProps) => {
+  const isTourStructure = title.toLowerCase().includes('tour');
   const { toast } = useToast();
   const [newFolderName, setNewFolderName] = useState("");
   
@@ -152,6 +157,42 @@ export const FolderStructureEditor = ({ value, onChange, title = "Custom Folder 
           ))}
         </div>
 
+        {/* Special tour elements */}
+        {isTourStructure && (
+          <div className="mb-4 p-3 bg-muted/30 rounded-lg border-dashed border">
+            <div className="text-sm font-medium mb-2">Special Tour Elements:</div>
+            <div className="space-y-2">
+              {TOUR_SPECIAL_ELEMENTS.map((element) => (
+                <div key={element.name} className="flex items-center justify-between">
+                  <div>
+                    <Badge variant="outline" className="mr-2">{element.name}</Badge>
+                    <span className="text-xs text-muted-foreground">{element.description}</span>
+                  </div>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => {
+                      if (currentStructure.some(folder => folder.name === element.name)) {
+                        toast({
+                          title: "Error",
+                          description: "Element already exists",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      const newStructure = [...currentStructure, { name: element.name, subfolders: [] }];
+                      onChange(newStructure);
+                    }}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Add new folder */}
         <div className="flex gap-2 pt-4 border-t">
           <Input
@@ -173,9 +214,23 @@ export const FolderStructureEditor = ({ value, onChange, title = "Custom Folder 
             {currentStructure.map((folder) => (
               <div key={folder.name}>
                 📁 {folder.name}
-                {folder.subfolders?.map((sub) => (
-                  <div key={sub} className="ml-4">📁 {sub}</div>
-                ))}
+                {folder.name === 'tourdates' && isTourStructure ? (
+                  <div className="ml-4 text-blue-600">
+                    <div>📁 250125 - Madrid - Show</div>
+                    {folder.subfolders?.map((sub) => (
+                      <div key={sub} className="ml-8">📁 {sub}</div>
+                    ))}
+                    <div>📁 250126 - Barcelona - Show</div>
+                    {folder.subfolders?.map((sub) => (
+                      <div key={sub} className="ml-8">📁 {sub}</div>
+                    ))}
+                    <div className="ml-4 text-muted-foreground italic">... (one folder per tour date)</div>
+                  </div>
+                ) : (
+                  folder.subfolders?.map((sub) => (
+                    <div key={sub} className="ml-4">📁 {sub}</div>
+                  ))
+                )}
               </div>
             ))}
           </div>
@@ -227,10 +282,13 @@ const FolderItem = ({ folder, onUpdateName, onRemove, onAddSubfolder, onRemoveSu
         ) : (
           <>
             <div 
-              className="flex-1 font-medium cursor-pointer hover:text-primary"
+              className="flex-1 font-medium cursor-pointer hover:text-primary flex items-center gap-2"
               onClick={() => setIsEditing(true)}
             >
               📁 {folder.name}
+              {folder.name === 'tourdates' && (
+                <Badge variant="secondary" className="text-xs">Special</Badge>
+              )}
             </div>
             <Button
               size="sm"
