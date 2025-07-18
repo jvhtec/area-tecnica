@@ -70,6 +70,9 @@ const Sound = () => {
   const getDepartmentJobs = () => {
     if (!jobs) return [];
     return jobs.filter(job => {
+      // Filter out tour jobs (but keep tourdate jobs)
+      if (job.job_type === 'tour') return false;
+      
       const isInDepartment = job.job_departments?.some(dept => 
         dept.department === currentDepartment
       );
