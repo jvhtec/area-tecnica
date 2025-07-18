@@ -40,12 +40,15 @@ export const useHojaDeRutaImages = () => {
     setImagePreviews({ ...imagePreviews, [type]: newPreviews });
   };
 
-  const handleVenueMapUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleVenueMapUpload = (file: File) => {
+    setVenueMap(file);
+    const preview = URL.createObjectURL(file);
+    setVenueMapPreview(preview);
+  };
+
+  const handleVenueMapInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setVenueMap(file);
-      const preview = URL.createObjectURL(file);
-      setVenueMapPreview(preview);
+      handleVenueMapUpload(e.target.files[0]);
     }
   };
 
@@ -61,5 +64,6 @@ export const useHojaDeRutaImages = () => {
     handleImageUpload,
     removeImage,
     handleVenueMapUpload,
+    handleVenueMapInputChange,
   };
 };

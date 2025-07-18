@@ -50,7 +50,7 @@ const HojaDeRutaGenerator = () => {
     venueMapPreview,
     handleImageUpload,
     removeImage,
-    handleVenueMapUpload,
+    handleVenueMapInputChange,
   } = useHojaDeRutaImages();
 
   const {
@@ -213,7 +213,7 @@ const HojaDeRutaGenerator = () => {
             eventData={eventData}
             setEventData={setEventData}
             venueMapPreview={venueMapPreview}
-            handleVenueMapUpload={handleVenueMapUpload}
+            handleVenueMapUpload={handleVenueMapInputChange}
           />
 
           <ContactsDialog
