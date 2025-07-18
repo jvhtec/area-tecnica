@@ -3755,6 +3755,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      update_tour_dates: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
       assignment_status: "invited" | "confirmed" | "declined"
