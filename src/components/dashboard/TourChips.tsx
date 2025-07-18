@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Eye, EyeOff, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 import { TourDateManagementDialog } from "../tours/TourDateManagementDialog";
 import { TourCard } from "../tours/TourCard";
@@ -19,6 +19,8 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
   const [selectedTourId, setSelectedTourId] = useState<string | null>(null);
   const [isDatesDialogOpen, setIsDatesDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [showCompletedTours, setShowCompletedTours] = useState(false);
+  const [showLegacyDisclaimer, setShowLegacyDisclaimer] = useState(true);
 
   // Set up realtime subscription for tours
   useTourSubscription();
@@ -100,6 +102,29 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
     );
   };
 
+  // Filter tours based on completion status
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const activeTours = tours.filter((tour: any) => {
+    if (!tour.end_date) return true; // Tours without end_date are considered active
+    const endDate = new Date(tour.end_date);
+    endDate.setHours(0, 0, 0, 0);
+    return endDate >= today;
+  });
+
+  const completedTours = tours.filter((tour: any) => {
+    if (!tour.end_date) return false;
+    const endDate = new Date(tour.end_date);
+    endDate.setHours(0, 0, 0, 0);
+    return endDate < today;
+  });
+
+  const displayedTours = showCompletedTours ? tours : activeTours;
+  
+  // Find tours that need root folders from all tours
+  const toursNeedingRootFolders = tours.filter((tour: any) => !tour.flex_folders_created);
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -110,18 +135,43 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
           <Plus className="h-4 w-4" />
           Create Tour
         </Button>
+        
+        <div className="flex items-center gap-2">
+          {completedTours.length > 0 && (
+            <>
+              <span className="text-sm text-muted-foreground">
+                {completedTours.length} completed
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCompletedTours(!showCompletedTours)}
+                className="flex items-center gap-2"
+              >
+                {showCompletedTours ? (
+                  <>
+                    <EyeOff className="h-4 w-4" />
+                    Hide Completed
+                  </>
+                ) : (
+                  <>
+                    <Eye className="h-4 w-4" />
+                    Show Completed ({completedTours.length})
+                  </>
+                )}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
-      <BulkTourFolderActions 
-        tours={tours} 
-        onRefresh={() => refetchTours()} 
-      />
-
       <div className="flex flex-wrap gap-4">
-        {tours.map((tour: any) => (
+        {displayedTours.map((tour: any) => (
           <div
             key={tour.id}
-            className="w-full sm:w-[calc(50%-1rem)] md:w-[calc(33.33%-1rem)] lg:w-[calc(25%-1rem)]"
+            className={`w-full sm:w-[calc(50%-1rem)] md:w-[calc(33.33%-1rem)] lg:w-[calc(25%-1rem)] ${
+              completedTours.some(ct => ct.id === tour.id) ? 'opacity-75' : ''
+            }`}
           >
             <TourCard
               tour={tour}
@@ -146,6 +196,14 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
         onOpenChange={setIsCreateDialogOpen}
         currentDepartment="sound"
       />
+
+      {/* Legacy Tours Disclaimer - Moved to bottom and collapsible */}
+      {toursNeedingRootFolders.length > 0 && (
+        <BulkTourFolderActions 
+          tours={toursNeedingRootFolders} 
+          onRefresh={() => refetchTours()}
+        />
+      )}
     </div>
   );
 };

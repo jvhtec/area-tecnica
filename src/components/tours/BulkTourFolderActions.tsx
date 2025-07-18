@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FolderPlus, Loader2, RefreshCw } from "lucide-react";
+import { FolderPlus, Loader2, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createTourRootFolders } from "@/utils/tourFolders";
 import { supabase } from "@/lib/supabase";
@@ -11,12 +11,20 @@ import { supabase } from "@/lib/supabase";
 interface BulkTourFolderActionsProps {
   tours: any[];
   onRefresh: () => void;
+  isCollapsible?: boolean;
+  defaultCollapsed?: boolean;
 }
 
-export const BulkTourFolderActions = ({ tours, onRefresh }: BulkTourFolderActionsProps) => {
+export const BulkTourFolderActions = ({ 
+  tours, 
+  onRefresh, 
+  isCollapsible = false,
+  defaultCollapsed = false 
+}: BulkTourFolderActionsProps) => {
   const { toast } = useToast();
   const [isCreating, setIsCreating] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
 
   // Find tours that need root folders - check both flags and actual folder IDs
   const toursNeedingRootFolders = tours.filter(tour => !tour.flex_folders_created);
@@ -130,16 +138,29 @@ export const BulkTourFolderActions = ({ tours, onRefresh }: BulkTourFolderAction
   return (
     <Card className="mb-4 border-orange-200 bg-orange-50 dark:bg-orange-950/20">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <FolderPlus className="h-5 w-5 text-orange-600" />
-          Legacy Tours Detected
+        <CardTitle className="text-lg flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FolderPlus className="h-5 w-5 text-orange-600" />
+            Legacy Tours Detected
+          </div>
+          {isCollapsible && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="h-8 w-8 p-0"
+            >
+              {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+            </Button>
+          )}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            {toursNeedingRootFolders.length} tour(s) appear to need root folders. This might be a display issue if folders already exist.
-          </p>
+      {!isCollapsed && (
+        <CardContent>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {toursNeedingRootFolders.length} tour(s) appear to need root folders. This might be a display issue if folders already exist.
+            </p>
           
           <div className="flex flex-wrap gap-2">
             {toursNeedingRootFolders.map((tour) => (
@@ -190,8 +211,9 @@ export const BulkTourFolderActions = ({ tours, onRefresh }: BulkTourFolderAction
               )}
             </Button>
           </div>
-        </div>
-      </CardContent>
+          </div>
+        </CardContent>
+      )}
     </Card>
   );
 };
