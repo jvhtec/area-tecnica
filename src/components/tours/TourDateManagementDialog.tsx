@@ -37,6 +37,7 @@ import {
 import { createFlexFolder } from "@/utils/flex-folders/api";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { deleteJobDateTypes } from "@/services/deleteJobDateTypes";
 
 interface TourDateManagementDialogProps {
   open: boolean;
@@ -603,6 +604,26 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         throw deptError;
       }
 
+      // Create job date types for each day in the date range
+      const jobDateTypes = [];
+      const start = new Date(startDate);
+      const end = new Date(finalEndDate);
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        jobDateTypes.push({
+          job_id: newJob.id,
+          date: d.toISOString().split('T')[0],
+          type: tourDateType
+        });
+      }
+      
+      const { error: dateTypeError } = await supabase
+        .from("job_date_types")
+        .insert(jobDateTypes);
+      if (dateTypeError) {
+        console.error("Error creating job date types:", dateTypeError);
+        throw dateTypeError;
+      }
+
       // Force refresh all related queries after successful creation
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
@@ -687,16 +708,53 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       const { data: jobs, error: jobsError } = await supabase
         .from("jobs")
         .update({
-          title: `${tourData.name} (${newLocation || 'No Location'})`,
+          title: tourDateType === 'rehearsal' 
+            ? `${tourData.name} - Rehearsal (${newLocation})` 
+            : tourDateType === 'travel'
+            ? `${tourData.name} - Travel (${newLocation})`
+            : `${tourData.name} (${newLocation || 'No Location'})`,
           start_time: `${startDate}T06:00:00`,
           end_time: `${finalEndDate}T21:59:59`,
           location_id: locationId,
         })
-        .eq("tour_date_id", dateId);
+        .eq("tour_date_id", dateId)
+        .select("id");
 
       if (jobsError) {
         console.error("Error updating job:", jobsError);
         throw jobsError;
+      }
+
+      // Update job date types for all jobs of this tour date
+      if (jobs && jobs.length > 0) {
+        for (const job of jobs) {
+          // Delete existing job date types for this job
+          await supabase
+            .from("job_date_types")
+            .delete()
+            .eq("job_id", job.id);
+
+          // Create new job date types for the updated date range
+          const jobDateTypes = [];
+          const start = new Date(startDate);
+          const end = new Date(finalEndDate);
+          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            jobDateTypes.push({
+              job_id: job.id,
+              date: d.toISOString().split('T')[0],
+              type: tourDateType
+            });
+          }
+          
+          if (jobDateTypes.length > 0) {
+            const { error: dateTypeError } = await supabase
+              .from("job_date_types")
+              .insert(jobDateTypes);
+            if (dateTypeError) {
+              console.error("Error updating job date types:", dateTypeError);
+            }
+          }
+        }
       }
 
       // Force refresh all related queries after successful edit
@@ -786,7 +844,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
           { table: "memoria_tecnica_documents", condition: "job_id" },
           { table: "lights_memoria_tecnica_documents", condition: "job_id" },
           { table: "video_memoria_tecnica_documents", condition: "job_id" },
-          { table: "job_date_types", condition: "job_id" },
+          // Use service to delete job date types
+          { table: "job_date_types", condition: "job_id", useService: true },
           { table: "job_milestones", condition: "job_id" },
           { table: "power_requirement_tables", condition: "job_id" },
           { table: "festival_artists", condition: "job_id" },
@@ -817,6 +876,15 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
               if (error) {
                 console.error(`Error deleting from ${step.table}:`, error);
                 // Continue with other deletions even if one fails
+              }
+            }
+          } else if (step.useService && step.table === "job_date_types") {
+            // Use service for job date types deletion
+            for (const jobId of jobIds) {
+              try {
+                await deleteJobDateTypes(jobId);
+              } catch (error) {
+                console.error(`Error deleting job date types for job ${jobId}:`, error);
               }
             }
           } else {
