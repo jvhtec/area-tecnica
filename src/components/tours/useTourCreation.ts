@@ -14,6 +14,8 @@ export const useTourCreation = (
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [color, setColor] = useState("#7E69AB");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   
   const { dates, handleAddDate, handleRemoveDate, handleDateChange } = useTourDates();
@@ -60,6 +62,8 @@ export const useTourCreation = (
         dates,
         color,
         departments,
+        startDate,
+        endDate,
       });
       console.log("Tour created successfully");
 
@@ -77,6 +81,8 @@ export const useTourCreation = (
       setTitle("");
       setDescription("");
       setColor("#7E69AB");
+      setStartDate("");
+      setEndDate("");
     } catch (error: any) {
       console.error("Error creating tour:", error);
       toast({
@@ -99,6 +105,10 @@ export const useTourCreation = (
     setColor,
     departments,
     isCreating,
+    startDate,
+    endDate,
+    handleStartDateChange: setStartDate,
+    handleEndDateChange: setEndDate,
     handleAddDate,
     handleRemoveDate,
     handleDateChange,
