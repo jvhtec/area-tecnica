@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 
 const EnhancedHojaDeRutaGenerator = () => {
+  console.log("🚀 EnhancedHojaDeRutaGenerator is rendering!");
   const {
     eventData,
     setEventData,
@@ -98,6 +99,7 @@ const EnhancedHojaDeRutaGenerator = () => {
     createTemplate,
     isCreating 
   } = useHojaDeRutaTemplates();
+  console.log("📝 Templates loaded:", templates?.length || 0, templates);
   
   const { 
     jobDetails, 
