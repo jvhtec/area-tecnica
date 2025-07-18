@@ -320,6 +320,17 @@ export const useTourCreationMutation = () => {
           .insert(dateDepartments);
 
         if (dateDeptError) throw dateDeptError;
+
+        // Create job_date_types entry for the tour date job
+        const { error: dateTypeError } = await supabase
+          .from("job_date_types")
+          .insert({
+            job_id: dateJob.id,
+            date: dateInfo.date,
+            type: "show" // Default to show, can be changed later
+          });
+
+        if (dateTypeError) throw dateTypeError;
       }
 
       return tour;
