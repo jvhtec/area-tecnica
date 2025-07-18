@@ -98,6 +98,35 @@ export const Profile = () => {
     }
   };
 
+  const handleFolderStructureSave = async () => {
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          custom_folder_structure: folderStructure,
+          custom_tour_folder_structure: tourFolderStructure,
+        })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Folder structure saved successfully",
+      });
+    } catch (error: any) {
+      console.error('Error saving folder structure:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save folder structure",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePasswordChange = async () => {
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       toast({
@@ -372,6 +401,26 @@ export const Profile = () => {
                     </div>
                   </TabsContent>
                 </Tabs>
+                
+                <div className="pt-4 border-t">
+                  <Button 
+                    onClick={handleFolderStructureSave} 
+                    disabled={loading}
+                    className="w-full"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save Folder Structure
+                      </>
+                    )}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </div>
