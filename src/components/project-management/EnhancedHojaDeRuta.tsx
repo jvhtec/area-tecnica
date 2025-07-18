@@ -327,53 +327,74 @@ const EnhancedHojaDeRutaGenerator = () => {
   const StatusIcon = statusInfo.icon;
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <CardTitle>Generador de Hoja de Ruta</CardTitle>
-            {hojaDeRuta && (
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="flex items-center gap-1">
-                  <StatusIcon className="w-3 h-3" />
-                  {statusInfo.text}
-                </Badge>
-                <Badge variant="secondary">
-                  v{hojaDeRuta.document_version || 1}
-                </Badge>
-              </div>
-            )}
+    <Card className="w-full max-w-4xl mx-auto border-2 border-primary/20 shadow-lg">
+      <CardHeader className="bg-gradient-to-r from-primary/5 to-secondary/5 border-b">
+        <div className="flex flex-col gap-4">
+          {/* Enhanced Title with Clear Indicators */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <CardTitle className="text-2xl font-bold text-primary flex items-center gap-2">
+                🚀 Enhanced Hoja de Ruta Generator
+              </CardTitle>
+              {hojaDeRuta && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="flex items-center gap-1 border-2">
+                    <StatusIcon className="w-3 h-3" />
+                    {statusInfo.text}
+                  </Badge>
+                  <Badge variant="secondary" className="bg-primary/10">
+                    v{hojaDeRuta.document_version || 1}
+                  </Badge>
+                </div>
+              )}
+            </div>
+            
+            {/* Enhanced Feature Badge */}
+            <div className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium border border-green-200">
+              ✨ Versión Mejorada
+            </div>
           </div>
           
-          {/* Enhanced action buttons */}
-          <div className="flex items-center gap-2">
-            {selectedJobId && jobDetails && (
+          {/* Enhanced Action Bar */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-white/70 rounded-lg border border-primary/10">
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Auto-Complete Button - Always Visible */}
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleAutoPopulate}
-                disabled={isLoadingJob}
+                disabled={!selectedJobId || !jobDetails || isLoadingJob}
+                className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50 hover:border-blue-600 font-medium"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Auto-completar
+                Auto-completar desde Job
               </Button>
-            )}
-            
-            {templates.length > 0 && (
+              
+              {/* Template Selector - Enhanced UI */}
               <div className="flex items-center gap-2">
                 <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Seleccionar plantilla" />
+                  <SelectTrigger className="w-52 border-2 border-purple-300 hover:border-purple-400">
+                    <SelectValue placeholder={
+                      templates.length > 0 
+                        ? "📋 Seleccionar plantilla" 
+                        : "📋 No hay plantillas"
+                    } />
                   </SelectTrigger>
                   <SelectContent>
-                    {templates.map((template) => (
-                      <SelectItem key={template.id} value={template.id}>
-                        <div className="flex items-center gap-2">
-                          <File className="w-4 h-4" />
-                          {template.name}
-                        </div>
+                    {templates.length > 0 ? (
+                      templates.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          <div className="flex items-center gap-2">
+                            <File className="w-4 h-4" />
+                            {template.name}
+                          </div>
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled>
+                        No hay plantillas disponibles
                       </SelectItem>
-                    ))}
+                    )}
                   </SelectContent>
                 </Select>
                 
@@ -385,11 +406,25 @@ const EnhancedHojaDeRutaGenerator = () => {
                   >
                     Aplicar
                   </Button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+                 )}
+               </div>
+               
+               {/* Status and Feedback */}
+               <div className="text-xs text-muted-foreground">
+                 {!selectedJobId && (
+                   <span className="text-amber-600 font-medium">
+                     ⚠️ Selecciona un job para habilitar auto-completar
+                   </span>
+                 )}
+                 {templates.length === 0 && (
+                   <span className="text-orange-600 font-medium ml-2">
+                     📋 Sin plantillas disponibles
+                   </span>
+                 )}
+               </div>
+             </div>
+           </div>
+         </div>
       </CardHeader>
 
       <ScrollArea className="h-[calc(100vh-12rem)]">
