@@ -23,7 +23,7 @@ import ConsumosTool from '@/pages/ConsumosTool';
 import LightsConsumosTool from '@/pages/LightsConsumosTool';
 import VideoConsumosTool from '@/pages/VideoConsumosTool';
 import ExcelTool from '@/pages/ExcelTool';
-import HojaDeRuta from '@/pages/HojaDeRuta';
+import { ModernHojaDeRuta } from '@/components/hoja-de-ruta/ModernHojaDeRuta';
 import LaborPOForm from '@/pages/LaborPOForm';
 import Logistics from '@/pages/Logistics';
 import FestivalManagement from '@/pages/FestivalManagement';
@@ -93,7 +93,7 @@ export default function App() {
                     <Route path="/lights-memoria-tecnica" element={<LightsMemoriaTecnica />} />
                     <Route path="/video-memoria-tecnica" element={<VideoMemoriaTecnica />} />
                     <Route path="/excel-tool" element={<ExcelTool />} />
-                    <Route path="/hoja-de-ruta" element={<HojaDeRuta />} />
+                    <Route path="/hoja-de-ruta" element={<ModernHojaDeRuta />} />
                     <Route path="/labor-po-form" element={<LaborPOForm />} />
                     
                     {/* Tour-specific tool routes */}
