@@ -169,10 +169,10 @@ export const Profile = () => {
   }
 
   return (
-    <div className="container max-w-4xl mx-auto py-6 space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column */}
-        <div className="space-y-6">
+    <div className="container max-w-7xl mx-auto py-6 space-y-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 lg:grid-cols-2 gap-6">
+        {/* Left Column - Profile Info */}
+        <div className="xl:col-span-1 space-y-6">
           {needsPasswordChange && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
@@ -338,34 +338,38 @@ export const Profile = () => {
 
         {/* Right Column - Folder Structure */}
         {(profile.role === 'admin' || profile.role === 'management') && (
-          <div className="space-y-6">
-            <Card>
+          <div className="xl:col-span-2 lg:col-span-1 space-y-6">
+            <Card className="h-fit">
               <CardHeader>
                 <CardTitle>Folder Structure Customization</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <Tabs defaultValue="jobs" className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="jobs">Job Folders</TabsTrigger>
                     <TabsTrigger value="tours">Tour Folders</TabsTrigger>
                   </TabsList>
                   
-                  <TabsContent value="jobs" className="mt-4">
-                    <FolderStructureEditor
-                      value={folderStructure}
-                      onChange={setFolderStructure}
-                      title="Custom Job Folder Structure"
-                      description="Customize the folder structure for regular jobs/festivals."
-                    />
+                  <TabsContent value="jobs" className="mt-6">
+                    <div className="max-h-[600px] overflow-y-auto">
+                      <FolderStructureEditor
+                        value={folderStructure}
+                        onChange={setFolderStructure}
+                        title="Custom Job Folder Structure"
+                        description="Customize the folder structure for regular jobs/festivals."
+                      />
+                    </div>
                   </TabsContent>
                   
-                  <TabsContent value="tours" className="mt-4">
-                    <FolderStructureEditor
-                      value={tourFolderStructure}
-                      onChange={setTourFolderStructure}
-                      title="Custom Tour Folder Structure"
-                      description="Customize the folder structure specifically for tours. Use 'tourdates' element to create folders for each tour date."
-                    />
+                  <TabsContent value="tours" className="mt-6">
+                    <div className="max-h-[600px] overflow-y-auto">
+                      <FolderStructureEditor
+                        value={tourFolderStructure}
+                        onChange={setTourFolderStructure}
+                        title="Custom Tour Folder Structure"
+                        description="Customize the folder structure specifically for tours. Use 'tourdates' element to create folders for each tour date."
+                      />
+                    </div>
                   </TabsContent>
                 </Tabs>
               </CardContent>
