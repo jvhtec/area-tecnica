@@ -205,13 +205,13 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
       if (user) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('custom_folder_structure, role')
+          .select('custom_tour_folder_structure, role')
           .eq('id', user.id)
           .single();
         
-        // Only use custom structure for management users
-        if (profile && (profile.role === 'admin' || profile.role === 'management') && profile.custom_folder_structure) {
-          folderStructure = profile.custom_folder_structure;
+        // Only use custom tour structure for management users
+        if (profile && (profile.role === 'admin' || profile.role === 'management') && profile.custom_tour_folder_structure) {
+          folderStructure = profile.custom_tour_folder_structure;
         }
       }
       

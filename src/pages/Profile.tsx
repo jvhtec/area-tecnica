@@ -20,6 +20,7 @@ export const Profile = () => {
   const [profile, setProfile] = useState<any>(null);
   const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
   const [folderStructure, setFolderStructure] = useState<FolderStructure | null>(null);
+  const [tourFolderStructure, setTourFolderStructure] = useState<FolderStructure | null>(null);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -51,8 +52,9 @@ export const Profile = () => {
         return;
       }
 
-      setProfile(data);
-      setFolderStructure(data.custom_folder_structure);
+        setProfile(data);
+        setFolderStructure(data.custom_folder_structure);
+        setTourFolderStructure(data.custom_tour_folder_structure);
       setNeedsPasswordChange(user.user_metadata?.needs_password_change ?? false);
     };
 
@@ -74,6 +76,7 @@ export const Profile = () => {
           dni: profile.dni,
           residencia: profile.residencia,
           custom_folder_structure: folderStructure,
+          custom_tour_folder_structure: tourFolderStructure,
         })
         .eq('id', profile.id);
 
@@ -331,10 +334,21 @@ export const Profile = () => {
 
       {/* Custom Folder Structure - Only for management users */}
       {(profile.role === 'admin' || profile.role === 'management') && (
-        <FolderStructureEditor
-          value={folderStructure}
-          onChange={setFolderStructure}
-        />
+        <>
+          <FolderStructureEditor
+            value={folderStructure}
+            onChange={setFolderStructure}
+            title="Custom Job Folder Structure"
+            description="Customize the folder structure for regular jobs/festivals."
+          />
+          
+          <FolderStructureEditor
+            value={tourFolderStructure}
+            onChange={setTourFolderStructure}
+            title="Custom Tour Folder Structure"
+            description="Customize the folder structure specifically for tours. This is separate from the regular job structure."
+          />
+        </>
       )}
     </div>
   );

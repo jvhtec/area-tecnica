@@ -16,6 +16,8 @@ export type FolderStructure = string[] | FolderStructureItem[];
 interface FolderStructureEditorProps {
   value: FolderStructure | null;
   onChange: (structure: FolderStructure) => void;
+  title?: string;
+  description?: string;
 }
 
 const DEFAULT_STRUCTURE: string[] = [
@@ -29,7 +31,7 @@ const DEFAULT_STRUCTURE: string[] = [
   "Predicciones"
 ];
 
-export const FolderStructureEditor = ({ value, onChange }: FolderStructureEditorProps) => {
+export const FolderStructureEditor = ({ value, onChange, title = "Custom Folder Structure", description = "Customize the folder structure that will be created in your local system." }: FolderStructureEditorProps) => {
   const { toast } = useToast();
   const [newFolderName, setNewFolderName] = useState("");
   
@@ -123,7 +125,7 @@ export const FolderStructureEditor = ({ value, onChange }: FolderStructureEditor
         <CardTitle className="flex items-center justify-between">
           <span className="flex items-center gap-2">
             <FolderPlus className="h-5 w-5" />
-            Custom Folder Structure
+            {title}
           </span>
           <Button variant="outline" size="sm" onClick={resetToDefault}>
             <RotateCcw className="h-4 w-4 mr-2" />
@@ -133,7 +135,7 @@ export const FolderStructureEditor = ({ value, onChange }: FolderStructureEditor
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="text-sm text-muted-foreground">
-          Customize the folder structure that will be created when you click "Create Local Folders" on a job.
+          {description}
         </div>
 
         {/* Current folders */}
