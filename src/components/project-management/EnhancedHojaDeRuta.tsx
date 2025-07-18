@@ -20,7 +20,7 @@ import { useHojaDeRutaForm } from "@/hooks/useHojaDeRutaForm";
 import { useHojaDeRutaImages } from "@/hooks/useHojaDeRutaImages";
 import { useHojaDeRutaHandlers } from "@/hooks/useHojaDeRutaHandlers";
 import { useHojaDeRutaPersistence } from "@/hooks/useHojaDeRutaPersistence";
-import { useHojaDeRutaTemplates, useHojaDeRutaEquipment } from "@/hooks/useHojaDeRutaTemplates";
+import { useHojaDeRutaTemplates } from "@/hooks/useHojaDeRutaTemplates";
 import { useJobIntegration } from "@/hooks/useJobIntegration";
 import { ImageUploadSection } from "@/components/hoja-de-ruta/sections/ImageUploadSection";
 import { EventDetailsSection } from "@/components/hoja-de-ruta/sections/EventDetailsSection";
@@ -119,11 +119,7 @@ const EnhancedHojaDeRutaGenerator = () => {
     saveRoomAssignments,
   } = useHojaDeRutaPersistence(selectedJobId);
 
-  const { 
-    equipment,
-    saveEquipment,
-    isSavingEquipment 
-  } = useHojaDeRutaEquipment(hojaDeRuta?.id);
+  // Equipment hook removed per user request
 
   // Update isDirty when any data changes
   useEffect(() => {
@@ -244,7 +240,6 @@ const EnhancedHojaDeRutaGenerator = () => {
       
       const enhancedEventData = {
         ...eventData,
-        equipment: equipment || [],
         metadata: hojaDeRuta ? {
           id: hojaDeRuta.id,
           document_version: hojaDeRuta.document_version || 1,

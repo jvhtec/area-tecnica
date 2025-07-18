@@ -193,35 +193,7 @@ export const generateEnhancedPDF = async (
         }
       }
 
-      // Equipment section (new)
-      if (eventData.equipment && eventData.equipment.length > 0) {
-        yPosition = checkPageBreak(yPosition, 60);
-        doc.setFontSize(14);
-        doc.setTextColor(125, 1, 1);
-        doc.text('Equipamiento', 14, yPosition);
-        yPosition += 10;
-
-        const equipmentData = eventData.equipment.map(eq => [
-          eq.equipment_category,
-          eq.equipment_name,
-          eq.quantity.toString(),
-          eq.notes || ''
-        ]);
-
-        autoTable(doc, {
-          startY: yPosition,
-          head: [['Categoría', 'Equipo', 'Cantidad', 'Notas']],
-          body: equipmentData,
-          theme: 'grid',
-          styles: { fontSize: 10, cellPadding: 4 },
-          headStyles: {
-            fillColor: [125, 1, 1],
-            textColor: [255, 255, 255],
-            fontStyle: 'bold',
-          },
-        });
-        yPosition = (doc as any).lastAutoTable.finalY + 15;
-      }
+      // Equipment section removed per user request
 
       // Logistics section
       if (eventData.logistics) {

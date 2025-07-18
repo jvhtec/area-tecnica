@@ -36,14 +36,7 @@ export interface EventData {
   auxiliaryNeeds: string;
 }
 
-// New interfaces for enhanced functionality
-export interface HojaDeRutaEquipment {
-  id?: string;
-  equipment_category: string;
-  equipment_name: string;
-  quantity: number;
-  notes?: string;
-}
+// Equipment interface removed per user request
 
 export interface HojaDeRutaTemplate {
   id: string;
@@ -69,7 +62,6 @@ export interface HojaDeRutaMetadata {
 
 export interface EnhancedEventData extends EventData {
   metadata?: HojaDeRutaMetadata;
-  equipment?: HojaDeRutaEquipment[];
 }
 
 export interface ImagePreviews {
