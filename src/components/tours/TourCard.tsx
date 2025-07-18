@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, MoreVertical, Settings, FileText, Printer, FolderPlus, Image } from "lucide-react";
+import { Calendar, MapPin, MoreVertical, Settings, FileText, Printer, FolderPlus, Image, HardDrive } from "lucide-react";
 import { format } from "date-fns";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -13,6 +13,13 @@ import { useToast } from "@/hooks/use-toast";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { createTourRootFolders, createTourDateFolders, createTourRootFoldersManual } from "@/utils/tourFolders";
+
+// File System Access API types
+declare global {
+  interface Window {
+    showDirectoryPicker(): Promise<FileSystemDirectoryHandle>;
+  }
+}
 
 interface TourCardProps {
   tour: any;
@@ -27,6 +34,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
   const [isManagementOpen, setIsManagementOpen] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isCreatingLocalFolders, setIsCreatingLocalFolders] = useState(false);
   const isMobile = useIsMobile();
 
   // Fetch tour logo
@@ -58,7 +66,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
   const getUpcomingDates = () => {
     if (!tour.tour_dates) return [];
     return tour.tour_dates
-      .filter((date: any) => new Date(date.date) >= new Date())
+      .filter((date: any) => new Date(date.start_date || date.date) >= new Date())
       .slice(0, 3);
   };
 
@@ -145,6 +153,159 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
     }
   };
 
+  const createLocalFoldersHandler = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsMobileMenuOpen(false);
+
+    if (isCreatingLocalFolders) {
+      console.log("TourCard: Local folder creation already in progress");
+      return;
+    }
+
+    // Check if File System Access API is supported
+    if (!('showDirectoryPicker' in window)) {
+      toast({
+        title: "Not supported",
+        description: "Your browser doesn't support local folder creation. Please use Chrome, Edge, or another Chromium-based browser.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsCreatingLocalFolders(true);
+
+      // Ask user to pick a base folder
+      const baseDirHandle = await window.showDirectoryPicker();
+
+      // Format tour date range
+      const startDate = tour.start_date ? new Date(tour.start_date) : null;
+      const endDate = tour.end_date ? new Date(tour.end_date) : null;
+      
+      let dateRange = "";
+      if (startDate && endDate) {
+        dateRange = `${format(startDate, "yyMMdd")} to ${format(endDate, "yyMMdd")}`;
+      } else if (startDate) {
+        dateRange = format(startDate, "yyMMdd");
+      } else {
+        dateRange = "TBD";
+      }
+
+      // Use tour name with date range as root folder name
+      const cleanTourName = tour.name.replace(/[<>:"/\\|?*]/g, '_');
+      const rootFolderName = `${cleanTourName} - ${dateRange}`;
+
+      // Create root folder
+      const rootDirHandle = await baseDirHandle.getDirectoryHandle(rootFolderName, { create: true });
+
+      // Get current user's custom folder structure or use default
+      const { data: { user } } = await supabase.auth.getUser();
+      let folderStructure = null;
+      
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('custom_folder_structure, role')
+          .eq('id', user.id)
+          .single();
+        
+        // Only use custom structure for management users
+        if (profile && (profile.role === 'admin' || profile.role === 'management') && profile.custom_folder_structure) {
+          folderStructure = profile.custom_folder_structure;
+        }
+      }
+      
+      // Default tour structure if no custom one exists
+      if (!folderStructure) {
+        folderStructure = [
+          { name: "00 - Tour Documents", subfolders: ["Contracts", "Insurance", "Permits", "Logistics"] },
+          { name: "01 - Technical", subfolders: ["Sound", "Lights", "Video", "Stage"] },
+          { name: "02 - Marketing", subfolders: ["Logos", "Press", "Social Media"] },
+          { name: "03 - Dates", subfolders: [] },
+          { name: "04 - Archive", subfolders: ["OLD"] }
+        ];
+      }
+      
+      // Create main tour folders
+      if (Array.isArray(folderStructure)) {
+        for (const folder of folderStructure) {
+          if (typeof folder === 'string') {
+            // Simple string structure
+            const subDirHandle = await rootDirHandle.getDirectoryHandle(folder, { create: true });
+            await subDirHandle.getDirectoryHandle("OLD", { create: true });
+          } else if (folder && typeof folder === 'object' && folder.name) {
+            // Object structure with subfolders
+            const subDirHandle = await rootDirHandle.getDirectoryHandle(folder.name, { create: true });
+            
+            // Create subfolders if they exist
+            if (folder.subfolders && Array.isArray(folder.subfolders) && folder.subfolders.length > 0) {
+              for (const subfolder of folder.subfolders) {
+                await subDirHandle.getDirectoryHandle(subfolder, { create: true });
+              }
+            } else {
+              // Default to OLD subfolder if no subfolders specified
+              await subDirHandle.getDirectoryHandle("OLD", { create: true });
+            }
+
+            // Special handling for Dates folder - create date-specific subfolders
+            if (folder.name === "03 - Dates" && tour.tour_dates && tour.tour_dates.length > 0) {
+              const sortedDates = [...tour.tour_dates].sort((a, b) => 
+                new Date(a.start_date || a.date).getTime() - new Date(b.start_date || b.date).getTime()
+              );
+
+              for (const tourDate of sortedDates) {
+                let dateFolderName = "";
+                const dateStart = new Date(tourDate.start_date || tourDate.date);
+                
+                if (tourDate.date_type === 'rehearsal' && tourDate.end_date) {
+                  const dateEnd = new Date(tourDate.end_date);
+                  dateFolderName = `${format(dateStart, "yyMMdd")}-${format(dateEnd, "yyMMdd")} - ${tourDate.location?.name || 'TBD'} - Rehearsal`;
+                } else if (tourDate.date_type === 'travel') {
+                  dateFolderName = `${format(dateStart, "yyMMdd")} - ${tourDate.location?.name || 'TBD'} - Travel`;
+                } else {
+                  dateFolderName = `${format(dateStart, "yyMMdd")} - ${tourDate.location?.name || 'TBD'} - Show`;
+                }
+
+                const cleanDateFolderName = dateFolderName.replace(/[<>:"/\\|?*]/g, '_');
+                const dateDirHandle = await subDirHandle.getDirectoryHandle(cleanDateFolderName, { create: true });
+                
+                // Create standard subfolders for each date
+                await dateDirHandle.getDirectoryHandle("Technical", { create: true });
+                await dateDirHandle.getDirectoryHandle("Logistics", { create: true });
+                await dateDirHandle.getDirectoryHandle("Documentation", { create: true });
+                
+                if (tourDate.date_type === 'rehearsal') {
+                  await dateDirHandle.getDirectoryHandle("Schedule", { create: true });
+                  await dateDirHandle.getDirectoryHandle("Notes", { create: true });
+                }
+              }
+            }
+          }
+        }
+      }
+
+      const isCustom = user && folderStructure !== null;
+      toast({
+        title: "Success!",
+        description: `${isCustom ? 'Custom' : 'Default'} tour folder structure created at "${rootFolderName}"`
+      });
+
+    } catch (error: any) {
+      console.error("TourCard: Error creating local folders:", error);
+      if (error.name === 'AbortError') {
+        // User cancelled, don't show error
+        return;
+      }
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create local folder structure",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreatingLocalFolders(false);
+    }
+  };
+
   const handleManageTour = () => {
     setIsManagementOpen(true);
     setIsMobileMenuOpen(false);
@@ -197,6 +358,17 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
             ? "Create Root Folders First" 
             : "Create Date Folders"
           }
+        </span>
+      </div>
+      <div 
+        className={`flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors ${
+          isCreatingLocalFolders ? 'opacity-50 cursor-not-allowed' : ''
+        }`}
+        onClick={isCreatingLocalFolders ? undefined : createLocalFoldersHandler}
+      >
+        <HardDrive className="h-4 w-4 mr-3" />
+        <span>
+          {isCreatingLocalFolders ? "Creating Local Folders..." : "Create Local Folders"}
         </span>
       </div>
       <div 
@@ -307,6 +479,13 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
                       : "Create Date Folders"
                     }
                   </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={createLocalFoldersHandler}
+                    disabled={isCreatingLocalFolders}
+                  >
+                    <HardDrive className="h-4 w-4 mr-2" />
+                    {isCreatingLocalFolders ? "Creating Local Folders..." : "Create Local Folders"}
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={handlePrintClick}>
                     <Printer className="h-4 w-4 mr-2" />
                     Print Schedule
@@ -341,7 +520,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
                 {upcomingDates.map((date: any) => (
                   <div key={date.id} className="flex items-center gap-2 text-xs">
                     <Calendar className="h-3 w-3 text-muted-foreground" />
-                    <span>{format(new Date(date.date), 'MMM d, yyyy')}</span>
+                    <span>{format(new Date(date.start_date || date.date), 'MMM d, yyyy')}</span>
                     {date.location?.name && (
                       <>
                         <MapPin className="h-3 w-3 text-muted-foreground ml-2" />
