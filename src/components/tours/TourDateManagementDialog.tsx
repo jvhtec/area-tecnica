@@ -577,7 +577,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
           tour_date_id: newTourDate.id,
           tour_id: tourId,
           color: tourData.color || "#7E69AB",
-          job_type: tourDateType === 'rehearsal' ? 'rehearsal' : 'show',
+          job_type: 'tourdate',
         })
         .select()
         .single();
