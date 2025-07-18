@@ -267,8 +267,9 @@ const EnhancedHojaDeRutaGenerator = () => {
         jobDetails?.start_time || new Date().toISOString()
       );
 
-      // Upload to job documents
-      const fileName = `hoja_de_ruta_${eventData.eventName.replace(/\s+/g, "_")}_v${enhancedEventData.metadata?.document_version || 1}.pdf`;
+      // Upload to job documents with sanitized filename
+      const eventName = eventData.eventName || 'sin_nombre';
+      const fileName = `hoja_de_ruta_${eventName.replace(/[^a-zA-Z0-9]/g, '_')}_v${enhancedEventData.metadata?.document_version || 1}.pdf`;
       await uploadPdfToJob(selectedJobId, pdfBlob, fileName);
 
       // Download for user
