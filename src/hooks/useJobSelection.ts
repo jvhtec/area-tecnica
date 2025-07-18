@@ -38,6 +38,7 @@ export const useJobSelection = () => {
           end_time,
           tour_date_id,
           job_type,
+          status,
           tour_date:tour_dates!tour_date_id (
             id,
             tour:tours (
@@ -47,7 +48,8 @@ export const useJobSelection = () => {
           )
         `)
         .gte('start_time', today.toISOString()) // Filter to present/future jobs only
-        .neq('job_type', 'dryhire') // Exclude dry hire jobs
+        .in('job_type', ['single', 'festival', 'tourdate']) // Only include relevant job types
+        .neq('status', 'Completado') // Exclude completed/deleted jobs
         .order("start_time", { ascending: true });
 
       if (error) {
