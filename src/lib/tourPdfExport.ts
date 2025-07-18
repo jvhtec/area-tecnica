@@ -9,6 +9,10 @@ export const exportTourPDF = async (tour: any) => {
   const pageWidth = pdf.internal.pageSize.width;
   const pageHeight = pdf.internal.pageSize.height;
 
+  // Add subtle background
+  pdf.setFillColor(248, 250, 252);
+  pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+
   // Try to load tour logo
   let logoUrl: string | undefined;
   try {
@@ -17,38 +21,57 @@ export const exportTourPDF = async (tour: any) => {
     console.warn('Could not load tour logo:', error);
   }
 
-  // Header with logo if available
-  let startY = 20;
+  // Header section with improved styling
+  let startY = 30;
+  
+  // Add header background
+  pdf.setFillColor(255, 255, 255);
+  pdf.setDrawColor(226, 232, 240);
+  pdf.setLineWidth(0.5);
+  pdf.roundedRect(15, 15, pageWidth - 30, 45, 3, 3, 'FD');
+
   if (logoUrl) {
     try {
-      pdf.addImage(logoUrl, 'PNG', 20, 10, 30, 30);
-      pdf.setFontSize(20);
+      // Add logo with better positioning
+      pdf.addImage(logoUrl, 'PNG', 25, 20, 35, 35);
+      
+      // Tour name with improved typography
+      pdf.setFontSize(24);
       pdf.setFont('helvetica', 'bold');
-      pdf.text(tour.name, 60, 25);
-      pdf.setFontSize(12);
+      pdf.setTextColor(51, 65, 85);
+      pdf.text(tour.name, 70, 35);
+      
+      // Subtitle with styling
+      pdf.setFontSize(14);
       pdf.setFont('helvetica', 'normal');
-      pdf.text('Tour Schedule', 60, 35);
-      startY = 50;
+      pdf.setTextColor(100, 116, 139);
+      pdf.text('Tour Schedule', 70, 45);
+      
+      startY = 75;
     } catch (error) {
       console.warn('Error adding logo to PDF:', error);
       // Fallback to text-only header
-      pdf.setFontSize(20);
+      pdf.setFontSize(24);
       pdf.setFont('helvetica', 'bold');
-      pdf.text(tour.name, 20, 20);
-      pdf.setFontSize(12);
+      pdf.setTextColor(51, 65, 85);
+      pdf.text(tour.name, 25, 35);
+      pdf.setFontSize(14);
       pdf.setFont('helvetica', 'normal');
-      pdf.text('Tour Schedule', 20, 30);
-      startY = 40;
+      pdf.setTextColor(100, 116, 139);
+      pdf.text('Tour Schedule', 25, 45);
+      startY = 75;
     }
   } else {
-    // Text-only header
-    pdf.setFontSize(20);
+    // Text-only header with improved styling
+    pdf.setFontSize(24);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(tour.name, 20, 20);
-    pdf.setFontSize(12);
+    pdf.setTextColor(51, 65, 85);
+    pdf.text(tour.name, 25, 35);
+    pdf.setFontSize(14);
     pdf.setFont('helvetica', 'normal');
-    pdf.text('Tour Schedule', 20, 30);
-    startY = 40;
+    pdf.setTextColor(100, 116, 139);
+    pdf.text('Tour Schedule', 25, 45);
+    startY = 75;
   }
 
   // Sort tour dates
@@ -65,51 +88,83 @@ export const exportTourPDF = async (tour: any) => {
   ]);
 
   // Calculate available space for table (leave space for footer)
-  const bottomMargin = 60; // Increased space for footer and logo
+  const bottomMargin = 70;
   const availableHeight = pageHeight - startY - bottomMargin;
 
-  // Add table with improved spacing
+  // Add table with professional styling
   autoTable(pdf, {
     head: [['Date', 'Day', 'Venue', 'Setup Type']],
     body: tableData,
-    startY: startY,
-    theme: 'striped',
+    startY: startY + 10,
+    theme: 'grid',
+    styles: {
+      fontSize: 10,
+      cellPadding: 8,
+      lineColor: [226, 232, 240],
+      lineWidth: 0.5,
+    },
     headStyles: {
-      fillColor: [126, 105, 171], // Tour color
-      textColor: 255,
-      fontStyle: 'bold'
+      fillColor: [71, 85, 105],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 11,
+      cellPadding: 10,
     },
     bodyStyles: {
-      fontSize: 10
+      fillColor: [255, 255, 255],
+      textColor: [51, 65, 85],
+      fontSize: 10,
     },
     alternateRowStyles: {
-      fillColor: [245, 245, 245]
+      fillColor: [248, 250, 252],
     },
     margin: { 
-      top: startY, 
+      top: startY + 10, 
       bottom: bottomMargin,
       left: 20, 
       right: 20 
     },
     tableWidth: 'auto',
     columnStyles: {
-      0: { cellWidth: 30 },
-      1: { cellWidth: 30 },
-      2: { cellWidth: 'auto' },
-      3: { cellWidth: 40 }
+      0: { 
+        cellWidth: 35,
+        halign: 'center',
+        fontStyle: 'bold'
+      },
+      1: { 
+        cellWidth: 35,
+        halign: 'center'
+      },
+      2: { 
+        cellWidth: 'auto',
+        halign: 'left'
+      },
+      3: { 
+        cellWidth: 45,
+        halign: 'center',
+        fontSize: 9
+      }
     }
   });
 
-  // Add footer text
+  // Enhanced footer section
   const finalY = (pdf as any).lastAutoTable.finalY || startY + 100;
-  const footerTextY = Math.max(finalY + 20, pageHeight - 50);
+  const footerY = Math.max(finalY + 30, pageHeight - 50);
 
-  pdf.setFontSize(10);
-  pdf.setTextColor(128, 128, 128);
+  // Add footer background
+  pdf.setFillColor(248, 250, 252);
+  pdf.setDrawColor(226, 232, 240);
+  pdf.setLineWidth(0.5);
+  pdf.roundedRect(15, footerY - 10, pageWidth - 30, 25, 2, 2, 'FD');
+
+  // Footer text with better styling
+  pdf.setFontSize(9);
+  pdf.setTextColor(100, 116, 139);
+  pdf.setFont('helvetica', 'normal');
   pdf.text(
     `Generated on ${format(new Date(), 'dd/MM/yyyy HH:mm')}`,
-    20,
-    footerTextY
+    25,
+    footerY
   );
 
   // Function to load image as base64
