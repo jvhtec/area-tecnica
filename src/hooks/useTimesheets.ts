@@ -46,7 +46,9 @@ export const useTimesheets = (jobId: string) => {
   };
 
   useEffect(() => {
+    console.log("useTimesheets useEffect triggered with jobId:", jobId);
     if (jobId) {
+      console.log("Calling fetchTimesheets and autoCreateTimesheets");
       fetchTimesheets();
       autoCreateTimesheets();
     }
