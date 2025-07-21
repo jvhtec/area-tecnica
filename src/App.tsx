@@ -51,8 +51,8 @@ export default function App() {
         <SubscriptionProvider>
           <Router>
             <AuthProvider>
+              <AppInit />
               <div className="app">
-                <AppInit />
                 <Routes>
                   <Route path="/" element={<Auth />} />
                   <Route path="/auth" element={<Auth />} />

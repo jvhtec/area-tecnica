@@ -1,5 +1,4 @@
-
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { checkNetworkConnection, getRealtimeConnectionStatus, ensureRealtimeConnection } from "@/lib/enhanced-supabase-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
@@ -14,11 +13,9 @@ const calculateBackoff = (attempt: number, baseMs: number = 1000, maxMs: number 
 };
 
 /**
- * Component that initializes app-wide services when the application starts
- * Doesn't render anything to the UI
- * IMPORTANT: Must be used inside QueryClientProvider
+ * Inner component that requires router context
  */
-export function AppInit() {
+function AppInitWithRouter() {
   const queryClient = useQueryClient();
   const location = useLocation();
   const isInitialized = useRef(false);
@@ -179,4 +176,48 @@ export function AppInit() {
   
   // This component doesn't render anything
   return null;
+}
+
+/**
+ * Component that initializes app-wide services when the application starts
+ * Doesn't render anything to the UI
+ * IMPORTANT: Must be used inside QueryClientProvider
+ * Safely handles router context availability
+ */
+export function AppInit() {
+  const queryClient = useQueryClient();
+  
+  // Initialize core services that don't require router context
+  useEffect(() => {
+    console.log('Initializing basic core services...');
+    
+    // Initialize token manager
+    const tokenManager = TokenManager.getInstance();
+    
+    // Initialize the subscription manager
+    const manager = UnifiedSubscriptionManager.getInstance(queryClient);
+    manager.setupVisibilityBasedRefetching();
+    manager.setupNetworkStatusRefetching();
+    
+    // Subscribe to token refresh events
+    tokenManager.subscribe(() => {
+      console.log("Token refreshed, updating subscriptions");
+      manager.reestablishSubscriptions();
+    });
+  }, [queryClient]);
+
+  // Check if we're in a router context
+  const [hasRouterContext, setHasRouterContext] = useState(false);
+  
+  useEffect(() => {
+    // Delay checking for router context to allow it to initialize
+    const timeout = setTimeout(() => {
+      setHasRouterContext(true);
+    }, 100);
+    
+    return () => clearTimeout(timeout);
+  }, []);
+
+  // Only render router-dependent initialization if router context is available
+  return hasRouterContext ? <AppInitWithRouter /> : null;
 }
