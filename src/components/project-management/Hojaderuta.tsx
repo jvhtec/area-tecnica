@@ -121,19 +121,23 @@ const HojaDeRutaGenerator = () => {
     if (!selectedJobId) return;
 
     try {
-      await saveHojaDeRuta(eventData);
+      console.log('Starting save process...');
+      const savedRecord = await saveHojaDeRuta(eventData);
+      console.log('Main record saved:', savedRecord);
 
-      if (hojaDeRuta?.id) {
+      if (savedRecord?.id) {
+        console.log('Saving travel arrangements and room assignments...');
         await Promise.all([
           saveTravelArrangements({
-            hojaDeRutaId: hojaDeRuta.id,
+            hojaDeRutaId: savedRecord.id,
             arrangements: travelArrangements,
           }),
           saveRoomAssignments({
-            hojaDeRutaId: hojaDeRuta.id,
+            hojaDeRutaId: savedRecord.id,
             assignments: roomAssignments,
           })
         ]);
+        console.log('All data saved successfully');
       }
       
       setIsDirty(false);
