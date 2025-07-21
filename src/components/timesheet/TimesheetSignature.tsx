@@ -10,13 +10,13 @@ interface TimesheetSignatureProps {
   timesheetId: string;
   currentSignature?: string;
   canSign: boolean;
+  onSigned: (timesheetId: string, signatureData: string) => Promise<any>;
 }
 
-export const TimesheetSignature = ({ timesheetId, currentSignature, canSign }: TimesheetSignatureProps) => {
+export const TimesheetSignature = ({ timesheetId, currentSignature, canSign, onSigned }: TimesheetSignatureProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const signaturePadRef = useRef<SignatureCanvas>(null);
-  const { signTimesheet } = useTimesheets(''); // We'll pass the actual hook from parent
 
   const handleSaveSignature = async () => {
     if (!signaturePadRef.current) return;
@@ -24,7 +24,7 @@ export const TimesheetSignature = ({ timesheetId, currentSignature, canSign }: T
     setIsLoading(true);
     try {
       const signatureData = signaturePadRef.current.toDataURL();
-      await signTimesheet(timesheetId, signatureData);
+      await onSigned(timesheetId, signatureData);
       setIsDialogOpen(false);
     } catch (error) {
       console.error('Error saving signature:', error);

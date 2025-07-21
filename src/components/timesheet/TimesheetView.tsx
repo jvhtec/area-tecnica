@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CalendarDays, Clock, FileText, Download, Plus, User } from "lucide-react";
 import { useTimesheets } from "@/hooks/useTimesheets";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
+import { useAuth } from "@/hooks/useAuth";
 import { Timesheet, TimesheetFormData } from "@/types/timesheet";
 import { TimesheetSignature } from "./TimesheetSignature";
 import { format, parseISO } from "date-fns";
@@ -20,8 +21,9 @@ interface TimesheetViewProps {
 }
 
 export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetViewProps) => {
-  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet } = useTimesheets(jobId);
+  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, signTimesheet } = useTimesheets(jobId);
   const { assignments } = useJobAssignmentsRealtime(jobId);
+  const { user, userRole } = useAuth();
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [editingTimesheet, setEditingTimesheet] = useState<string | null>(null);
   const [formData, setFormData] = useState<TimesheetFormData>({
@@ -180,7 +182,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    {canManage && timesheet.status === 'draft' && (
+                    {(userRole === 'admin' || userRole === 'management') && timesheet.status === 'draft' && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -189,7 +191,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         Edit
                       </Button>
                     )}
-                    {canManage && timesheet.status === 'submitted' && (
+                    {(userRole === 'admin' || userRole === 'management') && timesheet.status === 'submitted' && (
                       <Button
                         size="sm"
                         onClick={() => approveTimesheet(timesheet.id)}
@@ -197,7 +199,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         Approve
                       </Button>
                     )}
-                    {canManage && timesheet.status === 'draft' && (
+                    {(userRole === 'admin' || userRole === 'management') && timesheet.status === 'draft' && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -303,7 +305,8 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   <TimesheetSignature
                     timesheetId={timesheet.id}
                     currentSignature={timesheet.signature_data}
-                    canSign={timesheet.technician_id === 'current-user-id'} // TODO: Replace with actual auth check
+                    canSign={timesheet.technician_id === user?.id || userRole === 'admin' || userRole === 'management'}
+                    onSigned={signTimesheet}
                   />
                 )}
               </div>
