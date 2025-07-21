@@ -64,7 +64,7 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
       yPosition = 20;
     }
 
-    const technicianName = `${timesheet.profiles?.first_name || ''} ${timesheet.profiles?.last_name || ''}`.trim();
+    const technicianName = `${timesheet.technician?.first_name || ''} ${timesheet.technician?.last_name || ''}`.trim();
     const startTime = timesheet.start_time || '--';
     const endTime = timesheet.end_time || '--';
     const breakTime = timesheet.break_minutes ? `${timesheet.break_minutes}min` : '--';

@@ -16,7 +16,7 @@ export interface Timesheet {
   approved_at?: string;
   created_at: string;
   updated_at: string;
-  profiles?: {
+  technician?: {
     first_name: string;
     last_name: string;
     email: string;

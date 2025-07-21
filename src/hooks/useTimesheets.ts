@@ -17,7 +17,15 @@ export const useTimesheets = (jobId: string) => {
 
       const { data, error } = await supabase
         .from("timesheets")
-        .select("*")
+        .select(`
+          *,
+          technician:profiles!timesheets_technician_id_fkey (
+            first_name,
+            last_name,
+            email,
+            department
+          )
+        `)
         .eq("job_id", jobId)
         .order("date", { ascending: true })
         .order("created_at", { ascending: true });

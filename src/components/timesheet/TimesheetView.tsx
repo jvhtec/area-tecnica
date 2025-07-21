@@ -170,9 +170,9 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   <div className="flex items-center gap-3">
                     <div>
                       <p className="font-medium">
-                        {timesheet.profiles?.first_name} {timesheet.profiles?.last_name}
+                        {timesheet.technician?.first_name} {timesheet.technician?.last_name}
                       </p>
-                      <p className="text-sm text-muted-foreground">{timesheet.profiles?.department}</p>
+                      <p className="text-sm text-muted-foreground">{timesheet.technician?.department}</p>
                     </div>
                     <Badge variant={getStatusColor(timesheet.status)}>
                       {timesheet.status}
