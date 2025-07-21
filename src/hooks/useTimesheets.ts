@@ -13,6 +13,7 @@ export const useTimesheets = (jobId: string) => {
     try {
       setIsLoading(true);
       setIsError(false);
+      console.log("Starting fetchTimesheets for jobId:", jobId);
 
       const { data, error } = await supabase
         .from("timesheets")
@@ -29,6 +30,8 @@ export const useTimesheets = (jobId: string) => {
         .order("date", { ascending: true })
         .order("created_at", { ascending: true });
 
+      console.log("Fetch result:", { data, error });
+
       if (error) {
         console.error("Error fetching timesheets:", error);
         setIsError(true);
@@ -36,12 +39,14 @@ export const useTimesheets = (jobId: string) => {
         return;
       }
 
+      console.log("Setting timesheets:", data);
       setTimesheets((data || []) as unknown as Timesheet[]);
     } catch (error) {
       console.error("Error in fetchTimesheets:", error);
       setIsError(true);
       toast.error("Failed to fetch timesheets");
     } finally {
+      console.log("fetchTimesheets completed, setting loading to false");
       setIsLoading(false);
     }
   }, [jobId]);
