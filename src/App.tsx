@@ -42,6 +42,7 @@ import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AppInit } from "@/components/AppInit";
 import { TourManagementWrapper } from "@/components/tours/TourManagementWrapper";
+import Timesheets from '@/pages/Timesheets';
 
 export default function App() {
   return (
@@ -75,6 +76,7 @@ export default function App() {
                     <Route path="/project-management" element={<ProjectManagement />} />
                     <Route path="/equipment-management" element={<EquipmentManagement />} />
                     <Route path="/job-assignment-matrix" element={<JobAssignmentMatrix />} />
+                    <Route path="/timesheets" element={<Timesheets />} />
                     <Route path="/tours" element={<Tours />} />
                     <Route path="/festivals" element={<Festivals />} />
                     

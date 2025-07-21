@@ -2952,6 +2952,66 @@ export type Database = {
           },
         ]
       }
+      timesheets: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          break_minutes: number | null
+          created_at: string
+          created_by: string | null
+          date: string
+          end_time: string | null
+          id: string
+          job_id: string
+          notes: string | null
+          overtime_hours: number | null
+          signature_data: string | null
+          signed_at: string | null
+          start_time: string | null
+          status: Database["public"]["Enums"]["timesheet_status"]
+          technician_id: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          break_minutes?: number | null
+          created_at?: string
+          created_by?: string | null
+          date: string
+          end_time?: string | null
+          id?: string
+          job_id: string
+          notes?: string | null
+          overtime_hours?: number | null
+          signature_data?: string | null
+          signed_at?: string | null
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["timesheet_status"]
+          technician_id: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          break_minutes?: number | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          end_time?: string | null
+          id?: string
+          job_id?: string
+          notes?: string | null
+          overtime_hours?: number | null
+          signature_data?: string | null
+          signed_at?: string | null
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["timesheet_status"]
+          technician_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tour_assignments: {
         Row: {
           assigned_at: string
@@ -3804,6 +3864,7 @@ export type Database = {
       provider_type: "festival" | "band" | "mixed"
       room_type: "single" | "double"
       task_status: "not_started" | "in_progress" | "completed"
+      timesheet_status: "draft" | "submitted" | "approved"
       tour_date_type: "show" | "rehearsal" | "travel"
       transport_type: "trailer" | "9m" | "8m" | "6m" | "4m" | "furgoneta" | "rv"
       transportation_type: "van" | "sleeper_bus" | "train" | "plane" | "rv"
@@ -3992,6 +4053,7 @@ export const Constants = {
       provider_type: ["festival", "band", "mixed"],
       room_type: ["single", "double"],
       task_status: ["not_started", "in_progress", "completed"],
+      timesheet_status: ["draft", "submitted", "approved"],
       tour_date_type: ["show", "rehearsal", "travel"],
       transport_type: ["trailer", "9m", "8m", "6m", "4m", "furgoneta", "rv"],
       transportation_type: ["van", "sleeper_bus", "train", "plane", "rv"],

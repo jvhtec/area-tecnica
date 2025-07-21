@@ -12,7 +12,8 @@ import {
   Tent,
   Calendar,
   MapPin,
-  Grid3X3
+  Grid3X3,
+  Clock
 } from "lucide-react";
 
 interface SidebarNavigationProps {
@@ -113,6 +114,21 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
             >
               <Grid3X3 className="h-4 w-4" />
               <span>Assignment Matrix</span>
+            </Button>
+          </Link>
+        )}
+
+        {/* Timesheets - Only for management users */}
+        {isManagementUser && (
+          <Link to="/timesheets">
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-2 ${
+                location.pathname === "/timesheets" ? "bg-accent" : ""
+              }`}
+            >
+              <Clock className="h-4 w-4" />
+              <span>Timesheets</span>
             </Button>
           </Link>
         )}
