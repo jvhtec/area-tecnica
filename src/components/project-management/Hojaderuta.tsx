@@ -118,7 +118,15 @@ const HojaDeRutaGenerator = () => {
   }, [eventData, travelArrangements, roomAssignments, hojaDeRuta]);
 
   const handleSave = async () => {
-    if (!selectedJobId) return;
+    console.log('handleSave called with selectedJobId:', selectedJobId);
+    console.log('eventData:', eventData);
+    console.log('travelArrangements:', travelArrangements);
+    console.log('roomAssignments:', roomAssignments);
+    
+    if (!selectedJobId) {
+      console.error('No selectedJobId - cannot save');
+      return;
+    }
 
     try {
       console.log('Starting save process...');
@@ -138,9 +146,12 @@ const HojaDeRutaGenerator = () => {
           })
         ]);
         console.log('All data saved successfully');
+      } else {
+        console.error('No saved record ID returned');
       }
       
       setIsDirty(false);
+      console.log('Save process completed');
     } catch (error) {
       console.error('Error saving data:', error);
     }
