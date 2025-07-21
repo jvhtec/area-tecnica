@@ -48,10 +48,13 @@ export const useTimesheets = (jobId: string) => {
 
   useEffect(() => {
     console.log("useTimesheets useEffect triggered with jobId:", jobId);
-    if (jobId) {
+    if (jobId && jobId.length > 0) {
       console.log("Calling fetchTimesheets and autoCreateTimesheets");
       fetchTimesheets();
       autoCreateTimesheets();
+    } else {
+      console.log("jobId is empty or invalid, skipping fetch");
+      setIsLoading(false);
     }
   }, [jobId]);
 
