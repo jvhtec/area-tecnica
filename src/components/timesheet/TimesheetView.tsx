@@ -58,7 +58,6 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     if (!editingTimesheet) return;
 
     await updateTimesheet(editingTimesheet, {
-      date: formData.date,
       start_time: formData.start_time,
       end_time: formData.end_time,
       break_minutes: formData.break_minutes,
