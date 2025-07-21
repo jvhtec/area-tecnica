@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Timesheet } from "@/types/timesheet";
 import { toast } from "sonner";
@@ -9,7 +9,7 @@ export const useTimesheets = (jobId: string) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
 
-  const fetchTimesheets = async () => {
+  const fetchTimesheets = useCallback(async () => {
     try {
       setIsLoading(true);
       setIsError(false);
@@ -44,21 +44,9 @@ export const useTimesheets = (jobId: string) => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    console.log("useTimesheets useEffect triggered with jobId:", jobId);
-    if (jobId && jobId.length > 0) {
-      console.log("Calling fetchTimesheets and autoCreateTimesheets");
-      fetchTimesheets();
-      autoCreateTimesheets();
-    } else {
-      console.log("jobId is empty or invalid, skipping fetch");
-      setIsLoading(false);
-    }
   }, [jobId]);
 
-  const autoCreateTimesheets = async () => {
+  const autoCreateTimesheets = useCallback(async () => {
     try {
       console.log("autoCreateTimesheets started for jobId:", jobId);
       
@@ -155,8 +143,21 @@ export const useTimesheets = (jobId: string) => {
       }
     } catch (error) {
       console.error("Error in autoCreateTimesheets:", error);
+      setIsLoading(false);
     }
-  };
+  }, [jobId, fetchTimesheets]);
+
+  useEffect(() => {
+    console.log("useTimesheets useEffect triggered with jobId:", jobId);
+    if (jobId && jobId.length > 0) {
+      console.log("Calling fetchTimesheets and autoCreateTimesheets");
+      fetchTimesheets();
+      autoCreateTimesheets();
+    } else {
+      console.log("jobId is empty or invalid, skipping fetch");
+      setIsLoading(false);
+    }
+  }, [jobId, fetchTimesheets, autoCreateTimesheets]);
 
   const createTimesheet = async (technicianId: string, date: string) => {
     try {
