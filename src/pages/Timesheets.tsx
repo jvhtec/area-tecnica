@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Clock, Download, FileText } from "lucide-react";
@@ -10,13 +9,22 @@ import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { useTimesheets } from "@/hooks/useTimesheets";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
+import { useSearchParams } from "react-router-dom";
 
 export default function Timesheets() {
-  const [selectedJobId, setSelectedJobId] = useState<string>("");
+  const [searchParams] = useSearchParams();
+  const jobIdFromUrl = searchParams.get('jobId');
+  const [selectedJobId, setSelectedJobId] = useState<string>(jobIdFromUrl || "");
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const { user } = useAuth();
   const { data: jobs = [], isLoading: jobsLoading } = useOptimizedJobs();
   const { timesheets } = useTimesheets(selectedJobId);
+
+  useEffect(() => {
+    if (jobIdFromUrl) {
+      setSelectedJobId(jobIdFromUrl);
+    }
+  }, [jobIdFromUrl]);
 
   const selectedJob = jobs.find(job => job.id === selectedJobId);
   const canManage = user?.role === 'admin' || user?.role === 'management';
@@ -87,64 +95,39 @@ export default function Timesheets() {
         )}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Select Job
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Job</label>
-                <Select value={selectedJobId} onValueChange={setSelectedJobId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a job" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {jobs.map((job) => (
-                      <SelectItem key={job.id} value={job.id}>
-                        <div className="flex items-center justify-between w-full">
-                          <span>{job.title}</span>
-                          <Badge variant="outline" className="ml-2">
-                            {job.job_type}
-                          </Badge>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {selectedJob && (
-              <div className="p-4 bg-muted rounded-lg">
-                <h3 className="font-medium mb-2">{selectedJob.title}</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">Start</p>
-                    <p>{format(new Date(selectedJob.start_time), 'PPP')}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">End</p>
-                    <p>{format(new Date(selectedJob.end_time), 'PPP')}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Type</p>
-                    <p className="capitalize">{selectedJob.job_type}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Status</p>
-                    <p className="capitalize">{selectedJob.status || 'Active'}</p>
-                  </div>
+      {selectedJob && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Job Details
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="p-4 bg-muted rounded-lg">
+              <h3 className="font-medium mb-2">{selectedJob.title}</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Start</p>
+                  <p>{format(new Date(selectedJob.start_time), 'PPP')}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">End</p>
+                  <p>{format(new Date(selectedJob.end_time), 'PPP')}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Type</p>
+                  <p className="capitalize">{selectedJob.job_type}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Status</p>
+                  <p className="capitalize">{selectedJob.status || 'Active'}</p>
                 </div>
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {selectedJobId && (
         <TimesheetView
