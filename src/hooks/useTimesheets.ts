@@ -123,6 +123,9 @@ export const useTimesheets = (jobId: string) => {
           // Refresh the timesheets after creation
           setTimeout(() => fetchTimesheets(), 500);
         }
+      } else {
+        // No timesheets to create, just finish loading
+        setIsLoading(false);
       }
     } catch (error) {
       console.error("Error in autoCreateTimesheets:", error);
