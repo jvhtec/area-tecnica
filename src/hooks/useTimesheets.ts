@@ -150,15 +150,14 @@ export const useTimesheets = (jobId: string) => {
   useEffect(() => {
     console.log("useTimesheets useEffect triggered with jobId:", jobId);
     if (jobId && jobId.length > 0 && jobId !== "") {
-      console.log("Calling fetchTimesheets and autoCreateTimesheets");
+      console.log("Calling fetchTimesheets only");
       fetchTimesheets();
-      autoCreateTimesheets();
     } else {
       console.log("jobId is empty or invalid, skipping fetch");
       setIsLoading(false);
       setTimesheets([]);
     }
-  }, [jobId, fetchTimesheets, autoCreateTimesheets]);
+  }, [jobId, fetchTimesheets]);
 
   const createTimesheet = async (technicianId: string, date: string) => {
     try {
