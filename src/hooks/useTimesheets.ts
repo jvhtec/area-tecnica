@@ -54,14 +54,19 @@ export const useTimesheets = (jobId: string) => {
 
   const autoCreateTimesheets = async () => {
     try {
+      console.log("autoCreateTimesheets started for jobId:", jobId);
+      
       // Get job assignments and job details
       const { data: assignments, error: assignmentsError } = await supabase
         .from("job_assignments")
         .select("technician_id")
         .eq("job_id", jobId);
 
+      console.log("Assignments fetched:", assignments, "Error:", assignmentsError);
+
       if (assignmentsError || !assignments) {
         console.error("Error fetching assignments:", assignmentsError);
+        setIsLoading(false);
         return;
       }
 
@@ -71,8 +76,11 @@ export const useTimesheets = (jobId: string) => {
         .eq("id", jobId)
         .single();
 
+      console.log("Job fetched:", job, "Error:", jobError);
+
       if (jobError || !job) {
         console.error("Error fetching job:", jobError);
+        setIsLoading(false);
         return;
       }
 
@@ -81,9 +89,13 @@ export const useTimesheets = (jobId: string) => {
       const endDate = new Date(job.end_time);
       const dates = [];
       
+      console.log("Job dates:", { start_time: job.start_time, end_time: job.end_time, startDate, endDate });
+      
       for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
         dates.push(d.toISOString().split('T')[0]);
       }
+
+      console.log("Generated dates:", dates);
 
       // Check which timesheets already exist
       const { data: existingTimesheets } = await supabase
@@ -91,9 +103,13 @@ export const useTimesheets = (jobId: string) => {
         .select("technician_id, date")
         .eq("job_id", jobId);
 
+      console.log("Existing timesheets:", existingTimesheets);
+
       const existingCombos = new Set(
         (existingTimesheets || []).map(t => `${t.technician_id}-${t.date}`)
       );
+
+      console.log("Existing combos:", existingCombos);
 
       // Create missing timesheets
       const timesheetsToCreate = [];
@@ -111,6 +127,8 @@ export const useTimesheets = (jobId: string) => {
         }
       }
 
+      console.log("Timesheets to create:", timesheetsToCreate);
+
       if (timesheetsToCreate.length > 0) {
         const { error: insertError } = await supabase
           .from("timesheets")
@@ -118,12 +136,14 @@ export const useTimesheets = (jobId: string) => {
 
         if (insertError) {
           console.error("Error creating timesheets:", insertError);
+          setIsLoading(false);
         } else {
           console.log(`Auto-created ${timesheetsToCreate.length} timesheets`);
           // Refresh the timesheets after creation
           setTimeout(() => fetchTimesheets(), 500);
         }
       } else {
+        console.log("No timesheets to create, finishing loading");
         // No timesheets to create, just finish loading
         setIsLoading(false);
       }
