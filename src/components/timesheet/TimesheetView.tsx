@@ -301,7 +301,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   </div>
                 )}
 
-                {timesheet.status === 'submitted' && (
+                {(timesheet.status === 'draft' || timesheet.status === 'submitted') && (
                   <TimesheetSignature
                     timesheetId={timesheet.id}
                     currentSignature={timesheet.signature_data}
