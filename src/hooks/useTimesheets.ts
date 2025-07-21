@@ -17,20 +17,10 @@ export const useTimesheets = (jobId: string) => {
 
       const { data, error } = await supabase
         .from("timesheets")
-        .select(`
-          *,
-          technician:profiles!timesheets_technician_id_fkey (
-            first_name,
-            last_name,
-            email,
-            department
-          )
-        `)
+        .select("*")
         .eq("job_id", jobId)
         .order("date", { ascending: true })
         .order("created_at", { ascending: true });
-
-      console.log("Fetch result:", { data, error });
 
       if (error) {
         console.error("Error fetching timesheets:", error);
@@ -39,8 +29,25 @@ export const useTimesheets = (jobId: string) => {
         return;
       }
 
-      console.log("Setting timesheets:", data);
-      setTimesheets((data || []) as unknown as Timesheet[]);
+      // Fetch technician profiles separately
+      if (data && data.length > 0) {
+        const technicianIds = [...new Set(data.map(t => t.technician_id))];
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name, email, department")
+          .in("id", technicianIds);
+
+        // Merge profile data with timesheets
+        const timesheetsWithProfiles = data.map(timesheet => ({
+          ...timesheet,
+          technician: profiles?.find(p => p.id === timesheet.technician_id)
+        }));
+
+        console.log("Setting timesheets:", timesheetsWithProfiles);
+        setTimesheets(timesheetsWithProfiles as unknown as Timesheet[]);
+      } else {
+        setTimesheets([]);
+      }
     } catch (error) {
       console.error("Error in fetchTimesheets:", error);
       setIsError(true);
