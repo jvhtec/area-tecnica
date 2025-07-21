@@ -1,7 +1,8 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
-import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus } from "lucide-react";
+import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface JobCardActionsProps {
   job: any;
@@ -49,6 +50,12 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   onAssignmentDialogOpen,
   handleFileUpload
 }) => {
+  const navigate = useNavigate();
+
+  const handleTimesheetClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/timesheets?jobId=${job.id}`);
+  };
   const getFlexButtonTitle = () => {
     if (isCreatingFolders) {
       return "Creating folders...";
@@ -87,6 +94,15 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         className="hover:bg-accent/50"
       >
         <RefreshCw className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={handleTimesheetClick}
+        title="Manage Timesheets"
+        className="hover:bg-accent/50"
+      >
+        <Clock className="h-4 w-4" />
       </Button>
       {canEditJobs && (
         <>
