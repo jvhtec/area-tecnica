@@ -111,25 +111,6 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
           </h2>
           {jobTitle && <p className="text-muted-foreground">Job: {jobTitle}</p>}
         </div>
-        
-        {canManage && (
-          <div className="flex items-center gap-3">
-            <Input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="w-auto"
-            />
-            <Button 
-              onClick={handleCreateTimesheets}
-              disabled={!assignments.length}
-              className="flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Create Timesheets
-            </Button>
-          </div>
-        )}
       </div>
 
       {!assignments.length && (
@@ -138,19 +119,36 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
             <div className="text-center">
               <User className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">No technicians assigned to this job</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Assign technicians to this job to generate timesheets automatically
+              </p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {Object.entries(timesheetsByDate).length === 0 && assignments.length > 0 && (
+      {isLoading && assignments.length > 0 && (
+        <Card>
+          <CardContent className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <Clock className="h-12 w-12 mx-auto text-muted-foreground animate-spin mb-4" />
+              <p className="text-muted-foreground">Loading timesheets...</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Creating timesheets for assigned technicians...
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {Object.entries(timesheetsByDate).length === 0 && assignments.length > 0 && !isLoading && (
         <Card>
           <CardContent className="flex items-center justify-center p-8">
             <div className="text-center">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No timesheets created yet</p>
+              <p className="text-muted-foreground">Timesheets are being generated...</p>
               <p className="text-sm text-muted-foreground mt-2">
-                Select a date and click "Create Timesheets" to get started
+                Timesheets are automatically created for all assigned technicians
               </p>
             </div>
           </CardContent>

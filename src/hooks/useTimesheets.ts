@@ -48,8 +48,86 @@ export const useTimesheets = (jobId: string) => {
   useEffect(() => {
     if (jobId) {
       fetchTimesheets();
+      autoCreateTimesheets();
     }
   }, [jobId]);
+
+  const autoCreateTimesheets = async () => {
+    try {
+      // Get job assignments and job details
+      const { data: assignments, error: assignmentsError } = await supabase
+        .from("job_assignments")
+        .select("technician_id")
+        .eq("job_id", jobId);
+
+      if (assignmentsError || !assignments) {
+        console.error("Error fetching assignments:", assignmentsError);
+        return;
+      }
+
+      const { data: job, error: jobError } = await supabase
+        .from("jobs")
+        .select("start_time, end_time")
+        .eq("id", jobId)
+        .single();
+
+      if (jobError || !job) {
+        console.error("Error fetching job:", jobError);
+        return;
+      }
+
+      // Generate dates between start and end
+      const startDate = new Date(job.start_time);
+      const endDate = new Date(job.end_time);
+      const dates = [];
+      
+      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        dates.push(d.toISOString().split('T')[0]);
+      }
+
+      // Check which timesheets already exist
+      const { data: existingTimesheets } = await supabase
+        .from("timesheets")
+        .select("technician_id, date")
+        .eq("job_id", jobId);
+
+      const existingCombos = new Set(
+        (existingTimesheets || []).map(t => `${t.technician_id}-${t.date}`)
+      );
+
+      // Create missing timesheets
+      const timesheetsToCreate = [];
+      for (const assignment of assignments) {
+        for (const date of dates) {
+          const combo = `${assignment.technician_id}-${date}`;
+          if (!existingCombos.has(combo)) {
+            timesheetsToCreate.push({
+              job_id: jobId,
+              technician_id: assignment.technician_id,
+              date: date,
+              created_by: (await supabase.auth.getUser()).data.user?.id,
+            });
+          }
+        }
+      }
+
+      if (timesheetsToCreate.length > 0) {
+        const { error: insertError } = await supabase
+          .from("timesheets")
+          .insert(timesheetsToCreate);
+
+        if (insertError) {
+          console.error("Error creating timesheets:", insertError);
+        } else {
+          console.log(`Auto-created ${timesheetsToCreate.length} timesheets`);
+          // Refresh the timesheets after creation
+          setTimeout(() => fetchTimesheets(), 500);
+        }
+      }
+    } catch (error) {
+      console.error("Error in autoCreateTimesheets:", error);
+    }
+  };
 
   const createTimesheet = async (technicianId: string, date: string) => {
     try {
