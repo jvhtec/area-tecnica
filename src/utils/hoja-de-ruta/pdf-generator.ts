@@ -21,44 +21,80 @@ export const generatePDF = async (
   const doc = new jsPDF() as AutoTableJsPDF;
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
-  const bottomMargin = 60;
+  const bottomMargin = 40;
 
   const checkPageBreak = (currentY: number): number => {
     if (currentY > pageHeight - bottomMargin) {
       doc.addPage();
-      return 20;
+      return 40; // Account for header space
     }
     return currentY;
   };
 
-  doc.setFillColor(125, 1, 1);
-  doc.rect(0, 0, pageWidth, 40, "F");
+  // Helper function to check if data exists
+  const hasData = (value: any): boolean => {
+    if (typeof value === 'string') return value.trim() !== '';
+    if (Array.isArray(value)) return value.length > 0 && value.some(item => hasData(item));
+    if (typeof value === 'object' && value !== null) {
+      return Object.values(value).some(val => hasData(val));
+    }
+    return value !== null && value !== undefined;
+  };
 
-  doc.setFontSize(24);
+  // === HEADER SECTION === (consistent with tour PDF)
+  doc.setFillColor(125, 1, 1); // Red header background
+  doc.rect(0, 0, pageWidth, 30, 'F');
+
+  // Header text (white text on red background)
   doc.setTextColor(255, 255, 255);
-  doc.text("Hoja de Ruta", pageWidth / 2, 20, { align: "center" });
-  doc.setFontSize(16);
-  doc.text(eventData.eventName, pageWidth / 2, 30, { align: "center" });
-
-  let yPosition = 50;
+  doc.setFontSize(18);
+  doc.text("Hoja de Ruta", pageWidth / 2, 15, { align: "center" });
+  
   doc.setFontSize(12);
-  doc.setTextColor(51, 51, 51);
+  doc.text(eventData.eventName, pageWidth / 2, 25, { align: "center" });
 
-  yPosition = checkPageBreak(yPosition);
-  doc.text(`Fechas: ${eventData.eventDates}`, 20, yPosition);
-  yPosition += 15;
-
+  let yPosition = 40;
+  
+  // === EVENT DETAILS SECTION ===
   yPosition = checkPageBreak(yPosition);
   doc.setFontSize(14);
   doc.setTextColor(125, 1, 1);
-  doc.text("Información del Lugar", 20, yPosition);
+  doc.text("Detalles del Evento", 20, yPosition);
   yPosition += 10;
+  
   doc.setFontSize(10);
   doc.setTextColor(51, 51, 51);
-  doc.text(`Nombre: ${eventData.venue.name}`, 30, yPosition);
-  yPosition += 7;
-  doc.text(`Dirección: ${eventData.venue.address}`, 30, yPosition);
-  yPosition += 15;
+  
+  if (hasData(eventData.eventDates)) {
+    doc.text(`Fechas: ${eventData.eventDates}`, 30, yPosition);
+    yPosition += 8;
+  }
+  
+  yPosition += 5;
+
+  // === VENUE INFORMATION ===
+  if (hasData(eventData.venue.name) || hasData(eventData.venue.address)) {
+    yPosition = checkPageBreak(yPosition);
+    doc.setFontSize(14);
+    doc.setTextColor(125, 1, 1);
+    doc.text("Información del Lugar", 20, yPosition);
+    yPosition += 10;
+    
+    doc.setFontSize(10);
+    doc.setTextColor(51, 51, 51);
+    
+    if (hasData(eventData.venue.name)) {
+      doc.text(`Nombre: ${eventData.venue.name}`, 30, yPosition);
+      yPosition += 8;
+    }
+    
+    if (hasData(eventData.venue.address)) {
+      doc.text(`Dirección: ${eventData.venue.address}`, 30, yPosition);
+      yPosition += 8;
+    }
+    
+    yPosition += 10;
+  }
 
   if (venueMapPreview) {
     try {
@@ -71,180 +107,241 @@ export const generatePDF = async (
     }
   }
 
-  if (
-    eventData.contacts.some(
-      (contact) => contact.name || contact.role || contact.phone
-    )
-  ) {
+  // === CONTACTS SECTION ===
+  const validContacts = eventData.contacts.filter(contact => 
+    hasData(contact.name) || hasData(contact.role) || hasData(contact.phone)
+  );
+  
+  if (validContacts.length > 0) {
     yPosition = checkPageBreak(yPosition);
     doc.setFontSize(14);
     doc.setTextColor(125, 1, 1);
     doc.text("Contactos", 20, yPosition);
     yPosition += 10;
 
-    const contactsTableData = eventData.contacts.map((contact) => [
-      contact.name,
-      contact.role,
-      contact.phone,
+    const contactsTableData = validContacts.map((contact) => [
+      contact.name || '',
+      contact.role || '',
+      contact.phone || '',
     ]);
+    
     autoTable(doc, {
       startY: yPosition,
       head: [["Nombre", "Rol", "Teléfono"]],
       body: contactsTableData,
       theme: "grid",
-      styles: { fontSize: 10 },
+      styles: {
+        fontSize: 10,
+        cellPadding: 3,
+        valign: 'top',
+      },
+      headStyles: {
+        fillColor: [125, 1, 1], // Same red as header
+        textColor: [255, 255, 255],
+        fontSize: 11,
+        fontStyle: 'bold',
+      },
+      margin: { left: 10, right: 10 },
     });
     yPosition = (doc as any).lastAutoTable.finalY + 15;
   }
 
-  if (
-    eventData.logistics.transport ||
-    eventData.logistics.loadingDetails ||
-    eventData.logistics.unloadingDetails
-  ) {
+  // === LOGISTICS SECTION ===
+  const logisticsData = [
+    { label: "Transporte:", value: eventData.logistics.transport },
+    { label: "Detalles de Carga:", value: eventData.logistics.loadingDetails },
+    { label: "Detalles de Descarga:", value: eventData.logistics.unloadingDetails },
+  ].filter(item => hasData(item.value));
+
+  if (logisticsData.length > 0) {
     yPosition = checkPageBreak(yPosition);
     doc.setFontSize(14);
     doc.setTextColor(125, 1, 1);
     doc.text("Logística", 20, yPosition);
     yPosition += 10;
+    
     doc.setFontSize(10);
     doc.setTextColor(51, 51, 51);
-    const logisticsText = [
-      { label: "Transporte:", value: eventData.logistics.transport },
-      { label: "Detalles de Carga:", value: eventData.logistics.loadingDetails },
-      { label: "Detalles de Descarga:", value: eventData.logistics.unloadingDetails },
-    ];
-    logisticsText.forEach((item) => {
-      if (item.value) {
-        doc.text(item.label, 30, yPosition);
-        const lines = doc.splitTextToSize(item.value, pageWidth - 60);
-        doc.text(lines, 30, yPosition + 7);
-        yPosition += lines.length * 7 + 15;
-        yPosition = checkPageBreak(yPosition);
-      }
+    
+    logisticsData.forEach((item) => {
+      doc.setFont(undefined, 'bold');
+      doc.text(item.label, 30, yPosition);
+      doc.setFont(undefined, 'normal');
+      
+      const lines = doc.splitTextToSize(item.value, pageWidth - 60);
+      doc.text(lines, 30, yPosition + 8);
+      yPosition += lines.length * 8 + 12;
+      yPosition = checkPageBreak(yPosition);
     });
+    
+    yPosition += 5;
   }
 
-  if (
-    eventData.staff.some(
-      (person) => person.name || person.surname1 || person.surname2 || person.position
-    )
-  ) {
+  // === STAFF SECTION ===
+  const validStaff = eventData.staff.filter(person => 
+    hasData(person.name) || hasData(person.surname1) || hasData(person.surname2) || hasData(person.position)
+  );
+
+  if (validStaff.length > 0) {
     yPosition = checkPageBreak(yPosition);
     doc.setFontSize(14);
     doc.setTextColor(125, 1, 1);
     doc.text("Lista de Personal", 20, yPosition);
     yPosition += 10;
 
-    const staffTableData = eventData.staff.map((person) => [
-      person.name,
-      person.surname1,
-      person.surname2,
-      person.position,
+    const staffTableData = validStaff.map((person) => [
+      person.name || '',
+      person.surname1 || '',
+      person.surname2 || '',
+      person.position || '',
     ]);
+    
     autoTable(doc, {
       startY: yPosition,
       head: [["Nombre", "Primer Apellido", "Segundo Apellido", "Puesto"]],
       body: staffTableData,
       theme: "grid",
-      styles: { fontSize: 10 },
+      styles: {
+        fontSize: 10,
+        cellPadding: 3,
+        valign: 'top',
+      },
+      headStyles: {
+        fillColor: [125, 1, 1],
+        textColor: [255, 255, 255],
+        fontSize: 11,
+        fontStyle: 'bold',
+      },
+      margin: { left: 10, right: 10 },
     });
     yPosition = (doc as any).lastAutoTable.finalY + 15;
   }
 
-  if (
-    travelArrangements.length > 0 &&
-    travelArrangements.some((arr) =>
-      Object.values(arr).some((val) => val && val !== "")
-    )
-  ) {
+  // === TRAVEL ARRANGEMENTS SECTION ===
+  const validTravelArrangements = travelArrangements.filter(arr =>
+    Object.values(arr).some((val) => hasData(val))
+  );
+
+  if (validTravelArrangements.length > 0) {
     yPosition = checkPageBreak(yPosition);
     doc.setFontSize(14);
     doc.setTextColor(125, 1, 1);
     doc.text("Arreglos de Viaje", 20, yPosition);
     yPosition += 10;
-    const travelTableData = travelArrangements.map((arr) => [
-      arr.transportation_type,
+    
+    const travelTableData = validTravelArrangements.map((arr) => [
+      arr.transportation_type || "",
       `${arr.pickup_address || ""} ${arr.pickup_time || ""}`.trim(),
       arr.departure_time || "",
       arr.arrival_time || "",
       arr.flight_train_number || "",
       arr.notes || "",
     ]);
+    
     autoTable(doc, {
       startY: yPosition,
       head: [["Transporte", "Recogida", "Salida", "Llegada", "Vuelo/Tren #", "Notas"]],
       body: travelTableData,
       theme: "grid",
-      styles: { fontSize: 10 },
+      styles: {
+        fontSize: 10,
+        cellPadding: 3,
+        valign: 'top',
+      },
+      headStyles: {
+        fillColor: [125, 1, 1],
+        textColor: [255, 255, 255],
+        fontSize: 11,
+        fontStyle: 'bold',
+      },
+      margin: { left: 10, right: 10 },
     });
     yPosition = (doc as any).lastAutoTable.finalY + 15;
   }
 
-  if (
-    roomAssignments.length > 0 &&
-    roomAssignments.some((room) =>
-      Object.values(room).some((val) => val && val !== "")
-    )
-  ) {
+  // === ROOM ASSIGNMENTS SECTION ===
+  const validRoomAssignments = roomAssignments.filter(room =>
+    Object.values(room).some((val) => hasData(val))
+  );
+
+  if (validRoomAssignments.length > 0) {
     yPosition = checkPageBreak(yPosition);
     doc.setFontSize(14);
     doc.setTextColor(125, 1, 1);
     doc.text("Asignaciones de Habitaciones", 20, yPosition);
     yPosition += 10;
-    const roomTableData = roomAssignments.map((room) => [
-      room.room_type,
+    
+    const roomTableData = validRoomAssignments.map((room) => [
+      room.room_type || "",
       room.room_number || "",
       room.staff_member1_id || "",
       room.room_type === "double" ? room.staff_member2_id || "" : "",
     ]);
+    
     autoTable(doc, {
       startY: yPosition,
       head: [["Tipo de Habitación", "Número", "Personal 1", "Personal 2"]],
       body: roomTableData,
       theme: "grid",
-      styles: { fontSize: 10 },
+      styles: {
+        fontSize: 10,
+        cellPadding: 3,
+        valign: 'top',
+      },
+      headStyles: {
+        fillColor: [125, 1, 1],
+        textColor: [255, 255, 255],
+        fontSize: 11,
+        fontStyle: 'bold',
+      },
+      margin: { left: 10, right: 10 },
     });
     yPosition = (doc as any).lastAutoTable.finalY + 15;
   }
 
-  if (eventData.schedule) {
+  // === SCHEDULE SECTION ===
+  if (hasData(eventData.schedule)) {
     yPosition = checkPageBreak(yPosition);
     doc.setFontSize(14);
     doc.setTextColor(125, 1, 1);
     doc.text("Programa", 20, yPosition);
     yPosition += 10;
+    
     doc.setFontSize(10);
     doc.setTextColor(51, 51, 51);
     const scheduleLines = doc.splitTextToSize(eventData.schedule, pageWidth - 40);
-    doc.text(scheduleLines, 20, yPosition);
-    yPosition += scheduleLines.length * 7 + 15;
+    doc.text(scheduleLines, 30, yPosition);
+    yPosition += scheduleLines.length * 8 + 15;
   }
 
-  if (eventData.powerRequirements) {
+  // === POWER REQUIREMENTS SECTION ===
+  if (hasData(eventData.powerRequirements)) {
     yPosition = checkPageBreak(yPosition);
     doc.setFontSize(14);
     doc.setTextColor(125, 1, 1);
     doc.text("Requisitos Eléctricos", 20, yPosition);
     yPosition += 10;
+    
     doc.setFontSize(10);
     doc.setTextColor(51, 51, 51);
     const powerLines = doc.splitTextToSize(eventData.powerRequirements, pageWidth - 40);
-    doc.text(powerLines, 20, yPosition);
-    yPosition += powerLines.length * 7 + 15;
+    doc.text(powerLines, 30, yPosition);
+    yPosition += powerLines.length * 8 + 15;
   }
 
-  if (eventData.auxiliaryNeeds) {
+  // === AUXILIARY NEEDS SECTION ===
+  if (hasData(eventData.auxiliaryNeeds)) {
     yPosition = checkPageBreak(yPosition);
     doc.setFontSize(14);
     doc.setTextColor(125, 1, 1);
     doc.text("Necesidades Auxiliares", 20, yPosition);
     yPosition += 10;
+    
     doc.setFontSize(10);
     doc.setTextColor(51, 51, 51);
     const auxLines = doc.splitTextToSize(eventData.auxiliaryNeeds, pageWidth - 40);
-    doc.text(auxLines, 20, yPosition);
-    yPosition += auxLines.length * 7 + 15;
+    doc.text(auxLines, 30, yPosition);
+    yPosition += auxLines.length * 8 + 15;
   }
 
   if (imagePreviews.venue.length > 0) {
