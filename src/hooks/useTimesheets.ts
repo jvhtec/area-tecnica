@@ -4,6 +4,7 @@ import { Timesheet } from "@/types/timesheet";
 import { toast } from "sonner";
 
 export const useTimesheets = (jobId: string) => {
+  console.log("useTimesheets hook called with jobId:", jobId);
   const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
