@@ -1327,7 +1327,7 @@ export type Database = {
           {
             foreignKeyName: "hoja_de_ruta_job_id_fkey"
             columns: ["job_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
@@ -1363,6 +1363,13 @@ export type Database = {
           role?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_hoja_de_ruta_contacts_main"
+            columns: ["hoja_de_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_de_ruta"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "hoja_de_ruta_contacts_hoja_de_ruta_id_fkey"
             columns: ["hoja_de_ruta_id"]
@@ -1405,6 +1412,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_hoja_de_ruta_equipment_main"
+            columns: ["hoja_de_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_de_ruta"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "hoja_de_ruta_equipment_hoja_de_ruta_id_fkey"
             columns: ["hoja_de_ruta_id"]
             isOneToOne: false
@@ -1433,6 +1447,13 @@ export type Database = {
           image_type?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_hoja_de_ruta_images_main"
+            columns: ["hoja_de_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_de_ruta"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "hoja_de_ruta_images_hoja_de_ruta_id_fkey"
             columns: ["hoja_de_ruta_id"]
@@ -1469,6 +1490,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_hoja_de_ruta_logistics_main"
+            columns: ["hoja_de_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_de_ruta"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "hoja_de_ruta_logistics_hoja_de_ruta_id_fkey"
             columns: ["hoja_de_ruta_id"]
             isOneToOne: false
@@ -1503,6 +1531,13 @@ export type Database = {
           staff_member2_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_hoja_de_ruta_rooms_main"
+            columns: ["hoja_de_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_de_ruta"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "hoja_de_ruta_rooms_hoja_de_ruta_id_fkey"
             columns: ["hoja_de_ruta_id"]
@@ -1552,6 +1587,13 @@ export type Database = {
           surname2?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_hoja_de_ruta_staff_main"
+            columns: ["hoja_de_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_de_ruta"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "hoja_de_ruta_staff_hoja_de_ruta_id_fkey"
             columns: ["hoja_de_ruta_id"]
@@ -1632,6 +1674,13 @@ export type Database = {
           transportation_type?: Database["public"]["Enums"]["transportation_type"]
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_hoja_de_ruta_travel_main"
+            columns: ["hoja_de_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_de_ruta"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "hoja_de_ruta_travel_hoja_de_ruta_id_fkey"
             columns: ["hoja_de_ruta_id"]

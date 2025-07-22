@@ -48,10 +48,12 @@ export const useHojaDeRutaForm = () => {
 
   // Initialize form with existing data when hojaDeRuta changes
   useEffect(() => {
-    console.log("🔄 FORM: useEffect triggered with hojaDeRuta:", hojaDeRuta);
-    console.log("🔄 FORM: Current selectedJobId:", selectedJobId);
-    if (hojaDeRuta) {
-      console.log("✅ FORM: Initializing form with hojaDeRuta data:", hojaDeRuta);
+    console.log("🔄 FORM: Data initialization effect triggered");
+    console.log("🔄 FORM: selectedJobId:", selectedJobId);
+    console.log("🔄 FORM: hojaDeRuta:", hojaDeRuta ? "Found data" : "No data");
+    
+    if (selectedJobId && hojaDeRuta) {
+      console.log("✅ FORM: Initializing form with existing data");
       
       setEventData({
         eventName: hojaDeRuta.event_name || "",
@@ -88,6 +90,7 @@ export const useHojaDeRutaForm = () => {
 
       // Set travel arrangements
       if (hojaDeRuta.travel && hojaDeRuta.travel.length > 0) {
+        console.log("🚗 FORM: Setting travel arrangements:", hojaDeRuta.travel.length);
         setTravelArrangements(hojaDeRuta.travel.map((arr: any) => ({
           transportation_type: arr.transportation_type,
           pickup_address: arr.pickup_address,
@@ -97,38 +100,50 @@ export const useHojaDeRutaForm = () => {
           flight_train_number: arr.flight_train_number,
           notes: arr.notes,
         })));
+      } else {
+        setTravelArrangements([{ transportation_type: "van" }]);
       }
 
       // Set room assignments
       if (hojaDeRuta.rooms && hojaDeRuta.rooms.length > 0) {
+        console.log("🏨 FORM: Setting room assignments:", hojaDeRuta.rooms.length);
         setRoomAssignments(hojaDeRuta.rooms.map((room: any) => ({
           room_type: room.room_type,
           room_number: room.room_number,
           staff_member1_id: room.staff_member1_id,
           staff_member2_id: room.staff_member2_id,
         })));
+      } else {
+        setRoomAssignments([{ room_type: "single" }]);
       }
-    } else {
-      // Reset form to initial state when no data is available
-      console.log("❌ FORM: No hojaDeRuta data found, resetting form to initial state");
-      console.log("❌ FORM: Current selectedJobId:", selectedJobId);
+    } else if (selectedJobId && !hojaDeRuta && !isLoadingHojaDeRuta) {
+      // Reset form to initial state when no data is available for this job
+      console.log("🆕 FORM: No existing data found, resetting to initial state");
       setEventData(initialEventData);
       setTravelArrangements([{ transportation_type: "van" }]);
       setRoomAssignments([{ room_type: "single" }]);
     }
-  }, [hojaDeRuta]);
+  }, [hojaDeRuta, selectedJobId, isLoadingHojaDeRuta]);
 
   // Reset form when job selection changes
   useEffect(() => {
+    console.log("🔄 FORM: Job selection changed to:", selectedJobId);
     if (selectedJobId) {
       setPowerRequirements("");
       fetchPowerRequirements(selectedJobId);
       fetchAssignedStaff(selectedJobId);
+    } else {
+      // Clear all data when no job is selected
+      setEventData(initialEventData);
+      setTravelArrangements([{ transportation_type: "van" }]);
+      setRoomAssignments([{ room_type: "single" }]);
+      setPowerRequirements("");
     }
   }, [selectedJobId]);
 
   const fetchPowerRequirements = async (jobId: string) => {
     try {
+      console.log("⚡ FORM: Fetching power requirements for job:", jobId);
       const { data: requirements, error } = await supabase
         .from("power_requirement_tables")
         .select("*")
@@ -145,6 +160,8 @@ export const useHojaDeRutaForm = () => {
               `PDU Recomendado: ${req.pdu_type}\n`;
           })
           .join("\n");
+        
+        console.log("⚡ FORM: Power requirements fetched successfully");
         setPowerRequirements(formattedRequirements);
         setEventData((prev) => ({
           ...prev,
@@ -152,7 +169,7 @@ export const useHojaDeRutaForm = () => {
         }));
       }
     } catch (error: any) {
-      console.error("Error al obtener los requisitos eléctricos:", error);
+      console.error("❌ FORM: Error fetching power requirements:", error);
       toast({
         title: "Error",
         description: "No se pudieron obtener los requisitos eléctricos",
@@ -163,6 +180,7 @@ export const useHojaDeRutaForm = () => {
 
   const fetchAssignedStaff = async (jobId: string) => {
     try {
+      console.log("👥 FORM: Fetching assigned staff for job:", jobId);
       const { data: assignments, error } = await supabase
         .from("job_assignments")
         .select(
@@ -190,13 +208,14 @@ export const useHojaDeRutaForm = () => {
             "Técnico",
         }));
 
+        console.log("👥 FORM: Staff fetched successfully:", staffList.length);
         setEventData((prev) => ({
           ...prev,
           staff: staffList,
         }));
       }
     } catch (error) {
-      console.error("Error al obtener el personal:", error);
+      console.error("❌ FORM: Error fetching assigned staff:", error);
       toast({
         title: "Error",
         description: "No se pudo obtener el personal asignado",
@@ -225,4 +244,3 @@ export const useHojaDeRutaForm = () => {
     isLoadingHojaDeRuta,
   };
 };
-
