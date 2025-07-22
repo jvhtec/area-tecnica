@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import {
   Card,
@@ -62,12 +63,15 @@ const EnhancedHojaDeRutaGenerator = () => {
     isLoadingHojaDeRuta,
     isSaving,
     hojaDeRuta,
-    handleSaveAll, // Get the comprehensive save function from the form hook
+    handleSaveAll,
+    isInitialized,
+    refreshData
   } = useHojaDeRutaForm();
   
   console.log("🚀 COMPONENT: Current selectedJobId:", selectedJobId);
   console.log("🚀 COMPONENT: Jobs available:", jobs?.length);
   console.log("🚀 COMPONENT: Has save function:", !!handleSaveAll);
+  console.log("🚀 COMPONENT: Is initialized:", isInitialized);
 
   const {
     images,
@@ -119,7 +123,7 @@ const EnhancedHojaDeRutaGenerator = () => {
 
   // Track if data has changed to show save button
   useEffect(() => {
-    if (hojaDeRuta) {
+    if (hojaDeRuta && isInitialized) {
       const isDataDifferent = JSON.stringify(eventData) !== JSON.stringify({
         eventName: hojaDeRuta.event_name || "",
         eventDates: hojaDeRuta.event_dates || "",
@@ -144,7 +148,7 @@ const EnhancedHojaDeRutaGenerator = () => {
       const areRoomAssignmentsDifferent = JSON.stringify(roomAssignments) !== JSON.stringify(hojaDeRuta.rooms || []);
 
       setIsDirty(Boolean(isDataDifferent || areTravelArrangementsDifferent || areRoomAssignmentsDifferent));
-    } else if (selectedJobId) {
+    } else if (selectedJobId && isInitialized) {
       // If we have a selected job but no saved data, consider it dirty if there's any data entered
       const hasAnyData = Boolean(
         eventData.eventName || 
@@ -158,7 +162,7 @@ const EnhancedHojaDeRutaGenerator = () => {
       );
       setIsDirty(hasAnyData);
     }
-  }, [eventData, travelArrangements, roomAssignments, hojaDeRuta, selectedJobId]);
+  }, [eventData, travelArrangements, roomAssignments, hojaDeRuta, selectedJobId, isInitialized]);
 
   // Auto-populate data from job when job is selected
   const handleAutoPopulate = () => {
@@ -191,7 +195,7 @@ const EnhancedHojaDeRutaGenerator = () => {
 
   // Apply template
   const handleApplyTemplate = (templateId: string) => {
-    const template = templates.find(t => t.id === templateId);
+    const template = templates?.find(t => t.id === templateId);
     if (!template) return;
 
     setEventData(prev => ({
@@ -220,8 +224,32 @@ const EnhancedHojaDeRutaGenerator = () => {
       return;
     }
 
-    await handleSaveAll();
-    setIsDirty(false);
+    try {
+      await handleSaveAll();
+      setIsDirty(false);
+    } catch (error) {
+      console.error("Error in handleSave:", error);
+    }
+  };
+
+  // Force refresh data
+  const handleRefreshData = async () => {
+    if (!selectedJobId) return;
+    
+    try {
+      await refreshData();
+      toast({
+        title: "Datos actualizados",
+        description: "Los datos se han actualizado correctamente.",
+      });
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron actualizar los datos.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Enhanced PDF generation with new features
@@ -236,6 +264,11 @@ const EnhancedHojaDeRutaGenerator = () => {
     }
 
     try {
+      // Save data first to ensure we're generating PDF with latest data
+      if (isDirty) {
+        await handleSaveAll();
+      }
+      
       const { generateEnhancedPDF } = await import("@/utils/hoja-de-ruta/enhanced-pdf-generator");
       
       const enhancedEventData = {
@@ -369,18 +402,30 @@ const EnhancedHojaDeRutaGenerator = () => {
                 Auto-completar desde Job
               </Button>
               
+              {/* Manual Refresh Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefreshData}
+                disabled={!selectedJobId || isLoadingHojaDeRuta}
+                className="border-2 border-purple-500 text-purple-600 hover:bg-purple-50 hover:border-purple-600 font-medium"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Actualizar datos
+              </Button>
+              
               {/* Template Selector - Enhanced UI */}
               <div className="flex items-center gap-2">
                 <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
                   <SelectTrigger className="w-52 border-2 border-purple-300 hover:border-purple-400">
                     <SelectValue placeholder={
-                      templates.length > 0 
+                      templates && templates.length > 0 
                         ? "📋 Seleccionar plantilla" 
                         : "📋 No hay plantillas"
                     } />
                   </SelectTrigger>
                   <SelectContent>
-                    {templates.length > 0 ? (
+                    {templates && templates.length > 0 ? (
                       templates.map((template) => (
                         <SelectItem key={template.id} value={template.id}>
                           <div className="flex items-center gap-2">
@@ -501,17 +546,17 @@ const EnhancedHojaDeRutaGenerator = () => {
                 variant="default"
                 onClick={generateDocument}
                 className="min-w-[180px]"
-                disabled={!selectedJobId}
+                disabled={!selectedJobId || !isInitialized}
               >
                 <FileText className="w-4 h-4 mr-2" />
                 Generar PDF
               </Button>
               
-              {(isDirty || !hojaDeRuta) && selectedJobId && (
+              {(isDirty || !hojaDeRuta) && selectedJobId && isInitialized && (
                 <Button
                   variant="secondary"
                   onClick={handleSave}
-                  disabled={isSaving}
+                  disabled={isSaving || !isInitialized}
                   className="min-w-[160px] bg-green-100 hover:bg-green-200 text-green-800 border-green-300"
                 >
                   {isSaving ? (

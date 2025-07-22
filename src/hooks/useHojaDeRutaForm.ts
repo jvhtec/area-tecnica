@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { EventData, TravelArrangement, RoomAssignment } from "@/types/hoja-de-ruta";
 import { useJobSelection } from "@/hooks/useJobSelection";
 import { supabase } from "@/lib/supabase";
@@ -39,23 +39,30 @@ export const useHojaDeRutaForm = () => {
   const [roomAssignments, setRoomAssignments] = useState<RoomAssignment[]>([
     { room_type: "single" },
   ]);
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
   // Get persistence functions - this is the single source of truth
   const {
     hojaDeRuta,
     isLoading: isLoadingHojaDeRuta,
+    fetchError,
     saveHojaDeRuta,
     isSaving,
     saveTravelArrangements,
+    isSavingTravel,
     saveRoomAssignments,
+    isSavingRooms,
     saveVenueImages,
+    isSavingImages,
+    refreshData
   } = useHojaDeRutaPersistence(selectedJobId);
 
   console.log("🚀 FORM HOOK: Current state:", {
     selectedJobId,
     hasHojaDeRuta: !!hojaDeRuta,
     isLoadingHojaDeRuta,
-    eventDataEventName: eventData.eventName
+    eventDataEventName: eventData.eventName,
+    isInitialized
   });
 
   // Initialize form with existing data when hojaDeRuta changes
@@ -128,28 +135,49 @@ export const useHojaDeRutaForm = () => {
       } else {
         setRoomAssignments([{ room_type: "single" }]);
       }
+      
+      setIsInitialized(true);
     } else if (selectedJobId && !hojaDeRuta && !isLoadingHojaDeRuta) {
       // Reset form to initial state when no data is available for this job
       console.log("🆕 FORM: No existing data found, resetting to initial state");
       setEventData(initialEventData);
       setTravelArrangements([{ transportation_type: "van" }]);
       setRoomAssignments([{ room_type: "single" }]);
+      setIsInitialized(true);
     }
   }, [hojaDeRuta, selectedJobId, isLoadingHojaDeRuta]);
 
-  // Reset form when job selection changes
+  // Reset form and trigger data fetch when job selection changes
   useEffect(() => {
     console.log("🔄 FORM: Job selection changed to:", selectedJobId);
     if (selectedJobId) {
+      setIsInitialized(false); // Mark as not initialized until data is loaded
+      // Data will be loaded by the persistence hook and handled in the other effect
       fetchPowerRequirements(selectedJobId);
       fetchAssignedStaff(selectedJobId);
+      
+      // Force a refresh of the data when job selection changes
+      refreshData();
     } else {
       // Clear all data when no job is selected
       setEventData(initialEventData);
       setTravelArrangements([{ transportation_type: "van" }]);
       setRoomAssignments([{ room_type: "single" }]);
+      setIsInitialized(true);
     }
-  }, [selectedJobId]);
+  }, [selectedJobId, refreshData]);
+
+  // Display error toast if there was a fetch error
+  useEffect(() => {
+    if (fetchError) {
+      console.error("❌ FORM: Error fetching data:", fetchError);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos. Por favor, intente de nuevo.",
+        variant: "destructive",
+      });
+    }
+  }, [fetchError, toast]);
 
   const fetchPowerRequirements = async (jobId: string) => {
     try {
@@ -234,7 +262,7 @@ export const useHojaDeRutaForm = () => {
   };
 
   // Enhanced save function that handles all data types
-  const handleSaveAll = async () => {
+  const handleSaveAll = useCallback(async () => {
     console.log("💾 FORM: handleSaveAll called with selectedJobId:", selectedJobId);
     if (!selectedJobId) {
       toast({
@@ -266,23 +294,39 @@ export const useHojaDeRutaForm = () => {
         ]);
         
         console.log("✅ FORM: All data saved successfully");
+        // Explicitly refresh data after save to ensure we have the latest
+        await refreshData();
+        
         toast({
           title: "✅ Guardado completo",
           description: "Todos los datos se han guardado correctamente.",
         });
+        
+        return savedRecord;
       } else {
         console.error("❌ FORM: No saved record ID returned");
         throw new Error("No se pudo obtener el ID del registro guardado");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ FORM: Error in handleSaveAll:", error);
       toast({
         title: "❌ Error al guardar",
         description: `No se pudieron guardar los datos: ${error.message}`,
         variant: "destructive",
       });
+      throw error;
     }
-  };
+  }, [
+    selectedJobId, 
+    eventData, 
+    travelArrangements, 
+    roomAssignments, 
+    saveHojaDeRuta, 
+    saveTravelArrangements, 
+    saveRoomAssignments, 
+    refreshData, 
+    toast
+  ]);
 
   return {
     // Data state
@@ -300,21 +344,23 @@ export const useHojaDeRutaForm = () => {
     setShowAlert,
     alertMessage,
     setAlertMessage,
+    isInitialized,
     
     // Loading states
     isLoadingJobs,
     isLoadingHojaDeRuta,
-    isSaving,
+    isSaving: isSaving || isSavingTravel || isSavingRooms || isSavingImages,
     
     // Data
     jobs,
     hojaDeRuta,
     
-    // Persistence functions - now exposed from this hook
+    // Persistence functions
     saveHojaDeRuta,
     saveTravelArrangements,
     saveRoomAssignments,
     saveVenueImages,
-    handleSaveAll, // New comprehensive save function
+    handleSaveAll,
+    refreshData
   };
 };

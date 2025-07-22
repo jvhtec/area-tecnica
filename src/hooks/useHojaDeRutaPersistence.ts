@@ -10,7 +10,7 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
   const queryClient = useQueryClient();
 
   // Fetch existing hoja de ruta data
-  const { data: hojaDeRuta, isLoading } = useQuery({
+  const { data: hojaDeRuta, isLoading, error: fetchError, refetch } = useQuery({
     queryKey: ['hoja-de-ruta', jobId],
     queryFn: async () => {
       console.log("🔍 PERSISTENCE: Fetching hoja de ruta data for job:", jobId);
@@ -42,12 +42,12 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
 
         // Fetch all related data in parallel
         const [
-          { data: contacts },
-          { data: staff },
-          { data: logistics },
-          { data: travel },
-          { data: rooms },
-          { data: images }
+          { data: contacts, error: contactsError },
+          { data: staff, error: staffError },
+          { data: logistics, error: logisticsError },
+          { data: travel, error: travelError },
+          { data: rooms, error: roomsError },
+          { data: images, error: imagesError }
         ] = await Promise.all([
           supabase.from('hoja_de_ruta_contacts').select('*').eq('hoja_de_ruta_id', mainData.id),
           supabase.from('hoja_de_ruta_staff').select('*').eq('hoja_de_ruta_id', mainData.id),
@@ -56,6 +56,14 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
           supabase.from('hoja_de_ruta_rooms').select('*').eq('hoja_de_ruta_id', mainData.id),
           supabase.from('hoja_de_ruta_images').select('*').eq('hoja_de_ruta_id', mainData.id)
         ]);
+
+        // Check for errors in any of the requests
+        if (contactsError || staffError || logisticsError || travelError || roomsError || imagesError) {
+          console.error("❌ PERSISTENCE: Error fetching related data:", { 
+            contactsError, staffError, logisticsError, travelError, roomsError, imagesError 
+          });
+          throw new Error("Failed to fetch complete hoja de ruta data");
+        }
 
         console.log("📊 PERSISTENCE: Fetched related data:", {
           contacts: contacts?.length || 0,
@@ -80,19 +88,39 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
         throw error;
       }
     },
-    enabled: !!jobId
+    enabled: !!jobId,
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    retry: 2, // Retry failed requests twice
   });
+
+  // Improved validation before save
+  const validateData = (data: EventData): boolean => {
+    // Basic validation to ensure required fields are present
+    if (!data.eventName?.trim()) {
+      toast({
+        title: "❌ Datos incompletos",
+        description: "El nombre del evento es obligatorio",
+        variant: "destructive",
+      });
+      return false;
+    }
+    return true;
+  };
 
   // Create or update hoja de ruta with proper upsert
   const { mutateAsync: saveHojaDeRuta, isPending: isSaving } = useMutation({
     mutationFn: async (data: EventData) => {
       console.log("💾 PERSISTENCE: Starting save operation");
       console.log("💾 PERSISTENCE: Job ID:", jobId);
-      console.log("💾 PERSISTENCE: Data to save:", data);
       
       if (!jobId) throw new Error('No job ID provided');
+      if (!validateData(data)) throw new Error('Data validation failed');
 
       try {
+        // Start with a clean timestamp for last_modified
+        const timestamp = new Date().toISOString();
+        const userId = (await supabase.auth.getUser()).data.user?.id;
+        
         // Use upsert to handle both insert and update cases
         const { data: upsertedRecord, error: upsertError } = await supabase
           .from('hoja_de_ruta')
@@ -105,8 +133,11 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
             schedule: data.schedule,
             power_requirements: data.powerRequirements,
             auxiliary_needs: data.auxiliaryNeeds,
-            last_modified: new Date().toISOString(),
-            created_by: (await supabase.auth.getUser()).data.user?.id
+            last_modified: timestamp,
+            created_by: userId,
+            // For new records, set initial values
+            document_version: hojaDeRuta ? hojaDeRuta.document_version : 1,
+            status: hojaDeRuta ? hojaDeRuta.status : 'draft',
           }, {
             onConflict: 'job_id',
             ignoreDuplicates: false
@@ -142,11 +173,18 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
 
         // Update contacts - delete existing and insert new ones
         if (data.contacts.length > 0) {
-          await supabase
+          // First delete existing contacts
+          const { error: deleteContactsError } = await supabase
             .from('hoja_de_ruta_contacts')
             .delete()
             .eq('hoja_de_ruta_id', upsertedRecord.id);
+            
+          if (deleteContactsError) {
+            console.error("❌ PERSISTENCE: Error deleting contacts:", deleteContactsError);
+            throw deleteContactsError;
+          }
 
+          // Then insert new contacts
           const { error: contactsError } = await supabase
             .from('hoja_de_ruta_contacts')
             .insert(data.contacts.map(contact => ({
@@ -164,11 +202,18 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
 
         // Update staff members - delete existing and insert new ones
         if (data.staff.length > 0) {
-          await supabase
+          // First delete existing staff
+          const { error: deleteStaffError } = await supabase
             .from('hoja_de_ruta_staff')
             .delete()
             .eq('hoja_de_ruta_id', upsertedRecord.id);
+            
+          if (deleteStaffError) {
+            console.error("❌ PERSISTENCE: Error deleting staff:", deleteStaffError);
+            throw deleteStaffError;
+          }
 
+          // Then insert new staff
           const { error: staffError } = await supabase
             .from('hoja_de_ruta_staff')
             .insert(data.staff.map(member => ({
@@ -193,13 +238,14 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
       }
     },
     onSuccess: () => {
+      // Explicitly invalidate the query to force a refetch
       queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });
       toast({
         title: "✅ Guardado con éxito",
         description: "Los cambios se han guardado correctamente.",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('❌ PERSISTENCE: Error saving hoja de ruta:', error);
       toast({
         title: "❌ Error al guardar",
@@ -210,15 +256,22 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
   });
 
   // Save travel arrangements with proper error handling
-  const { mutateAsync: saveTravelArrangements } = useMutation({
+  const { mutateAsync: saveTravelArrangements, isPending: isSavingTravel } = useMutation({
     mutationFn: async ({ hojaDeRutaId, arrangements }: { hojaDeRutaId: string, arrangements: TravelArrangement[] }) => {
       console.log("🚗 PERSISTENCE: Saving travel arrangements:", arrangements.length);
       
-      await supabase
+      // First delete existing travel arrangements
+      const { error: deleteError } = await supabase
         .from('hoja_de_ruta_travel')
         .delete()
         .eq('hoja_de_ruta_id', hojaDeRutaId);
+        
+      if (deleteError) {
+        console.error("❌ PERSISTENCE: Error deleting travel arrangements:", deleteError);
+        throw deleteError;
+      }
 
+      // Then insert new travel arrangements if there are any
       if (arrangements.length > 0) {
         const { error } = await supabase
           .from('hoja_de_ruta_travel')
@@ -233,17 +286,18 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
             notes: arr.notes
           })));
         
-        if (error) throw error;
+        if (error) {
+          console.error("❌ PERSISTENCE: Error inserting travel arrangements:", error);
+          throw error;
+        }
       }
+      
+      return { success: true, count: arrangements.length };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });
-      toast({
-        title: "🚗 Arreglos de viaje guardados",
-        description: "Los arreglos de viaje se han actualizado correctamente.",
-      });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('❌ PERSISTENCE: Error saving travel arrangements:', error);
       toast({
         title: "❌ Error al guardar viajes",
@@ -254,15 +308,22 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
   });
 
   // Save room assignments with proper error handling
-  const { mutateAsync: saveRoomAssignments } = useMutation({
+  const { mutateAsync: saveRoomAssignments, isPending: isSavingRooms } = useMutation({
     mutationFn: async ({ hojaDeRutaId, assignments }: { hojaDeRutaId: string, assignments: RoomAssignment[] }) => {
       console.log("🏨 PERSISTENCE: Saving room assignments:", assignments.length);
       
-      await supabase
+      // First delete existing room assignments
+      const { error: deleteError } = await supabase
         .from('hoja_de_ruta_rooms')
         .delete()
         .eq('hoja_de_ruta_id', hojaDeRutaId);
+        
+      if (deleteError) {
+        console.error("❌ PERSISTENCE: Error deleting room assignments:", deleteError);
+        throw deleteError;
+      }
 
+      // Then insert new room assignments if there are any
       if (assignments.length > 0) {
         const { error } = await supabase
           .from('hoja_de_ruta_rooms')
@@ -274,17 +335,18 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
             staff_member2_id: room.staff_member2_id
           })));
         
-        if (error) throw error;
+        if (error) {
+          console.error("❌ PERSISTENCE: Error inserting room assignments:", error);
+          throw error;
+        }
       }
+      
+      return { success: true, count: assignments.length };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });
-      toast({
-        title: "🏨 Asignaciones de habitaciones guardadas",
-        description: "Las asignaciones de habitaciones se han actualizado correctamente.",
-      });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('❌ PERSISTENCE: Error saving room assignments:', error);
       toast({
         title: "❌ Error al guardar habitaciones",
@@ -295,15 +357,22 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
   });
 
   // Save venue images with proper error handling
-  const { mutateAsync: saveVenueImages } = useMutation({
+  const { mutateAsync: saveVenueImages, isPending: isSavingImages } = useMutation({
     mutationFn: async ({ hojaDeRutaId, images }: { hojaDeRutaId: string, images: { image_path: string, image_type: string }[] }) => {
       console.log("📸 PERSISTENCE: Saving venue images:", images.length);
       
-      await supabase
+      // First delete existing images
+      const { error: deleteError } = await supabase
         .from('hoja_de_ruta_images')
         .delete()
         .eq('hoja_de_ruta_id', hojaDeRutaId);
+        
+      if (deleteError) {
+        console.error("❌ PERSISTENCE: Error deleting images:", deleteError);
+        throw deleteError;
+      }
 
+      // Then insert new images if there are any
       if (images.length > 0) {
         const { error } = await supabase
           .from('hoja_de_ruta_images')
@@ -313,17 +382,18 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
             image_type: img.image_type
           })));
         
-        if (error) throw error;
+        if (error) {
+          console.error("❌ PERSISTENCE: Error inserting images:", error);
+          throw error;
+        }
       }
+      
+      return { success: true, count: images.length };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });
-      toast({
-        title: "📸 Imágenes guardadas",
-        description: "Las imágenes se han actualizado correctamente.",
-      });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('❌ PERSISTENCE: Error saving venue images:', error);
       toast({
         title: "❌ Error al guardar imágenes",
@@ -333,13 +403,27 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
     }
   });
 
+  // Force a manual refetch of the data
+  const refreshData = useCallback(() => {
+    if (jobId) {
+      console.log("🔄 PERSISTENCE: Manually refreshing data for job:", jobId);
+      return refetch();
+    }
+    return Promise.resolve({ data: null, error: null, isLoading: false });
+  }, [jobId, refetch]);
+
   return {
     hojaDeRuta,
     isLoading,
+    fetchError,
     saveHojaDeRuta,
     isSaving,
     saveTravelArrangements,
+    isSavingTravel,
     saveRoomAssignments,
-    saveVenueImages
+    isSavingRooms,
+    saveVenueImages,
+    isSavingImages,
+    refreshData
   };
 };

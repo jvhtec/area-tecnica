@@ -23,7 +23,7 @@ import { RoomAssignmentsDialog } from "@/components/hoja-de-ruta/dialogs/RoomAss
 import { generatePDF } from "@/utils/hoja-de-ruta/pdf-generator";
 import { uploadPdfToJob } from "@/utils/hoja-de-ruta/pdf-upload";
 import { useToast } from "@/hooks/use-toast";
-import { Save, FileText, Loader2 } from "lucide-react";
+import { Save, FileText, Loader2, RefreshCw } from "lucide-react";
 
 const HojaDeRutaGenerator = () => {
   const {
@@ -42,7 +42,9 @@ const HojaDeRutaGenerator = () => {
     isLoadingHojaDeRuta,
     isSaving,
     hojaDeRuta,
-    handleSaveAll, // Get the comprehensive save function from the form hook
+    handleSaveAll,
+    isInitialized,
+    refreshData
   } = useHojaDeRutaForm();
 
   const {
@@ -79,7 +81,7 @@ const HojaDeRutaGenerator = () => {
 
   // Update isDirty when any data changes
   useEffect(() => {
-    if (hojaDeRuta) {
+    if (hojaDeRuta && isInitialized) {
       const isDataDifferent = JSON.stringify(eventData) !== JSON.stringify({
         eventName: hojaDeRuta.event_name,
         eventDates: hojaDeRuta.event_dates,
@@ -104,12 +106,12 @@ const HojaDeRutaGenerator = () => {
       const areRoomAssignmentsDifferent = JSON.stringify(roomAssignments) !== JSON.stringify(hojaDeRuta.rooms || []);
 
       setIsDirty(Boolean(isDataDifferent || areTravelArrangementsDifferent || areRoomAssignmentsDifferent));
-    } else if (selectedJobId) {
+    } else if (selectedJobId && isInitialized) {
       // If we have a selected job but no saved data, consider it dirty if there's any data entered
       const hasAnyData = Boolean(eventData.eventName || eventData.eventDates || eventData.venue.name);
       setIsDirty(hasAnyData);
     }
-  }, [eventData, travelArrangements, roomAssignments, hojaDeRuta, selectedJobId]);
+  }, [eventData, travelArrangements, roomAssignments, hojaDeRuta, selectedJobId, isInitialized]);
 
   const handleSave = async () => {
     console.log('🎯 BASIC: Save button clicked, calling handleSaveAll');
@@ -122,12 +124,50 @@ const HojaDeRutaGenerator = () => {
       return;
     }
 
-    await handleSaveAll();
-    setIsDirty(false);
+    try {
+      await handleSaveAll();
+      setIsDirty(false);
+    } catch (error) {
+      console.error("Error in handleSave:", error);
+    }
+  };
+
+  // Force refresh data
+  const handleRefreshData = async () => {
+    if (!selectedJobId) return;
+    
+    try {
+      await refreshData();
+      toast({
+        title: "Datos actualizados",
+        description: "Los datos se han actualizado correctamente.",
+      });
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron actualizar los datos.",
+        variant: "destructive",
+      });
+    }
   };
 
   const generateDocument = async () => {
+    if (!selectedJobId) {
+      toast({
+        title: "Error",
+        description: "Por favor, seleccione un trabajo antes de generar el documento.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
+      // Save data first to ensure we're generating PDF with latest data
+      if (isDirty) {
+        await handleSaveAll();
+      }
+      
       generatePDF(
         eventData,
         travelArrangements,
@@ -145,6 +185,11 @@ const HojaDeRutaGenerator = () => {
       });
     } catch (error) {
       console.error("Error generating PDF:", error);
+      toast({
+        title: "Error",
+        description: "Hubo un problema al generar el documento.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -153,6 +198,7 @@ const HojaDeRutaGenerator = () => {
       <Card className="w-full max-w-3xl mx-auto">
         <CardContent className="p-6">
           <div className="flex items-center justify-center h-64">
+            <Loader2 className="w-8 h-8 animate-spin mr-2" />
             <p className="text-muted-foreground">Cargando datos...</p>
           </div>
         </CardContent>
@@ -233,20 +279,33 @@ const HojaDeRutaGenerator = () => {
           />
 
           <div className="sticky bottom-0 bg-background p-4 border-t flex justify-between items-center gap-4">
-            <Button
-              variant="default"
-              className="w-full"
-              onClick={generateDocument}
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              Generar Hoja de Ruta
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="default"
+                onClick={generateDocument}
+                disabled={!selectedJobId || !isInitialized}
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Generar Hoja de Ruta
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefreshData}
+                disabled={!selectedJobId || isLoadingHojaDeRuta}
+                className="border-2"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Actualizar datos
+              </Button>
+            </div>
             
-            {(isDirty || !hojaDeRuta) && selectedJobId && (
+            {(isDirty || !hojaDeRuta) && selectedJobId && isInitialized && (
               <Button
                 variant="secondary"
                 onClick={handleSave}
-                disabled={isSaving}
+                disabled={isSaving || !isInitialized}
                 className="min-w-[200px]"
               >
                 {isSaving ? (
