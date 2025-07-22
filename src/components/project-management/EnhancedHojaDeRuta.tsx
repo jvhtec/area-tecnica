@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import {
   Card,
@@ -115,7 +114,7 @@ const EnhancedHojaDeRutaGenerator = () => {
   } = useJobIntegration(selectedJobId);
 
   const { toast } = useToast();
-  const [isDirty, setIsDirty] = useState(false);
+  const [isDirty, setIsDirty] = useState<boolean>(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
 
   // Track if data has changed to show save button
@@ -144,13 +143,19 @@ const EnhancedHojaDeRutaGenerator = () => {
       const areTravelArrangementsDifferent = JSON.stringify(travelArrangements) !== JSON.stringify(hojaDeRuta.travel || []);
       const areRoomAssignmentsDifferent = JSON.stringify(roomAssignments) !== JSON.stringify(hojaDeRuta.rooms || []);
 
-      setIsDirty(isDataDifferent || areTravelArrangementsDifferent || areRoomAssignmentsDifferent);
+      setIsDirty(Boolean(isDataDifferent || areTravelArrangementsDifferent || areRoomAssignmentsDifferent));
     } else if (selectedJobId) {
       // If we have a selected job but no saved data, consider it dirty if there's any data entered
-      const hasAnyData = eventData.eventName || eventData.eventDates || eventData.venue.name || 
-                        eventData.schedule || eventData.powerRequirements || eventData.auxiliaryNeeds ||
-                        travelArrangements.some(arr => arr.pickup_address || arr.notes) ||
-                        roomAssignments.some(room => room.room_number);
+      const hasAnyData = Boolean(
+        eventData.eventName || 
+        eventData.eventDates || 
+        eventData.venue.name || 
+        eventData.schedule || 
+        eventData.powerRequirements || 
+        eventData.auxiliaryNeeds ||
+        travelArrangements.some(arr => arr.pickup_address || arr.notes) ||
+        roomAssignments.some(room => room.room_number)
+      );
       setIsDirty(hasAnyData);
     }
   }, [eventData, travelArrangements, roomAssignments, hojaDeRuta, selectedJobId]);

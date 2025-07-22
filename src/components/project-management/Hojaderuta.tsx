@@ -75,7 +75,7 @@ const HojaDeRutaGenerator = () => {
   );
 
   const { toast } = useToast();
-  const [isDirty, setIsDirty] = useState(false);
+  const [isDirty, setIsDirty] = useState<boolean>(false);
 
   // Update isDirty when any data changes
   useEffect(() => {
@@ -103,10 +103,10 @@ const HojaDeRutaGenerator = () => {
       const areTravelArrangementsDifferent = JSON.stringify(travelArrangements) !== JSON.stringify(hojaDeRuta.travel || []);
       const areRoomAssignmentsDifferent = JSON.stringify(roomAssignments) !== JSON.stringify(hojaDeRuta.rooms || []);
 
-      setIsDirty(isDataDifferent || areTravelArrangementsDifferent || areRoomAssignmentsDifferent);
+      setIsDirty(Boolean(isDataDifferent || areTravelArrangementsDifferent || areRoomAssignmentsDifferent));
     } else if (selectedJobId) {
       // If we have a selected job but no saved data, consider it dirty if there's any data entered
-      const hasAnyData = eventData.eventName || eventData.eventDates || eventData.venue.name;
+      const hasAnyData = Boolean(eventData.eventName || eventData.eventDates || eventData.venue.name);
       setIsDirty(hasAnyData);
     }
   }, [eventData, travelArrangements, roomAssignments, hojaDeRuta, selectedJobId]);
