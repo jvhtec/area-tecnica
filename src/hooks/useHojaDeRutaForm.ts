@@ -48,8 +48,10 @@ export const useHojaDeRutaForm = () => {
 
   // Initialize form with existing data when hojaDeRuta changes
   useEffect(() => {
+    console.log("🔄 FORM: useEffect triggered with hojaDeRuta:", hojaDeRuta);
+    console.log("🔄 FORM: Current selectedJobId:", selectedJobId);
     if (hojaDeRuta) {
-      console.log("Initializing form with hojaDeRuta data:", hojaDeRuta);
+      console.log("✅ FORM: Initializing form with hojaDeRuta data:", hojaDeRuta);
       
       setEventData({
         eventName: hojaDeRuta.event_name || "",
@@ -108,7 +110,8 @@ export const useHojaDeRutaForm = () => {
       }
     } else {
       // Reset form to initial state when no data is available
-      console.log("No hojaDeRuta data found, resetting form to initial state");
+      console.log("❌ FORM: No hojaDeRuta data found, resetting form to initial state");
+      console.log("❌ FORM: Current selectedJobId:", selectedJobId);
       setEventData(initialEventData);
       setTravelArrangements([{ transportation_type: "van" }]);
       setRoomAssignments([{ room_type: "single" }]);

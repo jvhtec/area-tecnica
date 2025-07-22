@@ -13,7 +13,11 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
   const { data: hojaDeRuta, isLoading } = useQuery({
     queryKey: ['hoja-de-ruta', jobId],
     queryFn: async () => {
-      if (!jobId) return null;
+      console.log("🔍 PERSISTENCE: Fetching hoja de ruta data for job:", jobId);
+      if (!jobId) {
+        console.log("❌ PERSISTENCE: No jobId provided, returning null");
+        return null;
+      }
 
       console.log("Fetching hoja de ruta data for job:", jobId);
 
@@ -78,7 +82,8 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
   // Create or update hoja de ruta
   const { mutateAsync: saveHojaDeRuta, isPending: isSaving } = useMutation({
     mutationFn: async (data: EventData) => {
-      console.log("Starting save operation with data:", data);
+      console.log("💾 PERSISTENCE: Starting save operation with data:", data);
+      console.log("💾 PERSISTENCE: Job ID:", jobId);
       
       if (!jobId) throw new Error('No job ID provided');
 

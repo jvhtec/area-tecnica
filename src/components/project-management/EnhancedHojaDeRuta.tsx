@@ -46,7 +46,7 @@ import {
 } from "lucide-react";
 
 const EnhancedHojaDeRutaGenerator = () => {
-  console.log("🚀 EnhancedHojaDeRutaGenerator is rendering!");
+  console.log("🚀 COMPONENT: EnhancedHojaDeRutaGenerator is rendering!");
   const {
     eventData,
     setEventData,
@@ -61,6 +61,8 @@ const EnhancedHojaDeRutaGenerator = () => {
     isLoadingJobs,
     jobs,
   } = useHojaDeRutaForm();
+  console.log("🚀 COMPONENT: Current selectedJobId:", selectedJobId);
+  console.log("🚀 COMPONENT: Jobs available:", jobs?.length);
 
   const {
     images,
@@ -120,6 +122,7 @@ const EnhancedHojaDeRutaGenerator = () => {
     saveTravelArrangements,
     saveRoomAssignments,
   } = useHojaDeRutaPersistence(selectedJobId);
+  console.log("🚀 COMPONENT: Persistence hook data:", { hojaDeRuta, isLoadingHojaDeRuta });
 
   // Equipment hook removed per user request
 
@@ -202,6 +205,9 @@ const EnhancedHojaDeRutaGenerator = () => {
   };
 
   const handleSave = async () => {
+    console.log("💾 COMPONENT: Save button clicked");
+    console.log("💾 COMPONENT: selectedJobId:", selectedJobId);
+    console.log("💾 COMPONENT: eventData:", eventData);
     if (!selectedJobId) return;
 
     try {
