@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import {
   Card,
@@ -19,7 +20,6 @@ import {
 import { useHojaDeRutaForm } from "@/hooks/useHojaDeRutaForm";
 import { useHojaDeRutaImages } from "@/hooks/useHojaDeRutaImages";
 import { useHojaDeRutaHandlers } from "@/hooks/useHojaDeRutaHandlers";
-import { useHojaDeRutaPersistence } from "@/hooks/useHojaDeRutaPersistence";
 import { useHojaDeRutaTemplates } from "@/hooks/useHojaDeRutaTemplates";
 import { useJobIntegration } from "@/hooks/useJobIntegration";
 import { ImageUploadSection } from "@/components/hoja-de-ruta/sections/ImageUploadSection";
@@ -42,11 +42,11 @@ import {
   CheckCircle2,
   Clock,
   Eye,
-  Download
 } from "lucide-react";
 
 const EnhancedHojaDeRutaGenerator = () => {
   console.log("🚀 COMPONENT: EnhancedHojaDeRutaGenerator is rendering!");
+  
   const {
     eventData,
     setEventData,
@@ -60,14 +60,19 @@ const EnhancedHojaDeRutaGenerator = () => {
     setRoomAssignments,
     isLoadingJobs,
     jobs,
+    isLoadingHojaDeRuta,
+    isSaving,
+    hojaDeRuta,
+    handleSaveAll, // Get the comprehensive save function from the form hook
   } = useHojaDeRutaForm();
+  
   console.log("🚀 COMPONENT: Current selectedJobId:", selectedJobId);
   console.log("🚀 COMPONENT: Jobs available:", jobs?.length);
+  console.log("🚀 COMPONENT: Has save function:", !!handleSaveAll);
 
   const {
     images,
     imagePreviews,
-    venueMap,
     venueMapPreview,
     handleImageUpload,
     removeImage,
@@ -101,7 +106,7 @@ const EnhancedHojaDeRutaGenerator = () => {
     createTemplate,
     isCreating 
   } = useHojaDeRutaTemplates();
-  console.log("📝 Templates loaded:", templates?.length || 0, templates);
+  console.log("📝 Templates loaded:", templates?.length || 0);
   
   const { 
     jobDetails, 
@@ -110,31 +115,18 @@ const EnhancedHojaDeRutaGenerator = () => {
   } = useJobIntegration(selectedJobId);
 
   const { toast } = useToast();
-  const [isDirty, setIsDirty] = useState(true);
+  const [isDirty, setIsDirty] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
 
-  // Add persistence hook
-  const {
-    hojaDeRuta,
-    isLoading: isLoadingHojaDeRuta,
-    saveHojaDeRuta,
-    isSaving,
-    saveTravelArrangements,
-    saveRoomAssignments,
-  } = useHojaDeRutaPersistence(selectedJobId);
-  console.log("🚀 COMPONENT: Persistence hook data:", { hojaDeRuta, isLoadingHojaDeRuta });
-
-  // Equipment hook removed per user request
-
-  // Update isDirty when any data changes
+  // Track if data has changed to show save button
   useEffect(() => {
     if (hojaDeRuta) {
       const isDataDifferent = JSON.stringify(eventData) !== JSON.stringify({
-        eventName: hojaDeRuta.event_name,
-        eventDates: hojaDeRuta.event_dates,
+        eventName: hojaDeRuta.event_name || "",
+        eventDates: hojaDeRuta.event_dates || "",
         venue: {
-          name: hojaDeRuta.venue_name,
-          address: hojaDeRuta.venue_address,
+          name: hojaDeRuta.venue_name || "",
+          address: hojaDeRuta.venue_address || "",
         },
         contacts: hojaDeRuta.contacts || [],
         logistics: hojaDeRuta.logistics || {
@@ -153,8 +145,15 @@ const EnhancedHojaDeRutaGenerator = () => {
       const areRoomAssignmentsDifferent = JSON.stringify(roomAssignments) !== JSON.stringify(hojaDeRuta.rooms || []);
 
       setIsDirty(isDataDifferent || areTravelArrangementsDifferent || areRoomAssignmentsDifferent);
+    } else if (selectedJobId) {
+      // If we have a selected job but no saved data, consider it dirty if there's any data entered
+      const hasAnyData = eventData.eventName || eventData.eventDates || eventData.venue.name || 
+                        eventData.schedule || eventData.powerRequirements || eventData.auxiliaryNeeds ||
+                        travelArrangements.some(arr => arr.pickup_address || arr.notes) ||
+                        roomAssignments.some(room => room.room_number);
+      setIsDirty(hasAnyData);
     }
-  }, [eventData, travelArrangements, roomAssignments, hojaDeRuta]);
+  }, [eventData, travelArrangements, roomAssignments, hojaDeRuta, selectedJobId]);
 
   // Auto-populate data from job when job is selected
   const handleAutoPopulate = () => {
@@ -204,32 +203,20 @@ const EnhancedHojaDeRutaGenerator = () => {
     });
   };
 
+  // Use the comprehensive save function from the form hook
   const handleSave = async () => {
-    console.log("💾 COMPONENT: Save button clicked");
-    console.log("💾 COMPONENT: selectedJobId:", selectedJobId);
-    console.log("💾 COMPONENT: eventData:", eventData);
-    if (!selectedJobId) return;
-
-    try {
-      await saveHojaDeRuta(eventData);
-
-      if (hojaDeRuta?.id) {
-        await Promise.all([
-          saveTravelArrangements({
-            hojaDeRutaId: hojaDeRuta.id,
-            arrangements: travelArrangements,
-          }),
-          saveRoomAssignments({
-            hojaDeRutaId: hojaDeRuta.id,
-            assignments: roomAssignments,
-          })
-        ]);
-      }
-      
-      setIsDirty(false);
-    } catch (error) {
-      console.error('Error saving data:', error);
+    console.log("💾 COMPONENT: Save button clicked, calling handleSaveAll");
+    if (!selectedJobId) {
+      toast({
+        title: "Error",
+        description: "Por favor, seleccione un trabajo antes de guardar.",
+        variant: "destructive",
+      });
+      return;
     }
+
+    await handleSaveAll();
+    setIsDirty(false);
   };
 
   // Enhanced PDF generation with new features
@@ -420,12 +407,12 @@ const EnhancedHojaDeRutaGenerator = () => {
                <div className="text-xs text-muted-foreground">
                  {!selectedJobId && (
                    <span className="text-amber-600 font-medium">
-                     ⚠️ Selecciona un job para habilitar auto-completar
+                     ⚠️ Selecciona un job para habilitar funciones
                    </span>
                  )}
-                 {templates.length === 0 && (
-                   <span className="text-orange-600 font-medium ml-2">
-                     📋 Sin plantillas disponibles
+                 {isDirty && selectedJobId && (
+                   <span className="text-orange-600 font-medium">
+                     💾 Hay cambios sin guardar
                    </span>
                  )}
                </div>
@@ -509,17 +496,18 @@ const EnhancedHojaDeRutaGenerator = () => {
                 variant="default"
                 onClick={generateDocument}
                 className="min-w-[180px]"
+                disabled={!selectedJobId}
               >
                 <FileText className="w-4 h-4 mr-2" />
                 Generar PDF
               </Button>
               
-              {isDirty && (
+              {(isDirty || !hojaDeRuta) && selectedJobId && (
                 <Button
                   variant="secondary"
                   onClick={handleSave}
-                  disabled={isSaving || !isDirty}
-                  className="min-w-[160px]"
+                  disabled={isSaving}
+                  className="min-w-[160px] bg-green-100 hover:bg-green-200 text-green-800 border-green-300"
                 >
                   {isSaving ? (
                     <>
@@ -529,7 +517,7 @@ const EnhancedHojaDeRutaGenerator = () => {
                   ) : (
                     <>
                       <Save className="w-4 h-4 mr-2" />
-                      Guardar Cambios
+                      {hojaDeRuta ? "Guardar Cambios" : "Guardar"}
                     </>
                   )}
                 </Button>

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import {
   Card,
@@ -11,7 +12,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useHojaDeRutaForm } from "@/hooks/useHojaDeRutaForm";
 import { useHojaDeRutaImages } from "@/hooks/useHojaDeRutaImages";
 import { useHojaDeRutaHandlers } from "@/hooks/useHojaDeRutaHandlers";
-import { useHojaDeRutaPersistence } from "@/hooks/useHojaDeRutaPersistence";
 import { ImageUploadSection } from "@/components/hoja-de-ruta/sections/ImageUploadSection";
 import { EventDetailsSection } from "@/components/hoja-de-ruta/sections/EventDetailsSection";
 import { ProgramDetailsSection } from "@/components/hoja-de-ruta/sections/ProgramDetailsSection";
@@ -32,21 +32,22 @@ const HojaDeRutaGenerator = () => {
     selectedJobId,
     setSelectedJobId,
     showAlert,
-    setShowAlert,
     alertMessage,
-    setAlertMessage,
     travelArrangements,
     setTravelArrangements,
     roomAssignments,
     setRoomAssignments,
     isLoadingJobs,
     jobs,
+    isLoadingHojaDeRuta,
+    isSaving,
+    hojaDeRuta,
+    handleSaveAll, // Get the comprehensive save function from the form hook
   } = useHojaDeRutaForm();
 
   const {
     images,
     imagePreviews,
-    venueMap,
     venueMapPreview,
     handleImageUpload,
     removeImage,
@@ -74,18 +75,7 @@ const HojaDeRutaGenerator = () => {
   );
 
   const { toast } = useToast();
-  const [isDirty, setIsDirty] = useState(true);
-
-  // Add persistence hook
-  const {
-    hojaDeRuta,
-    isLoading: isLoadingHojaDeRuta,
-    saveHojaDeRuta,
-    isSaving,
-    saveTravelArrangements,
-    saveRoomAssignments,
-  } = useHojaDeRutaPersistence(selectedJobId);
-
+  const [isDirty, setIsDirty] = useState(false);
 
   // Update isDirty when any data changes
   useEffect(() => {
@@ -114,47 +104,26 @@ const HojaDeRutaGenerator = () => {
       const areRoomAssignmentsDifferent = JSON.stringify(roomAssignments) !== JSON.stringify(hojaDeRuta.rooms || []);
 
       setIsDirty(isDataDifferent || areTravelArrangementsDifferent || areRoomAssignmentsDifferent);
+    } else if (selectedJobId) {
+      // If we have a selected job but no saved data, consider it dirty if there's any data entered
+      const hasAnyData = eventData.eventName || eventData.eventDates || eventData.venue.name;
+      setIsDirty(hasAnyData);
     }
-  }, [eventData, travelArrangements, roomAssignments, hojaDeRuta]);
+  }, [eventData, travelArrangements, roomAssignments, hojaDeRuta, selectedJobId]);
 
   const handleSave = async () => {
-    console.log('handleSave called with selectedJobId:', selectedJobId);
-    console.log('eventData:', eventData);
-    console.log('travelArrangements:', travelArrangements);
-    console.log('roomAssignments:', roomAssignments);
-    
+    console.log('🎯 BASIC: Save button clicked, calling handleSaveAll');
     if (!selectedJobId) {
-      console.error('No selectedJobId - cannot save');
+      toast({
+        title: "Error",
+        description: "Por favor, seleccione un trabajo antes de guardar.",
+        variant: "destructive",
+      });
       return;
     }
 
-    try {
-      console.log('Starting save process...');
-      const savedRecord = await saveHojaDeRuta(eventData);
-      console.log('Main record saved:', savedRecord);
-
-      if (savedRecord?.id) {
-        console.log('Saving travel arrangements and room assignments...');
-        await Promise.all([
-          saveTravelArrangements({
-            hojaDeRutaId: savedRecord.id,
-            arrangements: travelArrangements,
-          }),
-          saveRoomAssignments({
-            hojaDeRutaId: savedRecord.id,
-            assignments: roomAssignments,
-          })
-        ]);
-        console.log('All data saved successfully');
-      } else {
-        console.error('No saved record ID returned');
-      }
-      
-      setIsDirty(false);
-      console.log('Save process completed');
-    } catch (error) {
-      console.error('Error saving data:', error);
-    }
+    await handleSaveAll();
+    setIsDirty(false);
   };
 
   const generateDocument = async () => {
@@ -273,15 +242,24 @@ const HojaDeRutaGenerator = () => {
               Generar Hoja de Ruta
             </Button>
             
-            {isDirty && (
+            {(isDirty || !hojaDeRuta) && selectedJobId && (
               <Button
                 variant="secondary"
                 onClick={handleSave}
-                disabled={isSaving || !isDirty}
+                disabled={isSaving}
                 className="min-w-[200px]"
               >
-                <Save className="w-4 h-4 mr-2" />
-                {isSaving ? "Guardando..." : "Guardar Cambios"}
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    {hojaDeRuta ? "Guardar Cambios" : "Guardar"}
+                  </>
+                )}
               </Button>
             )}
           </div>

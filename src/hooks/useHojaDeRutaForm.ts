@@ -4,7 +4,6 @@ import { EventData, TravelArrangement, RoomAssignment } from "@/types/hoja-de-ru
 import { useJobSelection } from "@/hooks/useJobSelection";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
 import { useHojaDeRutaPersistence } from "./useHojaDeRutaPersistence";
 
 const initialEventData: EventData = {
@@ -33,7 +32,7 @@ export const useHojaDeRutaForm = () => {
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState("");
   const [selectedJobId, setSelectedJobId] = useState<string>("");
-  const [powerRequirements, setPowerRequirements] = useState<string>("");
+  const [eventData, setEventData] = useState<EventData>(initialEventData);
   const [travelArrangements, setTravelArrangements] = useState<TravelArrangement[]>([
     { transportation_type: "van" },
   ]);
@@ -41,10 +40,23 @@ export const useHojaDeRutaForm = () => {
     { room_type: "single" },
   ]);
 
-  const [eventData, setEventData] = useState<EventData>(initialEventData);
+  // Get persistence functions - this is the single source of truth
+  const {
+    hojaDeRuta,
+    isLoading: isLoadingHojaDeRuta,
+    saveHojaDeRuta,
+    isSaving,
+    saveTravelArrangements,
+    saveRoomAssignments,
+    saveVenueImages,
+  } = useHojaDeRutaPersistence(selectedJobId);
 
-  // Get hoja de ruta data using the persistence hook
-  const { hojaDeRuta, isLoading: isLoadingHojaDeRuta } = useHojaDeRutaPersistence(selectedJobId);
+  console.log("🚀 FORM HOOK: Current state:", {
+    selectedJobId,
+    hasHojaDeRuta: !!hojaDeRuta,
+    isLoadingHojaDeRuta,
+    eventDataEventName: eventData.eventName
+  });
 
   // Initialize form with existing data when hojaDeRuta changes
   useEffect(() => {
@@ -129,7 +141,6 @@ export const useHojaDeRutaForm = () => {
   useEffect(() => {
     console.log("🔄 FORM: Job selection changed to:", selectedJobId);
     if (selectedJobId) {
-      setPowerRequirements("");
       fetchPowerRequirements(selectedJobId);
       fetchAssignedStaff(selectedJobId);
     } else {
@@ -137,7 +148,6 @@ export const useHojaDeRutaForm = () => {
       setEventData(initialEventData);
       setTravelArrangements([{ transportation_type: "van" }]);
       setRoomAssignments([{ room_type: "single" }]);
-      setPowerRequirements("");
     }
   }, [selectedJobId]);
 
@@ -162,7 +172,6 @@ export const useHojaDeRutaForm = () => {
           .join("\n");
         
         console.log("⚡ FORM: Power requirements fetched successfully");
-        setPowerRequirements(formattedRequirements);
         setEventData((prev) => ({
           ...prev,
           powerRequirements: formattedRequirements,
@@ -224,23 +233,88 @@ export const useHojaDeRutaForm = () => {
     }
   };
 
+  // Enhanced save function that handles all data types
+  const handleSaveAll = async () => {
+    console.log("💾 FORM: handleSaveAll called with selectedJobId:", selectedJobId);
+    if (!selectedJobId) {
+      toast({
+        title: "Error",
+        description: "Por favor, seleccione un trabajo antes de guardar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      console.log("💾 FORM: Starting comprehensive save process...");
+      
+      // Save main hoja de ruta data first
+      const savedRecord = await saveHojaDeRuta(eventData);
+      console.log("✅ FORM: Main record saved:", savedRecord);
+
+      if (savedRecord?.id) {
+        // Save travel arrangements and room assignments in parallel
+        await Promise.all([
+          saveTravelArrangements({
+            hojaDeRutaId: savedRecord.id,
+            arrangements: travelArrangements,
+          }),
+          saveRoomAssignments({
+            hojaDeRutaId: savedRecord.id,
+            assignments: roomAssignments,
+          })
+        ]);
+        
+        console.log("✅ FORM: All data saved successfully");
+        toast({
+          title: "✅ Guardado completo",
+          description: "Todos los datos se han guardado correctamente.",
+        });
+      } else {
+        console.error("❌ FORM: No saved record ID returned");
+        throw new Error("No se pudo obtener el ID del registro guardado");
+      }
+    } catch (error) {
+      console.error("❌ FORM: Error in handleSaveAll:", error);
+      toast({
+        title: "❌ Error al guardar",
+        description: `No se pudieron guardar los datos: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  };
+
   return {
+    // Data state
     eventData,
     setEventData,
     selectedJobId,
     setSelectedJobId,
-    showAlert,
-    setShowAlert,
-    alertMessage,
-    setAlertMessage,
-    powerRequirements,
-    setPowerRequirements,
     travelArrangements,
     setTravelArrangements,
     roomAssignments,
     setRoomAssignments,
+    
+    // UI state
+    showAlert,
+    setShowAlert,
+    alertMessage,
+    setAlertMessage,
+    
+    // Loading states
     isLoadingJobs,
-    jobs,
     isLoadingHojaDeRuta,
+    isSaving,
+    
+    // Data
+    jobs,
+    hojaDeRuta,
+    
+    // Persistence functions - now exposed from this hook
+    saveHojaDeRuta,
+    saveTravelArrangements,
+    saveRoomAssignments,
+    saveVenueImages,
+    handleSaveAll, // New comprehensive save function
   };
 };

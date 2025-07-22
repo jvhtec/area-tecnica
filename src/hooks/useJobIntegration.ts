@@ -1,135 +1,98 @@
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { EventData } from '@/types/hoja-de-ruta';
 
-export const useJobIntegration = (jobId?: string) => {
-  // Fetch job details for auto-population
-  const {
-    data: jobDetails,
-    isLoading: isLoadingJob,
-    error: jobError
-  } = useQuery({
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+import { EventData } from "@/types/hoja-de-ruta";
+
+export const useJobIntegration = (jobId: string) => {
+  // Fetch job details
+  const { data: jobDetails, isLoading: isLoadingJob } = useQuery({
     queryKey: ['job-details', jobId],
     queryFn: async () => {
       if (!jobId) return null;
+      
+      console.log("🔍 JOB INTEGRATION: Fetching job details for:", jobId);
       
       const { data, error } = await supabase
         .from('jobs')
         .select(`
           *,
-          locations (
-            name,
-            formatted_address,
-            latitude,
-            longitude
-          ),
-          job_assignments (
-            technician_id,
-            sound_role,
-            lights_role,
-            video_role,
-            profiles (
-              first_name,
-              last_name,
-              department
-            )
+          job_assignments(
+            *,
+            profiles:technician_id(first_name, last_name)
           )
         `)
         .eq('id', jobId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ JOB INTEGRATION: Error fetching job:', error);
+        throw error;
+      }
+
+      console.log("✅ JOB INTEGRATION: Job details fetched");
       return data;
     },
     enabled: !!jobId
   });
 
-  // Fetch assigned staff for the job
-  const {
-    data: assignedStaff = [],
-    isLoading: isLoadingStaff,
-    error: staffError
-  } = useQuery({
-    queryKey: ['job-assigned-staff', jobId],
-    queryFn: async () => {
-      if (!jobId) return [];
-      
-      const { data, error } = await supabase
-        .from('job_assignments')
-        .select(`
-          technician_id,
-          sound_role,
-          lights_role,
-          video_role,
-          profiles (
-            first_name,
-            last_name,
-            department,
-            phone
-          )
-        `)
-        .eq('job_id', jobId);
-
-      if (error) throw error;
-      
-      // Transform the data to the format expected by EventData
-      return data.map(assignment => {
-        const profile = Array.isArray(assignment.profiles) 
-          ? assignment.profiles[0] 
-          : assignment.profiles;
-        const roles = [
-          assignment.sound_role,
-          assignment.lights_role,
-          assignment.video_role
-        ].filter(Boolean);
-
-        return {
-          name: profile?.first_name || '',
-          surname1: profile?.last_name || '',
-          surname2: '',
-          position: roles.join(', ') || profile?.department || 'Técnico'
-        };
-      });
-    },
-    enabled: !!jobId
-  });
-
-  // Function to auto-populate event data from job
+  // Generate event data from job details
   const generateEventDataFromJob = (): Partial<EventData> => {
     if (!jobDetails) return {};
 
-    const eventData: Partial<EventData> = {
-      eventName: jobDetails.title || '',
-      eventDates: jobDetails.start_time && jobDetails.end_time 
-        ? `${new Date(jobDetails.start_time).toLocaleDateString('es-ES')} - ${new Date(jobDetails.end_time).toLocaleDateString('es-ES')}`
-        : '',
-      venue: {
-        name: jobDetails.locations?.name || '',
-        address: jobDetails.locations?.formatted_address || ''
-      },
-      staff: assignedStaff,
-      contacts: [], // Will need to be filled manually
-      logistics: {
-        transport: '',
-        loadingDetails: '',
-        unloadingDetails: '',
-        equipmentLogistics: ''
-      },
-      schedule: `Inicio: ${jobDetails.start_time ? new Date(jobDetails.start_time).toLocaleString('es-ES') : 'Por definir'}\nFin: ${jobDetails.end_time ? new Date(jobDetails.end_time).toLocaleString('es-ES') : 'Por definir'}`,
-      powerRequirements: '',
-      auxiliaryNeeds: ''
-    };
+    console.log("🔄 JOB INTEGRATION: Generating event data from job");
 
-    return eventData;
+    const startDate = jobDetails.start_time ? new Date(jobDetails.start_time) : null;
+    const endDate = jobDetails.end_time ? new Date(jobDetails.end_time) : null;
+    
+    let eventDates = "";
+    if (startDate && endDate) {
+      if (startDate.toDateString() === endDate.toDateString()) {
+        eventDates = startDate.toLocaleDateString('es-ES');
+      } else {
+        eventDates = `${startDate.toLocaleDateString('es-ES')} - ${endDate.toLocaleDateString('es-ES')}`;
+      }
+    }
+
+    const contacts = [];
+    if (jobDetails.client_name) {
+      contacts.push({
+        name: jobDetails.client_name,
+        role: "Cliente",
+        phone: jobDetails.client_phone || ""
+      });
+    }
+
+    const staff = jobDetails.job_assignments?.map((assignment: any) => ({
+      name: assignment.profiles?.first_name || "",
+      surname1: assignment.profiles?.last_name || "",
+      surname2: "",
+      position: assignment.sound_role || assignment.lights_role || assignment.video_role || "Técnico"
+    })) || [];
+
+    return {
+      eventName: jobDetails.title || "",
+      eventDates,
+      venue: {
+        name: jobDetails.venue || "",
+        address: jobDetails.location || ""
+      },
+      contacts: contacts.length > 0 ? contacts : [{ name: "", role: "", phone: "" }],
+      staff: staff.length > 0 ? staff : [{ name: "", surname1: "", surname2: "", position: "" }],
+      logistics: {
+        transport: "",
+        loadingDetails: "",
+        unloadingDetails: "",
+        equipmentLogistics: ""
+      },
+      schedule: startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : "",
+      powerRequirements: "",
+      auxiliaryNeeds: ""
+    };
   };
 
   return {
     jobDetails,
-    assignedStaff,
     isLoadingJob,
-    isLoadingStaff,
-    jobError,
-    staffError,
     generateEventDataFromJob
   };
 };
