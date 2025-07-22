@@ -83,23 +83,56 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
       if (!jobId) throw new Error('No job ID provided');
 
       try {
-        // First, upsert the main hoja_de_ruta record
-        const { data: mainRecord, error: mainError } = await supabase
+        // Check if a record already exists for this job
+        const { data: existingRecord } = await supabase
           .from('hoja_de_ruta')
-          .upsert({
-            job_id: jobId,
-            event_name: data.eventName,
-            event_dates: data.eventDates,
-            venue_name: data.venue.name,
-            venue_address: data.venue.address,
-            schedule: data.schedule,
-            power_requirements: data.powerRequirements,
-            auxiliary_needs: data.auxiliaryNeeds
-          })
-          .select()
-          .single();
+          .select('id')
+          .eq('job_id', jobId)
+          .order('last_modified', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-        if (mainError) throw mainError;
+        let mainRecord;
+        if (existingRecord) {
+          // Update existing record
+          const { data: updatedRecord, error: updateError } = await supabase
+            .from('hoja_de_ruta')
+            .update({
+              event_name: data.eventName,
+              event_dates: data.eventDates,
+              venue_name: data.venue.name,
+              venue_address: data.venue.address,
+              schedule: data.schedule,
+              power_requirements: data.powerRequirements,
+              auxiliary_needs: data.auxiliaryNeeds,
+              last_modified: new Date().toISOString()
+            })
+            .eq('id', existingRecord.id)
+            .select()
+            .single();
+
+          if (updateError) throw updateError;
+          mainRecord = updatedRecord;
+        } else {
+          // Create new record
+          const { data: newRecord, error: insertError } = await supabase
+            .from('hoja_de_ruta')
+            .insert({
+              job_id: jobId,
+              event_name: data.eventName,
+              event_dates: data.eventDates,
+              venue_name: data.venue.name,
+              venue_address: data.venue.address,
+              schedule: data.schedule,
+              power_requirements: data.powerRequirements,
+              auxiliary_needs: data.auxiliaryNeeds
+            })
+            .select()
+            .single();
+
+          if (insertError) throw insertError;
+          mainRecord = newRecord;
+        }
 
         console.log("Saved main record:", mainRecord);
 
