@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import EnhancedHojaDeRutaGenerator from "@/components/project-management/EnhancedHojaDeRuta";
 
 const HojaDeRuta = () => {
+  console.log("🏠 PAGE: HojaDeRuta page is rendering");
   const navigate = useNavigate();
 
   return (
@@ -23,6 +24,7 @@ const HojaDeRuta = () => {
           </div>
         </CardHeader>
         <CardContent>
+          <div>DEBUG: About to render EnhancedHojaDeRutaGenerator</div>
           <EnhancedHojaDeRutaGenerator />
         </CardContent>
       </Card>
