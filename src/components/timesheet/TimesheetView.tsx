@@ -130,6 +130,11 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   };
 
   const handleBulkEdit = async () => {
+    console.log('Bulk edit starting with:', { 
+      selectedTimesheets: Array.from(selectedTimesheets), 
+      bulkFormData 
+    });
+    
     const promises = Array.from(selectedTimesheets).map(timesheetId => {
       const updates: Partial<Timesheet> = {};
       
@@ -139,10 +144,13 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
       if (bulkFormData.overtime_hours !== undefined) updates.overtime_hours = bulkFormData.overtime_hours;
       if (bulkFormData.notes) updates.notes = bulkFormData.notes;
       
+      console.log('Updating timesheet', timesheetId, 'with:', updates);
       return updateTimesheet(timesheetId, updates);
     });
     
-    await Promise.all(promises);
+    const results = await Promise.all(promises);
+    console.log('Bulk edit results:', results);
+    
     setSelectedTimesheets(new Set());
     setShowBulkActions(false);
     setShowBulkEditForm(false);
