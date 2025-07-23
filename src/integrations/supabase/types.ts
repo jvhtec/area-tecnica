@@ -1492,14 +1492,14 @@ export type Database = {
           {
             foreignKeyName: "fk_hoja_de_ruta_logistics_main"
             columns: ["hoja_de_ruta_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "hoja_de_ruta"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "hoja_de_ruta_logistics_hoja_de_ruta_id_fkey"
             columns: ["hoja_de_ruta_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "hoja_de_ruta"
             referencedColumns: ["id"]
           },
