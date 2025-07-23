@@ -85,7 +85,7 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
   // Load images
   const [jobLogo, companyLogo] = await Promise.all([
     jobLogoUrl ? loadImageSafely(jobLogoUrl, 'job logo') : Promise.resolve(null),
-    loadImageSafely('/sector-pro-logo.png', 'company logo')
+    loadImageSafely('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', 'company logo')
   ]);
 
   // Create signature map
@@ -126,11 +126,39 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
   
-  // Show date range or "All Dates" if date is "all-dates"
-  const dateText = date === "all-dates" ? "All Dates" : format(parseISO(date), 'EEEE, MMMM do, yyyy');
+  // Calculate actual date range from timesheets if showing all dates
+  let dateText;
+  if (date === "all-dates" && timesheets.length > 0) {
+    const dates = timesheets.map(t => parseISO(t.date)).sort((a, b) => a.getTime() - b.getTime());
+    const startDate = dates[0];
+    const endDate = dates[dates.length - 1];
+    
+    if (startDate.getTime() === endDate.getTime()) {
+      dateText = format(startDate, 'MMM dd, yyyy');
+    } else {
+      dateText = `${format(startDate, 'MMM dd')} - ${format(endDate, 'MMM dd, yyyy')}`;
+    }
+  } else if (date === "all-dates") {
+    dateText = "All Dates";
+  } else {
+    dateText = format(parseISO(date), 'EEEE, MMMM do, yyyy');
+  }
+  
   doc.text(`Period: ${dateText}`, 20, yPosition);
   yPosition += 8;
-  doc.text(`Location: ${job.location_id || 'TBD'}`, 20, yPosition);
+  
+  // Display location name and address from job.location
+  const locationText = (job as any).location?.name || 'TBD';
+  const addressText = (job as any).location?.formatted_address;
+  doc.text(`Location: ${locationText}`, 20, yPosition);
+  if (addressText) {
+    yPosition += 6;
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`${addressText}`, 20, yPosition);
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+  }
   yPosition += 20;
 
   // Group timesheets by date and technician for better organization
