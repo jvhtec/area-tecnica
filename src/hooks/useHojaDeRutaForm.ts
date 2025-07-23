@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { EventData, TravelArrangement, RoomAssignment } from "@/types/hoja-de-ruta";
 import { useJobSelection } from "@/hooks/useJobSelection";
 import { supabase } from "@/lib/supabase";
@@ -43,6 +43,11 @@ export const useHojaDeRutaForm = () => {
   const [hasSavedData, setHasSavedData] = useState<boolean>(false);
   const [hasBasicJobData, setHasBasicJobData] = useState<boolean>(false);
   const [dataSource, setDataSource] = useState<'none' | 'saved' | 'job' | 'mixed'>('none');
+  const [lastSaveTime, setLastSaveTime] = useState<number>(0);
+  
+  // Refs for better state management
+  const saveInProgressRef = useRef<boolean>(false);
+  const lastSaveDataRef = useRef<string>("");
 
   // Get persistence functions
   const {
@@ -57,7 +62,11 @@ export const useHojaDeRutaForm = () => {
     isSavingRooms,
     saveVenueImages,
     isSavingImages,
-    refreshData
+    refreshData,
+    resetSaveMutation,
+    resetTravelMutation,
+    resetRoomsMutation,
+    resetImagesMutation
   } = useHojaDeRutaPersistence(selectedJobId);
 
   console.log("🚀 FORM HOOK: Current state:", {
@@ -70,7 +79,10 @@ export const useHojaDeRutaForm = () => {
     eventDataEventName: eventData.eventName,
     isInitialized,
     staffCount: eventData.staff.length,
-    hasStaffData: eventData.staff.some(s => s.name || s.position)
+    hasStaffData: eventData.staff.some(s => s.name || s.position),
+    isSaving,
+    saveInProgress: saveInProgressRef.current,
+    lastSaveTime: new Date(lastSaveTime).toLocaleTimeString()
   });
 
   // Auto-populate basic job data when job is selected (if no saved data)
@@ -229,6 +241,13 @@ export const useHojaDeRutaForm = () => {
       
       setIsInitialized(true);
       
+      // Update last save data reference
+      lastSaveDataRef.current = JSON.stringify({
+        eventData: eventData,
+        travelArrangements,
+        roomAssignments
+      });
+      
       toast({
         title: "✅ Datos guardados cargados",
         description: "Se han cargado los datos previamente guardados para este trabajo.",
@@ -252,6 +271,16 @@ export const useHojaDeRutaForm = () => {
       setHasSavedData(false);
       setHasBasicJobData(false);
       setDataSource('none');
+      setLastSaveTime(0);
+      saveInProgressRef.current = false;
+      lastSaveDataRef.current = "";
+      
+      // Reset all mutation states
+      resetSaveMutation();
+      resetTravelMutation();
+      resetRoomsMutation();
+      resetImagesMutation();
+      
       // Data will be loaded by the persistence hook and then auto-populated if needed
       refreshData();
     } else {
@@ -262,9 +291,12 @@ export const useHojaDeRutaForm = () => {
       setHasSavedData(false);
       setHasBasicJobData(false);
       setDataSource('none');
+      setLastSaveTime(0);
+      saveInProgressRef.current = false;
+      lastSaveDataRef.current = "";
       setIsInitialized(true);
     }
-  }, [selectedJobId, refreshData]);
+  }, [selectedJobId, refreshData, resetSaveMutation, resetTravelMutation, resetRoomsMutation, resetImagesMutation]);
 
   // Display error toast if there was a fetch error
   useEffect(() => {
@@ -372,9 +404,10 @@ export const useHojaDeRutaForm = () => {
     }
   }, [selectedJobId, eventData, hasSavedData, toast]);
 
-  // Enhanced save function with better error handling
+  // Enhanced save function with better error handling and debouncing
   const handleSaveAll = useCallback(async () => {
     console.log("💾 FORM: handleSaveAll called with selectedJobId:", selectedJobId);
+    
     if (!selectedJobId) {
       toast({
         title: "Error",
@@ -383,6 +416,22 @@ export const useHojaDeRutaForm = () => {
       });
       return;
     }
+
+    // Prevent multiple simultaneous saves
+    if (saveInProgressRef.current) {
+      console.log("⏳ FORM: Save already in progress, skipping");
+      return;
+    }
+
+    // Debouncing: prevent saves too close together
+    const now = Date.now();
+    if (now - lastSaveTime < 2000) {
+      console.log("⏳ FORM: Save too recent, debouncing");
+      return;
+    }
+
+    saveInProgressRef.current = true;
+    setLastSaveTime(now);
 
     try {
       console.log("💾 FORM: Starting comprehensive save process...");
@@ -408,8 +457,12 @@ export const useHojaDeRutaForm = () => {
         setHasSavedData(true);
         setDataSource('saved');
         
-        // Refresh data after save
-        await refreshData();
+        // Update last save data reference
+        lastSaveDataRef.current = JSON.stringify({
+          eventData,
+          travelArrangements,
+          roomAssignments
+        });
         
         toast({
           title: "✅ Guardado completo",
@@ -429,6 +482,8 @@ export const useHojaDeRutaForm = () => {
         variant: "destructive",
       });
       throw error;
+    } finally {
+      saveInProgressRef.current = false;
     }
   }, [
     selectedJobId, 
@@ -438,15 +493,25 @@ export const useHojaDeRutaForm = () => {
     saveHojaDeRuta, 
     saveTravelArrangements, 
     saveRoomAssignments, 
-    refreshData, 
+    lastSaveTime,
     toast
   ]);
 
-  // Simplified isDirty function for better reliability
+  // Improved isDirty function with better reliability
   const isDirty = useCallback(() => {
     if (!selectedJobId || !isInitialized) return false;
     
-    // Check if any field has meaningful content
+    // Create current data snapshot
+    const currentData = JSON.stringify({
+      eventData,
+      travelArrangements,
+      roomAssignments
+    });
+    
+    // Compare with last saved data
+    const hasChanges = currentData !== lastSaveDataRef.current;
+    
+    // Also check if any field has meaningful content
     const hasContent = 
       eventData.eventName?.trim() !== "" ||
       eventData.eventDates?.trim() !== "" ||
@@ -464,8 +529,8 @@ export const useHojaDeRutaForm = () => {
       travelArrangements.some(t => t.pickup_address || t.pickup_time || t.departure_time || t.arrival_time || t.flight_train_number || t.notes) ||
       roomAssignments.some(r => r.room_number || r.staff_member1_id || r.staff_member2_id);
 
-    return hasContent;
-  }, [selectedJobId, isInitialized, eventData, travelArrangements, roomAssignments]);
+    return hasContent && (hasChanges || !hasSavedData);
+  }, [selectedJobId, isInitialized, eventData, travelArrangements, roomAssignments, hasSavedData]);
 
   return {
     // Data state
@@ -492,7 +557,7 @@ export const useHojaDeRutaForm = () => {
     // Loading states
     isLoadingJobs,
     isLoadingHojaDeRuta,
-    isSaving: isSaving || isSavingTravel || isSavingRooms || isSavingImages,
+    isSaving: isSaving || isSavingTravel || isSavingRooms || isSavingImages || saveInProgressRef.current,
     
     // Data
     jobs,

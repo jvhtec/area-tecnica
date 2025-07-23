@@ -107,8 +107,13 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
     return true;
   };
 
-  // Create or update hoja de ruta with proper upsert
-  const { mutateAsync: saveHojaDeRuta, isPending: isSaving } = useMutation({
+  // Helper function to update cache optimistically
+  const updateCacheOptimistically = useCallback((updatedData: any) => {
+    queryClient.setQueryData(['hoja-de-ruta', jobId], updatedData);
+  }, [queryClient, jobId]);
+
+  // Create or update hoja de ruta with improved state management
+  const { mutateAsync: saveHojaDeRuta, isPending: isSaving, reset: resetSaveMutation } = useMutation({
     mutationFn: async (data: EventData) => {
       console.log("💾 PERSISTENCE: Starting save operation");
       console.log("💾 PERSISTENCE: Job ID:", jobId);
@@ -237,9 +242,18 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
         throw error;
       }
     },
-    onSuccess: () => {
-      // Explicitly invalidate the query to force a refetch
-      queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });
+    onSuccess: (savedRecord) => {
+      // Update cache with the new data immediately
+      updateCacheOptimistically({
+        ...savedRecord,
+        contacts: hojaDeRuta?.contacts || [],
+        staff: hojaDeRuta?.staff || [],
+        logistics: hojaDeRuta?.logistics || null,
+        travel: hojaDeRuta?.travel || [],
+        rooms: hojaDeRuta?.rooms || [],
+        images: hojaDeRuta?.images || []
+      });
+      
       toast({
         title: "✅ Guardado con éxito",
         description: "Los cambios se han guardado correctamente.",
@@ -252,11 +266,17 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
         description: `No se pudieron guardar los cambios: ${error.message}`,
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      // Reset the mutation state to allow subsequent saves
+      setTimeout(() => {
+        resetSaveMutation();
+      }, 1000);
     }
   });
 
-  // Save travel arrangements with proper error handling
-  const { mutateAsync: saveTravelArrangements, isPending: isSavingTravel } = useMutation({
+  // Save travel arrangements with improved state management
+  const { mutateAsync: saveTravelArrangements, isPending: isSavingTravel, reset: resetTravelMutation } = useMutation({
     mutationFn: async ({ hojaDeRutaId, arrangements }: { hojaDeRutaId: string, arrangements: TravelArrangement[] }) => {
       console.log("🚗 PERSISTENCE: Saving travel arrangements:", arrangements.length);
       
@@ -295,7 +315,13 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
       return { success: true, count: arrangements.length };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });
+      // Only update the travel part of the cache
+      if (hojaDeRuta) {
+        updateCacheOptimistically({
+          ...hojaDeRuta,
+          travel: hojaDeRuta.travel || []
+        });
+      }
     },
     onError: (error: any) => {
       console.error('❌ PERSISTENCE: Error saving travel arrangements:', error);
@@ -304,11 +330,16 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
         description: `No se pudieron guardar los arreglos de viaje: ${error.message}`,
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      setTimeout(() => {
+        resetTravelMutation();
+      }, 1000);
     }
   });
 
-  // Save room assignments with proper error handling
-  const { mutateAsync: saveRoomAssignments, isPending: isSavingRooms } = useMutation({
+  // Save room assignments with improved state management
+  const { mutateAsync: saveRoomAssignments, isPending: isSavingRooms, reset: resetRoomsMutation } = useMutation({
     mutationFn: async ({ hojaDeRutaId, assignments }: { hojaDeRutaId: string, assignments: RoomAssignment[] }) => {
       console.log("🏨 PERSISTENCE: Saving room assignments:", assignments.length);
       
@@ -344,7 +375,13 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
       return { success: true, count: assignments.length };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });
+      // Only update the rooms part of the cache
+      if (hojaDeRuta) {
+        updateCacheOptimistically({
+          ...hojaDeRuta,
+          rooms: hojaDeRuta.rooms || []
+        });
+      }
     },
     onError: (error: any) => {
       console.error('❌ PERSISTENCE: Error saving room assignments:', error);
@@ -353,11 +390,16 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
         description: `No se pudieron guardar las asignaciones de habitaciones: ${error.message}`,
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      setTimeout(() => {
+        resetRoomsMutation();
+      }, 1000);
     }
   });
 
-  // Save venue images with proper error handling
-  const { mutateAsync: saveVenueImages, isPending: isSavingImages } = useMutation({
+  // Save venue images with improved state management
+  const { mutateAsync: saveVenueImages, isPending: isSavingImages, reset: resetImagesMutation } = useMutation({
     mutationFn: async ({ hojaDeRutaId, images }: { hojaDeRutaId: string, images: { image_path: string, image_type: string }[] }) => {
       console.log("📸 PERSISTENCE: Saving venue images:", images.length);
       
@@ -391,7 +433,13 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
       return { success: true, count: images.length };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });
+      // Only update the images part of the cache
+      if (hojaDeRuta) {
+        updateCacheOptimistically({
+          ...hojaDeRuta,
+          images: hojaDeRuta.images || []
+        });
+      }
     },
     onError: (error: any) => {
       console.error('❌ PERSISTENCE: Error saving venue images:', error);
@@ -400,17 +448,24 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
         description: `No se pudieron guardar las imágenes: ${error.message}`,
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      setTimeout(() => {
+        resetImagesMutation();
+      }, 1000);
     }
   });
 
-  // Force a manual refetch of the data
+  // Force a manual refetch of the data with cache invalidation
   const refreshData = useCallback(() => {
     if (jobId) {
       console.log("🔄 PERSISTENCE: Manually refreshing data for job:", jobId);
+      // Invalidate and refetch
+      queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });
       return refetch();
     }
     return Promise.resolve({ data: null, error: null, isLoading: false });
-  }, [jobId, refetch]);
+  }, [jobId, refetch, queryClient]);
 
   return {
     hojaDeRuta,
@@ -424,6 +479,11 @@ export const useHojaDeRutaPersistence = (jobId: string) => {
     isSavingRooms,
     saveVenueImages,
     isSavingImages,
-    refreshData
+    refreshData,
+    // Expose mutation reset functions for better state management
+    resetSaveMutation,
+    resetTravelMutation,
+    resetRoomsMutation,
+    resetImagesMutation
   };
 };
