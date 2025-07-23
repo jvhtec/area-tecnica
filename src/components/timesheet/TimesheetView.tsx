@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,7 +21,7 @@ interface TimesheetViewProps {
 }
 
 export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetViewProps) => {
-  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, signTimesheet } = useTimesheets(jobId);
+  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, signTimesheet, refetch } = useTimesheets(jobId);
   const { assignments } = useJobAssignmentsRealtime(jobId);
   const { user, userRole } = useAuth();
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -30,6 +29,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   const [selectedTimesheets, setSelectedTimesheets] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showBulkEditForm, setShowBulkEditForm] = useState(false);
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
   const [bulkFormData, setBulkFormData] = useState<Partial<TimesheetFormData>>({
     start_time: '',
     end_time: '',
@@ -135,32 +135,46 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
       bulkFormData 
     });
     
-    const promises = Array.from(selectedTimesheets).map(timesheetId => {
-      const updates: Partial<Timesheet> = {};
-      
-      if (bulkFormData.start_time) updates.start_time = bulkFormData.start_time;
-      if (bulkFormData.end_time) updates.end_time = bulkFormData.end_time;
-      if (bulkFormData.break_minutes !== undefined) updates.break_minutes = bulkFormData.break_minutes;
-      if (bulkFormData.overtime_hours !== undefined) updates.overtime_hours = bulkFormData.overtime_hours;
-      if (bulkFormData.notes) updates.notes = bulkFormData.notes;
-      
-      console.log('Updating timesheet', timesheetId, 'with:', updates);
-      return updateTimesheet(timesheetId, updates);
-    });
+    setIsBulkUpdating(true);
     
-    const results = await Promise.all(promises);
-    console.log('Bulk edit results:', results);
-    
-    setSelectedTimesheets(new Set());
-    setShowBulkActions(false);
-    setShowBulkEditForm(false);
-    setBulkFormData({
-      start_time: '',
-      end_time: '',
-      break_minutes: undefined,
-      overtime_hours: undefined,
-      notes: ''
-    });
+    try {
+      const promises = Array.from(selectedTimesheets).map(timesheetId => {
+        const updates: Partial<Timesheet> = {};
+        
+        if (bulkFormData.start_time) updates.start_time = bulkFormData.start_time;
+        if (bulkFormData.end_time) updates.end_time = bulkFormData.end_time;
+        if (bulkFormData.break_minutes !== undefined) updates.break_minutes = bulkFormData.break_minutes;
+        if (bulkFormData.overtime_hours !== undefined) updates.overtime_hours = bulkFormData.overtime_hours;
+        if (bulkFormData.notes) updates.notes = bulkFormData.notes;
+        
+        console.log('Updating timesheet', timesheetId, 'with:', updates);
+        // Skip refetch for bulk operations
+        return updateTimesheet(timesheetId, updates, true);
+      });
+      
+      const results = await Promise.all(promises);
+      console.log('Bulk edit results:', results);
+      
+      // Now refetch once to get all updated data
+      await refetch();
+      
+      setSelectedTimesheets(new Set());
+      setShowBulkActions(false);
+      setShowBulkEditForm(false);
+      setBulkFormData({
+        start_time: '',
+        end_time: '',
+        break_minutes: undefined,
+        overtime_hours: undefined,
+        notes: ''
+      });
+      
+      console.log('Bulk edit completed successfully');
+    } catch (error) {
+      console.error('Error in bulk edit:', error);
+    } finally {
+      setIsBulkUpdating(false);
+    }
   };
 
   const toggleTimesheetSelection = (timesheetId: string) => {
@@ -229,6 +243,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                     console.log('Edit Times button clicked, showBulkEditForm:', showBulkEditForm); 
                     setShowBulkEditForm(!showBulkEditForm); 
                   }}
+                  disabled={isBulkUpdating}
                 >
                   Edit Times ({selectedTimesheets.size})
                 </Button>
@@ -236,14 +251,14 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   variant="outline"
                   size="sm"
                   onClick={() => handleBulkAction('submit')}
-                  disabled={selectedTimesheets.size === 0}
+                  disabled={selectedTimesheets.size === 0 || isBulkUpdating}
                 >
                   Submit Selected ({selectedTimesheets.size})
                 </Button>
                 <Button
                   size="sm"
                   onClick={() => handleBulkAction('approve')}
-                  disabled={selectedTimesheets.size === 0}
+                  disabled={selectedTimesheets.size === 0 || isBulkUpdating}
                 >
                   Approve Selected ({selectedTimesheets.size})
                 </Button>
@@ -251,6 +266,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   variant="outline"
                   size="sm"
                   onClick={clearSelection}
+                  disabled={isBulkUpdating}
                 >
                   Clear
                 </Button>
@@ -260,6 +276,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
               variant="outline"
               size="sm"
               onClick={selectedTimesheets.size > 0 ? clearSelection : selectAllVisibleTimesheets}
+              disabled={isBulkUpdating}
             >
               {selectedTimesheets.size > 0 ? 'Deselect All' : 'Select All'}
             </Button>
@@ -271,7 +288,10 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
       {showBulkEditForm && selectedTimesheets.size > 0 && (
         <Card className="p-6">
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Edit Times for {selectedTimesheets.size} Selected Timesheets</h3>
+            <h3 className="text-lg font-semibold">
+              Edit Times for {selectedTimesheets.size} Selected Timesheets
+              {isBulkUpdating && <span className="text-sm text-muted-foreground ml-2">(Updating...)</span>}
+            </h3>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div>
                 <Label htmlFor="bulk_start_time">Start Time</Label>
@@ -281,6 +301,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   value={bulkFormData.start_time}
                   onChange={(e) => setBulkFormData({ ...bulkFormData, start_time: e.target.value })}
                   placeholder="Leave empty to skip"
+                  disabled={isBulkUpdating}
                 />
               </div>
               <div>
@@ -291,6 +312,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   value={bulkFormData.end_time}
                   onChange={(e) => setBulkFormData({ ...bulkFormData, end_time: e.target.value })}
                   placeholder="Leave empty to skip"
+                  disabled={isBulkUpdating}
                 />
               </div>
               <div>
@@ -301,6 +323,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   value={bulkFormData.break_minutes || ''}
                   onChange={(e) => setBulkFormData({ ...bulkFormData, break_minutes: e.target.value ? parseInt(e.target.value) : undefined })}
                   placeholder="Leave empty to skip"
+                  disabled={isBulkUpdating}
                 />
               </div>
               <div>
@@ -312,11 +335,19 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   value={bulkFormData.overtime_hours || ''}
                   onChange={(e) => setBulkFormData({ ...bulkFormData, overtime_hours: e.target.value ? parseFloat(e.target.value) : undefined })}
                   placeholder="Leave empty to skip"
+                  disabled={isBulkUpdating}
                 />
               </div>
               <div className="flex items-end">
-                <Button onClick={() => { console.log('Apply Changes button clicked!'); handleBulkEdit(); }} className="w-full">
-                  Apply Changes
+                <Button 
+                  onClick={() => { 
+                    console.log('Apply Changes button clicked!'); 
+                    handleBulkEdit(); 
+                  }} 
+                  className="w-full"
+                  disabled={isBulkUpdating}
+                >
+                  {isBulkUpdating ? 'Updating...' : 'Apply Changes'}
                 </Button>
               </div>
             </div>
@@ -327,9 +358,23 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                 value={bulkFormData.notes}
                 onChange={(e) => setBulkFormData({ ...bulkFormData, notes: e.target.value })}
                 placeholder="Leave empty to skip adding notes"
+                disabled={isBulkUpdating}
               />
             </div>
           </div>
+        </Card>
+      )}
+
+      {/* Loading indicator during bulk operations */}
+      {isBulkUpdating && (
+        <Card>
+          <CardContent className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <Clock className="h-12 w-12 mx-auto text-muted-foreground animate-spin mb-4" />
+              <p className="text-muted-foreground">Updating timesheets...</p>
+              <p className="text-sm text-muted-foreground mt-2">Please wait while we update all selected timesheets</p>
+            </div>
+          </CardContent>
         </Card>
       )}
 
@@ -399,6 +444,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         checked={selectedTimesheets.has(timesheet.id)}
                         onChange={() => toggleTimesheetSelection(timesheet.id)}
                         className="h-4 w-4"
+                        disabled={isBulkUpdating}
                       />
                     )}
                     <div>
@@ -421,6 +467,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         variant="outline"
                         size="sm"
                         onClick={() => startEditing(timesheet)}
+                        disabled={isBulkUpdating}
                       >
                         Edit
                       </Button>
@@ -432,6 +479,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         variant="outline"
                         size="sm"
                         onClick={() => startEditing(timesheet)}
+                        disabled={isBulkUpdating}
                       >
                         Edit
                       </Button>
@@ -442,6 +490,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                       <Button
                         size="sm"
                         onClick={() => approveTimesheet(timesheet.id)}
+                        disabled={isBulkUpdating}
                       >
                         Approve
                       </Button>
@@ -453,6 +502,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         variant="outline"
                         size="sm"
                         onClick={() => submitTimesheet(timesheet.id)}
+                        disabled={isBulkUpdating}
                       >
                         Submit
                       </Button>

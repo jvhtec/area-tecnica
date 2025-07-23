@@ -208,7 +208,7 @@ export const useTimesheets = (jobId: string) => {
     }
   };
 
-  const updateTimesheet = async (timesheetId: string, updates: Partial<Timesheet>) => {
+  const updateTimesheet = async (timesheetId: string, updates: Partial<Timesheet>, skipRefetch = false) => {
     try {
       const { data, error } = await supabase
         .from("timesheets")
@@ -231,9 +231,12 @@ export const useTimesheets = (jobId: string) => {
         return null;
       }
 
-      // Refetch timesheets to ensure we have the complete data with technician profiles
-      await fetchTimesheets();
-      toast.success("Timesheet updated successfully");
+      // Only refetch if not skipping (for bulk operations)
+      if (!skipRefetch) {
+        await fetchTimesheets();
+        toast.success("Timesheet updated successfully");
+      }
+      
       return data;
     } catch (error) {
       console.error("Error in updateTimesheet:", error);
