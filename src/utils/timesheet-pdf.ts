@@ -1,8 +1,10 @@
 
 import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import { Timesheet } from '@/types/timesheet';
 import { Job } from '@/types/job';
 import { format, parseISO } from 'date-fns';
+import { fetchJobLogo } from '@/utils/pdf/logoUtils';
 
 interface GenerateTimesheetPDFOptions {
   job: Job;
@@ -43,31 +45,195 @@ const formatOvertime = (overtimeHours: number | null | undefined): string => {
   return `${overtimeHours}h`;
 };
 
+// Helper function to safely load images with timeout
+const loadImageSafely = (src: string, description: string): Promise<HTMLImageElement | null> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    const timeout = setTimeout(() => {
+      console.warn(`Timeout loading ${description}`);
+      resolve(null);
+    }, 5000);
+
+    img.onload = () => {
+      clearTimeout(timeout);
+      console.log(`Successfully loaded ${description}`);
+      resolve(img);
+    };
+
+    img.onerror = (error) => {
+      clearTimeout(timeout);
+      console.error(`Error loading ${description}:`, error);
+      resolve(null);
+    };
+
+    img.src = src;
+  });
+};
+
 export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTimesheetPDFOptions) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
-  let yPosition = 20;
 
-  // Header
+  // Load logos and signatures in parallel
+  const [jobLogoUrl, loadedSignatures] = await Promise.all([
+    fetchJobLogo(job.id),
+    loadSignatures(timesheets)
+  ]);
+
+  // Load images
+  const [jobLogo, companyLogo] = await Promise.all([
+    jobLogoUrl ? loadImageSafely(jobLogoUrl, 'job logo') : Promise.resolve(null),
+    loadImageSafely('/sector-pro-logo.png', 'company logo')
+  ]);
+
+  // Create signature map
+  const signatureMap = new Map<string, HTMLImageElement>();
+  loadedSignatures.forEach((result) => {
+    if (result.status === 'fulfilled' && result.value) {
+      signatureMap.set(result.value.timesheetId, result.value.image);
+    }
+  });
+
+  // Corporate Header
+  doc.setFillColor(125, 1, 1); // Corporate red
+  doc.rect(0, 0, pageWidth, 40, 'F');
+
+  // Add job logo on left side of header
+  if (jobLogo) {
+    try {
+      doc.addImage(jobLogo, 'PNG', 15, 8, 30, 24);
+    } catch (error) {
+      console.error('Error adding job logo to PDF:', error);
+    }
+  }
+
+  // Header text
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.text('TIMESHEET', pageWidth / 2, yPosition, { align: 'center' });
+  doc.setFontSize(18);
+  doc.setTextColor(255, 255, 255); // White text
+  doc.text('TIMESHEET', pageWidth / 2, 20, { align: 'center' });
   
-  yPosition += 15;
-  
-  // Job Information
   doc.setFontSize(12);
-  doc.text(`Job: ${job.title}`, 20, yPosition);
-  yPosition += 8;
-  
+  doc.text(`${job.title}`, pageWidth / 2, 30, { align: 'center' });
+
+  // Reset text color
+  doc.setTextColor(0, 0, 0);
+
+  // Job Information
+  let yPosition = 55;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
   doc.text(`Date: ${format(parseISO(date), 'EEEE, MMMM do, yyyy')}`, 20, yPosition);
   yPosition += 8;
-  
   doc.text(`Location: ${job.location_id || 'TBD'}`, 20, yPosition);
-  yPosition += 15;
+  yPosition += 20;
 
-  // Load all signatures first
+  // Prepare table data
+  const tableData = timesheets.map((timesheet) => {
+    const technicianName = `${timesheet.technician?.first_name || ''} ${timesheet.technician?.last_name || ''}`.trim();
+    const startTime = formatTime(timesheet.start_time);
+    const endTime = formatTime(timesheet.end_time);
+    const breakTime = formatBreakTime(timesheet.break_minutes);
+    const overtime = formatOvertime(timesheet.overtime_hours);
+    
+    // Handle signature display
+    let signatureStatus = '--';
+    const signatureImg = signatureMap.get(timesheet.id);
+    if (signatureImg) {
+      signatureStatus = 'Signed';
+    } else if (timesheet.signature_data) {
+      signatureStatus = 'Failed';
+    } else if (timesheet.status === 'approved') {
+      signatureStatus = 'Pending';
+    }
+
+    const row = [technicianName, startTime, endTime, breakTime, overtime, signatureStatus];
+    
+    // Add notes if present
+    if (timesheet.notes) {
+      row.push(`Notes: ${timesheet.notes}`);
+    }
+    
+    return row;
+  });
+
+  // Create the table using autoTable
+  (doc as any).autoTable({
+    startY: yPosition,
+    head: [['Technician', 'Start Time', 'End Time', 'Break', 'Overtime', 'Signature']],
+    body: tableData,
+    theme: 'grid',
+    headStyles: {
+      fillColor: [125, 1, 1], // Corporate red
+      textColor: [255, 255, 255], // White text
+      fontSize: 10,
+      fontStyle: 'bold',
+    },
+    bodyStyles: {
+      fontSize: 9,
+      cellPadding: 3,
+    },
+    alternateRowStyles: {
+      fillColor: [248, 248, 248],
+    },
+    columnStyles: {
+      0: { cellWidth: 40 }, // Technician
+      1: { cellWidth: 20 }, // Start
+      2: { cellWidth: 20 }, // End  
+      3: { cellWidth: 18 }, // Break
+      4: { cellWidth: 18 }, // Overtime
+      5: { cellWidth: 25 }, // Signature
+    },
+    didDrawCell: (data: any) => {
+      // Add signature images to the signature column
+      if (data.column.index === 5 && data.section === 'body') {
+        const timesheet = timesheets[data.row.index];
+        const signatureImg = signatureMap.get(timesheet.id);
+        if (signatureImg) {
+          try {
+            doc.addImage(signatureImg, 'PNG', 
+              data.cell.x + 2, 
+              data.cell.y + 2, 
+              20, 
+              data.cell.height - 4
+            );
+          } catch (error) {
+            console.error('Error adding signature to table cell:', error);
+          }
+        }
+      }
+    }
+  });
+
+  // Footer with company logo
+  const footerY = pageHeight - 25;
+  
+  // Add company logo centered
+  if (companyLogo) {
+    try {
+      const logoWidth = 20;
+      const logoHeight = 10;
+      const logoX = (pageWidth - logoWidth) / 2;
+      doc.addImage(companyLogo, 'PNG', logoX, footerY - 5, logoWidth, logoHeight);
+    } catch (error) {
+      console.error('Error adding company logo to PDF:', error);
+    }
+  }
+
+  // Footer text
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(100, 100, 100);
+  doc.text(`Generated on: ${format(new Date(), 'PPP')}`, pageWidth / 2, footerY + 8, { align: 'center' });
+
+  return doc;
+};
+
+// Helper function to load all signatures
+const loadSignatures = async (timesheets: Timesheet[]) => {
   const signaturePromises: Promise<{ timesheetId: string; image: HTMLImageElement }>[] = [];
   
   for (const timesheet of timesheets) {
@@ -83,121 +249,7 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
     }
   }
 
-  // Wait for all signatures to load
-  const loadedSignatures = await Promise.allSettled(signaturePromises);
-  const signatureMap = new Map<string, HTMLImageElement>();
-  
-  loadedSignatures.forEach((result) => {
-    if (result.status === 'fulfilled' && result.value) {
-      signatureMap.set(result.value.timesheetId, result.value.image);
-    }
-  });
-
-  // Table header
-  const tableStartY = yPosition;
-  const colWidths = [60, 25, 25, 20, 20, 40];
-  const colPositions = [20, 80, 105, 130, 150, 170];
-  
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  
-  // Header background
-  doc.setFillColor(240, 240, 240);
-  doc.rect(20, yPosition - 5, pageWidth - 40, 12, 'F');
-  
-  doc.text('Technician', colPositions[0] + 2, yPosition + 3);
-  doc.text('Start', colPositions[1] + 2, yPosition + 3);
-  doc.text('End', colPositions[2] + 2, yPosition + 3);
-  doc.text('Break', colPositions[3] + 2, yPosition + 3);
-  doc.text('OT', colPositions[4] + 2, yPosition + 3);
-  doc.text('Signature', colPositions[5] + 2, yPosition + 3);
-  
-  yPosition += 12;
-
-  // Table data
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  
-  for (const timesheet of timesheets) {
-    if (yPosition > pageHeight - 50) {
-      doc.addPage();
-      yPosition = 20;
-    }
-
-    const technicianName = `${timesheet.technician?.first_name || ''} ${timesheet.technician?.last_name || ''}`.trim();
-    const startTime = formatTime(timesheet.start_time);
-    const endTime = formatTime(timesheet.end_time);
-    const breakTime = formatBreakTime(timesheet.break_minutes);
-    const overtime = formatOvertime(timesheet.overtime_hours);
-
-    // Row background (alternating)
-    if (timesheets.indexOf(timesheet) % 2 === 0) {
-      doc.setFillColor(250, 250, 250);
-      doc.rect(20, yPosition - 3, pageWidth - 40, 20, 'F');
-    }
-
-    doc.text(technicianName, colPositions[0] + 2, yPosition + 5);
-    doc.text(startTime, colPositions[1] + 2, yPosition + 5);
-    doc.text(endTime, colPositions[2] + 2, yPosition + 5);
-    doc.text(breakTime, colPositions[3] + 2, yPosition + 5);
-    doc.text(overtime, colPositions[4] + 2, yPosition + 5);
-
-    // Add signature if available
-    const signatureImg = signatureMap.get(timesheet.id);
-    if (signatureImg) {
-      try {
-        // Add the signature image to the PDF
-        doc.addImage(signatureImg, 'PNG', colPositions[5] + 2, yPosition - 2, 35, 15);
-      } catch (error) {
-        console.error('Error adding signature to PDF:', error);
-        doc.text('Error', colPositions[5] + 2, yPosition + 5);
-      }
-    } else if (timesheet.signature_data) {
-      // Signature data exists but failed to load
-      doc.text('Failed', colPositions[5] + 2, yPosition + 5);
-    } else if (timesheet.status === 'approved') {
-      doc.text('Pending', colPositions[5] + 2, yPosition + 5);
-    } else {
-      doc.text('--', colPositions[5] + 2, yPosition + 5);
-    }
-
-    // Notes (if any)
-    if (timesheet.notes) {
-      yPosition += 12;
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'italic');
-      const noteText = `Notes: ${timesheet.notes}`;
-      const splitNotes = doc.splitTextToSize(noteText, pageWidth - 50);
-      doc.text(splitNotes, 25, yPosition);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      yPosition += splitNotes.length * 4;
-    }
-
-    yPosition += 20;
-
-    // Draw row border
-    doc.setDrawColor(200, 200, 200);
-    doc.line(20, yPosition - 18, pageWidth - 20, yPosition - 18);
-  }
-
-  // Table border
-  doc.setDrawColor(0, 0, 0);
-  doc.rect(20, tableStartY - 5, pageWidth - 40, yPosition - tableStartY + 3);
-
-  // Vertical lines for columns
-  for (let i = 1; i < colPositions.length; i++) {
-    doc.line(colPositions[i], tableStartY - 5, colPositions[i], yPosition - 15);
-  }
-
-  // Footer
-  yPosition = pageHeight - 30;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.text('This timesheet was digitally generated and signed.', pageWidth / 2, yPosition, { align: 'center' });
-  doc.text(`Generated on: ${format(new Date(), 'PPP')}`, pageWidth / 2, yPosition + 5, { align: 'center' });
-
-  return doc;
+  return Promise.allSettled(signaturePromises);
 };
 
 export const downloadTimesheetPDF = async (options: GenerateTimesheetPDFOptions) => {
