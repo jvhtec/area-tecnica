@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,16 +35,18 @@ import {
   Activity,
   Palette,
   Globe,
-  MoreHorizontal
+  MoreHorizontal,
+  RefreshCw,
+  Database,
+  AlertCircle,
+  FileDown,
+  Loader2
 } from "lucide-react";
 
-// Import existing hooks
+// Import the working hooks
 import { useHojaDeRutaForm } from "@/hooks/useHojaDeRutaForm";
 import { useHojaDeRutaImages } from "@/hooks/useHojaDeRutaImages";
 import { useHojaDeRutaHandlers } from "@/hooks/useHojaDeRutaHandlers";
-import { useHojaDeRutaPersistence } from "@/hooks/useHojaDeRutaPersistence";
-import { useHojaDeRutaTemplates } from "@/hooks/useHojaDeRutaTemplates";
-import { useJobIntegration } from "@/hooks/useJobIntegration";
 
 // Import new modern sections
 import { ModernEventSection } from "./sections/ModernEventSection";
@@ -64,30 +67,38 @@ export const ModernHojaDeRuta = () => {
   const [completionProgress, setCompletionProgress] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Existing hooks
+  // Use the working hooks
   const {
     eventData,
     setEventData,
     selectedJobId,
     setSelectedJobId,
-    showAlert,
-    alertMessage,
     travelArrangements,
     setTravelArrangements,
     roomAssignments,
     setRoomAssignments,
     isLoadingJobs,
+    isLoadingHojaDeRuta,
+    isSaving,
     jobs,
+    hojaDeRuta,
+    handleSaveAll,
+    isInitialized,
+    hasSavedData,
+    hasBasicJobData,
+    dataSource,
+    isDirty,
+    autoPopulateFromJob,
+    refreshData,
   } = useHojaDeRutaForm();
 
   const {
     images,
     imagePreviews,
-    venueMap,
     venueMapPreview,
     handleImageUpload,
     removeImage,
-    handleVenueMapUpload,
+    handleVenueMapInputChange,
   } = useHojaDeRutaImages();
 
   const {
@@ -109,18 +120,6 @@ export const ModernHojaDeRuta = () => {
     roomAssignments,
     setRoomAssignments
   );
-
-  const {
-    hojaDeRuta,
-    isLoading: isLoadingHojaDeRuta,
-    saveHojaDeRuta,
-    isSaving,
-    saveTravelArrangements,
-    saveRoomAssignments,
-  } = useHojaDeRutaPersistence(selectedJobId);
-
-  const { templates, isLoadingTemplates } = useHojaDeRutaTemplates();
-  const { jobDetails, generateEventDataFromJob, isLoadingJob } = useJobIntegration(selectedJobId);
 
   // Calculate completion progress
   useEffect(() => {
@@ -144,28 +143,7 @@ export const ModernHojaDeRuta = () => {
     calculateProgress();
   }, [eventData, travelArrangements, roomAssignments]);
 
-  // Auto-save functionality
-  const handleAutoSave = async () => {
-    if (!selectedJobId || !hojaDeRuta?.id) return;
-    
-    try {
-      await saveHojaDeRuta(eventData);
-      await Promise.all([
-        saveTravelArrangements({
-          hojaDeRutaId: hojaDeRuta.id,
-          arrangements: travelArrangements,
-        }),
-        saveRoomAssignments({
-          hojaDeRutaId: hojaDeRuta.id,
-          assignments: roomAssignments,
-        })
-      ]);
-    } catch (error) {
-      console.error('Auto-save failed:', error);
-    }
-  };
-
-  // Generate enhanced PDF
+  // Enhanced PDF generation using the working functionality
   const handleGeneratePDF = async () => {
     if (!selectedJobId) {
       toast({
@@ -178,6 +156,11 @@ export const ModernHojaDeRuta = () => {
 
     setIsGenerating(true);
     try {
+      // Save data first if there are changes
+      if (isDirty || hasSavedData) {
+        await handleSaveAll();
+      }
+
       const { generateEnhancedPDF } = await import("@/utils/hoja-de-ruta/enhanced-pdf-generator");
       
       const enhancedEventData = {
@@ -192,6 +175,7 @@ export const ModernHojaDeRuta = () => {
         } : undefined
       };
 
+      const jobDetails = jobs?.find(job => job.id === selectedJobId);
       const pdfBlob = await generateEnhancedPDF(
         enhancedEventData,
         travelArrangements,
@@ -199,7 +183,7 @@ export const ModernHojaDeRuta = () => {
         imagePreviews,
         venueMapPreview,
         selectedJobId,
-        jobs?.find(job => job.id === selectedJobId)?.title || "",
+        jobDetails?.title || "",
         jobDetails?.start_time || new Date().toISOString()
       );
 
@@ -212,18 +196,73 @@ export const ModernHojaDeRuta = () => {
       URL.revokeObjectURL(url);
 
       toast({
-        title: "¡Éxito!",
+        title: "✅ Documento generado",
         description: "La hoja de ruta ha sido generada correctamente.",
       });
     } catch (error) {
       console.error("Error generating PDF:", error);
       toast({
-        title: "Error",
+        title: "❌ Error",
         description: "Hubo un problema al generar el documento.",
         variant: "destructive",
       });
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // Enhanced load job data function
+  const handleLoadJobData = async () => {
+    if (!selectedJobId) {
+      toast({
+        title: "Error",
+        description: "No hay trabajo seleccionado para cargar datos.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await autoPopulateFromJob();
+      toast({
+        title: "✅ Datos cargados",
+        description: "Los datos del trabajo se han cargado automáticamente.",
+      });
+    } catch (error) {
+      console.error("Error loading job data:", error);
+      toast({
+        title: "❌ Error",
+        description: "No se pudieron cargar los datos del trabajo.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Get status info
+  const getStatusInfo = () => {
+    const status = hojaDeRuta?.status || 'draft';
+    switch (status) {
+      case 'draft':
+        return { icon: Clock, color: 'bg-yellow-500', text: 'Borrador' };
+      case 'review':
+        return { icon: Eye, color: 'bg-blue-500', text: 'En Revisión' };
+      case 'approved':
+        return { icon: CheckCircle2, color: 'bg-green-500', text: 'Aprobado' };
+      case 'final':
+        return { icon: CheckCircle2, color: 'bg-green-600', text: 'Final' };
+      default:
+        return { icon: AlertCircle, color: 'bg-gray-500', text: 'Sin Estado' };
+    }
+  };
+
+  // Get data source info
+  const getDataSourceInfo = () => {
+    if (hasSavedData) {
+      return { icon: Database, color: 'bg-green-100 text-green-800 border-green-200', text: 'Datos Guardados' };
+    } else if (hasBasicJobData) {
+      return { icon: FileDown, color: 'bg-blue-100 text-blue-800 border-blue-200', text: 'Datos Básicos' };
+    } else {
+      return { icon: AlertCircle, color: 'bg-gray-100 text-gray-800 border-gray-200', text: 'Sin Datos' };
     }
   };
 
@@ -256,6 +295,11 @@ export const ModernHojaDeRuta = () => {
     );
   }
 
+  const statusInfo = getStatusInfo();
+  const dataSourceInfo = getDataSourceInfo();
+  const StatusIcon = statusInfo.icon;
+  const DataSourceIcon = dataSourceInfo.icon;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       {/* Modern Header */}
@@ -281,18 +325,68 @@ export const ModernHojaDeRuta = () => {
             </div>
 
             <div className="flex items-center gap-3">
-              <ModernStatusIndicator status={hojaDeRuta?.status || 'draft'} />
+              {/* Status and Data Source Indicators */}
+              <div className="flex items-center gap-2">
+                {hojaDeRuta && (
+                  <Badge variant="outline" className="flex items-center gap-1 border-2">
+                    <StatusIcon className="w-3 h-3" />
+                    {statusInfo.text}
+                  </Badge>
+                )}
+                <Badge variant="outline" className={dataSourceInfo.color}>
+                  <DataSourceIcon className="w-3 h-3 mr-1" />
+                  {dataSourceInfo.text}
+                </Badge>
+                {isDirty && (
+                  <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
+                    💾 Cambios sin guardar
+                  </Badge>
+                )}
+              </div>
+
               <ModernProgressTracker progress={completionProgress} />
               
+              {/* Action Buttons */}
               <Button
-                onClick={handleAutoSave}
-                disabled={isSaving}
+                onClick={handleLoadJobData}
+                disabled={!selectedJobId || !isInitialized}
+                variant="outline"
+                size="sm"
+                className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Cargar Datos
+              </Button>
+
+              <Button
+                onClick={refreshData}
+                disabled={!selectedJobId || isLoadingHojaDeRuta}
+                variant="outline"
+                size="sm"
+                className="border-2 border-purple-500 text-purple-600 hover:bg-purple-50"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Actualizar
+              </Button>
+
+              <Button
+                onClick={handleSaveAll}
+                disabled={isSaving || !selectedJobId || !isInitialized}
                 variant="outline"
                 size="sm"
                 className="border-2"
               >
-                <Save className="w-4 h-4 mr-2" />
-                {isSaving ? "Guardando..." : "Guardar"}
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Guardar
+                  </>
+                )}
               </Button>
 
               <Button
@@ -314,6 +408,30 @@ export const ModernHojaDeRuta = () => {
               </Button>
             </div>
           </div>
+
+          {/* Status Messages */}
+          <div className="mt-3 text-xs text-muted-foreground">
+            {!selectedJobId && (
+              <span className="text-amber-600 font-medium">
+                ⚠️ Selecciona un trabajo para comenzar
+              </span>
+            )}
+            {selectedJobId && !isInitialized && (
+              <span className="text-blue-600 font-medium">
+                ⏳ Inicializando...
+              </span>
+            )}
+            {selectedJobId && isInitialized && hasSavedData && (
+              <span className="text-green-600 font-medium">
+                ✅ Datos guardados cargados
+              </span>
+            )}
+            {selectedJobId && isInitialized && !hasSavedData && hasBasicJobData && (
+              <span className="text-blue-600 font-medium">
+                📋 Datos básicos cargados
+              </span>
+            )}
+          </div>
         </div>
       </motion.div>
 
@@ -324,7 +442,7 @@ export const ModernHojaDeRuta = () => {
           <div className="col-span-3">
             <div className="sticky top-24 space-y-4">
               <ModernTemplateManager
-                templates={templates}
+                templates={[]}
                 onApplyTemplate={(templateData) => {
                   setEventData(prev => ({
                     ...templateData,
@@ -332,7 +450,7 @@ export const ModernHojaDeRuta = () => {
                     eventDates: prev.eventDates || templateData.eventDates,
                   }));
                 }}
-                isLoading={isLoadingTemplates}
+                isLoading={false}
               />
 
               {/* Quick Navigation */}
@@ -410,11 +528,8 @@ export const ModernHojaDeRuta = () => {
                         setSelectedJobId={setSelectedJobId}
                         jobs={jobs}
                         isLoadingJobs={isLoadingJobs}
-                        jobDetails={jobDetails}
-                        onAutoPopulate={() => {
-                          const autoData = generateEventDataFromJob();
-                          setEventData(prev => ({ ...prev, ...autoData }));
-                        }}
+                        jobDetails={null}
+                        onAutoPopulate={handleLoadJobData}
                       />
                     </TabsContent>
 
@@ -427,7 +542,7 @@ export const ModernHojaDeRuta = () => {
                         venueMapPreview={venueMapPreview}
                         onImageUpload={handleImageUpload}
                         onRemoveImage={removeImage}
-                        onVenueMapUpload={handleVenueMapUpload}
+                        onVenueMapUpload={handleVenueMapInputChange}
                       />
                     </TabsContent>
 
