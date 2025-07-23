@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { Timesheet } from '@/types/timesheet';
@@ -126,13 +125,26 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
   let yPosition = 55;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
-  doc.text(`Date: ${format(parseISO(date), 'EEEE, MMMM do, yyyy')}`, 20, yPosition);
+  
+  // Show date range or "All Dates" if date is "all-dates"
+  const dateText = date === "all-dates" ? "All Dates" : format(parseISO(date), 'EEEE, MMMM do, yyyy');
+  doc.text(`Period: ${dateText}`, 20, yPosition);
   yPosition += 8;
   doc.text(`Location: ${job.location_id || 'TBD'}`, 20, yPosition);
   yPosition += 20;
 
-  // Prepare table data
-  const tableData = timesheets.map((timesheet) => {
+  // Group timesheets by date and technician for better organization
+  const groupedTimesheets = timesheets.reduce((acc, timesheet) => {
+    const key = `${timesheet.date}-${timesheet.technician_id}`;
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(timesheet);
+    return acc;
+  }, {} as Record<string, Timesheet[]>);
+
+  // Prepare table data with date grouping
+  const tableData = Object.values(groupedTimesheets).flat().map((timesheet) => {
     const technicianName = `${timesheet.technician?.first_name || ''} ${timesheet.technician?.last_name || ''}`.trim();
     const startTime = formatTime(timesheet.start_time);
     const endTime = formatTime(timesheet.end_time);
@@ -150,7 +162,15 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
       signatureStatus = 'Pending';
     }
 
-    const row = [technicianName, startTime, endTime, breakTime, overtime, signatureStatus];
+    const row = [
+      format(parseISO(timesheet.date), 'MMM dd'),
+      technicianName, 
+      startTime, 
+      endTime, 
+      breakTime, 
+      overtime, 
+      signatureStatus
+    ];
     
     // Add notes if present
     if (timesheet.notes) {
@@ -160,10 +180,10 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
     return row;
   });
 
-  // Create the table using autoTable
+  // Create the table using autoTable with updated headers
   (doc as any).autoTable({
     startY: yPosition,
-    head: [['Technician', 'Start Time', 'End Time', 'Break', 'Overtime', 'Signature']],
+    head: [['Date', 'Technician', 'Start Time', 'End Time', 'Break', 'Overtime', 'Signature']],
     body: tableData,
     theme: 'grid',
     headStyles: {
@@ -180,24 +200,25 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
       fillColor: [248, 248, 248],
     },
     columnStyles: {
-      0: { cellWidth: 40 }, // Technician
-      1: { cellWidth: 20 }, // Start
-      2: { cellWidth: 20 }, // End  
-      3: { cellWidth: 18 }, // Break
-      4: { cellWidth: 18 }, // Overtime
-      5: { cellWidth: 25 }, // Signature
+      0: { cellWidth: 18 }, // Date
+      1: { cellWidth: 35 }, // Technician
+      2: { cellWidth: 18 }, // Start
+      3: { cellWidth: 18 }, // End  
+      4: { cellWidth: 15 }, // Break
+      5: { cellWidth: 15 }, // Overtime
+      6: { cellWidth: 22 }, // Signature
     },
     didDrawCell: (data: any) => {
       // Add signature images to the signature column
-      if (data.column.index === 5 && data.section === 'body') {
-        const timesheet = timesheets[data.row.index];
+      if (data.column.index === 6 && data.section === 'body') {
+        const timesheet = Object.values(groupedTimesheets).flat()[data.row.index];
         const signatureImg = signatureMap.get(timesheet.id);
         if (signatureImg) {
           try {
             doc.addImage(signatureImg, 'PNG', 
               data.cell.x + 2, 
               data.cell.y + 2, 
-              20, 
+              18, 
               data.cell.height - 4
             );
           } catch (error) {
@@ -254,6 +275,11 @@ const loadSignatures = async (timesheets: Timesheet[]) => {
 
 export const downloadTimesheetPDF = async (options: GenerateTimesheetPDFOptions) => {
   const doc = await generateTimesheetPDF(options);
-  const fileName = `timesheet-${options.job.title.replace(/[^a-zA-Z0-9]/g, '_')}-${options.date}.pdf`;
+  
+  // Update filename to reflect that it contains all dates
+  const fileName = options.date === "all-dates" 
+    ? `timesheet-${options.job.title.replace(/[^a-zA-Z0-9]/g, '_')}-all-dates.pdf`
+    : `timesheet-${options.job.title.replace(/[^a-zA-Z0-9]/g, '_')}-${options.date}.pdf`;
+    
   doc.save(fileName);
 };

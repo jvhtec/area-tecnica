@@ -30,20 +30,19 @@ export default function Timesheets() {
   const canManage = user?.role === 'admin' || user?.role === 'management';
 
   const handleDownloadPDF = async () => {
-    if (!selectedJob || !selectedDate) return;
+    if (!selectedJob) return;
 
-    const dateTimesheets = timesheets.filter(t => t.date === selectedDate);
-    
-    if (dateTimesheets.length === 0) {
-      alert('No timesheets found for the selected date');
+    // Use all timesheets for the job, not filtered by date
+    if (timesheets.length === 0) {
+      alert('No timesheets found for this job');
       return;
     }
 
     try {
       await downloadTimesheetPDF({
         job: selectedJob,
-        timesheets: dateTimesheets,
-        date: selectedDate
+        timesheets: timesheets, // Use all timesheets
+        date: "all-dates" // Indicate this covers all dates
       });
     } catch (error) {
       console.error('Error generating PDF:', error);
