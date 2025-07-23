@@ -29,6 +29,14 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   const [editingTimesheet, setEditingTimesheet] = useState<string | null>(null);
   const [selectedTimesheets, setSelectedTimesheets] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
+  const [showBulkEditForm, setShowBulkEditForm] = useState(false);
+  const [bulkFormData, setBulkFormData] = useState<Partial<TimesheetFormData>>({
+    start_time: '',
+    end_time: '',
+    break_minutes: undefined,
+    overtime_hours: undefined,
+    notes: ''
+  });
   const [formData, setFormData] = useState<TimesheetFormData>({
     date: selectedDate,
     start_time: "09:00",
@@ -121,6 +129,32 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     setShowBulkActions(false);
   };
 
+  const handleBulkEdit = async () => {
+    const promises = Array.from(selectedTimesheets).map(timesheetId => {
+      const updates: Partial<Timesheet> = {};
+      
+      if (bulkFormData.start_time) updates.start_time = bulkFormData.start_time;
+      if (bulkFormData.end_time) updates.end_time = bulkFormData.end_time;
+      if (bulkFormData.break_minutes !== undefined) updates.break_minutes = bulkFormData.break_minutes;
+      if (bulkFormData.overtime_hours !== undefined) updates.overtime_hours = bulkFormData.overtime_hours;
+      if (bulkFormData.notes) updates.notes = bulkFormData.notes;
+      
+      return updateTimesheet(timesheetId, updates);
+    });
+    
+    await Promise.all(promises);
+    setSelectedTimesheets(new Set());
+    setShowBulkActions(false);
+    setShowBulkEditForm(false);
+    setBulkFormData({
+      start_time: '',
+      end_time: '',
+      break_minutes: undefined,
+      overtime_hours: undefined,
+      notes: ''
+    });
+  };
+
   const toggleTimesheetSelection = (timesheetId: string) => {
     const newSelection = new Set(selectedTimesheets);
     if (newSelection.has(timesheetId)) {
@@ -141,6 +175,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   const clearSelection = () => {
     setSelectedTimesheets(new Set());
     setShowBulkActions(false);
+    setShowBulkEditForm(false);
   };
 
   const timesheetsByDate = filteredTimesheets.reduce((acc, timesheet) => {
@@ -171,6 +206,13 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
           <div className="flex items-center gap-2">
             {showBulkActions && (
               <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowBulkEditForm(!showBulkEditForm)}
+                >
+                  Edit Times ({selectedTimesheets.size})
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -205,6 +247,72 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
           </div>
         )}
       </div>
+
+      {/* Bulk Edit Form */}
+      {showBulkEditForm && selectedTimesheets.size > 0 && (
+        <Card className="p-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Edit Times for {selectedTimesheets.size} Selected Timesheets</h3>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div>
+                <Label htmlFor="bulk_start_time">Start Time</Label>
+                <Input
+                  id="bulk_start_time"
+                  type="time"
+                  value={bulkFormData.start_time}
+                  onChange={(e) => setBulkFormData({ ...bulkFormData, start_time: e.target.value })}
+                  placeholder="Leave empty to skip"
+                />
+              </div>
+              <div>
+                <Label htmlFor="bulk_end_time">End Time</Label>
+                <Input
+                  id="bulk_end_time"
+                  type="time"
+                  value={bulkFormData.end_time}
+                  onChange={(e) => setBulkFormData({ ...bulkFormData, end_time: e.target.value })}
+                  placeholder="Leave empty to skip"
+                />
+              </div>
+              <div>
+                <Label htmlFor="bulk_break_minutes">Break (minutes)</Label>
+                <Input
+                  id="bulk_break_minutes"
+                  type="number"
+                  value={bulkFormData.break_minutes || ''}
+                  onChange={(e) => setBulkFormData({ ...bulkFormData, break_minutes: e.target.value ? parseInt(e.target.value) : undefined })}
+                  placeholder="Leave empty to skip"
+                />
+              </div>
+              <div>
+                <Label htmlFor="bulk_overtime_hours">Overtime (hours)</Label>
+                <Input
+                  id="bulk_overtime_hours"
+                  type="number"
+                  step="0.5"
+                  value={bulkFormData.overtime_hours || ''}
+                  onChange={(e) => setBulkFormData({ ...bulkFormData, overtime_hours: e.target.value ? parseFloat(e.target.value) : undefined })}
+                  placeholder="Leave empty to skip"
+                />
+              </div>
+              <div className="flex items-end">
+                <Button onClick={handleBulkEdit} className="w-full">
+                  Apply Changes
+                </Button>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="bulk_notes">Notes (will append to existing notes)</Label>
+              <Textarea
+                id="bulk_notes"
+                value={bulkFormData.notes}
+                onChange={(e) => setBulkFormData({ ...bulkFormData, notes: e.target.value })}
+                placeholder="Leave empty to skip adding notes"
+              />
+            </div>
+          </div>
+        </Card>
+      )}
 
       {!assignments.length && isManagementUser && (
         <Card>
