@@ -188,6 +188,14 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   const isManagementUser = userRole === 'admin' || userRole === 'management';
   const isTechnician = userRole === 'technician';
 
+  console.log('TimesheetView Debug:', { 
+    userRole, 
+    isManagementUser, 
+    canManage, 
+    filteredTimesheetsLength: filteredTimesheets.length,
+    user: user?.email 
+  });
+
   if (isLoading) {
     return <div className="flex items-center justify-center p-8">Loading timesheets...</div>;
   }
@@ -202,7 +210,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
           </h2>
           {jobTitle && <p className="text-muted-foreground">Job: {jobTitle}</p>}
         </div>
-        {canManage && filteredTimesheets.length > 0 && (
+        {isManagementUser && filteredTimesheets.length > 0 && (
           <div className="flex items-center gap-2">
             {showBulkActions && (
               <>
@@ -374,7 +382,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
               <div key={timesheet.id} className="border rounded-lg p-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    {canManage && (
+                    {isManagementUser && (
                       <input
                         type="checkbox"
                         checked={selectedTimesheets.has(timesheet.id)}
@@ -408,7 +416,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                     )}
                     
                     {/* Management can edit any draft timesheet */}
-                    {canManage && timesheet.status === 'draft' && (
+                    {isManagementUser && timesheet.status === 'draft' && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -419,7 +427,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                     )}
                     
                     {/* Only management can approve submitted timesheets */}
-                    {canManage && timesheet.status === 'submitted' && (
+                    {isManagementUser && timesheet.status === 'submitted' && (
                       <Button
                         size="sm"
                         onClick={() => approveTimesheet(timesheet.id)}
@@ -429,7 +437,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                     )}
                     
                     {/* Both technicians and management can submit draft timesheets */}
-                    {(isTechnician || canManage) && timesheet.status === 'draft' && (
+                    {(isTechnician || isManagementUser) && timesheet.status === 'draft' && (
                       <Button
                         variant="outline"
                         size="sm"
