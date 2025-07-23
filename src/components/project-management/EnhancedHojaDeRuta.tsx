@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useSimplifiedHojaDeRutaForm } from "@/hooks/useSimplifiedHojaDeRutaForm";
+import { useHojaDeRutaForm } from "@/hooks/useHojaDeRutaForm";
 import { useHojaDeRutaImages } from "@/hooks/useHojaDeRutaImages";
 import { useHojaDeRutaHandlers } from "@/hooks/useHojaDeRutaHandlers";
 import { ImageUploadSection } from "@/components/hoja-de-ruta/sections/ImageUploadSection";
@@ -55,11 +55,10 @@ const EnhancedHojaDeRutaGenerator = () => {
     hojaDeRuta,
     handleSaveAll,
     isInitialized,
-    isDirty,
-    dataSource,
-    loadAdditionalJobData,
+    hasSavedData,
+    autoPopulateFromJob,
     refreshData
-  } = useSimplifiedHojaDeRutaForm();
+  } = useHojaDeRutaForm();
 
   const {
     images,
@@ -105,7 +104,7 @@ const EnhancedHojaDeRutaGenerator = () => {
 
     try {
       // Save data first if there are changes
-      if (isDirty) {
+      if (hasSavedData || eventData.eventName) {
         await handleSaveAll();
       }
       
@@ -166,6 +165,33 @@ const EnhancedHojaDeRutaGenerator = () => {
     }
   };
 
+  // Enhanced load job data function
+  const handleLoadJobData = async () => {
+    if (!selectedJobId) {
+      toast({
+        title: "Error",
+        description: "No hay trabajo seleccionado para cargar datos.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await autoPopulateFromJob();
+      toast({
+        title: "✅ Datos cargados",
+        description: "Los datos del trabajo se han cargado automáticamente.",
+      });
+    } catch (error) {
+      console.error("Error loading job data:", error);
+      toast({
+        title: "❌ Error",
+        description: "No se pudieron cargar los datos del trabajo.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Get status info
   const getStatusInfo = () => {
     const status = hojaDeRuta?.status || 'draft';
@@ -185,16 +211,22 @@ const EnhancedHojaDeRutaGenerator = () => {
 
   // Get data source info
   const getDataSourceInfo = () => {
-    switch (dataSource) {
-      case 'saved':
-        return { icon: Database, color: 'bg-green-100 text-green-800 border-green-200', text: 'Datos Guardados' };
-      case 'job':
-        return { icon: FileDown, color: 'bg-blue-100 text-blue-800 border-blue-200', text: 'Datos del Trabajo' };
-      case 'mixed':
-        return { icon: Zap, color: 'bg-purple-100 text-purple-800 border-purple-200', text: 'Datos Mixtos' };
-      default:
-        return { icon: AlertCircle, color: 'bg-gray-100 text-gray-800 border-gray-200', text: 'Sin Datos' };
+    if (hasSavedData) {
+      return { icon: Database, color: 'bg-green-100 text-green-800 border-green-200', text: 'Datos Guardados' };
+    } else if (eventData.eventName) {
+      return { icon: FileDown, color: 'bg-blue-100 text-blue-800 border-blue-200', text: 'Datos Básicos' };
+    } else {
+      return { icon: AlertCircle, color: 'bg-gray-100 text-gray-800 border-gray-200', text: 'Sin Datos' };
     }
+  };
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = () => {
+    return eventData.eventName || eventData.eventDates || eventData.venue.name || 
+           eventData.venue.address || eventData.schedule || eventData.powerRequirements ||
+           eventData.auxiliaryNeeds || eventData.contacts.some(c => c.name) ||
+           eventData.staff.some(s => s.name) || travelArrangements.some(t => t.pickup_address) ||
+           roomAssignments.some(r => r.room_number);
   };
 
   if (isLoadingHojaDeRuta) {
@@ -214,6 +246,7 @@ const EnhancedHojaDeRutaGenerator = () => {
   const dataSourceInfo = getDataSourceInfo();
   const StatusIcon = statusInfo.icon;
   const DataSourceIcon = dataSourceInfo.icon;
+  const isDirty = hasUnsavedChanges() && !hasSavedData;
 
   return (
     <Card className="w-full max-w-4xl mx-auto border-2 border-primary/20 shadow-lg">
@@ -259,7 +292,7 @@ const EnhancedHojaDeRutaGenerator = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={loadAdditionalJobData}
+                onClick={handleLoadJobData}
                 disabled={!selectedJobId || !isInitialized}
                 className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50 hover:border-blue-600 font-medium"
               >
@@ -292,14 +325,14 @@ const EnhancedHojaDeRutaGenerator = () => {
                   ⏳ Inicializando...
                 </span>
               )}
-              {selectedJobId && isInitialized && dataSource === 'saved' && !isDirty && (
+              {selectedJobId && isInitialized && hasSavedData && (
                 <span className="text-green-600 font-medium">
                   ✅ Datos guardados cargados
                 </span>
               )}
-              {selectedJobId && isInitialized && dataSource === 'job' && (
+              {selectedJobId && isInitialized && !hasSavedData && eventData.eventName && (
                 <span className="text-blue-600 font-medium">
-                  📋 Datos básicos del trabajo
+                  📋 Datos básicos cargados
                 </span>
               )}
             </div>
