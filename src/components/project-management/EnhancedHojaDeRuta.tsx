@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
   Card,
   CardHeader,
@@ -10,17 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { useHojaDeRutaForm } from "@/hooks/useHojaDeRutaForm";
+import { useSimplifiedHojaDeRutaForm } from "@/hooks/useSimplifiedHojaDeRutaForm";
 import { useHojaDeRutaImages } from "@/hooks/useHojaDeRutaImages";
 import { useHojaDeRutaHandlers } from "@/hooks/useHojaDeRutaHandlers";
-import { useHojaDeRutaTemplates } from "@/hooks/useHojaDeRutaTemplates";
 import { ImageUploadSection } from "@/components/hoja-de-ruta/sections/ImageUploadSection";
 import { EventDetailsSection } from "@/components/hoja-de-ruta/sections/EventDetailsSection";
 import { ProgramDetailsSection } from "@/components/hoja-de-ruta/sections/ProgramDetailsSection";
@@ -36,25 +28,22 @@ import {
   FileText, 
   Loader2, 
   RefreshCw, 
-  File, 
+  Database,
+  Download,
   AlertCircle,
   CheckCircle2,
   Clock,
   Eye,
-  Database,
-  Wand2,
+  FileDown,
+  Zap,
 } from "lucide-react";
 
 const EnhancedHojaDeRutaGenerator = () => {
-  console.log("🚀 COMPONENT: EnhancedHojaDeRutaGenerator is rendering!");
-  
   const {
     eventData,
     setEventData,
     selectedJobId,
     setSelectedJobId,
-    showAlert,
-    alertMessage,
     travelArrangements,
     setTravelArrangements,
     roomAssignments,
@@ -66,10 +55,11 @@ const EnhancedHojaDeRutaGenerator = () => {
     hojaDeRuta,
     handleSaveAll,
     isInitialized,
-    hasSavedData,
-    autoPopulateFromJob,
+    isDirty,
+    dataSource,
+    loadAdditionalJobData,
     refreshData
-  } = useHojaDeRutaForm();
+  } = useSimplifiedHojaDeRutaForm();
 
   const {
     images,
@@ -100,121 +90,9 @@ const EnhancedHojaDeRutaGenerator = () => {
     setRoomAssignments
   );
 
-  // Enhanced functionality hooks
-  const { 
-    templates, 
-    isLoadingTemplates,
-    createTemplate,
-    isCreating 
-  } = useHojaDeRutaTemplates();
-
   const { toast } = useToast();
-  const [isDirty, setIsDirty] = useState<boolean>(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
 
-  // Track if data has changed to show save button
-  useEffect(() => {
-    if (hojaDeRuta && isInitialized) {
-      const isDataDifferent = JSON.stringify(eventData) !== JSON.stringify({
-        eventName: hojaDeRuta.event_name || "",
-        eventDates: hojaDeRuta.event_dates || "",
-        venue: {
-          name: hojaDeRuta.venue_name || "",
-          address: hojaDeRuta.venue_address || "",
-        },
-        contacts: hojaDeRuta.contacts || [],
-        logistics: hojaDeRuta.logistics || {
-          transport: "",
-          loadingDetails: "",
-          unloadingDetails: "",
-          equipmentLogistics: "",
-        },
-        staff: hojaDeRuta.staff || [],
-        schedule: hojaDeRuta.schedule || "",
-        powerRequirements: hojaDeRuta.power_requirements || "",
-        auxiliaryNeeds: hojaDeRuta.auxiliary_needs || "",
-      });
-
-      const areTravelArrangementsDifferent = JSON.stringify(travelArrangements) !== JSON.stringify(hojaDeRuta.travel || []);
-      const areRoomAssignmentsDifferent = JSON.stringify(roomAssignments) !== JSON.stringify(hojaDeRuta.rooms || []);
-
-      setIsDirty(Boolean(isDataDifferent || areTravelArrangementsDifferent || areRoomAssignmentsDifferent));
-    } else if (selectedJobId && isInitialized && !hasSavedData) {
-      // If we have a selected job but no saved data, consider it dirty if there's any data entered
-      const hasAnyData = Boolean(
-        eventData.eventName || 
-        eventData.eventDates || 
-        eventData.venue.name || 
-        eventData.schedule || 
-        eventData.powerRequirements || 
-        eventData.auxiliaryNeeds ||
-        travelArrangements.some(arr => arr.pickup_address || arr.notes) ||
-        roomAssignments.some(room => room.room_number)
-      );
-      setIsDirty(hasAnyData);
-    }
-  }, [eventData, travelArrangements, roomAssignments, hojaDeRuta, selectedJobId, isInitialized, hasSavedData]);
-
-  // Apply template
-  const handleApplyTemplate = (templateId: string) => {
-    const template = templates?.find(t => t.id === templateId);
-    if (!template) return;
-
-    setEventData(prev => ({
-      ...template.template_data,
-      // Preserve event-specific data
-      eventName: prev.eventName || template.template_data.eventName,
-      eventDates: prev.eventDates || template.template_data.eventDates,
-      venue: prev.venue.name ? prev.venue : template.template_data.venue
-    }));
-
-    toast({
-      title: "Plantilla aplicada",
-      description: `Se ha aplicado la plantilla "${template.name}".`,
-    });
-  };
-
-  // Use the comprehensive save function from the form hook
-  const handleSave = async () => {
-    console.log("💾 COMPONENT: Save button clicked");
-    if (!selectedJobId) {
-      toast({
-        title: "Error",
-        description: "Por favor, seleccione un trabajo antes de guardar.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      await handleSaveAll();
-      setIsDirty(false);
-    } catch (error) {
-      console.error("Error in handleSave:", error);
-    }
-  };
-
-  // Force refresh data
-  const handleRefreshData = async () => {
-    if (!selectedJobId) return;
-    
-    try {
-      await refreshData();
-      toast({
-        title: "Datos actualizados",
-        description: "Los datos guardados se han actualizado correctamente.",
-      });
-    } catch (error) {
-      console.error("Error refreshing data:", error);
-      toast({
-        title: "Error",
-        description: "No se pudieron actualizar los datos.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Enhanced PDF generation with new features
+  // Enhanced PDF generation
   const generateDocument = async () => {
     if (!selectedJobId) {
       toast({
@@ -226,7 +104,7 @@ const EnhancedHojaDeRutaGenerator = () => {
     }
 
     try {
-      // Save data first to ensure we're generating PDF with latest data
+      // Save data first if there are changes
       if (isDirty) {
         await handleSaveAll();
       }
@@ -261,7 +139,7 @@ const EnhancedHojaDeRutaGenerator = () => {
         jobDetails?.start_time || new Date().toISOString()
       );
 
-      // Upload to job documents with sanitized filename
+      // Upload to job documents
       const eventName = eventData.eventName || 'sin_nombre';
       const fileName = `hoja_de_ruta_${eventName.replace(/[^a-zA-Z0-9]/g, '_')}_v${enhancedEventData.metadata?.document_version || 1}.pdf`;
       await uploadPdfToJob(selectedJobId, pdfBlob, fileName);
@@ -275,31 +153,18 @@ const EnhancedHojaDeRutaGenerator = () => {
       URL.revokeObjectURL(url);
 
       toast({
-        title: "Documento generado",
+        title: "✅ Documento generado",
         description: "La hoja de ruta ha sido generada y descargada correctamente.",
       });
     } catch (error) {
       console.error("Error generating PDF:", error);
       toast({
-        title: "Error",
+        title: "❌ Error",
         description: "Hubo un problema al generar el documento.",
         variant: "destructive",
       });
     }
   };
-
-  if (isLoadingHojaDeRuta) {
-    return (
-      <Card className="w-full max-w-4xl mx-auto">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 animate-spin mr-2" />
-            <p className="text-muted-foreground">Cargando datos guardados...</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   // Get status info
   const getStatusInfo = () => {
@@ -318,18 +183,47 @@ const EnhancedHojaDeRutaGenerator = () => {
     }
   };
 
+  // Get data source info
+  const getDataSourceInfo = () => {
+    switch (dataSource) {
+      case 'saved':
+        return { icon: Database, color: 'bg-green-100 text-green-800 border-green-200', text: 'Datos Guardados' };
+      case 'job':
+        return { icon: FileDown, color: 'bg-blue-100 text-blue-800 border-blue-200', text: 'Datos del Trabajo' };
+      case 'mixed':
+        return { icon: Zap, color: 'bg-purple-100 text-purple-800 border-purple-200', text: 'Datos Mixtos' };
+      default:
+        return { icon: AlertCircle, color: 'bg-gray-100 text-gray-800 border-gray-200', text: 'Sin Datos' };
+    }
+  };
+
+  if (isLoadingHojaDeRuta) {
+    return (
+      <Card className="w-full max-w-4xl mx-auto">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="w-8 h-8 animate-spin mr-2" />
+            <p className="text-muted-foreground">Cargando datos...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const statusInfo = getStatusInfo();
+  const dataSourceInfo = getDataSourceInfo();
   const StatusIcon = statusInfo.icon;
+  const DataSourceIcon = dataSourceInfo.icon;
 
   return (
     <Card className="w-full max-w-4xl mx-auto border-2 border-primary/20 shadow-lg">
       <CardHeader className="bg-gradient-to-r from-primary/5 to-secondary/5 border-b">
         <div className="flex flex-col gap-4">
-          {/* Enhanced Title with Clear Indicators */}
+          {/* Title with Status */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <CardTitle className="text-2xl font-bold text-primary flex items-center gap-2">
-                🚀 Enhanced Hoja de Ruta Generator
+              <CardTitle className="text-2xl font-bold text-primary">
+                📋 Hoja de Ruta Generator
               </CardTitle>
               {hojaDeRuta && (
                 <div className="flex items-center gap-2">
@@ -344,118 +238,77 @@ const EnhancedHojaDeRutaGenerator = () => {
               )}
             </div>
             
-            {/* Enhanced Feature Badge */}
+            {/* Data Source Indicator */}
             <div className="flex items-center gap-2">
-              {hasSavedData && (
-                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                  <Database className="w-3 h-3 mr-1" />
-                  Datos Guardados
+              <Badge variant="outline" className={dataSourceInfo.color}>
+                <DataSourceIcon className="w-3 h-3 mr-1" />
+                {dataSourceInfo.text}
+              </Badge>
+              {isDirty && (
+                <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
+                  💾 Cambios sin guardar
                 </Badge>
               )}
-              <div className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium border border-green-200">
-                ✨ Versión Mejorada
-              </div>
             </div>
           </div>
           
-          {/* Enhanced Action Bar */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-white/70 rounded-lg border border-primary/10">
+          {/* Action Bar */}
+          <div className="flex items-center justify-between gap-4 p-4 bg-white/70 rounded-lg border border-primary/10">
             <div className="flex items-center gap-3 flex-wrap">
-              {/* Auto-Complete Button - Now clearly separate from data loading */}
+              {/* Load Additional Data Button */}
               <Button
                 variant="outline"
                 size="sm"
-                onClick={autoPopulateFromJob}
+                onClick={loadAdditionalJobData}
                 disabled={!selectedJobId || !isInitialized}
                 className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50 hover:border-blue-600 font-medium"
               >
-                <Wand2 className="w-4 h-4 mr-2" />
-                Auto-completar desde Job
+                <Download className="w-4 h-4 mr-2" />
+                Cargar Datos del Trabajo
               </Button>
               
-              {/* Manual Refresh Button for Saved Data */}
+              {/* Refresh Button */}
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleRefreshData}
+                onClick={refreshData}
                 disabled={!selectedJobId || isLoadingHojaDeRuta}
                 className="border-2 border-purple-500 text-purple-600 hover:bg-purple-50 hover:border-purple-600 font-medium"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Recargar Guardados
+                Actualizar
               </Button>
-              
-              {/* Template Selector */}
-              <div className="flex items-center gap-2">
-                <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
-                  <SelectTrigger className="w-52 border-2 border-purple-300 hover:border-purple-400">
-                    <SelectValue placeholder={
-                      templates && templates.length > 0 
-                        ? "📋 Seleccionar plantilla" 
-                        : "📋 No hay plantillas"
-                    } />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templates && templates.length > 0 ? (
-                      templates.map((template) => (
-                        <SelectItem key={template.id} value={template.id}>
-                          <div className="flex items-center gap-2">
-                            <File className="w-4 h-4" />
-                            {template.name}
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="none" disabled>
-                        No hay plantillas disponibles
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-                
-                {selectedTemplate && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleApplyTemplate(selectedTemplate)}
-                  >
-                    Aplicar
-                  </Button>
-                 )}
-               </div>
-               
-               {/* Status and Feedback */}
-               <div className="text-xs text-muted-foreground">
-                 {!selectedJobId && (
-                   <span className="text-amber-600 font-medium">
-                     ⚠️ Selecciona un job para habilitar funciones
-                   </span>
-                 )}
-                 {isDirty && selectedJobId && (
-                   <span className="text-orange-600 font-medium">
-                     💾 Hay cambios sin guardar
-                   </span>
-                 )}
-                 {hasSavedData && !isDirty && (
-                   <span className="text-green-600 font-medium">
-                     ✅ Datos guardados cargados
-                   </span>
-                 )}
-               </div>
-             </div>
-           </div>
-         </div>
+            </div>
+            
+            {/* Status Info */}
+            <div className="text-xs text-muted-foreground">
+              {!selectedJobId && (
+                <span className="text-amber-600 font-medium">
+                  ⚠️ Selecciona un trabajo para comenzar
+                </span>
+              )}
+              {selectedJobId && !isInitialized && (
+                <span className="text-blue-600 font-medium">
+                  ⏳ Inicializando...
+                </span>
+              )}
+              {selectedJobId && isInitialized && dataSource === 'saved' && !isDirty && (
+                <span className="text-green-600 font-medium">
+                  ✅ Datos guardados cargados
+                </span>
+              )}
+              {selectedJobId && isInitialized && dataSource === 'job' && (
+                <span className="text-blue-600 font-medium">
+                  📋 Datos básicos del trabajo
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
       </CardHeader>
 
       <ScrollArea className="h-[calc(100vh-12rem)]">
         <CardContent className="space-y-6">
-          {showAlert && (
-            <Alert className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{alertMessage}</AlertDescription>
-            </Alert>
-          )}
-
           <EventDetailsSection
             selectedJobId={selectedJobId}
             setSelectedJobId={setSelectedJobId}
@@ -528,10 +381,10 @@ const EnhancedHojaDeRutaGenerator = () => {
                 Generar PDF
               </Button>
               
-              {(isDirty || !hasSavedData) && selectedJobId && isInitialized && (
+              {isDirty && selectedJobId && isInitialized && (
                 <Button
                   variant="secondary"
-                  onClick={handleSave}
+                  onClick={handleSaveAll}
                   disabled={isSaving || !isInitialized}
                   className="min-w-[160px] bg-green-100 hover:bg-green-200 text-green-800 border-green-300"
                 >
@@ -543,7 +396,7 @@ const EnhancedHojaDeRutaGenerator = () => {
                   ) : (
                     <>
                       <Save className="w-4 h-4 mr-2" />
-                      {hasSavedData ? "Guardar Cambios" : "Guardar"}
+                      Guardar
                     </>
                   )}
                 </Button>
