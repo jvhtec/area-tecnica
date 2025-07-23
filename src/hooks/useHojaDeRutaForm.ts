@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { EventData, TravelArrangement, RoomAssignment } from "@/types/hoja-de-ruta";
 import { useJobSelection } from "@/hooks/useJobSelection";
@@ -40,6 +41,8 @@ export const useHojaDeRutaForm = () => {
   ]);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [hasSavedData, setHasSavedData] = useState<boolean>(false);
+  const [hasBasicJobData, setHasBasicJobData] = useState<boolean>(false);
+  const [dataSource, setDataSource] = useState<'none' | 'saved' | 'job' | 'mixed'>('none');
 
   // Get persistence functions
   const {
@@ -61,10 +64,87 @@ export const useHojaDeRutaForm = () => {
     selectedJobId,
     hasHojaDeRuta: !!hojaDeRuta,
     hasSavedData,
+    hasBasicJobData,
+    dataSource,
     isLoadingHojaDeRuta,
     eventDataEventName: eventData.eventName,
     isInitialized
   });
+
+  // Auto-populate basic job data when job is selected (if no saved data)
+  const autoPopulateBasicJobData = useCallback(async (jobId: string) => {
+    if (!jobId) return;
+    
+    console.log("🔄 FORM: Auto-populating basic job data for:", jobId);
+    
+    try {
+      // Fetch basic job data
+      const { data: jobData, error: jobError } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('id', jobId)
+        .single();
+
+      if (jobError) {
+        console.error("❌ FORM: Error fetching job data:", jobError);
+        return;
+      }
+
+      if (!jobData) {
+        console.log("❌ FORM: No job data found for:", jobId);
+        return;
+      }
+
+      // Prepare basic event data
+      const startDate = jobData.start_time ? new Date(jobData.start_time) : null;
+      const endDate = jobData.end_time ? new Date(jobData.end_time) : null;
+      
+      let eventDates = "";
+      if (startDate && endDate) {
+        if (startDate.toDateString() === endDate.toDateString()) {
+          eventDates = startDate.toLocaleDateString('es-ES');
+        } else {
+          eventDates = `${startDate.toLocaleDateString('es-ES')} - ${endDate.toLocaleDateString('es-ES')}`;
+        }
+      }
+
+      const basicEventData: EventData = {
+        eventName: jobData.title || "",
+        eventDates,
+        venue: {
+          name: jobData.venue || "",
+          address: jobData.location || "",
+        },
+        contacts: jobData.client_name ? [{
+          name: jobData.client_name,
+          role: "Cliente",
+          phone: jobData.client_phone || ""
+        }] : [{ name: "", role: "", phone: "" }],
+        logistics: {
+          transport: "",
+          loadingDetails: "",
+          unloadingDetails: "",
+          equipmentLogistics: "",
+        },
+        staff: [{ name: "", surname1: "", surname2: "", position: "" }],
+        schedule: startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : "",
+        powerRequirements: "",
+        auxiliaryNeeds: "",
+      };
+
+      console.log("✅ FORM: Setting basic job data:", basicEventData);
+      setEventData(basicEventData);
+      setHasBasicJobData(true);
+      setDataSource('job');
+      
+      toast({
+        title: "📋 Datos básicos cargados",
+        description: "Se han cargado los datos básicos del trabajo seleccionado.",
+      });
+    } catch (error: any) {
+      console.error("❌ FORM: Error auto-populating basic job data:", error);
+    }
+  }, [toast]);
 
   // Initialize form with existing saved data when hojaDeRuta changes
   useEffect(() => {
@@ -75,6 +155,8 @@ export const useHojaDeRutaForm = () => {
     if (selectedJobId && hojaDeRuta) {
       console.log("✅ FORM: Initializing form with SAVED data (takes priority)");
       setHasSavedData(true);
+      setHasBasicJobData(false);
+      setDataSource('saved');
       
       setEventData({
         eventName: hojaDeRuta.event_name || "",
@@ -139,16 +221,21 @@ export const useHojaDeRutaForm = () => {
       }
       
       setIsInitialized(true);
+      
+      toast({
+        title: "✅ Datos guardados cargados",
+        description: "Se han cargado los datos previamente guardados para este trabajo.",
+      });
     } else if (selectedJobId && !hojaDeRuta && !isLoadingHojaDeRuta) {
-      // No saved data found - reset to initial state
-      console.log("🆕 FORM: No saved data found, resetting to initial state");
+      // No saved data found - auto-populate basic job data
+      console.log("🆕 FORM: No saved data found, auto-populating basic job data");
       setHasSavedData(false);
-      setEventData(initialEventData);
+      autoPopulateBasicJobData(selectedJobId);
       setTravelArrangements([{ transportation_type: "van" }]);
       setRoomAssignments([{ room_type: "single" }]);
       setIsInitialized(true);
     }
-  }, [hojaDeRuta, selectedJobId, isLoadingHojaDeRuta]);
+  }, [hojaDeRuta, selectedJobId, isLoadingHojaDeRuta, autoPopulateBasicJobData]);
 
   // Reset form when job selection changes
   useEffect(() => {
@@ -156,7 +243,9 @@ export const useHojaDeRutaForm = () => {
     if (selectedJobId) {
       setIsInitialized(false);
       setHasSavedData(false);
-      // Data will be loaded by the persistence hook
+      setHasBasicJobData(false);
+      setDataSource('none');
+      // Data will be loaded by the persistence hook and then auto-populated if needed
       refreshData();
     } else {
       // Clear all data when no job is selected
@@ -164,6 +253,8 @@ export const useHojaDeRutaForm = () => {
       setTravelArrangements([{ transportation_type: "van" }]);
       setRoomAssignments([{ room_type: "single" }]);
       setHasSavedData(false);
+      setHasBasicJobData(false);
+      setDataSource('none');
       setIsInitialized(true);
     }
   }, [selectedJobId, refreshData]);
@@ -180,7 +271,7 @@ export const useHojaDeRutaForm = () => {
     }
   }, [fetchError, toast]);
 
-  // SEPARATE function to fetch and auto-populate from job data (only when manually triggered)
+  // Enhanced function to fetch and merge additional job data
   const autoPopulateFromJob = useCallback(async () => {
     if (!selectedJobId) {
       toast({
@@ -191,10 +282,10 @@ export const useHojaDeRutaForm = () => {
       return;
     }
 
-    console.log("🔄 FORM: Auto-populating from job data for:", selectedJobId);
+    console.log("🔄 FORM: Auto-populating additional job data for:", selectedJobId);
     
     try {
-      // Fetch job data
+      // Fetch comprehensive job data
       const { data: jobData, error: jobError } = await supabase
         .from('jobs')
         .select(`
@@ -217,28 +308,7 @@ export const useHojaDeRutaForm = () => {
 
       if (powerError) throw powerError;
 
-      // Prepare auto-populated data
-      const startDate = jobData.start_time ? new Date(jobData.start_time) : null;
-      const endDate = jobData.end_time ? new Date(jobData.end_time) : null;
-      
-      let eventDates = "";
-      if (startDate && endDate) {
-        if (startDate.toDateString() === endDate.toDateString()) {
-          eventDates = startDate.toLocaleDateString('es-ES');
-        } else {
-          eventDates = `${startDate.toLocaleDateString('es-ES')} - ${endDate.toLocaleDateString('es-ES')}`;
-        }
-      }
-
-      const contacts = [];
-      if (jobData.client_name) {
-        contacts.push({
-          name: jobData.client_name,
-          role: "Cliente",
-          phone: jobData.client_phone || ""
-        });
-      }
-
+      // Prepare comprehensive data
       const staff = jobData.job_assignments?.map((assignment: any) => ({
         name: assignment.profiles?.first_name || "",
         surname1: assignment.profiles?.last_name || "",
@@ -261,37 +331,26 @@ export const useHojaDeRutaForm = () => {
       // Merge with existing data (preserve user modifications)
       setEventData(prevData => ({
         ...prevData,
-        eventName: prevData.eventName || jobData.title || "",
-        eventDates: prevData.eventDates || eventDates,
-        venue: {
-          name: prevData.venue.name || jobData.venue || "",
-          address: prevData.venue.address || jobData.location || ""
-        },
-        contacts: prevData.contacts.some(c => c.name) ? prevData.contacts : 
-          (contacts.length > 0 ? contacts : [{ name: "", role: "", phone: "" }]),
-        staff: prevData.staff.some(s => s.name) ? prevData.staff : 
-          (staff.length > 0 ? staff : [{ name: "", surname1: "", surname2: "", position: "" }]),
-        schedule: prevData.schedule || (startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : ""),
-        powerRequirements: prevData.powerRequirements || formattedPowerRequirements,
-        // Keep existing logistics and auxiliary needs
-        logistics: prevData.logistics,
-        auxiliaryNeeds: prevData.auxiliaryNeeds,
+        staff: staff.length > 0 ? staff : prevData.staff,
+        powerRequirements: formattedPowerRequirements || prevData.powerRequirements,
       }));
 
-      console.log("✅ FORM: Auto-populated from job data successfully");
+      setDataSource(hasSavedData ? 'mixed' : 'job');
+      
+      console.log("✅ FORM: Enhanced job data loaded successfully");
       toast({
-        title: "Datos auto-completados",
-        description: "Los datos del trabajo han sido cargados automáticamente.",
+        title: "✅ Datos adicionales cargados",
+        description: "Se han cargado datos adicionales del trabajo (personal y requisitos técnicos).",
       });
     } catch (error: any) {
-      console.error("❌ FORM: Error auto-populating from job:", error);
+      console.error("❌ FORM: Error auto-populating additional job data:", error);
       toast({
         title: "Error",
-        description: "No se pudieron obtener los datos del trabajo.",
+        description: "No se pudieron obtener los datos adicionales del trabajo.",
         variant: "destructive",
       });
     }
-  }, [selectedJobId, toast]);
+  }, [selectedJobId, hasSavedData, toast]);
 
   // Enhanced save function
   const handleSaveAll = useCallback(async () => {
@@ -327,6 +386,7 @@ export const useHojaDeRutaForm = () => {
         
         console.log("✅ FORM: All data saved successfully");
         setHasSavedData(true);
+        setDataSource('saved');
         
         // Refresh data after save
         await refreshData();
@@ -362,6 +422,43 @@ export const useHojaDeRutaForm = () => {
     toast
   ]);
 
+  // Check if there are unsaved changes
+  const isDirty = useCallback(() => {
+    if (!selectedJobId || !isInitialized) return false;
+    
+    // If we have saved data, check if current data differs from saved
+    if (hasSavedData && hojaDeRuta) {
+      return (
+        eventData.eventName !== (hojaDeRuta.event_name || "") ||
+        eventData.eventDates !== (hojaDeRuta.event_dates || "") ||
+        eventData.venue.name !== (hojaDeRuta.venue_name || "") ||
+        eventData.venue.address !== (hojaDeRuta.venue_address || "") ||
+        eventData.schedule !== (hojaDeRuta.schedule || "") ||
+        eventData.powerRequirements !== (hojaDeRuta.power_requirements || "") ||
+        eventData.auxiliaryNeeds !== (hojaDeRuta.auxiliary_needs || "")
+      );
+    }
+    
+    // If no saved data, check if any field has content
+    return (
+      eventData.eventName.trim() !== "" ||
+      eventData.eventDates.trim() !== "" ||
+      eventData.venue.name.trim() !== "" ||
+      eventData.venue.address.trim() !== "" ||
+      eventData.schedule.trim() !== "" ||
+      eventData.powerRequirements.trim() !== "" ||
+      eventData.auxiliaryNeeds.trim() !== "" ||
+      eventData.contacts.some(c => c.name.trim() !== "" || c.role.trim() !== "" || c.phone.trim() !== "") ||
+      eventData.staff.some(s => s.name.trim() !== "" || s.surname1.trim() !== "" || s.position.trim() !== "") ||
+      eventData.logistics.transport.trim() !== "" ||
+      eventData.logistics.loadingDetails.trim() !== "" ||
+      eventData.logistics.unloadingDetails.trim() !== "" ||
+      eventData.logistics.equipmentLogistics.trim() !== "" ||
+      travelArrangements.some(t => t.pickup_address || t.pickup_time || t.departure_time || t.arrival_time || t.flight_train_number || t.notes) ||
+      roomAssignments.some(r => r.room_number || r.staff_member1_id || r.staff_member2_id)
+    );
+  }, [selectedJobId, isInitialized, hasSavedData, hojaDeRuta, eventData, travelArrangements, roomAssignments]);
+
   return {
     // Data state
     eventData,
@@ -380,6 +477,9 @@ export const useHojaDeRutaForm = () => {
     setAlertMessage,
     isInitialized,
     hasSavedData,
+    hasBasicJobData,
+    dataSource,
+    isDirty: isDirty(),
     
     // Loading states
     isLoadingJobs,
