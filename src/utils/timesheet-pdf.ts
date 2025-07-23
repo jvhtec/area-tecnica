@@ -179,6 +179,18 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
     const breakTime = formatBreakTime(timesheet.break_minutes);
     const overtime = formatOvertime(timesheet.overtime_hours);
     
+    // Calculate total hours
+    let totalHours = '--';
+    if (timesheet.start_time && timesheet.end_time) {
+      const start = new Date(`2000-01-01T${timesheet.start_time}`);
+      const end = new Date(`2000-01-01T${timesheet.end_time}`);
+      const diffMs = end.getTime() - start.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+      const breakHours = (timesheet.break_minutes || 0) / 60;
+      const workHours = Math.max(0, diffHours - breakHours);
+      totalHours = workHours.toFixed(2);
+    }
+    
     // Handle signature display
     let signatureStatus = '--';
     const signatureImg = signatureMap.get(timesheet.id);
@@ -196,6 +208,7 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
       startTime, 
       endTime, 
       breakTime, 
+      totalHours,
       overtime, 
       signatureStatus
     ];
@@ -211,7 +224,7 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
   // Create the table using autoTable with updated headers
   (doc as any).autoTable({
     startY: yPosition,
-    head: [['Date', 'Technician', 'Start Time', 'End Time', 'Break', 'Overtime', 'Signature']],
+    head: [['Date', 'Technician', 'Start Time', 'End Time', 'Break', 'Total Hours', 'Overtime', 'Signature']],
     body: tableData,
     theme: 'grid',
     headStyles: {

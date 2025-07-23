@@ -27,6 +27,8 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   const { user, userRole } = useAuth();
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [editingTimesheet, setEditingTimesheet] = useState<string | null>(null);
+  const [selectedTimesheets, setSelectedTimesheets] = useState<Set<string>>(new Set());
+  const [showBulkActions, setShowBulkActions] = useState(false);
   const [formData, setFormData] = useState<TimesheetFormData>({
     date: selectedDate,
     start_time: "09:00",
@@ -105,6 +107,42 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     return Math.max(0, workingHours);
   };
 
+  const handleBulkAction = async (action: 'approve' | 'submit') => {
+    const promises = Array.from(selectedTimesheets).map(timesheetId => {
+      if (action === 'approve') {
+        return approveTimesheet(timesheetId);
+      } else {
+        return submitTimesheet(timesheetId);
+      }
+    });
+    
+    await Promise.all(promises);
+    setSelectedTimesheets(new Set());
+    setShowBulkActions(false);
+  };
+
+  const toggleTimesheetSelection = (timesheetId: string) => {
+    const newSelection = new Set(selectedTimesheets);
+    if (newSelection.has(timesheetId)) {
+      newSelection.delete(timesheetId);
+    } else {
+      newSelection.add(timesheetId);
+    }
+    setSelectedTimesheets(newSelection);
+    setShowBulkActions(newSelection.size > 0);
+  };
+
+  const selectAllVisibleTimesheets = () => {
+    const visibleIds = filteredTimesheets.map(t => t.id);
+    setSelectedTimesheets(new Set(visibleIds));
+    setShowBulkActions(visibleIds.length > 0);
+  };
+
+  const clearSelection = () => {
+    setSelectedTimesheets(new Set());
+    setShowBulkActions(false);
+  };
+
   const timesheetsByDate = filteredTimesheets.reduce((acc, timesheet) => {
     const date = timesheet.date;
     if (!acc[date]) acc[date] = [];
@@ -129,6 +167,43 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
           </h2>
           {jobTitle && <p className="text-muted-foreground">Job: {jobTitle}</p>}
         </div>
+        {canManage && filteredTimesheets.length > 0 && (
+          <div className="flex items-center gap-2">
+            {showBulkActions && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleBulkAction('submit')}
+                  disabled={selectedTimesheets.size === 0}
+                >
+                  Submit Selected ({selectedTimesheets.size})
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => handleBulkAction('approve')}
+                  disabled={selectedTimesheets.size === 0}
+                >
+                  Approve Selected ({selectedTimesheets.size})
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearSelection}
+                >
+                  Clear
+                </Button>
+              </>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={selectedTimesheets.size > 0 ? clearSelection : selectAllVisibleTimesheets}
+            >
+              {selectedTimesheets.size > 0 ? 'Deselect All' : 'Select All'}
+            </Button>
+          </div>
+        )}
       </div>
 
       {!assignments.length && isManagementUser && (
@@ -191,6 +266,14 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
               <div key={timesheet.id} className="border rounded-lg p-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
+                    {canManage && (
+                      <input
+                        type="checkbox"
+                        checked={selectedTimesheets.has(timesheet.id)}
+                        onChange={() => toggleTimesheetSelection(timesheet.id)}
+                        className="h-4 w-4"
+                      />
+                    )}
                     <div>
                       <p className="font-medium">
                         {isTechnician ? 'My Timesheet' : `${timesheet.technician?.first_name} ${timesheet.technician?.last_name}`}
