@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import { Timesheet } from '@/types/timesheet';
 import { Job } from '@/types/job';
@@ -8,6 +9,39 @@ interface GenerateTimesheetPDFOptions {
   timesheets: Timesheet[];
   date: string;
 }
+
+// Helper function to load signature images as promises
+const loadSignatureImage = (signatureData: string): Promise<HTMLImageElement> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = (error) => {
+      console.error('Error loading signature image:', error);
+      reject(error);
+    };
+    img.src = signatureData;
+  });
+};
+
+// Helper function to format time display
+const formatTime = (time: string | null | undefined): string => {
+  if (!time) return '--';
+  // Handle both "HH:MM:SS" and "HH:MM" formats
+  return time.substring(0, 5); // "09:00:00" -> "09:00"
+};
+
+// Helper function to format break time
+const formatBreakTime = (breakMinutes: number | null | undefined): string => {
+  if (!breakMinutes) return '--';
+  return `${breakMinutes}min`;
+};
+
+// Helper function to format overtime
+const formatOvertime = (overtimeHours: number | null | undefined): string => {
+  if (!overtimeHours) return '--';
+  return `${overtimeHours}h`;
+};
 
 export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTimesheetPDFOptions) => {
   const doc = new jsPDF();
@@ -32,6 +66,32 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
   
   doc.text(`Location: ${job.location_id || 'TBD'}`, 20, yPosition);
   yPosition += 15;
+
+  // Load all signatures first
+  const signaturePromises: Promise<{ timesheetId: string; image: HTMLImageElement }>[] = [];
+  
+  for (const timesheet of timesheets) {
+    if (timesheet.signature_data) {
+      signaturePromises.push(
+        loadSignatureImage(timesheet.signature_data)
+          .then(image => ({ timesheetId: timesheet.id, image }))
+          .catch(error => {
+            console.error(`Failed to load signature for timesheet ${timesheet.id}:`, error);
+            return null;
+          })
+      );
+    }
+  }
+
+  // Wait for all signatures to load
+  const loadedSignatures = await Promise.allSettled(signaturePromises);
+  const signatureMap = new Map<string, HTMLImageElement>();
+  
+  loadedSignatures.forEach((result) => {
+    if (result.status === 'fulfilled' && result.value) {
+      signatureMap.set(result.value.timesheetId, result.value.image);
+    }
+  });
 
   // Table header
   const tableStartY = yPosition;
@@ -65,10 +125,10 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
     }
 
     const technicianName = `${timesheet.technician?.first_name || ''} ${timesheet.technician?.last_name || ''}`.trim();
-    const startTime = timesheet.start_time || '--';
-    const endTime = timesheet.end_time || '--';
-    const breakTime = timesheet.break_minutes ? `${timesheet.break_minutes}min` : '--';
-    const overtime = timesheet.overtime_hours ? `${timesheet.overtime_hours}h` : '--';
+    const startTime = formatTime(timesheet.start_time);
+    const endTime = formatTime(timesheet.end_time);
+    const breakTime = formatBreakTime(timesheet.break_minutes);
+    const overtime = formatOvertime(timesheet.overtime_hours);
 
     // Row background (alternating)
     if (timesheets.indexOf(timesheet) % 2 === 0) {
@@ -83,20 +143,22 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
     doc.text(overtime, colPositions[4] + 2, yPosition + 5);
 
     // Add signature if available
-    if (timesheet.signature_data) {
+    const signatureImg = signatureMap.get(timesheet.id);
+    if (signatureImg) {
       try {
-        // Create a smaller signature image
-        const signatureImg = new Image();
-        signatureImg.src = timesheet.signature_data;
-        signatureImg.onload = () => {
-          doc.addImage(signatureImg, 'PNG', colPositions[5] + 2, yPosition - 2, 35, 15);
-        };
+        // Add the signature image to the PDF
+        doc.addImage(signatureImg, 'PNG', colPositions[5] + 2, yPosition - 2, 35, 15);
       } catch (error) {
         console.error('Error adding signature to PDF:', error);
-        doc.text('Signed', colPositions[5] + 2, yPosition + 5);
+        doc.text('Error', colPositions[5] + 2, yPosition + 5);
       }
+    } else if (timesheet.signature_data) {
+      // Signature data exists but failed to load
+      doc.text('Failed', colPositions[5] + 2, yPosition + 5);
     } else if (timesheet.status === 'approved') {
       doc.text('Pending', colPositions[5] + 2, yPosition + 5);
+    } else {
+      doc.text('--', colPositions[5] + 2, yPosition + 5);
     }
 
     // Notes (if any)
