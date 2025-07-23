@@ -186,103 +186,200 @@ export const useHojaDeRutaForm = () => {
     }
   }, [toast]);
 
-  // Initialize form with existing saved data when hojaDeRuta changes
-  useEffect(() => {
-    console.log("🔄 FORM: Saved data initialization effect triggered");
-    console.log("🔄 FORM: selectedJobId:", selectedJobId);
-    console.log("🔄 FORM: hojaDeRuta:", hojaDeRuta ? "Found saved data" : "No saved data");
+  // Load current job assignments (always fetch assignments when job is selected)
+  const loadCurrentJobAssignments = useCallback(async (jobId: string) => {
+    if (!jobId) return null;
     
-    if (selectedJobId && hojaDeRuta) {
-      console.log("✅ FORM: Initializing form with SAVED data (takes priority)");
-      setHasSavedData(true);
-      setHasBasicJobData(false);
-      setDataSource('saved');
-      
-      setEventData({
-        eventName: hojaDeRuta.event_name || "",
-        eventDates: hojaDeRuta.event_dates || "",
-        venue: {
-          name: hojaDeRuta.venue_name || "",
-          address: hojaDeRuta.venue_address || "",
-        },
-        contacts: hojaDeRuta.contacts?.length > 0 
-          ? hojaDeRuta.contacts.map((contact: any) => ({
-              name: contact.name || "",
-              role: contact.role || "",
-              phone: contact.phone || "",
-            }))
-          : [{ name: "", role: "", phone: "" }],
-        logistics: {
-          transport: hojaDeRuta.logistics?.transport || "",
-          loadingDetails: hojaDeRuta.logistics?.loading_details || "",
-          unloadingDetails: hojaDeRuta.logistics?.unloading_details || "",
-          equipmentLogistics: hojaDeRuta.logistics?.equipment_logistics || "",
-        },
-        staff: hojaDeRuta.staff?.length > 0
-          ? hojaDeRuta.staff.map((member: any) => ({
-              name: member.name || "",
-              surname1: member.surname1 || "",
-              surname2: member.surname2 || "",
-              position: member.position || "",
-            }))
-          : [{ name: "", surname1: "", surname2: "", position: "" }],
-        schedule: hojaDeRuta.schedule || "",
-        powerRequirements: hojaDeRuta.power_requirements || "",
-        auxiliaryNeeds: hojaDeRuta.auxiliary_needs || "",
-      });
+    console.log("👥 FORM: Loading current job assignments for:", jobId);
+    
+    try {
+      const { data: jobData, error: jobError } = await supabase
+        .from('jobs')
+        .select(`
+          *,
+          job_assignments(
+            *,
+            profiles:technician_id(first_name, last_name)
+          )
+        `)
+        .eq('id', jobId)
+        .single();
 
-      // Set travel arrangements - use empty array if no data
-      if (hojaDeRuta.travel && hojaDeRuta.travel.length > 0) {
-        console.log("🚗 FORM: Setting saved travel arrangements:", hojaDeRuta.travel.length);
-        setTravelArrangements(hojaDeRuta.travel.map((arr: any) => ({
-          transportation_type: arr.transportation_type,
-          pickup_address: arr.pickup_address,
-          pickup_time: arr.pickup_time,
-          departure_time: arr.departure_time,
-          arrival_time: arr.arrival_time,
-          flight_train_number: arr.flight_train_number,
-          notes: arr.notes,
-        })));
-      } else {
-        setTravelArrangements([]);
+      if (jobError || !jobData) {
+        console.error("❌ FORM: Error fetching job assignments:", jobError);
+        return null;
       }
 
-      // Set room assignments - use empty array if no data
-      if (hojaDeRuta.rooms && hojaDeRuta.rooms.length > 0) {
-        console.log("🏨 FORM: Setting saved room assignments:", hojaDeRuta.rooms.length);
-        setRoomAssignments(hojaDeRuta.rooms.map((room: any) => ({
-          room_type: room.room_type,
-          room_number: room.room_number,
-          staff_member1_id: room.staff_member1_id,
-          staff_member2_id: room.staff_member2_id,
-        })));
-      } else {
-        setRoomAssignments([]);
-      }
-      
-      setIsInitialized(true);
-      
-      // Update last save data reference
-      lastSaveDataRef.current = JSON.stringify({
-        eventData: eventData,
-        travelArrangements,
-        roomAssignments
-      });
-      
-      toast({
-        title: "✅ Datos guardados cargados",
-        description: "Se han cargado los datos previamente guardados para este trabajo.",
-      });
-    } else if (selectedJobId && !hojaDeRuta && !isLoadingHojaDeRuta) {
-      // No saved data found - auto-populate basic job data with assignments
-      console.log("🆕 FORM: No saved data found, auto-populating basic job data with assignments");
-      setHasSavedData(false);
-      autoPopulateBasicJobData(selectedJobId);
-      setTravelArrangements([]);
-      setRoomAssignments([]);
-      setIsInitialized(true);
+      const staffFromAssignments = jobData.job_assignments?.map((assignment: any) => ({
+        name: assignment.profiles?.first_name || "",
+        surname1: assignment.profiles?.last_name || "",
+        surname2: "",
+        position: assignment.sound_role || assignment.lights_role || assignment.video_role || "Técnico"
+      })) || [];
+
+      console.log("✅ FORM: Loaded current assignments:", staffFromAssignments);
+      return { jobData, staffFromAssignments };
+    } catch (error) {
+      console.error("❌ FORM: Error loading job assignments:", error);
+      return null;
     }
-  }, [hojaDeRuta, selectedJobId, isLoadingHojaDeRuta, autoPopulateBasicJobData]);
+  }, []);
+
+  // Initialize form with current job assignments ALWAYS, then merge with saved data if exists
+  useEffect(() => {
+    if (!selectedJobId || isLoadingHojaDeRuta) return;
+    
+    console.log("🔄 FORM: Initialization effect triggered for job:", selectedJobId);
+    
+    const initializeFormData = async () => {
+      // Always load current job assignments first
+      const assignmentData = await loadCurrentJobAssignments(selectedJobId);
+      
+      if (!assignmentData) {
+        console.log("❌ FORM: No assignment data available");
+        setIsInitialized(true);
+        return;
+      }
+
+      const { jobData, staffFromAssignments } = assignmentData;
+      
+      // Prepare basic event data from job
+      const startDate = jobData.start_time ? new Date(jobData.start_time) : null;
+      const endDate = jobData.end_time ? new Date(jobData.end_time) : null;
+      
+      let eventDates = "";
+      if (startDate && endDate) {
+        if (startDate.toDateString() === endDate.toDateString()) {
+          eventDates = startDate.toLocaleDateString('es-ES');
+        } else {
+          eventDates = `${startDate.toLocaleDateString('es-ES')} - ${endDate.toLocaleDateString('es-ES')}`;
+        }
+      }
+
+      // If we have saved data, merge current assignments with saved data
+      if (hojaDeRuta) {
+        console.log("✅ FORM: Initializing with SAVED data + current assignments");
+        setHasSavedData(true);
+        setDataSource('saved');
+        
+        setEventData({
+          eventName: hojaDeRuta.event_name || jobData.title || "",
+          eventDates: hojaDeRuta.event_dates || eventDates,
+          venue: {
+            name: hojaDeRuta.venue_name || jobData.venue || "",
+            address: hojaDeRuta.venue_address || jobData.location || "",
+          },
+          contacts: hojaDeRuta.contacts?.length > 0 
+            ? hojaDeRuta.contacts.map((contact: any) => ({
+                name: contact.name || "",
+                role: contact.role || "",
+                phone: contact.phone || "",
+              }))
+            : jobData.client_name ? [{
+                name: jobData.client_name,
+                role: "Cliente",
+                phone: jobData.client_phone || ""
+              }] : [{ name: "", role: "", phone: "" }],
+          logistics: {
+            transport: hojaDeRuta.logistics?.transport || "",
+            loadingDetails: hojaDeRuta.logistics?.loading_details || "",
+            unloadingDetails: hojaDeRuta.logistics?.unloading_details || "",
+            equipmentLogistics: hojaDeRuta.logistics?.equipment_logistics || "",
+          },
+          // Prioritize current assignments over saved staff
+          staff: staffFromAssignments.length > 0 
+            ? staffFromAssignments 
+            : hojaDeRuta.staff?.length > 0
+              ? hojaDeRuta.staff.map((member: any) => ({
+                  name: member.name || "",
+                  surname1: member.surname1 || "",
+                  surname2: member.surname2 || "",
+                  position: member.position || "",
+                }))
+              : [{ name: "", surname1: "", surname2: "", position: "" }],
+          schedule: hojaDeRuta.schedule || (startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : ""),
+          powerRequirements: hojaDeRuta.power_requirements || "",
+          auxiliaryNeeds: hojaDeRuta.auxiliary_needs || "",
+        });
+
+        // Set travel arrangements
+        if (hojaDeRuta.travel && hojaDeRuta.travel.length > 0) {
+          setTravelArrangements(hojaDeRuta.travel.map((arr: any) => ({
+            transportation_type: arr.transportation_type,
+            pickup_address: arr.pickup_address,
+            pickup_time: arr.pickup_time,
+            departure_time: arr.departure_time,
+            arrival_time: arr.arrival_time,
+            flight_train_number: arr.flight_train_number,
+            notes: arr.notes,
+          })));
+        } else {
+          setTravelArrangements([]);
+        }
+
+        // Set room assignments
+        if (hojaDeRuta.rooms && hojaDeRuta.rooms.length > 0) {
+          setRoomAssignments(hojaDeRuta.rooms.map((room: any) => ({
+            room_type: room.room_type,
+            room_number: room.room_number,
+            staff_member1_id: room.staff_member1_id,
+            staff_member2_id: room.staff_member2_id,
+          })));
+        } else {
+          setRoomAssignments([]);
+        }
+        
+        toast({
+          title: "✅ Datos cargados",
+          description: `Se han cargado los datos guardados con ${staffFromAssignments.length} miembros del personal actual.`,
+        });
+      } else {
+        // No saved data - use current job data with assignments
+        console.log("🆕 FORM: No saved data, using current job data with assignments");
+        setHasSavedData(false);
+        setDataSource('job');
+        
+        const basicEventData: EventData = {
+          eventName: jobData.title || "",
+          eventDates,
+          venue: {
+            name: jobData.venue || "",
+            address: jobData.location || "",
+          },
+          contacts: jobData.client_name ? [{
+            name: jobData.client_name,
+            role: "Cliente",
+            phone: jobData.client_phone || ""
+          }] : [{ name: "", role: "", phone: "" }],
+          logistics: {
+            transport: "",
+            loadingDetails: "",
+            unloadingDetails: "",
+            equipmentLogistics: "",
+          },
+          staff: staffFromAssignments.length > 0 ? staffFromAssignments : [{ name: "", surname1: "", surname2: "", position: "" }],
+          schedule: startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : "",
+          powerRequirements: "",
+          auxiliaryNeeds: "",
+        };
+        
+        setEventData(basicEventData);
+        setTravelArrangements([]);
+        setRoomAssignments([]);
+        
+        toast({
+          title: "📋 Datos del trabajo cargados",
+          description: staffFromAssignments.length > 0 
+            ? `Se han cargado ${staffFromAssignments.length} miembros del personal asignado.`
+            : "Se han cargado los datos básicos del trabajo.",
+        });
+      }
+      
+      setIsInitialized(true);
+    };
+
+    initializeFormData();
+  }, [selectedJobId, hojaDeRuta, isLoadingHojaDeRuta, loadCurrentJobAssignments, toast]);
 
   // Reset form when job selection changes
   useEffect(() => {
