@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +17,7 @@ export default function Timesheets() {
   const jobIdFromUrl = searchParams.get('jobId');
   const [selectedJobId, setSelectedJobId] = useState<string>(jobIdFromUrl || "");
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
   const { data: jobs = [], isLoading: jobsLoading } = useOptimizedJobs();
   const { timesheets } = useTimesheets(selectedJobId || "");
 
@@ -28,6 +29,7 @@ export default function Timesheets() {
 
   const selectedJob = jobs.find(job => job.id === selectedJobId);
   const canManage = user?.role === 'admin' || user?.role === 'management';
+  const canDownloadPDF = user?.role === 'admin' || user?.role === 'management';
 
   const handleDownloadPDF = async () => {
     if (!selectedJob) return;
@@ -74,7 +76,7 @@ export default function Timesheets() {
           </p>
         </div>
 
-        {selectedJobId && (
+        {selectedJobId && canDownloadPDF && (
           <div className="flex items-center gap-3">
             <input
               type="date"

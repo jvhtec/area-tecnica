@@ -1,3 +1,4 @@
+
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,8 +51,8 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   const filteredTimesheets = useMemo(() => {
     if (!timesheets || !user) return [];
     
-    // Technicians only see their own timesheets
-    if (userRole === 'technician') {
+    // Technicians and house_tech only see their own timesheets
+    if (userRole === 'technician' || userRole === 'house_tech') {
       return timesheets.filter(t => t.technician_id === user.id);
     }
     
@@ -208,14 +209,16 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
   }, {} as Record<string, Timesheet[]>);
 
   const isManagementUser = userRole === 'admin' || userRole === 'management';
-  const isTechnician = userRole === 'technician';
+  const isTechnician = userRole === 'technician' || userRole === 'house_tech';
 
   console.log('TimesheetView Debug:', { 
     userRole, 
-    isManagementUser, 
+    isManagementUser,
+    isTechnician,
     canManage, 
     filteredTimesheetsLength: filteredTimesheets.length,
-    user: user?.email 
+    user: user?.email,
+    userId: user?.id
   });
 
   if (isLoading) {
@@ -434,182 +437,190 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {dayTimesheets.map((timesheet) => (
-              <div key={timesheet.id} className="border rounded-lg p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {isManagementUser && (
-                      <input
-                        type="checkbox"
-                        checked={selectedTimesheets.has(timesheet.id)}
-                        onChange={() => toggleTimesheetSelection(timesheet.id)}
-                        className="h-4 w-4"
-                        disabled={isBulkUpdating}
-                      />
-                    )}
-                    <div>
-                      <p className="font-medium">
-                        {isTechnician ? 'My Timesheet' : `${timesheet.technician?.first_name} ${timesheet.technician?.last_name}`}
-                      </p>
-                      {!isTechnician && (
-                        <p className="text-sm text-muted-foreground">{timesheet.technician?.department}</p>
+            {dayTimesheets.map((timesheet) => {
+              const canEditTimesheet = isTechnician 
+                ? (timesheet.technician_id === user?.id && timesheet.status === 'draft')
+                : (isManagementUser && timesheet.status === 'draft');
+                
+              const canSubmitTimesheet = isTechnician 
+                ? (timesheet.technician_id === user?.id && timesheet.status === 'draft')
+                : (isManagementUser && timesheet.status === 'draft');
+              
+              console.log('Timesheet permission check:', {
+                timesheetId: timesheet.id,
+                technicianId: timesheet.technician_id,
+                userId: user?.id,
+                status: timesheet.status,
+                isTechnician,
+                canEditTimesheet,
+                canSubmitTimesheet
+              });
+              
+              return (
+                <div key={timesheet.id} className="border rounded-lg p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {isManagementUser && (
+                        <input
+                          type="checkbox"
+                          checked={selectedTimesheets.has(timesheet.id)}
+                          onChange={() => toggleTimesheetSelection(timesheet.id)}
+                          className="h-4 w-4"
+                          disabled={isBulkUpdating}
+                        />
+                      )}
+                      <div>
+                        <p className="font-medium">
+                          {isTechnician ? 'My Timesheet' : `${timesheet.technician?.first_name} ${timesheet.technician?.last_name}`}
+                        </p>
+                        {!isTechnician && (
+                          <p className="text-sm text-muted-foreground">{timesheet.technician?.department}</p>
+                        )}
+                      </div>
+                      <Badge variant={getStatusColor(timesheet.status)}>
+                        {timesheet.status}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      {/* Edit button */}
+                      {canEditTimesheet && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => startEditing(timesheet)}
+                          disabled={isBulkUpdating}
+                        >
+                          Edit
+                        </Button>
+                      )}
+                      
+                      {/* Submit button */}
+                      {canSubmitTimesheet && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => submitTimesheet(timesheet.id)}
+                          disabled={isBulkUpdating}
+                        >
+                          Submit
+                        </Button>
+                      )}
+                      
+                      {/* Only management can approve submitted timesheets */}
+                      {isManagementUser && timesheet.status === 'submitted' && (
+                        <Button
+                          size="sm"
+                          onClick={() => approveTimesheet(timesheet.id)}
+                          disabled={isBulkUpdating}
+                        >
+                          Approve
+                        </Button>
                       )}
                     </div>
-                    <Badge variant={getStatusColor(timesheet.status)}>
-                      {timesheet.status}
-                    </Badge>
                   </div>
-                  
-                  <div className="flex items-center gap-2">
-                    {/* Technicians can edit their own draft timesheets */}
-                    {isTechnician && timesheet.status === 'draft' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => startEditing(timesheet)}
-                        disabled={isBulkUpdating}
-                      >
-                        Edit
-                      </Button>
-                    )}
-                    
-                    {/* Management can edit any draft timesheet */}
-                    {isManagementUser && timesheet.status === 'draft' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => startEditing(timesheet)}
-                        disabled={isBulkUpdating}
-                      >
-                        Edit
-                      </Button>
-                    )}
-                    
-                    {/* Only management can approve submitted timesheets */}
-                    {isManagementUser && timesheet.status === 'submitted' && (
-                      <Button
-                        size="sm"
-                        onClick={() => approveTimesheet(timesheet.id)}
-                        disabled={isBulkUpdating}
-                      >
-                        Approve
-                      </Button>
-                    )}
-                    
-                    {/* Both technicians and management can submit draft timesheets */}
-                    {(isTechnician || isManagementUser) && timesheet.status === 'draft' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => submitTimesheet(timesheet.id)}
-                        disabled={isBulkUpdating}
-                      >
-                        Submit
-                      </Button>
-                    )}
-                  </div>
-                </div>
 
-                {editingTimesheet === timesheet.id ? (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <Label htmlFor="start_time">Start Time</Label>
-                      <Input
-                        id="start_time"
-                        type="time"
-                        value={formData.start_time}
-                        onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="end_time">End Time</Label>
-                      <Input
-                        id="end_time"
-                        type="time"
-                        value={formData.end_time}
-                        onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="break_minutes">Break (minutes)</Label>
-                      <Input
-                        id="break_minutes"
-                        type="number"
-                        value={formData.break_minutes}
-                        onChange={(e) => setFormData({ ...formData, break_minutes: parseInt(e.target.value) || 0 })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="overtime_hours">Overtime (hours)</Label>
-                      <Input
-                        id="overtime_hours"
-                        type="number"
-                        step="0.5"
-                        value={formData.overtime_hours}
-                        onChange={(e) => setFormData({ ...formData, overtime_hours: parseFloat(e.target.value) || 0 })}
-                      />
-                    </div>
-                    <div className="col-span-2 md:col-span-4">
-                      <Label htmlFor="notes">Notes</Label>
-                      <Textarea
-                        id="notes"
-                        value={formData.notes}
-                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                        placeholder="Additional notes..."
-                      />
-                    </div>
-                    <div className="col-span-2 md:col-span-4 flex gap-2">
-                      <Button onClick={() => handleUpdateTimesheet(timesheet)}>
-                        Save Changes
-                      </Button>
-                      <Button variant="outline" onClick={() => setEditingTimesheet(null)}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Start Time</p>
-                      <p className="font-medium">{timesheet.start_time || 'Not set'}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">End Time</p>
-                      <p className="font-medium">{timesheet.end_time || 'Not set'}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Break</p>
-                      <p className="font-medium">{timesheet.break_minutes || 0} min</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Total Hours</p>
-                      <p className="font-medium">
-                        {calculateHours(
-                          timesheet.start_time || '09:00',
-                          timesheet.end_time || '17:00',
-                          timesheet.break_minutes || 0
-                        ).toFixed(1)}h
-                      </p>
-                    </div>
-                    {timesheet.notes && (
-                      <div className="col-span-2 md:col-span-4">
-                        <p className="text-muted-foreground">Notes</p>
-                        <p className="font-medium">{timesheet.notes}</p>
+                  {editingTimesheet === timesheet.id ? (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <Label htmlFor="start_time">Start Time</Label>
+                        <Input
+                          id="start_time"
+                          type="time"
+                          value={formData.start_time}
+                          onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                        />
                       </div>
-                    )}
-                  </div>
-                )}
+                      <div>
+                        <Label htmlFor="end_time">End Time</Label>
+                        <Input
+                          id="end_time"
+                          type="time"
+                          value={formData.end_time}
+                          onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="break_minutes">Break (minutes)</Label>
+                        <Input
+                          id="break_minutes"
+                          type="number"
+                          value={formData.break_minutes}
+                          onChange={(e) => setFormData({ ...formData, break_minutes: parseInt(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="overtime_hours">Overtime (hours)</Label>
+                        <Input
+                          id="overtime_hours"
+                          type="number"
+                          step="0.5"
+                          value={formData.overtime_hours}
+                          onChange={(e) => setFormData({ ...formData, overtime_hours: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="col-span-2 md:col-span-4">
+                        <Label htmlFor="notes">Notes</Label>
+                        <Textarea
+                          id="notes"
+                          value={formData.notes}
+                          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                          placeholder="Additional notes..."
+                        />
+                      </div>
+                      <div className="col-span-2 md:col-span-4 flex gap-2">
+                        <Button onClick={() => handleUpdateTimesheet(timesheet)}>
+                          Save Changes
+                        </Button>
+                        <Button variant="outline" onClick={() => setEditingTimesheet(null)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Start Time</p>
+                        <p className="font-medium">{timesheet.start_time || 'Not set'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">End Time</p>
+                        <p className="font-medium">{timesheet.end_time || 'Not set'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Break</p>
+                        <p className="font-medium">{timesheet.break_minutes || 0} min</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Total Hours</p>
+                        <p className="font-medium">
+                          {calculateHours(
+                            timesheet.start_time || '09:00',
+                            timesheet.end_time || '17:00',
+                            timesheet.break_minutes || 0
+                          ).toFixed(1)}h
+                        </p>
+                      </div>
+                      {timesheet.notes && (
+                        <div className="col-span-2 md:col-span-4">
+                          <p className="text-muted-foreground">Notes</p>
+                          <p className="font-medium">{timesheet.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                {(timesheet.status === 'draft' || timesheet.status === 'submitted') && (
-                  <TimesheetSignature
-                    timesheetId={timesheet.id}
-                    currentSignature={timesheet.signature_data}
-                    canSign={timesheet.technician_id === user?.id || isManagementUser}
-                    onSigned={signTimesheet}
-                  />
-                )}
-              </div>
-            ))}
+                  {(timesheet.status === 'draft' || timesheet.status === 'submitted') && (
+                    <TimesheetSignature
+                      timesheetId={timesheet.id}
+                      currentSignature={timesheet.signature_data}
+                      canSign={timesheet.technician_id === user?.id || isManagementUser}
+                      onSigned={signTimesheet}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       ))}
