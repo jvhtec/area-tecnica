@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -383,12 +384,13 @@ export const ModernHojaDeRuta = () => {
                 Actualizar
               </Button>
 
+              {/* Simplified Save Button - Always enabled when job is selected */}
               <Button
                 onClick={handleSave}
-                disabled={isSaving || !selectedJobId || !isInitialized}
+                disabled={!selectedJobId || !isInitialized || isSaving}
                 variant="outline"
                 size="sm"
-                className="border-2"
+                className="border-2 border-green-500 text-green-600 hover:bg-green-50"
               >
                 {isSaving ? (
                   <>
@@ -423,8 +425,8 @@ export const ModernHojaDeRuta = () => {
             </div>
           </div>
 
-          {/* Status Messages */}
-          <div className="mt-3 text-xs text-muted-foreground">
+          {/* Enhanced Status Messages */}
+          <div className="mt-3 text-xs text-muted-foreground flex items-center gap-4">
             {!selectedJobId && (
               <span className="text-amber-600 font-medium">
                 ⚠️ Selecciona un trabajo para comenzar
@@ -443,6 +445,11 @@ export const ModernHojaDeRuta = () => {
             {selectedJobId && isInitialized && !hasSavedData && hasBasicJobData && (
               <span className="text-blue-600 font-medium">
                 📋 Datos básicos cargados
+              </span>
+            )}
+            {selectedJobId && isInitialized && eventData.staff.some(s => s.name || s.position) && (
+              <span className="text-purple-600 font-medium">
+                👥 Personal: {eventData.staff.filter(s => s.name || s.position).length} asignado(s)
               </span>
             )}
           </div>
