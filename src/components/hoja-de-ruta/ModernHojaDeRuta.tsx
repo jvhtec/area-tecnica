@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -224,10 +223,6 @@ export const ModernHojaDeRuta = () => {
 
     try {
       await autoPopulateFromJob();
-      toast({
-        title: "✅ Datos cargados",
-        description: "Los datos del trabajo se han cargado automáticamente.",
-      });
     } catch (error) {
       console.error("Error loading job data:", error);
       toast({
@@ -235,6 +230,25 @@ export const ModernHojaDeRuta = () => {
         description: "No se pudieron cargar los datos del trabajo.",
         variant: "destructive",
       });
+    }
+  };
+
+  // Enhanced save function with better error handling
+  const handleSave = async () => {
+    if (!selectedJobId) {
+      toast({
+        title: "Error",
+        description: "Por favor, seleccione un trabajo antes de guardar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await handleSaveAll();
+    } catch (error) {
+      console.error("Save error:", error);
+      // Error handling is already done in handleSaveAll
     }
   };
 
@@ -370,7 +384,7 @@ export const ModernHojaDeRuta = () => {
               </Button>
 
               <Button
-                onClick={handleSaveAll}
+                onClick={handleSave}
                 disabled={isSaving || !selectedJobId || !isInitialized}
                 variant="outline"
                 size="sm"
@@ -391,7 +405,7 @@ export const ModernHojaDeRuta = () => {
 
               <Button
                 onClick={handleGeneratePDF}
-                disabled={isGenerating || completionProgress < 50}
+                disabled={isGenerating || !selectedJobId}
                 className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
               >
                 {isGenerating ? (

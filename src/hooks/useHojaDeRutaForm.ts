@@ -271,7 +271,7 @@ export const useHojaDeRutaForm = () => {
     }
   }, [fetchError, toast]);
 
-  // Enhanced function to fetch and merge additional job data
+  // Enhanced function to fetch and merge additional job data (only if no saved staff exists)
   const autoPopulateFromJob = useCallback(async () => {
     if (!selectedJobId) {
       toast({
@@ -308,15 +308,26 @@ export const useHojaDeRutaForm = () => {
 
       if (powerError) throw powerError;
 
-      // Prepare comprehensive data
-      const staff = jobData.job_assignments?.map((assignment: any) => ({
-        name: assignment.profiles?.first_name || "",
-        surname1: assignment.profiles?.last_name || "",
-        surname2: "",
-        position: assignment.sound_role || assignment.lights_role || assignment.video_role || "Técnico"
-      })) || [];
+      // Only populate staff if no saved staff exists or if current staff is just the default empty entry
+      const shouldPopulateStaff = !hasSavedData && (
+        !eventData.staff || 
+        eventData.staff.length === 0 || 
+        (eventData.staff.length === 1 && !eventData.staff[0].name && !eventData.staff[0].position)
+      );
 
-      let formattedPowerRequirements = "";
+      let staff = eventData.staff; // Keep existing staff by default
+      
+      if (shouldPopulateStaff && jobData.job_assignments?.length > 0) {
+        console.log("👥 FORM: Populating staff from job assignments");
+        staff = jobData.job_assignments.map((assignment: any) => ({
+          name: assignment.profiles?.first_name || "",
+          surname1: assignment.profiles?.last_name || "",
+          surname2: "",
+          position: assignment.sound_role || assignment.lights_role || assignment.video_role || "Técnico"
+        }));
+      }
+
+      let formattedPowerRequirements = eventData.powerRequirements; // Keep existing by default
       if (powerRequirements && powerRequirements.length > 0) {
         formattedPowerRequirements = powerRequirements
           .map((req: any) => {
@@ -331,7 +342,7 @@ export const useHojaDeRutaForm = () => {
       // Merge with existing data (preserve user modifications)
       setEventData(prevData => ({
         ...prevData,
-        staff: staff.length > 0 ? staff : prevData.staff,
+        staff,
         powerRequirements: formattedPowerRequirements || prevData.powerRequirements,
       }));
 
@@ -340,7 +351,9 @@ export const useHojaDeRutaForm = () => {
       console.log("✅ FORM: Enhanced job data loaded successfully");
       toast({
         title: "✅ Datos adicionales cargados",
-        description: "Se han cargado datos adicionales del trabajo (personal y requisitos técnicos).",
+        description: shouldPopulateStaff 
+          ? "Se han cargado datos adicionales del trabajo (personal y requisitos técnicos)."
+          : "Se han cargado los requisitos técnicos del trabajo.",
       });
     } catch (error: any) {
       console.error("❌ FORM: Error auto-populating additional job data:", error);
@@ -350,9 +363,9 @@ export const useHojaDeRutaForm = () => {
         variant: "destructive",
       });
     }
-  }, [selectedJobId, hasSavedData, toast]);
+  }, [selectedJobId, hasSavedData, eventData.staff, eventData.powerRequirements, toast]);
 
-  // Enhanced save function
+  // Enhanced save function with better error handling
   const handleSaveAll = useCallback(async () => {
     console.log("💾 FORM: handleSaveAll called with selectedJobId:", selectedJobId);
     if (!selectedJobId) {
@@ -422,42 +435,45 @@ export const useHojaDeRutaForm = () => {
     toast
   ]);
 
-  // Check if there are unsaved changes
+  // Improved isDirty function to always allow saving if there's any meaningful data
   const isDirty = useCallback(() => {
     if (!selectedJobId || !isInitialized) return false;
     
-    // If we have saved data, check if current data differs from saved
-    if (hasSavedData && hojaDeRuta) {
-      return (
-        eventData.eventName !== (hojaDeRuta.event_name || "") ||
-        eventData.eventDates !== (hojaDeRuta.event_dates || "") ||
-        eventData.venue.name !== (hojaDeRuta.venue_name || "") ||
-        eventData.venue.address !== (hojaDeRuta.venue_address || "") ||
-        eventData.schedule !== (hojaDeRuta.schedule || "") ||
-        eventData.powerRequirements !== (hojaDeRuta.power_requirements || "") ||
-        eventData.auxiliaryNeeds !== (hojaDeRuta.auxiliary_needs || "")
-      );
-    }
+    // Check if any field has meaningful content
+    const hasEventName = eventData.eventName?.trim() !== "";
+    const hasEventDates = eventData.eventDates?.trim() !== "";
+    const hasVenueName = eventData.venue.name?.trim() !== "";
+    const hasVenueAddress = eventData.venue.address?.trim() !== "";
+    const hasSchedule = eventData.schedule?.trim() !== "";
+    const hasPowerRequirements = eventData.powerRequirements?.trim() !== "";
+    const hasAuxiliaryNeeds = eventData.auxiliaryNeeds?.trim() !== "";
     
-    // If no saved data, check if any field has content
-    return (
-      eventData.eventName.trim() !== "" ||
-      eventData.eventDates.trim() !== "" ||
-      eventData.venue.name.trim() !== "" ||
-      eventData.venue.address.trim() !== "" ||
-      eventData.schedule.trim() !== "" ||
-      eventData.powerRequirements.trim() !== "" ||
-      eventData.auxiliaryNeeds.trim() !== "" ||
-      eventData.contacts.some(c => c.name.trim() !== "" || c.role.trim() !== "" || c.phone.trim() !== "") ||
-      eventData.staff.some(s => s.name.trim() !== "" || s.surname1.trim() !== "" || s.position.trim() !== "") ||
-      eventData.logistics.transport.trim() !== "" ||
-      eventData.logistics.loadingDetails.trim() !== "" ||
-      eventData.logistics.unloadingDetails.trim() !== "" ||
-      eventData.logistics.equipmentLogistics.trim() !== "" ||
-      travelArrangements.some(t => t.pickup_address || t.pickup_time || t.departure_time || t.arrival_time || t.flight_train_number || t.notes) ||
-      roomAssignments.some(r => r.room_number || r.staff_member1_id || r.staff_member2_id)
+    const hasContacts = eventData.contacts.some(c => 
+      c.name?.trim() !== "" || c.role?.trim() !== "" || c.phone?.trim() !== ""
     );
-  }, [selectedJobId, isInitialized, hasSavedData, hojaDeRuta, eventData, travelArrangements, roomAssignments]);
+    
+    const hasStaff = eventData.staff.some(s => 
+      s.name?.trim() !== "" || s.surname1?.trim() !== "" || s.position?.trim() !== ""
+    );
+    
+    const hasLogistics = eventData.logistics.transport?.trim() !== "" ||
+      eventData.logistics.loadingDetails?.trim() !== "" ||
+      eventData.logistics.unloadingDetails?.trim() !== "" ||
+      eventData.logistics.equipmentLogistics?.trim() !== "";
+    
+    const hasTravel = travelArrangements.some(t => 
+      t.pickup_address || t.pickup_time || t.departure_time || t.arrival_time || 
+      t.flight_train_number || t.notes
+    );
+    
+    const hasRooms = roomAssignments.some(r => 
+      r.room_number || r.staff_member1_id || r.staff_member2_id
+    );
+
+    return hasEventName || hasEventDates || hasVenueName || hasVenueAddress ||
+           hasSchedule || hasPowerRequirements || hasAuxiliaryNeeds ||
+           hasContacts || hasStaff || hasLogistics || hasTravel || hasRooms;
+  }, [selectedJobId, isInitialized, eventData, travelArrangements, roomAssignments]);
 
   return {
     // Data state
