@@ -33,12 +33,9 @@ export const useHojaDeRutaForm = () => {
   const [alertMessage, setAlertMessage] = useState("");
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [eventData, setEventData] = useState<EventData>(initialEventData);
-  const [travelArrangements, setTravelArrangements] = useState<TravelArrangement[]>([
-    { transportation_type: "van" },
-  ]);
-  const [roomAssignments, setRoomAssignments] = useState<RoomAssignment[]>([
-    { room_type: "single" },
-  ]);
+  // Change default to empty arrays instead of having one empty entry
+  const [travelArrangements, setTravelArrangements] = useState<TravelArrangement[]>([]);
+  const [roomAssignments, setRoomAssignments] = useState<RoomAssignment[]>([]);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [hasSavedData, setHasSavedData] = useState<boolean>(false);
   const [hasBasicJobData, setHasBasicJobData] = useState<boolean>(false);
@@ -82,20 +79,28 @@ export const useHojaDeRutaForm = () => {
     hasStaffData: eventData.staff.some(s => s.name || s.position),
     isSaving,
     saveInProgress: saveInProgressRef.current,
-    lastSaveTime: new Date(lastSaveTime).toLocaleTimeString()
+    lastSaveTime: new Date(lastSaveTime).toLocaleTimeString(),
+    travelCount: travelArrangements.length,
+    roomsCount: roomAssignments.length
   });
 
-  // Auto-populate basic job data when job is selected (if no saved data)
+  // Enhanced auto-populate function that includes job assignments
   const autoPopulateBasicJobData = useCallback(async (jobId: string) => {
     if (!jobId) return;
     
-    console.log("🔄 FORM: Auto-populating basic job data for:", jobId);
+    console.log("🔄 FORM: Auto-populating basic job data with assignments for:", jobId);
     
     try {
-      // Fetch basic job data
+      // Fetch comprehensive job data including assignments
       const { data: jobData, error: jobError } = await supabase
         .from('jobs')
-        .select('*')
+        .select(`
+          *,
+          job_assignments(
+            *,
+            profiles:technician_id(first_name, last_name)
+          )
+        `)
         .eq('id', jobId)
         .single();
 
@@ -122,6 +127,14 @@ export const useHojaDeRutaForm = () => {
         }
       }
 
+      // Prepare staff data from job assignments
+      const staffFromAssignments = jobData.job_assignments?.map((assignment: any) => ({
+        name: assignment.profiles?.first_name || "",
+        surname1: assignment.profiles?.last_name || "",
+        surname2: "",
+        position: assignment.sound_role || assignment.lights_role || assignment.video_role || "Técnico"
+      })) || [];
+
       const basicEventData: EventData = {
         eventName: jobData.title || "",
         eventDates,
@@ -140,20 +153,28 @@ export const useHojaDeRutaForm = () => {
           unloadingDetails: "",
           equipmentLogistics: "",
         },
-        staff: [{ name: "", surname1: "", surname2: "", position: "" }],
+        // Use staff from assignments if available, otherwise default empty entry
+        staff: staffFromAssignments.length > 0 ? staffFromAssignments : [{ name: "", surname1: "", surname2: "", position: "" }],
         schedule: startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : "",
         powerRequirements: "",
         auxiliaryNeeds: "",
       };
 
-      console.log("✅ FORM: Setting basic job data:", basicEventData);
+      console.log("✅ FORM: Setting basic job data with assignments:", {
+        eventName: basicEventData.eventName,
+        staffCount: basicEventData.staff.length,
+        staffData: basicEventData.staff
+      });
+      
       setEventData(basicEventData);
       setHasBasicJobData(true);
       setDataSource('job');
       
       toast({
         title: "📋 Datos básicos cargados",
-        description: "Se han cargado los datos básicos del trabajo seleccionado.",
+        description: staffFromAssignments.length > 0 
+          ? `Se han cargado los datos básicos del trabajo y ${staffFromAssignments.length} miembros del personal asignado.`
+          : "Se han cargado los datos básicos del trabajo seleccionado.",
       });
     } catch (error: any) {
       console.error("❌ FORM: Error auto-populating basic job data:", error);
@@ -210,7 +231,7 @@ export const useHojaDeRutaForm = () => {
         auxiliaryNeeds: hojaDeRuta.auxiliary_needs || "",
       });
 
-      // Set travel arrangements
+      // Set travel arrangements - use empty array if no data
       if (hojaDeRuta.travel && hojaDeRuta.travel.length > 0) {
         console.log("🚗 FORM: Setting saved travel arrangements:", hojaDeRuta.travel.length);
         setTravelArrangements(hojaDeRuta.travel.map((arr: any) => ({
@@ -223,10 +244,10 @@ export const useHojaDeRutaForm = () => {
           notes: arr.notes,
         })));
       } else {
-        setTravelArrangements([{ transportation_type: "van" }]);
+        setTravelArrangements([]);
       }
 
-      // Set room assignments
+      // Set room assignments - use empty array if no data
       if (hojaDeRuta.rooms && hojaDeRuta.rooms.length > 0) {
         console.log("🏨 FORM: Setting saved room assignments:", hojaDeRuta.rooms.length);
         setRoomAssignments(hojaDeRuta.rooms.map((room: any) => ({
@@ -236,7 +257,7 @@ export const useHojaDeRutaForm = () => {
           staff_member2_id: room.staff_member2_id,
         })));
       } else {
-        setRoomAssignments([{ room_type: "single" }]);
+        setRoomAssignments([]);
       }
       
       setIsInitialized(true);
@@ -253,12 +274,12 @@ export const useHojaDeRutaForm = () => {
         description: "Se han cargado los datos previamente guardados para este trabajo.",
       });
     } else if (selectedJobId && !hojaDeRuta && !isLoadingHojaDeRuta) {
-      // No saved data found - auto-populate basic job data
-      console.log("🆕 FORM: No saved data found, auto-populating basic job data");
+      // No saved data found - auto-populate basic job data with assignments
+      console.log("🆕 FORM: No saved data found, auto-populating basic job data with assignments");
       setHasSavedData(false);
       autoPopulateBasicJobData(selectedJobId);
-      setTravelArrangements([{ transportation_type: "van" }]);
-      setRoomAssignments([{ room_type: "single" }]);
+      setTravelArrangements([]);
+      setRoomAssignments([]);
       setIsInitialized(true);
     }
   }, [hojaDeRuta, selectedJobId, isLoadingHojaDeRuta, autoPopulateBasicJobData]);
@@ -286,8 +307,8 @@ export const useHojaDeRutaForm = () => {
     } else {
       // Clear all data when no job is selected
       setEventData(initialEventData);
-      setTravelArrangements([{ transportation_type: "van" }]);
-      setRoomAssignments([{ room_type: "single" }]);
+      setTravelArrangements([]);
+      setRoomAssignments([]);
       setHasSavedData(false);
       setHasBasicJobData(false);
       setDataSource('none');
@@ -310,7 +331,7 @@ export const useHojaDeRutaForm = () => {
     }
   }, [fetchError, toast]);
 
-  // Enhanced function to fetch and merge additional job data
+  // Enhanced function to fetch and merge additional job data (now mainly for power requirements)
   const autoPopulateFromJob = useCallback(async () => {
     if (!selectedJobId) {
       toast({
@@ -321,24 +342,9 @@ export const useHojaDeRutaForm = () => {
       return;
     }
 
-    console.log("🔄 FORM: Auto-populating additional job data for:", selectedJobId);
+    console.log("🔄 FORM: Auto-populating additional job data (power requirements) for:", selectedJobId);
     
     try {
-      // Fetch comprehensive job data
-      const { data: jobData, error: jobError } = await supabase
-        .from('jobs')
-        .select(`
-          *,
-          job_assignments(
-            *,
-            profiles:technician_id(first_name, last_name)
-          )
-        `)
-        .eq('id', selectedJobId)
-        .single();
-
-      if (jobError) throw jobError;
-
       // Fetch power requirements
       const { data: powerRequirements, error: powerError } = await supabase
         .from("power_requirement_tables")
@@ -347,28 +353,7 @@ export const useHojaDeRutaForm = () => {
 
       if (powerError) throw powerError;
 
-      // Check if staff data is actually empty (improved condition)
-      const isStaffEmpty = eventData.staff.length === 0 || 
-        (eventData.staff.length === 1 && !eventData.staff[0].name && !eventData.staff[0].position);
-
-      console.log("👥 FORM: Staff check:", {
-        currentStaffCount: eventData.staff.length,
-        isStaffEmpty,
-        jobAssignmentsCount: jobData.job_assignments?.length || 0
-      });
-
       let updatedEventData = { ...eventData };
-
-      // Populate staff if empty and job assignments exist
-      if (isStaffEmpty && jobData.job_assignments?.length > 0) {
-        console.log("👥 FORM: Populating staff from job assignments");
-        updatedEventData.staff = jobData.job_assignments.map((assignment: any) => ({
-          name: assignment.profiles?.first_name || "",
-          surname1: assignment.profiles?.last_name || "",
-          surname2: "",
-          position: assignment.sound_role || assignment.lights_role || assignment.video_role || "Técnico"
-        }));
-      }
 
       // Always update power requirements if available
       if (powerRequirements && powerRequirements.length > 0) {
@@ -387,12 +372,10 @@ export const useHojaDeRutaForm = () => {
       setEventData(updatedEventData);
       setDataSource(hasSavedData ? 'mixed' : 'job');
       
-      console.log("✅ FORM: Enhanced job data loaded successfully");
+      console.log("✅ FORM: Power requirements loaded successfully");
       toast({
-        title: "✅ Datos adicionales cargados",
-        description: isStaffEmpty && jobData.job_assignments?.length > 0
-          ? "Se han cargado datos adicionales del trabajo (personal y requisitos técnicos)."
-          : "Se han cargado los requisitos técnicos del trabajo.",
+        title: "✅ Requisitos técnicos cargados",
+        description: "Se han cargado los requisitos técnicos del trabajo.",
       });
     } catch (error: any) {
       console.error("❌ FORM: Error auto-populating additional job data:", error);
