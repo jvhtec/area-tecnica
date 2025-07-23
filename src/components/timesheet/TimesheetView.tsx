@@ -312,7 +312,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                 />
               </div>
               <div className="flex items-end">
-                <Button onClick={handleBulkEdit} className="w-full">
+                <Button onClick={() => { console.log('Apply Changes button clicked!'); handleBulkEdit(); }} className="w-full">
                   Apply Changes
                 </Button>
               </div>
