@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,19 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     overtime_hours: 0,
     notes: ""
   });
+
+  // Filter timesheets based on user role
+  const filteredTimesheets = useMemo(() => {
+    if (!timesheets || !user) return [];
+    
+    // Technicians only see their own timesheets
+    if (userRole === 'technician') {
+      return timesheets.filter(t => t.technician_id === user.id);
+    }
+    
+    // Management sees all timesheets
+    return timesheets;
+  }, [timesheets, userRole, user]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -91,12 +105,15 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     return Math.max(0, workingHours);
   };
 
-  const timesheetsByDate = timesheets.reduce((acc, timesheet) => {
+  const timesheetsByDate = filteredTimesheets.reduce((acc, timesheet) => {
     const date = timesheet.date;
     if (!acc[date]) acc[date] = [];
     acc[date].push(timesheet);
     return acc;
   }, {} as Record<string, Timesheet[]>);
+
+  const isManagementUser = userRole === 'admin' || userRole === 'management';
+  const isTechnician = userRole === 'technician';
 
   if (isLoading) {
     return <div className="flex items-center justify-center p-8">Loading timesheets...</div>;
@@ -108,13 +125,13 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Clock className="h-6 w-6" />
-            Timesheets
+            {isTechnician ? 'My Timesheets' : 'Timesheets'}
           </h2>
           {jobTitle && <p className="text-muted-foreground">Job: {jobTitle}</p>}
         </div>
       </div>
 
-      {!assignments.length && (
+      {!assignments.length && isManagementUser && (
         <Card>
           <CardContent className="flex items-center justify-center p-8">
             <div className="text-center">
@@ -135,21 +152,26 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
               <Clock className="h-12 w-12 mx-auto text-muted-foreground animate-spin mb-4" />
               <p className="text-muted-foreground">Loading timesheets...</p>
               <p className="text-sm text-muted-foreground mt-2">
-                Creating timesheets for assigned technicians...
+                {isTechnician ? 'Loading your timesheets...' : 'Creating timesheets for assigned technicians...'}
               </p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {Object.entries(timesheetsByDate).length === 0 && assignments.length > 0 && !isLoading && (
+      {Object.entries(timesheetsByDate).length === 0 && !isLoading && (
         <Card>
           <CardContent className="flex items-center justify-center p-8">
             <div className="text-center">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">Timesheets are being generated...</p>
+              <p className="text-muted-foreground">
+                {isTechnician ? 'No timesheets found for you on this job' : 'Timesheets are being generated...'}
+              </p>
               <p className="text-sm text-muted-foreground mt-2">
-                Timesheets are automatically created for all assigned technicians
+                {isTechnician 
+                  ? 'Your timesheets will appear here once they are created by management'
+                  : 'Timesheets are automatically created for all assigned technicians'
+                }
               </p>
             </div>
           </CardContent>
@@ -171,9 +193,11 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   <div className="flex items-center gap-3">
                     <div>
                       <p className="font-medium">
-                        {timesheet.technician?.first_name} {timesheet.technician?.last_name}
+                        {isTechnician ? 'My Timesheet' : `${timesheet.technician?.first_name} ${timesheet.technician?.last_name}`}
                       </p>
-                      <p className="text-sm text-muted-foreground">{timesheet.technician?.department}</p>
+                      {!isTechnician && (
+                        <p className="text-sm text-muted-foreground">{timesheet.technician?.department}</p>
+                      )}
                     </div>
                     <Badge variant={getStatusColor(timesheet.status)}>
                       {timesheet.status}
@@ -181,7 +205,8 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    {(userRole === 'admin' || userRole === 'management') && timesheet.status === 'draft' && (
+                    {/* Technicians can edit their own draft timesheets */}
+                    {isTechnician && timesheet.status === 'draft' && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -190,7 +215,20 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         Edit
                       </Button>
                     )}
-                    {(userRole === 'admin' || userRole === 'management') && timesheet.status === 'submitted' && (
+                    
+                    {/* Management can edit any draft timesheet */}
+                    {isManagementUser && timesheet.status === 'draft' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => startEditing(timesheet)}
+                      >
+                        Edit
+                      </Button>
+                    )}
+                    
+                    {/* Only management can approve submitted timesheets */}
+                    {isManagementUser && timesheet.status === 'submitted' && (
                       <Button
                         size="sm"
                         onClick={() => approveTimesheet(timesheet.id)}
@@ -198,7 +236,9 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         Approve
                       </Button>
                     )}
-                    {(userRole === 'admin' || userRole === 'management') && timesheet.status === 'draft' && (
+                    
+                    {/* Both technicians and management can submit draft timesheets */}
+                    {(isTechnician || isManagementUser) && timesheet.status === 'draft' && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -304,7 +344,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   <TimesheetSignature
                     timesheetId={timesheet.id}
                     currentSignature={timesheet.signature_data}
-                    canSign={timesheet.technician_id === user?.id || userRole === 'admin' || userRole === 'management'}
+                    canSign={timesheet.technician_id === user?.id || isManagementUser}
                     onSigned={signTimesheet}
                   />
                 )}
