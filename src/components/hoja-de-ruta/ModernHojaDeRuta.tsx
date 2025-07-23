@@ -542,7 +542,12 @@ export const ModernHojaDeRuta = () => {
                         venueMapPreview={venueMapPreview}
                         onImageUpload={handleImageUpload}
                         onRemoveImage={removeImage}
-                        onVenueMapUpload={handleVenueMapInputChange}
+                        onVenueMapUpload={(file: File) => {
+                          const fakeEvent = {
+                            target: { files: [file] }
+                          } as unknown as React.ChangeEvent<HTMLInputElement>;
+                          handleVenueMapInputChange(fakeEvent);
+                        }}
                       />
                     </TabsContent>
 
