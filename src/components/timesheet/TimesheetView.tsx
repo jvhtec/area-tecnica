@@ -225,7 +225,10 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowBulkEditForm(!showBulkEditForm)}
+                  onClick={() => { 
+                    console.log('Edit Times button clicked, showBulkEditForm:', showBulkEditForm); 
+                    setShowBulkEditForm(!showBulkEditForm); 
+                  }}
                 >
                   Edit Times ({selectedTimesheets.size})
                 </Button>
