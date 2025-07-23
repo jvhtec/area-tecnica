@@ -22,7 +22,7 @@ interface TimesheetViewProps {
 }
 
 export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetViewProps) => {
-  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, signTimesheet } = useTimesheets(jobId);
+  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, signTimesheet, refetch } = useTimesheets(jobId);
   const { assignments } = useJobAssignmentsRealtime(jobId);
   const { user, userRole } = useAuth();
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -150,6 +150,9 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     
     const results = await Promise.all(promises);
     console.log('Bulk edit results:', results);
+    
+    // Force a refresh to ensure data is updated before PDF generation
+    await refetch();
     
     setSelectedTimesheets(new Set());
     setShowBulkActions(false);
