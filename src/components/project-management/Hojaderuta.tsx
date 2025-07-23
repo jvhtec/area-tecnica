@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { useSimplifiedHojaDeRutaForm } from "@/hooks/useSimplifiedHojaDeRutaForm";
+import { useHojaDeRutaForm } from "@/hooks/useHojaDeRutaForm";
 import { useHojaDeRutaImages } from "@/hooks/useHojaDeRutaImages";
 import { useHojaDeRutaHandlers } from "@/hooks/useHojaDeRutaHandlers";
 import { ImageUploadSection } from "@/components/hoja-de-ruta/sections/ImageUploadSection";
@@ -39,14 +39,11 @@ const HojaDeRutaGenerator = () => {
     jobs,
     isLoadingHojaDeRuta,
     isSaving,
-    hojaDeRuta,
     handleSaveAll,
     isInitialized,
-    isDirty,
-    dataSource,
-    loadAdditionalJobData,
+    autoPopulateFromJob,
     refreshData
-  } = useSimplifiedHojaDeRutaForm();
+  } = useHojaDeRutaForm();
 
   const {
     images,
@@ -90,10 +87,8 @@ const HojaDeRutaGenerator = () => {
     }
 
     try {
-      // Save data first if there are changes
-      if (isDirty) {
-        await handleSaveAll();
-      }
+      // Save data first
+      await handleSaveAll();
       
       generatePDF(
         eventData,
@@ -120,19 +115,6 @@ const HojaDeRutaGenerator = () => {
     }
   };
 
-  // Get data source info
-  const getDataSourceInfo = () => {
-    switch (dataSource) {
-      case 'saved':
-        return { color: 'bg-green-50 text-green-700 border-green-200', text: 'Datos Guardados' };
-      case 'job':
-        return { color: 'bg-blue-50 text-blue-700 border-blue-200', text: 'Datos del Trabajo' };
-      case 'mixed':
-        return { color: 'bg-purple-50 text-purple-700 border-purple-200', text: 'Datos Mixtos' };
-      default:
-        return { color: 'bg-gray-50 text-gray-700 border-gray-200', text: 'Sin Datos' };
-    }
-  };
 
   if (isLoadingHojaDeRuta) {
     return (
@@ -147,24 +129,11 @@ const HojaDeRutaGenerator = () => {
     );
   }
 
-  const dataSourceInfo = getDataSourceInfo();
-
   return (
     <Card className="w-full max-w-3xl mx-auto">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Generador de Hoja de Ruta</CardTitle>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className={dataSourceInfo.color}>
-              <Database className="w-3 h-3 mr-1" />
-              {dataSourceInfo.text}
-            </Badge>
-            {isDirty && (
-              <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-                💾 Sin guardar
-              </Badge>
-            )}
-          </div>
         </div>
       </CardHeader>
       <ScrollArea className="h-[calc(100vh-12rem)]">
@@ -242,7 +211,7 @@ const HojaDeRutaGenerator = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={loadAdditionalJobData}
+                onClick={autoPopulateFromJob}
                 disabled={!selectedJobId || !isInitialized}
                 className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50"
               >
@@ -262,26 +231,24 @@ const HojaDeRutaGenerator = () => {
               </Button>
             </div>
             
-            {isDirty && selectedJobId && isInitialized && (
-              <Button
-                variant="secondary"
-                onClick={handleSaveAll}
-                disabled={isSaving || !isInitialized}
-                className="min-w-[180px] bg-green-100 hover:bg-green-200 text-green-800 border-green-300"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    Guardar
-                  </>
-                )}
-              </Button>
-            )}
+            <Button
+              variant="secondary"
+              onClick={handleSaveAll}
+              disabled={isSaving || !isInitialized || !selectedJobId}
+              className="min-w-[180px] bg-green-100 hover:bg-green-200 text-green-800 border-green-300"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Guardar
+                </>
+              )}
+            </Button>
           </div>
         </CardContent>
       </ScrollArea>
