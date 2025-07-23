@@ -408,7 +408,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                     )}
                     
                     {/* Management can edit any draft timesheet */}
-                    {isManagementUser && timesheet.status === 'draft' && (
+                    {canManage && timesheet.status === 'draft' && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -419,7 +419,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                     )}
                     
                     {/* Only management can approve submitted timesheets */}
-                    {isManagementUser && timesheet.status === 'submitted' && (
+                    {canManage && timesheet.status === 'submitted' && (
                       <Button
                         size="sm"
                         onClick={() => approveTimesheet(timesheet.id)}
@@ -429,7 +429,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                     )}
                     
                     {/* Both technicians and management can submit draft timesheets */}
-                    {(isTechnician || isManagementUser) && timesheet.status === 'draft' && (
+                    {(isTechnician || canManage) && timesheet.status === 'draft' && (
                       <Button
                         variant="outline"
                         size="sm"
