@@ -34,7 +34,8 @@ import {
   ChevronUp,
   Eye,
   Download,
-  FolderPlus
+  FolderPlus,
+  ClipboardList
 } from "lucide-react";
 
 import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
@@ -734,10 +735,18 @@ export function JobCardNew({
   const canManageArtists = ['admin', 'management', 'logistics', 'technician', 'house_tech'].includes(userRole || '');
   const canUploadDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
   const canCreateFlexFolders = ['admin', 'management', 'logistics'].includes(userRole || '');
+  const canCreateLocalFolders = ['admin', 'management', 'logistics'].includes(userRole || '');
 
   // Show loading state if job is being deleted
   const cardOpacity = isJobBeingDeleted ? "opacity-50" : "";
   const pointerEvents = isJobBeingDeleted ? "pointer-events-none" : "";
+
+  // Add timesheet handler
+  const handleTimesheetClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isJobBeingDeleted) return;
+    navigate(`/timesheets?jobId=${job.id}`);
+  };
 
   console.log("Job card rendering with:", {
     jobType: job.job_type,
@@ -794,6 +803,18 @@ export function JobCardNew({
               </Button>
             </div>
             <div className="flex flex-wrap gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+              {/* Timesheet button - available for all users */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleTimesheetClick}
+                className="hover:bg-accent/50"
+                disabled={isJobBeingDeleted}
+              >
+                <ClipboardList className="h-4 w-4 mr-2" />
+                Timesheet
+              </Button>
+              
               {job.job_type === "festival" && isProjectManagementPage && canManageArtists && (
                 <Button
                   variant="outline"
@@ -875,24 +896,26 @@ export function JobCardNew({
                   )}
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={createLocalFoldersHandler}
-                disabled={isCreatingLocalFolders || isJobBeingDeleted}
-                title={isCreatingLocalFolders ? "Creating local folders..." : "Create local folder structure"}
-                className={
-                  isCreatingLocalFolders || isJobBeingDeleted
-                    ? "opacity-50 cursor-not-allowed"
-                    : "hover:bg-accent/50"
-                }
-              >
-                {isCreatingLocalFolders ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <FolderPlus className="h-4 w-4" />
-                )}
-              </Button>
+              {canCreateLocalFolders && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={createLocalFoldersHandler}
+                  disabled={isCreatingLocalFolders || isJobBeingDeleted}
+                  title={isCreatingLocalFolders ? "Creating local folders..." : "Create local folder structure"}
+                  className={
+                    isCreatingLocalFolders || isJobBeingDeleted
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:bg-accent/50"
+                  }
+                >
+                  {isCreatingLocalFolders ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <FolderPlus className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
               {job.job_type !== "dryhire" && showUpload && canUploadDocuments && (
                 <div className="relative">
                   <input
