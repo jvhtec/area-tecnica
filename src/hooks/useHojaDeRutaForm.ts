@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { EventData, TravelArrangement, RoomAssignment } from "@/types/hoja-de-ruta";
 import { useJobSelection } from "@/hooks/useJobSelection";
@@ -40,8 +39,9 @@ export const useHojaDeRutaForm = () => {
     { room_type: "single" },
   ]);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
+  const [hasSavedData, setHasSavedData] = useState<boolean>(false);
 
-  // Get persistence functions - this is the single source of truth
+  // Get persistence functions
   const {
     hojaDeRuta,
     isLoading: isLoadingHojaDeRuta,
@@ -60,19 +60,21 @@ export const useHojaDeRutaForm = () => {
   console.log("🚀 FORM HOOK: Current state:", {
     selectedJobId,
     hasHojaDeRuta: !!hojaDeRuta,
+    hasSavedData,
     isLoadingHojaDeRuta,
     eventDataEventName: eventData.eventName,
     isInitialized
   });
 
-  // Initialize form with existing data when hojaDeRuta changes
+  // Initialize form with existing saved data when hojaDeRuta changes
   useEffect(() => {
-    console.log("🔄 FORM: Data initialization effect triggered");
+    console.log("🔄 FORM: Saved data initialization effect triggered");
     console.log("🔄 FORM: selectedJobId:", selectedJobId);
-    console.log("🔄 FORM: hojaDeRuta:", hojaDeRuta ? "Found data" : "No data");
+    console.log("🔄 FORM: hojaDeRuta:", hojaDeRuta ? "Found saved data" : "No saved data");
     
     if (selectedJobId && hojaDeRuta) {
-      console.log("✅ FORM: Initializing form with existing data");
+      console.log("✅ FORM: Initializing form with SAVED data (takes priority)");
+      setHasSavedData(true);
       
       setEventData({
         eventName: hojaDeRuta.event_name || "",
@@ -109,7 +111,7 @@ export const useHojaDeRutaForm = () => {
 
       // Set travel arrangements
       if (hojaDeRuta.travel && hojaDeRuta.travel.length > 0) {
-        console.log("🚗 FORM: Setting travel arrangements:", hojaDeRuta.travel.length);
+        console.log("🚗 FORM: Setting saved travel arrangements:", hojaDeRuta.travel.length);
         setTravelArrangements(hojaDeRuta.travel.map((arr: any) => ({
           transportation_type: arr.transportation_type,
           pickup_address: arr.pickup_address,
@@ -125,7 +127,7 @@ export const useHojaDeRutaForm = () => {
 
       // Set room assignments
       if (hojaDeRuta.rooms && hojaDeRuta.rooms.length > 0) {
-        console.log("🏨 FORM: Setting room assignments:", hojaDeRuta.rooms.length);
+        console.log("🏨 FORM: Setting saved room assignments:", hojaDeRuta.rooms.length);
         setRoomAssignments(hojaDeRuta.rooms.map((room: any) => ({
           room_type: room.room_type,
           room_number: room.room_number,
@@ -138,8 +140,9 @@ export const useHojaDeRutaForm = () => {
       
       setIsInitialized(true);
     } else if (selectedJobId && !hojaDeRuta && !isLoadingHojaDeRuta) {
-      // Reset form to initial state when no data is available for this job
-      console.log("🆕 FORM: No existing data found, resetting to initial state");
+      // No saved data found - reset to initial state
+      console.log("🆕 FORM: No saved data found, resetting to initial state");
+      setHasSavedData(false);
       setEventData(initialEventData);
       setTravelArrangements([{ transportation_type: "van" }]);
       setRoomAssignments([{ room_type: "single" }]);
@@ -147,22 +150,20 @@ export const useHojaDeRutaForm = () => {
     }
   }, [hojaDeRuta, selectedJobId, isLoadingHojaDeRuta]);
 
-  // Reset form and trigger data fetch when job selection changes
+  // Reset form when job selection changes
   useEffect(() => {
     console.log("🔄 FORM: Job selection changed to:", selectedJobId);
     if (selectedJobId) {
-      setIsInitialized(false); // Mark as not initialized until data is loaded
-      // Data will be loaded by the persistence hook and handled in the other effect
-      fetchPowerRequirements(selectedJobId);
-      fetchAssignedStaff(selectedJobId);
-      
-      // Force a refresh of the data when job selection changes
+      setIsInitialized(false);
+      setHasSavedData(false);
+      // Data will be loaded by the persistence hook
       refreshData();
     } else {
       // Clear all data when no job is selected
       setEventData(initialEventData);
       setTravelArrangements([{ transportation_type: "van" }]);
       setRoomAssignments([{ room_type: "single" }]);
+      setHasSavedData(false);
       setIsInitialized(true);
     }
   }, [selectedJobId, refreshData]);
@@ -170,27 +171,84 @@ export const useHojaDeRutaForm = () => {
   // Display error toast if there was a fetch error
   useEffect(() => {
     if (fetchError) {
-      console.error("❌ FORM: Error fetching data:", fetchError);
+      console.error("❌ FORM: Error fetching saved data:", fetchError);
       toast({
         title: "Error",
-        description: "No se pudieron cargar los datos. Por favor, intente de nuevo.",
+        description: "No se pudieron cargar los datos guardados. Por favor, intente de nuevo.",
         variant: "destructive",
       });
     }
   }, [fetchError, toast]);
 
-  const fetchPowerRequirements = async (jobId: string) => {
+  // SEPARATE function to fetch and auto-populate from job data (only when manually triggered)
+  const autoPopulateFromJob = useCallback(async () => {
+    if (!selectedJobId) {
+      toast({
+        title: "Error",
+        description: "No hay trabajo seleccionado para auto-completar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log("🔄 FORM: Auto-populating from job data for:", selectedJobId);
+    
     try {
-      console.log("⚡ FORM: Fetching power requirements for job:", jobId);
-      const { data: requirements, error } = await supabase
+      // Fetch job data
+      const { data: jobData, error: jobError } = await supabase
+        .from('jobs')
+        .select(`
+          *,
+          job_assignments(
+            *,
+            profiles:technician_id(first_name, last_name)
+          )
+        `)
+        .eq('id', selectedJobId)
+        .single();
+
+      if (jobError) throw jobError;
+
+      // Fetch power requirements
+      const { data: powerRequirements, error: powerError } = await supabase
         .from("power_requirement_tables")
         .select("*")
-        .eq("job_id", jobId);
+        .eq("job_id", selectedJobId);
 
-      if (error) throw error;
+      if (powerError) throw powerError;
 
-      if (requirements && requirements.length > 0) {
-        const formattedRequirements = requirements
+      // Prepare auto-populated data
+      const startDate = jobData.start_time ? new Date(jobData.start_time) : null;
+      const endDate = jobData.end_time ? new Date(jobData.end_time) : null;
+      
+      let eventDates = "";
+      if (startDate && endDate) {
+        if (startDate.toDateString() === endDate.toDateString()) {
+          eventDates = startDate.toLocaleDateString('es-ES');
+        } else {
+          eventDates = `${startDate.toLocaleDateString('es-ES')} - ${endDate.toLocaleDateString('es-ES')}`;
+        }
+      }
+
+      const contacts = [];
+      if (jobData.client_name) {
+        contacts.push({
+          name: jobData.client_name,
+          role: "Cliente",
+          phone: jobData.client_phone || ""
+        });
+      }
+
+      const staff = jobData.job_assignments?.map((assignment: any) => ({
+        name: assignment.profiles?.first_name || "",
+        surname1: assignment.profiles?.last_name || "",
+        surname2: "",
+        position: assignment.sound_role || assignment.lights_role || assignment.video_role || "Técnico"
+      })) || [];
+
+      let formattedPowerRequirements = "";
+      if (powerRequirements && powerRequirements.length > 0) {
+        formattedPowerRequirements = powerRequirements
           .map((req: any) => {
             return `${req.department.toUpperCase()} - ${req.table_name}:\n` +
               `Potencia Total: ${req.total_watts}W\n` +
@@ -198,70 +256,44 @@ export const useHojaDeRutaForm = () => {
               `PDU Recomendado: ${req.pdu_type}\n`;
           })
           .join("\n");
-        
-        console.log("⚡ FORM: Power requirements fetched successfully");
-        setEventData((prev) => ({
-          ...prev,
-          powerRequirements: formattedRequirements,
-        }));
       }
+
+      // Merge with existing data (preserve user modifications)
+      setEventData(prevData => ({
+        ...prevData,
+        eventName: prevData.eventName || jobData.title || "",
+        eventDates: prevData.eventDates || eventDates,
+        venue: {
+          name: prevData.venue.name || jobData.venue || "",
+          address: prevData.venue.address || jobData.location || ""
+        },
+        contacts: prevData.contacts.some(c => c.name) ? prevData.contacts : 
+          (contacts.length > 0 ? contacts : [{ name: "", role: "", phone: "" }]),
+        staff: prevData.staff.some(s => s.name) ? prevData.staff : 
+          (staff.length > 0 ? staff : [{ name: "", surname1: "", surname2: "", position: "" }]),
+        schedule: prevData.schedule || (startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : ""),
+        powerRequirements: prevData.powerRequirements || formattedPowerRequirements,
+        // Keep existing logistics and auxiliary needs
+        logistics: prevData.logistics,
+        auxiliaryNeeds: prevData.auxiliaryNeeds,
+      }));
+
+      console.log("✅ FORM: Auto-populated from job data successfully");
+      toast({
+        title: "Datos auto-completados",
+        description: "Los datos del trabajo han sido cargados automáticamente.",
+      });
     } catch (error: any) {
-      console.error("❌ FORM: Error fetching power requirements:", error);
+      console.error("❌ FORM: Error auto-populating from job:", error);
       toast({
         title: "Error",
-        description: "No se pudieron obtener los requisitos eléctricos",
+        description: "No se pudieron obtener los datos del trabajo.",
         variant: "destructive",
       });
     }
-  };
+  }, [selectedJobId, toast]);
 
-  const fetchAssignedStaff = async (jobId: string) => {
-    try {
-      console.log("👥 FORM: Fetching assigned staff for job:", jobId);
-      const { data: assignments, error } = await supabase
-        .from("job_assignments")
-        .select(
-          `
-          *,
-          profiles:technician_id (
-            first_name,
-            last_name
-          )
-        `
-        )
-        .eq("job_id", jobId);
-
-      if (error) throw error;
-
-      if (assignments && assignments.length > 0) {
-        const staffList = assignments.map((assignment: any) => ({
-          name: assignment.profiles.first_name,
-          surname1: assignment.profiles.last_name,
-          surname2: "",
-          position:
-            assignment.sound_role ||
-            assignment.lights_role ||
-            assignment.video_role ||
-            "Técnico",
-        }));
-
-        console.log("👥 FORM: Staff fetched successfully:", staffList.length);
-        setEventData((prev) => ({
-          ...prev,
-          staff: staffList,
-        }));
-      }
-    } catch (error) {
-      console.error("❌ FORM: Error fetching assigned staff:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo obtener el personal asignado",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Enhanced save function that handles all data types
+  // Enhanced save function
   const handleSaveAll = useCallback(async () => {
     console.log("💾 FORM: handleSaveAll called with selectedJobId:", selectedJobId);
     if (!selectedJobId) {
@@ -294,7 +326,9 @@ export const useHojaDeRutaForm = () => {
         ]);
         
         console.log("✅ FORM: All data saved successfully");
-        // Explicitly refresh data after save to ensure we have the latest
+        setHasSavedData(true);
+        
+        // Refresh data after save
         await refreshData();
         
         toast({
@@ -345,6 +379,7 @@ export const useHojaDeRutaForm = () => {
     alertMessage,
     setAlertMessage,
     isInitialized,
+    hasSavedData,
     
     // Loading states
     isLoadingJobs,
@@ -355,12 +390,15 @@ export const useHojaDeRutaForm = () => {
     jobs,
     hojaDeRuta,
     
+    // Functions
+    autoPopulateFromJob,
+    handleSaveAll,
+    refreshData,
+    
     // Persistence functions
     saveHojaDeRuta,
     saveTravelArrangements,
     saveRoomAssignments,
     saveVenueImages,
-    handleSaveAll,
-    refreshData
   };
 };

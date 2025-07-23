@@ -23,7 +23,8 @@ import { RoomAssignmentsDialog } from "@/components/hoja-de-ruta/dialogs/RoomAss
 import { generatePDF } from "@/utils/hoja-de-ruta/pdf-generator";
 import { uploadPdfToJob } from "@/utils/hoja-de-ruta/pdf-upload";
 import { useToast } from "@/hooks/use-toast";
-import { Save, FileText, Loader2, RefreshCw } from "lucide-react";
+import { Save, FileText, Loader2, RefreshCw, Wand2, Database } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 const HojaDeRutaGenerator = () => {
   const {
@@ -44,6 +45,8 @@ const HojaDeRutaGenerator = () => {
     hojaDeRuta,
     handleSaveAll,
     isInitialized,
+    hasSavedData,
+    autoPopulateFromJob,
     refreshData
   } = useHojaDeRutaForm();
 
@@ -106,12 +109,12 @@ const HojaDeRutaGenerator = () => {
       const areRoomAssignmentsDifferent = JSON.stringify(roomAssignments) !== JSON.stringify(hojaDeRuta.rooms || []);
 
       setIsDirty(Boolean(isDataDifferent || areTravelArrangementsDifferent || areRoomAssignmentsDifferent));
-    } else if (selectedJobId && isInitialized) {
+    } else if (selectedJobId && isInitialized && !hasSavedData) {
       // If we have a selected job but no saved data, consider it dirty if there's any data entered
       const hasAnyData = Boolean(eventData.eventName || eventData.eventDates || eventData.venue.name);
       setIsDirty(hasAnyData);
     }
-  }, [eventData, travelArrangements, roomAssignments, hojaDeRuta, selectedJobId, isInitialized]);
+  }, [eventData, travelArrangements, roomAssignments, hojaDeRuta, selectedJobId, isInitialized, hasSavedData]);
 
   const handleSave = async () => {
     console.log('🎯 BASIC: Save button clicked, calling handleSaveAll');
@@ -140,7 +143,7 @@ const HojaDeRutaGenerator = () => {
       await refreshData();
       toast({
         title: "Datos actualizados",
-        description: "Los datos se han actualizado correctamente.",
+        description: "Los datos guardados se han actualizado correctamente.",
       });
     } catch (error) {
       console.error("Error refreshing data:", error);
@@ -199,7 +202,7 @@ const HojaDeRutaGenerator = () => {
         <CardContent className="p-6">
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 animate-spin mr-2" />
-            <p className="text-muted-foreground">Cargando datos...</p>
+            <p className="text-muted-foreground">Cargando datos guardados...</p>
           </div>
         </CardContent>
       </Card>
@@ -209,7 +212,15 @@ const HojaDeRutaGenerator = () => {
   return (
     <Card className="w-full max-w-3xl mx-auto">
       <CardHeader>
-        <CardTitle>Generador de Hoja de Ruta</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>Generador de Hoja de Ruta</CardTitle>
+          {hasSavedData && (
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              <Database className="w-3 h-3 mr-1" />
+              Datos Guardados
+            </Badge>
+          )}
+        </div>
       </CardHeader>
       <ScrollArea className="h-[calc(100vh-12rem)]">
         <CardContent className="space-y-6">
@@ -292,16 +303,27 @@ const HojaDeRutaGenerator = () => {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={autoPopulateFromJob}
+                disabled={!selectedJobId || !isInitialized}
+                className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50"
+              >
+                <Wand2 className="w-4 h-4 mr-2" />
+                Auto-completar
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleRefreshData}
                 disabled={!selectedJobId || isLoadingHojaDeRuta}
                 className="border-2"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Actualizar datos
+                Recargar
               </Button>
             </div>
             
-            {(isDirty || !hojaDeRuta) && selectedJobId && isInitialized && (
+            {(isDirty || !hasSavedData) && selectedJobId && isInitialized && (
               <Button
                 variant="secondary"
                 onClick={handleSave}
@@ -316,7 +338,7 @@ const HojaDeRutaGenerator = () => {
                 ) : (
                   <>
                     <Save className="w-4 h-4 mr-2" />
-                    {hojaDeRuta ? "Guardar Cambios" : "Guardar"}
+                    {hasSavedData ? "Guardar Cambios" : "Guardar"}
                   </>
                 )}
               </Button>
