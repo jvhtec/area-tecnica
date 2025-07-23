@@ -231,9 +231,8 @@ export const useTimesheets = (jobId: string) => {
         return null;
       }
 
-      setTimesheets(prev => 
-        prev.map(t => t.id === timesheetId ? data as unknown as Timesheet : t)
-      );
+      // Refetch timesheets to ensure we have the complete data with technician profiles
+      await fetchTimesheets();
       toast.success("Timesheet updated successfully");
       return data;
     } catch (error) {
