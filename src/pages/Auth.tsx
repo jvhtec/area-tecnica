@@ -6,6 +6,7 @@ import { SignUpForm } from "@/components/auth/SignUpForm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
+import { UserRole } from "@/types/user";
 
 const Auth = () => {
   const { session, userRole, isLoading, error } = useAuth();
@@ -32,7 +33,7 @@ const Auth = () => {
   }
 
   if (session) {
-    const dashboardPath = getDashboardPath(userRole);
+    const dashboardPath = getDashboardPath(userRole as UserRole);
     return <Navigate to={dashboardPath} replace />;
   }
 
