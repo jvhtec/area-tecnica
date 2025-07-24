@@ -31,7 +31,7 @@ export const generatePDF = async (
     return currentY;
   };
 
-  // Helper function to check if data exists
+  // Helper function to check if data exists with stricter criteria
   const hasData = (value: any): boolean => {
     if (typeof value === 'string') return value.trim() !== '';
     if (Array.isArray(value)) return value.length > 0 && value.some(item => hasData(item));
@@ -39,6 +39,26 @@ export const generatePDF = async (
       return Object.values(value).some(val => hasData(val));
     }
     return value !== null && value !== undefined;
+  };
+
+  // Helper function to check if travel arrangement has meaningful data
+  const hasMeaningfulTravelData = (arrangement: TravelArrangement): boolean => {
+    return hasData(arrangement.transportation_type) && (
+      hasData(arrangement.pickup_address) || 
+      hasData(arrangement.pickup_time) ||
+      hasData(arrangement.departure_time) || 
+      hasData(arrangement.arrival_time) ||
+      hasData(arrangement.flight_train_number)
+    );
+  };
+
+  // Helper function to check if room assignment has meaningful data
+  const hasMeaningfulRoomData = (room: RoomAssignment): boolean => {
+    return hasData(room.room_type) && (
+      hasData(room.room_number) || 
+      hasData(room.staff_member1_id) ||
+      hasData(room.staff_member2_id)
+    );
   };
 
   // === HEADER SECTION === (consistent with tour PDF)
@@ -217,10 +237,8 @@ export const generatePDF = async (
     yPosition = (doc as any).lastAutoTable.finalY + 15;
   }
 
-  // === TRAVEL ARRANGEMENTS SECTION ===
-  const validTravelArrangements = travelArrangements.filter(arr =>
-    Object.values(arr).some((val) => hasData(val))
-  );
+  // === TRAVEL ARRANGEMENTS SECTION === (improved filtering)
+  const validTravelArrangements = travelArrangements.filter(hasMeaningfulTravelData);
 
   if (validTravelArrangements.length > 0) {
     yPosition = checkPageBreak(yPosition);
@@ -259,10 +277,8 @@ export const generatePDF = async (
     yPosition = (doc as any).lastAutoTable.finalY + 15;
   }
 
-  // === ROOM ASSIGNMENTS SECTION ===
-  const validRoomAssignments = roomAssignments.filter(room =>
-    Object.values(room).some((val) => hasData(val))
-  );
+  // === ROOM ASSIGNMENTS SECTION === (improved filtering)
+  const validRoomAssignments = roomAssignments.filter(hasMeaningfulRoomData);
 
   if (validRoomAssignments.length > 0) {
     yPosition = checkPageBreak(yPosition);

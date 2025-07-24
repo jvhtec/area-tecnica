@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -29,6 +30,26 @@ export const generateEnhancedPDF = async (
 
     // Format job date properly
     const jobDateStr = jobDate ? format(new Date(jobDate), 'dd/MM/yyyy', { locale: es }) : '';
+
+    // Helper function to check if travel arrangement has meaningful data
+    const hasMeaningfulTravelData = (arrangement: TravelArrangement): boolean => {
+      return arrangement.transportation_type && arrangement.transportation_type.trim() !== '' && (
+        (arrangement.pickup_address && arrangement.pickup_address.trim() !== '') || 
+        (arrangement.pickup_time && arrangement.pickup_time.trim() !== '') ||
+        (arrangement.departure_time && arrangement.departure_time.trim() !== '') || 
+        (arrangement.arrival_time && arrangement.arrival_time.trim() !== '') ||
+        (arrangement.flight_train_number && arrangement.flight_train_number.trim() !== '')
+      );
+    };
+
+    // Helper function to check if room assignment has meaningful data
+    const hasMeaningfulRoomData = (room: RoomAssignment): boolean => {
+      return room.room_type && room.room_type.trim() !== '' && (
+        (room.room_number && room.room_number.trim() !== '') || 
+        (room.staff_member1_id && room.staff_member1_id.trim() !== '') ||
+        (room.staff_member2_id && room.staff_member2_id.trim() !== '')
+      );
+    };
 
     // Header setup function
     const setupHeader = (pageTitle?: string) => {
@@ -83,83 +104,8 @@ export const generateEnhancedPDF = async (
       doc.text(`Generado: ${createdDate}`, pageWidth - 14, 50, { align: 'right' });
     };
 
-    // Generate summary page
-    const generateSummaryPage = () => {
-      setupHeader('Resumen Ejecutivo');
-      let yPosition = 80;
-
-      // Executive summary section
-      doc.setFontSize(16);
-      doc.setTextColor(125, 1, 1);
-      doc.text('Resumen Ejecutivo', 14, yPosition);
-      yPosition += 15;
-
-      // Key event information
-      const summaryData = [
-        ['Evento', eventData.eventName || 'N/A'],
-        ['Fechas', eventData.eventDates || 'N/A'],
-        ['Lugar', eventData.venue?.name || 'N/A'],
-        ['Dirección', eventData.venue?.address || 'N/A'],
-        ['Personal Asignado', eventData.staff?.length.toString() || '0'],
-        ['Contactos', eventData.contacts?.length.toString() || '0'],
-        ['Arreglos de Viaje', travelArrangements.length.toString()],
-        ['Habitaciones', roomAssignments.length.toString()]
-      ];
-
-      autoTable(doc, {
-        startY: yPosition,
-        head: [['Concepto', 'Detalle']],
-        body: summaryData,
-        theme: 'grid',
-        styles: {
-          fontSize: 11,
-          cellPadding: 6,
-          lineColor: [220, 220, 230],
-          lineWidth: 0.1,
-        },
-        headStyles: {
-          fillColor: [125, 1, 1],
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-        },
-        bodyStyles: { textColor: [51, 51, 51] },
-        alternateRowStyles: { fillColor: [250, 250, 255] },
-      });
-
-      yPosition = (doc as any).lastAutoTable.finalY + 20;
-
-      // Key contacts summary
-      if (eventData.contacts && eventData.contacts.length > 0) {
-        yPosition = checkPageBreak(yPosition, 60);
-        doc.setFontSize(14);
-        doc.setTextColor(125, 1, 1);
-        doc.text('Contactos Principales', 14, yPosition);
-        yPosition += 10;
-
-        const contactsData = eventData.contacts.slice(0, 5).map(contact => [
-          contact.name || 'N/A',
-          contact.role || 'N/A',
-          contact.phone || 'N/A'
-        ]);
-
-        autoTable(doc, {
-          startY: yPosition,
-          head: [['Nombre', 'Rol', 'Teléfono']],
-          body: contactsData,
-          theme: 'grid',
-          styles: { fontSize: 10, cellPadding: 4 },
-          headStyles: {
-            fillColor: [125, 1, 1],
-            textColor: [255, 255, 255],
-            fontStyle: 'bold',
-          },
-        });
-      }
-    };
-
     // Generate detailed content
     const generateDetailedContent = () => {
-      doc.addPage();
       setupHeader('Información Detallada');
       let yPosition = 80;
 
@@ -192,8 +138,6 @@ export const generateEnhancedPDF = async (
           console.error("Error adding venue map:", error);
         }
       }
-
-      // Equipment section removed per user request
 
       // Logistics section
       if (eventData.logistics) {
@@ -259,15 +203,17 @@ export const generateEnhancedPDF = async (
         yPosition = (doc as any).lastAutoTable.finalY + 15;
       }
 
-      // Travel arrangements
-      if (travelArrangements.length > 0) {
+      // Travel arrangements - improved filtering
+      const validTravelArrangements = travelArrangements.filter(hasMeaningfulTravelData);
+      
+      if (validTravelArrangements.length > 0) {
         yPosition = checkPageBreak(yPosition, 60);
         doc.setFontSize(14);
         doc.setTextColor(125, 1, 1);
         doc.text('Arreglos de Viaje', 14, yPosition);
         yPosition += 10;
 
-        const travelData = travelArrangements.map(arr => [
+        const travelData = validTravelArrangements.map(arr => [
           arr.transportation_type || 'N/A',
           arr.pickup_address || 'N/A',
           arr.pickup_time || 'N/A',
@@ -291,15 +237,17 @@ export const generateEnhancedPDF = async (
         yPosition = (doc as any).lastAutoTable.finalY + 15;
       }
 
-      // Room assignments with improved display
-      if (roomAssignments.length > 0) {
+      // Room assignments - improved filtering
+      const validRoomAssignments = roomAssignments.filter(hasMeaningfulRoomData);
+      
+      if (validRoomAssignments.length > 0) {
         yPosition = checkPageBreak(yPosition, 60);
         doc.setFontSize(14);
         doc.setTextColor(125, 1, 1);
         doc.text('Asignaciones de Habitaciones', 14, yPosition);
         yPosition += 10;
 
-        const roomData = roomAssignments.map(room => [
+        const roomData = validRoomAssignments.map(room => [
           room.room_type === 'single' ? 'Individual' : 'Doble',
           room.room_number || 'Por asignar',
           room.staff_member1_id || 'Por asignar',
@@ -410,6 +358,81 @@ export const generateEnhancedPDF = async (
       }
     };
 
+    // Generate summary page (moved to last)
+    const generateSummaryPage = () => {
+      doc.addPage();
+      setupHeader('Resumen Final');
+      let yPosition = 80;
+
+      // Executive summary section
+      doc.setFontSize(16);
+      doc.setTextColor(125, 1, 1);
+      doc.text('Resumen Final', 14, yPosition);
+      yPosition += 15;
+
+      // Key event information
+      const summaryData = [
+        ['Evento', eventData.eventName || 'N/A'],
+        ['Fechas', eventData.eventDates || 'N/A'],
+        ['Lugar', eventData.venue?.name || 'N/A'],
+        ['Dirección', eventData.venue?.address || 'N/A'],
+        ['Personal Asignado', eventData.staff?.length.toString() || '0'],
+        ['Contactos', eventData.contacts?.length.toString() || '0'],
+        ['Arreglos de Viaje', travelArrangements.filter(hasMeaningfulTravelData).length.toString()],
+        ['Habitaciones', roomAssignments.filter(hasMeaningfulRoomData).length.toString()]
+      ];
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [['Concepto', 'Detalle']],
+        body: summaryData,
+        theme: 'grid',
+        styles: {
+          fontSize: 11,
+          cellPadding: 6,
+          lineColor: [220, 220, 230],
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [125, 1, 1],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+        },
+        bodyStyles: { textColor: [51, 51, 51] },
+        alternateRowStyles: { fillColor: [250, 250, 255] },
+      });
+
+      yPosition = (doc as any).lastAutoTable.finalY + 20;
+
+      // Key contacts summary
+      if (eventData.contacts && eventData.contacts.length > 0) {
+        yPosition = checkPageBreak(yPosition, 60);
+        doc.setFontSize(14);
+        doc.setTextColor(125, 1, 1);
+        doc.text('Contactos Principales', 14, yPosition);
+        yPosition += 10;
+
+        const contactsData = eventData.contacts.slice(0, 5).map(contact => [
+          contact.name || 'N/A',
+          contact.role || 'N/A',
+          contact.phone || 'N/A'
+        ]);
+
+        autoTable(doc, {
+          startY: yPosition,
+          head: [['Nombre', 'Rol', 'Teléfono']],
+          body: contactsData,
+          theme: 'grid',
+          styles: { fontSize: 10, cellPadding: 4 },
+          headStyles: {
+            fillColor: [125, 1, 1],
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+          },
+        });
+      }
+    };
+
     // Add footer with logo and page numbers
     const addFooter = () => {
       const logo = new Image();
@@ -461,34 +484,34 @@ export const generateEnhancedPDF = async (
       };
     };
 
-    // Main generation process
+    // Main generation process - reordered to move summary to last
     const generatePDF = () => {
       // Load custom logo first if provided
       if (customLogoUrl && headerLogo) {
         headerLogo.onload = () => {
           setupHeader();
           addMetadata();
-          generateSummaryPage();
-          generateDetailedContent();
-          generateImagesPage();
+          generateDetailedContent();  // First: detailed content
+          generateImagesPage();       // Second: images
+          generateSummaryPage();      // Last: summary
           addFooter();
         };
         headerLogo.onerror = () => {
           console.error('Failed to load custom logo');
           setupHeader();
           addMetadata();
-          generateSummaryPage();
           generateDetailedContent();
           generateImagesPage();
+          generateSummaryPage();
           addFooter();
         };
         headerLogo.src = customLogoUrl;
       } else {
         setupHeader();
         addMetadata();
-        generateSummaryPage();
         generateDetailedContent();
         generateImagesPage();
+        generateSummaryPage();
         addFooter();
       }
     };
