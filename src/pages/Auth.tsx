@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -6,9 +5,10 @@ import { LoginForm } from "@/components/auth/LoginForm";
 import { SignUpForm } from "@/components/auth/SignUpForm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
+import { getDashboardPath } from "@/utils/roleBasedRouting";
 
 const Auth = () => {
-  const { session, isLoading, error } = useAuth();
+  const { session, userRole, isLoading, error } = useAuth();
   const [showSignUp, setShowSignUp] = useState(false);
   
   useEffect(() => {
@@ -32,7 +32,8 @@ const Auth = () => {
   }
 
   if (session) {
-    return <Navigate to="/dashboard" replace />;
+    const dashboardPath = getDashboardPath(userRole);
+    return <Navigate to={dashboardPath} replace />;
   }
 
   return (

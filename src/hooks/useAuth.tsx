@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useContext, createContext, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
@@ -6,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Session } from "@supabase/supabase-js";
 import { TokenManager } from "@/lib/token-manager";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
+import { getDashboardPath } from "@/utils/roleBasedRouting";
 
 interface AuthContextType {
   session: Session | null;
@@ -61,7 +61,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [idleTime, setIdleTime] = useState(0);
   const tokenManager = TokenManager.getInstance();
 
-  // Fetch user profile with proper error handling
   const fetchUserProfile = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -82,17 +81,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // Memoized session getter to prevent redundant calls using cache
   const getSessionOnce = useCallback(async () => {
     if (isInitialized) return session;
     
     try {
-      // Use cached session from TokenManager
       const currentSession = await tokenManager.getCachedSession();
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
-      // Fetch user role if session exists
       if (currentSession?.user?.id) {
         const profileData = await fetchUserProfile(currentSession.user.id);
         if (profileData) {
@@ -112,19 +108,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [session, isInitialized, tokenManager, fetchUserProfile]);
 
-  // Advanced and safe session refresh with proper error handling
   const refreshSession = useCallback(async (): Promise<Session | null> => {
     try {
       console.log("Starting session refresh");
       setIdleTime(0);
       
-      // Use the token manager to handle refresh
       const { session: refreshedSession, error } = await tokenManager.refreshToken();
       
       if (error) {
         console.error("Session refresh error:", error);
         
-        // Handle expired session
         if (error.message && error.message.includes('expired')) {
           setSession(null);
           setUser(null);
@@ -145,7 +138,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(refreshedSession);
         setUser(refreshedSession.user);
         
-        // Only fetch profile if user changed
         if (!user || user.id !== refreshedSession.user.id) {
           const profile = await fetchUserProfile(refreshedSession.user.id);
           if (profile) {
@@ -154,7 +146,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         }
         
-        // Refresh subscriptions and invalidate queries for fresh data
         refreshSubscriptions();
         invalidateQueries();
         
@@ -169,14 +160,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [fetchUserProfile, navigate, user, tokenManager, toast, refreshSubscriptions, invalidateQueries]);
 
-  // Initialize session on mount
   useEffect(() => {
     if (!isInitialized) {
       getSessionOnce();
     }
   }, [getSessionOnce, isInitialized]);
 
-  // Listen for auth changes
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
@@ -184,7 +173,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(newSession);
         setUser(newSession?.user ?? null);
         
-        // Fetch user role for new session
         if (newSession?.user?.id) {
           fetchUserProfile(newSession.user.id).then((profileData) => {
             if (profileData) {
@@ -204,7 +192,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, [fetchUserProfile]);
 
-  // Idle time management
   useEffect(() => {
     const idleInterval = setInterval(() => {
       setIdleTime((prevIdleTime) => prevIdleTime + 1);
@@ -220,7 +207,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [idleTime, refreshSession]);
 
-  // Periodic session refresh
   useEffect(() => {
     const interval = setInterval(async () => {
       if (session?.user?.id) {
@@ -232,7 +218,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => clearInterval(interval);
   }, [refreshSession, session]);
 
-  // Login function
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
@@ -255,9 +240,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (data.user) {
         const profile = await fetchUserProfile(data.user.id);
+        let roleForNavigation = null;
+        
         if (profile) {
           setUserRole(profile.role);
           setUserDepartment(profile.department);
+          roleForNavigation = profile.role;
         }
         
         toast({
@@ -265,7 +253,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           description: "You have successfully logged in.",
         });
         
-        navigate("/dashboard");
+        const dashboardPath = getDashboardPath(roleForNavigation);
+        navigate(dashboardPath);
       }
     } catch (error: any) {
       setError(error.message);
@@ -279,7 +268,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Sign Up function
   const signUp = async (userData: SignUpData) => {
     try {
       setIsLoading(true);
@@ -311,12 +299,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (data.user) {
+        // Wait a moment for the profile to be created by the trigger
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const profile = await fetchUserProfile(data.user.id);
+        let roleForNavigation = null;
+        
+        if (profile) {
+          setUserRole(profile.role);
+          setUserDepartment(profile.department);
+          roleForNavigation = profile.role;
+        }
+        
         toast({
           title: "Welcome!",
           description: "Your account has been created successfully.",
         });
         
-        navigate("/dashboard");
+        const dashboardPath = getDashboardPath(roleForNavigation);
+        navigate(dashboardPath);
       }
     } catch (error: any) {
       setError(error.message);
@@ -330,14 +331,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Logout function
   const logout = async () => {
     try {
       setIsLoading(true);
       
       await tokenManager.signOut();
       
-      // Clear all state
       setSession(null);
       setUser(null);
       setUserRole(null);
@@ -356,18 +355,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: error.message,
         variant: "destructive",
       });
-      // Still navigate to auth page even if there's an error
       navigate('/auth');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Setup predictive token refresh
   useEffect(() => {
     if (!session) return;
     
-    // Calculate optimal refresh time
     const refreshTime = tokenManager.calculateRefreshTime(session);
     console.log(`Scheduling token refresh in ${Math.round(refreshTime/1000)} seconds`);
     
@@ -379,7 +375,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => clearTimeout(refreshTimer);
   }, [session, refreshSession, tokenManager]);
 
-  // Network status monitoring
   useEffect(() => {
     const handleOnline = () => {
       refreshSession();
@@ -392,7 +387,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        // Only refresh if we have a session and it might be stale
         if (session && tokenManager.checkTokenExpiration(session, 10 * 60 * 1000)) {
           refreshSession();
         }
@@ -422,8 +416,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     refreshSession,
     setUserRole,
     setUserDepartment,
-    getSessionOnce,
-    // Expose cache utilities for debugging/monitoring
     clearCache: tokenManager.clearCache.bind(tokenManager),
     getCacheStatus: tokenManager.getCacheStatus.bind(tokenManager)
   };

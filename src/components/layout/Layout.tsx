@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { 
   SidebarProvider, 
@@ -44,10 +43,10 @@ const Layout = () => {
     logout
   } = useAuth();
 
-  // Redirect technicians to technician dashboard if they somehow get to the regular dashboard
+  // Redirect technicians and house techs to technician dashboard if they somehow get to the regular dashboard
   useEffect(() => {
-    if (!isLoading && userRole === 'technician' && location.pathname === '/dashboard') {
-      console.log('Technician on dashboard, redirecting to technician dashboard');
+    if (!isLoading && (userRole === 'technician' || userRole === 'house_tech') && location.pathname === '/dashboard') {
+      console.log('Technician or house tech on dashboard, redirecting to technician dashboard');
       navigate('/technician-dashboard');
     }
   }, [userRole, location.pathname, isLoading, navigate]);
