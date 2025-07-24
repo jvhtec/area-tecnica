@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,8 +27,8 @@ export default function Timesheets() {
   }, [jobIdFromUrl]);
 
   const selectedJob = jobs.find(job => job.id === selectedJobId);
-  const canManage = user?.role === 'admin' || user?.role === 'management';
-  const canDownloadPDF = user?.role === 'admin' || user?.role === 'management';
+  const canManage = userRole === 'admin' || userRole === 'management';
+  const canDownloadPDF = userRole === 'admin' || userRole === 'management';
 
   const handleDownloadPDF = async () => {
     if (!selectedJob) return;
