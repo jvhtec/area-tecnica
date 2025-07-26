@@ -78,7 +78,11 @@ export const useTimesheets = (jobId: string) => {
 
       const { data: job, error: jobError } = await supabase
         .from("jobs")
-        .select("start_time, end_time")
+        .select(`
+          start_time, 
+          end_time,
+          job_date_types(type, date)
+        `)
         .eq("id", jobId)
         .single();
 
@@ -93,15 +97,23 @@ export const useTimesheets = (jobId: string) => {
       // Generate dates between start and end
       const startDate = new Date(job.start_time);
       const endDate = new Date(job.end_time);
-      const dates = [];
+      const allDates = [];
       
       console.log("Job dates:", { start_time: job.start_time, end_time: job.end_time, startDate, endDate });
       
       for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-        dates.push(d.toISOString().split('T')[0]);
+        allDates.push(d.toISOString().split('T')[0]);
       }
 
-      console.log("Generated dates:", dates);
+      // Filter out dates that are marked as "off" or "travel"
+      const dates = allDates.filter(date => {
+        const dateType = job.job_date_types?.find((dt: any) => dt.date === date);
+        // If no date type is defined, or if it's not "off" or "travel", include it
+        return !dateType || (dateType.type !== 'off' && dateType.type !== 'travel');
+      });
+
+      console.log("Generated dates (filtered):", dates);
+      console.log("Date types:", job.job_date_types);
 
       // Check which timesheets already exist
       const { data: existingTimesheets } = await supabase
