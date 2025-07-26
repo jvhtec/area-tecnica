@@ -20,13 +20,25 @@ export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => 
   const { userRole, user } = useAuth();
   const navigate = useNavigate();
 
-  // Filter jobs and exclude dry hire jobs, then sort by date (recent first)
+  // Filter jobs and exclude dry hire jobs and jobs with only off/travel date types
   const relevantJobs = useMemo(() => {
     return allJobs
       .filter(job => {
         // Filter out dry hire jobs since they don't have personnel/timesheets
         const isDryHire = job.job_type === 'dry_hire' || job.job_type === 'dryhire';
-        return !isDryHire;
+        if (isDryHire) return false;
+        
+        // Check if job has any work date types (not just "off" or "travel")
+        if (job.job_date_types && job.job_date_types.length > 0) {
+          const hasWorkDates = job.job_date_types.some((dateType: any) => 
+            dateType.type !== 'off' && dateType.type !== 'travel'
+          );
+          // Only include jobs that have at least one work date
+          return hasWorkDates;
+        }
+        
+        // If no date types are defined, assume it's a work job
+        return true;
       })
       .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()); // Most recent first
   }, [allJobs]);
