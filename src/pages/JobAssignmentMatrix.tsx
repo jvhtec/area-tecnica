@@ -102,7 +102,8 @@ export default function JobAssignmentMatrix() {
       let query = supabase
         .from('jobs')
         .select(`
-          id, title, start_time, end_time, color, status, job_type
+          id, title, start_time, end_time, color, status, job_type,
+          job_departments!inner(department)
         `)
         .gte('start_time', startDate.toISOString())
         .lte('end_time', endDate.toISOString())
@@ -111,7 +112,7 @@ export default function JobAssignmentMatrix() {
 
       // Add department filter if selected
       if (selectedDepartment !== 'all') {
-        query = query.contains('job_departments', [{ department: selectedDepartment }]);
+        query = query.eq('job_departments.department', selectedDepartment);
       }
 
       const { data, error } = await query.order('start_time', { ascending: true });
