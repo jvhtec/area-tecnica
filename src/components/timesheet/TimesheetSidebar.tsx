@@ -1,0 +1,201 @@
+import { useState, useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Clock, ChevronLeft, ChevronRight, Calendar, MapPin } from "lucide-react";
+import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
+import { useAuth } from "@/hooks/useAuth";
+import { format, isAfter, isBefore, addDays } from "date-fns";
+import { useNavigate } from "react-router-dom";
+
+interface TimesheetSidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const JOBS_PER_PAGE = 5;
+
+export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => {
+  const [currentPage, setCurrentPage] = useState(0);
+  const { data: allJobs = [], isLoading } = useOptimizedJobs();
+  const { userRole, user } = useAuth();
+  const navigate = useNavigate();
+
+  // Filter for upcoming jobs (today and future)
+  const upcomingJobs = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return allJobs
+      .filter(job => {
+        const jobDate = new Date(job.start_time);
+        jobDate.setHours(0, 0, 0, 0);
+        return !isBefore(jobDate, today); // Today or future
+      })
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+  }, [allJobs]);
+
+  // Paginate jobs
+  const totalPages = Math.ceil(upcomingJobs.length / JOBS_PER_PAGE);
+  const paginatedJobs = upcomingJobs.slice(
+    currentPage * JOBS_PER_PAGE,
+    (currentPage + 1) * JOBS_PER_PAGE
+  );
+
+  const handleJobSelect = (jobId: string) => {
+    navigate(`/timesheets?jobId=${jobId}`);
+    onClose();
+  };
+
+  const nextPage = () => {
+    if (currentPage < totalPages - 1) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const prevPage = () => {
+    if (currentPage > 0) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const getJobStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-green-500/20 text-green-700 border-green-500/30';
+      case 'in_progress':
+        return 'bg-blue-500/20 text-blue-700 border-blue-500/30';
+      case 'pending':
+        return 'bg-yellow-500/20 text-yellow-700 border-yellow-500/30';
+      default:
+        return 'bg-gray-500/20 text-gray-700 border-gray-500/30';
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 lg:z-auto">
+      {/* Backdrop for mobile */}
+      <div 
+        className="fixed inset-0 bg-black/20 lg:hidden" 
+        onClick={onClose}
+      />
+      
+      {/* Sidebar */}
+      <div className="fixed right-0 top-0 h-full w-96 bg-background border-l border-border shadow-lg overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-primary" />
+            <h2 className="font-semibold">Upcoming Jobs</h2>
+          </div>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            ×
+          </Button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Clock className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : upcomingJobs.length === 0 ? (
+            <div className="text-center py-8">
+              <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No upcoming jobs found</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {paginatedJobs.map((job) => (
+                <Card 
+                  key={job.id} 
+                  className="cursor-pointer hover:shadow-md transition-shadow border border-border/50 hover:border-border"
+                  onClick={() => handleJobSelect(job.id)}
+                >
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <CardTitle className="text-sm font-medium leading-tight">
+                        {job.title}
+                      </CardTitle>
+                      <Badge 
+                        variant="outline" 
+                        className={`text-xs ml-2 flex-shrink-0 ${getJobStatusColor(job.status)}`}
+                      >
+                        {job.status}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Calendar className="h-3 w-3" />
+                        <span>
+                          {format(new Date(job.start_time), 'MMM dd, yyyy')}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span>
+                          {format(new Date(job.start_time), 'HH:mm')} - {format(new Date(job.end_time), 'HH:mm')}
+                        </span>
+                      </div>
+                      {job.venue && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <MapPin className="h-3 w-3" />
+                          <span className="truncate">{job.venue}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <Button 
+                      size="sm" 
+                      className="w-full mt-3" 
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleJobSelect(job.id);
+                      }}
+                    >
+                      View Timesheets
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between p-4 border-t border-border bg-muted/30">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={prevPage}
+              disabled={currentPage === 0}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            
+            <span className="text-sm text-muted-foreground">
+              Page {currentPage + 1} of {totalPages}
+            </span>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={nextPage}
+              disabled={currentPage === totalPages - 1}
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

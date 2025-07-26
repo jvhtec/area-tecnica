@@ -15,6 +15,7 @@ import {
   Grid3X3,
   Clock
 } from "lucide-react";
+import { TimesheetSidebarTrigger } from "@/components/timesheet/TimesheetSidebarTrigger";
 
 interface SidebarNavigationProps {
   userRole: string | null;
@@ -118,7 +119,10 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
           </Link>
         )}
 
-        {/* Timesheets - Only for management users */}
+        {/* Timesheets - Available for all users */}
+        <TimesheetSidebarTrigger userRole={userRole} />
+        
+        {/* Direct Timesheets Page - Only for management users */}
         {isManagementUser && (
           <Link to="/timesheets">
             <Button
@@ -128,7 +132,7 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
               }`}
             >
               <Clock className="h-4 w-4" />
-              <span>Timesheets</span>
+              <span>All Timesheets</span>
             </Button>
           </Link>
         )}
