@@ -7,13 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarDays, Clock, FileText, Download, Plus, User } from "lucide-react";
+import { CalendarDays, Clock, FileText, Download, Plus, User, Trash2, AlertTriangle } from "lucide-react";
 import { useTimesheets } from "@/hooks/useTimesheets";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useAuth } from "@/hooks/useAuth";
 import { Timesheet, TimesheetFormData } from "@/types/timesheet";
 import { TimesheetSignature } from "./TimesheetSignature";
 import { format, parseISO } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 interface TimesheetViewProps {
   jobId: string;
@@ -22,9 +23,10 @@ interface TimesheetViewProps {
 }
 
 export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetViewProps) => {
-  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, signTimesheet, refetch } = useTimesheets(jobId);
+  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, refetch } = useTimesheets(jobId);
   const { assignments } = useJobAssignmentsRealtime(jobId);
   const { user, userRole } = useAuth();
+  const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [editingTimesheet, setEditingTimesheet] = useState<string | null>(null);
   const [selectedTimesheets, setSelectedTimesheets] = useState<Set<string>>(new Set());
@@ -116,18 +118,39 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     return Math.max(0, workingHours);
   };
 
-  const handleBulkAction = async (action: 'approve' | 'submit') => {
-    const promises = Array.from(selectedTimesheets).map(timesheetId => {
-      if (action === 'approve') {
-        return approveTimesheet(timesheetId);
-      } else {
-        return submitTimesheet(timesheetId);
-      }
-    });
+  const handleBulkAction = async (action: 'submit' | 'approve' | 'delete') => {
+    if (selectedTimesheets.size === 0) return;
     
-    await Promise.all(promises);
-    setSelectedTimesheets(new Set());
-    setShowBulkActions(false);
+    setIsBulkUpdating(true);
+    const timesheetIds = Array.from(selectedTimesheets);
+    
+    try {
+      if (action === 'delete') {
+        await deleteTimesheets(timesheetIds);
+      } else {
+        const promises = timesheetIds.map(timesheetId => {
+          if (action === 'submit') {
+            return submitTimesheet(timesheetId);
+          } else if (action === 'approve') {
+            return approveTimesheet(timesheetId);
+          }
+        });
+        
+        await Promise.all(promises);
+      }
+      
+      setSelectedTimesheets(new Set());
+      setShowBulkActions(false);
+      
+      // Refetch after bulk operations
+      setTimeout(() => {
+        refetch();
+      }, 500);
+    } catch (error) {
+      console.error(`Error in bulk ${action}:`, error);
+    } finally {
+      setIsBulkUpdating(false);
+    }
   };
 
   const handleBulkEdit = async () => {
@@ -264,6 +287,15 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   disabled={selectedTimesheets.size === 0 || isBulkUpdating}
                 >
                   Approve Selected ({selectedTimesheets.size})
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => handleBulkAction('delete')}
+                  disabled={selectedTimesheets.size === 0 || isBulkUpdating}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete Selected ({selectedTimesheets.size})
                 </Button>
                 <Button
                   variant="outline"
@@ -515,6 +547,18 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                           disabled={isBulkUpdating}
                         >
                           Approve
+                        </Button>
+                      )}
+                      
+                      {/* Delete button - only for management */}
+                      {isManagementUser && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => deleteTimesheet(timesheet.id)}
+                          disabled={isBulkUpdating}
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       )}
                     </div>

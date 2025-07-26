@@ -277,6 +277,50 @@ export const useTimesheets = (jobId: string) => {
     });
   };
 
+  const deleteTimesheet = async (timesheetId: string) => {
+    try {
+      const { error } = await supabase
+        .from("timesheets")
+        .delete()
+        .eq("id", timesheetId);
+
+      if (error) {
+        console.error("Error deleting timesheet:", error);
+        toast.error("Failed to delete timesheet");
+        throw error;
+      }
+
+      await fetchTimesheets();
+      toast.success("Timesheet deleted successfully");
+    } catch (error) {
+      console.error("Error in deleteTimesheet:", error);
+      toast.error("Failed to delete timesheet");
+      throw error;
+    }
+  };
+
+  const deleteTimesheets = async (timesheetIds: string[]) => {
+    try {
+      const { error } = await supabase
+        .from("timesheets")
+        .delete()
+        .in("id", timesheetIds);
+
+      if (error) {
+        console.error("Error deleting timesheets:", error);
+        toast.error("Failed to delete timesheets");
+        throw error;
+      }
+
+      await fetchTimesheets();
+      toast.success(`${timesheetIds.length} timesheets deleted successfully`);
+    } catch (error) {
+      console.error("Error in deleteTimesheets:", error);
+      toast.error("Failed to delete timesheets");
+      throw error;
+    }
+  };
+
   return {
     timesheets,
     isLoading,
@@ -286,6 +330,8 @@ export const useTimesheets = (jobId: string) => {
     updateTimesheet,
     submitTimesheet,
     approveTimesheet,
-    signTimesheet
+    signTimesheet,
+    deleteTimesheet,
+    deleteTimesheets
   };
 };
