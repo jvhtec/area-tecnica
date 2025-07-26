@@ -16,30 +16,58 @@ interface TimesheetSidebarProps {
 const JOBS_PER_PAGE = 5;
 
 export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => {
-  const [currentPage, setCurrentPage] = useState(0);
   const { data: allJobs = [], isLoading } = useOptimizedJobs();
   const { userRole, user } = useAuth();
   const navigate = useNavigate();
 
-  // Filter for upcoming jobs (today and future) and exclude dry hire jobs
-  const upcomingJobs = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
+  // Filter jobs and exclude dry hire jobs, then sort by date (recent first)
+  const relevantJobs = useMemo(() => {
     return allJobs
       .filter(job => {
-        const jobDate = new Date(job.start_time);
-        jobDate.setHours(0, 0, 0, 0);
         // Filter out dry hire jobs since they don't have personnel/timesheets
         const isDryHire = job.job_type === 'dry_hire' || job.job_type === 'dryhire';
-        return !isBefore(jobDate, today) && !isDryHire; // Today or future, not dry hire
+        return !isDryHire;
       })
-      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+      .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()); // Most recent first
   }, [allJobs]);
 
+  // Find the current page based on today's date
+  const getCurrentPageIndex = useMemo(() => {
+    const today = new Date();
+    const todayIndex = relevantJobs.findIndex(job => {
+      const jobDate = new Date(job.start_time);
+      return jobDate.toDateString() === today.toDateString();
+    });
+    
+    if (todayIndex !== -1) {
+      return Math.floor(todayIndex / JOBS_PER_PAGE);
+    }
+    
+    // If no job today, find the closest upcoming job
+    const upcomingIndex = relevantJobs.findIndex(job => {
+      const jobDate = new Date(job.start_time);
+      return jobDate >= today;
+    });
+    
+    if (upcomingIndex !== -1) {
+      return Math.floor(upcomingIndex / JOBS_PER_PAGE);
+    }
+    
+    // Default to first page
+    return 0;
+  }, [relevantJobs]);
+
+  // Initialize current page to center around today
+  const [currentPage, setCurrentPage] = useState(getCurrentPageIndex);
+
+  // Reset to current page when sidebar opens
+  const resetToCurrentPage = () => {
+    setCurrentPage(getCurrentPageIndex);
+  };
+
   // Paginate jobs
-  const totalPages = Math.ceil(upcomingJobs.length / JOBS_PER_PAGE);
-  const paginatedJobs = upcomingJobs.slice(
+  const totalPages = Math.ceil(relevantJobs.length / JOBS_PER_PAGE);
+  const paginatedJobs = relevantJobs.slice(
     currentPage * JOBS_PER_PAGE,
     (currentPage + 1) * JOBS_PER_PAGE
   );
@@ -73,6 +101,17 @@ export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => 
         return 'bg-gray-500/20 text-gray-700 border-gray-500/30';
     }
   };
+  
+  const isJobToday = (jobDate: Date) => {
+    const today = new Date();
+    return jobDate.toDateString() === today.toDateString();
+  };
+
+  const isJobInPast = (jobDate: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return jobDate < today;
+  };
 
   if (!isOpen) return null;
 
@@ -90,11 +129,16 @@ export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => 
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-primary" />
-            <h2 className="font-semibold">Upcoming Jobs</h2>
+            <h2 className="font-semibold">All Jobs</h2>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            ×
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={resetToCurrentPage} title="Go to current date">
+              <Calendar className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              ×
+            </Button>
+          </div>
         </div>
 
         {/* Content */}
@@ -103,23 +147,32 @@ export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => 
             <div className="flex items-center justify-center py-8">
               <Clock className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : upcomingJobs.length === 0 ? (
+          ) : relevantJobs.length === 0 ? (
             <div className="text-center py-8">
               <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No upcoming jobs found</p>
+              <p className="text-muted-foreground">No jobs found</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {paginatedJobs.map((job) => (
+              {paginatedJobs.map((job) => {
+                const jobDate = new Date(job.start_time);
+                const isPast = isJobInPast(jobDate);
+                const isToday = isJobToday(jobDate);
+                
+                return (
                 <Card 
                   key={job.id} 
-                  className="cursor-pointer hover:shadow-md transition-shadow border border-border/50 hover:border-border"
+                  className={`cursor-pointer hover:shadow-md transition-shadow border border-border/50 hover:border-border ${
+                    isToday ? 'ring-2 ring-primary/50 bg-primary/5' : isPast ? 'opacity-75' : ''
+                  }`}
                   onClick={() => handleJobSelect(job.id)}
                 >
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between">
                       <CardTitle className="text-sm font-medium leading-tight">
                         {job.title}
+                        {isToday && <span className="ml-2 text-xs text-primary">(Today)</span>}
+                        {isPast && <span className="ml-2 text-xs text-muted-foreground">(Past)</span>}
                       </CardTitle>
                       <Badge 
                         variant="outline" 
@@ -164,7 +217,8 @@ export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => 
                     </Button>
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
