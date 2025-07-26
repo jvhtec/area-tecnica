@@ -21,7 +21,7 @@ export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => 
   const { userRole, user } = useAuth();
   const navigate = useNavigate();
 
-  // Filter for upcoming jobs (today and future)
+  // Filter for upcoming jobs (today and future) and exclude dry hire jobs
   const upcomingJobs = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -30,7 +30,9 @@ export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => 
       .filter(job => {
         const jobDate = new Date(job.start_time);
         jobDate.setHours(0, 0, 0, 0);
-        return !isBefore(jobDate, today); // Today or future
+        // Filter out dry hire jobs since they don't have personnel/timesheets
+        const isDryHire = job.job_type === 'dry_hire' || job.job_type === 'dryhire';
+        return !isBefore(jobDate, today) && !isDryHire; // Today or future, not dry hire
       })
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
   }, [allJobs]);

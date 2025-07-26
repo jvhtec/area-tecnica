@@ -121,21 +121,6 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
 
         {/* Timesheets - Available for all users */}
         <TimesheetSidebarTrigger userRole={userRole} />
-        
-        {/* Direct Timesheets Page - Only for management users */}
-        {isManagementUser && (
-          <Link to="/timesheets">
-            <Button
-              variant="ghost"
-              className={`w-full justify-start gap-2 ${
-                location.pathname === "/timesheets" ? "bg-accent" : ""
-              }`}
-            >
-              <Clock className="h-4 w-4" />
-              <span>All Timesheets</span>
-            </Button>
-          </Link>
-        )}
 
         {/* Department Pages - Show for Management and House Techs */}
         {(isManagementUser || userRole === 'house_tech') && (
