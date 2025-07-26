@@ -23,9 +23,10 @@ interface OptimizedMatrixCellProps {
   onClick: (action: 'select-job' | 'assign' | 'unavailable' | 'confirm' | 'decline') => void;
   onPrefetch?: () => void;
   onOptimisticUpdate?: (status: string) => void;
+  onRender?: () => void;
 }
 
-export const OptimizedMatrixCell = memo(({ 
+export const OptimizedMatrixCell = memo(({
   technician, 
   date, 
   assignment, 
@@ -36,8 +37,13 @@ export const OptimizedMatrixCell = memo(({
   onSelect, 
   onClick,
   onPrefetch,
-  onOptimisticUpdate
+  onOptimisticUpdate,
+  onRender
 }: OptimizedMatrixCellProps) => {
+  // Track cell renders for performance monitoring
+  React.useEffect(() => {
+    onRender?.();
+  }, [onRender]);
   const isTodayCell = isToday(date);
   const isWeekendCell = isWeekend(date);
   const hasAssignment = !!assignment;

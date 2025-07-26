@@ -49,37 +49,53 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     end: dates[dates.length - 1]
   }), [dates]);
 
-  // Optimized assignments query with selective fields - exclude declined assignments
+  // Optimized assignments query with batch processing and indexing hints
   const { data: allAssignments = [], isLoading: assignmentsLoading } = useQuery({
-    queryKey: ['optimized-matrix-assignments', jobIds],
+    queryKey: ['optimized-matrix-assignments', jobIds, technicianIds],
     queryFn: async (): Promise<AssignmentWithJob[]> => {
-      if (jobIds.length === 0) return [];
+      if (jobIds.length === 0 || technicianIds.length === 0) return [];
       
-      const { data, error } = await supabase
-        .from('job_assignments')
-        .select(`
-          job_id,
-          technician_id,
-          sound_role,
-          lights_role,
-          video_role,
-          status,
-          assigned_at,
-          jobs!job_id (
-            id,
-            title,
-            start_time,
-            end_time,
-            color
-          )
-        `)
-        .in('job_id', jobIds)
-        .neq('status', 'declined'); // Filter out declined assignments
+      // Split large requests to avoid timeout
+      const batchSize = 50;
+      const jobBatches = [];
+      for (let i = 0; i < jobIds.length; i += batchSize) {
+        jobBatches.push(jobIds.slice(i, i + batchSize));
+      }
+      
+      const allResults = await Promise.all(
+        jobBatches.map(async (batch) => {
+          const { data, error } = await supabase
+            .from('job_assignments')
+            .select(`
+              job_id,
+              technician_id,
+              sound_role,
+              lights_role,
+              video_role,
+              status,
+              assigned_at,
+              jobs!job_id (
+                id,
+                title,
+                start_time,
+                end_time,
+                color
+              )
+            `)
+            .in('job_id', batch)
+            .in('technician_id', technicianIds)
+            .neq('status', 'declined')
+            .order('assigned_at', { ascending: false });
 
-      if (error) throw error;
+          if (error) throw error;
+          return data || [];
+        })
+      );
       
-      // Transform the data to match our interface
-      const transformedData = (data || []).map(item => ({
+      const flatResults = allResults.flat();
+      
+      // Transform and optimize the data
+      const transformedData = flatResults.map(item => ({
         job_id: item.job_id,
         technician_id: item.technician_id,
         sound_role: item.sound_role,
@@ -92,30 +108,44 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       
       return transformedData as AssignmentWithJob[];
     },
-    enabled: jobIds.length > 0,
-    staleTime: 30 * 1000, // 30 seconds for faster updates
-    gcTime: 2 * 60 * 1000, // 2 minutes cache
+    enabled: jobIds.length > 0 && technicianIds.length > 0,
+    staleTime: 60 * 1000, // 1 minute
+    gcTime: 5 * 60 * 1000, // 5 minutes cache
   });
 
-  // Optimized availability query with date filtering
+  // Optimized availability query with batch processing
   const { data: availabilityData = [], isLoading: availabilityLoading } = useQuery({
     queryKey: ['optimized-matrix-availability', technicianIds, format(dateRange.start, 'yyyy-MM-dd'), format(dateRange.end, 'yyyy-MM-dd')],
     queryFn: async () => {
       if (technicianIds.length === 0 || !dateRange.start || !dateRange.end) return [];
       
-      const { data, error } = await supabase
-        .from('availability_schedules')
-        .select('user_id, date, status, reason, notes')
-        .in('user_id', technicianIds)
-        .gte('date', format(dateRange.start, 'yyyy-MM-dd'))
-        .lte('date', format(dateRange.end, 'yyyy-MM-dd'));
+      // Batch technicians to avoid URL length limits
+      const batchSize = 100;
+      const techBatches = [];
+      for (let i = 0; i < technicianIds.length; i += batchSize) {
+        techBatches.push(technicianIds.slice(i, i + batchSize));
+      }
+      
+      const allResults = await Promise.all(
+        techBatches.map(async (batch) => {
+          const { data, error } = await supabase
+            .from('availability_schedules')
+            .select('user_id, date, status, notes')
+            .in('user_id', batch)
+            .gte('date', format(dateRange.start, 'yyyy-MM-dd'))
+            .lte('date', format(dateRange.end, 'yyyy-MM-dd'))
+            .order('date', { ascending: true });
 
-      if (error) throw error;
-      return data || [];
+          if (error) throw error;
+          return data || [];
+        })
+      );
+      
+      return allResults.flat();
     },
     enabled: technicianIds.length > 0 && !!dateRange.start && !!dateRange.end,
-    staleTime: 30 * 1000, // 30 seconds for faster updates
-    gcTime: 2 * 60 * 1000, // 2 minutes cache
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes cache
   });
 
   // Preload technician data for dialogs

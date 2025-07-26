@@ -9,6 +9,7 @@ import { AssignJobDialog } from './AssignJobDialog';
 import { AssignmentStatusDialog } from './AssignmentStatusDialog';
 import { MarkUnavailableDialog } from './MarkUnavailableDialog';
 import { useOptimizedMatrixData } from '@/hooks/useOptimizedMatrixData';
+import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
 interface MatrixJob {
@@ -52,6 +53,9 @@ export const OptimizedAssignmentMatrix = ({ technicians, dates, jobs }: Optimize
   const [scrollAttempts, setScrollAttempts] = useState(0);
   const syncInProgressRef = useRef(false);
   
+  // Performance monitoring
+  const { startRenderTimer, endRenderTimer, incrementCellRender } = usePerformanceMonitor('AssignmentMatrix');
+  
   // Cell dimensions
   const CELL_WIDTH = 160;
   const CELL_HEIGHT = 60;
@@ -68,6 +72,12 @@ export const OptimizedAssignmentMatrix = ({ technicians, dates, jobs }: Optimize
     invalidateAssignmentQueries,
     isLoading
   } = useOptimizedMatrixData({ technicians, dates, jobs });
+
+  // Start performance monitoring
+  useEffect(() => {
+    startRenderTimer();
+    return () => endRenderTimer();
+  }, [startRenderTimer, endRenderTimer]);
 
   // Calculate matrix dimensions
   const matrixWidth = dates.length * CELL_WIDTH;
@@ -375,6 +385,7 @@ export const OptimizedAssignmentMatrix = ({ technicians, dates, jobs }: Optimize
                         onClick={(action) => handleCellClick(technician.id, date, action)}
                         onPrefetch={() => handleCellPrefetch(technician.id)}
                         onOptimisticUpdate={(status) => assignment && handleOptimisticUpdate(technician.id, assignment.job_id, status)}
+                        onRender={() => incrementCellRender()}
                       />
                     </div>
                   );

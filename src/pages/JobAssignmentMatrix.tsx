@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Filter, Users, RefreshCw } from 'lucide-react';
 import { OptimizedAssignmentMatrix } from '@/components/matrix/OptimizedAssignmentMatrix';
+import { PerformanceIndicator } from '@/components/matrix/PerformanceIndicator';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { addDays, format, startOfYear, endOfYear } from 'date-fns';
@@ -16,19 +17,43 @@ export default function JobAssignmentMatrix() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Generate date range for the selected year
+  // Generate optimized date range for visible period (3 months around current date)
   const dateRange = useMemo(() => {
-    const startDate = startOfYear(new Date(selectedYear, 0, 1));
-    const endDate = endOfYear(new Date(selectedYear, 0, 1));
-    const dates = [];
-    let currentDate = startDate;
+    const today = new Date();
+    const currentYear = today.getFullYear();
     
-    while (currentDate <= endDate) {
-      dates.push(new Date(currentDate));
-      currentDate = addDays(currentDate, 1);
+    if (selectedYear === currentYear) {
+      // For current year, show 3 months around today for better performance
+      const currentMonth = today.getMonth();
+      const startMonth = Math.max(0, currentMonth - 1);
+      const endMonth = Math.min(11, currentMonth + 2);
+      
+      const startDate = new Date(selectedYear, startMonth, 1);
+      const endDate = new Date(selectedYear, endMonth + 1, 0); // Last day of end month
+      
+      const dates = [];
+      let currentDate = startDate;
+      
+      while (currentDate <= endDate) {
+        dates.push(new Date(currentDate));
+        currentDate = addDays(currentDate, 1);
+      }
+      
+      return dates;
+    } else {
+      // For other years, show full year but limit to 6 months for performance
+      const startDate = startOfYear(new Date(selectedYear, 0, 1));
+      const endDate = new Date(selectedYear, 5, 30); // First 6 months
+      const dates = [];
+      let currentDate = startDate;
+      
+      while (currentDate <= endDate) {
+        dates.push(new Date(currentDate));
+        currentDate = addDays(currentDate, 1);
+      }
+      
+      return dates;
     }
-    
-    return dates;
   }, [selectedYear]);
 
   // Optimized technicians query
@@ -67,29 +92,36 @@ export default function JobAssignmentMatrix() {
     );
   }, [technicians, searchTerm]);
 
-  // Optimized jobs query - excluding dry hire jobs
+  // Optimized jobs query with smart date filtering
   const { data: yearJobs = [], isLoading: isLoadingJobs } = useQuery({
-    queryKey: ['optimized-matrix-jobs', selectedYear],
+    queryKey: ['optimized-matrix-jobs', selectedYear, selectedDepartment],
     queryFn: async () => {
-      const startDate = startOfYear(new Date(selectedYear, 0, 1));
-      const endDate = endOfYear(new Date(selectedYear, 0, 1));
+      const startDate = dateRange[0];
+      const endDate = dateRange[dateRange.length - 1];
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('jobs')
         .select(`
-          id, title, start_time, end_time, color, status, job_type,
-          job_departments!inner(department)
+          id, title, start_time, end_time, color, status, job_type
         `)
         .gte('start_time', startDate.toISOString())
         .lte('end_time', endDate.toISOString())
         .neq('job_type', 'dryhire')
-        .order('start_time', { ascending: true });
+        .limit(500); // Limit for performance
+
+      // Add department filter if selected
+      if (selectedDepartment !== 'all') {
+        query = query.contains('job_departments', [{ department: selectedDepartment }]);
+      }
+
+      const { data, error } = await query.order('start_time', { ascending: true });
 
       if (error) throw error;
       return data || [];
     },
-    staleTime: 3 * 60 * 1000, // 3 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    enabled: dateRange.length > 0,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 15 * 60 * 1000, // 15 minutes
   });
 
   const handleRefresh = async () => {
@@ -168,6 +200,12 @@ export default function JobAssignmentMatrix() {
             <Badge variant="outline">
               {yearJobs.length} jobs (excluding dry hire)
             </Badge>
+            <PerformanceIndicator
+              assignmentCount={yearJobs.length * filteredTechnicians.length}
+              availabilityCount={filteredTechnicians.length * dateRange.length}
+              cellCount={filteredTechnicians.length * dateRange.length}
+              isLoading={isLoadingTechnicians || isLoadingJobs}
+            />
           </div>
         </div>
       </div>
