@@ -127,6 +127,8 @@ export const AssignJobDialog = ({
       const lightsRole = technician.department === 'lights' ? selectedRole : 'none';
       const videoRole = technician.department === 'video' ? selectedRole : 'none';
 
+      console.log('Role assignments:', { soundRole, lightsRole, videoRole, department: technician.department });
+
       if (isReassignment) {
         // For reassignments, we need to remove the old assignment and create a new one
         // First remove the old assignment
@@ -143,6 +145,15 @@ export const AssignJobDialog = ({
       }
 
       // Create new assignment using the same logic as the robust hook
+      console.log('Creating assignment with data:', {
+        job_id: selectedJobId,
+        technician_id: technicianId,
+        sound_role: soundRole !== 'none' ? soundRole : null,
+        lights_role: lightsRole !== 'none' ? lightsRole : null,
+        video_role: videoRole !== 'none' ? videoRole : null,
+        status: assignAsConfirmed ? 'confirmed' : 'invited'
+      });
+
       const { error } = await supabase
         .from('job_assignments')
         .insert({
@@ -161,6 +172,8 @@ export const AssignJobDialog = ({
         console.error('Error creating assignment:', error);
         throw error;
       }
+
+      console.log('Assignment created successfully, now handling Flex crew assignments...');
 
       // Handle Flex crew assignments for sound/lights departments
       try {

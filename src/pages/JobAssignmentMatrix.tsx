@@ -23,13 +23,11 @@ export default function JobAssignmentMatrix() {
     const currentYear = today.getFullYear();
     
     if (selectedYear === currentYear) {
-      // For current year, show 3 months around today for better performance
-      const currentMonth = today.getMonth();
-      const startMonth = Math.max(0, currentMonth - 1);
-      const endMonth = Math.min(11, currentMonth + 2);
-      
-      const startDate = new Date(selectedYear, startMonth, 1);
-      const endDate = new Date(selectedYear, endMonth + 1, 0); // Last day of end month
+      // For current year, show only 6 weeks around today for better performance
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() - 21); // 3 weeks before
+      const endDate = new Date(today);
+      endDate.setDate(today.getDate() + 21); // 3 weeks after
       
       const dates = [];
       let currentDate = startDate;
@@ -41,9 +39,9 @@ export default function JobAssignmentMatrix() {
       
       return dates;
     } else {
-      // For other years, show full year but limit to 6 months for performance
+      // For other years, show only 3 months for performance
       const startDate = startOfYear(new Date(selectedYear, 0, 1));
-      const endDate = new Date(selectedYear, 5, 30); // First 6 months
+      const endDate = new Date(selectedYear, 2, 31); // First 3 months
       const dates = [];
       let currentDate = startDate;
       

@@ -44,7 +44,7 @@ export const usePerformanceMonitor = (componentName: string) => {
 
   const incrementCellRender = () => {
     cellRenderCountRef.current += 1;
-    if (cellRenderCountRef.current % 100 === 0) {
+    if (cellRenderCountRef.current % 5000 === 0) { // Reduced logging frequency
       setMetrics(prev => ({ ...prev, cellRenderCount: cellRenderCountRef.current }));
       console.log(`${componentName} cells rendered: ${cellRenderCountRef.current}`);
     }
