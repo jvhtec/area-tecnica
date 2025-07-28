@@ -19,7 +19,7 @@ import { VenueDialog } from "@/components/hoja-de-ruta/dialogs/VenueDialog";
 import { ContactsDialog } from "@/components/hoja-de-ruta/dialogs/ContactsDialog";
 import { StaffDialog } from "@/components/hoja-de-ruta/dialogs/StaffDialog";
 import { TravelArrangementsDialog } from "@/components/hoja-de-ruta/dialogs/TravelArrangementsDialog";
-import { RoomAssignmentsDialog } from "@/components/hoja-de-ruta/dialogs/RoomAssignmentsDialog";
+import { ModernAccommodationSection } from "@/components/hoja-de-ruta/sections/ModernAccommodationSection";
 import { generatePDF } from "@/utils/hoja-de-ruta/pdf-generator";
 import { uploadPdfToJob } from "@/utils/hoja-de-ruta/pdf-upload";
 import { useToast } from "@/hooks/use-toast";
@@ -33,8 +33,8 @@ const HojaDeRutaGenerator = () => {
     setSelectedJobId,
     travelArrangements,
     setTravelArrangements,
-    roomAssignments,
-    setRoomAssignments,
+    accommodations,
+    setAccommodations,
     isLoadingJobs,
     jobs,
     isLoadingHojaDeRuta,
@@ -66,16 +66,19 @@ const HojaDeRutaGenerator = () => {
     updateTravelArrangement,
     addTravelArrangement,
     removeTravelArrangement,
-    updateRoomAssignment,
-    addRoomAssignment,
-    removeRoomAssignment,
+    updateAccommodation,
+    addAccommodation,
+    removeAccommodation,
+    updateRoom,
+    addRoom,
+    removeRoom,
   } = useHojaDeRutaHandlers(
     eventData,
     setEventData,
     travelArrangements,
     setTravelArrangements,
-    roomAssignments,
-    setRoomAssignments
+    accommodations,
+    setAccommodations
   );
 
   const { toast } = useToast();
@@ -94,10 +97,19 @@ const HojaDeRutaGenerator = () => {
       // Save data first
       await handleSaveAll();
       
+      // Convert accommodations to legacy room assignments for PDF generation
+      const legacyRoomAssignments = accommodations.flatMap(acc => 
+        acc.rooms.map(room => ({
+          ...room,
+          hotel_name: acc.hotel_name,
+          address: acc.address
+        }))
+      );
+
       generatePDF(
         eventData,
         travelArrangements,
-        roomAssignments,
+        legacyRoomAssignments,
         imagePreviews,
         venueMapPreview,
         selectedJobId,
@@ -214,12 +226,15 @@ const HojaDeRutaGenerator = () => {
             removeTravelArrangement={removeTravelArrangement}
           />
 
-          <RoomAssignmentsDialog
-            roomAssignments={roomAssignments}
+          <ModernAccommodationSection
+            accommodations={accommodations}
             eventData={eventData}
-            updateRoomAssignment={updateRoomAssignment}
-            addRoomAssignment={addRoomAssignment}
-            removeRoomAssignment={removeRoomAssignment}
+            onUpdateAccommodation={updateAccommodation}
+            onUpdateRoom={updateRoom}
+            onAddAccommodation={addAccommodation}
+            onRemoveAccommodation={removeAccommodation}
+            onAddRoom={addRoom}
+            onRemoveRoom={removeRoom}
           />
 
           <ProgramDetailsSection

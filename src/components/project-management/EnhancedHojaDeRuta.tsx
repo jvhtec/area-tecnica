@@ -21,7 +21,7 @@ import { VenueDialog } from "@/components/hoja-de-ruta/dialogs/VenueDialog";
 import { ContactsDialog } from "@/components/hoja-de-ruta/dialogs/ContactsDialog";
 import { StaffDialog } from "@/components/hoja-de-ruta/dialogs/StaffDialog";
 import { TravelArrangementsDialog } from "@/components/hoja-de-ruta/dialogs/TravelArrangementsDialog";
-import { RoomAssignmentsDialog } from "@/components/hoja-de-ruta/dialogs/RoomAssignmentsDialog";
+import { ModernAccommodationSection } from "@/components/hoja-de-ruta/sections/ModernAccommodationSection";
 import { uploadPdfToJob } from "@/utils/hoja-de-ruta/pdf-upload";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -47,8 +47,8 @@ const EnhancedHojaDeRutaGenerator = () => {
     setSelectedJobId,
     travelArrangements,
     setTravelArrangements,
-    roomAssignments,
-    setRoomAssignments,
+    accommodations,
+    setAccommodations,
     isLoadingJobs,
     jobs,
     isLoadingHojaDeRuta,
@@ -78,16 +78,19 @@ const EnhancedHojaDeRutaGenerator = () => {
     updateTravelArrangement,
     addTravelArrangement,
     removeTravelArrangement,
-    updateRoomAssignment,
-    addRoomAssignment,
-    removeRoomAssignment,
+    updateAccommodation,
+    addAccommodation,
+    removeAccommodation,
+    updateRoom,
+    addRoom,
+    removeRoom,
   } = useHojaDeRutaHandlers(
     eventData,
     setEventData,
     travelArrangements,
     setTravelArrangements,
-    roomAssignments,
-    setRoomAssignments
+    accommodations,
+    setAccommodations
   );
 
   const { toast } = useToast();
@@ -127,11 +130,20 @@ const EnhancedHojaDeRutaGenerator = () => {
         } : undefined
       };
 
+      // Convert accommodations to legacy room assignments for PDF generation
+      const legacyRoomAssignments = accommodations.flatMap(acc => 
+        acc.rooms.map(room => ({
+          ...room,
+          hotel_name: acc.hotel_name,
+          address: acc.address
+        }))
+      );
+
       const jobDetails = jobs?.find(job => job.id === selectedJobId);
       const pdfBlob = await generateEnhancedPDF(
         enhancedEventData,
         travelArrangements,
-        roomAssignments,
+        legacyRoomAssignments,
         imagePreviews,
         venueMapPreview,
         selectedJobId,
@@ -227,7 +239,7 @@ const EnhancedHojaDeRutaGenerator = () => {
            eventData.venue.address || eventData.schedule || eventData.powerRequirements ||
            eventData.auxiliaryNeeds || eventData.contacts.some(c => c.name) ||
            eventData.staff.some(s => s.name) || travelArrangements.some(t => t.pickup_address) ||
-           roomAssignments.some(r => r.room_number);
+           accommodations.some(a => a.hotel_name || a.rooms.some(r => r.room_number));
   };
 
   if (isLoadingHojaDeRuta) {
@@ -394,12 +406,15 @@ const EnhancedHojaDeRutaGenerator = () => {
             removeTravelArrangement={removeTravelArrangement}
           />
 
-          <RoomAssignmentsDialog
-            roomAssignments={roomAssignments}
+          <ModernAccommodationSection
+            accommodations={accommodations}
             eventData={eventData}
-            updateRoomAssignment={updateRoomAssignment}
-            addRoomAssignment={addRoomAssignment}
-            removeRoomAssignment={removeRoomAssignment}
+            onUpdateAccommodation={updateAccommodation}
+            onUpdateRoom={updateRoom}
+            onAddAccommodation={addAccommodation}
+            onRemoveAccommodation={removeAccommodation}
+            onAddRoom={addRoom}
+            onRemoveRoom={removeRoom}
           />
 
           <ProgramDetailsSection
