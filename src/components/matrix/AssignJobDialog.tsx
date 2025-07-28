@@ -121,6 +121,13 @@ export const AssignJobDialog = ({
     setIsAssigning(true);
     console.log('Starting assignment:', { selectedJobId, selectedRole, technicianId, isReassignment });
 
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.error('Assignment timeout after 10 seconds');
+      setIsAssigning(false);
+      toast.error('Assignment timed out - please try again');
+    }, 10000);
+
     try {
       // Determine role assignment based on department
       const soundRole = technician.department === 'sound' ? selectedRole : 'none';
@@ -215,6 +222,7 @@ export const AssignJobDialog = ({
       
       const statusText = assignAsConfirmed ? 'confirmed' : 'invited';
       console.log('Assignment completed successfully');
+      clearTimeout(timeoutId);
       toast.success(
         `${isReassignment ? 'Reassigned' : 'Assigned'} ${technician.first_name} ${technician.last_name} to ${selectedJob?.title} (${statusText})`
       );
@@ -224,6 +232,7 @@ export const AssignJobDialog = ({
         onClose();
       }, 100);
     } catch (error: any) {
+      clearTimeout(timeoutId);
       console.error('Error assigning job:', error);
       
       // Provide more specific error messages
@@ -235,6 +244,7 @@ export const AssignJobDialog = ({
         toast.error(`Failed to assign job: ${error.message || 'Unknown error'}`);
       }
     } finally {
+      clearTimeout(timeoutId);
       setIsAssigning(false);
     }
   };
