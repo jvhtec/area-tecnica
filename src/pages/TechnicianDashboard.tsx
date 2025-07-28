@@ -134,8 +134,8 @@ const TechnicianDashboard = () => {
             )
           `)
           .eq('technician_id', user.id)
-          .gte('jobs.start_time', new Date().toISOString())
           .lte('jobs.start_time', endDate.toISOString())
+          .gte('jobs.end_time', new Date().toISOString())
           .order('jobs(start_time)');
 
         if (jobAssignmentsError) {
