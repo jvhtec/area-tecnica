@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Calendar, Clock } from 'lucide-react';
 import { format } from 'date-fns';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
@@ -38,6 +38,7 @@ interface AssignJobDialogProps {
   }>;
   existingAssignment?: any;
   preSelectedJobId?: string;
+  invalidateAssignmentQueries?: () => Promise<void>;
 }
 
 export const AssignJobDialog = ({ 
@@ -47,8 +48,10 @@ export const AssignJobDialog = ({
   date, 
   availableJobs,
   existingAssignment,
-  preSelectedJobId
+  preSelectedJobId,
+  invalidateAssignmentQueries
 }: AssignJobDialogProps) => {
+  const queryClient = useQueryClient();
   const [selectedJobId, setSelectedJobId] = useState<string>(preSelectedJobId || existingAssignment?.job_id || '');
   const [selectedRole, setSelectedRole] = useState<string>('');
   const [assignAsConfirmed, setAssignAsConfirmed] = useState(false);
@@ -223,6 +226,20 @@ export const AssignJobDialog = ({
       const statusText = assignAsConfirmed ? 'confirmed' : 'invited';
       console.log('Assignment completed successfully');
       clearTimeout(timeoutId);
+      
+      // Invalidate queries to refresh the matrix
+      if (invalidateAssignmentQueries) {
+        await invalidateAssignmentQueries();
+      } else {
+        // Fallback invalidation for non-optimized matrix
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] }),
+          queryClient.invalidateQueries({ queryKey: ['matrix-assignments'] }),
+          queryClient.invalidateQueries({ queryKey: ['job-assignments'] })
+        ]);
+      }
+      console.log('Assignment queries invalidated');
+      
       toast.success(
         `${isReassignment ? 'Reassigned' : 'Assigned'} ${technician.first_name} ${technician.last_name} to ${selectedJob?.title} (${statusText})`
       );
