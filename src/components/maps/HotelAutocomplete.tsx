@@ -68,32 +68,12 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
     fetchApiKey();
   }, []);
 
-  // Load Google Maps script
+  // Load Google Maps script is not needed for new Places API
   useEffect(() => {
-    if (!apiKey) return;
-
-    const loadGoogleMaps = () => {
-      if (window.google?.maps?.places) {
-        setIsApiLoaded(true);
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-        console.log('Google Maps API loaded for hotel autocomplete');
-        setIsApiLoaded(true);
-      };
-      script.onerror = () => {
-        console.error('Failed to load Google Maps API');
-      };
-      
-      document.head.appendChild(script);
-    };
-
-    loadGoogleMaps();
+    if (apiKey) {
+      setIsApiLoaded(true);
+      console.log('Google Places API (New) ready for hotel autocomplete');
+    }
   }, [apiKey]);
 
   useEffect(() => {
@@ -114,51 +94,66 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
       return;
     }
 
-    if (!isApiLoaded || !window.google?.maps?.places) {
-      console.error('Google Maps Places API not loaded');
+    if (!isApiLoaded || !apiKey) {
+      console.error('Google Places API (New) not ready');
       return;
     }
 
     setIsLoading(true);
     
     try {
-      const service = new window.google.maps.places.AutocompleteService();
-      
-      const request = {
-        input: query,
-        types: ['lodging'], // This restricts to hotels and accommodations
-        componentRestrictions: { country: 'es' }, // Adjust country as needed
-      };
-
-      service.getPlacePredictions(request, (predictions, status) => {
-        console.log('Hotel search results:', { status, predictions });
-        if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
-          // Filter for hotels specifically
-          const hotelPredictions = predictions
-            .filter(prediction => 
-              prediction.types.includes('lodging') ||
-              prediction.types.includes('establishment')
-            )
-            .slice(0, 5)
-            .map(prediction => ({
-              place_id: prediction.place_id,
-              name: prediction.structured_formatting?.main_text || prediction.description,
-              formatted_address: prediction.structured_formatting?.secondary_text || prediction.description,
-              types: prediction.types
-            }));
-
-          setSuggestions(hotelPredictions);
-          setShowSuggestions(true);
-        } else {
-          setSuggestions([]);
-          setShowSuggestions(false);
-        }
-        setIsLoading(false);
+      // Use the new Google Places API (Text Search)
+      const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.types'
+        },
+        body: JSON.stringify({
+          textQuery: `${query} hotel`,
+          locationBias: {
+            circle: {
+              center: {
+                latitude: 40.4168, // Spain center coordinates
+                longitude: -3.7038
+              },
+              radius: 500000.0
+            }
+          },
+          maxResultCount: 5,
+          includedType: 'lodging'
+        })
       });
+
+      if (!response.ok) {
+        throw new Error(`Places API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Hotel search results (New API):', data);
+
+      if (data.places) {
+        const hotelPredictions = data.places.map((place: any) => ({
+          place_id: place.id,
+          name: place.displayName?.text || place.formattedAddress,
+          formatted_address: place.formattedAddress,
+          rating: place.rating,
+          types: place.types || ['lodging'],
+          location: place.location
+        }));
+
+        setSuggestions(hotelPredictions);
+        setShowSuggestions(true);
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
     } catch (error) {
-      console.error('Error searching hotels:', error);
+      console.error('Error searching hotels with new API:', error);
       setSuggestions([]);
       setShowSuggestions(false);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -178,40 +173,48 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
     }, 300);
   };
 
-  const getPlaceDetails = (placeId: string, hotelName: string) => {
-    if (!isApiLoaded || !window.google?.maps?.places) {
-      console.error('Google Maps Places API not loaded');
+  const getPlaceDetails = async (placeId: string, hotelName: string) => {
+    if (!isApiLoaded || !apiKey) {
+      console.error('Google Places API (New) not ready');
       onChange(hotelName);
       return;
     }
 
-    const service = new window.google.maps.places.PlacesService(document.createElement('div'));
-    
-    service.getDetails(
-      {
-        placeId: placeId,
-        fields: ['formatted_address', 'geometry', 'name', 'rating']
-      },
-      (place, status) => {
-        if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
-          const coordinates = place.geometry?.location 
-            ? {
-                lat: place.geometry.location.lat(),
-                lng: place.geometry.location.lng()
-              }
-            : undefined;
-
-          onChange(
-            place.name || hotelName,
-            place.formatted_address,
-            coordinates
-          );
-        } else {
-          onChange(hotelName);
+    try {
+      // Use the new Google Places API (Place Details)
+      const response = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
+        method: 'GET',
+        headers: {
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'id,displayName,formattedAddress,location,rating'
         }
-        setShowSuggestions(false);
+      });
+
+      if (!response.ok) {
+        throw new Error(`Place Details API error: ${response.status}`);
       }
-    );
+
+      const place = await response.json();
+      console.log('Hotel details (New API):', place);
+
+      const coordinates = place.location 
+        ? {
+            lat: place.location.latitude,
+            lng: place.location.longitude
+          }
+        : undefined;
+
+      onChange(
+        place.displayName?.text || hotelName,
+        place.formattedAddress,
+        coordinates
+      );
+    } catch (error) {
+      console.error('Error getting place details with new API:', error);
+      onChange(hotelName);
+    } finally {
+      setShowSuggestions(false);
+    }
   };
 
   const handleSelectHotel = (hotel: HotelPrediction) => {
@@ -255,6 +258,11 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm truncate">
                       {hotel.name}
+                      {hotel.rating && (
+                        <span className="ml-2 text-yellow-500">
+                          ⭐ {hotel.rating.toFixed(1)}
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-gray-500 truncate flex items-center gap-1">
                       <MapPin className="w-3 h-3" />
