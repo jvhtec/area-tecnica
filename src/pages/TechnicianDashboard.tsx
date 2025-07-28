@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, RefreshCw } from "lucide-react";
+import { Calendar, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { addWeeks, addMonths } from "date-fns";
 import { TimeSpanSelector } from "@/components/technician/TimeSpanSelector";
@@ -19,6 +19,7 @@ import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
 
 const TechnicianDashboard = () => {
   const [timeSpan, setTimeSpan] = useState<string>("1week");
+  const [viewMode, setViewMode] = useState<'upcoming' | 'past'>('upcoming');
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
   const [showMessages, setShowMessages] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -75,21 +76,21 @@ const TechnicianDashboard = () => {
     const today = new Date();
     switch (timeSpan) {
       case "1week":
-        return addWeeks(today, 1);
+        return viewMode === 'upcoming' ? addWeeks(today, 1) : addWeeks(today, -1);
       case "2weeks":
-        return addWeeks(today, 2);
+        return viewMode === 'upcoming' ? addWeeks(today, 2) : addWeeks(today, -2);
       case "1month":
-        return addMonths(today, 1);
+        return viewMode === 'upcoming' ? addMonths(today, 1) : addMonths(today, -1);
       case "3months":
-        return addMonths(today, 3);
+        return viewMode === 'upcoming' ? addMonths(today, 3) : addMonths(today, -3);
       default:
-        return addWeeks(today, 1);
+        return viewMode === 'upcoming' ? addWeeks(today, 1) : addWeeks(today, -1);
     }
   };
 
   // Use our new real-time query hook for fetching assignments
   const { data: assignments = [], isLoading, refetch } = useRealtimeQuery(
-    ['assignments', timeSpan],
+    ['assignments', timeSpan, viewMode],
     async () => {
       try {
         console.log("Fetching assignments with timeSpan:", timeSpan);
@@ -103,9 +104,9 @@ const TechnicianDashboard = () => {
         console.log("Fetching assignments for user:", user.id);
         
         const endDate = getTimeSpanEndDate();
-        console.log("Fetching assignments until:", endDate);
+        console.log("Fetching assignments until:", endDate, "viewMode:", viewMode);
         
-        const { data: jobAssignments, error: jobAssignmentsError } = await supabase
+        let query = supabase
           .from('job_assignments')
           .select(`
             job_id,
@@ -133,9 +134,21 @@ const TechnicianDashboard = () => {
               )
             )
           `)
-          .eq('technician_id', user.id)
-          .lte('jobs.start_time', endDate.toISOString())
-          .gte('jobs.end_time', new Date().toISOString())
+          .eq('technician_id', user.id);
+
+        if (viewMode === 'upcoming') {
+          // Show upcoming and ongoing jobs
+          query = query
+            .lte('jobs.start_time', endDate.toISOString())
+            .gte('jobs.end_time', new Date().toISOString());
+        } else {
+          // Show past jobs
+          query = query
+            .gte('jobs.start_time', endDate.toISOString())
+            .lte('jobs.end_time', new Date().toISOString());
+        }
+
+        const { data: jobAssignments, error: jobAssignmentsError } = await query
           .order('jobs(start_time)');
 
         if (jobAssignmentsError) {
@@ -254,8 +267,23 @@ const TechnicianDashboard = () => {
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </Button>
+          <Button
+            variant={viewMode === 'upcoming' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('upcoming')}
+          >
+            Upcoming
+          </Button>
+          <Button
+            variant={viewMode === 'past' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('past')}
+          >
+            Past
+          </Button>
           <TimeSpanSelector 
             value={timeSpan} 
+            viewMode={viewMode}
             onValueChange={(value) => {
               console.log("TimeSpan changed to:", value);
               setTimeSpan(value);
@@ -272,7 +300,7 @@ const TechnicianDashboard = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            My Upcoming Assignments
+            My {viewMode === 'upcoming' ? 'Upcoming' : 'Past'} Assignments
           </CardTitle>
         </CardHeader>
         <CardContent>
