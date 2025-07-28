@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Bed, Plus, Trash2, User, Hotel, MapPin, Building2 } from "lucide-react";
 import { Accommodation, RoomAssignment, EventData } from "@/types/hoja-de-ruta";
 import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
+import { HotelAutocomplete } from "@/components/maps/HotelAutocomplete";
 import { GoogleMap } from "@/components/maps/GoogleMap";
 
 interface ModernAccommodationSectionProps {
@@ -96,9 +97,17 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Nombre del Hotel</Label>
-                      <Input
+                      <HotelAutocomplete
                         value={accommodation.hotel_name}
-                        onChange={(e) => onUpdateAccommodation(accommodationIndex, 'hotel_name', e.target.value)}
+                        onChange={(hotelName, address, coordinates) => {
+                          onUpdateAccommodation(accommodationIndex, 'hotel_name', hotelName);
+                          if (address) {
+                            onUpdateAccommodation(accommodationIndex, 'address', address);
+                          }
+                          if (coordinates) {
+                            onUpdateAccommodation(accommodationIndex, 'coordinates', coordinates);
+                          }
+                        }}
                         placeholder="Hotel Majestic Plaza..."
                         className="border-2 focus:border-pink-300"
                       />
