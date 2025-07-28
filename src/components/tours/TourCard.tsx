@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Badge } from "@/components/ui/badge";
 import { Calendar, MapPin, MoreVertical, Settings, FileText, Printer, FolderPlus, Image, HardDrive } from "lucide-react";
 import { format } from "date-fns";
+import { createSafeFolderName, sanitizeFolderName } from "@/utils/folderNameSanitizer";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { TourManagementDialog } from "./TourManagementDialog";
@@ -191,9 +192,12 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
         dateRange = "TBD";
       }
 
-      // Use tour name with date range as root folder name
-      const cleanTourName = tour.name.replace(/[<>:"/\\|?*]/g, '_');
-      const rootFolderName = `${cleanTourName} - ${dateRange}`;
+      // Create safe folder name
+      const { name: rootFolderName, wasSanitized } = createSafeFolderName(tour.name, dateRange);
+      
+      if (wasSanitized) {
+        console.log('TourCard: Folder name was sanitized for safety:', { original: `${tour.name} - ${dateRange}`, sanitized: rootFolderName });
+      }
 
       // Create root folder
       const rootDirHandle = await baseDirHandle.getDirectoryHandle(rootFolderName, { create: true });
@@ -253,14 +257,15 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
                   dateFolderName = `${format(dateStart, "yyMMdd")} - ${tourDate.location?.name || 'TBD'}, Show`;
                 }
 
-                const cleanDateFolderName = dateFolderName.replace(/[<>:"/\\|?*]/g, '_');
+                  const cleanDateFolderName = sanitizeFolderName(dateFolderName);
                 const dateDirHandle = await rootDirHandle.getDirectoryHandle(cleanDateFolderName, { create: true });
                 
                 // Create subfolders specified in the tourdates element
-                if (folder.subfolders && Array.isArray(folder.subfolders) && folder.subfolders.length > 0) {
-                  for (const subfolder of folder.subfolders) {
-                    await dateDirHandle.getDirectoryHandle(subfolder, { create: true });
-                  }
+                  if (folder.subfolders && Array.isArray(folder.subfolders) && folder.subfolders.length > 0) {
+                    for (const subfolder of folder.subfolders) {
+                      const safeSubfolderName = sanitizeFolderName(subfolder);
+                      await dateDirHandle.getDirectoryHandle(safeSubfolderName, { create: true });
+                    }
                 } else {
                   // Default subfolders if none specified
                   await dateDirHandle.getDirectoryHandle("Technical", { create: true });
@@ -270,12 +275,14 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
               }
             } else {
               // Regular folder handling
-              const subDirHandle = await rootDirHandle.getDirectoryHandle(folder.name, { create: true });
+              const safeFolderName = sanitizeFolderName(folder.name);
+              const subDirHandle = await rootDirHandle.getDirectoryHandle(safeFolderName, { create: true });
               
               // Create subfolders if they exist
               if (folder.subfolders && Array.isArray(folder.subfolders) && folder.subfolders.length > 0) {
                 for (const subfolder of folder.subfolders) {
-                  await subDirHandle.getDirectoryHandle(subfolder, { create: true });
+                  const safeSubfolderName = sanitizeFolderName(subfolder);
+                  await subDirHandle.getDirectoryHandle(safeSubfolderName, { create: true });
                 }
               } else {
                 // Default to OLD subfolder if no subfolders specified
@@ -301,7 +308,7 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
                     dateFolderName = `${format(dateStart, "yyMMdd")} - ${tourDate.location?.name || 'TBD'} - Show`;
                   }
 
-                  const cleanDateFolderName = dateFolderName.replace(/[<>:"/\\|?*]/g, '_');
+                  const cleanDateFolderName = sanitizeFolderName(dateFolderName);
                   const dateDirHandle = await subDirHandle.getDirectoryHandle(cleanDateFolderName, { create: true });
                   
                   // Create standard subfolders for each date
@@ -332,9 +339,19 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
         // User cancelled, don't show error
         return;
       }
+      
+      let errorMessage = "Failed to create folders";
+      if (error.message?.includes("Name is not allowed")) {
+        errorMessage = "Invalid folder name detected. Please try again or contact support.";
+      } else if (error.message?.includes("getDirectoryHandle")) {
+        errorMessage = "Unable to create folder structure. Check for special characters in folder names.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error",
-        description: error.message || "Failed to create local folder structure",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {

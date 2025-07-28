@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { createSafeFolderName, sanitizeFolderName } from "@/utils/folderNameSanitizer";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -446,9 +447,12 @@ export function JobCardNew({
       const startDate = new Date(job.start_time);
       const formattedDate = format(startDate, "yyMMdd");
       
-      // Use job title with date as root folder name
-      const cleanJobTitle = job.title.replace(/[<>:"/\\|?*]/g, '_'); // Clean filename
-      const rootFolderName = `${formattedDate} - ${cleanJobTitle}`;
+      // Create safe folder name
+      const { name: rootFolderName, wasSanitized } = createSafeFolderName(job.title, formattedDate);
+      
+      if (wasSanitized) {
+        console.log('Dashboard JobCardNew: Folder name was sanitized for safety:', { original: `${formattedDate} - ${job.title}`, sanitized: rootFolderName });
+      }
 
       // Create root folder
       const rootDirHandle = await baseDirHandle.getDirectoryHandle(rootFolderName, { create: true });
@@ -489,16 +493,19 @@ export function JobCardNew({
         for (const folder of folderStructure) {
           if (typeof folder === 'string') {
             // Simple string structure
-            const subDirHandle = await rootDirHandle.getDirectoryHandle(folder, { create: true });
+            const safeFolderName = sanitizeFolderName(folder);
+            const subDirHandle = await rootDirHandle.getDirectoryHandle(safeFolderName, { create: true });
             await subDirHandle.getDirectoryHandle("OLD", { create: true });
           } else if (folder && typeof folder === 'object' && folder.name) {
             // Object structure with subfolders
-            const subDirHandle = await rootDirHandle.getDirectoryHandle(folder.name, { create: true });
+            const safeFolderName = sanitizeFolderName(folder.name);
+            const subDirHandle = await rootDirHandle.getDirectoryHandle(safeFolderName, { create: true });
             
             // Create subfolders if they exist
             if (folder.subfolders && Array.isArray(folder.subfolders)) {
               for (const subfolder of folder.subfolders) {
-                await subDirHandle.getDirectoryHandle(subfolder, { create: true });
+                const safeSubfolderName = sanitizeFolderName(subfolder);
+                await subDirHandle.getDirectoryHandle(safeSubfolderName, { create: true });
               }
             } else {
               // Default to OLD subfolder if no subfolders specified
