@@ -419,7 +419,6 @@ export const OptimizedAssignmentMatrix = ({ technicians, dates, jobs }: Optimize
           availableJobs={getJobsForDate(cellAction.date)}
           existingAssignment={cellAction.assignment}
           preSelectedJobId={cellAction.selectedJobId}
-          invalidateAssignmentQueries={invalidateAssignmentQueries}
         />
       )}
 
