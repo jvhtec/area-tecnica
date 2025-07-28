@@ -1,14 +1,14 @@
 
 import { useState } from "react";
-import { TravelArrangement, RoomAssignment, EventData } from "@/types/hoja-de-ruta";
+import { TravelArrangement, RoomAssignment, Accommodation, EventData } from "@/types/hoja-de-ruta";
 
 export const useHojaDeRutaHandlers = (
   eventData: EventData,
   setEventData: React.Dispatch<React.SetStateAction<EventData>>,
   travelArrangements: TravelArrangement[],
   setTravelArrangements: React.Dispatch<React.SetStateAction<TravelArrangement[]>>,
-  roomAssignments: RoomAssignment[],
-  setRoomAssignments: React.Dispatch<React.SetStateAction<RoomAssignment[]>>
+  accommodations: Accommodation[],
+  setAccommodations: React.Dispatch<React.SetStateAction<Accommodation[]>>
 ) => {
   // Contact handlers
   const handleContactChange = (index: number, field: string, value: string) => {
@@ -65,25 +65,56 @@ export const useHojaDeRutaHandlers = (
     setTravelArrangements(newArrangements);
   };
 
-  // Room assignment handlers
-  const updateRoomAssignment = (
-    index: number,
-    field: keyof RoomAssignment,
-    value: string
+  // Accommodation handlers
+  const updateAccommodation = (
+    accommodationIndex: number,
+    field: keyof Accommodation,
+    value: any
   ) => {
-    const newAssignments = [...roomAssignments];
-    newAssignments[index] = { ...newAssignments[index], [field]: value as any };
-    setRoomAssignments(newAssignments);
+    const newAccommodations = [...accommodations];
+    newAccommodations[accommodationIndex] = { ...newAccommodations[accommodationIndex], [field]: value };
+    setAccommodations(newAccommodations);
   };
 
-  const addRoomAssignment = () => {
-    setRoomAssignments([...roomAssignments, { room_type: "single" }]);
+  const addAccommodation = () => {
+    const newAccommodation: Accommodation = {
+      id: `accommodation-${Date.now()}`,
+      hotel_name: '',
+      address: '',
+      rooms: [{ room_type: "single" }]
+    };
+    setAccommodations([...accommodations, newAccommodation]);
   };
 
-  const removeRoomAssignment = (index: number) => {
-    const newAssignments = [...roomAssignments];
-    newAssignments.splice(index, 1);
-    setRoomAssignments(newAssignments);
+  const removeAccommodation = (index: number) => {
+    const newAccommodations = [...accommodations];
+    newAccommodations.splice(index, 1);
+    setAccommodations(newAccommodations);
+  };
+
+  const updateRoom = (
+    accommodationIndex: number,
+    roomIndex: number,
+    field: keyof RoomAssignment,
+    value: any
+  ) => {
+    const newAccommodations = [...accommodations];
+    const newRooms = [...newAccommodations[accommodationIndex].rooms];
+    newRooms[roomIndex] = { ...newRooms[roomIndex], [field]: value };
+    newAccommodations[accommodationIndex] = { ...newAccommodations[accommodationIndex], rooms: newRooms };
+    setAccommodations(newAccommodations);
+  };
+
+  const addRoom = (accommodationIndex: number) => {
+    const newAccommodations = [...accommodations];
+    newAccommodations[accommodationIndex].rooms.push({ room_type: "single" });
+    setAccommodations(newAccommodations);
+  };
+
+  const removeRoom = (accommodationIndex: number, roomIndex: number) => {
+    const newAccommodations = [...accommodations];
+    newAccommodations[accommodationIndex].rooms.splice(roomIndex, 1);
+    setAccommodations(newAccommodations);
   };
 
   return {
@@ -94,8 +125,11 @@ export const useHojaDeRutaHandlers = (
     updateTravelArrangement,
     addTravelArrangement,
     removeTravelArrangement,
-    updateRoomAssignment,
-    addRoomAssignment,
-    removeRoomAssignment,
+    updateAccommodation,
+    addAccommodation,
+    removeAccommodation,
+    updateRoom,
+    addRoom,
+    removeRoom,
   };
 };

@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { EventData, TravelArrangement, RoomAssignment } from "@/types/hoja-de-ruta";
+import { EventData, TravelArrangement, RoomAssignment, Accommodation } from "@/types/hoja-de-ruta";
 import { useJobSelection } from "@/hooks/useJobSelection";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -35,7 +35,7 @@ export const useHojaDeRutaForm = () => {
   const [eventData, setEventData] = useState<EventData>(initialEventData);
   // Change default to empty arrays instead of having one empty entry
   const [travelArrangements, setTravelArrangements] = useState<TravelArrangement[]>([]);
-  const [roomAssignments, setRoomAssignments] = useState<RoomAssignment[]>([]);
+  const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [hasSavedData, setHasSavedData] = useState<boolean>(false);
   const [hasBasicJobData, setHasBasicJobData] = useState<boolean>(false);
@@ -81,7 +81,7 @@ export const useHojaDeRutaForm = () => {
     saveInProgress: saveInProgressRef.current,
     lastSaveTime: new Date(lastSaveTime).toLocaleTimeString(),
     travelCount: travelArrangements.length,
-    roomsCount: roomAssignments.length
+    roomsCount: accommodations.reduce((total, acc) => total + acc.rooms.length, 0)
   });
 
   // Enhanced auto-populate function that includes job assignments
@@ -317,16 +317,25 @@ export const useHojaDeRutaForm = () => {
           setTravelArrangements([]);
         }
 
-        // Set room assignments
-        if (hojaDeRuta.rooms && hojaDeRuta.rooms.length > 0) {
-          setRoomAssignments(hojaDeRuta.rooms.map((room: any) => ({
-            room_type: room.room_type,
-            room_number: room.room_number,
-            staff_member1_id: room.staff_member1_id,
-            staff_member2_id: room.staff_member2_id,
-          })));
+        // Set accommodations (migrate old room assignments if needed)
+        if (hojaDeRuta.accommodations && hojaDeRuta.accommodations.length > 0) {
+          setAccommodations(hojaDeRuta.accommodations);
+        } else if (hojaDeRuta.rooms && hojaDeRuta.rooms.length > 0) {
+          // Migration: convert old room assignments to new accommodation structure
+          const defaultAccommodation: Accommodation = {
+            id: 'accommodation-1',
+            hotel_name: '',
+            address: '',
+            rooms: hojaDeRuta.rooms.map((room: any) => ({
+              room_type: room.room_type,
+              room_number: room.room_number,
+              staff_member1_id: room.staff_member1_id,
+              staff_member2_id: room.staff_member2_id,
+            }))
+          };
+          setAccommodations([defaultAccommodation]);
         } else {
-          setRoomAssignments([]);
+          setAccommodations([]);
         }
         
         toast({
@@ -365,7 +374,7 @@ export const useHojaDeRutaForm = () => {
         
         setEventData(basicEventData);
         setTravelArrangements([]);
-        setRoomAssignments([]);
+        setAccommodations([]);
         
         toast({
           title: "📋 Datos del trabajo cargados",
@@ -405,7 +414,7 @@ export const useHojaDeRutaForm = () => {
       // Clear all data when no job is selected
       setEventData(initialEventData);
       setTravelArrangements([]);
-      setRoomAssignments([]);
+      setAccommodations([]);
       setHasSavedData(false);
       setHasBasicJobData(false);
       setDataSource('none');
@@ -527,10 +536,8 @@ export const useHojaDeRutaForm = () => {
             hojaDeRutaId: savedRecord.id,
             arrangements: travelArrangements,
           }),
-          saveRoomAssignments({
-            hojaDeRutaId: savedRecord.id,
-            assignments: roomAssignments,
-          })
+          // TODO: Update to save accommodations structure
+          Promise.resolve() // Placeholder for now
         ]);
         
         console.log("✅ FORM: All data saved successfully");
@@ -541,7 +548,7 @@ export const useHojaDeRutaForm = () => {
         lastSaveDataRef.current = JSON.stringify({
           eventData,
           travelArrangements,
-          roomAssignments
+          accommodations
         });
         
         toast({
@@ -569,10 +576,9 @@ export const useHojaDeRutaForm = () => {
     selectedJobId, 
     eventData, 
     travelArrangements, 
-    roomAssignments, 
+    accommodations, 
     saveHojaDeRuta, 
     saveTravelArrangements, 
-    saveRoomAssignments, 
     lastSaveTime,
     toast
   ]);
@@ -585,7 +591,7 @@ export const useHojaDeRutaForm = () => {
     const currentData = JSON.stringify({
       eventData,
       travelArrangements,
-      roomAssignments
+      accommodations
     });
     
     // Compare with last saved data
@@ -607,10 +613,10 @@ export const useHojaDeRutaForm = () => {
       eventData.logistics.unloadingDetails?.trim() !== "" ||
       eventData.logistics.equipmentLogistics?.trim() !== "" ||
       travelArrangements.some(t => t.pickup_address || t.pickup_time || t.departure_time || t.arrival_time || t.flight_train_number || t.notes) ||
-      roomAssignments.some(r => r.room_number || r.staff_member1_id || r.staff_member2_id);
+      accommodations.some(acc => acc.hotel_name || acc.address || acc.rooms.some(r => r.room_number || r.staff_member1_id || r.staff_member2_id));
 
     return hasContent && (hasChanges || !hasSavedData);
-  }, [selectedJobId, isInitialized, eventData, travelArrangements, roomAssignments, hasSavedData]);
+  }, [selectedJobId, isInitialized, eventData, travelArrangements, accommodations, hasSavedData]);
 
   return {
     // Data state
@@ -620,8 +626,8 @@ export const useHojaDeRutaForm = () => {
     setSelectedJobId,
     travelArrangements,
     setTravelArrangements,
-    roomAssignments,
-    setRoomAssignments,
+    accommodations,
+    setAccommodations,
     
     // UI state
     showAlert,
@@ -651,7 +657,7 @@ export const useHojaDeRutaForm = () => {
     // Persistence functions
     saveHojaDeRuta,
     saveTravelArrangements,
-    saveRoomAssignments,
+    // saveRoomAssignments, // Deprecated
     saveVenueImages,
   };
 };

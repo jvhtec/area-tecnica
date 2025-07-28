@@ -75,8 +75,8 @@ export const ModernHojaDeRuta = () => {
     setSelectedJobId,
     travelArrangements,
     setTravelArrangements,
-    roomAssignments,
-    setRoomAssignments,
+    accommodations,
+    setAccommodations,
     isLoadingJobs,
     isLoadingHojaDeRuta,
     isSaving,
@@ -109,16 +109,19 @@ export const ModernHojaDeRuta = () => {
     updateTravelArrangement,
     addTravelArrangement,
     removeTravelArrangement,
-    updateRoomAssignment,
-    addRoomAssignment,
-    removeRoomAssignment,
+    updateAccommodation,
+    addAccommodation,
+    removeAccommodation,
+    updateRoom,
+    addRoom,
+    removeRoom,
   } = useHojaDeRutaHandlers(
     eventData,
     setEventData,
     travelArrangements,
     setTravelArrangements,
-    roomAssignments,
-    setRoomAssignments
+    accommodations,
+    setAccommodations
   );
 
   // Calculate completion progress
@@ -133,7 +136,7 @@ export const ModernHojaDeRuta = () => {
       if (eventData.contacts.some(c => c.name && c.phone)) completed++;
       if (eventData.staff.some(s => s.name && s.position)) completed++;
       if (travelArrangements.some(t => t.transportation_type)) completed++;
-      if (roomAssignments.some(r => r.room_type)) completed++;
+      if (accommodations.some(acc => acc.hotel_name || acc.rooms.some(r => r.room_type))) completed++;
       if (eventData.logistics.transport || eventData.logistics.loadingDetails) completed++;
       if (eventData.schedule) completed++;
 
@@ -141,7 +144,7 @@ export const ModernHojaDeRuta = () => {
     };
 
     calculateProgress();
-  }, [eventData, travelArrangements, roomAssignments]);
+  }, [eventData, travelArrangements, accommodations]);
 
   // Enhanced PDF generation using the working functionality
   const handleGeneratePDF = async () => {
@@ -176,10 +179,13 @@ export const ModernHojaDeRuta = () => {
       };
 
       const jobDetails = jobs?.find(job => job.id === selectedJobId);
+      // Convert accommodations to legacy room assignments for PDF generation
+      const legacyRoomAssignments = accommodations.flatMap(acc => acc.rooms);
+      
       const pdfBlob = await generateEnhancedPDF(
         enhancedEventData,
         travelArrangements,
-        roomAssignments,
+        legacyRoomAssignments,
         imagePreviews,
         venueMapPreview,
         selectedJobId,
@@ -599,11 +605,14 @@ export const ModernHojaDeRuta = () => {
 
                     <TabsContent value="accommodation" className="mt-0">
                       <ModernAccommodationSection
-                        roomAssignments={roomAssignments}
+                        accommodations={accommodations}
                         eventData={eventData}
-                        onUpdate={updateRoomAssignment}
-                        onAdd={addRoomAssignment}
-                        onRemove={removeRoomAssignment}
+                        onUpdateAccommodation={updateAccommodation}
+                        onUpdateRoom={updateRoom}
+                        onAddAccommodation={addAccommodation}
+                        onRemoveAccommodation={removeAccommodation}
+                        onAddRoom={addRoom}
+                        onRemoveRoom={removeRoom}
                       />
                     </TabsContent>
 

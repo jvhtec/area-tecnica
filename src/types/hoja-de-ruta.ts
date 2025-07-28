@@ -16,6 +16,17 @@ export interface RoomAssignment {
   staff_member2_id?: string;
 }
 
+export interface Accommodation {
+  id: string;
+  hotel_name: string;
+  address: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
+  rooms: RoomAssignment[];
+}
+
 export interface EventData {
   eventName: string;
   eventDates: string;

@@ -1,28 +1,45 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bed, Plus, Trash2, User, Hotel } from "lucide-react";
-import { RoomAssignment, EventData } from "@/types/hoja-de-ruta";
+import { Bed, Plus, Trash2, User, Hotel, MapPin, Building2 } from "lucide-react";
+import { Accommodation, RoomAssignment, EventData } from "@/types/hoja-de-ruta";
+import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
+import { GoogleMap } from "@/components/maps/GoogleMap";
 
 interface ModernAccommodationSectionProps {
-  roomAssignments: RoomAssignment[];
+  accommodations: Accommodation[];
   eventData: EventData;
-  onUpdate: (index: number, field: keyof RoomAssignment, value: any) => void;
-  onAdd: () => void;
-  onRemove: (index: number) => void;
+  onUpdateAccommodation: (accommodationIndex: number, field: keyof Accommodation, value: any) => void;
+  onUpdateRoom: (accommodationIndex: number, roomIndex: number, field: keyof RoomAssignment, value: any) => void;
+  onAddAccommodation: () => void;
+  onRemoveAccommodation: (index: number) => void;
+  onAddRoom: (accommodationIndex: number) => void;
+  onRemoveRoom: (accommodationIndex: number, roomIndex: number) => void;
 }
 
 export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProps> = ({
-  roomAssignments,
+  accommodations,
   eventData,
-  onUpdate,
-  onAdd,
-  onRemove,
+  onUpdateAccommodation,
+  onUpdateRoom,
+  onAddAccommodation,
+  onRemoveAccommodation,
+  onAddRoom,
+  onRemoveRoom,
 }) => {
+  const [expandedMaps, setExpandedMaps] = useState<Record<string, boolean>>({});
+
+  const toggleMap = (accommodationId: string) => {
+    setExpandedMaps(prev => ({
+      ...prev,
+      [accommodationId]: !prev[accommodationId]
+    }));
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -36,37 +53,38 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
               Alojamiento
             </CardTitle>
             <Button
-              onClick={onAdd}
+              onClick={onAddAccommodation}
               size="sm"
               variant="outline"
               className="gap-2"
             >
               <Plus className="w-4 h-4" />
-              Añadir Habitación
+              Añadir Hotel
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-6">
             <AnimatePresence>
-              {roomAssignments.map((room, index) => (
+              {accommodations.map((accommodation, accommodationIndex) => (
                 <motion.div
-                  key={index}
+                  key={accommodation.id}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
-                  className="p-4 border-2 border-gray-200 rounded-lg bg-gradient-to-r from-pink-50 to-transparent"
+                  className="p-6 border-2 border-gray-200 rounded-lg bg-gradient-to-r from-pink-50 to-transparent"
                 >
-                  <div className="flex items-center justify-between mb-4">
+                  {/* Hotel Header */}
+                  <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-2">
-                      <Hotel className="w-5 h-5 text-pink-600" />
-                      <h4 className="font-medium">Habitación {index + 1}</h4>
+                      <Building2 className="w-5 h-5 text-pink-600" />
+                      <h3 className="text-lg font-semibold">Hotel {accommodationIndex + 1}</h3>
                     </div>
-                    {index > 0 && (
+                    {accommodationIndex > 0 && (
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => onRemove(index)}
+                        onClick={() => onRemoveAccommodation(accommodationIndex)}
                         className="text-red-600 hover:text-red-700"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -74,90 +92,194 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Hotel Details */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">
-                        Tipo de Habitación
-                      </Label>
-                      <Select
-                        value={room.room_type}
-                        onValueChange={(value) => onUpdate(index, 'room_type', value)}
-                      >
-                        <SelectTrigger className="border-2 focus:border-pink-300">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="single">
-                            <div className="flex items-center gap-2">
-                              <User className="w-4 h-4" />
-                              Individual
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="double">
-                            <div className="flex items-center gap-2">
-                              <User className="w-4 h-4" />
-                              Doble
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">
-                        Número de Habitación
-                      </Label>
+                      <Label className="text-sm font-medium">Nombre del Hotel</Label>
                       <Input
-                        value={room.room_number || ''}
-                        onChange={(e) => onUpdate(index, 'room_number', e.target.value)}
-                        placeholder="101, 202..."
+                        value={accommodation.hotel_name}
+                        onChange={(e) => onUpdateAccommodation(accommodationIndex, 'hotel_name', e.target.value)}
+                        placeholder="Hotel Majestic Plaza..."
                         className="border-2 focus:border-pink-300"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">
-                        Personal 1
-                      </Label>
-                      <Select
-                        value={room.staff_member1_id || ''}
-                        onValueChange={(value) => onUpdate(index, 'staff_member1_id', value)}
+                      <Label className="text-sm font-medium">Dirección</Label>
+                      <AddressAutocomplete
+                        value={accommodation.address}
+                        onChange={(address, coordinates) => {
+                          onUpdateAccommodation(accommodationIndex, 'address', address);
+                          if (coordinates) {
+                            onUpdateAccommodation(accommodationIndex, 'coordinates', coordinates);
+                          }
+                        }}
+                        placeholder="Buscar dirección del hotel..."
+                        className="border-2 focus:border-pink-300"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Map Section */}
+                  {accommodation.address && (
+                    <div className="mb-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleMap(accommodation.id)}
+                          className="gap-2"
+                        >
+                          <MapPin className="w-4 h-4" />
+                          {expandedMaps[accommodation.id] ? 'Ocultar Mapa' : 'Ver Mapa'}
+                        </Button>
+                      </div>
+                      
+                      <AnimatePresence>
+                        {expandedMaps[accommodation.id] && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                          >
+                            <GoogleMap
+                              address={accommodation.address}
+                              coordinates={accommodation.coordinates}
+                              height="300px"
+                              showMarker
+                              interactive
+                              onLocationSelect={(coordinates, address) => {
+                                onUpdateAccommodation(accommodationIndex, 'coordinates', coordinates);
+                                onUpdateAccommodation(accommodationIndex, 'address', address);
+                              }}
+                            />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
+
+                  {/* Rooms Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium flex items-center gap-2">
+                        <Hotel className="w-4 h-4 text-pink-600" />
+                        Habitaciones
+                      </h4>
+                      <Button
+                        onClick={() => onAddRoom(accommodationIndex)}
+                        size="sm"
+                        variant="outline"
+                        className="gap-2"
                       >
-                        <SelectTrigger className="border-2 focus:border-pink-300">
-                          <SelectValue placeholder="Seleccionar personal" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {eventData.staff.map((staff, staffIndex) => (
-                            <SelectItem key={staffIndex} value={staffIndex.toString()}>
-                              {staff.name} {staff.surname1}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <Plus className="w-4 h-4" />
+                        Añadir Habitación
+                      </Button>
                     </div>
 
-                    {room.room_type === 'double' && (
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">
-                          Personal 2
-                        </Label>
-                        <Select
-                          value={room.staff_member2_id || ''}
-                          onValueChange={(value) => onUpdate(index, 'staff_member2_id', value)}
+                    <AnimatePresence>
+                      {accommodation.rooms.map((room, roomIndex) => (
+                        <motion.div
+                          key={roomIndex}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 10 }}
+                          className="p-4 border border-gray-200 rounded-lg bg-white/70"
                         >
-                          <SelectTrigger className="border-2 focus:border-pink-300">
-                            <SelectValue placeholder="Seleccionar personal" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {eventData.staff.map((staff, staffIndex) => (
-                              <SelectItem key={staffIndex} value={staffIndex.toString()}>
-                                {staff.name} {staff.surname1}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                          <div className="flex items-center justify-between mb-4">
+                            <h5 className="font-medium text-sm">Habitación {roomIndex + 1}</h5>
+                            {roomIndex > 0 && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => onRemoveRoom(accommodationIndex, roomIndex)}
+                                className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium">Tipo de Habitación</Label>
+                              <Select
+                                value={room.room_type}
+                                onValueChange={(value) => onUpdateRoom(accommodationIndex, roomIndex, 'room_type', value)}
+                              >
+                                <SelectTrigger className="border-2 focus:border-pink-300">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="single">
+                                    <div className="flex items-center gap-2">
+                                      <User className="w-4 h-4" />
+                                      Individual
+                                    </div>
+                                  </SelectItem>
+                                  <SelectItem value="double">
+                                    <div className="flex items-center gap-2">
+                                      <User className="w-4 h-4" />
+                                      Doble
+                                    </div>
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium">Número de Habitación</Label>
+                              <Input
+                                value={room.room_number || ''}
+                                onChange={(e) => onUpdateRoom(accommodationIndex, roomIndex, 'room_number', e.target.value)}
+                                placeholder="101, 202..."
+                                className="border-2 focus:border-pink-300"
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium">Personal 1</Label>
+                              <Select
+                                value={room.staff_member1_id || ''}
+                                onValueChange={(value) => onUpdateRoom(accommodationIndex, roomIndex, 'staff_member1_id', value)}
+                              >
+                                <SelectTrigger className="border-2 focus:border-pink-300">
+                                  <SelectValue placeholder="Seleccionar personal" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {eventData.staff.map((staff, staffIndex) => (
+                                    <SelectItem key={staffIndex} value={staffIndex.toString()}>
+                                      {staff.name} {staff.surname1}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {room.room_type === 'double' && (
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Personal 2</Label>
+                                <Select
+                                  value={room.staff_member2_id || ''}
+                                  onValueChange={(value) => onUpdateRoom(accommodationIndex, roomIndex, 'staff_member2_id', value)}
+                                >
+                                  <SelectTrigger className="border-2 focus:border-pink-300">
+                                    <SelectValue placeholder="Seleccionar personal" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {eventData.staff.map((staff, staffIndex) => (
+                                      <SelectItem key={staffIndex} value={staffIndex.toString()}>
+                                        {staff.name} {staff.surname1}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
                   </div>
                 </motion.div>
               ))}
