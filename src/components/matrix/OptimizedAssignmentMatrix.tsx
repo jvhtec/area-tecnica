@@ -129,7 +129,9 @@ export const OptimizedAssignmentMatrix = ({ technicians, dates, jobs }: Optimize
   }, [syncScrollPositions]);
 
   const handleCellClick = useCallback((technicianId: string, date: Date, action: 'select-job' | 'assign' | 'unavailable' | 'confirm' | 'decline') => {
+    console.log('Matrix handling cell click:', { technicianId, date: format(date, 'yyyy-MM-dd'), action });
     const assignment = getAssignmentForCell(technicianId, date);
+    console.log('Assignment data:', assignment);
     setCellAction({ type: action, technicianId, date, assignment });
   }, [getAssignmentForCell]);
 

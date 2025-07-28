@@ -57,14 +57,25 @@ export const OptimizedMatrixCell = memo(({
   const handleCellClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     
+    console.log('Cell clicked:', {
+      technician: `${technician.first_name} ${technician.last_name}`,
+      date: format(date, 'yyyy-MM-dd'),
+      hasAssignment,
+      isUnavailable,
+      assignment
+    });
+    
     if (hasAssignment) {
+      console.log('Opening assignment edit dialog');
       onClick('assign'); // Edit existing assignment
     } else if (isUnavailable) {
+      console.log('Opening unavailability dialog');
       onClick('unavailable'); // Edit unavailability
     } else {
+      console.log('Opening job selection dialog');
       onClick('select-job'); // Create new assignment
     }
-  }, [hasAssignment, isUnavailable, onClick]);
+  }, [hasAssignment, isUnavailable, onClick, technician, date, assignment]);
 
   const handleStatusClick = useCallback((e: React.MouseEvent, action: 'confirm' | 'decline') => {
     e.stopPropagation();
