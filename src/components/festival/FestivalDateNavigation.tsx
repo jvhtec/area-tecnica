@@ -239,7 +239,7 @@ export const FestivalDateNavigation = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {viewMode === 'week' && isLongFestival && (
+          {viewMode === 'week' && (
             <>
               <Button
                 variant="outline"
