@@ -9,8 +9,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { VenueDialogProps } from "@/types/hoja-de-ruta/dialogs";
+import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
+import { GoogleMap } from "@/components/maps/GoogleMap";
 
 export const VenueDialog = ({
   eventData,
@@ -44,18 +45,46 @@ export const VenueDialog = ({
             />
           </div>
           <div>
-            <Label htmlFor="venueAddress">Dirección</Label>
-            <Textarea
-              id="venueAddress"
+            <AddressAutocomplete
+              label="Dirección"
               value={eventData.venue.address}
-              onChange={(e) =>
+              onChange={(address, coordinates) =>
                 setEventData({
                   ...eventData,
-                  venue: { ...eventData.venue, address: e.target.value },
+                  venue: { 
+                    ...eventData.venue, 
+                    address,
+                    ...(coordinates && { coordinates })
+                  },
                 })
               }
+              placeholder="Buscar dirección del venue..."
             />
           </div>
+          
+          {/* Google Map Display */}
+          {(eventData.venue.address || eventData.venue.coordinates) && (
+            <div>
+              <Label>Ubicación en el Mapa</Label>
+              <div className="mt-2">
+                <GoogleMap
+                  address={eventData.venue.address}
+                  coordinates={eventData.venue.coordinates}
+                  height="250px"
+                  onLocationSelect={(coordinates, address) =>
+                    setEventData({
+                      ...eventData,
+                      venue: { 
+                        ...eventData.venue, 
+                        coordinates,
+                        address: address || eventData.venue.address
+                      },
+                    })
+                  }
+                />
+              </div>
+            </div>
+          )}
           <div>
             <Label htmlFor="venueMapUpload">Mapa de Ubicación del Lugar</Label>
             <Input

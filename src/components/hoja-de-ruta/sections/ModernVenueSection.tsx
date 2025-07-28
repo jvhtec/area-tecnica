@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { MapPin, Upload, X, Image as ImageIcon, Map, Plus } from "lucide-react";
 import { EventData, Images, ImagePreviews } from "@/types/hoja-de-ruta";
+import { GoogleMap } from "@/components/maps/GoogleMap";
 
 interface ModernVenueSectionProps {
   eventData: EventData;
@@ -222,6 +223,44 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Google Maps Location Section */}
+      {(eventData.venue.address || eventData.venue.coordinates) && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <Card className="border-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-emerald-600" />
+                Ubicación del Venue
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <GoogleMap
+                address={eventData.venue.address}
+                coordinates={eventData.venue.coordinates}
+                height="300px"
+                interactive={false}
+                showMarker={true}
+              />
+              {eventData.venue.address && (
+                <div className="mt-3 p-3 bg-muted rounded-lg">
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Dirección:</p>
+                  <p className="text-sm">{eventData.venue.address}</p>
+                  {eventData.venue.coordinates && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Coordenadas: {eventData.venue.coordinates.lat.toFixed(6)}, {eventData.venue.coordinates.lng.toFixed(6)}
+                    </p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
     </div>
   );
 };

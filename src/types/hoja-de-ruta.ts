@@ -22,6 +22,10 @@ export interface EventData {
   venue: {
     name: string;
     address: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
   };
   contacts: { name: string; role: string; phone: string }[];
   logistics: {
