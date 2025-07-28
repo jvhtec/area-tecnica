@@ -35,8 +35,66 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
   const [suggestions, setSuggestions] = useState<HotelPrediction[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [isApiLoaded, setIsApiLoaded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout>();
+
+  // Fetch Google Maps API key
+  useEffect(() => {
+    const fetchApiKey = async () => {
+      try {
+        const response = await fetch('https://syldobdcdsgfgjtbuwxm.supabase.co/functions/v1/get-secret', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN5bGRvYmRjZHNnZmdqdGJ1d3htIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU5NDE1ODcsImV4cCI6MjA1MTUxNzU4N30.iLtE6_xC0FE21JKzy77UPAvferh4l1WeLvvVCn15YJc`
+          },
+          body: JSON.stringify({ secretName: 'GOOGLE_MAPS_API_KEY' })
+        });
+        
+        const data = await response.json();
+        if (data.GOOGLE_MAPS_API_KEY) {
+          setApiKey(data.GOOGLE_MAPS_API_KEY);
+          console.log('Google Maps API key loaded for hotel autocomplete');
+        } else {
+          console.error('No Google Maps API key found');
+        }
+      } catch (err) {
+        console.error('Error fetching API key:', err);
+      }
+    };
+
+    fetchApiKey();
+  }, []);
+
+  // Load Google Maps script
+  useEffect(() => {
+    if (!apiKey) return;
+
+    const loadGoogleMaps = () => {
+      if (window.google?.maps?.places) {
+        setIsApiLoaded(true);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        console.log('Google Maps API loaded for hotel autocomplete');
+        setIsApiLoaded(true);
+      };
+      script.onerror = () => {
+        console.error('Failed to load Google Maps API');
+      };
+      
+      document.head.appendChild(script);
+    };
+
+    loadGoogleMaps();
+  }, [apiKey]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -56,15 +114,14 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
       return;
     }
 
+    if (!isApiLoaded || !window.google?.maps?.places) {
+      console.error('Google Maps Places API not loaded');
+      return;
+    }
+
     setIsLoading(true);
     
     try {
-      if (!window.google?.maps?.places) {
-        console.error('Google Maps Places API not loaded');
-        setIsLoading(false);
-        return;
-      }
-
       const service = new window.google.maps.places.AutocompleteService();
       
       const request = {
@@ -74,6 +131,7 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
       };
 
       service.getPlacePredictions(request, (predictions, status) => {
+        console.log('Hotel search results:', { status, predictions });
         if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
           // Filter for hotels specifically
           const hotelPredictions = predictions
@@ -121,7 +179,8 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
   };
 
   const getPlaceDetails = (placeId: string, hotelName: string) => {
-    if (!window.google?.maps?.places) {
+    if (!isApiLoaded || !window.google?.maps?.places) {
+      console.error('Google Maps Places API not loaded');
       onChange(hotelName);
       return;
     }
