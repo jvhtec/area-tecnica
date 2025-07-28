@@ -16,6 +16,7 @@ import { useHojaDeRutaHandlers } from "@/hooks/useHojaDeRutaHandlers";
 import { ImageUploadSection } from "@/components/hoja-de-ruta/sections/ImageUploadSection";
 import { EventDetailsSection } from "@/components/hoja-de-ruta/sections/EventDetailsSection";
 import { ProgramDetailsSection } from "@/components/hoja-de-ruta/sections/ProgramDetailsSection";
+import { VenueLocationSection } from "@/components/hoja-de-ruta/sections/VenueLocationSection";
 import { VenueDialog } from "@/components/hoja-de-ruta/dialogs/VenueDialog";
 import { ContactsDialog } from "@/components/hoja-de-ruta/dialogs/ContactsDialog";
 import { StaffDialog } from "@/components/hoja-de-ruta/dialogs/StaffDialog";
@@ -361,6 +362,11 @@ const EnhancedHojaDeRutaGenerator = () => {
               onRemove={removeImage}
             />
           </div>
+
+          <VenueLocationSection
+            eventData={eventData}
+            setEventData={setEventData}
+          />
 
           <VenueDialog
             eventData={eventData}
