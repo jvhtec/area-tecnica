@@ -4,9 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPin, Upload, X, Image as ImageIcon, Map, Plus } from "lucide-react";
+import { MapPin, Upload, X, Image as ImageIcon, Map, Plus, Settings } from "lucide-react";
 import { EventData, Images, ImagePreviews } from "@/types/hoja-de-ruta";
 import { GoogleMap } from "@/components/maps/GoogleMap";
+import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface ModernVenueSectionProps {
   eventData: EventData;
@@ -30,6 +32,17 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
   onVenueMapUpload,
 }) => {
   const [dragOver, setDragOver] = useState(false);
+
+  const handleLocationUpdate = (coordinates: { lat: number; lng: number }, address: string) => {
+    setEventData(prev => ({
+      ...prev,
+      venue: {
+        ...prev.venue,
+        coordinates,
+        address: address || prev.venue.address
+      }
+    }));
+  };
 
   const handleDrop = (e: React.DragEvent, type: 'venue' | 'map') => {
     e.preventDefault();
@@ -224,43 +237,113 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
         </Card>
       </motion.div>
 
-      {/* Google Maps Location Section */}
-      {(eventData.venue.address || eventData.venue.coordinates) && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card className="border-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+      {/* Venue Location Management */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <Card className="border-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 justify-between">
+              <div className="flex items-center gap-2">
                 <MapPin className="w-5 h-5 text-emerald-600" />
                 Ubicación del Venue
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <GoogleMap
-                address={eventData.venue.address}
-                coordinates={eventData.venue.coordinates}
-                height="300px"
-                interactive={false}
-                showMarker={true}
-              />
-              {eventData.venue.address && (
-                <div className="mt-3 p-3 bg-muted rounded-lg">
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Dirección:</p>
-                  <p className="text-sm">{eventData.venue.address}</p>
-                  {eventData.venue.coordinates && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Coordenadas: {eventData.venue.coordinates.lat.toFixed(6)}, {eventData.venue.coordinates.lng.toFixed(6)}
-                    </p>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+              </div>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Settings className="w-4 h-4" />
+                    Editar Ubicación
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Configurar Ubicación del Venue</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="venue-name">Nombre del Venue</Label>
+                      <Input
+                        id="venue-name"
+                        value={eventData.venue.name}
+                        onChange={(e) =>
+                          setEventData(prev => ({
+                            ...prev,
+                            venue: { ...prev.venue, name: e.target.value }
+                          }))
+                        }
+                        placeholder="Ej. Palacio de Congresos"
+                      />
+                    </div>
+                    <div>
+                      <Label>Dirección del Venue</Label>
+                      <AddressAutocomplete
+                        value={eventData.venue.address || ''}
+                        onChange={(address, coordinates) => {
+                          setEventData(prev => ({
+                            ...prev,
+                            venue: {
+                              ...prev.venue,
+                              address,
+                              coordinates
+                            }
+                          }));
+                        }}
+                        placeholder="Buscar dirección..."
+                      />
+                    </div>
+                    {(eventData.venue.address || eventData.venue.coordinates) && (
+                      <div>
+                        <Label>Vista Previa del Mapa</Label>
+                        <GoogleMap
+                          address={eventData.venue.address}
+                          coordinates={eventData.venue.coordinates}
+                          height="250px"
+                          interactive={true}
+                          showMarker={true}
+                          onLocationSelect={handleLocationUpdate}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {eventData.venue.address || eventData.venue.coordinates ? (
+              <div className="space-y-4">
+                <GoogleMap
+                  address={eventData.venue.address}
+                  coordinates={eventData.venue.coordinates}
+                  height="300px"
+                  interactive={false}
+                  showMarker={true}
+                />
+                {eventData.venue.address && (
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Dirección:</p>
+                    <p className="text-sm">{eventData.venue.address}</p>
+                    {eventData.venue.coordinates && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Coordenadas: {eventData.venue.coordinates.lat.toFixed(6)}, {eventData.venue.coordinates.lng.toFixed(6)}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <MapPin className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <p className="text-lg font-medium mb-2">No hay ubicación configurada</p>
+                <p className="text-sm mb-4">Haz clic en "Editar Ubicación" para agregar la dirección del venue</p>
+                <p className="text-xs text-blue-600">✓ Integración Google Maps habilitada</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   );
 };
