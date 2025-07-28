@@ -19,7 +19,6 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Calendar, Clock } from 'lucide-react';
 import { format } from 'date-fns';
-import { useJobAssignmentsRealtime } from '@/hooks/useJobAssignmentsRealtime';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -114,61 +113,114 @@ export const AssignJobDialog = ({
       return;
     }
 
+    if (isAssigning) {
+      console.log('Assignment already in progress, ignoring duplicate click');
+      return;
+    }
+
     setIsAssigning(true);
+    console.log('Starting assignment:', { selectedJobId, selectedRole, technicianId, isReassignment });
 
     try {
       // Determine role assignment based on department
-      const soundRole = technician.department === 'sound' ? selectedRole : '';
-      const lightsRole = technician.department === 'lights' ? selectedRole : '';
-      const videoRole = technician.department === 'video' ? selectedRole : '';
+      const soundRole = technician.department === 'sound' ? selectedRole : 'none';
+      const lightsRole = technician.department === 'lights' ? selectedRole : 'none';
+      const videoRole = technician.department === 'video' ? selectedRole : 'none';
 
       if (isReassignment) {
-        // Update existing assignment
-        const { error } = await supabase
+        // For reassignments, we need to remove the old assignment and create a new one
+        // First remove the old assignment
+        const { error: deleteError } = await supabase
           .from('job_assignments')
-          .update({
-            job_id: selectedJobId,
-            sound_role: soundRole || null,
-            lights_role: lightsRole || null,
-            video_role: videoRole || null,
-            assigned_at: new Date().toISOString(),
-            status: assignAsConfirmed ? 'confirmed' : 'invited',
-            response_time: assignAsConfirmed ? new Date().toISOString() : null,
-          })
+          .delete()
           .eq('job_id', existingAssignment.job_id)
           .eq('technician_id', technicianId);
 
-        if (error) throw error;
-      } else {
-        // Create new assignment
-        const { error } = await supabase
-          .from('job_assignments')
-          .insert({
-            job_id: selectedJobId,
-            technician_id: technicianId,
-            sound_role: soundRole || null,
-            lights_role: lightsRole || null,
-            video_role: videoRole || null,
-            assigned_by: (await supabase.auth.getUser()).data.user?.id,
-            assigned_at: new Date().toISOString(),
-            status: assignAsConfirmed ? 'confirmed' : 'invited',
-            response_time: assignAsConfirmed ? new Date().toISOString() : null,
+        if (deleteError) {
+          console.error('Error removing old assignment:', deleteError);
+          throw deleteError;
+        }
+      }
+
+      // Create new assignment using the same logic as the robust hook
+      const { error } = await supabase
+        .from('job_assignments')
+        .insert({
+          job_id: selectedJobId,
+          technician_id: technicianId,
+          sound_role: soundRole !== 'none' ? soundRole : null,
+          lights_role: lightsRole !== 'none' ? lightsRole : null,
+          video_role: videoRole !== 'none' ? videoRole : null,
+          assigned_by: (await supabase.auth.getUser()).data.user?.id,
+          assigned_at: new Date().toISOString(),
+          status: assignAsConfirmed ? 'confirmed' : 'invited',
+          response_time: assignAsConfirmed ? new Date().toISOString() : null,
+        });
+
+      if (error) {
+        console.error('Error creating assignment:', error);
+        throw error;
+      }
+
+      // Handle Flex crew assignments for sound/lights departments
+      try {
+        if (soundRole && soundRole !== 'none') {
+          const { error: flexError } = await supabase.functions.invoke('manage-flex-crew-assignments', {
+            body: {
+              job_id: selectedJobId,
+              technician_id: technicianId,
+              department: 'sound',
+              action: 'add'
+            }
           });
-
-        if (error) throw error;
-
-        // Handle Flex crew assignments if needed
-        // (keeping existing flex crew logic from original)
+          
+          if (flexError) {
+            console.error('Error adding to Flex crew (sound):', flexError);
+            // Don't fail the whole assignment for Flex errors
+          }
+        }
+        
+        if (lightsRole && lightsRole !== 'none') {
+          const { error: flexError } = await supabase.functions.invoke('manage-flex-crew-assignments', {
+            body: {
+              job_id: selectedJobId,
+              technician_id: technicianId,
+              department: 'lights',
+              action: 'add'
+            }
+          });
+          
+          if (flexError) {
+            console.error('Error adding to Flex crew (lights):', flexError);
+            // Don't fail the whole assignment for Flex errors
+          }
+        }
+      } catch (flexError) {
+        console.error('Error with Flex crew assignments:', flexError);
+        // Continue without failing the assignment
       }
       
       const statusText = assignAsConfirmed ? 'confirmed' : 'invited';
+      console.log('Assignment completed successfully');
       toast.success(
         `${isReassignment ? 'Reassigned' : 'Assigned'} ${technician.first_name} ${technician.last_name} to ${selectedJob?.title} (${statusText})`
       );
-      onClose();
-    } catch (error) {
+      
+      // Small delay to ensure the toast is visible before closing
+      setTimeout(() => {
+        onClose();
+      }, 100);
+    } catch (error: any) {
       console.error('Error assigning job:', error);
-      toast.error('Failed to assign job');
+      
+      // Provide more specific error messages
+      if (error.code === '23505') {
+        toast.error('This technician is already assigned to this job');
+      } else if (error.message?.includes('timeout') || error.message?.includes('network')) {
+        toast.error('Network error - please check your connection and try again');
+      } else {
+        toast.error(`Failed to assign job: ${error.message || 'Unknown error'}`);
+      }
     } finally {
       setIsAssigning(false);
     }
