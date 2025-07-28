@@ -36,6 +36,9 @@ export const VenueLocationSection: React.FC<VenueLocationSectionProps> = ({
             <p className="text-sm">
               Agrega una dirección del venue en "Editar Detalles del Lugar" para ver la ubicación aquí
             </p>
+            <p className="text-xs mt-2 text-blue-600">
+              Integración de Google Maps habilitada ✓
+            </p>
           </div>
         </CardContent>
       </Card>
