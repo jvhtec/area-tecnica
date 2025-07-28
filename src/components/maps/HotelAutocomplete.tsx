@@ -111,7 +111,7 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
           'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.types'
         },
         body: JSON.stringify({
-          textQuery: `${query} hotel`,
+          textQuery: `${query} hotel accommodation`,
           locationBias: {
             circle: {
               center: {
@@ -127,13 +127,15 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Places API error ${response.status}:`, errorText);
         throw new Error(`Places API error: ${response.status}`);
       }
 
       const data = await response.json();
       console.log('Hotel search results (New API):', data);
 
-      if (data.places) {
+      if (data.places && data.places.length > 0) {
         const hotelPredictions = data.places.map((place: any) => ({
           place_id: place.id,
           name: place.displayName?.text || place.formattedAddress,
@@ -146,15 +148,73 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
         setSuggestions(hotelPredictions);
         setShowSuggestions(true);
       } else {
-        setSuggestions([]);
-        setShowSuggestions(false);
+        // Fallback to simpler autocomplete if no results
+        await fallbackSearch(query);
       }
     } catch (error) {
       console.error('Error searching hotels with new API:', error);
-      setSuggestions([]);
-      setShowSuggestions(false);
+      // Try fallback search
+      await fallbackSearch(query);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Fallback to Autocomplete API for broader results
+  const fallbackSearch = async (query: string) => {
+    try {
+      console.log('Using fallback autocomplete search for:', query);
+      const response = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat'
+        },
+        body: JSON.stringify({
+          input: `${query} hotel`,
+          locationBias: {
+            circle: {
+              center: {
+                latitude: 40.4168,
+                longitude: -3.7038
+              },
+              radius: 500000.0
+            }
+          },
+          includedPrimaryTypes: ['lodging'],
+          maxSuggestions: 5
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Fallback autocomplete results:', data);
+        
+        if (data.suggestions) {
+          const hotelPredictions = data.suggestions
+            .filter((suggestion: any) => suggestion.placePrediction)
+            .map((suggestion: any) => {
+              const prediction = suggestion.placePrediction;
+              return {
+                place_id: prediction.placeId,
+                name: prediction.structuredFormat?.mainText?.text || prediction.text?.text,
+                formatted_address: prediction.structuredFormat?.secondaryText?.text || '',
+                types: ['lodging']
+              };
+            });
+
+          setSuggestions(hotelPredictions);
+          setShowSuggestions(hotelPredictions.length > 0);
+        }
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    } catch (fallbackError) {
+      console.error('Fallback search also failed:', fallbackError);
+      setSuggestions([]);
+      setShowSuggestions(false);
     }
   };
 
