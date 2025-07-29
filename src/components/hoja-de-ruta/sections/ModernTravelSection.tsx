@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { motion, AnimatePresence } from "framer-motion";
-import { Car, Plus, Trash2, Plane, Bus, Train, MapPin, Clock } from "lucide-react";
+import { Car, Plus, Trash2, Plane, Bus, Train, MapPin, Clock, User, Phone, Hash } from "lucide-react";
 import { TravelArrangement } from "@/types/hoja-de-ruta";
 
 interface ModernTravelSectionProps {
@@ -193,6 +193,52 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
                               type="time"
                               value={arrangement.arrival_time || ''}
                               onChange={(e) => onUpdate(index, 'arrival_time', e.target.value)}
+                              className="border-2 focus:border-cyan-300"
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {/* Driver Information - Only for ground transportation */}
+                      {(arrangement.transportation_type === 'van' || 
+                        arrangement.transportation_type === 'sleeper_bus' || 
+                        arrangement.transportation_type === 'RV') && (
+                        <>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                              <User className="w-4 h-4" />
+                              Nombre del Conductor
+                            </Label>
+                            <Input
+                              value={arrangement.driver_name || ''}
+                              onChange={(e) => onUpdate(index, 'driver_name', e.target.value)}
+                              placeholder="Nombre completo"
+                              className="border-2 focus:border-cyan-300"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                              <Phone className="w-4 h-4" />
+                              Teléfono del Conductor
+                            </Label>
+                            <Input
+                              value={arrangement.driver_phone || ''}
+                              onChange={(e) => onUpdate(index, 'driver_phone', e.target.value)}
+                              placeholder="+34 600 000 000"
+                              className="border-2 focus:border-cyan-300"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                              <Hash className="w-4 h-4" />
+                              Matrícula del Vehículo
+                            </Label>
+                            <Input
+                              value={arrangement.plate_number || ''}
+                              onChange={(e) => onUpdate(index, 'plate_number', e.target.value)}
+                              placeholder="1234-ABC"
                               className="border-2 focus:border-cyan-300"
                             />
                           </div>

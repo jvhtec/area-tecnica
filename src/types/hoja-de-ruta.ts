@@ -6,6 +6,9 @@ export interface TravelArrangement {
   flight_train_number?: string;
   departure_time?: string; // Now proper time format HH:MM
   arrival_time?: string; // Now proper time format HH:MM
+  driver_name?: string;
+  driver_phone?: string;
+  plate_number?: string;
   notes?: string;
 }
 
