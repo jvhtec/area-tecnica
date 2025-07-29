@@ -99,6 +99,7 @@ export const ModernHojaDeRuta = () => {
     handleImageUpload,
     removeImage,
     handleVenueMapInputChange,
+    handleVenueMapUrl,
   } = useHojaDeRutaImages();
 
   const {
@@ -566,7 +567,6 @@ export const ModernHojaDeRuta = () => {
                         setEventData={setEventData}
                         images={images}
                         imagePreviews={imagePreviews}
-                        venueMapPreview={venueMapPreview}
                         onImageUpload={handleImageUpload}
                         onRemoveImage={removeImage}
                         onVenueMapUpload={(file: File) => {
@@ -575,6 +575,7 @@ export const ModernHojaDeRuta = () => {
                           } as unknown as React.ChangeEvent<HTMLInputElement>;
                           handleVenueMapInputChange(fakeEvent);
                         }}
+                        handleVenueMapUrl={handleVenueMapUrl}
                       />
                     </TabsContent>
 

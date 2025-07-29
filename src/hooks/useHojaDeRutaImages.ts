@@ -52,6 +52,39 @@ export const useHojaDeRutaImages = () => {
     }
   };
 
+  const handleVenueMapUrl = async (url: string) => {
+    console.log("Fetching venue map from URL:", url);
+    try {
+      const img = new Image();
+      img.crossOrigin = "Anonymous";
+      img.onload = () => {
+        console.log("Venue map image loaded successfully");
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          canvas.toBlob((blob) => {
+            if (blob) {
+              console.log("Venue map blob created");
+              const file = new File([blob], "venue-map.jpg", {
+                type: "image/jpeg",
+              });
+              handleVenueMapUpload(file);
+            }
+          }, "image/jpeg");
+        }
+      };
+      img.onerror = (error) => {
+        console.error("Error loading venue map image:", error);
+      };
+      img.src = url;
+    } catch (error) {
+      console.error("Error fetching venue map from URL:", error);
+    }
+  };
+
   return {
     images,
     setImages,
@@ -65,5 +98,6 @@ export const useHojaDeRutaImages = () => {
     removeImage,
     handleVenueMapUpload,
     handleVenueMapInputChange,
+    handleVenueMapUrl,
   };
 };

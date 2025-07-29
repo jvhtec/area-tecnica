@@ -336,15 +336,9 @@ export const generateEnhancedPDF = async (
 
         imagePreviews.venue.forEach((image, index) => {
           try {
-            // Check if we need a new row
-            if (index > 0 && index % imagesPerRow === 0) {
-              yPosition += imageHeight + spacing;
-              currentX = 20;
-              yPosition = checkPageBreak(yPosition, imageHeight + spacing);
-            }
-
-            doc.addImage(image, 'JPEG', currentX, yPosition, imageWidth, imageHeight);
-            
+            yPosition = checkPageBreak(yPosition, imageHeight + 20);
+            doc.addImage(image, 'PNG', currentX, yPosition, imageWidth, imageHeight);
+          
             // Add image caption
             doc.setFontSize(8);
             doc.setTextColor(51, 51, 51);

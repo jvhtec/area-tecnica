@@ -9,6 +9,7 @@ interface GoogleMapProps {
   onLocationSelect?: (coordinates: { lat: number; lng: number }, address: string) => void;
   showMarker?: boolean;
   interactive?: boolean;
+  onStaticMapUrlChange?: (url: string) => void;
 }
 
 declare global {
@@ -25,6 +26,7 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
   onLocationSelect,
   showMarker = true,
   interactive = true,
+  onStaticMapUrlChange,
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -86,6 +88,12 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
     loadGoogleMaps();
   }, [apiKey]);
 
+  useEffect(() => {
+    if (mapInstanceRef.current) {
+      initializeMap();
+    }
+  }, [address, coordinates]);
+
   const initializeMap = async () => {
     if (!mapRef.current || !window.google) return;
 
@@ -118,6 +126,12 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
         } catch (geocodeError) {
           console.warn('Geocoding failed, using default location');
         }
+      }
+
+      // Generate static map URL
+      if (onStaticMapUrlChange && apiKey) {
+        const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${center.lat},${center.lng}&zoom=15&size=600x300&maptype=roadmap&markers=color:red%7C${center.lat},${center.lng}&key=${apiKey}`;
+        onStaticMapUrlChange(staticMapUrl);
       }
 
       const mapOptions = {
