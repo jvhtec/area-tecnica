@@ -136,7 +136,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
                   <div className="flex items-center space-x-2 pt-6">
                     <Checkbox
                       id={`has_return_${item.id}`}
-                      checked={item.has_return}
+                      checked={item.has_return || false}
                       onCheckedChange={(checked) => onUpdateTransport(index, 'has_return', checked)}
                     />
                     <Label htmlFor={`has_return_${item.id}`}>Mismo camión para la vuelta</Label>

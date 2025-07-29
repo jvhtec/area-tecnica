@@ -183,7 +183,9 @@ export const generateEnhancedPDF = async (
         doc.text('Logística', 14, yPosition);
         yPosition += 10;
 
-        const transportString = eventData.logistics.transport.map(t => `${t.transport_type} - ${t.driver_name || 'N/A'}`).join('\n');
+        const transportString = Array.isArray(eventData.logistics.transport)
+          ? eventData.logistics.transport.map(t => `${t.transport_type} - ${t.driver_name || 'N/A'}`).join('\n')
+          : 'N/A';
         const logisticsItems = [
           { label: 'Transporte:', value: transportString },
           { label: 'Detalles de Carga:', value: eventData.logistics.loadingDetails },
