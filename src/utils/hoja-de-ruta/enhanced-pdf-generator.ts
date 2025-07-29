@@ -1,4 +1,3 @@
-o
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -35,9 +34,9 @@ export const generateEnhancedPDF = async (
     // Helper function to check if travel arrangement has meaningful data
     const hasMeaningfulTravelData = (arrangement: TravelArrangement): boolean => {
       return arrangement.transportation_type && arrangement.transportation_type.trim() !== '' && (
-        (arrangement.pickup_address && arrangement.pickup_address.trim() !== '') || 
+        (arrangement.pickup_address && arrangement.pickup_address.trim() !== '') ||
         (arrangement.pickup_time && arrangement.pickup_time.trim() !== '') ||
-        (arrangement.departure_time && arrangement.departure_time.trim() !== '') || 
+        (arrangement.departure_time && arrangement.departure_time.trim() !== '') ||
         (arrangement.arrival_time && arrangement.arrival_time.trim() !== '') ||
         (arrangement.flight_train_number && arrangement.flight_train_number.trim() !== '')
       );
@@ -46,7 +45,7 @@ export const generateEnhancedPDF = async (
     // Helper function to check if room assignment has meaningful data
     const hasMeaningfulRoomData = (room: RoomAssignment): boolean => {
       return room.room_type && room.room_type.trim() !== '' && (
-        (room.room_number && room.room_number.trim() !== '') || 
+        (room.room_number && room.room_number.trim() !== '') ||
         (room.staff_member1_id && room.staff_member1_id.trim() !== '') ||
         (room.staff_member2_id && room.staff_member2_id.trim() !== '')
       );
@@ -74,7 +73,7 @@ export const generateEnhancedPDF = async (
 
       doc.setFontSize(16);
       doc.text(eventData.eventName || 'Evento sin título', pageWidth / 2, 30, { align: 'center' });
-      
+
       doc.setFontSize(12);
       doc.text(`Fecha del Evento: ${jobDateStr}`, pageWidth / 2, 38, { align: 'center' });
     };
@@ -93,7 +92,7 @@ export const generateEnhancedPDF = async (
     const addMetadata = () => {
       doc.setFontSize(10);
       doc.setTextColor(51, 51, 51);
-      
+
       if (eventData.metadata) {
         doc.text(`Versión: ${eventData.metadata.document_version}`, 14, 50);
         doc.text(`Estado: ${eventData.metadata.status}`, 14, 57);
@@ -105,9 +104,9 @@ export const generateEnhancedPDF = async (
       doc.text(`Generado: ${createdDate}`, pageWidth - 14, 50, { align: 'right' });
     };
 
-// Generate detailed content
+    // Generate detailed content
     const generateDetailedContent = () => {
-      setupHeader('Información Detallada');
+      setupHeader('Hoja de Ruta');
       let yPosition = 80;
 
       // Venue information with map
@@ -140,7 +139,7 @@ export const generateEnhancedPDF = async (
         }
       }
 
-// Accommodation information with maps
+      // Accommodation information with maps
       if (accommodations && accommodations.length > 0) {
         yPosition = checkPageBreak(yPosition);
         doc.setFontSize(14);
@@ -199,7 +198,7 @@ export const generateEnhancedPDF = async (
             doc.setTextColor(125, 1, 1);
             doc.text(item.label, 20, yPosition);
             yPosition += 7;
-            
+
             doc.setFontSize(10);
             doc.setTextColor(51, 51, 51);
             const lines = doc.splitTextToSize(item.value, pageWidth - 40);
@@ -219,12 +218,13 @@ export const generateEnhancedPDF = async (
 
         const staffData = eventData.staff.map(person => [
           `${person.name} ${person.surname1} ${person.surname2}`.trim(),
-          person.position || 'N/A'
+          person.position || 'N/A',
+          person.dni || 'N/A'
         ]);
 
         autoTable(doc, {
           startY: yPosition,
-          head: [['Nombre Completo', 'Puesto']],
+          head: [['Nombre Completo', 'Puesto', 'DNI']],
           body: staffData,
           theme: 'grid',
           styles: { fontSize: 10, cellPadding: 5 },
@@ -235,7 +235,8 @@ export const generateEnhancedPDF = async (
           },
           columnStyles: {
             0: { cellWidth: 100 },
-            1: { cellWidth: 80 }
+            1: { cellWidth: 80 },
+            2: { cellWidth: 80 }
           }
         });
         yPosition = (doc as any).lastAutoTable.finalY + 15;
@@ -243,7 +244,7 @@ export const generateEnhancedPDF = async (
 
       // Travel arrangements - improved filtering
       const validTravelArrangements = travelArrangements.filter(hasMeaningfulTravelData);
-      
+
       if (validTravelArrangements.length > 0) {
         yPosition = checkPageBreak(yPosition, 60);
         doc.setFontSize(14);
@@ -277,12 +278,12 @@ export const generateEnhancedPDF = async (
 
       // Room assignments - improved filtering
       const validRoomAssignments = roomAssignments.filter(hasMeaningfulRoomData);
-      
+
       if (validRoomAssignments.length > 0) {
         yPosition = checkPageBreak(yPosition, 60);
         doc.setFontSize(14);
         doc.setTextColor(125, 1, 1);
-        doc.text('Asignaciones de Habitaciones', 14, yPosition);
+        doc.text('Rooming', 14, yPosition);
         yPosition += 10;
 
         const roomData = validRoomAssignments.map(room => [
@@ -335,7 +336,7 @@ export const generateEnhancedPDF = async (
           doc.setTextColor(125, 1, 1);
           doc.text('Requisitos Eléctricos:', 20, yPosition);
           yPosition += 7;
-          
+
           doc.setFontSize(10);
           doc.setTextColor(51, 51, 51);
           const powerLines = doc.splitTextToSize(eventData.powerRequirements, pageWidth - 40);
@@ -349,7 +350,7 @@ export const generateEnhancedPDF = async (
           doc.setTextColor(125, 1, 1);
           doc.text('Necesidades Auxiliares:', 20, yPosition);
           yPosition += 7;
-          
+
           doc.setFontSize(10);
           doc.setTextColor(51, 51, 51);
           const auxLines = doc.splitTextToSize(eventData.auxiliaryNeeds, pageWidth - 40);
@@ -365,7 +366,7 @@ export const generateEnhancedPDF = async (
         doc.addPage();
         setupHeader('Imágenes del Lugar');
         let yPosition = 80;
-        
+
         const imageWidth = 80;
         const imageHeight = 60;
         const imagesPerRow = 2;
@@ -376,7 +377,7 @@ export const generateEnhancedPDF = async (
           try {
             yPosition = checkPageBreak(yPosition, imageHeight + 20);
             doc.addImage(image, 'PNG', currentX, yPosition, imageWidth, imageHeight);
-          
+
             // Add image caption
             doc.setFontSize(8);
             doc.setTextColor(51, 51, 51);
@@ -410,7 +411,7 @@ export const generateEnhancedPDF = async (
         ['Dirección', eventData.venue?.address || 'N/A'],
         ['Personal Asignado', eventData.staff?.length.toString() || '0'],
         ['Contactos', eventData.contacts?.length.toString() || '0'],
-        ['Arreglos de Viaje', travelArrangements.filter(hasMeaningfulTravelData).length.toString()],
+        ['Viaje', travelArrangements.filter(hasMeaningfulTravelData).length.toString()],
         ['Habitaciones', roomAssignments.filter(hasMeaningfulRoomData).length.toString()]
       ];
 
@@ -473,21 +474,21 @@ export const generateEnhancedPDF = async (
 
       logo.onload = () => {
         const totalPages = doc.internal.pages.length - 1;
-        
+
         for (let i = 1; i <= totalPages; i++) {
           doc.setPage(i);
-          
+
           // Add page number
           doc.setFontSize(10);
           doc.setTextColor(51, 51, 51);
           doc.text(`Página ${i} de ${totalPages}`, pageWidth - 14, pageHeight - 25, { align: 'right' });
-          
+
           // Add logo
           const logoWidth = 40;
           const logoHeight = logoWidth * (logo.height / logo.width);
           const xPosition = (pageWidth - logoWidth) / 2;
           const yLogo = pageHeight - logoHeight - 5;
-          
+
           try {
             doc.addImage(logo, 'PNG', xPosition, yLogo, logoWidth, logoHeight);
           } catch (error) {
@@ -510,7 +511,7 @@ export const generateEnhancedPDF = async (
         doc.setFontSize(10);
         doc.setTextColor(51, 51, 51);
         doc.text(`Creado: ${createdDate}`, 14, pageHeight - 10);
-        
+
         const blob = doc.output('blob');
         resolve(blob);
       };

@@ -1,4 +1,3 @@
-
 export interface TravelArrangement {
   transportation_type: "van" | "sleeper_bus" | "train" | "plane" | "RV";
   pickup_address?: string;
@@ -62,7 +61,7 @@ export interface EventData {
     unloadingDetails: string;
     equipmentLogistics: string;
   };
-  staff: { name: string; surname1: string; surname2: string; position: string }[];
+  staff: { name: string; surname1: string; surname2: string; position: string; dni?: string }[];
   schedule: string;
   powerRequirements: string;
   auxiliaryNeeds: string;

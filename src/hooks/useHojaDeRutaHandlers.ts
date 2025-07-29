@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { TravelArrangement, RoomAssignment, Accommodation, EventData, Transport } from "@/types/hoja-de-ruta";
 
@@ -36,7 +35,7 @@ export const useHojaDeRutaHandlers = (
       ...eventData,
       staff: [
         ...eventData.staff,
-        { name: "", surname1: "", surname2: "", position: "" },
+        { name: "", surname1: "", surname2: "", position: "", dni: "" },
       ],
     });
   };
