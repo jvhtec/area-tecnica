@@ -129,8 +129,8 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                     </div>
                   </div>
 
-                  {/* Map Section - Enhanced like venue section */}
-                  {accommodation.address && (
+                  {/* Map Section - Always show when hotel name or address exists */}
+                  {(accommodation.hotel_name || accommodation.address) && (
                     <div className="mb-6">
                       <div className="flex items-center gap-2 mb-3">
                         <Button
@@ -153,7 +153,7 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                           >
                             <div className="space-y-4">
                               <GoogleMap
-                                address={accommodation.address}
+                                address={accommodation.address || accommodation.hotel_name}
                                 coordinates={accommodation.coordinates}
                                 height="300px"
                                 showMarker
@@ -163,19 +163,25 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                                   onUpdateAccommodation(accommodationIndex, 'address', address);
                                 }}
                               />
-                              {accommodation.address && (
-                                <div className="p-3 bg-pink-50 rounded-lg border">
-                                  <p className="text-sm font-medium text-pink-800 mb-1">Hotel:</p>
-                                  <p className="text-sm text-pink-700">{accommodation.hotel_name}</p>
-                                  <p className="text-sm font-medium text-pink-800 mb-1 mt-2">Dirección:</p>
-                                  <p className="text-sm text-pink-700">{accommodation.address}</p>
-                                  {accommodation.coordinates && (
-                                    <p className="text-xs text-pink-600 mt-1">
-                                      Coordenadas: {accommodation.coordinates.lat.toFixed(6)}, {accommodation.coordinates.lng.toFixed(6)}
-                                    </p>
-                                  )}
-                                </div>
-                              )}
+                              <div className="p-3 bg-pink-50 rounded-lg border">
+                                {accommodation.hotel_name && (
+                                  <>
+                                    <p className="text-sm font-medium text-pink-800 mb-1">Hotel:</p>
+                                    <p className="text-sm text-pink-700">{accommodation.hotel_name}</p>
+                                  </>
+                                )}
+                                {accommodation.address && (
+                                  <>
+                                    <p className="text-sm font-medium text-pink-800 mb-1 mt-2">Dirección:</p>
+                                    <p className="text-sm text-pink-700">{accommodation.address}</p>
+                                  </>
+                                )}
+                                {accommodation.coordinates && (
+                                  <p className="text-xs text-pink-600 mt-1">
+                                    Coordenadas: {accommodation.coordinates.lat.toFixed(6)}, {accommodation.coordinates.lng.toFixed(6)}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </motion.div>
                         )}
