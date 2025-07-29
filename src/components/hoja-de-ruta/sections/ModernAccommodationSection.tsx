@@ -96,7 +96,7 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                   {/* Hotel Details */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Nombre del Hotel</Label>
+                      <Label className="text-sm font-medium">Buscar Hotel</Label>
                       <HotelAutocomplete
                         value={accommodation.hotel_name}
                         onChange={(hotelName, address, coordinates) => {
@@ -108,13 +108,13 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                             onUpdateAccommodation(accommodationIndex, 'coordinates', coordinates);
                           }
                         }}
-                        placeholder="Hotel Majestic Plaza..."
+                        placeholder="Buscar hotel por nombre..."
                         className="border-2 focus:border-pink-300"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Dirección</Label>
+                      <Label className="text-sm font-medium">Dirección del Hotel</Label>
                       <AddressAutocomplete
                         value={accommodation.address}
                         onChange={(address, coordinates) => {
@@ -129,7 +129,7 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                     </div>
                   </div>
 
-                  {/* Map Section */}
+                  {/* Map Section - Enhanced like venue section */}
                   {accommodation.address && (
                     <div className="mb-6">
                       <div className="flex items-center gap-2 mb-3">
@@ -140,7 +140,7 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                           className="gap-2"
                         >
                           <MapPin className="w-4 h-4" />
-                          {expandedMaps[accommodation.id] ? 'Ocultar Mapa' : 'Ver Mapa'}
+                          {expandedMaps[accommodation.id] ? 'Ocultar Mapa' : 'Ver Ubicación'}
                         </Button>
                       </div>
                       
@@ -151,17 +151,32 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
                           >
-                            <GoogleMap
-                              address={accommodation.address}
-                              coordinates={accommodation.coordinates}
-                              height="300px"
-                              showMarker
-                              interactive
-                              onLocationSelect={(coordinates, address) => {
-                                onUpdateAccommodation(accommodationIndex, 'coordinates', coordinates);
-                                onUpdateAccommodation(accommodationIndex, 'address', address);
-                              }}
-                            />
+                            <div className="space-y-4">
+                              <GoogleMap
+                                address={accommodation.address}
+                                coordinates={accommodation.coordinates}
+                                height="300px"
+                                showMarker
+                                interactive
+                                onLocationSelect={(coordinates, address) => {
+                                  onUpdateAccommodation(accommodationIndex, 'coordinates', coordinates);
+                                  onUpdateAccommodation(accommodationIndex, 'address', address);
+                                }}
+                              />
+                              {accommodation.address && (
+                                <div className="p-3 bg-pink-50 rounded-lg border">
+                                  <p className="text-sm font-medium text-pink-800 mb-1">Hotel:</p>
+                                  <p className="text-sm text-pink-700">{accommodation.hotel_name}</p>
+                                  <p className="text-sm font-medium text-pink-800 mb-1 mt-2">Dirección:</p>
+                                  <p className="text-sm text-pink-700">{accommodation.address}</p>
+                                  {accommodation.coordinates && (
+                                    <p className="text-xs text-pink-600 mt-1">
+                                      Coordenadas: {accommodation.coordinates.lat.toFixed(6)}, {accommodation.coordinates.lng.toFixed(6)}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </motion.div>
                         )}
                       </AnimatePresence>
