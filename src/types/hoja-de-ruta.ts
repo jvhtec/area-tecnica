@@ -1,26 +1,15 @@
+
 export interface TravelArrangement {
   transportation_type: "van" | "sleeper_bus" | "train" | "plane" | "RV";
   pickup_address?: string;
-  pickup_time?: string;
+  pickup_time?: string; // Now proper time format HH:MM
   flight_train_number?: string;
-  departure_time?: string;
-  arrival_time?: string;
+  departure_time?: string; // Now proper time format HH:MM
+  arrival_time?: string; // Now proper time format HH:MM
   driver_name?: string;
   driver_phone?: string;
   plate_number?: string;
   notes?: string;
-}
-
-export interface Transport {
-  id: string;
-  transport_type: "trailer" | "9m" | "8m" | "6m" | "4m" | "furgoneta";
-  driver_name?: string;
-  driver_phone?: string;
-  license_plate?: string;
-  company?: "pantoja" | "transluminaria" | "transcamarena" | "wild tour" | "camionaje" | "other";
-  date_time?: string;
-  has_return?: boolean;
-  return_date_time?: string;
 }
 
 export interface RoomAssignment {
@@ -34,8 +23,6 @@ export interface Accommodation {
   id: string;
   hotel_name: string;
   address: string;
-  check_in: string;
-  check_out: string;
   coordinates?: {
     lat: number;
     lng: number;
@@ -56,12 +43,12 @@ export interface EventData {
   };
   contacts: { name: string; role: string; phone: string }[];
   logistics: {
-    transport: Transport[];
+    transport: string;
     loadingDetails: string;
     unloadingDetails: string;
     equipmentLogistics: string;
   };
-  staff: { name: string; surname1: string; surname2: string; position: string; dni?: string }[];
+  staff: { name: string; surname1: string; surname2: string; position: string }[];
   schedule: string;
   powerRequirements: string;
   auxiliaryNeeds: string;
@@ -93,7 +80,6 @@ export interface HojaDeRutaMetadata {
 
 export interface EnhancedEventData extends EventData {
   metadata?: HojaDeRutaMetadata;
-  accommodations?: Accommodation[];
 }
 
 export interface ImagePreviews {

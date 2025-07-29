@@ -13,11 +13,7 @@ declare global {
 
 interface HotelAutocompleteProps {
   value: string;
-  checkIn: string;
-  checkOut: string;
   onChange: (hotelName: string, address?: string, coordinates?: { lat: number; lng: number }) => void;
-  onCheckInChange: (date: string) => void;
-  onCheckOutChange: (date: string) => void;
   placeholder?: string;
   className?: string;
 }
@@ -32,11 +28,7 @@ interface HotelPrediction {
 
 export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
   value,
-  checkIn,
-  checkOut,
   onChange,
-  onCheckInChange,
-  onCheckOutChange,
   placeholder = "Buscar hotel...",
   className
 }) => {
@@ -47,7 +39,6 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
   const [isApiLoaded, setIsApiLoaded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout>();
-  const searchCache = useRef<Record<string, HotelPrediction[]>>({});
 
   // Fetch Google Maps API key
   useEffect(() => {
@@ -97,23 +88,22 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
   }, []);
 
   const searchHotels = async (query: string) => {
-    if (!query || query.length < 2 || !isApiLoaded || !apiKey) {
+    if (!query || query.length < 2) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
     }
 
-    if (searchCache.current[query]) {
-      setSuggestions(searchCache.current[query]);
-      setShowSuggestions(true);
+    if (!isApiLoaded || !apiKey) {
+      console.error('Google Places API (New) not ready');
       return;
     }
 
     setIsLoading(true);
-
+    
     try {
-      // First, try the more specific Text Search
-      const searchResponse = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      // Use the new Google Places API (Text Search)
+      const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -121,33 +111,60 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
           'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.types'
         },
         body: JSON.stringify({
-          textQuery: query,
-          includedType: "lodging",
-          maxResultCount: 5
+          textQuery: `${query} hotel accommodation`,
+          locationBias: {
+            circle: {
+              center: {
+                latitude: 40.4168, // Spain center coordinates
+                longitude: -3.7038
+              },
+              radius: 500000.0
+            }
+          },
+          maxResultCount: 5,
+          includedType: 'lodging'
         })
       });
 
-      if (searchResponse.ok) {
-        const data = await searchResponse.json();
-        if (data.places && data.places.length > 0) {
-          const hotelPredictions = data.places.map((place: any) => ({
-            place_id: place.id,
-            name: place.displayName?.text || place.formattedAddress,
-            formatted_address: place.formattedAddress,
-            rating: place.rating,
-            types: place.types || ['lodging'],
-            location: place.location
-          }));
-          setSuggestions(hotelPredictions);
-          setShowSuggestions(true);
-          searchCache.current[query] = hotelPredictions;
-          return;
-        }
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Places API error ${response.status}:`, errorText);
+        throw new Error(`Places API error: ${response.status}`);
       }
 
-      // If Text Search fails or returns no results, fallback to Autocomplete
-      console.log('Fallback to autocomplete for:', query);
-      const autocompleteResponse = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+      const data = await response.json();
+      console.log('Hotel search results (New API):', data);
+
+      if (data.places && data.places.length > 0) {
+        const hotelPredictions = data.places.map((place: any) => ({
+          place_id: place.id,
+          name: place.displayName?.text || place.formattedAddress,
+          formatted_address: place.formattedAddress,
+          rating: place.rating,
+          types: place.types || ['lodging'],
+          location: place.location
+        }));
+
+        setSuggestions(hotelPredictions);
+        setShowSuggestions(true);
+      } else {
+        // Fallback to simpler autocomplete if no results
+        await fallbackSearch(query);
+      }
+    } catch (error) {
+      console.error('Error searching hotels with new API:', error);
+      // Try fallback search
+      await fallbackSearch(query);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fallback to Autocomplete API for broader results
+  const fallbackSearch = async (query: string) => {
+    try {
+      console.log('Using fallback autocomplete search for:', query);
+      const response = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -155,36 +172,49 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
           'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat'
         },
         body: JSON.stringify({
-          input: query,
+          input: `${query} hotel`,
+          locationBias: {
+            circle: {
+              center: {
+                latitude: 40.4168,
+                longitude: -3.7038
+              },
+              radius: 500000.0
+            }
+          },
           includedPrimaryTypes: ['lodging'],
-          maxResultCount: 5
+          maxSuggestions: 5
         })
       });
 
-      if (autocompleteResponse.ok) {
-        const data = await autocompleteResponse.json();
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Fallback autocomplete results:', data);
+        
         if (data.suggestions) {
           const hotelPredictions = data.suggestions
-            .filter((s: any) => s.placePrediction)
-            .map((s: any) => ({
-              place_id: s.placePrediction.placeId,
-              name: s.placePrediction.structuredFormat?.mainText?.text || s.placePrediction.text?.text,
-              formatted_address: s.placePrediction.structuredFormat?.secondaryText?.text || '',
-              types: ['lodging']
-            }));
+            .filter((suggestion: any) => suggestion.placePrediction)
+            .map((suggestion: any) => {
+              const prediction = suggestion.placePrediction;
+              return {
+                place_id: prediction.placeId,
+                name: prediction.structuredFormat?.mainText?.text || prediction.text?.text,
+                formatted_address: prediction.structuredFormat?.secondaryText?.text || '',
+                types: ['lodging']
+              };
+            });
+
           setSuggestions(hotelPredictions);
           setShowSuggestions(hotelPredictions.length > 0);
-          searchCache.current[query] = hotelPredictions;
         }
       } else {
-        throw new Error(`Autocomplete API error: ${autocompleteResponse.status}`);
+        setSuggestions([]);
+        setShowSuggestions(false);
       }
-    } catch (error) {
-      console.error('Error searching hotels:', error);
+    } catch (fallbackError) {
+      console.error('Fallback search also failed:', fallbackError);
       setSuggestions([]);
       setShowSuggestions(false);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -200,81 +230,77 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
     // Debounce search
     timeoutRef.current = setTimeout(() => {
       searchHotels(newValue);
-    }, 500); // Increased debounce time
+    }, 300);
   };
 
-  const getPlaceDetails = async (placeId: string, hotelName: string, fallbackAddress?: string) => {
+  const getPlaceDetails = async (placeId: string, hotelName: string) => {
     if (!isApiLoaded || !apiKey) {
       console.error('Google Places API (New) not ready');
-      onChange(hotelName, fallbackAddress);
+      onChange(hotelName);
       return;
     }
 
     try {
+      // Use the new Google Places API (Place Details)
       const response = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
         method: 'GET',
         headers: {
           'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask': 'id,displayName,formattedAddress,location'
+          'X-Goog-FieldMask': 'id,displayName,formattedAddress,location,rating'
         }
       });
 
-      if (!response.ok) throw new Error(`Place Details API error: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`Place Details API error: ${response.status}`);
+      }
 
       const place = await response.json();
-      const coordinates = place.location ? { lat: place.location.latitude, lng: place.location.longitude } : undefined;
-      
+      console.log('Hotel details (New API):', place);
+
+      const coordinates = place.location 
+        ? {
+            lat: place.location.latitude,
+            lng: place.location.longitude
+          }
+        : undefined;
+
       onChange(
         place.displayName?.text || hotelName,
-        place.formattedAddress || fallbackAddress,
+        place.formattedAddress,
         coordinates
       );
     } catch (error) {
-      console.error('Error getting place details, using fallback:', error);
-      onChange(hotelName, fallbackAddress);
+      console.error('Error getting place details with new API:', error);
+      onChange(hotelName);
     } finally {
       setShowSuggestions(false);
     }
   };
 
   const handleSelectHotel = (hotel: HotelPrediction) => {
-    getPlaceDetails(hotel.place_id, hotel.name, hotel.formatted_address);
+    getPlaceDetails(hotel.place_id, hotel.name);
   };
 
   return (
     <div className="relative" ref={inputRef}>
-      <div className="flex gap-2">
-        <div className="relative flex-grow">
-          <Input
-            value={value}
-            onChange={handleInputChange}
-            placeholder={placeholder}
-            className={cn("pl-10", className)}
-            onFocus={() => {
-              if (suggestions.length > 0) {
-                setShowSuggestions(true);
-              }
-            }}
-          />
-          <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-          {isLoading && (
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-            </div>
-          )}
-        </div>
+      <div className="relative">
         <Input
-          type="datetime-local"
-          value={checkIn}
-          onChange={(e) => onCheckInChange(e.target.value)}
-          className="w-48"
+          value={value}
+          onChange={handleInputChange}
+          placeholder={placeholder}
+          className={cn("pl-10", className)}
+          onFocus={() => {
+            if (suggestions.length > 0) {
+              setShowSuggestions(true);
+            }
+          }}
         />
-        <Input
-          type="datetime-local"
-          value={checkOut}
-          onChange={(e) => onCheckOutChange(e.target.value)}
-          className="w-48"
-        />
+        <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+        {isLoading && (
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+          </div>
+        )}
       </div>
 
       {showSuggestions && suggestions.length > 0 && (

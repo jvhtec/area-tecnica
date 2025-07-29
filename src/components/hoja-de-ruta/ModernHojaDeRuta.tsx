@@ -116,9 +116,6 @@ export const ModernHojaDeRuta = () => {
     updateRoom,
     addRoom,
     removeRoom,
-    updateTransport,
-    addTransport,
-    removeTransport,
   } = useHojaDeRutaHandlers(
     eventData,
     setEventData,
@@ -186,7 +183,7 @@ export const ModernHojaDeRuta = () => {
       // Convert accommodations to legacy room assignments for PDF generation
       const legacyRoomAssignments = accommodations.flatMap(acc => acc.rooms);
       
-const pdfBlob = await generateEnhancedPDF(
+      const pdfBlob = await generateEnhancedPDF(
         enhancedEventData,
         travelArrangements,
         legacyRoomAssignments,
@@ -194,9 +191,7 @@ const pdfBlob = await generateEnhancedPDF(
         venueMapPreview,
         selectedJobId,
         jobDetails?.title || "",
-        jobDetails?.start_time || new Date().toISOString(),
-        undefined,
-        accommodations
+        jobDetails?.start_time || new Date().toISOString()
       );
 
       // Download PDF
@@ -626,9 +621,6 @@ const pdfBlob = await generateEnhancedPDF(
                       <ModernLogisticsSection
                         eventData={eventData}
                         setEventData={setEventData}
-                        onUpdateTransport={updateTransport}
-                        onAddTransport={addTransport}
-                        onRemoveTransport={removeTransport}
                       />
                     </TabsContent>
 

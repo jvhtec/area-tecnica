@@ -1,6 +1,6 @@
 
 import jsPDF from 'jspdf';
-import { autoTable } from 'jspdf-autotable';
+import 'jspdf-autotable';
 
 export interface WiredMicrophoneMatrixData {
   jobTitle: string;  
@@ -15,10 +15,10 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
   const margin = 20;
   
   // Festival document styling
-  const primaryColor: [number, number, number] = [139, 21, 33]; // Burgundy/red
-  const secondaryColor: [number, number, number] = [52, 73, 94]; // Dark gray
-  const lightGray: [number, number, number] = [240, 240, 240];
-  const headerGray: [number, number, number] = [248, 249, 250];
+  const primaryColor = [139, 21, 33]; // Burgundy/red
+  const secondaryColor = [52, 73, 94]; // Dark gray
+  const lightGray = [240, 240, 240];
+  const headerGray = [248, 249, 250];
   
   let isFirstPage = true;
   
@@ -33,19 +33,15 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
   });
   
   // Process each date and stage
-  const dateEntries = Array.from(data.artistsByDateAndStage.entries());
-  for (let i = 0; i < dateEntries.length; i++) {
-    const [date, stagesMap] = dateEntries[i];
-    const stageEntries = Array.from(stagesMap.entries());
-    for (let j = 0; j < stageEntries.length; j++) {
-      const [stage, artists] = stageEntries[j];
+  for (const [date, stagesMap] of data.artistsByDateAndStage.entries()) {
+    for (const [stage, artists] of stagesMap.entries()) {
       console.log(`\n📋 Processing: ${date} - Stage ${stage} (${artists.length} artists)`);
-
+      
       if (!isFirstPage) {
         pdf.addPage();
       }
       isFirstPage = false;
-
+      
       let yPosition = 20;
       
       // Add logo if available
@@ -148,56 +144,56 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
       const artistColumnWidth = Math.max(artistColumnsWidth / matrixData.artistNames.length, 60);
       
       // Generate table
-      autoTable(pdf, {
+      (pdf as any).autoTable({
         startY: yPosition,
         head: [headers],
         body: tableBody,
         theme: 'grid',
-        headStyles: {
-          fillColor: primaryColor as [number, number, number],
-          textColor: [255, 255, 255] as [number, number, number],
+        headStyles: { 
+          fillColor: primaryColor,
+          textColor: [255, 255, 255],
           fontSize: 10,
           fontStyle: 'bold',
           halign: 'center',
           valign: 'middle'
         },
-        bodyStyles: {
+        bodyStyles: { 
           fontSize: 9,
-          textColor: secondaryColor as [number, number, number],
+          textColor: secondaryColor,
           cellPadding: 3,
           halign: 'center',
           valign: 'middle'
         },
         alternateRowStyles: {
-          fillColor: lightGray as [number, number, number]
+          fillColor: lightGray
         },
-        styles: {
+        styles: { 
           cellPadding: 3,
-          lineColor: [200, 200, 200] as [number, number, number],
+          lineColor: [200, 200, 200],
           lineWidth: 0.5,
           overflow: 'linebreak'
         },
         columnStyles: {
-          0: {
+          0: { 
             cellWidth: micModelColumnWidth,
             fontStyle: 'bold',
             halign: 'left'
           },
           [headers.length - 1]: {
             cellWidth: peakColumnWidth,
-            fillColor: [255, 240, 240] as [number, number, number],
+            fillColor: [255, 240, 240],
             fontStyle: 'bold',
-            textColor: primaryColor as [number, number, number]
+            textColor: [139, 21, 33]
           }
         },
         didParseCell: function(data: any) {
           // Style artist columns
           if (data.column.index > 0 && data.column.index < headers.length - 1) {
             data.cell.styles.cellWidth = artistColumnWidth;
-
+            
             // Highlight non-zero quantities
             if (data.section === 'body' && parseInt(data.cell.text[0]) > 0) {
-              data.cell.styles.fillColor = [235, 255, 235] as [number, number, number];
+              data.cell.styles.fillColor = [235, 255, 235];
               data.cell.styles.fontStyle = 'bold';
             }
           }
@@ -352,28 +348,21 @@ export const organizeArtistsByDateAndStage = (artists: any[]): Map<string, Map<n
   console.log(`📋 Input: ${artists.length} artists`);
   
   // Log all unique dates first
-  const allDates = [];
-  for (let i = 0; i < artists.length; i++) {
-    const date = artists[i].date;
-    if (date) {
-      allDates.push(date);
-    }
-  }
-  const uniqueDates = Array.from(new Set(allDates));
+  const allDates = artists.map(a => a.date).filter(Boolean);
+  const uniqueDates = [...new Set(allDates)];
   console.log('📅 ALL DATES IN INPUT:', uniqueDates);
-
-  for (let i = 0; i < artists.length; i++) {
-    const artist = artists[i];
+  
+  artists.forEach((artist, index) => {
     const date = artist.date;
     const stage = artist.stage || 1;
-
-    console.log(`📌 Artist ${i}: "${artist.name}" -> Date: "${date}", Stage: ${stage}`);
-
+    
+    console.log(`📌 Artist ${index}: "${artist.name}" -> Date: "${date}", Stage: ${stage}`);
+    
     if (!date) {
       console.warn(`⚠️ Skipping "${artist.name}" - no date field`);
-      continue;
+      return;
     }
-
+    
     // Initialize structures
     if (!organized.has(date)) {
       organized.set(date, new Map());
@@ -381,26 +370,21 @@ export const organizeArtistsByDateAndStage = (artists: any[]): Map<string, Map<n
     if (!organized.get(date)!.has(stage)) {
       organized.get(date)!.set(stage, []);
     }
-
+    
     organized.get(date)!.get(stage)!.push(artist);
-  }
-
+  });
+  
   console.log('\n📊 ORGANIZATION COMPLETE:');
-  const organizedEntries = Array.from(organized.entries());
-  for (let i = 0; i < organizedEntries.length; i++) {
-    const [date, stages] = organizedEntries[i];
+  Array.from(organized.entries()).forEach(([date, stages]) => {
     console.log(`📅 Date "${date}": ${stages.size} stages`);
-    const stageEntries = Array.from(stages.entries());
-    for (let j = 0; j < stageEntries.length; j++) {
-      const [stage, stageArtists] = stageEntries[j];
+    Array.from(stages.entries()).forEach(([stage, stageArtists]) => {
       console.log(`  🎪 Stage ${stage}: ${stageArtists.length} artists`);
-      for (let k = 0; k < stageArtists.length; k++) {
-        const artist = stageArtists[k];
+      stageArtists.forEach(artist => {
         const wiredMicCount = artist.wired_mics?.length || 0;
         console.log(`    👤 ${artist.name}: ${wiredMicCount} wired mics`);
-      }
-    }
-  }
+      });
+    });
+  });
   
   return organized;
 };

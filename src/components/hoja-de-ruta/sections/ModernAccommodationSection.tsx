@@ -14,7 +14,7 @@ import { GoogleMap } from "@/components/maps/GoogleMap";
 interface ModernAccommodationSectionProps {
   accommodations: Accommodation[];
   eventData: EventData;
-  onUpdateAccommodation: (accommodationIndex: number, data: Partial<Accommodation>) => void;
+  onUpdateAccommodation: (accommodationIndex: number, field: keyof Accommodation, value: any) => void;
   onUpdateRoom: (accommodationIndex: number, roomIndex: number, field: keyof RoomAssignment, value: any) => void;
   onAddAccommodation: () => void;
   onRemoveAccommodation: (index: number) => void;
@@ -94,38 +94,43 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                   </div>
 
                   {/* Hotel Details */}
-                  <div className="grid grid-cols-1 gap-4 mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Buscar Hotel</Label>
                       <HotelAutocomplete
                         value={accommodation.hotel_name}
-                        checkIn={accommodation.check_in}
-                        checkOut={accommodation.check_out}
                         onChange={(hotelName, address, coordinates) => {
-                          const updates: Partial<Accommodation> = { hotel_name: hotelName };
-                          if (address) updates.address = address;
-                          if (coordinates) updates.coordinates = coordinates;
-                          onUpdateAccommodation(accommodationIndex, updates);
+                          onUpdateAccommodation(accommodationIndex, 'hotel_name', hotelName);
+                          if (address) {
+                            onUpdateAccommodation(accommodationIndex, 'address', address);
+                          }
+                          if (coordinates) {
+                            onUpdateAccommodation(accommodationIndex, 'coordinates', coordinates);
+                          }
                         }}
-                        onCheckInChange={(date) => onUpdateAccommodation(accommodationIndex, { check_in: date })}
-                        onCheckOutChange={(date) => onUpdateAccommodation(accommodationIndex, { check_out: date })}
-                        placeholder="Buscar por nombre de hotel..."
+                        placeholder="Buscar hotel por nombre..."
                         className="border-2 focus:border-pink-300"
                       />
                     </div>
 
-                    {accommodation.address && (
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Dirección</Label>
-                        <p className="text-sm p-3 border rounded-md bg-muted/50">
-                          {accommodation.address}
-                        </p>
-                      </div>
-                    )}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Dirección del Hotel</Label>
+                      <AddressAutocomplete
+                        value={accommodation.address}
+                        onChange={(address, coordinates) => {
+                          onUpdateAccommodation(accommodationIndex, 'address', address);
+                          if (coordinates) {
+                            onUpdateAccommodation(accommodationIndex, 'coordinates', coordinates);
+                          }
+                        }}
+                        placeholder="Buscar dirección del hotel..."
+                        className="border-2 focus:border-pink-300"
+                      />
+                    </div>
                   </div>
 
-                  {/* Map Section */}
-                  {accommodation.address && (
+                  {/* Map Section - Always show when hotel name or address exists */}
+                  {(accommodation.hotel_name || accommodation.address) && (
                     <div className="mb-6">
                       <div className="flex items-center gap-2 mb-3">
                         <Button
@@ -135,7 +140,7 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                           className="gap-2"
                         >
                           <MapPin className="w-4 h-4" />
-                          {expandedMaps[accommodation.id] ? 'Ocultar Mapa' : 'Ver Mapa'}
+                          {expandedMaps[accommodation.id] ? 'Ocultar Mapa' : 'Ver Ubicación'}
                         </Button>
                       </div>
                       
@@ -146,19 +151,38 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
                           >
-                            <GoogleMap
-                              address={accommodation.address}
-                              coordinates={accommodation.coordinates}
-                              height="300px"
-                              showMarker
-                              interactive
-                              onLocationSelect={(coordinates, address) => {
-                                onUpdateAccommodation(accommodationIndex, {
-                                  coordinates,
-                                  address,
-                                });
-                              }}
-                            />
+                            <div className="space-y-4">
+                              <GoogleMap
+                                address={accommodation.address || accommodation.hotel_name}
+                                coordinates={accommodation.coordinates}
+                                height="300px"
+                                showMarker
+                                interactive
+                                onLocationSelect={(coordinates, address) => {
+                                  onUpdateAccommodation(accommodationIndex, 'coordinates', coordinates);
+                                  onUpdateAccommodation(accommodationIndex, 'address', address);
+                                }}
+                              />
+                              <div className="p-3 bg-pink-50 rounded-lg border">
+                                {accommodation.hotel_name && (
+                                  <>
+                                    <p className="text-sm font-medium text-pink-800 mb-1">Hotel:</p>
+                                    <p className="text-sm text-pink-700">{accommodation.hotel_name}</p>
+                                  </>
+                                )}
+                                {accommodation.address && (
+                                  <>
+                                    <p className="text-sm font-medium text-pink-800 mb-1 mt-2">Dirección:</p>
+                                    <p className="text-sm text-pink-700">{accommodation.address}</p>
+                                  </>
+                                )}
+                                {accommodation.coordinates && (
+                                  <p className="text-xs text-pink-600 mt-1">
+                                    Coordenadas: {accommodation.coordinates.lat.toFixed(6)}, {accommodation.coordinates.lng.toFixed(6)}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
                           </motion.div>
                         )}
                       </AnimatePresence>

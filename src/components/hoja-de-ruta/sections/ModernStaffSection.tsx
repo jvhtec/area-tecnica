@@ -66,7 +66,7 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
                         className="border-2 focus:border-orange-300"
                       />
                     </div>
-
+                    
                     <div className="space-y-2">
                       <Label className="text-sm font-medium flex items-center gap-2">
                         <IdCard className="w-4 h-4" />
@@ -79,7 +79,7 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
                         className="border-2 focus:border-orange-300"
                       />
                     </div>
-
+                    
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">
                         Segundo Apellido
@@ -91,20 +91,7 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
                         className="border-2 focus:border-orange-300"
                       />
                     </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium flex items-center gap-2">
-                        <IdCard className="w-4 h-4" />
-                        DNI
-                      </Label>
-                      <Input
-                        value={staff.dni}
-                        onChange={(e) => onStaffChange(index, 'dni', e.target.value)}
-                        placeholder="DNI"
-                        className="border-2 focus:border-orange-300"
-                      />
-                    </div>
-
+                    
                     <div className="space-y-2">
                       <Label className="text-sm font-medium flex items-center gap-2">
                         <Briefcase className="w-4 h-4" />
@@ -132,7 +119,7 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
                       </div>
                     </div>
                   </div>
-
+                  
                   {staff.position && (
                     <div className="mt-3 pt-3 border-t border-orange-200">
                       <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300">

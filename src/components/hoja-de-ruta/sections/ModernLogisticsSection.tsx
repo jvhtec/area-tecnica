@@ -3,24 +3,17 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { motion } from "framer-motion";
-import { Building2, Package, ArrowDown, ArrowUp } from "lucide-react";
-import { EventData, Transport } from "@/types/hoja-de-ruta";
-import { ModernTransportSection } from "./ModernTransportSection";
+import { Building2, Truck, Package, ArrowDown, ArrowUp } from "lucide-react";
+import { EventData } from "@/types/hoja-de-ruta";
 
 interface ModernLogisticsSectionProps {
   eventData: EventData;
   setEventData: React.Dispatch<React.SetStateAction<EventData>>;
-  onUpdateTransport: (index: number, field: keyof Transport, value: any) => void;
-  onAddTransport: () => void;
-  onRemoveTransport: (index: number) => void;
 }
 
 export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
   eventData,
   setEventData,
-  onUpdateTransport,
-  onAddTransport,
-  onRemoveTransport,
 }) => {
   return (
     <motion.div
@@ -28,12 +21,6 @@ export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      <ModernTransportSection
-        transport={eventData.logistics.transport}
-        onUpdateTransport={onUpdateTransport}
-        onAddTransport={onAddTransport}
-        onRemoveTransport={onRemoveTransport}
-      />
       <Card className="border-2">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -43,6 +30,23 @@ export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Transport */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Truck className="w-4 h-4 text-indigo-600" />
+                Transporte
+              </Label>
+              <Textarea
+                value={eventData.logistics.transport}
+                onChange={(e) => setEventData(prev => ({
+                  ...prev,
+                  logistics: { ...prev.logistics, transport: e.target.value }
+                }))}
+                placeholder="Detalles del transporte de equipos y personal..."
+                className="border-2 focus:border-indigo-300 min-h-[100px]"
+              />
+            </div>
+
             {/* Equipment Logistics */}
             <div className="space-y-3">
               <Label className="text-sm font-medium flex items-center gap-2">

@@ -15,7 +15,7 @@ const initialEventData: EventData = {
   },
   contacts: [{ name: "", role: "", phone: "" }],
   logistics: {
-    transport: [],
+    transport: "",
     loadingDetails: "",
     unloadingDetails: "",
     equipmentLogistics: "",
@@ -148,7 +148,7 @@ export const useHojaDeRutaForm = () => {
           phone: jobData.client_phone || ""
         }] : [{ name: "", role: "", phone: "" }],
         logistics: {
-          transport: [],
+          transport: "",
           loadingDetails: "",
           unloadingDetails: "",
           equipmentLogistics: "",
@@ -281,7 +281,7 @@ export const useHojaDeRutaForm = () => {
                 phone: jobData.client_phone || ""
               }] : [{ name: "", role: "", phone: "" }],
           logistics: {
-            transport: hojaDeRuta.logistics?.transport || [],
+            transport: hojaDeRuta.logistics?.transport || "",
             loadingDetails: hojaDeRuta.logistics?.loading_details || "",
             unloadingDetails: hojaDeRuta.logistics?.unloading_details || "",
             equipmentLogistics: hojaDeRuta.logistics?.equipment_logistics || "",
@@ -326,8 +326,6 @@ export const useHojaDeRutaForm = () => {
             id: 'accommodation-1',
             hotel_name: '',
             address: '',
-            check_in: '',
-            check_out: '',
             rooms: hojaDeRuta.rooms.map((room: any) => ({
               room_type: room.room_type,
               room_number: room.room_number,
@@ -363,7 +361,7 @@ export const useHojaDeRutaForm = () => {
             phone: jobData.client_phone || ""
           }] : [{ name: "", role: "", phone: "" }],
           logistics: {
-            transport: [],
+            transport: "",
             loadingDetails: "",
             unloadingDetails: "",
             equipmentLogistics: "",
@@ -610,7 +608,7 @@ export const useHojaDeRutaForm = () => {
       eventData.auxiliaryNeeds?.trim() !== "" ||
       eventData.contacts.some(c => c.name?.trim() !== "" || c.role?.trim() !== "" || c.phone?.trim() !== "") ||
       eventData.staff.some(s => s.name?.trim() !== "" || s.surname1?.trim() !== "" || s.position?.trim() !== "") ||
-      eventData.logistics.transport.length > 0 ||
+      eventData.logistics.transport?.trim() !== "" ||
       eventData.logistics.loadingDetails?.trim() !== "" ||
       eventData.logistics.unloadingDetails?.trim() !== "" ||
       eventData.logistics.equipmentLogistics?.trim() !== "" ||
