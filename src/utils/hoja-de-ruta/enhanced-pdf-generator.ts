@@ -1,9 +1,9 @@
-
+o
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { EnhancedEventData, TravelArrangement, RoomAssignment, ImagePreviews } from '@/types/hoja-de-ruta';
+import { EnhancedEventData, TravelArrangement, RoomAssignment, ImagePreviews, Accommodation } from '@/types/hoja-de-ruta';
 
 interface AutoTableJsPDF extends jsPDF {
   lastAutoTable: { finalY: number };
@@ -18,7 +18,8 @@ export const generateEnhancedPDF = async (
   selectedJobId: string,
   jobTitle: string,
   jobDate: string,
-  customLogoUrl?: string
+  customLogoUrl?: string,
+  accommodations?: Accommodation[]
 ): Promise<Blob> => {
   return new Promise<Blob>((resolve) => {
     const doc = new jsPDF() as AutoTableJsPDF;
@@ -104,7 +105,7 @@ export const generateEnhancedPDF = async (
       doc.text(`Generado: ${createdDate}`, pageWidth - 14, 50, { align: 'right' });
     };
 
-    // Generate detailed content
+// Generate detailed content
     const generateDetailedContent = () => {
       setupHeader('Información Detallada');
       let yPosition = 80;
@@ -120,7 +121,7 @@ export const generateEnhancedPDF = async (
       doc.setTextColor(51, 51, 51);
       doc.text(`Nombre: ${eventData.venue?.name || 'N/A'}`, 20, yPosition);
       yPosition += 7;
-      
+
       const addressLines = doc.splitTextToSize(eventData.venue?.address || 'N/A', pageWidth - 40);
       doc.text('Dirección:', 20, yPosition);
       doc.text(addressLines, 20, yPosition + 7);
@@ -139,6 +140,42 @@ export const generateEnhancedPDF = async (
         }
       }
 
+// Accommodation information with maps
+      if (accommodations && accommodations.length > 0) {
+        yPosition = checkPageBreak(yPosition);
+        doc.setFontSize(14);
+        doc.setTextColor(125, 1, 1);
+        doc.text('Información de Alojamiento', 14, yPosition);
+        yPosition += 10;
+
+        accommodations.forEach((accommodation, index) => {
+          yPosition = checkPageBreak(yPosition);
+          doc.setFontSize(12);
+          doc.setTextColor(125, 1, 1);
+          doc.text(`Hotel ${index + 1}: ${accommodation.hotel_name || 'N/A'}`, 20, yPosition);
+          yPosition += 7;
+
+          const addressLines = doc.splitTextToSize(accommodation.address || 'N/A', pageWidth - 40);
+          doc.text('Dirección:', 20, yPosition);
+          doc.text(addressLines, 20, yPosition + 7);
+          yPosition += addressLines.length * 7 + 10;
+
+          // Add accommodation map if available
+          if (accommodation.coordinates) {
+            yPosition = checkPageBreak(yPosition, 80);
+            try {
+              const mapWidth = 120;
+              const mapHeight = 70;
+              const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${accommodation.coordinates.lat},${accommodation.coordinates.lng}&zoom=15&size=600x400&markers=color:red%7C${accommodation.coordinates.lat},${accommodation.coordinates.lng}&key=YOUR_GOOGLE_MAPS_API_KEY`;
+              doc.addImage(staticMapUrl, 'JPEG', 20, yPosition, mapWidth, mapHeight);
+              yPosition += mapHeight + 15;
+            } catch (error) {
+              console.error("Error adding accommodation map:", error);
+            }
+          }
+        });
+      }
+
       // Logistics section
       if (eventData.logistics) {
         yPosition = checkPageBreak(yPosition);
@@ -147,8 +184,9 @@ export const generateEnhancedPDF = async (
         doc.text('Logística', 14, yPosition);
         yPosition += 10;
 
+        const transportString = eventData.logistics.transport.map(t => `${t.transport_type} - ${t.driver_name || 'N/A'}`).join('\n');
         const logisticsItems = [
-          { label: 'Transporte:', value: eventData.logistics.transport },
+          { label: 'Transporte:', value: transportString },
           { label: 'Detalles de Carga:', value: eventData.logistics.loadingDetails },
           { label: 'Detalles de Descarga:', value: eventData.logistics.unloadingDetails },
           { label: 'Logística de Equipamiento:', value: eventData.logistics.equipmentLogistics }

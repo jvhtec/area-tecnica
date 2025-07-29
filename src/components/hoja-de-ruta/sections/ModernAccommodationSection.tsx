@@ -14,7 +14,7 @@ import { GoogleMap } from "@/components/maps/GoogleMap";
 interface ModernAccommodationSectionProps {
   accommodations: Accommodation[];
   eventData: EventData;
-  onUpdateAccommodation: (accommodationIndex: number, field: keyof Accommodation, value: any) => void;
+  onUpdateAccommodation: (accommodationIndex: number, data: Partial<Accommodation>) => void;
   onUpdateRoom: (accommodationIndex: number, roomIndex: number, field: keyof RoomAssignment, value: any) => void;
   onAddAccommodation: () => void;
   onRemoveAccommodation: (index: number) => void;
@@ -94,39 +94,34 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                   </div>
 
                   {/* Hotel Details */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div className="grid grid-cols-1 gap-4 mb-6">
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Nombre del Hotel</Label>
+                      <Label className="text-sm font-medium">Buscar Hotel</Label>
                       <HotelAutocomplete
                         value={accommodation.hotel_name}
+                        checkIn={accommodation.check_in}
+                        checkOut={accommodation.check_out}
                         onChange={(hotelName, address, coordinates) => {
-                          onUpdateAccommodation(accommodationIndex, 'hotel_name', hotelName);
-                          if (address) {
-                            onUpdateAccommodation(accommodationIndex, 'address', address);
-                          }
-                          if (coordinates) {
-                            onUpdateAccommodation(accommodationIndex, 'coordinates', coordinates);
-                          }
+                          const updates: Partial<Accommodation> = { hotel_name: hotelName };
+                          if (address) updates.address = address;
+                          if (coordinates) updates.coordinates = coordinates;
+                          onUpdateAccommodation(accommodationIndex, updates);
                         }}
-                        placeholder="Hotel Majestic Plaza..."
+                        onCheckInChange={(date) => onUpdateAccommodation(accommodationIndex, { check_in: date })}
+                        onCheckOutChange={(date) => onUpdateAccommodation(accommodationIndex, { check_out: date })}
+                        placeholder="Buscar por nombre de hotel..."
                         className="border-2 focus:border-pink-300"
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Dirección</Label>
-                      <AddressAutocomplete
-                        value={accommodation.address}
-                        onChange={(address, coordinates) => {
-                          onUpdateAccommodation(accommodationIndex, 'address', address);
-                          if (coordinates) {
-                            onUpdateAccommodation(accommodationIndex, 'coordinates', coordinates);
-                          }
-                        }}
-                        placeholder="Buscar dirección del hotel..."
-                        className="border-2 focus:border-pink-300"
-                      />
-                    </div>
+                    {accommodation.address && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Dirección</Label>
+                        <p className="text-sm p-3 border rounded-md bg-muted/50">
+                          {accommodation.address}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Map Section */}
@@ -158,8 +153,10 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                               showMarker
                               interactive
                               onLocationSelect={(coordinates, address) => {
-                                onUpdateAccommodation(accommodationIndex, 'coordinates', coordinates);
-                                onUpdateAccommodation(accommodationIndex, 'address', address);
+                                onUpdateAccommodation(accommodationIndex, {
+                                  coordinates,
+                                  address,
+                                });
                               }}
                             />
                           </motion.div>
