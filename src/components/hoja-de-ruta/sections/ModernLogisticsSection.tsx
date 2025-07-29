@@ -51,10 +51,14 @@ export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
               </Label>
               <Textarea
                 value={eventData.logistics.equipmentLogistics}
-                onChange={(e) => setEventData(prev => ({
-                  ...prev,
-                  logistics: { ...prev.logistics, equipmentLogistics: e.target.value }
-                }))}
+                onChange={(e) => setEventData(prev => {
+                  const currentLogistics = prev.logistics || { transport: [], loadingDetails: "", unloadingDetails: "", equipmentLogistics: "" };
+                  const updatedLogistics = {
+                    ...currentLogistics,
+                    equipmentLogistics: e.target.value
+                  };
+                  return { ...prev, logistics: updatedLogistics };
+                })}
                 placeholder="Instrucciones especiales para equipos..."
                 className="border-2 focus:border-indigo-300 min-h-[100px]"
               />
@@ -70,10 +74,14 @@ export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
               </Label>
               <Textarea
                 value={eventData.logistics.loadingDetails}
-                onChange={(e) => setEventData(prev => ({
-                  ...prev,
-                  logistics: { ...prev.logistics, loadingDetails: e.target.value }
-                }))}
+                onChange={(e) => setEventData(prev => {
+                  const currentLogistics = prev.logistics || { transport: [], loadingDetails: "", unloadingDetails: "", equipmentLogistics: "" };
+                  const updatedLogistics = {
+                    ...currentLogistics,
+                    loadingDetails: e.target.value
+                  };
+                  return { ...prev, logistics: updatedLogistics };
+                })}
                 placeholder="Horarios, ubicación, personal necesario para la carga..."
                 className="border-2 focus:border-green-300 min-h-[120px]"
               />
@@ -87,10 +95,14 @@ export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
               </Label>
               <Textarea
                 value={eventData.logistics.unloadingDetails}
-                onChange={(e) => setEventData(prev => ({
-                  ...prev,
-                  logistics: { ...prev.logistics, unloadingDetails: e.target.value }
-                }))}
+                onChange={(e) => setEventData(prev => {
+                  const currentLogistics = prev.logistics || { transport: [], loadingDetails: "", unloadingDetails: "", equipmentLogistics: "" };
+                  const updatedLogistics = {
+                    ...currentLogistics,
+                    unloadingDetails: e.target.value
+                  };
+                  return { ...prev, logistics: updatedLogistics };
+                })}
                 placeholder="Horarios, ubicación, personal necesario para la descarga..."
                 className="border-2 focus:border-red-300 min-h-[120px]"
               />

@@ -22,6 +22,9 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
   onAddTransport,
   onRemoveTransport,
 }) => {
+  // Ensure transport is always an array
+  const validTransport = Array.isArray(transport) ? transport : [];
+
   return (
     <Card className="border-2">
       <CardHeader>
@@ -44,7 +47,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
       <CardContent>
         <div className="space-y-6">
           <AnimatePresence>
-            {transport.map((item, index) => (
+            {validTransport.map((item, index) => (
               <motion.div
                 key={item.id}
                 initial={{ opacity: 0, x: -20 }}

@@ -2,7 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import QRCode from 'qrcode';
+import * as QRCode from 'qrcode';
 import { ComprehensiveEventData, TravelArrangement, RoomAssignment, ImagePreviews, Accommodation, EnhancedStaff, EnhancedRoomAssignment } from '@/types/hoja-de-ruta';
 
 interface AutoTableJsPDF extends jsPDF {
@@ -10,7 +10,7 @@ interface AutoTableJsPDF extends jsPDF {
 }
 
 // Hardcoded departure address - modify as needed
-const DEPARTURE_ADDRESS = "Calle Sierpes 1, 41004 Sevilla, Spain";
+const DEPARTURE_ADDRESS = "Calle Puerto Rico 6, 28971, Spain";
 
 // Helper functions
 const generateRouteUrl = (origin: string, destination: string): string => {
@@ -886,4 +886,3 @@ export const generateEnhancedPDF = async (
     })();
   });
 };
-

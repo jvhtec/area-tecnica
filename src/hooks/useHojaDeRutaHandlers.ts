@@ -130,9 +130,17 @@ export const useHojaDeRutaHandlers = (
     field: keyof Transport,
     value: any
   ) => {
-    const newTransport = [...eventData.logistics.transport];
-    newTransport[index] = { ...newTransport[index], [field]: value };
-    setEventData({ ...eventData, logistics: { ...eventData.logistics, transport: newTransport } });
+    setEventData(prev => {
+      const currentLogistics = prev.logistics || { transport: [], loadingDetails: "", unloadingDetails: "", equipmentLogistics: "" };
+      const updatedTransportArray = (currentLogistics.transport || []).map((item, i) => 
+        i === index ? { ...item, [field]: value } : item
+      );
+      const updatedLogistics = {
+        ...currentLogistics,
+        transport: updatedTransportArray
+      };
+      return { ...prev, logistics: updatedLogistics };
+    });
   };
 
   const addTransport = () => {
@@ -140,19 +148,27 @@ export const useHojaDeRutaHandlers = (
       id: `transport-${Date.now()}`,
       transport_type: 'trailer',
     };
-    setEventData({
-      ...eventData,
-      logistics: {
-        ...eventData.logistics,
-        transport: [...eventData.logistics.transport, newTransport],
-      },
+    setEventData(prev => {
+      const currentLogistics = prev.logistics || { transport: [], loadingDetails: "", unloadingDetails: "", equipmentLogistics: "" };
+      const updatedTransportArray = [...(currentLogistics.transport || []), newTransport];
+      const updatedLogistics = {
+        ...currentLogistics,
+        transport: updatedTransportArray
+      };
+      return { ...prev, logistics: updatedLogistics };
     });
   };
 
   const removeTransport = (index: number) => {
-    const newTransport = [...eventData.logistics.transport];
-    newTransport.splice(index, 1);
-    setEventData({ ...eventData, logistics: { ...eventData.logistics, transport: newTransport } });
+    setEventData(prev => {
+      const currentLogistics = prev.logistics || { transport: [], loadingDetails: "", unloadingDetails: "", equipmentLogistics: "" };
+      const updatedTransportArray = (currentLogistics.transport || []).filter((_, i) => i !== index);
+      const updatedLogistics = {
+        ...currentLogistics,
+        transport: updatedTransportArray
+      };
+      return { ...prev, logistics: updatedLogistics };
+    });
   };
 
   return {
