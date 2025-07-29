@@ -1,7 +1,7 @@
 
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { EventData, TravelArrangement, RoomAssignment, Accommodation } from "@/types/hoja-de-ruta";
+import { EventData, TravelArrangement, RoomAssignment } from "@/types/hoja-de-ruta";
 import { supabase } from "@/lib/supabase";
 
 interface AutoTableJsPDF extends jsPDF {
@@ -11,7 +11,6 @@ interface AutoTableJsPDF extends jsPDF {
 export const generatePDF = async (
   eventData: EventData,
   travelArrangements: TravelArrangement[],
-  accommodations: Accommodation[],
   roomAssignments: RoomAssignment[],
   imagePreviews: { venue: string[] },
   venueMapPreview: string | null,
@@ -276,63 +275,6 @@ export const generatePDF = async (
       margin: { left: 10, right: 10 },
     });
     yPosition = (doc as any).lastAutoTable.finalY + 15;
-  }
-
-  // === ACCOMMODATION SECTION ===
-  const validAccommodations = accommodations.filter(acc => 
-    hasData(acc.hotel_name) || hasData(acc.address) || acc.rooms.length > 0
-  );
-
-  if (validAccommodations.length > 0) {
-    yPosition = checkPageBreak(yPosition);
-    doc.setFontSize(14);
-    doc.setTextColor(125, 1, 1);
-    doc.text("Alojamiento", 20, yPosition);
-    yPosition += 10;
-    
-    validAccommodations.forEach((accommodation, index) => {
-      yPosition = checkPageBreak(yPosition);
-      
-      doc.setFontSize(12);
-      doc.setTextColor(51, 51, 51);
-      doc.setFont(undefined, 'bold');
-      doc.text(`Hotel ${index + 1}`, 30, yPosition);
-      yPosition += 8;
-      
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'normal');
-      
-      if (hasData(accommodation.hotel_name)) {
-        doc.text(`Nombre: ${accommodation.hotel_name}`, 35, yPosition);
-        yPosition += 8;
-      }
-      
-      if (hasData(accommodation.address)) {
-        doc.text(`Dirección: ${accommodation.address}`, 35, yPosition);
-        yPosition += 8;
-      }
-      
-      // Add accommodation map if coordinates exist
-      if (accommodation.coordinates) {
-        try {
-          // Generate static map URL for this accommodation
-          const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${accommodation.coordinates.lat},${accommodation.coordinates.lng}&zoom=15&size=400x300&markers=color:red%7C${accommodation.coordinates.lat},${accommodation.coordinates.lng}&key=${process.env.VITE_GOOGLE_MAPS_API_KEY}`;
-          
-          // For now, we'll just indicate where the map would go
-          // In a full implementation, you'd fetch and add the map image
-          doc.setFontSize(8);
-          doc.setTextColor(100, 100, 100);
-          doc.text(`[Mapa de ubicación: ${accommodation.coordinates.lat.toFixed(6)}, ${accommodation.coordinates.lng.toFixed(6)}]`, 35, yPosition);
-          yPosition += 12;
-        } catch (error) {
-          console.error("Error al agregar mapa de alojamiento:", error);
-        }
-      }
-      
-      yPosition += 8;
-    });
-    
-    yPosition += 10;
   }
 
   // === ROOM ASSIGNMENTS SECTION === (improved filtering)

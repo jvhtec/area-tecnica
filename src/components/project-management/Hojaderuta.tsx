@@ -109,7 +109,6 @@ const HojaDeRutaGenerator = () => {
       generatePDF(
         eventData,
         travelArrangements,
-        accommodations,
         legacyRoomAssignments,
         imagePreviews,
         venueMapPreview,

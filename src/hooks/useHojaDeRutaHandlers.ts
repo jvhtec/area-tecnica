@@ -1,6 +1,5 @@
-
 import { useState } from "react";
-import { TravelArrangement, RoomAssignment, Accommodation, EventData } from "@/types/hoja-de-ruta";
+import { TravelArrangement, RoomAssignment, Accommodation, EventData, Transport } from "@/types/hoja-de-ruta";
 
 export const useHojaDeRutaHandlers = (
   eventData: EventData,
@@ -36,7 +35,7 @@ export const useHojaDeRutaHandlers = (
       ...eventData,
       staff: [
         ...eventData.staff,
-        { name: "", surname1: "", surname2: "", position: "" },
+        { name: "", surname1: "", surname2: "", position: "", dni: "" },
       ],
     });
   };
@@ -68,19 +67,27 @@ export const useHojaDeRutaHandlers = (
   // Accommodation handlers
   const updateAccommodation = (
     accommodationIndex: number,
-    field: keyof Accommodation,
-    value: any
+    data: Partial<Accommodation>
   ) => {
     const newAccommodations = [...accommodations];
-    newAccommodations[accommodationIndex] = { ...newAccommodations[accommodationIndex], [field]: value };
+    newAccommodations[accommodationIndex] = {
+      ...newAccommodations[accommodationIndex],
+      ...data,
+    };
     setAccommodations(newAccommodations);
   };
 
   const addAccommodation = () => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 14, 0).toISOString().slice(0, 16);
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 12, 0).toISOString().slice(0, 16);
+
     const newAccommodation: Accommodation = {
       id: `accommodation-${Date.now()}`,
       hotel_name: '',
       address: '',
+      check_in: today,
+      check_out: tomorrow,
       rooms: [{ room_type: "single" }]
     };
     setAccommodations([...accommodations, newAccommodation]);
@@ -117,6 +124,37 @@ export const useHojaDeRutaHandlers = (
     setAccommodations(newAccommodations);
   };
 
+  // Transport handlers
+  const updateTransport = (
+    index: number,
+    field: keyof Transport,
+    value: any
+  ) => {
+    const newTransport = [...eventData.logistics.transport];
+    newTransport[index] = { ...newTransport[index], [field]: value };
+    setEventData({ ...eventData, logistics: { ...eventData.logistics, transport: newTransport } });
+  };
+
+  const addTransport = () => {
+    const newTransport: Transport = {
+      id: `transport-${Date.now()}`,
+      transport_type: 'trailer',
+    };
+    setEventData({
+      ...eventData,
+      logistics: {
+        ...eventData.logistics,
+        transport: [...eventData.logistics.transport, newTransport],
+      },
+    });
+  };
+
+  const removeTransport = (index: number) => {
+    const newTransport = [...eventData.logistics.transport];
+    newTransport.splice(index, 1);
+    setEventData({ ...eventData, logistics: { ...eventData.logistics, transport: newTransport } });
+  };
+
   return {
     handleContactChange,
     addContact,
@@ -131,5 +169,8 @@ export const useHojaDeRutaHandlers = (
     updateRoom,
     addRoom,
     removeRoom,
+    updateTransport,
+    addTransport,
+    removeTransport,
   };
 };
