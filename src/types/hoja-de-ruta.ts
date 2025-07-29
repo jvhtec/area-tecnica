@@ -67,8 +67,6 @@ export interface EventData {
   auxiliaryNeeds: string;
 }
 
-// Equipment interface removed per user request
-
 export interface HojaDeRutaTemplate {
   id: string;
   name: string;
@@ -91,7 +89,72 @@ export interface HojaDeRutaMetadata {
   last_modified_by?: string;
 }
 
-export interface EnhancedEventData extends EventData {
+export interface ComprehensiveEventData extends EventData {
+  eventCode?: string;
+  eventType?: string;
+  eventStatus?: 'draft' | 'confirmed' | 'cancelled' | 'completed';
+  clientName?: string;
+  clientContact?: string;
+  estimatedAttendees?: number;
+  actualAttendees?: number;
+  venueContact?: { name: string; phone: string; email: string; };
+  venueCapacity?: number;
+  venueType?: string;
+  setupTime?: string;
+  eventStartTime?: string;
+  eventEndTime?: string;
+  dismantleTime?: string;
+  budget?: number;
+  actualCost?: number;
+  currency?: string;
+  equipmentList?: Array<{ item: string; quantity: number; supplier?: string; cost?: number; }>;
+  audioVisualRequirements?: string;
+  lightingRequirements?: string;
+  stagingRequirements?: string;
+  cateringDetails?: {
+    provider: string;
+    menuType: string;
+    servingTime: string;
+    dietaryRequirements: string[];
+    numberOfPeople: number;
+  };
+  weatherBackupPlan?: string;
+  emergencyContacts?: Array<{
+    name: string;
+    role: string;
+    phone: string;
+    available24h: boolean;
+  }>;
+  specialInstructions?: string;
+  riskAssessment?: string;
+  insuranceDetails?: string;
+}
+
+export interface EnhancedStaff {
+  id: string;
+  name: string;
+  surname1: string;
+  surname2?: string;
+  dni?: string;
+  position: string;
+  department?: string;
+  phone?: string;
+  email?: string;
+  specializations?: string[];
+  certifications?: string[];
+  emergencyContact?: string;
+  arrivalTime?: string;
+  departureTime?: string;
+  role?: string;
+  teamLead?: boolean;
+}
+
+export interface EnhancedRoomAssignment extends RoomAssignment {
+  staff1Name?: string;
+  staff2Name?: string;
+}
+
+export interface EnhancedEventData extends ComprehensiveEventData {
   metadata?: HojaDeRutaMetadata;
   accommodations?: Accommodation[];
 }
@@ -103,3 +166,5 @@ export interface ImagePreviews {
 export interface Images {
   venue: File[];
 }
+
+
