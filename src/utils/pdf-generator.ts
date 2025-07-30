@@ -163,7 +163,10 @@ export const generatePDF = (
     logisticsText.forEach((item) => {
       if (item.value) {
         doc.text(item.label, 30, yPosition);
-        const lines = doc.splitTextToSize(item.value, pageWidth - 60);
+        const transportValue = Array.isArray(item.value) 
+          ? item.value.map(t => `${t.transport_type} - ${t.driver_name || 'N/A'}`).join('\n')
+          : item.value;
+        const lines = doc.splitTextToSize(transportValue, pageWidth - 60);
         doc.text(lines, 30, yPosition + 7);
         yPosition += lines.length * 7 + 15;
         yPosition = checkPageBreak(yPosition);

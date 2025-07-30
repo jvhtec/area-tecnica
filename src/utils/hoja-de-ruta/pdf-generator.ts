@@ -188,7 +188,10 @@ export const generatePDF = async (
       doc.text(item.label, 30, yPosition);
       doc.setFont(undefined, 'normal');
       
-      const lines = doc.splitTextToSize(item.value, pageWidth - 60);
+      const transportValue = Array.isArray(item.value) 
+        ? item.value.map(t => `${t.transport_type} - ${t.driver_name || 'N/A'}`).join('\n')
+        : item.value;
+      const lines = doc.splitTextToSize(transportValue, pageWidth - 60);
       doc.text(lines, 30, yPosition + 8);
       yPosition += lines.length * 8 + 12;
       yPosition = checkPageBreak(yPosition);

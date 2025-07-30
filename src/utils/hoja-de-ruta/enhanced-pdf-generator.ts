@@ -98,9 +98,9 @@ export const generateEnhancedPDF = async (
     // Enhanced rooming logic - properly match staff names to room assignments
     const enhancedRoomAssignments: EnhancedRoomAssignment[] = roomAssignments.map(room => {
       const staff1 = staffData?.find(s => s.id === room.staff_member1_id) || 
-                    eventData.staff?.find(s => s.id === room.staff_member1_id);
+                    eventData.staff?.find((s, index) => index.toString() === room.staff_member1_id);
       const staff2 = staffData?.find(s => s.id === room.staff_member2_id) || 
-                    eventData.staff?.find(s => s.id === room.staff_member2_id);
+                    eventData.staff?.find((s, index) => index.toString() === room.staff_member2_id);
       
       return {
         ...room,
@@ -208,15 +208,8 @@ export const generateEnhancedPDF = async (
       doc.setTextColor(51, 51, 51);
       let yPos = 55;
 
-      // Left column
-      if (eventData.metadata) {
-        doc.text(`Versión: ${eventData.metadata.document_version}`, 14, yPos);
-        doc.text(`Estado: ${eventData.metadata.status}`, 14, yPos + 6);
-        if (eventData.metadata.approved_at) {
-          const approvedDate = format(new Date(eventData.metadata.approved_at), 'dd/MM/yyyy HH:mm', { locale: es });
-          doc.text(`Aprobado: ${approvedDate}`, 14, yPos + 12);
-        }
-      }
+      // Left column - metadata is part of EnhancedEventData, not ComprehensiveEventData
+      // Skip metadata section since it's not available in this interface
 
       // Right column
       doc.text(`Generado: ${createdDate}`, pageWidth - 14, yPos, { align: 'right' });

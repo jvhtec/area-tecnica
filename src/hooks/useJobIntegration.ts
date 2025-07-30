@@ -79,7 +79,7 @@ export const useJobIntegration = (jobId: string) => {
       contacts: contacts.length > 0 ? contacts : [{ name: "", role: "", phone: "" }],
       staff: staff.length > 0 ? staff : [{ name: "", surname1: "", surname2: "", position: "" }],
       logistics: {
-        transport: "",
+        transport: [],
         loadingDetails: "",
         unloadingDetails: "",
         equipmentLogistics: ""
