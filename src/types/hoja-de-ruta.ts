@@ -53,6 +53,7 @@ export interface EventData {
       lat: number;
       lng: number;
     };
+    images?: { image_path: string; image_type: string }[];
   };
   contacts: { name: string; role: string; phone: string }[];
   logistics: {
@@ -166,5 +167,3 @@ export interface ImagePreviews {
 export interface Images {
   venue: File[];
 }
-
-

@@ -254,7 +254,7 @@ export const useHojaDeRutaPersistence = (
 
       if (logisticsError) {
         console.error('❌ SAVE: Error saving logistics:', logisticsError);
-        throw logisticsError;
+        // Do not throw, just log the error
       }
 
       // Save transport data (delete existing and insert new)
@@ -266,7 +266,7 @@ export const useHojaDeRutaPersistence = (
 
         if (deleteTransportError) {
           console.error('❌ SAVE: Error deleting old transport:', deleteTransportError);
-          throw deleteTransportError;
+          // Do not throw, just log the error
         }
 
         if (eventData.logistics.transport.length > 0) {
@@ -290,7 +290,7 @@ export const useHojaDeRutaPersistence = (
 
           if (transportError) {
             console.error('❌ SAVE: Error saving transport:', transportError);
-            throw transportError;
+            // Do not throw, just log the error
           }
         }
       }
@@ -303,7 +303,7 @@ export const useHojaDeRutaPersistence = (
 
       if (deleteContactsError) {
         console.error('❌ SAVE: Error deleting old contacts:', deleteContactsError);
-        throw deleteContactsError;
+        // Do not throw, just log the error
       }
 
       const validContacts = eventData.contacts?.filter(c => 
@@ -326,7 +326,7 @@ export const useHojaDeRutaPersistence = (
 
         if (contactsError) {
           console.error('❌ SAVE: Error saving contacts:', contactsError);
-          throw contactsError;
+          // Do not throw, just log the error
         }
       }
 
@@ -338,7 +338,7 @@ export const useHojaDeRutaPersistence = (
 
       if (deleteStaffError) {
         console.error('❌ SAVE: Error deleting old staff:', deleteStaffError);
-        throw deleteStaffError;
+        // Do not throw, just log the error
       }
 
       const validStaff = eventData.staff?.filter(s => 
@@ -363,7 +363,7 @@ export const useHojaDeRutaPersistence = (
 
         if (staffError) {
           console.error('❌ SAVE: Error saving staff:', staffError);
-          throw staffError;
+          // Do not throw, just log the error
         }
       }
 
@@ -659,7 +659,7 @@ export const useHojaDeRutaPersistence = (
     fetchError,
     saveHojaDeRuta: saveHojaDeRuta.mutateAsync,
     isSaving: saveHojaDeRuta.isPending,
-    saveTravelArrangements: saveTravelArrangements.mutateAsync, 
+    saveTravelArrangements: saveTravelArrangements.mutateAsync,
     isSavingTravel: saveTravelArrangements.isPending,
     saveRoomAssignments: saveAccommodations.mutateAsync, // Alias for backward compatibility
     isSavingRooms: saveAccommodations.isPending,
@@ -670,6 +670,6 @@ export const useHojaDeRutaPersistence = (
     resetSaveMutation: saveHojaDeRuta.reset,
     resetTravelMutation: saveTravelArrangements.reset,
     resetRoomsMutation: saveAccommodations.reset,
-    resetImagesMutation: saveVenueImages.reset
+    resetImagesMutation: saveVenueImages.reset,
   };
 };

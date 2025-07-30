@@ -36,11 +36,20 @@ export const useHojaDeRutaForm = () => {
   // Change default to empty arrays instead of having one empty entry
   const [travelArrangements, setTravelArrangements] = useState<TravelArrangement[]>([]);
   const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
+  const [initializationComplete, setInitializationComplete] = useState(false);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [hasSavedData, setHasSavedData] = useState<boolean>(false);
   const [hasBasicJobData, setHasBasicJobData] = useState<boolean>(false);
   const [dataSource, setDataSource] = useState<'none' | 'saved' | 'job' | 'mixed'>('none');
   const [lastSaveTime, setLastSaveTime] = useState<number>(0);
+
+  useEffect(() => {
+    console.log('Form state changed:', {
+      eventData,
+      travelArrangements,
+      accommodations,
+    });
+  }, [eventData, travelArrangements, accommodations]);
   
   // Refs for better state management
   const saveInProgressRef = useRef<boolean>(false);
@@ -63,7 +72,8 @@ export const useHojaDeRutaForm = () => {
     resetSaveMutation,
     resetTravelMutation,
     resetRoomsMutation,
-    resetImagesMutation
+    resetImagesMutation,
+    saveAccommodations,
   } = useHojaDeRutaPersistence(selectedJobId);
 
   console.log("🚀 FORM HOOK: Current state:", {
@@ -396,22 +406,25 @@ export const useHojaDeRutaForm = () => {
   useEffect(() => {
     console.log("🔄 FORM: Job selection changed to:", selectedJobId);
     if (selectedJobId) {
-      setIsInitialized(false);
-      setHasSavedData(false);
-      setHasBasicJobData(false);
-      setDataSource('none');
-      setLastSaveTime(0);
-      saveInProgressRef.current = false;
-      lastSaveDataRef.current = "";
-      
-      // Reset all mutation states
-      resetSaveMutation();
-      resetTravelMutation();
-      resetRoomsMutation();
-      resetImagesMutation();
-      
-      // Data will be loaded by the persistence hook and then auto-populated if needed
-      refreshData();
+      // Only reset if we're not in the middle of a save AND the job ID has actually changed
+      if (!saveInProgressRef.current && !lastSaveDataRef.current.includes(selectedJobId)) {
+        setIsInitialized(false);
+        setHasSavedData(false);
+        setHasBasicJobData(false);
+        setDataSource('none');
+        setLastSaveTime(0);
+        saveInProgressRef.current = false;
+        lastSaveDataRef.current = "";
+
+        // Reset all mutation states
+        resetSaveMutation();
+        resetTravelMutation();
+        resetRoomsMutation();
+        resetImagesMutation();
+
+        // Data will be loaded by the persistence hook and then auto-populated if needed
+        refreshData();
+      }
     } else {
       // Clear all data when no job is selected
       setEventData(initialEventData);
@@ -498,7 +511,7 @@ export const useHojaDeRutaForm = () => {
   // Enhanced save function with better error handling and debouncing
   const handleSaveAll = useCallback(async () => {
     console.log("💾 FORM: handleSaveAll called with selectedJobId:", selectedJobId);
-    
+
     if (!selectedJobId) {
       toast({
         title: "Error",
@@ -526,38 +539,41 @@ export const useHojaDeRutaForm = () => {
 
     try {
       console.log("💾 FORM: Starting comprehensive save process...");
-      
+      console.log("📝 FORM: Data to save - EventData:", JSON.stringify(eventData, null, 2));
+      console.log("📝 FORM: Data to save - Travel Arrangements:", JSON.stringify(travelArrangements, null, 2));
+      console.log("📝 FORM: Data to save - Accommodations:", JSON.stringify(accommodations, null, 2));
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not authenticated");
+
       // Save main hoja de ruta data first
-      const savedRecord = await saveHojaDeRuta(eventData);
+      const savedRecord = await saveHojaDeRuta({ eventData, userId: user.id });
       console.log("✅ FORM: Main record saved:", savedRecord);
 
       if (savedRecord?.id) {
-        // Save travel arrangements and room assignments in parallel
+        // Save travel arrangements, accommodations, and images in parallel
         await Promise.all([
-          saveTravelArrangements({
-            hojaDeRutaId: savedRecord.id,
-            arrangements: travelArrangements,
-          }),
-          // TODO: Update to save accommodations structure
-          Promise.resolve() // Placeholder for now
+          saveTravelArrangements(travelArrangements),
+          saveAccommodations(accommodations),
+          saveVenueImages(eventData.venue.images || []),
         ]);
-        
+
         console.log("✅ FORM: All data saved successfully");
         setHasSavedData(true);
         setDataSource('saved');
-        
+
         // Update last save data reference
         lastSaveDataRef.current = JSON.stringify({
           eventData,
           travelArrangements,
           accommodations
         });
-        
+
         toast({
           title: "✅ Guardado completo",
           description: "Todos los datos se han guardado correctamente.",
         });
-        
+
         return savedRecord;
       } else {
         console.error("❌ FORM: No saved record ID returned");
@@ -575,14 +591,16 @@ export const useHojaDeRutaForm = () => {
       saveInProgressRef.current = false;
     }
   }, [
-    selectedJobId, 
-    eventData, 
-    travelArrangements, 
-    accommodations, 
-    saveHojaDeRuta, 
-    saveTravelArrangements, 
+    selectedJobId,
+    eventData,
+    travelArrangements,
+    accommodations,
+    saveHojaDeRuta,
+    saveTravelArrangements,
+    saveAccommodations,
+    saveVenueImages,
     lastSaveTime,
-    toast
+    toast,
   ]);
 
   // Improved isDirty function with better reliability

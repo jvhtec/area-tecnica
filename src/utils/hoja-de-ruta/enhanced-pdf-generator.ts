@@ -173,7 +173,7 @@ export const generateEnhancedPDF = async (
       doc.text(eventData.eventName || 'Evento sin título', pageWidth / 2, 32, { align: 'center' });
 
       doc.setFontSize(11);
-      doc.text(`${jobDateStr} | Ref: ${eventData.eventCode || selectedJobId}`, pageWidth / 2, 41, { align: 'center' });
+      doc.text(jobDateStr, pageWidth / 2, 41, { align: 'center' });
     };
 
     // Page break management
@@ -869,8 +869,7 @@ export const generateEnhancedPDF = async (
           doc.setPage(i);
           doc.setFontSize(10);
           doc.setTextColor(150, 150, 150);
-          doc.text(`Página ${i} de ${pageCount -1}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
-          doc.text(`Generado por Manus - ${createdDate}`, 14, pageHeight - 10);
+          doc.text(`Página ${i} de ${pageCount - 1}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
         }
       };
       addFooter();
