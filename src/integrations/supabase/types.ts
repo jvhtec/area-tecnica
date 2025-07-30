@@ -1281,6 +1281,8 @@ export type Database = {
           status: string | null
           updated_at: string | null
           venue_address: string | null
+          venue_latitude: number | null
+          venue_longitude: number | null
           venue_name: string | null
         }
         Insert: {
@@ -1301,6 +1303,8 @@ export type Database = {
           status?: string | null
           updated_at?: string | null
           venue_address?: string | null
+          venue_latitude?: number | null
+          venue_longitude?: number | null
           venue_name?: string | null
         }
         Update: {
@@ -1321,6 +1325,8 @@ export type Database = {
           status?: string | null
           updated_at?: string | null
           venue_address?: string | null
+          venue_latitude?: number | null
+          venue_longitude?: number | null
           venue_name?: string | null
         }
         Relationships: [
@@ -1336,6 +1342,53 @@ export type Database = {
             columns: ["last_modified_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hoja_de_ruta_accommodations: {
+        Row: {
+          address: string | null
+          check_in: string | null
+          check_out: string | null
+          created_at: string | null
+          hoja_de_ruta_id: string | null
+          hotel_name: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string | null
+          hoja_de_ruta_id?: string | null
+          hotel_name: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string | null
+          hoja_de_ruta_id?: string | null
+          hotel_name?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hoja_de_ruta_accommodations_hoja_de_ruta_id_fkey"
+            columns: ["hoja_de_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_de_ruta"
             referencedColumns: ["id"]
           },
         ]
@@ -1505,6 +1558,47 @@ export type Database = {
           },
         ]
       }
+      hoja_de_ruta_room_assignments: {
+        Row: {
+          accommodation_id: string | null
+          created_at: string | null
+          id: string
+          room_number: string | null
+          room_type: string
+          staff_member1_id: string | null
+          staff_member2_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          accommodation_id?: string | null
+          created_at?: string | null
+          id?: string
+          room_number?: string | null
+          room_type: string
+          staff_member1_id?: string | null
+          staff_member2_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          accommodation_id?: string | null
+          created_at?: string | null
+          id?: string
+          room_number?: string | null
+          room_type?: string
+          staff_member1_id?: string | null
+          staff_member2_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hoja_de_ruta_room_assignments_accommodation_id_fkey"
+            columns: ["accommodation_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_de_ruta_accommodations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hoja_de_ruta_rooms: {
         Row: {
           hoja_de_ruta_id: string | null
@@ -1563,6 +1657,7 @@ export type Database = {
       }
       hoja_de_ruta_staff: {
         Row: {
+          dni: string | null
           hoja_de_ruta_id: string | null
           id: string
           name: string
@@ -1571,6 +1666,7 @@ export type Database = {
           surname2: string | null
         }
         Insert: {
+          dni?: string | null
           hoja_de_ruta_id?: string | null
           id?: string
           name: string
@@ -1579,6 +1675,7 @@ export type Database = {
           surname2?: string | null
         }
         Update: {
+          dni?: string | null
           hoja_de_ruta_id?: string | null
           id?: string
           name?: string
@@ -1639,6 +1736,59 @@ export type Database = {
         }
         Relationships: []
       }
+      hoja_de_ruta_transport: {
+        Row: {
+          company: string | null
+          created_at: string | null
+          date_time: string | null
+          driver_name: string | null
+          driver_phone: string | null
+          has_return: boolean | null
+          hoja_de_ruta_id: string | null
+          id: string
+          license_plate: string | null
+          return_date_time: string | null
+          transport_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string | null
+          date_time?: string | null
+          driver_name?: string | null
+          driver_phone?: string | null
+          has_return?: boolean | null
+          hoja_de_ruta_id?: string | null
+          id?: string
+          license_plate?: string | null
+          return_date_time?: string | null
+          transport_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          company?: string | null
+          created_at?: string | null
+          date_time?: string | null
+          driver_name?: string | null
+          driver_phone?: string | null
+          has_return?: boolean | null
+          hoja_de_ruta_id?: string | null
+          id?: string
+          license_plate?: string | null
+          return_date_time?: string | null
+          transport_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hoja_de_ruta_transport_hoja_de_ruta_id_fkey"
+            columns: ["hoja_de_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_de_ruta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hoja_de_ruta_travel: {
         Row: {
           arrival_time: string | null
@@ -1683,6 +1833,65 @@ export type Database = {
           },
           {
             foreignKeyName: "hoja_de_ruta_travel_hoja_de_ruta_id_fkey"
+            columns: ["hoja_de_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_de_ruta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hoja_de_ruta_travel_arrangements: {
+        Row: {
+          arrival_time: string | null
+          created_at: string | null
+          departure_time: string | null
+          driver_name: string | null
+          driver_phone: string | null
+          flight_train_number: string | null
+          hoja_de_ruta_id: string | null
+          id: string
+          notes: string | null
+          pickup_address: string | null
+          pickup_time: string | null
+          plate_number: string | null
+          transportation_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          arrival_time?: string | null
+          created_at?: string | null
+          departure_time?: string | null
+          driver_name?: string | null
+          driver_phone?: string | null
+          flight_train_number?: string | null
+          hoja_de_ruta_id?: string | null
+          id?: string
+          notes?: string | null
+          pickup_address?: string | null
+          pickup_time?: string | null
+          plate_number?: string | null
+          transportation_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          arrival_time?: string | null
+          created_at?: string | null
+          departure_time?: string | null
+          driver_name?: string | null
+          driver_phone?: string | null
+          flight_train_number?: string | null
+          hoja_de_ruta_id?: string | null
+          id?: string
+          notes?: string | null
+          pickup_address?: string | null
+          pickup_time?: string | null
+          plate_number?: string | null
+          transportation_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hoja_de_ruta_travel_arrangements_hoja_de_ruta_id_fkey"
             columns: ["hoja_de_ruta_id"]
             isOneToOne: false
             referencedRelation: "hoja_de_ruta"
