@@ -412,43 +412,130 @@ export const generateEnhancedPDF = async (
       return (doc as any).lastAutoTable.finalY + 15;
     };
 
-    // Enhanced rooming section with proper staff name resolution
-    const addRoomingSection = (yPosition: number): number => {
-      const validRoomAssignments = enhancedRoomAssignments.filter(hasMeaningfulRoomData);
-      if (validRoomAssignments.length === 0) return yPosition;
+    // Enhanced accommodation section with hotel details, maps and QR codes
+    const addAccommodationSection = async (yPosition: number): Promise<number> => {
+      if (!accommodations || accommodations.length === 0) return yPosition;
 
       yPosition = checkPageBreak(yPosition, 80);
-      yPosition = addSectionHeader('Distribución de Habitaciones', yPosition, '🏨');
+      yPosition = addSectionHeader('Alojamiento', yPosition, '🏨');
 
-      const roomData = validRoomAssignments.map(room => {
-        const roomTypeMap = {
-          'single': 'Individual',
-          'double': 'Doble',
-          'twin': 'Doble (2 camas)',
-          'triple': 'Triple'
-        };
+      for (const accommodation of accommodations) {
+        yPosition = checkPageBreak(yPosition, 120);
+        
+        // Hotel header
+        doc.setFontSize(12);
+        doc.setTextColor(125, 1, 1);
+        doc.text(`🏨 ${accommodation.hotel_name || 'Hotel sin nombre'}`, 20, yPosition);
+        yPosition += 15;
 
-        return [
-          roomTypeMap[room.room_type] || room.room_type || 'N/A',
-          room.room_number || 'Por asignar',
-          room.staff1Name || 'Por asignar',
-          room.room_type === 'single' ? 'N/A' : (room.staff2Name || 'Por asignar')
-        ];
-      });
+        // Hotel details table
+        const hotelData = [];
+        if (accommodation.hotel_name) hotelData.push(['Hotel', accommodation.hotel_name]);
+        if (accommodation.address) hotelData.push(['Dirección', accommodation.address]);
+        if (accommodation.check_in) hotelData.push(['Check-in', accommodation.check_in]);
+        if (accommodation.check_out) hotelData.push(['Check-out', accommodation.check_out]);
 
-      autoTable(doc, {
-        startY: yPosition,
-        head: [['Tipo', 'Número', 'Ocupante 1', 'Ocupante 2']],
-        body: roomData,
-        theme: 'grid',
-        styles: { fontSize: 10, cellPadding: 4 },
-        headStyles: {
-          fillColor: [125, 1, 1],
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-        },
-      });
-      return (doc as any).lastAutoTable.finalY + 15;
+        if (hotelData.length > 0) {
+          autoTable(doc, {
+            startY: yPosition,
+            body: hotelData,
+            theme: 'plain',
+            styles: { fontSize: 10, cellPadding: 4 },
+            columnStyles: {
+              0: { cellWidth: 40, fontStyle: 'bold', textColor: [125, 1, 1] },
+              1: { cellWidth: 140 }
+            }
+          });
+          yPosition = (doc as any).lastAutoTable.finalY + 10;
+        }
+
+        // Generate QR code for hotel location
+        if (accommodation.address && accommodation.coordinates) {
+          try {
+            const hotelRouteUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(accommodation.address)}`;
+            const hotelQrDataUrl = await generateQRCode(hotelRouteUrl);
+            
+            yPosition = checkPageBreak(yPosition, 80);
+            
+            // Add QR code and location info
+            const qrSize = 50;
+            doc.addImage(hotelQrDataUrl, 'PNG', 25, yPosition, qrSize, qrSize);
+            
+            // Information box for hotel
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.3);
+            doc.rect(85, yPosition, 110, qrSize);
+            doc.setFillColor(248, 249, 250);
+            doc.rect(85, yPosition, 110, 15, 'F');
+            
+            doc.setFontSize(10);
+            doc.setTextColor(125, 1, 1);
+            doc.text('Ubicación del Hotel', 90, yPosition + 10);
+            
+            doc.setFontSize(9);
+            doc.setTextColor(51, 51, 51);
+            doc.text('• Escanea para navegación GPS', 90, yPosition + 22);
+            doc.text('• Abre Google Maps directamente', 90, yPosition + 30);
+            doc.text('• Navegación paso a paso', 90, yPosition + 38);
+            
+            doc.setFontSize(8);
+            doc.setTextColor(0, 0, 255);
+            doc.textWithLink('🔗 Ver en mapa', 90, yPosition + 46, { url: hotelRouteUrl });
+            
+            yPosition += qrSize + 20;
+          } catch (error) {
+            console.error('Error generating hotel QR code:', error);
+          }
+        }
+
+        // Rooms for this hotel
+        const hotelRooms = accommodation.rooms.filter(room => 
+          room.room_type || room.room_number || room.staff_member1_id || room.staff_member2_id
+        );
+
+        if (hotelRooms.length > 0) {
+          yPosition = checkPageBreak(yPosition, 60);
+          doc.setFontSize(11);
+          doc.setTextColor(125, 1, 1);
+          doc.text('Habitaciones:', 20, yPosition);
+          yPosition += 10;
+
+          const roomData = hotelRooms.map(room => {
+            const staff1 = room.staff_member1_id ? 
+              eventData.staff[parseInt(room.staff_member1_id)] : null;
+            const staff2 = room.staff_member2_id ? 
+              eventData.staff[parseInt(room.staff_member2_id)] : null;
+
+            const roomTypeMap = {
+              'single': 'Individual',
+              'double': 'Doble'
+            };
+
+            return [
+              roomTypeMap[room.room_type] || room.room_type || 'N/A',
+              room.room_number || 'Por asignar',
+              staff1 ? `${staff1.name} ${staff1.surname1}` : 'Por asignar',
+              room.room_type === 'single' ? 'N/A' : (staff2 ? `${staff2.name} ${staff2.surname1}` : 'Por asignar')
+            ];
+          });
+
+          autoTable(doc, {
+            startY: yPosition,
+            head: [['Tipo', 'Número', 'Ocupante 1', 'Ocupante 2']],
+            body: roomData,
+            theme: 'grid',
+            styles: { fontSize: 9, cellPadding: 3 },
+            headStyles: {
+              fillColor: [125, 1, 1],
+              textColor: [255, 255, 255],
+              fontStyle: 'bold',
+            },
+          });
+          yPosition = (doc as any).lastAutoTable.finalY + 20;
+        }
+      }
+
+      return yPosition;
     };
 
     // Add new sections from pasted_content.txt
@@ -620,7 +707,7 @@ export const generateEnhancedPDF = async (
       yPosition = addEventOverview(yPosition);
       yPosition = addVenueSection(yPosition);
       yPosition = addStaffSection(yPosition);
-      yPosition = addRoomingSection(yPosition);
+      yPosition = await addAccommodationSection(yPosition);
       yPosition = addEquipmentListSection(yPosition);
       yPosition = addTechnicalRequirementsSection(yPosition);
       yPosition = addCateringDetailsSection(yPosition);
@@ -664,36 +751,102 @@ export const generateEnhancedPDF = async (
         });
       }
 
-      // Travel arrangements - improved filtering
+      // Travel arrangements - enhanced with maps and QR codes
       const validTravelArrangements = travelArrangements.filter(hasMeaningfulTravelData);
 
       if (validTravelArrangements.length > 0) {
         yPosition = checkPageBreak(yPosition, 60);
-        addSectionHeader('Arreglos de Viaje', yPosition);
-        yPosition += 10;
+        yPosition = addSectionHeader('Arreglos de Viaje', yPosition, '🚐');
 
-        const travelData = validTravelArrangements.map(arr => [
-          arr.transportation_type || 'N/A',
-          arr.pickup_address || 'N/A',
-          arr.pickup_time || 'N/A',
-          arr.departure_time || 'N/A',
-          arr.arrival_time || 'N/A',
-          arr.flight_train_number || 'N/A'
-        ]);
+        for (const arrangement of validTravelArrangements) {
+          yPosition = checkPageBreak(yPosition, 100);
+          
+          // Travel arrangement header
+          doc.setFontSize(12);
+          doc.setTextColor(125, 1, 1);
+          doc.text(`🚗 ${arrangement.transportation_type || 'Transporte'}`, 20, yPosition);
+          yPosition += 15;
 
-        autoTable(doc, {
-          startY: yPosition,
-          head: [['Transporte', 'Dirección Recogida', 'Hora Recogida', 'Salida', 'Llegada', 'Vuelo/Tren']],
-          body: travelData,
-          theme: 'grid',
-          styles: { fontSize: 9, cellPadding: 3 },
-          headStyles: {
-            fillColor: [125, 1, 1],
-            textColor: [255, 255, 255],
-            fontStyle: 'bold',
-          },
-        });
-        yPosition = (doc as any).lastAutoTable.finalY + 15;
+          // Travel details table
+          const travelData = [];
+          if (arrangement.transportation_type) travelData.push(['Tipo', arrangement.transportation_type]);
+          if (arrangement.pickup_address) travelData.push(['Dirección Recogida', arrangement.pickup_address]);
+          if (arrangement.pickup_time) travelData.push(['Hora Recogida', arrangement.pickup_time]);
+          if (arrangement.departure_time) travelData.push(['Hora Salida', arrangement.departure_time]);
+          if (arrangement.arrival_time) travelData.push(['Hora Llegada', arrangement.arrival_time]);
+          if (arrangement.flight_train_number) travelData.push(['Vuelo/Tren', arrangement.flight_train_number]);
+          if (arrangement.driver_name) travelData.push(['Conductor', arrangement.driver_name]);
+          if (arrangement.driver_phone) travelData.push(['Teléfono Conductor', formatPhone(arrangement.driver_phone)]);
+          if (arrangement.plate_number) travelData.push(['Matrícula', arrangement.plate_number]);
+
+          if (travelData.length > 0) {
+            autoTable(doc, {
+              startY: yPosition,
+              body: travelData,
+              theme: 'plain',
+              styles: { fontSize: 10, cellPadding: 4 },
+              columnStyles: {
+                0: { cellWidth: 50, fontStyle: 'bold', textColor: [125, 1, 1] },
+                1: { cellWidth: 130 }
+              }
+            });
+            yPosition = (doc as any).lastAutoTable.finalY + 10;
+          }
+
+          // Generate QR code for pickup address
+          if (arrangement.pickup_address) {
+            try {
+              const pickupRouteUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(arrangement.pickup_address)}`;
+              const pickupQrDataUrl = await generateQRCode(pickupRouteUrl);
+              
+              yPosition = checkPageBreak(yPosition, 80);
+              
+              // Add QR code and pickup info
+              const qrSize = 50;
+              doc.addImage(pickupQrDataUrl, 'PNG', 25, yPosition, qrSize, qrSize);
+              
+              // Information box for pickup
+              doc.setDrawColor(200, 200, 200);
+              doc.setLineWidth(0.3);
+              doc.rect(85, yPosition, 110, qrSize);
+              doc.setFillColor(248, 249, 250);
+              doc.rect(85, yPosition, 110, 15, 'F');
+              
+              doc.setFontSize(10);
+              doc.setTextColor(125, 1, 1);
+              doc.text('Navegación a Punto de Recogida', 90, yPosition + 10);
+              
+              doc.setFontSize(9);
+              doc.setTextColor(51, 51, 51);
+              doc.text('• Escanea para navegación GPS', 90, yPosition + 22);
+              doc.text('• Abre Google Maps directamente', 90, yPosition + 30);
+              doc.text('• Navegación paso a paso', 90, yPosition + 38);
+              
+              doc.setFontSize(8);
+              doc.setTextColor(0, 0, 255);
+              doc.textWithLink('🔗 Ver en mapa', 90, yPosition + 46, { url: pickupRouteUrl });
+              
+              yPosition += qrSize + 20;
+            } catch (error) {
+              console.error('Error generating pickup QR code:', error);
+            }
+          }
+
+          // Notes section
+          if (arrangement.notes) {
+            yPosition = checkPageBreak(yPosition, 40);
+            doc.setFontSize(11);
+            doc.setTextColor(125, 1, 1);
+            doc.text('Notas:', 20, yPosition);
+            yPosition += 10;
+
+            doc.setFontSize(10);
+            doc.setTextColor(51, 51, 51);
+            const notesLines = doc.splitTextToSize(arrangement.notes, pageWidth - 40);
+            doc.text(notesLines, 20, yPosition);
+            yPosition += notesLines.length * 7 + 15;
+          }
+        }
       }
 
       // Schedule section

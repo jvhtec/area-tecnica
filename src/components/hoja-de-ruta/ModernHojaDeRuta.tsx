@@ -196,7 +196,18 @@ const pdfBlob = await generateEnhancedPDF(
         jobDetails?.title || "",
         jobDetails?.start_time || new Date().toISOString(),
         undefined,
-        accommodations
+        accommodations,
+        eventData.staff.map((staff, index) => ({
+          id: index.toString(),
+          name: staff.name,
+          surname1: staff.surname1,
+          surname2: staff.surname2,
+          position: staff.position,
+          dni: staff.dni,
+          department: '',
+          phone: '',
+          role: staff.position
+        }))
       );
 
       // Download PDF
