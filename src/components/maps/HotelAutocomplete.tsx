@@ -62,12 +62,18 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
           body: JSON.stringify({ secretName: 'GOOGLE_MAPS_API_KEY' })
         });
         
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
+        console.log('API key response:', data);
+        
         if (data.GOOGLE_MAPS_API_KEY) {
           setApiKey(data.GOOGLE_MAPS_API_KEY);
           console.log('Google Maps API key loaded for hotel autocomplete');
         } else {
-          console.error('No Google Maps API key found');
+          console.error('No Google Maps API key found in response:', data);
         }
       } catch (err) {
         console.error('Error fetching API key:', err);
