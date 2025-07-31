@@ -270,7 +270,7 @@ export const generateEnhancedPDF = async (
       if (!routeUrl || !qrCodeDataUrl) return yPosition;
 
       yPosition = checkPageBreak(yPosition, 120);
-      yPosition = addSectionHeader('Información de Ruta', yPosition, '🗺️');
+      yPosition = addSectionHeader('Información de Ruta', yPosition,);
 
       doc.setFontSize(11);
       doc.setTextColor(51, 51, 51);
@@ -319,7 +319,7 @@ export const generateEnhancedPDF = async (
     // Venue section
     const addVenueSection = (yPosition: number): number => {
       yPosition = checkPageBreak(yPosition);
-      yPosition = addSectionHeader('Información del Lugar', yPosition, '🏢');
+      yPosition = addSectionHeader('Información del Lugar', yPosition,);
 
       const venueData = [];
       if (eventData.venue?.name) venueData.push(['Nombre', eventData.venue.name]);
@@ -417,7 +417,7 @@ export const generateEnhancedPDF = async (
       if (!accommodations || accommodations.length === 0) return yPosition;
 
       yPosition = checkPageBreak(yPosition, 80);
-      yPosition = addSectionHeader('Alojamiento', yPosition, '🏨');
+      yPosition = addSectionHeader('Alojamiento', yPosition,);
 
       for (const accommodation of accommodations) {
         yPosition = checkPageBreak(yPosition, 120);
@@ -543,7 +543,7 @@ export const generateEnhancedPDF = async (
       if (!eventData.equipmentList || eventData.equipmentList.length === 0) return yPosition;
 
       yPosition = checkPageBreak(yPosition, 80);
-      yPosition = addSectionHeader('Lista de Equipamiento', yPosition, '🛠️');
+      yPosition = addSectionHeader('Lista de Equipamiento', yPosition);
 
       const equipmentTableData = eventData.equipmentList.map(item => [
         item.item || 'N/A',
@@ -571,7 +571,7 @@ export const generateEnhancedPDF = async (
       if (!eventData.audioVisualRequirements && !eventData.lightingRequirements && !eventData.stagingRequirements) return yPosition;
 
       yPosition = checkPageBreak(yPosition, 80);
-      yPosition = addSectionHeader('Requisitos Técnicos Adicionales', yPosition, '💡');
+      yPosition = addSectionHeader('Requisitos Técnicos Adicionales', yPosition);
 
       doc.setFontSize(10);
       doc.setTextColor(51, 51, 51);
@@ -601,7 +601,7 @@ export const generateEnhancedPDF = async (
       if (!eventData.cateringDetails) return yPosition;
 
       yPosition = checkPageBreak(yPosition, 80);
-      yPosition = addSectionHeader('Detalles de Catering', yPosition, '🍽️');
+      yPosition = addSectionHeader('Detalles de Catering', yPosition);
 
       const cateringData = [];
       cateringData.push(['Proveedor', eventData.cateringDetails.provider || 'N/A']);
@@ -626,7 +626,7 @@ export const generateEnhancedPDF = async (
       if (!eventData.emergencyContacts || eventData.emergencyContacts.length === 0) return yPosition;
 
       yPosition = checkPageBreak(yPosition, 80);
-      yPosition = addSectionHeader('Contactos de Emergencia', yPosition, '🚨');
+      yPosition = addSectionHeader('Contactos de Emergencia', yPosition);
 
       const contactsTableData = eventData.emergencyContacts.map(contact => [
         contact.name || 'N/A',
@@ -654,7 +654,7 @@ export const generateEnhancedPDF = async (
       if (!eventData.specialInstructions) return yPosition;
 
       yPosition = checkPageBreak(yPosition, 80);
-      yPosition = addSectionHeader('Instrucciones Especiales', yPosition, '📝');
+      yPosition = addSectionHeader('Instrucciones Especiales', yPosition);
 
       doc.setFontSize(10);
       doc.setTextColor(51, 51, 51);
@@ -666,7 +666,7 @@ export const generateEnhancedPDF = async (
       if (!eventData.riskAssessment) return yPosition;
 
       yPosition = checkPageBreak(yPosition, 80);
-      yPosition = addSectionHeader('Evaluación de Riesgos', yPosition, '⚠️');
+      yPosition = addSectionHeader('Evaluación de Riesgos', yPosition);
 
       doc.setFontSize(10);
       doc.setTextColor(51, 51, 51);
@@ -678,7 +678,7 @@ export const generateEnhancedPDF = async (
       if (!eventData.insuranceDetails) return yPosition;
 
       yPosition = checkPageBreak(yPosition, 80);
-      yPosition = addSectionHeader('Detalles del Seguro', yPosition, '🛡️');
+      yPosition = addSectionHeader('Detalles del Seguro', yPosition);
 
       doc.setFontSize(10);
       doc.setTextColor(51, 51, 51);
@@ -756,7 +756,7 @@ export const generateEnhancedPDF = async (
 
       if (validTravelArrangements.length > 0) {
         yPosition = checkPageBreak(yPosition, 60);
-        yPosition = addSectionHeader('Arreglos de Viaje', yPosition, '🚐');
+        yPosition = addSectionHeader('Arreglos de Viaje', yPosition);
 
         for (const arrangement of validTravelArrangements) {
           yPosition = checkPageBreak(yPosition, 100);
