@@ -393,7 +393,7 @@ export const generateEnhancedPDF = async (
         });
         yPosition = (doc as any).lastAutoTable.finalY + 15;
       }
-    }
+    },
     // Enhanced staff section
     const addStaffSection = (yPosition: number): number => {
       const staff = staffData || eventData.staff;
