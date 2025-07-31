@@ -272,82 +272,51 @@ export const useHojaDeRutaForm = () => {
         setHasSavedData(true);
         setDataSource('saved');
         
+        // Use the transformed data from the persistence hook
+        const savedEventData = hojaDeRuta.eventData;
+        console.log("🔍 FORM: Retrieved savedEventData:", savedEventData);
+        console.log("🔍 FORM: Full hojaDeRuta object:", hojaDeRuta);
+        
         setEventData({
-          eventName: hojaDeRuta.event_name || jobData.title || "",
-          eventDates: hojaDeRuta.event_dates || eventDates,
+          eventName: savedEventData?.eventName || jobData.title || "",
+          eventDates: savedEventData?.eventDates || eventDates,
           venue: {
-            name: hojaDeRuta.venue_name || jobData.venue || "",
-            address: hojaDeRuta.venue_address || jobData.location || "",
+            name: savedEventData?.venue?.name || jobData.venue || "",
+            address: savedEventData?.venue?.address || jobData.location || "",
+            coordinates: savedEventData?.venue?.coordinates
           },
-          contacts: hojaDeRuta.contacts?.length > 0 
-            ? hojaDeRuta.contacts.map((contact: any) => ({
-                name: contact.name || "",
-                role: contact.role || "",
-                phone: contact.phone || "",
-              }))
+          contacts: savedEventData?.contacts?.length > 0 
+            ? savedEventData.contacts
             : jobData.client_name ? [{
                 name: jobData.client_name,
                 role: "Cliente",
                 phone: jobData.client_phone || ""
               }] : [{ name: "", role: "", phone: "" }],
-          logistics: {
-            transport: hojaDeRuta.logistics?.transport || [],
-            loadingDetails: hojaDeRuta.logistics?.loading_details || "",
-            unloadingDetails: hojaDeRuta.logistics?.unloading_details || "",
-            equipmentLogistics: hojaDeRuta.logistics?.equipment_logistics || "",
+          logistics: savedEventData?.logistics || {
+            transport: [],
+            loadingDetails: "",
+            unloadingDetails: "",
+            equipmentLogistics: "",
           },
           // Prioritize current assignments over saved staff
-          staff: staffFromAssignments.length > 0 
+          staff: staffFromAssignments.length > 0
             ? staffFromAssignments 
-            : hojaDeRuta.staff?.length > 0
-              ? hojaDeRuta.staff.map((member: any) => ({
-                  name: member.name || "",
-                  surname1: member.surname1 || "",
-                  surname2: member.surname2 || "",
-                  position: member.position || "",
-                }))
-              : [{ name: "", surname1: "", surname2: "", position: "" }],
-          schedule: hojaDeRuta.schedule || (startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : ""),
-          powerRequirements: hojaDeRuta.power_requirements || "",
-          auxiliaryNeeds: hojaDeRuta.auxiliary_needs || "",
+            : savedEventData?.staff?.length > 0
+              ? savedEventData.staff
+              : [{ name: "", surname1: "", surname2: "", position: "", dni: "" }],
+          schedule: savedEventData?.schedule || (startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : ""),
+          powerRequirements: savedEventData?.powerRequirements || "",
+          auxiliaryNeeds: savedEventData?.auxiliaryNeeds || "",
         });
 
-        // Set travel arrangements
-        if (hojaDeRuta.travel && hojaDeRuta.travel.length > 0) {
-          setTravelArrangements(hojaDeRuta.travel.map((arr: any) => ({
-            transportation_type: arr.transportation_type,
-            pickup_address: arr.pickup_address,
-            pickup_time: arr.pickup_time,
-            departure_time: arr.departure_time,
-            arrival_time: arr.arrival_time,
-            flight_train_number: arr.flight_train_number,
-            notes: arr.notes,
-          })));
-        } else {
-          setTravelArrangements([]);
+        // Set travel arrangements using transformed data
+        if (hojaDeRuta.travelArrangements && hojaDeRuta.travelArrangements.length > 0) {
+          setTravelArrangements(hojaDeRuta.travelArrangements);
         }
 
-        // Set accommodations (migrate old room assignments if needed)
+        // Set accommodations using transformed data  
         if (hojaDeRuta.accommodations && hojaDeRuta.accommodations.length > 0) {
           setAccommodations(hojaDeRuta.accommodations);
-        } else if (hojaDeRuta.rooms && hojaDeRuta.rooms.length > 0) {
-          // Migration: convert old room assignments to new accommodation structure
-          const defaultAccommodation: Accommodation = {
-            id: 'accommodation-1',
-            hotel_name: '',
-            address: '',
-            check_in: '',
-            check_out: '',
-            rooms: hojaDeRuta.rooms.map((room: any) => ({
-              room_type: room.room_type,
-              room_number: room.room_number,
-              staff_member1_id: room.staff_member1_id,
-              staff_member2_id: room.staff_member2_id,
-            }))
-          };
-          setAccommodations([defaultAccommodation]);
-        } else {
-          setAccommodations([]);
         }
         
         toast({
