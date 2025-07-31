@@ -270,7 +270,7 @@ export const generateEnhancedPDF = async (
       if (!routeUrl || !qrCodeDataUrl) return yPosition;
 
       yPosition = checkPageBreak(yPosition, 120);
-      yPosition = addSectionHeader('Información de Ruta', yPosition);
+      yPosition = addSectionHeader('Información de Ruta', yPosition,);
 
       doc.setFontSize(11);
       doc.setTextColor(51, 51, 51);
@@ -319,7 +319,7 @@ export const generateEnhancedPDF = async (
     // Venue section
     const addVenueSection = (yPosition: number): number => {
       yPosition = checkPageBreak(yPosition);
-      yPosition = addSectionHeader('Información del Lugar', yPosition);
+      yPosition = addSectionHeader('Información del Lugar', yPosition,);
 
       const venueData = [];
       if (eventData.venue?.name) venueData.push(['Nombre', eventData.venue.name]);
@@ -372,7 +372,7 @@ export const generateEnhancedPDF = async (
       if (!staff || staff.length === 0) return yPosition;
 
       yPosition = checkPageBreak(yPosition, 80);
-      yPosition = addSectionHeader('Personal Asignado', yPosition);
+      yPosition = addSectionHeader('Personal Asignado', yPosition, '👥');
 
       const staffTableData = staff.map(person => [
         `${person.name} ${person.surname1} ${person.surname2 || ''}`.trim(),
@@ -417,7 +417,7 @@ export const generateEnhancedPDF = async (
       if (!accommodations || accommodations.length === 0) return yPosition;
 
       yPosition = checkPageBreak(yPosition, 80);
-      yPosition = addSectionHeader('Alojamiento', yPosition);
+      yPosition = addSectionHeader('Alojamiento', yPosition,);
 
       for (const accommodation of accommodations) {
         yPosition = checkPageBreak(yPosition, 120);
@@ -690,7 +690,7 @@ export const generateEnhancedPDF = async (
       if (!eventData.weatherBackupPlan) return yPosition;
 
       yPosition = checkPageBreak(yPosition, 80);
-      yPosition = addSectionHeader('Plan de Contingencia Meteorológica', yPosition);
+      yPosition = addSectionHeader('Plan de Contingencia Meteorológica', yPosition, '☁️');
 
       doc.setFontSize(10);
       doc.setTextColor(51, 51, 51);
