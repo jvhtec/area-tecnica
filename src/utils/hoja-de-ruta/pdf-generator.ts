@@ -63,7 +63,7 @@ export const generatePDF = async (
     doc.setFillColor(125, 1, 1);
     doc.rect(0, 0, pageWidth, 45, 'F');
 
-    // Try to add job logo
+    // Try to add job logo first
     try {
       const { data: jobData } = await supabase
         .from('jobs')
@@ -72,19 +72,34 @@ export const generatePDF = async (
         .single();
       
       if (jobData?.logo_url) {
-        const logoImg = new Image();
-        logoImg.crossOrigin = "anonymous";
-        logoImg.src = jobData.logo_url;
-        
-        logoImg.onload = () => {
-          try {
-            const logoHeight = 15;
-            const logoWidth = logoHeight * (logoImg.width / logoImg.height);
-            doc.addImage(logoImg, 'PNG', 10, 8, logoWidth, logoHeight);
-          } catch (error) {
-            console.error("Error adding job logo to header:", error);
-          }
-        };
+        const logoResponse = await fetch(jobData.logo_url);
+        if (logoResponse.ok) {
+          const logoBlob = await logoResponse.blob();
+          const logoUrl = URL.createObjectURL(logoBlob);
+          
+          const logoImg = new Image();
+          logoImg.crossOrigin = "anonymous";
+          logoImg.src = logoUrl;
+          
+          await new Promise<void>((resolve) => {
+            logoImg.onload = () => {
+              try {
+                const logoHeight = 30;
+                const logoWidth = logoHeight * (logoImg.width / logoImg.height);
+                doc.addImage(logoImg, 'PNG', 15, 8, logoWidth, logoHeight);
+                URL.revokeObjectURL(logoUrl);
+              } catch (error) {
+                console.error("Error adding job logo to header:", error);
+              }
+              resolve();
+            };
+            logoImg.onerror = () => {
+              console.error("Error loading job logo");
+              URL.revokeObjectURL(logoUrl);
+              resolve();
+            };
+          });
+        }
       }
     } catch (error) {
       console.error("Error fetching job logo:", error);
@@ -93,13 +108,13 @@ export const generatePDF = async (
     // Header text (white text on red background)
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(18);
-    doc.text("Hoja de Ruta", pageWidth / 2, 15, { align: "center" });
+    doc.text("Hoja de Ruta", pageWidth / 2, 20, { align: "center" });
     
     doc.setFontSize(12);
-    doc.text(eventData.eventName || jobTitle, pageWidth / 2, 25, { align: "center" });
+    doc.text(eventData.eventName || jobTitle, pageWidth / 2, 30, { align: "center" });
     
     doc.setFontSize(10);
-    doc.text(new Date().toLocaleDateString('es-ES'), pageWidth / 2, 35, { align: "center" });
+    doc.text(new Date().toLocaleDateString('es-ES'), pageWidth / 2, 40, { align: "center" });
   };
 
   // Helper function to check if data exists with stricter criteria
@@ -157,19 +172,34 @@ export const generatePDF = async (
       .single();
     
     if (jobData?.logo_url) {
-      const logoImg = new Image();
-      logoImg.crossOrigin = "anonymous";
-      logoImg.src = jobData.logo_url;
-      
-      logoImg.onload = () => {
-        try {
-          const logoWidth = 150;
-          const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
-          doc.addImage(logoImg, 'PNG', pageWidth - logoWidth - 20, pageHeight / 2 - logoHeight / 2, logoWidth, logoHeight);
-        } catch (error) {
-          console.error("Error adding job logo to cover:", error);
-        }
-      };
+      const logoResponse = await fetch(jobData.logo_url);
+      if (logoResponse.ok) {
+        const logoBlob = await logoResponse.blob();
+        const logoUrl = URL.createObjectURL(logoBlob);
+        
+        const logoImg = new Image();
+        logoImg.crossOrigin = "anonymous";
+        logoImg.src = logoUrl;
+        
+        await new Promise<void>((resolve) => {
+          logoImg.onload = () => {
+            try {
+              const logoWidth = 120;
+              const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
+              doc.addImage(logoImg, 'PNG', pageWidth - logoWidth - 20, pageHeight / 2 - logoHeight / 2, logoWidth, logoHeight);
+              URL.revokeObjectURL(logoUrl);
+            } catch (error) {
+              console.error("Error adding job logo to cover:", error);
+            }
+            resolve();
+          };
+          logoImg.onerror = () => {
+            console.error("Error loading job logo for cover");
+            URL.revokeObjectURL(logoUrl);
+            resolve();
+          };
+        });
+      }
     }
   } catch (error) {
     console.error("Error fetching job logo for cover:", error);
@@ -513,11 +543,30 @@ export const generatePDF = async (
         doc.text("Asignación de Habitaciones:", 30, yPosition);
         yPosition += 10;
 
+        // Helper to get staff name from ID or name
+        const getStaffName = (staffId: string): string => {
+          if (!staffId) return "";
+          // First try to find by ID if the staff has an id property
+          const staffById = eventData.staff.find(s => (s as any).id === staffId);
+          if (staffById) {
+            return `${staffById.name || ''} ${staffById.surname1 || ''}`.trim();
+          }
+          // If not found by ID, check if staffId is actually a name
+          const staffByName = eventData.staff.find(s => 
+            `${s.name || ''} ${s.surname1 || ''}`.trim() === staffId
+          );
+          if (staffByName) {
+            return staffId;
+          }
+          // Return the original value if it's not empty
+          return staffId;
+        };
+
         const roomTableData = accommodation.rooms.map((room) => [
           room.room_type || "",
           room.room_number || "",
-          room.staff_member1_id || "",
-          room.room_type === "double" ? room.staff_member2_id || "" : "",
+          getStaffName(room.staff_member1_id || ""),
+          room.room_type === "double" ? getStaffName(room.staff_member2_id || "") : "",
         ]);
         
         autoTable(doc, {
@@ -552,12 +601,31 @@ export const generatePDF = async (
     doc.setTextColor(125, 1, 1);
     doc.text("Asignaciones de Habitaciones", 20, yPosition);
     yPosition += 10;
+
+    // Helper to get staff name from ID or name (reused from accommodation section)
+    const getStaffName = (staffId: string): string => {
+      if (!staffId) return "";
+      // First try to find by ID if the staff has an id property
+      const staffById = eventData.staff.find(s => (s as any).id === staffId);
+      if (staffById) {
+        return `${staffById.name || ''} ${staffById.surname1 || ''}`.trim();
+      }
+      // If not found by ID, check if staffId is actually a name
+      const staffByName = eventData.staff.find(s => 
+        `${s.name || ''} ${s.surname1 || ''}`.trim() === staffId
+      );
+      if (staffByName) {
+        return staffId;
+      }
+      // Return the original value if it's not empty
+      return staffId;
+    };
     
     const roomTableData = validRoomAssignments.map((room) => [
       room.room_type || "",
       room.room_number || "",
-      room.staff_member1_id || "",
-      room.room_type === "double" ? room.staff_member2_id || "" : "",
+      getStaffName(room.staff_member1_id || ""),
+      room.room_type === "double" ? getStaffName(room.staff_member2_id || "") : "",
     ]);
     
     autoTable(doc, {
@@ -628,11 +696,14 @@ export const generatePDF = async (
 
   if (imagePreviews.venue.length > 0) {
     doc.addPage();
-    yPosition = 20;
+    await addHeader();
+    yPosition = 55;
+    
     doc.setFontSize(14);
     doc.setTextColor(125, 1, 1);
     doc.text("Imágenes del Lugar", 20, yPosition);
     yPosition += 20;
+    
     const imageWidth = 80;
     const imagesPerRow = 2;
     let currentX = 20;
@@ -647,7 +718,8 @@ export const generatePDF = async (
         }
         if (yPosition > pageHeight - bottomMargin && i < imagePreviews.venue.length - 1) {
           doc.addPage();
-          yPosition = 20;
+          await addHeader();
+          yPosition = 75;
           currentX = 20;
         }
       } catch (error) {
