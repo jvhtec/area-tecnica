@@ -168,7 +168,7 @@ export const ModernHojaDeRuta = () => {
         await handleSaveAll();
       }
 
-      const { generateEnhancedPDF } = await import("@/utils/hoja-de-ruta/enhanced-pdf-generator");
+      const { generatePDF } = await import("@/utils/hoja-de-ruta/pdf-generator");
       
       const enhancedEventData = {
         ...eventData,
@@ -186,37 +186,21 @@ export const ModernHojaDeRuta = () => {
       // Convert accommodations to legacy room assignments for PDF generation
       const legacyRoomAssignments = accommodations.flatMap(acc => acc.rooms);
       
-const pdfBlob = await generateEnhancedPDF(
-        enhancedEventData,
+      await generatePDF(
+        eventData,
         travelArrangements,
         legacyRoomAssignments,
         imagePreviews,
         venueMapPreview,
         selectedJobId,
         jobDetails?.title || "",
-        jobDetails?.start_time || new Date().toISOString(),
-        undefined,
-        accommodations,
-        eventData.staff.map((staff, index) => ({
-          id: index.toString(),
-          name: staff.name,
-          surname1: staff.surname1,
-          surname2: staff.surname2,
-          position: staff.position,
-          dni: staff.dni,
-          department: '',
-          phone: '',
-          role: staff.position
-        }))
+        async (jobId: string, pdfBlob: Blob, fileName: string) => {
+          // Upload PDF to job functionality - this is already handled in the function
+        },
+        accommodations
       );
 
-      // Download PDF
-      const url = URL.createObjectURL(pdfBlob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `hoja_de_ruta_${eventData.eventName || 'documento'}.pdf`;
-      link.click();
-      URL.revokeObjectURL(url);
+      // PDF generation and download is handled within the generatePDF function
 
       toast({
         title: "✅ Documento generado",

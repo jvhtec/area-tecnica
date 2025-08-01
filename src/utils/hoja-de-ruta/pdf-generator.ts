@@ -1,8 +1,9 @@
 
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { EventData, TravelArrangement, RoomAssignment } from "@/types/hoja-de-ruta";
+import { EventData, TravelArrangement, RoomAssignment, Accommodation } from "@/types/hoja-de-ruta";
 import { supabase } from "@/lib/supabase";
+import * as QRCode from 'qrcode';
 
 interface AutoTableJsPDF extends jsPDF {
   lastAutoTable: { finalY: number };
@@ -16,19 +17,89 @@ export const generatePDF = async (
   venueMapPreview: string | null,
   selectedJobId: string,
   jobTitle: string,
-  uploadPdfToJob: (jobId: string, pdfBlob: Blob, fileName: string) => Promise<void>
+  uploadPdfToJob: (jobId: string, pdfBlob: Blob, fileName: string) => Promise<void>,
+  accommodations?: Accommodation[]
 ) => {
   const doc = new jsPDF() as AutoTableJsPDF;
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
   const bottomMargin = 40;
 
-  const checkPageBreak = (currentY: number): number => {
-    if (currentY > pageHeight - bottomMargin) {
+  // Helper function to generate QR codes
+  const generateQRCode = async (text: string): Promise<string> => {
+    try {
+      return await QRCode.toDataURL(text, {
+        width: 200,
+        margin: 2,
+        color: { dark: '#000000', light: '#FFFFFF' }
+      });
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      return '';
+    }
+  };
+
+  // Helper function to generate route URL
+  const generateRouteUrl = (origin: string, destination: string): string => {
+    const baseUrl = "https://www.google.com/maps/dir/";
+    const encodedOrigin = encodeURIComponent(origin);
+    const encodedDestination = encodeURIComponent(destination);
+    return `${baseUrl}${encodedOrigin}/${encodedDestination}`;
+  };
+
+  const checkPageBreak = (currentY: number, requiredHeight?: number): number => {
+    const minHeight = requiredHeight || 25;
+    if (currentY + minHeight > pageHeight - bottomMargin) {
       doc.addPage();
-      return 40; // Account for header space
+      addHeader();
+      return 55; // Account for header space
     }
     return currentY;
+  };
+
+  // Enhanced header function with job logo
+  const addHeader = async () => {
+    // Main header background
+    doc.setFillColor(125, 1, 1);
+    doc.rect(0, 0, pageWidth, 45, 'F');
+
+    // Try to add job logo
+    try {
+      const { data: jobData } = await supabase
+        .from('jobs')
+        .select('logo_url')
+        .eq('id', selectedJobId)
+        .single();
+      
+      if (jobData?.logo_url) {
+        const logoImg = new Image();
+        logoImg.crossOrigin = "anonymous";
+        logoImg.src = jobData.logo_url;
+        
+        logoImg.onload = () => {
+          try {
+            const logoHeight = 15;
+            const logoWidth = logoHeight * (logoImg.width / logoImg.height);
+            doc.addImage(logoImg, 'PNG', 10, 8, logoWidth, logoHeight);
+          } catch (error) {
+            console.error("Error adding job logo to header:", error);
+          }
+        };
+      }
+    } catch (error) {
+      console.error("Error fetching job logo:", error);
+    }
+
+    // Header text (white text on red background)
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.text("Hoja de Ruta", pageWidth / 2, 15, { align: "center" });
+    
+    doc.setFontSize(12);
+    doc.text(eventData.eventName || jobTitle, pageWidth / 2, 25, { align: "center" });
+    
+    doc.setFontSize(10);
+    doc.text(new Date().toLocaleDateString('es-ES'), pageWidth / 2, 35, { align: "center" });
   };
 
   // Helper function to check if data exists with stricter criteria
@@ -61,20 +132,98 @@ export const generatePDF = async (
     );
   };
 
-  // === HEADER SECTION === (consistent with tour PDF)
-  doc.setFillColor(125, 1, 1); // Red header background
-  doc.rect(0, 0, pageWidth, 30, 'F');
-
-  // Header text (white text on red background)
+  // === COVER PAGE === (festival style)
+  doc.setFillColor(125, 1, 1);
+  doc.rect(0, pageHeight - 100, pageWidth, 100, 'F');
+  
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18);
-  doc.text("Hoja de Ruta", pageWidth / 2, 15, { align: "center" });
+  doc.setFontSize(24);
+  doc.text("HOJA DE RUTA", 20, pageHeight - 60);
   
-  doc.setFontSize(12);
-  doc.text(eventData.eventName, pageWidth / 2, 25, { align: "center" });
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(36);
+  doc.text(eventData.eventName || jobTitle, 20, pageHeight / 2 + 50);
+  
+  doc.setFontSize(16);
+  doc.setTextColor(80, 80, 80);
+  doc.text(new Date().toLocaleDateString('es-ES'), 20, pageHeight / 2);
 
-  let yPosition = 40;
+  // Add job logo to cover page
+  try {
+    const { data: jobData } = await supabase
+      .from('jobs')
+      .select('logo_url')
+      .eq('id', selectedJobId)
+      .single();
+    
+    if (jobData?.logo_url) {
+      const logoImg = new Image();
+      logoImg.crossOrigin = "anonymous";
+      logoImg.src = jobData.logo_url;
+      
+      logoImg.onload = () => {
+        try {
+          const logoWidth = 150;
+          const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
+          doc.addImage(logoImg, 'PNG', pageWidth - logoWidth - 20, pageHeight / 2 - logoHeight / 2, logoWidth, logoHeight);
+        } catch (error) {
+          console.error("Error adding job logo to cover:", error);
+        }
+      };
+    }
+  } catch (error) {
+    console.error("Error fetching job logo for cover:", error);
+  }
+
+  // Start new page for content
+  doc.addPage();
+  await addHeader();
+  let yPosition = 55;
   
+  // === CONTACTS SECTION (moved to be second page) ===
+  const validContacts = eventData.contacts.filter(contact => 
+    hasData(contact.name) || hasData(contact.role) || hasData(contact.phone)
+  );
+  
+  if (validContacts.length > 0) {
+    yPosition = checkPageBreak(yPosition);
+    doc.setFontSize(14);
+    doc.setTextColor(125, 1, 1);
+    doc.text("Contactos", 20, yPosition);
+    yPosition += 10;
+
+    const contactsTableData = validContacts.map((contact) => [
+      contact.name || '',
+      contact.role || '',
+      contact.phone || '',
+    ]);
+    
+    autoTable(doc, {
+      startY: yPosition,
+      head: [["Nombre", "Rol", "Teléfono"]],
+      body: contactsTableData,
+      theme: "grid",
+      styles: {
+        fontSize: 10,
+        cellPadding: 3,
+        valign: 'top',
+      },
+      headStyles: {
+        fillColor: [125, 1, 1],
+        textColor: [255, 255, 255],
+        fontSize: 11,
+        fontStyle: 'bold',
+      },
+      margin: { left: 10, right: 10 },
+    });
+    yPosition = (doc as any).lastAutoTable.finalY + 15;
+  }
+
+  // Start new page for event details
+  doc.addPage();
+  await addHeader();
+  yPosition = 55;
+
   // === EVENT DETAILS SECTION ===
   yPosition = checkPageBreak(yPosition);
   doc.setFontSize(14);
@@ -127,43 +276,84 @@ export const generatePDF = async (
     }
   }
 
-  // === CONTACTS SECTION ===
-  const validContacts = eventData.contacts.filter(contact => 
-    hasData(contact.name) || hasData(contact.role) || hasData(contact.phone)
-  );
-  
-  if (validContacts.length > 0) {
+  // === TRAVEL ARRANGEMENTS SECTION WITH PICKUP MAPS === 
+  const validTravelArrangements = travelArrangements.filter(hasMeaningfulTravelData);
+
+  if (validTravelArrangements.length > 0) {
     yPosition = checkPageBreak(yPosition);
     doc.setFontSize(14);
     doc.setTextColor(125, 1, 1);
-    doc.text("Contactos", 20, yPosition);
+    doc.text("Arreglos de Viaje", 20, yPosition);
     yPosition += 10;
 
-    const contactsTableData = validContacts.map((contact) => [
-      contact.name || '',
-      contact.role || '',
-      contact.phone || '',
-    ]);
-    
-    autoTable(doc, {
-      startY: yPosition,
-      head: [["Nombre", "Rol", "Teléfono"]],
-      body: contactsTableData,
-      theme: "grid",
-      styles: {
-        fontSize: 10,
-        cellPadding: 3,
-        valign: 'top',
-      },
-      headStyles: {
-        fillColor: [125, 1, 1], // Same red as header
-        textColor: [255, 255, 255],
-        fontSize: 11,
-        fontStyle: 'bold',
-      },
-      margin: { left: 10, right: 10 },
-    });
-    yPosition = (doc as any).lastAutoTable.finalY + 15;
+    for (const arrangement of validTravelArrangements) {
+      yPosition = checkPageBreak(yPosition, 120);
+      
+      // Travel arrangement header
+      doc.setFontSize(12);
+      doc.setTextColor(125, 1, 1);
+      doc.text(`Viaje: ${arrangement.transportation_type || 'N/A'}`, 30, yPosition);
+      yPosition += 15;
+
+      // Travel details table
+      const travelData = [];
+      if (arrangement.pickup_address) travelData.push(['Recogida', arrangement.pickup_address]);
+      if (arrangement.pickup_time) travelData.push(['Hora Recogida', arrangement.pickup_time]);
+      if (arrangement.departure_time) travelData.push(['Hora Salida', arrangement.departure_time]);
+      if (arrangement.arrival_time) travelData.push(['Hora Llegada', arrangement.arrival_time]);
+      if (arrangement.flight_train_number) travelData.push(['Vuelo/Tren', arrangement.flight_train_number]);
+      if (arrangement.notes) travelData.push(['Notas', arrangement.notes]);
+
+      if (travelData.length > 0) {
+        autoTable(doc, {
+          startY: yPosition,
+          body: travelData,
+          theme: "plain",
+          styles: { fontSize: 10, cellPadding: 4 },
+          columnStyles: {
+            0: { cellWidth: 40, fontStyle: 'bold', textColor: [125, 1, 1] },
+            1: { cellWidth: 140 }
+          }
+        });
+        yPosition = (doc as any).lastAutoTable.finalY + 10;
+      }
+
+      // Generate QR code for pickup location
+      if (arrangement.pickup_address) {
+        try {
+          const pickupRouteUrl = generateRouteUrl("Calle Puerto Rico 6, 28971, Spain", arrangement.pickup_address);
+          const pickupQrDataUrl = await generateQRCode(pickupRouteUrl);
+          
+          if (pickupQrDataUrl) {
+            yPosition = checkPageBreak(yPosition, 80);
+            
+            // Add QR code and pickup info
+            const qrSize = 50;
+            doc.addImage(pickupQrDataUrl, 'PNG', 30, yPosition, qrSize, qrSize);
+            
+            // Information box for pickup
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.3);
+            doc.rect(90, yPosition, 100, qrSize);
+            doc.setFillColor(248, 249, 250);
+            doc.rect(90, yPosition, 100, 15, 'F');
+            
+            doc.setFontSize(10);
+            doc.setTextColor(125, 1, 1);
+            doc.text('Mapa de Recogida', 95, yPosition + 10);
+            
+            doc.setFontSize(9);
+            doc.setTextColor(51, 51, 51);
+            doc.text('• Escanea para ver ruta', 95, yPosition + 22);
+            doc.text('• Navegación GPS incluida', 95, yPosition + 30);
+            
+            yPosition += qrSize + 20;
+          }
+        } catch (error) {
+          console.error('Error generating pickup QR:', error);
+        }
+      }
+    }
   }
 
   // === LOGISTICS SECTION ===
@@ -240,44 +430,117 @@ export const generatePDF = async (
     yPosition = (doc as any).lastAutoTable.finalY + 15;
   }
 
-  // === TRAVEL ARRANGEMENTS SECTION === (improved filtering)
-  const validTravelArrangements = travelArrangements.filter(hasMeaningfulTravelData);
-
-  if (validTravelArrangements.length > 0) {
+  // === ACCOMMODATION SECTION WITH HOTEL MAPS AND QR CODES ===
+  if (accommodations && accommodations.length > 0) {
     yPosition = checkPageBreak(yPosition);
     doc.setFontSize(14);
     doc.setTextColor(125, 1, 1);
-    doc.text("Arreglos de Viaje", 20, yPosition);
+    doc.text("Alojamiento", 20, yPosition);
     yPosition += 10;
-    
-    const travelTableData = validTravelArrangements.map((arr) => [
-      arr.transportation_type || "",
-      `${arr.pickup_address || ""} ${arr.pickup_time || ""}`.trim(),
-      arr.departure_time || "",
-      arr.arrival_time || "",
-      arr.flight_train_number || "",
-      arr.notes || "",
-    ]);
-    
-    autoTable(doc, {
-      startY: yPosition,
-      head: [["Transporte", "Recogida", "Salida", "Llegada", "Vuelo/Tren #", "Notas"]],
-      body: travelTableData,
-      theme: "grid",
-      styles: {
-        fontSize: 10,
-        cellPadding: 3,
-        valign: 'top',
-      },
-      headStyles: {
-        fillColor: [125, 1, 1],
-        textColor: [255, 255, 255],
-        fontSize: 11,
-        fontStyle: 'bold',
-      },
-      margin: { left: 10, right: 10 },
-    });
-    yPosition = (doc as any).lastAutoTable.finalY + 15;
+
+    for (const accommodation of accommodations) {
+      yPosition = checkPageBreak(yPosition, 120);
+      
+      // Hotel header
+      doc.setFontSize(12);
+      doc.setTextColor(125, 1, 1);
+      doc.text(`Hotel: ${accommodation.hotel_name || 'Hotel sin nombre'}`, 30, yPosition);
+      yPosition += 15;
+
+      // Hotel details table
+      const hotelData = [];
+      if (accommodation.hotel_name) hotelData.push(['Hotel', accommodation.hotel_name]);
+      if (accommodation.address) hotelData.push(['Dirección', accommodation.address]);
+      if (accommodation.check_in) hotelData.push(['Check-in', accommodation.check_in]);
+      if (accommodation.check_out) hotelData.push(['Check-out', accommodation.check_out]);
+
+      if (hotelData.length > 0) {
+        autoTable(doc, {
+          startY: yPosition,
+          body: hotelData,
+          theme: "plain",
+          styles: { fontSize: 10, cellPadding: 4 },
+          columnStyles: {
+            0: { cellWidth: 40, fontStyle: 'bold', textColor: [125, 1, 1] },
+            1: { cellWidth: 140 }
+          }
+        });
+        yPosition = (doc as any).lastAutoTable.finalY + 10;
+      }
+
+      // Generate QR code for hotel location
+      if (accommodation.address) {
+        try {
+          const hotelRouteUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(accommodation.address)}`;
+          const hotelQrDataUrl = await generateQRCode(hotelRouteUrl);
+          
+          if (hotelQrDataUrl) {
+            yPosition = checkPageBreak(yPosition, 80);
+            
+            // Add QR code and location info
+            const qrSize = 50;
+            doc.addImage(hotelQrDataUrl, 'PNG', 30, yPosition, qrSize, qrSize);
+            
+            // Information box for hotel
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.3);
+            doc.rect(90, yPosition, 100, qrSize);
+            doc.setFillColor(248, 249, 250);
+            doc.rect(90, yPosition, 100, 15, 'F');
+            
+            doc.setFontSize(10);
+            doc.setTextColor(125, 1, 1);
+            doc.text('Ubicación del Hotel', 95, yPosition + 10);
+            
+            doc.setFontSize(9);
+            doc.setTextColor(51, 51, 51);
+            doc.text('• Escanea para ver ubicación', 95, yPosition + 22);
+            doc.text('• Navegación directa', 95, yPosition + 30);
+            
+            yPosition += qrSize + 20;
+          }
+        } catch (error) {
+          console.error('Error generating hotel QR:', error);
+        }
+      }
+
+      // Room assignments for this hotel
+      if (accommodation.rooms && accommodation.rooms.length > 0) {
+        yPosition = checkPageBreak(yPosition);
+        
+        doc.setFontSize(11);
+        doc.setTextColor(125, 1, 1);
+        doc.text("Asignación de Habitaciones:", 30, yPosition);
+        yPosition += 10;
+
+        const roomTableData = accommodation.rooms.map((room) => [
+          room.room_type || "",
+          room.room_number || "",
+          room.staff_member1_id || "",
+          room.room_type === "double" ? room.staff_member2_id || "" : "",
+        ]);
+        
+        autoTable(doc, {
+          startY: yPosition,
+          head: [["Tipo", "Número", "Personal 1", "Personal 2"]],
+          body: roomTableData,
+          theme: "grid",
+          styles: {
+            fontSize: 9,
+            cellPadding: 3,
+            valign: 'top',
+          },
+          headStyles: {
+            fillColor: [125, 1, 1],
+            textColor: [255, 255, 255],
+            fontSize: 10,
+            fontStyle: 'bold',
+          },
+          margin: { left: 25, right: 25 },
+        });
+        yPosition = (doc as any).lastAutoTable.finalY + 15;
+      }
+    }
   }
 
   // === ROOM ASSIGNMENTS SECTION === (improved filtering)
@@ -394,39 +657,55 @@ export const generatePDF = async (
     }
   }
 
-  const logo = new Image();
-  logo.crossOrigin = "anonymous";
-  logo.src = "/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png";
-  
-  logo.onload = () => {
-    const totalPages = doc.getNumberOfPages();
-    for (let i = 1; i <= totalPages; i++) {
-      doc.setPage(i);
-      const logoWidth = 50;
-      const logoHeight = logoWidth * (logo.height / logo.width);
-      const xPositionLogo = (pageWidth - logoWidth) / 2;
-      const yPositionLogo = pageHeight - logoHeight - 10;
-      doc.addImage(logo, "PNG", xPositionLogo, yPositionLogo, logoWidth, logoHeight);
-    }
-    const blob = doc.output("blob");
-    const fileName = `hoja_de_ruta_${jobTitle.replace(/\s+/g, "_")}.pdf`;
-    uploadPdfToJob(selectedJobId, blob, fileName);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    link.click();
-    URL.revokeObjectURL(url);
+  // Add footer with Sector Pro logo on all pages
+  const addFooterLogo = async () => {
+    const logo = new Image();
+    logo.crossOrigin = "anonymous";
+    logo.src = "/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png";
+    
+    return new Promise<void>((resolve) => {
+      logo.onload = () => {
+        try {
+          const totalPages = doc.getNumberOfPages();
+          for (let i = 1; i <= totalPages; i++) {
+            doc.setPage(i);
+            const logoWidth = 40;
+            const logoHeight = logoWidth * (logo.height / logo.width);
+            const xPositionLogo = (pageWidth - logoWidth) / 2;
+            const yPositionLogo = pageHeight - logoHeight - 5;
+            doc.addImage(logo, "PNG", xPositionLogo, yPositionLogo, logoWidth, logoHeight);
+            
+            // Add page numbers
+            doc.setFontSize(8);
+            doc.setTextColor(128, 128, 128);
+            doc.text(`Página ${i}`, pageWidth - 20, pageHeight - 10, { align: 'right' });
+          }
+          console.log("Sector Pro logo added successfully to all pages");
+          resolve();
+        } catch (error) {
+          console.error("Error adding Sector Pro logo:", error);
+          resolve();
+        }
+      };
+      
+      logo.onerror = () => {
+        console.error("No se pudo cargar el logo de Sector Pro");
+        resolve();
+      };
+    });
   };
+
+  // Add footer logo and then finalize PDF
+  await addFooterLogo();
   
-  logo.onerror = () => {
-    console.error("No se pudo cargar el logo");
-    const blob = doc.output("blob");
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `hoja_de_ruta_${eventData.eventName.replace(/\s+/g, "_")}.pdf`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
+  const blob = doc.output("blob");
+  const fileName = `hoja_de_ruta_${jobTitle.replace(/\s+/g, "_")}.pdf`;
+  await uploadPdfToJob(selectedJobId, blob, fileName);
+  
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
 };
