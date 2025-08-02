@@ -25,6 +25,118 @@ export const generatePDF = async (
   const pageHeight = doc.internal.pageSize.height;
   const bottomMargin = 40;
 
+  // Track logo loading state
+  let logoLoaded = false;
+  let logoData: string | null = null;
+
+  // Load logo at the beginning
+  const loadLogo = async (): Promise<void> => {
+    try {
+      // First check for job logo
+      const { data: jobData } = await supabase
+        .from('jobs')
+        .select('logo_url')
+        .eq('id', selectedJobId)
+        .single();
+      
+      if (jobData?.logo_url) {
+        const logoResponse = await fetch(jobData.logo_url);
+        if (logoResponse.ok) {
+          const logoBlob = await logoResponse.blob();
+          const reader = new FileReader();
+          
+          await new Promise<void>((resolve) => {
+            reader.onload = () => {
+              logoData = reader.result as string;
+              logoLoaded = true;
+              resolve();
+            };
+            reader.onerror = () => {
+              console.error("Error reading job logo");
+              resolve();
+            };
+            reader.readAsDataURL(logoBlob);
+          });
+          return;
+        }
+      }
+
+      // If no job logo, try festival logos
+      const { data: festivalLogos } = await supabase
+        .from('festival_logos')
+        .select('file_path, job_id')
+        .eq('job_id', selectedJobId)
+        .order('uploaded_at', { ascending: false })
+        .limit(1);
+      
+      if (festivalLogos && festivalLogos.length > 0) {
+        const logoUrl = supabase.storage.from('festival-logos').getPublicUrl(festivalLogos[0].file_path).data.publicUrl;
+        const logoResponse = await fetch(logoUrl);
+        if (logoResponse.ok) {
+          const logoBlob = await logoResponse.blob();
+          const reader = new FileReader();
+          
+          await new Promise<void>((resolve) => {
+            reader.onload = () => {
+              logoData = reader.result as string;
+              logoLoaded = true;
+              resolve();
+            };
+            reader.onerror = () => {
+              console.error("Error reading festival logo");
+              resolve();
+            };
+            reader.readAsDataURL(logoBlob);
+          });
+          return;
+        }
+      }
+
+      // Try tour logos by joining with jobs table
+      const { data: jobWithTour } = await supabase
+        .from('jobs')
+        .select('tour_id')
+        .eq('id', selectedJobId)
+        .single();
+      
+      if (jobWithTour?.tour_id) {
+        const { data: tourLogos } = await supabase
+          .from('tour_logos')
+          .select('file_path')
+          .eq('tour_id', jobWithTour.tour_id)
+          .order('uploaded_at', { ascending: false })
+          .limit(1);
+        
+        if (tourLogos && tourLogos.length > 0) {
+          const logoUrl = supabase.storage.from('tour-logos').getPublicUrl(tourLogos[0].file_path).data.publicUrl;
+          const logoResponse = await fetch(logoUrl);
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob();
+            const reader = new FileReader();
+            
+            await new Promise<void>((resolve) => {
+              reader.onload = () => {
+                logoData = reader.result as string;
+                logoLoaded = true;
+                resolve();
+              };
+              reader.onerror = () => {
+                console.error("Error reading tour logo");
+                resolve();
+              };
+              reader.readAsDataURL(logoBlob);
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error loading logos:", error);
+    }
+  };
+
+  // Load logo first
+  await loadLogo();
+
   // Helper function to generate QR codes
   const generateQRCode = async (text: string): Promise<string> => {
     try {
@@ -57,52 +169,24 @@ export const generatePDF = async (
     return currentY;
   };
 
-  // Enhanced header function with job logo
-  const addHeader = async () => {
+
+  // Enhanced header function with logo
+  const addHeader = () => {
     // Main header background
     doc.setFillColor(125, 1, 1);
     doc.rect(0, 0, pageWidth, 45, 'F');
 
-    // Try to add job logo first
-    try {
-      const { data: jobData } = await supabase
-        .from('jobs')
-        .select('logo_url')
-        .eq('id', selectedJobId)
-        .single();
-      
-      if (jobData?.logo_url) {
-        const logoResponse = await fetch(jobData.logo_url);
-        if (logoResponse.ok) {
-          const logoBlob = await logoResponse.blob();
-          const logoUrl = URL.createObjectURL(logoBlob);
-          
-          const logoImg = new Image();
-          logoImg.crossOrigin = "anonymous";
-          logoImg.src = logoUrl;
-          
-          await new Promise<void>((resolve) => {
-            logoImg.onload = () => {
-              try {
-                const logoHeight = 30;
-                const logoWidth = logoHeight * (logoImg.width / logoImg.height);
-                doc.addImage(logoImg, 'PNG', 15, 8, logoWidth, logoHeight);
-                URL.revokeObjectURL(logoUrl);
-              } catch (error) {
-                console.error("Error adding job logo to header:", error);
-              }
-              resolve();
-            };
-            logoImg.onerror = () => {
-              console.error("Error loading job logo");
-              URL.revokeObjectURL(logoUrl);
-              resolve();
-            };
-          });
-        }
+    // Add logo if loaded
+    if (logoLoaded && logoData) {
+      try {
+        const logoHeight = 30;
+        const logoImg = new Image();
+        logoImg.src = logoData;
+        const logoWidth = logoHeight * (logoImg.width / logoImg.height) || 50;
+        doc.addImage(logoData, 'PNG', 15, 8, logoWidth, logoHeight);
+      } catch (error) {
+        console.error("Error adding logo to header:", error);
       }
-    } catch (error) {
-      console.error("Error fetching job logo:", error);
     }
 
     // Header text (white text on red background)
@@ -164,50 +248,21 @@ export const generatePDF = async (
   doc.text(new Date().toLocaleDateString('es-ES'), 20, pageHeight / 2);
 
   // Add job logo to cover page
-  try {
-    const { data: jobData } = await supabase
-      .from('jobs')
-      .select('logo_url')
-      .eq('id', selectedJobId)
-      .single();
-    
-    if (jobData?.logo_url) {
-      const logoResponse = await fetch(jobData.logo_url);
-      if (logoResponse.ok) {
-        const logoBlob = await logoResponse.blob();
-        const logoUrl = URL.createObjectURL(logoBlob);
-        
-        const logoImg = new Image();
-        logoImg.crossOrigin = "anonymous";
-        logoImg.src = logoUrl;
-        
-        await new Promise<void>((resolve) => {
-          logoImg.onload = () => {
-            try {
-              const logoWidth = 120;
-              const logoHeight = (logoImg.height / logoImg.width) * logoWidth;
-              doc.addImage(logoImg, 'PNG', pageWidth - logoWidth - 20, pageHeight / 2 - logoHeight / 2, logoWidth, logoHeight);
-              URL.revokeObjectURL(logoUrl);
-            } catch (error) {
-              console.error("Error adding job logo to cover:", error);
-            }
-            resolve();
-          };
-          logoImg.onerror = () => {
-            console.error("Error loading job logo for cover");
-            URL.revokeObjectURL(logoUrl);
-            resolve();
-          };
-        });
-      }
+  if (logoLoaded && logoData) {
+    try {
+      const logoWidth = 120;
+      const logoImg = new Image();
+      logoImg.src = logoData;
+      const logoHeight = (logoImg.height / logoImg.width) * logoWidth || 60;
+      doc.addImage(logoData, 'PNG', pageWidth - logoWidth - 20, pageHeight / 2 - logoHeight / 2, logoWidth, logoHeight);
+    } catch (error) {
+      console.error("Error adding logo to cover:", error);
     }
-  } catch (error) {
-    console.error("Error fetching job logo for cover:", error);
   }
 
   // Start new page for content
   doc.addPage();
-  await addHeader();
+  addHeader();
   let yPosition = 55;
   
   // === CONTACTS SECTION (moved to be second page) ===
@@ -251,7 +306,7 @@ export const generatePDF = async (
 
   // Start new page for event details
   doc.addPage();
-  await addHeader();
+  addHeader();
   yPosition = 55;
 
   // === EVENT DETAILS SECTION ===
@@ -579,20 +634,31 @@ export const generatePDF = async (
         // Helper to get staff name from ID or name
         const getStaffName = (staffId: string): string => {
           if (!staffId) return "";
-          // First try to find by ID if the staff has an id property
+          
+          // Try to find staff member by ID first
           const staffById = eventData.staff.find(s => (s as any).id === staffId);
           if (staffById) {
-            return `${staffById.name || ''} ${staffById.surname1 || ''}`.trim();
+            return `${staffById.name || ''} ${staffById.surname1 || ''} ${staffById.surname2 || ''}`.trim();
           }
-          // If not found by ID, check if staffId is actually a name
-          const staffByName = eventData.staff.find(s => 
-            `${s.name || ''} ${s.surname1 || ''}`.trim() === staffId
-          );
+          
+          // Try to find by name components matching the ID
+          const staffByName = eventData.staff.find(s => {
+            const fullName = `${s.name || ''} ${s.surname1 || ''} ${s.surname2 || ''}`.trim();
+            return fullName === staffId || s.name === staffId;
+          });
           if (staffByName) {
-            return staffId;
+            return `${staffByName.name || ''} ${staffByName.surname1 || ''} ${staffByName.surname2 || ''}`.trim();
           }
-          // Return the original value if it's not empty
-          return staffId;
+          
+          // Try to find by index if staffId is a number
+          const staffIndex = parseInt(staffId);
+          if (!isNaN(staffIndex) && eventData.staff[staffIndex]) {
+            const staff = eventData.staff[staffIndex];
+            return `${staff.name || ''} ${staff.surname1 || ''} ${staff.surname2 || ''}`.trim();
+          }
+          
+          // Return the original value if it looks like a name, otherwise return empty
+          return staffId.length > 2 ? staffId : "";
         };
 
         const roomTableData = accommodation.rooms.map((room) => [
@@ -674,7 +740,7 @@ export const generatePDF = async (
 
   if (imagePreviews.venue.length > 0) {
     doc.addPage();
-    await addHeader();
+    addHeader();
     yPosition = 55;
     
     doc.setFontSize(14);
@@ -696,7 +762,7 @@ export const generatePDF = async (
         }
         if (yPosition > pageHeight - bottomMargin && i < imagePreviews.venue.length - 1) {
           doc.addPage();
-          await addHeader();
+          addHeader();
           yPosition = 75;
           currentX = 20;
         }
