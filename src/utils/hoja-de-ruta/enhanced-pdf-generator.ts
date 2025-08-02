@@ -756,7 +756,7 @@ export const generateEnhancedPDF = async (
 
       if (validTravelArrangements.length > 0) {
         yPosition = checkPageBreak(yPosition, 60);
-        yPosition = addSectionHeader('Arreglos de Viaje', yPosition);
+        yPosition = addSectionHeader('Viaje', yPosition);
 
         for (const arrangement of validTravelArrangements) {
           yPosition = checkPageBreak(yPosition, 100);
