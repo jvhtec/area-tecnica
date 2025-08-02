@@ -332,6 +332,9 @@ export const generatePDF = async (
       if (arrangement.departure_time) travelData.push(['Hora Salida', arrangement.departure_time]);
       if (arrangement.arrival_time) travelData.push(['Hora Llegada', arrangement.arrival_time]);
       if (arrangement.flight_train_number) travelData.push(['Vuelo/Tren', arrangement.flight_train_number]);
+      if (arrangement.driver_name) travelData.push(['Conductor', arrangement.driver_name]);
+      if (arrangement.driver_phone) travelData.push(['Teléfono', arrangement.driver_phone]);
+      if (arrangement.plate_number) travelData.push(['Matrícula', arrangement.plate_number]);
       if (arrangement.notes) travelData.push(['Notas', arrangement.notes]);
 
       if (travelData.length > 0) {
@@ -387,19 +390,52 @@ export const generatePDF = async (
   }
 
   // === LOGISTICS SECTION ===
+  const hasTransportData = eventData.logistics.transport && Array.isArray(eventData.logistics.transport) && eventData.logistics.transport.length > 0;
   const logisticsData = [
-    { label: "Transporte:", value: eventData.logistics.transport },
     { label: "Detalles de Carga:", value: eventData.logistics.loadingDetails },
     { label: "Detalles de Descarga:", value: eventData.logistics.unloadingDetails },
   ].filter(item => hasData(item.value));
 
-  if (logisticsData.length > 0) {
+  if (hasTransportData || logisticsData.length > 0) {
     yPosition = checkPageBreak(yPosition);
     doc.setFontSize(14);
     doc.setTextColor(125, 1, 1);
     doc.text("Logística", 20, yPosition);
     yPosition += 10;
+
+    // Transport table if available
+    if (hasTransportData) {
+      const transportTableData = eventData.logistics.transport.map((transport) => [
+        transport.transport_type || '',
+        transport.driver_name || '',
+        transport.driver_phone || '',
+        transport.license_plate || '',
+        transport.date_time || '',
+        transport.return_date_time || ''
+      ]);
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [["Tipo", "Conductor", "Teléfono", "Matrícula", "Fecha/Hora", "Retorno"]],
+        body: transportTableData,
+        theme: "grid",
+        styles: {
+          fontSize: 9,
+          cellPadding: 3,
+          valign: 'top',
+        },
+        headStyles: {
+          fillColor: [125, 1, 1],
+          textColor: [255, 255, 255],
+          fontSize: 10,
+          fontStyle: 'bold',
+        },
+        margin: { left: 10, right: 10 },
+      });
+      yPosition = (doc as any).lastAutoTable.finalY + 15;
+    }
     
+    // Other logistics details
     doc.setFontSize(10);
     doc.setTextColor(51, 51, 51);
     
@@ -408,10 +444,7 @@ export const generatePDF = async (
       doc.text(item.label, 30, yPosition);
       doc.setFont(undefined, 'normal');
       
-      const transportValue = Array.isArray(item.value) 
-        ? item.value.map(t => `${t.transport_type} - ${t.driver_name || 'N/A'}`).join('\n')
-        : item.value;
-      const lines = doc.splitTextToSize(transportValue, pageWidth - 60);
+      const lines = doc.splitTextToSize(item.value, pageWidth - 60);
       doc.text(lines, 30, yPosition + 8);
       yPosition += lines.length * 8 + 12;
       yPosition = checkPageBreak(yPosition);
@@ -592,62 +625,7 @@ export const generatePDF = async (
     }
   }
 
-  // === ROOM ASSIGNMENTS SECTION === (improved filtering)
-  const validRoomAssignments = roomAssignments.filter(hasMeaningfulRoomData);
-
-  if (validRoomAssignments.length > 0) {
-    yPosition = checkPageBreak(yPosition);
-    doc.setFontSize(14);
-    doc.setTextColor(125, 1, 1);
-    doc.text("Asignaciones de Habitaciones", 20, yPosition);
-    yPosition += 10;
-
-    // Helper to get staff name from ID or name (reused from accommodation section)
-    const getStaffName = (staffId: string): string => {
-      if (!staffId) return "";
-      // First try to find by ID if the staff has an id property
-      const staffById = eventData.staff.find(s => (s as any).id === staffId);
-      if (staffById) {
-        return `${staffById.name || ''} ${staffById.surname1 || ''}`.trim();
-      }
-      // If not found by ID, check if staffId is actually a name
-      const staffByName = eventData.staff.find(s => 
-        `${s.name || ''} ${s.surname1 || ''}`.trim() === staffId
-      );
-      if (staffByName) {
-        return staffId;
-      }
-      // Return the original value if it's not empty
-      return staffId;
-    };
-    
-    const roomTableData = validRoomAssignments.map((room) => [
-      room.room_type || "",
-      room.room_number || "",
-      getStaffName(room.staff_member1_id || ""),
-      room.room_type === "double" ? getStaffName(room.staff_member2_id || "") : "",
-    ]);
-    
-    autoTable(doc, {
-      startY: yPosition,
-      head: [["Tipo de Habitación", "Número", "Personal 1", "Personal 2"]],
-      body: roomTableData,
-      theme: "grid",
-      styles: {
-        fontSize: 10,
-        cellPadding: 3,
-        valign: 'top',
-      },
-      headStyles: {
-        fillColor: [125, 1, 1],
-        textColor: [255, 255, 255],
-        fontSize: 11,
-        fontStyle: 'bold',
-      },
-      margin: { left: 10, right: 10 },
-    });
-    yPosition = (doc as any).lastAutoTable.finalY + 15;
-  }
+  // Skip the duplicate room assignments section since it's already handled in accommodations
 
   // === SCHEDULE SECTION ===
   if (hasData(eventData.schedule)) {
