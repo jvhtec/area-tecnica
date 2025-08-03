@@ -112,7 +112,7 @@ const EnhancedHojaDeRutaGenerator = () => {
         await handleSaveAll();
       }
       
-      const { generateEnhancedPDF } = await import("@/utils/hoja-de-ruta/enhanced-pdf-generator");
+      const { generatePDF } = await import("@/utils/hoja-de-ruta/unified-pdf-generator");
       
       const enhancedEventData = {
         ...eventData,
@@ -140,7 +140,7 @@ const EnhancedHojaDeRutaGenerator = () => {
       );
 
       const jobDetails = jobs?.find(job => job.id === selectedJobId);
-      const pdfBlob = await generateEnhancedPDF(
+      await generatePDF(
         enhancedEventData,
         travelArrangements,
         legacyRoomAssignments,
@@ -148,34 +148,13 @@ const EnhancedHojaDeRutaGenerator = () => {
         venueMapPreview,
         selectedJobId,
         jobDetails?.title || "",
-        jobDetails?.start_time || new Date().toISOString(),
-        undefined,
-        accommodations,
-        eventData.staff.map((staff, index) => ({
-          id: index.toString(),
-          name: staff.name,
-          surname1: staff.surname1,
-          surname2: staff.surname2,
-          position: staff.position,
-          dni: staff.dni,
-          department: '',
-          phone: '',
-          role: staff.position
-        }))
+        toast,
+        accommodations
       );
 
-      // Upload to job documents
-      const eventName = eventData.eventName || 'sin_nombre';
-      const fileName = `hoja_de_ruta_${eventName.replace(/[^a-zA-Z0-9]/g, '_')}_v${enhancedEventData.metadata?.document_version || 1}.pdf`;
-      await uploadPdfToJob(selectedJobId, pdfBlob, fileName);
+      // The function handles everything including download, so we just show success message
 
-      // Download for user
-      const url = URL.createObjectURL(pdfBlob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      link.click();
-      URL.revokeObjectURL(url);
+      // generatePDF already handles upload and download
 
       toast({
         title: "✅ Documento generado",

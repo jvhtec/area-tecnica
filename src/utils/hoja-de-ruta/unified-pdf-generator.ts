@@ -101,7 +101,10 @@ interface Accommodation {
   address?: string;
   check_in?: string;
   check_out?: string;
-  coordinates?: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
   rooms: RoomAssignment[];
 }
 
