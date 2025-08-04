@@ -161,11 +161,27 @@ const formatTime = (time: string): string => {
 const getStaffName = (staffId: string, staffData?: any[]): string => {
   if (!staffId || !staffData) return 'Por asignar';
   
-  const staff = staffData.find(s => s.id === staffId || s.id?.toString() === staffId);
-  if (staff) {
-    return `${staff.name} ${staff.surname1} ${staff.surname2 || ''}`.trim();
+  // Try to find by exact ID match
+  let staff = staffData.find(s => s.id === staffId || s.id?.toString() === staffId);
+  
+  // If not found, try to find by name (in case staffId is actually a name)
+  if (!staff && typeof staffId === 'string' && staffId !== 'Por asignar') {
+    staff = staffData.find(s => 
+      `${s.name} ${s.surname1} ${s.surname2 || ''}`.trim().toLowerCase() === staffId.toLowerCase() ||
+      s.name?.toLowerCase() === staffId.toLowerCase()
+    );
   }
-  return staffId || 'Por asignar';
+  
+  if (staff) {
+    return `${staff.name || ''} ${staff.surname1 || ''} ${staff.surname2 || ''}`.trim();
+  }
+  
+  // If staffId looks like a name (contains letters), return it as is, otherwise show "Por asignar"
+  if (typeof staffId === 'string' && /[a-zA-Z]/.test(staffId)) {
+    return staffId;
+  }
+  
+  return 'Por asignar';
 };
 
 // Data validation helpers
@@ -298,7 +314,7 @@ export const generatePDF = async (
   };
 
   // Enhanced section header
-  const addSectionHeader = (title: string, yPosition: number, icon?: string): number => {
+  const addSectionHeader = (title: string, yPosition: number): number => {
     doc.setFillColor(248, 249, 250);
     doc.rect(14, yPosition - 5, pageWidth - 28, 15, 'F');
     
@@ -308,7 +324,7 @@ export const generatePDF = async (
     
     doc.setFontSize(14);
     doc.setTextColor(125, 1, 1);
-    doc.text(`${icon || '■'} ${title}`, 20, yPosition + 4);
+    doc.text(`■ ${title}`, 20, yPosition + 4);
     
     return yPosition + 20;
   };
@@ -363,7 +379,7 @@ export const generatePDF = async (
   // Event overview section
   const addEventOverview = (yPosition: number): number => {
     yPosition = checkPageBreak(yPosition, 80);
-    yPosition = addSectionHeader('Resumen del Evento', yPosition, '📋');
+    yPosition = addSectionHeader('Resumen del Evento', yPosition);
 
     const overviewData = [];
     
@@ -598,7 +614,7 @@ export const generatePDF = async (
       }
 
       yPosition = checkPageBreak(yPosition, 60);
-      yPosition = addSectionHeader('Arreglos de Viaje', yPosition, '🚗');
+      yPosition = addSectionHeader('Arreglos de Viaje', yPosition);
 
       for (const arrangement of validTravelArrangements) {
         yPosition = checkPageBreak(yPosition, 120);
@@ -668,7 +684,7 @@ export const generatePDF = async (
       // Hotel header
       doc.setFontSize(12);
       doc.setTextColor(125, 1, 1);
-      doc.text(`🏨 ${accommodation.hotel_name || 'Hotel sin nombre'}`, 20, yPosition);
+      doc.text(`■ ${accommodation.hotel_name || 'Hotel sin nombre'}`, 20, yPosition);
       yPosition += 15;
 
       // Hotel details table
@@ -927,14 +943,48 @@ export const generatePDF = async (
     });
   };
 
-  // Footer generation
-  const addFooter = () => {
+  // Footer generation with Sector Pro logo
+  const addFooter = async () => {
     const pageCount = doc.internal.pages.length;
+    
+    // Load Sector Pro logo
+    let sectorProLogo: HTMLImageElement | null = null;
+    try {
+      const { data: { publicUrl } } = await supabase.storage
+        .from('festival-logos')
+        .getPublicUrl('sector-pro-logo.png');
+      
+      if (publicUrl) {
+        sectorProLogo = new Image();
+        sectorProLogo.crossOrigin = 'anonymous';
+        await new Promise((resolve) => {
+          sectorProLogo!.onload = resolve;
+          sectorProLogo!.onerror = () => resolve(null);
+          sectorProLogo!.src = publicUrl;
+        });
+      }
+    } catch (error) {
+      console.log('Sector Pro logo not found, continuing without it');
+    }
+    
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
+      
+      // Page number
       doc.setFontSize(10);
       doc.setTextColor(150, 150, 150);
       doc.text(`Página ${i} de ${pageCount - 1}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+      
+      // Sector Pro logo in bottom right
+      if (sectorProLogo) {
+        try {
+          const logoHeight = 8;
+          const logoWidth = logoHeight * (sectorProLogo.width / sectorProLogo.height);
+          doc.addImage(sectorProLogo, 'PNG', pageWidth - logoWidth - 10, pageHeight - 15, logoWidth, logoHeight);
+        } catch (error) {
+          console.error("Error adding Sector Pro logo to footer:", error);
+        }
+      }
     }
   };
 
@@ -942,7 +992,7 @@ export const generatePDF = async (
   try {
     await generateMainContent();
     generateImagesPage();
-    addFooter();
+    await addFooter();
 
     // Generate filename and save
     const fileName = `hoja-de-ruta-${eventData.eventName?.replace(/[^a-zA-Z0-9]/g, '_') || 'evento'}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
