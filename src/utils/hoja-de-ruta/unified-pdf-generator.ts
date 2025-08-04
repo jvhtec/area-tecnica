@@ -947,40 +947,33 @@ export const generatePDF = async (
   const addFooter = async () => {
     const pageCount = doc.internal.pages.length;
     
-    // Load Sector Pro logo - try multiple possible locations and names
+    // Load Sector Pro logo using the same approach as other working PDF generators
     let sectorProLogo: HTMLImageElement | null = null;
     try {
-      // Try different possible logo names/paths
+      const logo = new Image();
+      logo.crossOrigin = "anonymous";
+      
+      // Try the known working logo paths
       const logoAttempts = [
-        'sector-pro-logo.png',
-        'sector_pro_logo.png', 
-        'logo.png',
-        'sector-pro.png'
+        "/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png",
+        "/sector pro logo.png"
       ];
       
-      for (const logoName of logoAttempts) {
+      for (const logoPath of logoAttempts) {
         try {
-          const { data: { publicUrl } } = await supabase.storage
-            .from('festival-logos')
-            .getPublicUrl(logoName);
+          const loadResult = await new Promise<boolean>((resolve) => {
+            logo.onload = () => resolve(true);
+            logo.onerror = () => resolve(false);
+            logo.src = logoPath;
+          });
           
-          if (publicUrl) {
-            const testImg = new Image();
-            testImg.crossOrigin = 'anonymous';
-            const loadResult = await new Promise<boolean>((resolve) => {
-              testImg.onload = () => resolve(true);
-              testImg.onerror = () => resolve(false);
-              testImg.src = publicUrl;
-            });
-            
-            if (loadResult) {
-              sectorProLogo = testImg;
-              console.log(`Sector Pro logo loaded successfully from: ${logoName}`);
-              break;
-            }
+          if (loadResult) {
+            sectorProLogo = logo;
+            console.log(`Sector Pro logo loaded successfully from: ${logoPath}`);
+            break;
           }
         } catch (error) {
-          console.log(`Failed to load logo: ${logoName}`);
+          console.log(`Failed to load logo from: ${logoPath}`);
         }
       }
     } catch (error) {
