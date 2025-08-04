@@ -1008,7 +1008,7 @@ export const generatePDF = async (
     await addFooter();
 
     // Generate filename and save
-    const fileName = `hoja-de-ruta-${eventData.eventName?.replace(/[^a-zA-Z0-9]/g, '_') || 'evento'}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+    const fileName = `hoja-de-ruta-${eventData.eventName?.replace(/[^a-zA-Z0-9]/g, '_') || 'evento'}-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.pdf`;
     const pdfBlob = doc.output('blob');
 
     // Upload to job storage
