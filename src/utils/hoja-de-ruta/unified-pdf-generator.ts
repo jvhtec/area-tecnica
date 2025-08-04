@@ -324,7 +324,7 @@ export const generatePDF = async (
     
     doc.setFontSize(14);
     doc.setTextColor(125, 1, 1);
-    doc.text(`■ ${title}`, 20, yPosition + 4);
+    doc.text(title, 20, yPosition + 4);
     
     return yPosition + 20;
   };
@@ -684,7 +684,7 @@ export const generatePDF = async (
       // Hotel header
       doc.setFontSize(12);
       doc.setTextColor(125, 1, 1);
-      doc.text(`■ ${accommodation.hotel_name || 'Hotel sin nombre'}`, 20, yPosition);
+      doc.text(accommodation.hotel_name || 'Hotel sin nombre', 20, yPosition);
       yPosition += 15;
 
       // Hotel details table
@@ -947,21 +947,41 @@ export const generatePDF = async (
   const addFooter = async () => {
     const pageCount = doc.internal.pages.length;
     
-    // Load Sector Pro logo
+    // Load Sector Pro logo - try multiple possible locations and names
     let sectorProLogo: HTMLImageElement | null = null;
     try {
-      const { data: { publicUrl } } = await supabase.storage
-        .from('festival-logos')
-        .getPublicUrl('sector-pro-logo.png');
+      // Try different possible logo names/paths
+      const logoAttempts = [
+        'sector-pro-logo.png',
+        'sector_pro_logo.png', 
+        'logo.png',
+        'sector-pro.png'
+      ];
       
-      if (publicUrl) {
-        sectorProLogo = new Image();
-        sectorProLogo.crossOrigin = 'anonymous';
-        await new Promise((resolve) => {
-          sectorProLogo!.onload = resolve;
-          sectorProLogo!.onerror = () => resolve(null);
-          sectorProLogo!.src = publicUrl;
-        });
+      for (const logoName of logoAttempts) {
+        try {
+          const { data: { publicUrl } } = await supabase.storage
+            .from('festival-logos')
+            .getPublicUrl(logoName);
+          
+          if (publicUrl) {
+            const testImg = new Image();
+            testImg.crossOrigin = 'anonymous';
+            const loadResult = await new Promise<boolean>((resolve) => {
+              testImg.onload = () => resolve(true);
+              testImg.onerror = () => resolve(false);
+              testImg.src = publicUrl;
+            });
+            
+            if (loadResult) {
+              sectorProLogo = testImg;
+              console.log(`Sector Pro logo loaded successfully from: ${logoName}`);
+              break;
+            }
+          }
+        } catch (error) {
+          console.log(`Failed to load logo: ${logoName}`);
+        }
       }
     } catch (error) {
       console.log('Sector Pro logo not found, continuing without it');
