@@ -182,19 +182,55 @@ const formatTime = (time: string): string => {
 const getStaffName = (staffId: string, staffData?: any[]): string => {
   if (!staffId || !staffData) return 'Por asignar';
   
-  // Try to find by exact ID match
+  // Try to find by exact ID match first
   let staff = staffData.find(s => s.id === staffId || s.id?.toString() === staffId);
   
-  // If not found, try to find by name (in case staffId is actually a name)
-  if (!staff && typeof staffId === 'string' && staffId !== 'Por asignar') {
+  // If not found, try different ID fields that might be used
+  if (!staff) {
     staff = staffData.find(s => 
-      `${s.name} ${s.surname1} ${s.surname2 || ''}`.trim().toLowerCase() === staffId.toLowerCase() ||
-      s.name?.toLowerCase() === staffId.toLowerCase()
+      s.user_id === staffId || 
+      s.technician_id === staffId ||
+      s.staff_id === staffId ||
+      s.user_id?.toString() === staffId ||
+      s.technician_id?.toString() === staffId ||
+      s.staff_id?.toString() === staffId
     );
   }
   
+  // Try to find by profile data if staff has profiles
+  if (!staff) {
+    staff = staffData.find(s => 
+      s.profiles?.id === staffId || 
+      s.profiles?.user_id === staffId ||
+      s.profiles?.id?.toString() === staffId ||
+      s.profiles?.user_id?.toString() === staffId
+    );
+  }
+  
+  // If not found, try to find by name (in case staffId is actually a name)
+  if (!staff && typeof staffId === 'string' && staffId !== 'Por asignar') {
+    staff = staffData.find(s => {
+      const fullName = `${s.name || ''} ${s.surname1 || ''} ${s.surname2 || ''}`.trim();
+      const profileName = s.profiles ? 
+        `${s.profiles.first_name || ''} ${s.profiles.last_name || ''}`.trim() : '';
+      
+      return fullName.toLowerCase() === staffId.toLowerCase() ||
+             s.name?.toLowerCase() === staffId.toLowerCase() ||
+             profileName.toLowerCase() === staffId.toLowerCase();
+    });
+  }
+  
   if (staff) {
-    return `${staff.name || ''} ${staff.surname1 || ''} ${staff.surname2 || ''}`.trim();
+    // Try to get name from different possible structures
+    if (staff.profiles) {
+      return `${staff.profiles.first_name || ''} ${staff.profiles.last_name || ''}`.trim();
+    }
+    if (staff.name || staff.surname1) {
+      return `${staff.name || ''} ${staff.surname1 || ''} ${staff.surname2 || ''}`.trim();
+    }
+    if (staff.first_name || staff.last_name) {
+      return `${staff.first_name || ''} ${staff.last_name || ''}`.trim();
+    }
   }
   
   // If staffId looks like a name (contains letters), return it as is, otherwise show "Por asignar"
@@ -693,7 +729,7 @@ export const generatePDF = async (
   };
 
   // Accommodation section with proper name resolution
-  const addAccommodationSection = (yPosition: number): number => {
+  const addAccommodationSection = async (yPosition: number): Promise<number> => {
     if (!accommodations || accommodations.length === 0) return yPosition;
 
     yPosition = checkPageBreak(yPosition, 80);
@@ -727,6 +763,53 @@ export const generatePDF = async (
           }
         });
         yPosition = (doc as any).lastAutoTable.finalY + 10;
+      }
+
+      // Hotel location map and QR code
+      if (accommodation.coordinates && accommodation.address) {
+        yPosition = checkPageBreak(yPosition, 120);
+        
+        try {
+          // Generate hotel location URL (not route)
+          const hotelLocationUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(accommodation.address)}`;
+          
+          // Generate QR code for hotel location
+          const hotelQrCode = await generateQRCode(hotelLocationUrl);
+          
+          doc.setFontSize(11);
+          doc.setTextColor(125, 1, 1);
+          doc.text('Ubicación del Hotel:', 20, yPosition);
+          yPosition += 15;
+
+          // Add QR code and information
+          const qrSize = 50;
+          doc.addImage(hotelQrCode, 'PNG', 25, yPosition, qrSize, qrSize);
+          
+          // Information box
+          doc.setDrawColor(200, 200, 200);
+          doc.setLineWidth(0.3);
+          doc.rect(85, yPosition, 110, qrSize);
+          doc.setFillColor(248, 249, 250);
+          doc.rect(85, yPosition, 110, 15, 'F');
+          
+          doc.setFontSize(10);
+          doc.setTextColor(125, 1, 1);
+          doc.text('Ubicación del Hotel', 90, yPosition + 10);
+          
+          doc.setFontSize(9);
+          doc.setTextColor(51, 51, 51);
+          doc.text('• Escanea el QR para ver ubicación', 90, yPosition + 22);
+          doc.text('• Se abre Google Maps directamente', 90, yPosition + 30);
+          doc.text('• Muestra la ubicación exacta del hotel', 90, yPosition + 38);
+          
+          doc.setFontSize(8);
+          doc.setTextColor(0, 0, 255);
+          doc.textWithLink('🔗 Ver ubicación', 90, yPosition + 46, { url: hotelLocationUrl });
+          
+          yPosition += qrSize + 20;
+        } catch (error) {
+          console.error('Error generating hotel location QR:', error);
+        }
       }
 
       // Room assignments with proper names
@@ -955,7 +1038,7 @@ export const generatePDF = async (
       yPosition = addContactsSection(yPosition);
       yPosition = addStaffSection(yPosition);
       yPosition = await addTravelSection(yPosition);
-      yPosition = addAccommodationSection(yPosition);
+      yPosition = await addAccommodationSection(yPosition);
       yPosition = addLogisticsSection(yPosition);
       yPosition = addScheduleSection(yPosition);
       yPosition = addTechnicalSection(yPosition);
