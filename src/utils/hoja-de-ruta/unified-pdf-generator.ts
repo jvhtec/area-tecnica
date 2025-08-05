@@ -182,7 +182,25 @@ const formatTime = (time: string): string => {
 const getStaffName = (staffId: string, staffData?: any[]): string => {
   if (!staffId || !staffData) return 'Por asignar';
   
-  // Try to find by exact ID match first
+  // Check if staffId is a numeric string (array index)
+  const numericIndex = parseInt(staffId);
+  if (!isNaN(numericIndex) && numericIndex >= 0 && numericIndex < staffData.length) {
+    const staff = staffData[numericIndex];
+    if (staff) {
+      // Try to get name from different possible structures
+      if (staff.profiles) {
+        return `${staff.profiles.first_name || ''} ${staff.profiles.last_name || ''}`.trim();
+      }
+      if (staff.name || staff.surname1) {
+        return `${staff.name || ''} ${staff.surname1 || ''} ${staff.surname2 || ''}`.trim();
+      }
+      if (staff.first_name || staff.last_name) {
+        return `${staff.first_name || ''} ${staff.last_name || ''}`.trim();
+      }
+    }
+  }
+  
+  // Try to find by exact ID match
   let staff = staffData.find(s => s.id === staffId || s.id?.toString() === staffId);
   
   // If not found, try different ID fields that might be used
