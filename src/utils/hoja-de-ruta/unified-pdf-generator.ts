@@ -148,6 +148,27 @@ const formatPhone = (phone: string): string => {
   return phone;
 };
 
+// Translation function for transportation types
+const translateTransportType = (type: string | undefined): string => {
+  if (!type) return 'N/A';
+  
+  const translations: Record<string, string> = {
+    'van': 'Furgoneta',
+    'sleeper_bus': 'Autobús Cama',
+    'train': 'Tren',
+    'plane': 'Avión',
+    'RV': 'Autocaravana',
+    'trailer': 'Trailer',
+    '9m': '9m',
+    '8m': '8m',
+    '6m': '6m',
+    '4m': '4m',
+    'furgoneta': 'Furgoneta'
+  };
+  
+  return translations[type] || type;
+};
+
 const formatTime = (time: string): string => {
   if (!time) return 'N/A';
   try {
@@ -622,12 +643,12 @@ export const generatePDF = async (
         // Travel arrangement header
         doc.setFontSize(12);
         doc.setTextColor(125, 1, 1);
-        doc.text(`${arrangement.transportation_type || 'Transporte'}`, 20, yPosition);
+        doc.text(`${translateTransportType(arrangement.transportation_type) || 'Transporte'}`, 20, yPosition);
         yPosition += 15;
 
         // Travel details table with all fields
         const travelData = [];
-        if (arrangement.transportation_type) travelData.push(['Tipo', arrangement.transportation_type]);
+        if (arrangement.transportation_type) travelData.push(['Tipo', translateTransportType(arrangement.transportation_type)]);
         if (arrangement.pickup_address) travelData.push(['Dirección Recogida', arrangement.pickup_address]);
         if (arrangement.pickup_time) travelData.push(['Hora Recogida', arrangement.pickup_time]);
         if (arrangement.departure_time) travelData.push(['Hora Salida', arrangement.departure_time]);
@@ -767,7 +788,7 @@ export const generatePDF = async (
       yPosition += 10;
 
       const transportTableData = eventData.logistics.transport.map(transport => [
-        transport.transport_type || 'N/A',
+        translateTransportType(transport.transport_type),
         transport.driver_name || 'N/A',
         formatPhone(transport.driver_phone) || 'N/A',
         transport.license_plate || 'N/A',
