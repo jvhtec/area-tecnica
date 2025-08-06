@@ -794,7 +794,7 @@ export const generatePDF = async (
 
       // Hotel location map and QR code
       if (accommodation.coordinates && accommodation.address) {
-        yPosition = checkPageBreak(yPosition, 120);
+        yPosition = checkPageBreak(yPosition, 200);
         
         try {
           // Generate hotel location URL (not route)
@@ -803,12 +803,47 @@ export const generatePDF = async (
           // Generate QR code for hotel location
           const hotelQrCode = await generateQRCode(hotelLocationUrl);
           
+          // Generate hotel map image
+          const lat = accommodation.coordinates.lat;
+          const lng = accommodation.coordinates.lng;
+          const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=640x320&markers=color:red%7C${lat},${lng}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
+          
+          let hotelMapImage = null;
+          try {
+            const mapResponse = await fetch(mapUrl);
+            if (mapResponse.ok) {
+              const mapBlob = await mapResponse.blob();
+              hotelMapImage = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(mapBlob);
+              });
+            }
+          } catch (mapError) {
+            console.log('Could not load hotel map image:', mapError);
+          }
+          
           doc.setFontSize(11);
           doc.setTextColor(125, 1, 1);
           doc.text('Ubicación del Hotel:', 20, yPosition);
           yPosition += 15;
 
+          // Add hotel map if available
+          if (hotelMapImage) {
+            yPosition = checkPageBreak(yPosition, 100);
+            try {
+              const mapWidth = 160;
+              const mapHeight = 80;
+              doc.addImage(hotelMapImage, 'JPEG', 25, yPosition, mapWidth, mapHeight);
+              yPosition += mapHeight + 15;
+            } catch (error) {
+              console.error("Error adding hotel map:", error);
+            }
+          }
+
           // Add QR code and information
+          yPosition = checkPageBreak(yPosition, 60);
           const qrSize = 50;
           doc.addImage(hotelQrCode, 'PNG', 25, yPosition, qrSize, qrSize);
           
