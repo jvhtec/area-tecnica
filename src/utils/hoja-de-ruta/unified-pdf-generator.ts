@@ -5,6 +5,7 @@ import { es } from 'date-fns/locale';
 import * as QRCode from 'qrcode';
 import { uploadPdfToJob } from './pdf-upload';
 import { supabase } from '@/lib/supabase';
+import { fetchJobLogo } from '@/utils/pdf/logoUtils';
 
 // Types
 interface AutoTableJsPDF extends jsPDF {
@@ -295,25 +296,33 @@ export const generatePDF = async (
   const createdDate = new Date().toLocaleDateString('es-ES');
   const footerSpace = 40;
 
-  // Load job logo - try to get the logo from jobs data
+  // Load job logo using the proper utility function
   let jobLogo: HTMLImageElement | null = null;
   try {
-    // Try to load logo from Supabase storage
-    const { data: { publicUrl } } = await supabase.storage
-      .from('festival-logos')
-      .getPublicUrl(`${selectedJobId}.png`);
+    const logoUrl = await fetchJobLogo(selectedJobId);
+    console.log('Fetched logo URL:', logoUrl);
     
-    if (publicUrl) {
+    if (logoUrl) {
       jobLogo = new Image();
       jobLogo.crossOrigin = 'anonymous';
       await new Promise((resolve, reject) => {
-        jobLogo!.onload = resolve;
-        jobLogo!.onerror = () => resolve(null); // Fail silently
-        jobLogo!.src = publicUrl;
+        if (jobLogo) {
+          jobLogo.onload = () => {
+            console.log('Logo loaded successfully:', logoUrl);
+            resolve(null);
+          };
+          jobLogo.onerror = (error) => {
+            console.log('Logo failed to load:', error);
+            resolve(null); // Fail silently
+          };
+          jobLogo.src = logoUrl;
+        } else {
+          resolve(null);
+        }
       });
     }
   } catch (error) {
-    console.log('No job logo found, continuing without it');
+    console.log('No job logo found, continuing without it:', error);
   }
 
   // Format job date
