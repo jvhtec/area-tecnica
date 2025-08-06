@@ -80,6 +80,7 @@ interface TravelArrangement {
   departure_time?: string;
   arrival_time?: string;
   flight_train_number?: string;
+  company?: string;
   driver_name?: string;
   driver_phone?: string;
   plate_number?: string;
@@ -717,6 +718,7 @@ export const generatePDF = async (
         if (arrangement.departure_time) travelData.push(['Hora Salida', arrangement.departure_time]);
         if (arrangement.arrival_time) travelData.push(['Hora Llegada', arrangement.arrival_time]);
         if (arrangement.flight_train_number) travelData.push(['Vuelo/Tren', arrangement.flight_train_number]);
+        if (arrangement.company) travelData.push(['Compañía', arrangement.company]);
         if (arrangement.driver_name) travelData.push(['Conductor', arrangement.driver_name]);
         if (arrangement.driver_phone) travelData.push(['Teléfono Conductor', formatPhone(arrangement.driver_phone)]);
         if (arrangement.plate_number) travelData.push(['Matrícula', arrangement.plate_number]);
