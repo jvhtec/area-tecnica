@@ -793,6 +793,13 @@ export const generatePDF = async (
       }
 
       // Hotel location map and QR code
+      console.log('Checking hotel location data:', {
+        coordinates: accommodation.coordinates,
+        address: accommodation.address,
+        hasCoordinates: !!accommodation.coordinates,
+        hasAddress: !!accommodation.address
+      });
+      
       if (accommodation.coordinates && accommodation.address) {
         yPosition = checkPageBreak(yPosition, 200);
         
@@ -806,22 +813,36 @@ export const generatePDF = async (
           // Generate hotel map image
           const lat = accommodation.coordinates.lat;
           const lng = accommodation.coordinates.lng;
-          const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=640x320&markers=color:red%7C${lat},${lng}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
+          console.log('Hotel coordinates:', { lat, lng });
+          
+          // Use the API key from environment
+          const apiKey = 'AIzaSyDSptYeQpvfb4fGDJuGlaoequSxIkV-bLs';
+          const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=640x320&markers=color:red%7C${lat},${lng}&key=${apiKey}`;
+          console.log('Hotel map URL:', mapUrl);
           
           let hotelMapImage = null;
           try {
+            console.log('Fetching hotel map from:', mapUrl);
             const mapResponse = await fetch(mapUrl);
+            console.log('Hotel map response status:', mapResponse.status, mapResponse.statusText);
+            
             if (mapResponse.ok) {
               const mapBlob = await mapResponse.blob();
+              console.log('Hotel map blob size:', mapBlob.size);
               hotelMapImage = await new Promise<string>((resolve, reject) => {
                 const reader = new FileReader();
-                reader.onload = () => resolve(reader.result as string);
+                reader.onload = () => {
+                  console.log('Hotel map image data URL created');
+                  resolve(reader.result as string);
+                };
                 reader.onerror = reject;
                 reader.readAsDataURL(mapBlob);
               });
+            } else {
+              console.error('Failed to fetch hotel map:', mapResponse.status, mapResponse.statusText);
             }
           } catch (mapError) {
-            console.log('Could not load hotel map image:', mapError);
+            console.error('Error loading hotel map image:', mapError);
           }
           
           doc.setFontSize(11);
@@ -831,15 +852,19 @@ export const generatePDF = async (
 
           // Add hotel map if available
           if (hotelMapImage) {
+            console.log('Adding hotel map to PDF');
             yPosition = checkPageBreak(yPosition, 100);
             try {
               const mapWidth = 160;
               const mapHeight = 80;
               doc.addImage(hotelMapImage, 'JPEG', 25, yPosition, mapWidth, mapHeight);
               yPosition += mapHeight + 15;
+              console.log('Hotel map added successfully');
             } catch (error) {
-              console.error("Error adding hotel map:", error);
+              console.error("Error adding hotel map to PDF:", error);
             }
+          } else {
+            console.log('No hotel map image available');
           }
 
           // Add QR code and information
