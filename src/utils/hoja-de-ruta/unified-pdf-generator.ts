@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import * as QRCode from 'qrcode';
 import { uploadPdfToJob } from './pdf-upload';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { fetchJobLogo } from '@/utils/pdf/logoUtils';
 
 // Types
@@ -817,8 +817,14 @@ export const generatePDF = async (
           const lng = accommodation.coordinates.lng;
           console.log('Hotel coordinates:', { lat, lng });
           
-          // Use the API key from environment
-          const apiKey = 'AIzaSyDSptYeQpvfb4fGDJuGlaoequSxIkV-bLs';
+          // Fetch Google Maps API key securely
+          const { data: secretData, error: secretError } = await supabase.functions.invoke('get-secret', {
+            body: { secretName: 'GOOGLE_MAPS_API_KEY' }
+          });
+          if (secretError) {
+            console.error('Failed to fetch Google Maps API key:', secretError);
+          }
+          const apiKey = (secretData && (secretData as any).GOOGLE_MAPS_API_KEY) || '';
           const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=640x320&markers=color:red%7C${lat},${lng}&key=${apiKey}`;
           console.log('Hotel map URL:', mapUrl);
           
