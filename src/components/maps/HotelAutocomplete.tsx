@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MapPin, Building, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 declare global {
   interface Window {
@@ -53,23 +54,18 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
   useEffect(() => {
     const fetchApiKey = async () => {
       try {
-        const response = await fetch('https://syldobdcdsgfgjtbuwxm.supabase.co/functions/v1/get-secret', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN5bGRvYmRjZHNnZmdqdGJ1d3htIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU5NDE1ODcsImV4cCI6MjA1MTUxNzU4N30.iLtE6_xC0FE21JKzy77UPAvferh4l1WeLvvVCn15YJc`
-          },
-          body: JSON.stringify({ secretName: 'GOOGLE_MAPS_API_KEY' })
+        const { data, error } = await supabase.functions.invoke('get-secret', {
+          body: { secretName: 'GOOGLE_MAPS_API_KEY' }
         });
         
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        if (error) {
+          console.error('Failed to fetch Google Maps API key:', error);
+          return;
         }
         
-        const data = await response.json();
         console.log('API key response:', data);
         
-        if (data.GOOGLE_MAPS_API_KEY) {
+        if (data?.GOOGLE_MAPS_API_KEY) {
           setApiKey(data.GOOGLE_MAPS_API_KEY);
           console.log('Google Maps API key loaded for hotel autocomplete');
         } else {
