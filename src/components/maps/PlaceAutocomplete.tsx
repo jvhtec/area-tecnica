@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Loader2, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -18,6 +20,12 @@ interface PlaceAutocompleteProps {
   className?: string;
 }
 
+interface PredictionItem {
+  place_id: string;
+  name: string;
+  formatted_address: string;
+}
+
 export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   value,
   onSelect,
@@ -25,15 +33,24 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   label = 'Lugar',
   className,
 }) => {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<any>(null);
+  const [inputValue, setInputValue] = useState(value || '');
+  const [suggestions, setSuggestions] = useState<PredictionItem[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [apiKey, setApiKey] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<number | undefined>(undefined);
+  const cacheRef = useRef<Record<string, PredictionItem[]>>({});
 
+  // Keep local input in sync with external value
+  useEffect(() => {
+    setInputValue(value || '');
+  }, [value]);
+
+  // Fetch Google Maps API key securely
   useEffect(() => {
     const fetchApiKey = async () => {
       try {
-        setIsLoading(true);
         const { data, error } = await supabase.functions.invoke('get-secret', {
           body: { secretName: 'GOOGLE_MAPS_API_KEY' },
         });
@@ -46,122 +63,198 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
         }
       } catch (err) {
         console.error('Error fetching API key:', err);
-      } finally {
-        setIsLoading(false);
       }
     };
-
     fetchApiKey();
   }, []);
 
   useEffect(() => {
-    if (!apiKey || !inputRef.current) return;
-
-    const loadAutocomplete = () => {
-      if (!window.google) {
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
-        script.async = true;
-        script.defer = true;
-        script.onload = initAutocomplete;
-        document.head.appendChild(script);
-      } else {
-        initAutocomplete();
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
       }
     };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-    const initAutocomplete = async () => {
-      if (!inputRef.current || !window.google) return;
+  const searchPlaces = async (query: string) => {
+    if (!apiKey || !query || query.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
 
-      try {
-        const { PlaceAutocompleteElement } = await window.google.maps.importLibrary('places' as any);
-        autocompleteRef.current = new (PlaceAutocompleteElement as any)();
-        autocompleteRef.current.id = 'place-autocomplete';
-        autocompleteRef.current.setAttribute('placeholder', placeholder);
-        // Prefer establishments and addresses
-        autocompleteRef.current.setAttribute('types', 'establishment,geocode');
+    if (cacheRef.current[query]) {
+      setSuggestions(cacheRef.current[query]);
+      setShowSuggestions(true);
+      return;
+    }
 
-        if (inputRef.current.parentNode) {
-          inputRef.current.parentNode.replaceChild(autocompleteRef.current, inputRef.current);
+    setIsLoading(true);
+
+    try {
+      // Try Places Text Search first (good for establishments)
+      const textSearchRes = await fetch('https://places.googleapis.com/v1/places:searchText', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types',
+        },
+        body: JSON.stringify({
+          textQuery: query,
+          maxResultCount: 6,
+        }),
+      });
+
+      if (textSearchRes.ok) {
+        const data = await textSearchRes.json();
+        if (data.places && data.places.length > 0) {
+          const results: PredictionItem[] = data.places.map((p: any) => ({
+            place_id: p.id,
+            name: p.displayName?.text || p.formattedAddress,
+            formatted_address: p.formattedAddress || '',
+          }));
+          cacheRef.current[query] = results;
+          setSuggestions(results);
+          setShowSuggestions(true);
+          setIsLoading(false);
+          return;
         }
-
-        autocompleteRef.current.addEventListener('gmp-placeselect', async (event: any) => {
-          const place = event.target.place;
-          if (!place) return;
-
-          try {
-            await place.fetchFields({
-              fields: ['displayName', 'formattedAddress', 'location'],
-            });
-          } catch (e) {
-            console.warn('fetchFields failed, continuing with available data', e);
-          }
-
-          const coordinates = place.location
-            ? { lat: place.location.lat(), lng: place.location.lng() }
-            : undefined;
-
-          onSelect({
-            name: place.displayName || '',
-            address: place.formattedAddress || '',
-            coordinates,
-          });
-        });
-      } catch (error) {
-        console.error('Error initializing place autocomplete:', error);
-        initLegacyAutocomplete();
       }
-    };
 
-    const initLegacyAutocomplete = () => {
-      if (!inputRef.current || !window.google) return;
-      // Legacy Autocomplete with establishment bias
-      autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current as any, {
-        types: ['establishment', 'geocode'],
-        fields: ['name', 'formatted_address', 'geometry'],
+      // Fallback to Autocomplete API for broader matches (establishments + addresses)
+      const acRes = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat',
+        },
+        body: JSON.stringify({
+          input: query,
+          includedPrimaryTypes: ['establishment', 'point_of_interest'],
+          // We still want addresses if user types one
+          includedSecondaryTypes: ['street_address', 'route', 'premise'],
+          maxResultCount: 6,
+        }),
       });
 
-      autocompleteRef.current.addListener('place_changed', () => {
-        const place = autocompleteRef.current.getPlace();
-        const coordinates = place.geometry?.location
-          ? { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() }
-          : undefined;
-        onSelect({
-          name: place.name || '',
-          address: place.formatted_address || '',
-          coordinates,
-        });
-      });
-    };
-
-    loadAutocomplete();
-
-    return () => {
-      if (autocompleteRef.current) {
-        window.google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
+      if (acRes.ok) {
+        const data = await acRes.json();
+        const results: PredictionItem[] = (data.suggestions || [])
+          .filter((s: any) => s.placePrediction)
+          .map((s: any) => ({
+            place_id: s.placePrediction.placeId,
+            name: s.placePrediction.structuredFormat?.mainText?.text || s.placePrediction.text?.text,
+            formatted_address: s.placePrediction.structuredFormat?.secondaryText?.text || '',
+          }));
+        cacheRef.current[query] = results;
+        setSuggestions(results);
+        setShowSuggestions(results.length > 0);
+      } else {
+        console.error('Places Autocomplete API error:', acRes.status);
+        setSuggestions([]);
+        setShowSuggestions(false);
       }
-    };
-  }, [apiKey, onSelect, placeholder]);
+    } catch (e) {
+      console.error('Error searching places:', e);
+      setSuggestions([]);
+      setShowSuggestions(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getPlaceDetails = async (placeId: string, fallbackName: string, fallbackAddress?: string) => {
+    if (!apiKey) {
+      onSelect({ name: fallbackName, address: fallbackAddress || '' });
+      return;
+    }
+    try {
+      const res = await fetch(`https://places.googleapis.com/v1/places/${placeId}` +
+        `?fields=id,displayName,formattedAddress,location`, {
+        headers: {
+          'X-Goog-Api-Key': apiKey,
+        },
+      });
+      if (!res.ok) throw new Error(`Place Details API error: ${res.status}`);
+      const place = await res.json();
+      const coordinates = place.location
+        ? { lat: place.location.latitude, lng: place.location.longitude }
+        : undefined;
+      const result: PlaceAutocompleteResult = {
+        name: place.displayName?.text || fallbackName,
+        address: place.formattedAddress || fallbackAddress || '',
+        coordinates,
+      };
+      onSelect(result);
+      setInputValue(result.name);
+      setShowSuggestions(false);
+    } catch (err) {
+      console.error('Error fetching place details:', err);
+      onSelect({ name: fallbackName, address: fallbackAddress || '' });
+      setInputValue(fallbackName);
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    setInputValue(v);
+    // Debounce
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => searchPlaces(v), 400);
+  };
+
+  const handleSelect = (item: PredictionItem) => {
+    getPlaceDetails(item.place_id, item.name, item.formatted_address);
+  };
 
   return (
-    <div className={className}>
+    <div className={className} ref={containerRef}>
       {label && <Label htmlFor="place-autocomplete">{label}</Label>}
       <div className="relative">
         <Input
-          ref={inputRef}
           id="place-autocomplete"
-          value={value}
-          onChange={() => { /* controlled by parent or selection; typing allowed before replacement */ }}
+          value={inputValue}
+          onChange={handleInputChange}
           placeholder={placeholder}
-          className="pr-8"
+          className="pl-9"
+          onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
         />
-        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">
           {isLoading ? (
             <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-          ) : (
-            <MapPin className="w-4 h-4 text-muted-foreground" />
-          )}
+          ) : null}
         </div>
+
+        {showSuggestions && suggestions.length > 0 && (
+          <Card className="absolute z-50 mt-1 w-full border-2 shadow-sm">
+            <div className="max-h-64 overflow-auto py-1">
+              {suggestions.map((s) => (
+                <Button
+                  key={s.place_id}
+                  variant="ghost"
+                  className="w-full h-auto justify-start px-3 py-2 text-left"
+                  onClick={() => handleSelect(s)}
+                >
+                  <div className="flex items-start gap-2">
+                    <MapPin className="w-4 h-4 mt-0.5 text-primary" />
+                    <div>
+                      <div className="text-sm font-medium">{s.name}</div>
+                      {s.formatted_address && (
+                        <div className="text-xs text-muted-foreground">{s.formatted_address}</div>
+                      )}
+                    </div>
+                  </div>
+                </Button>
+              ))}
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );
