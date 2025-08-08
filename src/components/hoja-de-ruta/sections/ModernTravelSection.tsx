@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { motion, AnimatePresence } from "framer-motion";
 import { Car, Plus, Trash2, Plane, Bus, Train, MapPin, Clock, User, Phone, Hash } from "lucide-react";
 import { TravelArrangement } from "@/types/hoja-de-ruta";
+import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
 
 interface ModernTravelSectionProps {
   travelArrangements: TravelArrangement[];
@@ -138,11 +139,10 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
                           <MapPin className="w-4 h-4" />
                           Dirección de Recogida
                         </Label>
-                        <Input
+                        <AddressAutocomplete
                           value={arrangement.pickup_address || ''}
-                          onChange={(e) => onUpdate(index, 'pickup_address', e.target.value)}
-                          placeholder="Dirección completa"
-                          className="border-2 focus:border-cyan-300"
+                          onChange={(address) => onUpdate(index, 'pickup_address', address)}
+                          placeholder="Buscar dirección de recogida..."
                         />
                       </div>
 

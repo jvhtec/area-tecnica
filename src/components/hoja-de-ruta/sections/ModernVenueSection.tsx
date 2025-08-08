@@ -8,6 +8,7 @@ import { MapPin, Upload, X, Image as ImageIcon, Map, Plus, Settings } from "luci
 import { EventData, Images, ImagePreviews } from "@/types/hoja-de-ruta";
 import { GoogleMap } from "@/components/maps/GoogleMap";
 import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
+import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface ModernVenueSectionProps {
@@ -192,16 +193,20 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
                   <div className="space-y-4">
                     <div>
                       <Label htmlFor="venue-name">Nombre del Venue</Label>
-                      <Input
-                        id="venue-name"
-                        value={eventData.venue.name}
-                        onChange={(e) =>
+                      <PlaceAutocomplete
+                        value={eventData.venue.name || ''}
+                        onSelect={({ name, address, coordinates }) =>
                           setEventData(prev => ({
                             ...prev,
-                            venue: { ...prev.venue, name: e.target.value }
+                            venue: {
+                              ...prev.venue,
+                              name: name || prev.venue.name,
+                              address: address || prev.venue.address,
+                              coordinates: coordinates || prev.venue.coordinates,
+                            }
                           }))
                         }
-                        placeholder="Ej. Palacio de Congresos"
+                        placeholder="Buscar venue o lugar..."
                       />
                     </div>
                     <div>
