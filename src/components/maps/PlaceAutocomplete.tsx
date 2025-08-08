@@ -134,9 +134,8 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
         },
         body: JSON.stringify({
           input: query,
+          // establishments and POIs; addresses may still appear
           includedPrimaryTypes: ['establishment', 'point_of_interest'],
-          // We still want addresses if user types one
-          includedSecondaryTypes: ['street_address', 'route', 'premise'],
           maxResultCount: 6,
         }),
       });
@@ -173,10 +172,10 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
       return;
     }
     try {
-      const res = await fetch(`https://places.googleapis.com/v1/places/${placeId}` +
-        `?fields=id,displayName,formattedAddress,location`, {
+      const res = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
         headers: {
           'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'id,displayName,formattedAddress,location',
         },
       });
       if (!res.ok) throw new Error(`Place Details API error: ${res.status}`);
