@@ -132,12 +132,10 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
           'X-Goog-Api-Key': apiKey,
           'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat',
         },
-        body: JSON.stringify({
-          input: query,
-          // establishments and POIs; addresses may still appear
-          includedPrimaryTypes: ['establishment', 'point_of_interest'],
-          maxResultCount: 6,
-        }),
+          body: JSON.stringify({
+            input: query,
+            maxResultCount: 6,
+          }),
       });
 
       if (acRes.ok) {
