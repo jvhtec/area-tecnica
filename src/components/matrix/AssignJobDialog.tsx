@@ -227,6 +227,11 @@ export const AssignJobDialog = ({
         `${isReassignment ? 'Reassigned' : 'Assigned'} ${technician.first_name} ${technician.last_name} to ${selectedJob?.title} (${statusText})`
       );
       
+      // Force refresh of queries by dispatching a custom event
+      window.dispatchEvent(new CustomEvent('assignment-updated', { 
+        detail: { technicianId, jobId: selectedJobId } 
+      }));
+      
       // Small delay to ensure the toast is visible before closing
       setTimeout(() => {
         onClose();

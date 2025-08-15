@@ -17,17 +17,17 @@ export default function JobAssignmentMatrix() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Generate optimized date range for visible period (3 months around current date)
+  // Generate optimized date range - much smaller for better performance
   const dateRange = useMemo(() => {
     const today = new Date();
     const currentYear = today.getFullYear();
     
     if (selectedYear === currentYear) {
-      // For current year, show only 6 weeks around today for better performance
+      // For current year, show only 2 weeks around today for optimal performance
       const startDate = new Date(today);
-      startDate.setDate(today.getDate() - 21); // 3 weeks before
+      startDate.setDate(today.getDate() - 7); // 1 week before
       const endDate = new Date(today);
-      endDate.setDate(today.getDate() + 21); // 3 weeks after
+      endDate.setDate(today.getDate() + 14); // 2 weeks after
       
       const dates = [];
       let currentDate = startDate;
@@ -39,9 +39,9 @@ export default function JobAssignmentMatrix() {
       
       return dates;
     } else {
-      // For other years, show only 3 months for performance
+      // For other years, show only 1 month for performance
       const startDate = startOfYear(new Date(selectedYear, 0, 1));
-      const endDate = new Date(selectedYear, 2, 31); // First 3 months
+      const endDate = new Date(selectedYear, 0, 31); // First month only
       const dates = [];
       let currentDate = startDate;
       
@@ -125,6 +125,10 @@ export default function JobAssignmentMatrix() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
+    
+    // Dispatch the assignment update event to force refresh
+    window.dispatchEvent(new CustomEvent('assignment-updated'));
+    
     setTimeout(() => setIsRefreshing(false), 1000);
   };
 

@@ -73,6 +73,17 @@ export const OptimizedAssignmentMatrix = ({ technicians, dates, jobs }: Optimize
     isLoading
   } = useOptimizedMatrixData({ technicians, dates, jobs });
 
+  // Listen for assignment updates and refresh data
+  useEffect(() => {
+    const handleAssignmentUpdate = () => {
+      console.log('Assignment update event received, refreshing data...');
+      invalidateAssignmentQueries();
+    };
+
+    window.addEventListener('assignment-updated', handleAssignmentUpdate);
+    return () => window.removeEventListener('assignment-updated', handleAssignmentUpdate);
+  }, [invalidateAssignmentQueries]);
+
   // Start performance monitoring
   useEffect(() => {
     startRenderTimer();

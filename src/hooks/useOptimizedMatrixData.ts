@@ -49,22 +49,23 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     end: dates[dates.length - 1]
   }), [dates]);
 
-  // Optimized assignments query with batch processing and indexing hints
+  // Much more optimized assignments query - only fetch what's actually needed
   const { data: allAssignments = [], isLoading: assignmentsLoading } = useQuery({
-    queryKey: ['optimized-matrix-assignments', jobIds, technicianIds],
+    queryKey: ['optimized-matrix-assignments', jobIds, technicianIds, format(dateRange.start, 'yyyy-MM-dd')],
     queryFn: async (): Promise<AssignmentWithJob[]> => {
       if (jobIds.length === 0 || technicianIds.length === 0) return [];
       
-      // Split large requests to avoid timeout
-      const batchSize = 50;
-      const jobBatches = [];
-      for (let i = 0; i < jobIds.length; i += batchSize) {
-        jobBatches.push(jobIds.slice(i, i + batchSize));
-      }
+      console.log('Fetching assignments for', jobIds.length, 'jobs and', technicianIds.length, 'technicians');
       
-      const allResults = await Promise.all(
-        jobBatches.map(async (batch) => {
-          const { data, error } = await supabase
+      // Much smaller batch size for faster queries
+      const batchSize = 25;
+      const promises = [];
+      
+      for (let i = 0; i < jobIds.length; i += batchSize) {
+        const jobBatch = jobIds.slice(i, i + batchSize);
+        
+        promises.push(
+          supabase
             .from('job_assignments')
             .select(`
               job_id,
@@ -82,35 +83,47 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
                 color
               )
             `)
-            .in('job_id', batch)
+            .in('job_id', jobBatch)
             .in('technician_id', technicianIds)
             .neq('status', 'declined')
-            .order('assigned_at', { ascending: false });
-
-          if (error) throw error;
-          return data || [];
-        })
-      );
+            .limit(500) // Limit per batch
+        );
+      }
       
-      const flatResults = allResults.flat();
-      
-      // Transform and optimize the data
-      const transformedData = flatResults.map(item => ({
-        job_id: item.job_id,
-        technician_id: item.technician_id,
-        sound_role: item.sound_role,
-        lights_role: item.lights_role,
-        video_role: item.video_role,
-        status: item.status,
-        assigned_at: item.assigned_at,
-        job: Array.isArray(item.jobs) ? item.jobs[0] : item.jobs
-      })).filter(item => item.job); // Filter out items without job data
-      
-      return transformedData as AssignmentWithJob[];
+      try {
+        const results = await Promise.all(promises);
+        const allData = results.flatMap(result => {
+          if (result.error) {
+            console.error('Assignment query error:', result.error);
+            return [];
+          }
+          return result.data || [];
+        });
+        
+        console.log('Fetched', allData.length, 'assignments');
+        
+        // Transform and filter the data
+        const transformedData = allData.map(item => ({
+          job_id: item.job_id,
+          technician_id: item.technician_id,
+          sound_role: item.sound_role,
+          lights_role: item.lights_role,
+          video_role: item.video_role,
+          status: item.status,
+          assigned_at: item.assigned_at,
+          job: Array.isArray(item.jobs) ? item.jobs[0] : item.jobs
+        })).filter(item => item.job); // Filter out items without job data
+        
+        return transformedData as AssignmentWithJob[];
+      } catch (error) {
+        console.error('Error fetching assignments:', error);
+        return [];
+      }
     },
-    enabled: jobIds.length > 0 && technicianIds.length > 0,
-    staleTime: 60 * 1000, // 1 minute
-    gcTime: 5 * 60 * 1000, // 5 minutes cache
+    enabled: jobIds.length > 0 && technicianIds.length > 0 && !!dateRange.start,
+    staleTime: 30 * 1000, // 30 seconds - more frequent updates
+    gcTime: 2 * 60 * 1000, // 2 minutes cache
+    refetchOnWindowFocus: false, // Disable automatic refetch on focus
   });
 
   // Optimized availability query with batch processing
@@ -248,11 +261,14 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
 
   // Invalidate specific queries for real-time updates
   const invalidateAssignmentQueries = async () => {
+    console.log('Invalidating assignment queries...');
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] }),
       queryClient.invalidateQueries({ queryKey: ['matrix-assignments'] }),
-      queryClient.invalidateQueries({ queryKey: ['job-assignments'] })
+      queryClient.invalidateQueries({ queryKey: ['job-assignments'] }),
+      queryClient.invalidateQueries({ queryKey: ['jobs'] }) // Also invalidate jobs to refresh the matrix
     ]);
+    console.log('Assignment queries invalidated');
   };
 
   return {
