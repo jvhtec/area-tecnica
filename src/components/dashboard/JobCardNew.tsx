@@ -786,40 +786,47 @@ export function JobCardNew({
           </div>
         )}
 
-        <div className="p-6 pb-3">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div className="flex items-center gap-1">
-                {getDateTypeIcon(job.id, new Date(job.start_time), dateTypes)}
-                <span className="font-medium text-lg break-words whitespace-normal">{job.title}</span>
-                {getBadgeForJobType(job.job_type)}
+        <div className="p-3 sm:p-6 pb-3">
+          <div className="flex items-start justify-between gap-2 sm:gap-4">
+            <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-1">
+              <div className="flex items-start sm:items-center gap-1 min-w-0 flex-1">
+                <div className="shrink-0 mt-0.5 sm:mt-0">
+                  {getDateTypeIcon(job.id, new Date(job.start_time), dateTypes)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-medium text-sm sm:text-lg leading-tight break-words line-clamp-2">{job.title}</h3>
+                  <div className="mt-1 sm:mt-2">
+                    {getBadgeForJobType(job.job_type)}
+                  </div>
+                </div>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={toggleCollapse}
                 title="Toggle Details"
-                className="ml-2 hover:bg-accent/50 shrink-0"
+                className="hover:bg-accent/50 shrink-0 h-8 w-8 sm:h-10 sm:w-10"
                 disabled={isJobBeingDeleted}
               >
                 {collapsed ? (
-                  <ChevronDown className="h-4 w-4" />
+                  <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
                 ) : (
-                  <ChevronUp className="h-4 w-4" />
+                  <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4" />
                 )}
               </Button>
             </div>
-            <div className="flex flex-wrap gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-wrap gap-1 sm:gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
               {/* Timesheet button - available for all users */}
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleTimesheetClick}
-                className="hover:bg-accent/50"
+                className="hover:bg-accent/50 text-xs sm:text-sm px-2 sm:px-3 h-7 sm:h-8"
                 disabled={isJobBeingDeleted}
               >
-                <ClipboardList className="h-4 w-4 mr-2" />
-                Timesheet
+                <ClipboardList className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Timesheet</span>
+                <span className="sm:hidden">Time</span>
               </Button>
               
               {job.job_type === "festival" && isProjectManagementPage && canManageArtists && (
@@ -827,10 +834,13 @@ export function JobCardNew({
                   variant="outline"
                   size="sm"
                   onClick={handleFestivalArtistsClick}
-                  className="hover:bg-accent/50"
+                  className="hover:bg-accent/50 text-xs sm:text-sm px-2 sm:px-3 h-7 sm:h-8"
                   disabled={isJobBeingDeleted}
                 >
-                  {userRole === 'technician' || userRole === 'house_tech' ? 'View Festival' : 'Manage Festival'}
+                  <span className="hidden sm:inline">
+                    {userRole === 'technician' || userRole === 'house_tech' ? 'View Festival' : 'Manage Festival'}
+                  </span>
+                  <span className="sm:hidden">Festival</span>
                 </Button>
               )}
               {!isHouseTech && job.job_type !== "dryhire" && isProjectManagementPage && (
@@ -843,11 +853,12 @@ export function JobCardNew({
                       setAssignmentDialogOpen(true);
                     }
                   }}
-                  className="hover:bg-accent/50"
+                  className="hover:bg-accent/50 text-xs sm:text-sm px-2 sm:px-3 h-7 sm:h-8"
                   disabled={isJobBeingDeleted}
                 >
-                  <Users className="h-4 w-4 mr-2" />
-                  Assign
+                  <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Assign</span>
+                  <span className="sm:hidden">Assign</span>
                 </Button>
               )}
               <Button
@@ -855,10 +866,10 @@ export function JobCardNew({
                 size="icon"
                 onClick={refreshData}
                 title="Refresh"
-                className="hover:bg-accent/50"
+                className="hover:bg-accent/50 h-7 w-7 sm:h-8 sm:w-8"
                 disabled={isJobBeingDeleted}
               >
-                <RefreshCw className="h-4 w-4" />
+                <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
               {canEditJobs && (
                 <>
@@ -867,19 +878,19 @@ export function JobCardNew({
                     size="icon"
                     onClick={handleEditButtonClick}
                     title="Edit job details"
-                    className="hover:bg-accent/50"
+                    className="hover:bg-accent/50 h-7 w-7 sm:h-8 sm:w-8"
                     disabled={isJobBeingDeleted}
                   >
-                    <Edit className="h-4 w-4" />
+                    <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={handleDeleteClick}
-                    className="hover:bg-accent/50"
+                    className="hover:bg-accent/50 h-7 w-7 sm:h-8 sm:w-8"
                     disabled={isJobBeingDeleted}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
                 </>
               )}
@@ -946,12 +957,12 @@ export function JobCardNew({
           </div>
         </div>
 
-        <div className="px-6 pb-6">
-          <div className="space-y-2 text-sm">
+        <div className="px-3 sm:px-6 pb-3 sm:pb-6">
+          <div className="space-y-2 text-xs sm:text-sm">
             <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <div className="flex flex-col">
-                <span>
+              <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
+              <div className="flex flex-col min-w-0">
+                <span className="truncate">
                   {format(new Date(job.start_time), "MMM d, yyyy")} -{" "}
                   {format(new Date(job.end_time), "MMM d, yyyy")}
                 </span>
@@ -962,19 +973,19 @@ export function JobCardNew({
             </div>
             {job.location?.name && (
               <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">{job.location.name}</span>
+                <MapPin className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
+                <span className="font-medium truncate">{job.location.name}</span>
               </div>
             )}
             {job.job_type !== "dryhire" && (
               <>
                 {assignedTechnicians.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <div className="flex flex-wrap gap-1">
+                  <div className="flex items-start gap-2">
+                    <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="flex flex-wrap gap-1 min-w-0">
                       {assignedTechnicians.map((tech) => (
-                        <Badge key={tech.id} variant="secondary" className="text-xs">
-                          {tech.name} {tech.role && `(${tech.role})`}
+                        <Badge key={tech.id} variant="secondary" className="text-xs max-w-full">
+                          <span className="truncate">{tech.name} {tech.role && `(${tech.role})`}</span>
                         </Badge>
                       ))}
                     </div>
@@ -983,7 +994,7 @@ export function JobCardNew({
                 
                 {documents.length > 0 && (
                   <div className="mt-4 space-y-2">
-                    <div className="text-sm font-medium">Documents</div>
+                    <div className="text-xs sm:text-sm font-medium">Documents</div>
                     <div className="space-y-2">
                       {documents.map((doc) => (
                         <div
@@ -991,21 +1002,24 @@ export function JobCardNew({
                           className="flex items-center justify-between p-2 rounded-md bg-accent/20 hover:bg-accent/30 transition-colors"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium">{doc.file_name}</span>
+                          <div className="flex flex-col min-w-0 flex-1 mr-2">
+                            <span className="text-xs sm:text-sm font-medium truncate" title={doc.file_name}>
+                              {doc.file_name}
+                            </span>
                             <span className="text-xs text-muted-foreground">
                               Uploaded {format(new Date(doc.uploaded_at), "MMM d, yyyy")}
                             </span>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-1 shrink-0">
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => handleViewDocument(doc)}
                               title="View"
                               disabled={isJobBeingDeleted}
+                              className="h-7 w-7 sm:h-8 sm:w-8"
                             >
-                              <Eye className="h-4 w-4" />
+                              <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -1013,8 +1027,9 @@ export function JobCardNew({
                               onClick={() => handleDownload(doc)}
                               title="Download"
                               disabled={isJobBeingDeleted}
+                              className="h-7 w-7 sm:h-8 sm:w-8"
                             >
-                              <Download className="h-4 w-4" />
+                              <Download className="h-3 w-3 sm:h-4 sm:w-4" />
                             </Button>
                             {['admin', 'management'].includes(userRole || '') && (
                               <Button
@@ -1023,8 +1038,9 @@ export function JobCardNew({
                                 onClick={() => handleDeleteDocument(doc)}
                                 title="Delete"
                                 disabled={isJobBeingDeleted}
+                                className="h-7 w-7 sm:h-8 sm:w-8"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                               </Button>
                             )}
                           </div>
