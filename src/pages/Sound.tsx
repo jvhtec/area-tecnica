@@ -148,15 +148,15 @@ const Sound = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 space-y-4 sm:space-y-6">
       <LightsHeader 
         onCreateJob={() => setIsJobDialogOpen(true)}
         onCreateTour={() => setIsTourDialogOpen(true)}
         department="Sound"
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-12">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:gap-8">
+        <div className="w-full">
           <CalendarSection 
             date={date} 
             onDateSelect={setDate}
@@ -165,7 +165,7 @@ const Sound = () => {
             onDateTypeChange={() => {}}
           />
         </div>
-        <div className="lg:col-span-12">
+        <div className="w-full">
           <TodaySchedule
             jobs={getSelectedDateJobs()}
             onEditClick={handleEditClick}
@@ -177,79 +177,79 @@ const Sound = () => {
         </div>
       </div>
 
-      <Card className="mt-8">
-        <div className="p-6">
-          <h2 className="text-2xl font-semibold mb-4">Tools</h2>
-          <Separator className="mb-6" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
+      <Card className="mt-4 sm:mt-8">
+        <div className="p-4 sm:p-6">
+          <h2 className="text-xl sm:text-2xl font-semibold mb-3 sm:mb-4">Tools</h2>
+          <Separator className="mb-4 sm:mb-6" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4">
             <Button
               variant="outline"
               size="lg"
-              className="w-full h-auto py-4 flex flex-col items-center gap-2"
+              className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
               onClick={() => navigate('/pesos-tool')}
             >
-              <Calculator className="h-6 w-6" />
-              <span>Weight Calculator</span>
+              <Calculator className="h-4 w-4 sm:h-6 sm:w-6" />
+              <span className="text-center leading-tight">Weight Calculator</span>
             </Button>
 
             <Button
               variant="outline"
               size="lg"
-              className="w-full h-auto py-4 flex flex-col items-center gap-2"
+              className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
               onClick={() => navigate('/consumos-tool')}
             >
-              <PieChart className="h-6 w-6" />
-              <span>Power Calculator</span>
+              <PieChart className="h-4 w-4 sm:h-6 sm:w-6" />
+              <span className="text-center leading-tight">Power Calculator</span>
             </Button>
 
             <Button
               variant="outline"
               size="lg"
-              className="w-full h-auto py-4 flex flex-col items-center gap-2"
+              className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
               onClick={() => setShowReportGenerator(true)}
             >
-              <FileText className="h-6 w-6" />
-              <span>SV Report Generator</span>
+              <FileText className="h-4 w-4 sm:h-6 sm:w-6" />
+              <span className="text-center leading-tight">SV Report Generator</span>
             </Button>
 
             <Button
               variant="outline"
               size="lg"
-              className="w-full h-auto py-4 flex flex-col items-center gap-2"
+              className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
               onClick={() => setShowAnalysisForm(true)}
             >
-              <Sparkles className="h-6 w-6" />
-              <span>AI Rider Analysis</span>
+              <Sparkles className="h-4 w-4 sm:h-6 sm:w-6" />
+              <span className="text-center leading-tight">AI Rider Analysis</span>
             </Button>
 
             <Button
               variant="outline"
               size="lg"
-              className="w-full h-auto py-4 flex flex-col items-center gap-2"
+              className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
               onClick={() => setShowAmplifierTool(true)}
             >
-              <Zap className="h-6 w-6" />
-              <span>Amplifier Calculator</span>
+              <Zap className="h-4 w-4 sm:h-6 sm:w-6" />
+              <span className="text-center leading-tight">Amplifier Calculator</span>
             </Button>
 
             <Button
               variant="outline"
               size="lg"
-              className="w-full h-auto py-4 flex flex-col items-center gap-2"
+              className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
               onClick={() => setShowMemoriaTecnica(true)}
             >
-              <FileStack className="h-6 w-6" />
-              <span>Memoria Técnica</span>
+              <FileStack className="h-4 w-4 sm:h-6 sm:w-6" />
+              <span className="text-center leading-tight">Memoria Técnica</span>
             </Button>
 
             <Button
               variant="outline"
               size="lg"
-              className="w-full h-auto py-4 flex flex-col items-center gap-2"
+              className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
               onClick={() => navigate('/festivals')}
             >
-              <Tent className="h-6 w-6" />
-              <span>Festivals</span>
+              <Tent className="h-4 w-4 sm:h-6 sm:w-6" />
+              <span className="text-center leading-tight">Festivals</span>
             </Button>
           </div>
         </div>
@@ -287,7 +287,7 @@ const Sound = () => {
       )}
       
       <Dialog open={showReportGenerator} onOpenChange={setShowReportGenerator}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Generador de Reportes</DialogTitle>
           </DialogHeader>
@@ -296,7 +296,7 @@ const Sound = () => {
       </Dialog>
 
       <Dialog open={showAnalysisForm} onOpenChange={setShowAnalysisForm}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Análisis de PDF</DialogTitle>
           </DialogHeader>
@@ -305,7 +305,7 @@ const Sound = () => {
       </Dialog>
 
       <Dialog open={showAmplifierTool} onOpenChange={setShowAmplifierTool}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Calculadora de Amplificadores</DialogTitle>
           </DialogHeader>
@@ -314,7 +314,7 @@ const Sound = () => {
       </Dialog>
 
       <Dialog open={showMemoriaTecnica} onOpenChange={setShowMemoriaTecnica}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Memoria Técnica</DialogTitle>
           </DialogHeader>
