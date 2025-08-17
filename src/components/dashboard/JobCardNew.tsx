@@ -794,9 +794,17 @@ export function JobCardNew({
                   {getDateTypeIcon(job.id, new Date(job.start_time), dateTypes)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-medium text-sm sm:text-lg leading-tight break-words line-clamp-2">{job.title}</h3>
-                  <div className="mt-1 sm:mt-2">
+                  {/* Mobile: Show job title on its own line with better spacing */}
+                  <div className="sm:hidden">
+                    <h3 className="font-medium text-sm leading-tight mb-1">{job.title}</h3>
                     {getBadgeForJobType(job.job_type)}
+                  </div>
+                  {/* Desktop: Keep original layout */}
+                  <div className="hidden sm:block">
+                    <h3 className="font-medium text-lg leading-tight break-words line-clamp-2">{job.title}</h3>
+                    <div className="mt-2">
+                      {getBadgeForJobType(job.job_type)}
+                    </div>
                   </div>
                 </div>
               </div>
