@@ -793,10 +793,10 @@ export function JobCardNew({
                 <div className="shrink-0 mt-0.5 sm:mt-0">
                   {getDateTypeIcon(job.id, new Date(job.start_time), dateTypes)}
                 </div>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 pr-2">
                   {/* Mobile: Show job title on its own line with better spacing */}
                   <div className="sm:hidden">
-                    <h3 className="font-medium text-sm leading-tight mb-1">{job.title}</h3>
+                    <h3 className="font-medium text-sm leading-tight mb-1 pr-16">{job.title}</h3>
                     {getBadgeForJobType(job.job_type)}
                   </div>
                   {/* Desktop: Keep original layout */}
