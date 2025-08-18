@@ -87,12 +87,28 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
     doc.text('All artists have complete technical riders!', 20, yPosition);
   } else {
     // Create table data
-    const tableData = data.artists.map(artist => [
-      artist.name,
-      `Stage ${artist.stage}`,
-      format(new Date(artist.date), 'EEE, MMM d'),
-      `${artist.showTime.start} - ${artist.showTime.end}`
-    ]);
+    const tableData = data.artists.map(artist => {
+      // Safely format date
+      let dateText = 'TBA';
+      try {
+        if (artist.date) {
+          const d = new Date(artist.date);
+          if (!isNaN(d.getTime())) {
+            dateText = format(d, 'EEE, MMM d');
+          }
+        }
+      } catch {}
+
+      const start = artist.showTime?.start || '-';
+      const end = artist.showTime?.end || '-';
+
+      return [
+        artist.name,
+        `Stage ${artist.stage}`,
+        dateText,
+        `${start} - ${end}`
+      ];
+    });
     
     // Add table
     (doc as any).autoTable({
