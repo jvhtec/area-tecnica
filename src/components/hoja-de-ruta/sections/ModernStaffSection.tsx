@@ -23,6 +23,8 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
   onProfileSelect,
 }) => {
   const handleProfileSelect = (index: number, profile: any) => {
+    console.log('Profile selected:', profile); // Debug log
+    
     // Auto-fill the form fields from the selected profile
     if (profile.first_name) {
       onStaffChange(index, 'name', profile.first_name);
