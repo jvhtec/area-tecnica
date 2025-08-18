@@ -431,6 +431,7 @@ const FestivalManagement = () => {
           onConfirm={handlePrintAllDocumentation}
           maxStages={maxStages}
           jobTitle={job?.title || ''}
+          jobId={jobId}
         />
       )}
     </div>

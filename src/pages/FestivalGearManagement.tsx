@@ -600,6 +600,7 @@ const FestivalGearManagement = () => {
           onConfirm={handlePrintAllDocumentation}
           maxStages={maxStages}
           jobTitle={jobTitle}
+          jobId={jobId}
         />
       )}
     </div>

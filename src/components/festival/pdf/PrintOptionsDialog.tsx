@@ -4,6 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useState } from "react";
+import { Download } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { exportMissingRiderReportPDF, MissingRiderReportData } from "@/utils/missingRiderReportPdfExport";
+import { toast } from "sonner";
 
 export interface PrintOptions {
   includeGearSetup: boolean;
@@ -30,6 +34,7 @@ interface PrintOptionsDialogProps {
   onConfirm: (options: PrintOptions, filename: string) => void;
   maxStages: number;
   jobTitle: string;
+  jobId?: string;
 }
 
 export const PrintOptionsDialog = ({ 
@@ -37,7 +42,8 @@ export const PrintOptionsDialog = ({
   onOpenChange, 
   onConfirm,
   maxStages,
-  jobTitle
+  jobTitle,
+  jobId
 }: PrintOptionsDialogProps) => {
   const [options, setOptions] = useState<PrintOptions>({
     includeGearSetup: true,
@@ -198,6 +204,88 @@ export const PrintOptionsDialog = ({
     const filename = generateFilename();
     onConfirm(options, filename);
     onOpenChange(false);
+  };
+
+  const handleDownloadMissingRiderReport = async () => {
+    if (!jobId) {
+      toast.error('Job ID is required to generate missing rider report');
+      return;
+    }
+
+    try {
+      console.log('Downloading Missing Rider Report for job:', jobId);
+      
+      // Fetch festival artists
+      const { data: artists, error } = await supabase
+        .from('festival_artists')
+        .select('*')
+        .eq('job_id', jobId);
+
+      if (error) {
+        console.error('Error fetching artists:', error);
+        throw error;
+      }
+
+      // Filter artists with missing riders
+      const missingRiderArtists = artists?.filter(artist => 
+        Boolean(artist.rider_missing)
+      ) || [];
+
+      console.log(`Found ${missingRiderArtists.length} artists with missing riders out of ${artists?.length || 0} total artists`);
+
+      // Fetch logo
+      let logoUrl = '';
+      try {
+        const { data: logoData } = await supabase
+          .from('festival_logos')
+          .select('file_path')
+          .eq('job_id', jobId)
+          .maybeSingle();
+
+        if (logoData?.file_path) {
+          const { data: { publicUrl } } = supabase
+            .storage
+            .from('festival-logos')
+            .getPublicUrl(logoData.file_path);
+          logoUrl = publicUrl;
+        }
+      } catch (err) {
+        console.warn('Could not fetch logo:', err);
+      }
+
+      // Prepare data for PDF
+      const missingRiderData: MissingRiderReportData = {
+        jobTitle,
+        logoUrl,
+        artists: missingRiderArtists.map(artist => ({
+          name: artist.name || 'Unnamed Artist',
+          stage: artist.stage || 1,
+          date: artist.date || '',
+          showTime: {
+            start: artist.show_start || '',
+            end: artist.show_end || ''
+          }
+        }))
+      };
+
+      // Generate PDF
+      const pdfBlob = await exportMissingRiderReportPDF(missingRiderData);
+      
+      // Download file
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${jobTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}_Missing_Rider_Report.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success('Missing Rider Report downloaded successfully');
+    } catch (error: any) {
+      console.error('Error generating Missing Rider Report:', error);
+      toast.error(`Failed to generate Missing Rider Report: ${error.message}`);
+    }
   };
 
   return (
@@ -405,21 +493,34 @@ export const PrintOptionsDialog = ({
             </div>
 
             <div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="missing-rider-report"
-                  checked={options.includeMissingRiderReport}
-                  onCheckedChange={(checked) => 
-                    setOptions(prev => ({ ...prev, includeMissingRiderReport: checked as boolean }))
-                  }
-                  className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
-                />
-                <Label 
-                  htmlFor="missing-rider-report"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
-                >
-                  Missing Rider Report
-                </Label>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="missing-rider-report"
+                    checked={options.includeMissingRiderReport}
+                    onCheckedChange={(checked) => 
+                      setOptions(prev => ({ ...prev, includeMissingRiderReport: checked as boolean }))
+                    }
+                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
+                  />
+                  <Label 
+                    htmlFor="missing-rider-report"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
+                  >
+                    Missing Rider Report
+                  </Label>
+                </div>
+                {jobId && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleDownloadMissingRiderReport}
+                    className="h-8 px-2"
+                    title="Download Missing Rider Report only"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
               <div className="pl-6 text-sm text-muted-foreground dark:text-gray-300">
                 Summary of all artists with missing technical riders

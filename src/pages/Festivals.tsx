@@ -347,6 +347,7 @@ const Festivals = () => {
         onConfirm={handlePrintConfirm}
         maxStages={3} // You might want to make this dynamic based on festival data
         jobTitle={selectedJobForPrint?.title || ''}
+        jobId={selectedJobForPrint?.id}
       />
     </div>
   );
