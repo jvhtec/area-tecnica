@@ -1,6 +1,6 @@
 
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 
 export interface MissingRiderArtist {
@@ -111,7 +111,7 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
     });
     
     // Add table
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: yPosition,
       head: [['Artist Name', 'Stage', 'Date', 'Show Time']],
       body: tableData,
@@ -139,7 +139,8 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
     });
     
     // Add footer with action items
-    const finalY = (doc as any).lastAutoTable.finalY + 20;
+    const lastY = (doc as any).lastAutoTable?.finalY || yPosition;
+    const finalY = lastY + 20;
     
     doc.setFontSize(11);
     doc.setTextColor(textColor);
