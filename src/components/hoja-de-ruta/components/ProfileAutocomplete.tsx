@@ -45,31 +45,19 @@ export const ProfileAutocomplete: React.FC<ProfileAutocompleteProps> = ({
 
     setLoading(true);
     try {
-      // For now, return mock data since profiles table doesn't exist
-      // You'll need to create a profiles table or use an existing user table
-      const mockData = [
-        {
-          id: '1',
-          first_name: 'Juan',
-          last_name: 'García López',
-          dni: '12345678A',
-          department: 'Técnico',
-          role: 'Técnico de Sonido'
-        },
-        {
-          id: '2', 
-          first_name: 'María',
-          last_name: 'Fernández Silva',
-          dni: '87654321B',
-          department: 'Logística',
-          role: 'Coordinadora'
-        }
-      ].filter(profile => 
-        profile.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        profile.last_name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      
-      setProfiles(mockData);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, dni, department, role')
+        .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`)
+        .limit(10);
+
+      if (error) {
+        console.error('Error fetching profiles:', error);
+        setProfiles([]);
+        return;
+      }
+
+      setProfiles(data || []);
     } catch (error) {
       console.error('Error fetching profiles:', error);
     } finally {
