@@ -102,8 +102,10 @@ export const ProfileAutocomplete: React.FC<ProfileAutocompleteProps> = ({
       last_name: profile.last_name,
       dni: profile.dni,
       department: profile.department,
-      role: profile.role
-    });
+      role: profile.role,
+      // Provide full_name so consumers can reliably parse
+      full_name: fullName
+    } as any);
     
     setIsOpen(false);
     setProfiles([]);

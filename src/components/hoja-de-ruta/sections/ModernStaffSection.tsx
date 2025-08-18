@@ -26,17 +26,23 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
     console.log('Profile selected:', profile); // Debug log
     
     // Auto-fill the form fields from the selected profile
-    if (profile.first_name) {
-      onStaffChange(index, 'name', profile.first_name);
-    }
-    if (profile.last_name) {
-      // Split last name into surname1 and surname2 if needed
-      const lastNames = profile.last_name.split(' ');
-      onStaffChange(index, 'surname1', lastNames[0] || '');
-      if (lastNames.length > 1) {
-        onStaffChange(index, 'surname2', lastNames.slice(1).join(' '));
+    const fullName = (profile.full_name || [profile.first_name, profile.last_name].filter(Boolean).join(' ')).trim();
+
+    if (fullName) {
+      const parts = fullName.split(/\s+/);
+      const firstName = parts[0] || '';
+      const surnameParts = parts.slice(1);
+
+      // Set first name
+      onStaffChange(index, 'name', firstName);
+
+      // Set surnames if available
+      if (surnameParts.length > 0) {
+        onStaffChange(index, 'surname1', surnameParts[0] || '');
+        onStaffChange(index, 'surname2', surnameParts.slice(1).join(' ') || '');
       }
     }
+
     if (profile.dni) {
       onStaffChange(index, 'dni', profile.dni);
     }
