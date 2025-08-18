@@ -7,18 +7,46 @@ import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, Plus, Trash2, User, IdCard, Briefcase } from "lucide-react";
 import { EventData } from "@/types/hoja-de-ruta";
+import { ProfileAutocomplete } from "../components/ProfileAutocomplete";
 
 interface ModernStaffSectionProps {
   eventData: EventData;
   onStaffChange: (index: number, field: string, value: string) => void;
   onAddStaff: () => void;
+  onProfileSelect?: (index: number, profileData: any) => void;
 }
 
 export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
   eventData,
   onStaffChange,
   onAddStaff,
+  onProfileSelect,
 }) => {
+  const handleProfileSelect = (index: number, profile: any) => {
+    // Auto-fill the form fields from the selected profile
+    if (profile.first_name) {
+      onStaffChange(index, 'name', profile.first_name);
+    }
+    if (profile.last_name) {
+      // Split last name into surname1 and surname2 if needed
+      const lastNames = profile.last_name.split(' ');
+      onStaffChange(index, 'surname1', lastNames[0] || '');
+      if (lastNames.length > 1) {
+        onStaffChange(index, 'surname2', lastNames.slice(1).join(' '));
+      }
+    }
+    if (profile.dni) {
+      onStaffChange(index, 'dni', profile.dni);
+    }
+    if (profile.role) {
+      onStaffChange(index, 'position', profile.role);
+    }
+    
+    // Call the optional callback
+    if (onProfileSelect) {
+      onProfileSelect(index, profile);
+    }
+  };
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -59,10 +87,11 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
                         <User className="w-4 h-4" />
                         Nombre
                       </Label>
-                      <Input
+                      <ProfileAutocomplete
                         value={staff.name}
-                        onChange={(e) => onStaffChange(index, 'name', e.target.value)}
-                        placeholder="Nombre"
+                        onChange={(value) => onStaffChange(index, 'name', value)}
+                        onSelect={(profile) => handleProfileSelect(index, profile)}
+                        placeholder="Buscar por nombre..."
                         className="border-2 focus:border-orange-300"
                       />
                     </div>
