@@ -40,9 +40,7 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
     if (profile.dni) {
       onStaffChange(index, 'dni', profile.dni);
     }
-    if (profile.role) {
-      onStaffChange(index, 'position', profile.role);
-    }
+    // Role/position will be handled by fixed options later
     
     // Call the optional callback
     if (onProfileSelect) {
