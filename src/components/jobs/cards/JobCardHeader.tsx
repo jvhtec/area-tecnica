@@ -64,27 +64,27 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
 
   return (
     <div className="p-6 pb-3">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <div className="flex items-center gap-1">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
             {getDateTypeIcon(job.id, new Date(job.start_time), dateTypes)}
-            <span className="font-medium text-lg break-words whitespace-normal">{job.title}</span>
+            <h3 className="font-medium text-lg break-words leading-tight">{job.title}</h3>
             {getBadgeForJobType(job.job_type)}
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onToggleCollapse}
-            title="Toggle Details"
-            className="ml-2 hover:bg-accent/50 shrink-0"
-          >
-            {collapsed ? (
-              <ChevronDown className="h-4 w-4" />
-            ) : (
-              <ChevronUp className="h-4 w-4" />
-            )}
-          </Button>
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onToggleCollapse}
+          title="Toggle Details"
+          className="hover:bg-accent/50 shrink-0"
+        >
+          {collapsed ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronUp className="h-4 w-4" />
+          )}
+        </Button>
       </div>
       <div className="space-y-2 text-sm mt-2">
         <div className="flex items-center gap-2">
