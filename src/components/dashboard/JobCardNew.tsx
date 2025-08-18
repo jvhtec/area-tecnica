@@ -827,12 +827,12 @@ export function JobCardNew({
                 variant="outline"
                 size="sm"
                 onClick={handleTimesheetClick}
-                className="hover:bg-accent/50 text-xs sm:text-sm px-2 sm:px-3 h-7 sm:h-8"
+                className="hover:bg-accent/50 text-xs sm:text-sm px-1 sm:px-2 h-7 sm:h-8"
                 disabled={isJobBeingDeleted}
               >
                 <ClipboardList className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Timesheet</span>
-                <span className="sm:hidden">Time</span>
+                <span className="hidden sm:inline">Times</span>
+                <span className="sm:hidden">Times</span>
               </Button>
               
               {job.job_type === "festival" && isProjectManagementPage && canManageArtists && (
