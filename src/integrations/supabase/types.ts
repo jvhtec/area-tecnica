@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -4066,7 +4066,7 @@ export type Database = {
         Returns: boolean
       }
       convert_to_timezone: {
-        Args: { timestamp_val: string; target_timezone?: string }
+        Args: { target_timezone?: string; timestamp_val: string }
         Returns: string
       }
       create_default_logistics_events_for_job: {
