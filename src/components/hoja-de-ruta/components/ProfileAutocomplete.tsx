@@ -94,7 +94,8 @@ export const ProfileAutocomplete: React.FC<ProfileAutocompleteProps> = ({
 
   const handleProfileSelect = (profile: Profile) => {
     const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
-    onChange(fullName);
+    const firstName = (profile.first_name || fullName.split(/\s+/)[0] || '').trim();
+    onChange(firstName);
     
     onSelect({
       id: profile.id,
