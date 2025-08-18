@@ -729,11 +729,25 @@ export const generateAndMergeFestivalPDFs = async (
       missingRiderReportPdf: missingRiderReportPdf ? 1 : 0,
       individualArtistPdfs: individualArtistPdfs.length
     });
+    console.log('Selected options:', options);
+    
+    // Count actual content PDFs - be more specific about what constitutes content
+    const actualContentPdfs = [
+      ...shiftPdfs,
+      ...gearPdfs,
+      ...artistTablePdfs,
+      ...(rfIemTablePdf ? [rfIemTablePdf] : []),
+      ...(infrastructureTablePdf ? [infrastructureTablePdf] : []),
+      ...(wiredMicMatrixPdf ? [wiredMicMatrixPdf] : []),
+      ...(missingRiderReportPdf ? [missingRiderReportPdf] : []),
+      ...individualArtistPdfs
+    ];
+    
+    console.log(`Actual content PDFs count: ${actualContentPdfs.length}`);
     
     // Check if we have at least one content PDF beyond cover and TOC
-    const contentPdfCount = selectedPdfs.length - 2; // Subtract cover page and TOC
-    if (contentPdfCount === 0) {
-      throw new Error('No content documents were selected for generation. Please select at least one document type to include in the PDF.');
+    if (actualContentPdfs.length === 0) {
+      throw new Error('No content documents were generated. Please ensure at least one document type has data to include in the PDF.');
     }
     
     const mergedBlob = await mergePDFs(selectedPdfs);
