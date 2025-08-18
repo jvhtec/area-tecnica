@@ -24,6 +24,10 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
 }) => {
   const handleProfileSelect = (index: number, profile: any) => {
     console.log('Profile selected:', profile); // Debug log
+    console.log('Profile keys:', Object.keys(profile)); // Debug keys
+    console.log('Profile full_name:', profile.full_name); // Debug full_name
+    console.log('Profile first_name:', profile.first_name); // Debug first_name
+    console.log('Profile last_name:', profile.last_name); // Debug last_name
     
     // Auto-fill the form fields from the selected profile
     const fullName = (profile.full_name || [profile.first_name, profile.last_name].filter(Boolean).join(' ')).trim();
