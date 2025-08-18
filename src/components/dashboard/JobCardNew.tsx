@@ -787,27 +787,25 @@ export function JobCardNew({
         )}
 
         <div className="p-3 sm:p-6 pb-3">
-          <div className="flex items-start justify-between gap-2 sm:gap-4">
-            <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-1">
-              <div className="flex items-start sm:items-center gap-1 min-w-0 flex-1">
-                <div className="shrink-0 mt-0.5 sm:mt-0">
-                  {getDateTypeIcon(job.id, new Date(job.start_time), dateTypes)}
-                </div>
-                <div className="min-w-0 flex-1 pr-2">
-                  {/* Mobile: Show job title on its own line with better spacing */}
-                  <div className="sm:hidden">
-                    <h3 className="font-medium text-sm leading-tight mb-1 pr-24">{job.title}</h3>
-                    {getBadgeForJobType(job.job_type)}
-                  </div>
-                  {/* Desktop: Keep original layout */}
-                  <div className="hidden sm:block">
-                    <h3 className="font-medium text-lg leading-tight break-words line-clamp-2">{job.title}</h3>
-                    <div className="mt-2">
-                      {getBadgeForJobType(job.job_type)}
-                    </div>
-                  </div>
+          {/* Job title and badge section - full width */}
+          <div className="mb-3 sm:mb-4">
+            <div className="flex items-start gap-2">
+              <div className="shrink-0 mt-0.5 sm:mt-1">
+                {getDateTypeIcon(job.id, new Date(job.start_time), dateTypes)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-medium text-sm sm:text-lg leading-tight break-words">{job.title}</h3>
+                <div className="mt-1 sm:mt-2">
+                  {getBadgeForJobType(job.job_type)}
                 </div>
               </div>
+            </div>
+          </div>
+          
+          {/* Buttons section */}
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            <div className="flex-1" /> {/* Spacer */}
+            <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
                 size="icon"
