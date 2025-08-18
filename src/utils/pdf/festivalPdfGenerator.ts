@@ -581,35 +581,61 @@ export const generateAndMergeFestivalPDFs = async (
     }
     
     // Generate Missing Rider Report if option is selected
-    if (options.includeMissingRiderReport && artists && artists.length > 0) {
-      const missingRiderArtists = artists.filter(artist => 
-        Boolean(artist.rider_missing)
-      );
+    if (options.includeMissingRiderReport) {
+      console.log("Processing Missing Rider Report generation");
       
-      console.log(`Generating Missing Rider Report with ${missingRiderArtists.length} artists`);
-      
-      // Use chronological sorting for Missing Rider Report as well
-      const sortedMissingRiderArtists = sortArtistsChronologically(missingRiderArtists);
-      
-      const missingRiderData: MissingRiderReportData = {
-        jobTitle,
-        logoUrl,
-        artists: sortedMissingRiderArtists.map(artist => ({
-          name: artist.name || 'Unnamed Artist',
-          stage: artist.stage || 1,
-          date: artist.date || '',
-          showTime: {
-            start: artist.show_start || '',
-            end: artist.show_end || ''
-          }
-        }))
-      };
-      
-      try {
-        missingRiderReportPdf = await exportMissingRiderReportPDF(missingRiderData);
-        console.log(`Generated Missing Rider Report PDF, size: ${missingRiderReportPdf.size} bytes`);
-      } catch (err) {
-        console.error('Error generating Missing Rider Report PDF:', err);
+      if (artists && artists.length > 0) {
+        const missingRiderArtists = artists.filter(artist => 
+          Boolean(artist.rider_missing)
+        );
+        
+        console.log(`Found ${missingRiderArtists.length} artists with missing riders out of ${artists.length} total artists`);
+        
+        // Use chronological sorting for Missing Rider Report as well
+        const sortedMissingRiderArtists = sortArtistsChronologically(missingRiderArtists);
+        
+        const missingRiderData: MissingRiderReportData = {
+          jobTitle,
+          logoUrl,
+          artists: sortedMissingRiderArtists.map(artist => ({
+            name: artist.name || 'Unnamed Artist',
+            stage: artist.stage || 1,
+            date: artist.date || '',
+            showTime: {
+              start: artist.show_start || '',
+              end: artist.show_end || ''
+            }
+          }))
+        };
+        
+        try {
+          console.log("Generating Missing Rider Report PDF with data:", {
+            artistCount: missingRiderData.artists.length,
+            jobTitle: missingRiderData.jobTitle,
+            hasLogo: !!missingRiderData.logoUrl
+          });
+          
+          missingRiderReportPdf = await exportMissingRiderReportPDF(missingRiderData);
+          console.log(`Generated Missing Rider Report PDF, size: ${missingRiderReportPdf.size} bytes`);
+        } catch (err) {
+          console.error('Error generating Missing Rider Report PDF:', err);
+        }
+      } else {
+        console.log("No artists found for Missing Rider Report generation");
+        
+        // Still generate an empty report to show that all riders are complete
+        const emptyMissingRiderData: MissingRiderReportData = {
+          jobTitle,
+          logoUrl,
+          artists: []
+        };
+        
+        try {
+          missingRiderReportPdf = await exportMissingRiderReportPDF(emptyMissingRiderData);
+          console.log(`Generated empty Missing Rider Report PDF, size: ${missingRiderReportPdf.size} bytes`);
+        } catch (err) {
+          console.error('Error generating empty Missing Rider Report PDF:', err);
+        }
       }
     }
     
@@ -691,9 +717,23 @@ export const generateAndMergeFestivalPDFs = async (
     ];
     
     console.log(`Total PDFs to merge: ${selectedPdfs.length}`);
+    console.log('PDF breakdown:', {
+      coverPage: 1,
+      tableOfContents: 1,
+      shiftPdfs: shiftPdfs.length,
+      gearPdfs: gearPdfs.length,
+      artistTablePdfs: artistTablePdfs.length,
+      rfIemTablePdf: rfIemTablePdf ? 1 : 0,
+      infrastructureTablePdf: infrastructureTablePdf ? 1 : 0,
+      wiredMicMatrixPdf: wiredMicMatrixPdf ? 1 : 0,
+      missingRiderReportPdf: missingRiderReportPdf ? 1 : 0,
+      individualArtistPdfs: individualArtistPdfs.length
+    });
     
-    if (selectedPdfs.length <= 2) {
-      throw new Error('No documents were selected for generation');
+    // Check if we have at least one content PDF beyond cover and TOC
+    const contentPdfCount = selectedPdfs.length - 2; // Subtract cover page and TOC
+    if (contentPdfCount === 0) {
+      throw new Error('No content documents were selected for generation. Please select at least one document type to include in the PDF.');
     }
     
     const mergedBlob = await mergePDFs(selectedPdfs);
