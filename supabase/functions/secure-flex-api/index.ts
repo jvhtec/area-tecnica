@@ -54,11 +54,11 @@ serve(async (req) => {
       throw new Error('Endpoint not allowed')
     }
 
-    console.log('Payload before sending to Flex:', JSON.stringify(payload, null, 2));
+    // Sanitize logging - don't expose sensitive data
+    console.log(`Making ${method} request to Flex endpoint: ${endpoint} by user: ${user.id}`);
 
     // Make secure API call to Flex
     const flexUrl = `${FLEX_API_BASE_URL}${endpoint}`
-    console.log(`Making ${method} request to Flex API:`, flexUrl)
     
     const response = await fetch(flexUrl, {
       method,

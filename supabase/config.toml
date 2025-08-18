@@ -2,3 +2,6 @@ project_id = "syldobdcdsgfgjtbuwxm"
 
 [functions.get-secret]
 verify_jwt = true
+
+[functions.secure-flex-api]
+verify_jwt = true
