@@ -23,18 +23,13 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
   onProfileSelect,
 }) => {
   const handleProfileSelect = (index: number, profile: any) => {
-    console.log('Profile selected:', profile); // Debug log
-    
     // Auto-fill the form fields from the selected profile
     const fullName = (profile.full_name || [profile.first_name, profile.last_name].filter(Boolean).join(' ')).trim();
-    console.log('Full name to parse:', fullName); // Debug full name
     
     if (fullName) {
       const parts = fullName.split(/\s+/);
-      console.log('Name parts:', parts); // Debug parts
       const firstName = parts[0] || '';
       const surnameParts = parts.slice(1);
-      console.log('First name:', firstName, 'Surname parts:', surnameParts); // Debug names
 
       // Set first name
       onStaffChange(index, 'name', firstName);
@@ -42,7 +37,9 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
       // Set surnames if available
       if (surnameParts.length > 0) {
         onStaffChange(index, 'surname1', surnameParts[0] || '');
-        onStaffChange(index, 'surname2', surnameParts.slice(1).join(' ') || '');
+        if (surnameParts.length > 1) {
+          onStaffChange(index, 'surname2', surnameParts.slice(1).join(' ') || '');
+        }
       }
     }
 
