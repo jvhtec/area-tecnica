@@ -125,6 +125,35 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
     },
   });
 
+  // Update default table
+  const updateTableMutation = useMutation({
+    mutationFn: async ({ tableId, updates }: { tableId: string, updates: Partial<TourDefaultTable> }) => {
+      const { data, error } = await supabase
+        .from("tour_default_tables")
+        .update(updates)
+        .eq("id", tableId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tour-default-tables", tourId] });
+      toast({
+        title: "Success",
+        description: "Default table updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update default table",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Delete default set (and all its tables)
   const deleteSetMutation = useMutation({
     mutationFn: async (setId: string) => {
@@ -186,10 +215,12 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
     isLoading: setsLoading || tablesLoading,
     createSet: createSetMutation.mutateAsync,
     createTable: createTableMutation.mutateAsync,
+    updateTable: updateTableMutation.mutateAsync,
     deleteSet: deleteSetMutation.mutateAsync,
     deleteTable: deleteTableMutation.mutateAsync,
     isCreatingSet: createSetMutation.isPending,
     isCreatingTable: createTableMutation.isPending,
+    isUpdatingTable: updateTableMutation.isPending,
     isDeletingSet: deleteSetMutation.isPending,
     isDeletingTable: deleteTableMutation.isPending,
   };

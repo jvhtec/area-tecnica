@@ -52,6 +52,7 @@ interface Table {
   isDefault?: boolean;
   isOverride?: boolean;
   overrideId?: string;
+  defaultTableId?: string;
 }
 
 const ConsumosTool: React.FC = () => {
@@ -63,7 +64,7 @@ const ConsumosTool: React.FC = () => {
   // NEW: Add tour defaults mode detection
   const tourId = searchParams.get('tourId');
   const mode = searchParams.get('mode');
-  const isTourDefaults = mode === 'tour-defaults';
+  const isTourDefaults = mode === 'tour-defaults' || mode === 'defaults';
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<any>(null);
@@ -82,8 +83,10 @@ const ConsumosTool: React.FC = () => {
   // Tour-specific hooks - use the new defaults system for tour mode
   const { 
     defaultSets,
+    defaultTables,
     createSet,
-    createTable: createTourDefaultTable 
+    createTable: createTourDefaultTable,
+    updateTable: updateTourDefaultTable
   } = useTourDefaultSets(tourId || '');
   
   const { powerDefaults: legacyTourDefaults = [], createDefault: createLegacyTourDefault } = useTourPowerDefaults(tourId || '');
@@ -213,7 +216,7 @@ const ConsumosTool: React.FC = () => {
       const setId = await getOrCreateSoundSetId();
 
       // Now create the table with the detailed data
-      await createTourDefaultTable({
+      const newDefaultTable = await createTourDefaultTable({
         set_id: setId,
         table_name: table.name,
         table_data: {
@@ -226,9 +229,20 @@ const ConsumosTool: React.FC = () => {
           current_per_phase: table.currentPerPhase,
           pdu_type: table.customPduType || table.pduType,
           custom_pdu_type: table.customPduType,
+          includes_hoist: table.includesHoist || false,
           safetyMargin: safetyMargin
         }
       });
+
+      // Mark this table as a default with the ID for future updates
+      const tableIndex = tables.findIndex(t => t.id === table.id);
+      if (tableIndex !== -1) {
+        setTables(prev => prev.map(t => 
+          t.id === table.id 
+            ? { ...t, isDefault: true, defaultTableId: newDefaultTable.id }
+            : t
+        ));
+      }
 
       toast({
         title: "Success",
@@ -384,7 +398,26 @@ const ConsumosTool: React.FC = () => {
           const updatedTable = { ...table, ...updates };
           
           // Persist changes based on mode
-          if (isJobOverrideMode && table.isOverride && table.overrideId && updatePowerOverride) {
+          if (isTourDefaults && table.isDefault && table.defaultTableId && updateTourDefaultTable) {
+            // Update the tour default table in database
+            updateTourDefaultTable({
+              tableId: table.defaultTableId,
+              updates: {
+                table_data: {
+                  rows: updatedTable.rows,
+                  safetyMargin: safetyMargin
+                },
+                total_value: updatedTable.totalWatts || 0,
+                metadata: {
+                  current_per_phase: updatedTable.currentPerPhase,
+                  pdu_type: updatedTable.customPduType || updatedTable.pduType,
+                  custom_pdu_type: updatedTable.customPduType,
+                  includes_hoist: updatedTable.includesHoist || false,
+                  safetyMargin: safetyMargin
+                }
+              }
+            });
+          } else if (isJobOverrideMode && table.isOverride && table.overrideId && updatePowerOverride) {
             // Update the override in database
             updatePowerOverride({
               id: table.overrideId,
@@ -499,9 +532,26 @@ const ConsumosTool: React.FC = () => {
     fetchTourInfo();
   }, [tourId]);
 
-  // Convert tour defaults to display format
-  const tourDefaultTables = legacyTourDefaults.map(def => ({
-    id: `default-${def.id}`,
+  // Convert new tour defaults to display format (prefer new system)
+  const newTourDefaultTables = (defaultTables || [])
+    .filter(table => table.table_type === 'power')
+    .map(table => ({
+      id: `new-default-${table.id}`,
+      name: table.table_name,
+      rows: table.table_data?.rows || [],
+      totalWatts: table.total_value,
+      adjustedWatts: table.total_value * (1 + safetyMargin / 100),
+      currentPerPhase: table.metadata?.current_per_phase || 0,
+      pduType: table.metadata?.pdu_type || '',
+      customPduType: table.metadata?.custom_pdu_type || '',
+      includesHoist: table.metadata?.includes_hoist || false,
+      isDefault: true,
+      defaultTableId: table.id
+    }));
+
+  // Convert legacy tour defaults to display format (fallback)
+  const legacyTourDefaultTables = legacyTourDefaults.map(def => ({
+    id: `legacy-default-${def.id}`,
     name: def.table_name,
     rows: [],
     totalWatts: def.total_watts,
@@ -512,6 +562,9 @@ const ConsumosTool: React.FC = () => {
     includesHoist: def.includes_hoist,
     isDefault: true
   }));
+
+  // Prefer new defaults over legacy ones
+  const tourDefaultTables = newTourDefaultTables.length > 0 ? newTourDefaultTables : legacyTourDefaultTables;
 
   // Convert tour overrides to display format
   const tourOverrideTables = powerOverrides.map(override => ({
