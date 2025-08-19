@@ -7,52 +7,36 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, Filter, Users, RefreshCw } from 'lucide-react';
 import { OptimizedAssignmentMatrix } from '@/components/matrix/OptimizedAssignmentMatrix';
 import { PerformanceIndicator } from '@/components/matrix/PerformanceIndicator';
+import { DateRangeExpander } from '@/components/matrix/DateRangeExpander';
+import { useVirtualizedDateRange } from '@/hooks/useVirtualizedDateRange';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { addDays, format, startOfYear, endOfYear } from 'date-fns';
+import { format } from 'date-fns';
 
 export default function JobAssignmentMatrix() {
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Generate optimized date range - much smaller for better performance
-  const dateRange = useMemo(() => {
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    
-    if (selectedYear === currentYear) {
-      // For current year, show only 2 weeks around today for optimal performance
-      const startDate = new Date(today);
-      startDate.setDate(today.getDate() - 7); // 1 week before
-      const endDate = new Date(today);
-      endDate.setDate(today.getDate() + 14); // 2 weeks after
-      
-      const dates = [];
-      let currentDate = startDate;
-      
-      while (currentDate <= endDate) {
-        dates.push(new Date(currentDate));
-        currentDate = addDays(currentDate, 1);
-      }
-      
-      return dates;
-    } else {
-      // For other years, show only 1 month for performance
-      const startDate = startOfYear(new Date(selectedYear, 0, 1));
-      const endDate = new Date(selectedYear, 0, 31); // First month only
-      const dates = [];
-      let currentDate = startDate;
-      
-      while (currentDate <= endDate) {
-        dates.push(new Date(currentDate));
-        currentDate = addDays(currentDate, 1);
-      }
-      
-      return dates;
-    }
-  }, [selectedYear]);
+  // Use virtualized date range with expandable capabilities
+  const {
+    dateRange,
+    todayIndex,
+    canExpandBefore,
+    canExpandAfter,
+    expandBefore,
+    expandAfter,
+    setCenterDate,
+    resetRange,
+    jumpToMonth,
+    rangeInfo
+  } = useVirtualizedDateRange({
+    initialWeeksBefore: 1,   // Start with 1 week before today
+    initialWeeksAfter: 2,    // Start with 2 weeks after today
+    maxWeeksBefore: 26,      // Allow up to 6 months before
+    maxWeeksAfter: 26,       // Allow up to 6 months after
+    expandByWeeks: 4         // Expand by 4 weeks at a time
+  });
 
   // Optimized technicians query
   const { data: technicians = [], isLoading: isLoadingTechnicians } = useQuery({
@@ -92,10 +76,10 @@ export default function JobAssignmentMatrix() {
 
   // Optimized jobs query with smart date filtering
   const { data: yearJobs = [], isLoading: isLoadingJobs } = useQuery({
-    queryKey: ['optimized-matrix-jobs', selectedYear, selectedDepartment],
+    queryKey: ['optimized-matrix-jobs', rangeInfo.startFormatted, rangeInfo.endFormatted, selectedDepartment],
     queryFn: async () => {
-      const startDate = dateRange[0];
-      const endDate = dateRange[dateRange.length - 1];
+      const startDate = rangeInfo.start;
+      const endDate = rangeInfo.end;
 
       let query = supabase
         .from('jobs')
@@ -133,7 +117,6 @@ export default function JobAssignmentMatrix() {
   };
 
   const departments = ['all', 'sound', 'lights', 'video'];
-  const years = [selectedYear - 1, selectedYear, selectedYear + 1];
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -155,25 +138,23 @@ export default function JobAssignmentMatrix() {
           </Button>
         </div>
 
+        {/* Date Range Controls */}
+        <DateRangeExpander
+          canExpandBefore={canExpandBefore}
+          canExpandAfter={canExpandAfter}
+          onExpandBefore={expandBefore}
+          onExpandAfter={expandAfter}
+          onReset={resetRange}
+          onJumpToMonth={jumpToMonth}
+          rangeInfo={rangeInfo}
+        />
+
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4" />
             <span className="text-sm font-medium">Filters:</span>
           </div>
-          
-          <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
-            <SelectTrigger className="w-24">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map(year => (
-                <SelectItem key={year} value={year.toString()}>
-                  {year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
 
           <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
             <SelectTrigger className="w-32">
@@ -227,6 +208,15 @@ export default function JobAssignmentMatrix() {
             technicians={filteredTechnicians}
             dates={dateRange}
             jobs={yearJobs}
+            onNearEdgeScroll={(direction) => {
+              if (direction === 'before' && canExpandBefore) {
+                expandBefore();
+              } else if (direction === 'after' && canExpandAfter) {
+                expandAfter();
+              }
+            }}
+            canExpandBefore={canExpandBefore}
+            canExpandAfter={canExpandAfter}
           />
         )}
       </div>

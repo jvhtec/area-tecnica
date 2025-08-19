@@ -43,7 +43,20 @@ interface CellAction {
   selectedJobId?: string;
 }
 
-export const OptimizedAssignmentMatrix = ({ technicians, dates, jobs }: OptimizedAssignmentMatrixProps) => {
+interface OptimizedAssignmentMatrixExtendedProps extends OptimizedAssignmentMatrixProps {
+  onNearEdgeScroll?: (direction: 'before' | 'after') => void;
+  canExpandBefore?: boolean;
+  canExpandAfter?: boolean;
+}
+
+export const OptimizedAssignmentMatrix = ({ 
+  technicians, 
+  dates, 
+  jobs, 
+  onNearEdgeScroll,
+  canExpandBefore = false,
+  canExpandAfter = false
+}: OptimizedAssignmentMatrixExtendedProps) => {
   const [cellAction, setCellAction] = useState<CellAction | null>(null);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
   const matrixContainerRef = useRef<HTMLDivElement>(null);
@@ -124,8 +137,25 @@ export const OptimizedAssignmentMatrix = ({ technicians, dates, jobs }: Optimize
     if (syncInProgressRef.current) return;
     const scrollLeft = e.currentTarget.scrollLeft;
     const scrollTop = e.currentTarget.scrollTop;
+    
+    // Check if we're near the edges and can expand
+    const scrollElement = e.currentTarget;
+    const scrollWidth = scrollElement.scrollWidth;
+    const clientWidth = scrollElement.clientWidth;
+    const maxScrollLeft = scrollWidth - clientWidth;
+    
+    const nearLeftEdge = scrollLeft < 200; // Within 200px of left edge
+    const nearRightEdge = scrollLeft > maxScrollLeft - 200; // Within 200px of right edge
+    
+    // Trigger expansion if we're near an edge and can expand
+    if (nearLeftEdge && canExpandBefore && onNearEdgeScroll) {
+      onNearEdgeScroll('before');
+    } else if (nearRightEdge && canExpandAfter && onNearEdgeScroll) {
+      onNearEdgeScroll('after');
+    }
+    
     syncScrollPositions(scrollLeft, scrollTop, 'main');
-  }, [syncScrollPositions]);
+  }, [syncScrollPositions, canExpandBefore, canExpandAfter, onNearEdgeScroll]);
 
   const handleDateHeadersScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (syncInProgressRef.current) return;
