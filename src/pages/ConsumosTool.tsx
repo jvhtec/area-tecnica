@@ -442,7 +442,7 @@ const ConsumosTool: React.FC = () => {
   };
 
   const handleExportPDF = async () => {
-    if (!selectedJobId) {
+    if (!selectedJobId && !isTourDefaults) {
       toast({
         title: 'No job selected',
         description: 'Please select a job before exporting.',
@@ -459,14 +459,21 @@ const ConsumosTool: React.FC = () => {
 
       let logoUrl: string | undefined = undefined;
       try {
-        const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
-        logoUrl = await fetchJobLogo(selectedJobId);
+        if (isTourDefaults && tourId) {
+          // Fetch tour logo for tour defaults mode
+          const { fetchTourLogo } = await import('@/utils/pdf/logoUtils');
+          logoUrl = await fetchTourLogo(tourId);
+        } else if (selectedJobId) {
+          // Fetch job logo for regular mode
+          const { fetchJobLogo } = await import('@/utils/pdf/logoUtils');
+          logoUrl = await fetchJobLogo(selectedJobId);
+        }
       } catch (logoError) {
         console.error("Error fetching logo:", logoError);
       }
 
       // Include location info and ensure proper date format
-      const jobTitle = selectedJob?.title || 'Power Report';
+      const jobTitle = isTourDefaults ? `${tourName} - Sound Power Defaults` : (selectedJob?.title || 'Power Report');
       const jobLocation = selectedJob?.location?.name || '';
       const headerTitle = jobLocation ? `${jobTitle} - ${jobLocation}` : jobTitle;
       
@@ -475,23 +482,30 @@ const ConsumosTool: React.FC = () => {
         tables.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
         headerTitle,
-        selectedJob?.date || new Date().toISOString(),
+        isTourDefaults ? new Date().toISOString() : (selectedJob?.date || new Date().toISOString()),
         undefined, // summaryRows - undefined for power reports (auto-generated)
         powerSummary,
         safetyMargin,
         logoUrl
       );
 
-      const fileName = `Sound Power Report - ${selectedJob?.title || 'Report'}.pdf`;
+      const fileName = isTourDefaults 
+        ? `${tourName} - Sound Power Defaults.pdf`
+        : `Sound Power Report - ${selectedJob?.title || 'Report'}.pdf`;
       const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-      const filePath = `sound/${selectedJobId}/${crypto.randomUUID()}.pdf`;
-
-      const { error: uploadError } = await supabase.storage.from('task_documents').upload(filePath, file);
-      if (uploadError) throw uploadError;
+      
+      // Only upload to storage if we have a job selected (not in tour defaults mode)
+      if (selectedJobId) {
+        const filePath = `sound/${selectedJobId}/${crypto.randomUUID()}.pdf`;
+        const { error: uploadError } = await supabase.storage.from('task_documents').upload(filePath, file);
+        if (uploadError) throw uploadError;
+      }
 
       toast({
         title: 'Success',
-        description: 'PDF has been generated and uploaded successfully.',
+        description: isTourDefaults 
+          ? 'PDF has been generated and downloaded successfully.'
+          : 'PDF has been generated and uploaded successfully.',
       });
 
       // Also provide download to user
@@ -871,12 +885,12 @@ const ConsumosTool: React.FC = () => {
             <Button onClick={resetCurrentTable} variant="destructive">
               {editingOverride ? 'Cancel Edit' : 'Reset'}
             </Button>
-            {tables.length > 0 && !isTourDefaults && (
+            {(tables.length > 0 && !isTourDefaults) || (tables.length > 0 && isTourDefaults) ? (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
                 <FileText className="h-4 w-4" />
-                Export & Upload PDF
+                {isTourDefaults ? 'Export PDF' : 'Export & Upload PDF'}
               </Button>
-            )}
+            ) : null}
           </div>
 
           {tables.map((table) => (
