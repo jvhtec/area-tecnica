@@ -51,17 +51,17 @@ const Tours = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="w-full max-w-full space-y-4">
       <Card className="w-full bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
             Tours {new Date().getFullYear()}
           </CardTitle>
           <Button
             variant="ghost"
             size="sm"
             onClick={handleToggleTours}
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 p-0 shrink-0"
           >
             {showTours ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </Button>

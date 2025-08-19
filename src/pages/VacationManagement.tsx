@@ -114,10 +114,10 @@ const VacationManagement = () => {
   };
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
+    <div className="w-full max-w-full space-y-4 md:space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Manage Vacation Requests</CardTitle>
+          <CardTitle className="text-lg md:text-xl">Manage Vacation Requests</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -126,16 +126,30 @@ const VacationManagement = () => {
             <div className="text-center py-8 text-muted-foreground">No pending vacation requests.</div>
           ) : (
             <>
-              <div className="flex justify-end gap-2 mb-4">
-                <Button onClick={handleApproveSelected} disabled={selectedRequests.length === 0}>
-                  Approve Selected ({selectedRequests.length})
+              <div className="flex flex-col sm:flex-row justify-end gap-2 mb-4">
+                <Button 
+                  onClick={handleApproveSelected} 
+                  disabled={selectedRequests.length === 0}
+                  size="sm"
+                  className="w-full sm:w-auto"
+                >
+                  <span className="sm:hidden">Approve ({selectedRequests.length})</span>
+                  <span className="hidden sm:inline">Approve Selected ({selectedRequests.length})</span>
                 </Button>
-                <Button variant="outline" onClick={handleRejectSelected} disabled={selectedRequests.length === 0}>
-                  Reject Selected ({selectedRequests.length})
+                <Button 
+                  variant="outline" 
+                  onClick={handleRejectSelected} 
+                  disabled={selectedRequests.length === 0}
+                  size="sm"
+                  className="w-full sm:w-auto"
+                >
+                  <span className="sm:hidden">Reject ({selectedRequests.length})</span>
+                  <span className="hidden sm:inline">Reject Selected ({selectedRequests.length})</span>
                 </Button>
               </div>
-              <div className="overflow-x-auto">
-                <Table>
+              <div className="overflow-x-auto -mx-4 sm:mx-0">
+                <div className="min-w-[600px] px-4 sm:px-0">
+                  <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[50px]">
@@ -170,7 +184,8 @@ const VacationManagement = () => {
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                  </Table>
+                </div>
               </div>
             </>
           )}

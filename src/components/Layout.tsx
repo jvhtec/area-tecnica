@@ -91,7 +91,7 @@ const Layout = () => {
   }
 
   return (
-    <SidebarProvider defaultOpen={true}>
+    <SidebarProvider defaultOpen={!isMobile}>
       <div className="min-h-screen flex w-full">
         <Sidebar>
           <SidebarContent>
@@ -141,17 +141,17 @@ const Layout = () => {
             </div>
           </SidebarFooter>
         </Sidebar>
-        <div className="flex-1">
-          <header className="border-b p-4 flex justify-between items-center bg-background">
+        <div className="flex-1 min-w-0">
+          <header className="border-b p-2 md:p-4 flex justify-between items-center bg-background">
             <div className="flex items-center gap-2">
               <SidebarTrigger />
             </div>
-            <div className="flex items-center gap-2">
-              <HeaderStatus className="mr-3" />
+            <div className="flex items-center gap-1 md:gap-2">
+              <HeaderStatus className="mr-1 md:mr-3" />
               <ReloadButton onReload={handleReload} />
             </div>
           </header>
-          <main className="p-6">
+          <main className="p-2 md:p-6">
             <Outlet />
           </main>
         </div>

@@ -163,17 +163,17 @@ const Dashboard = () => {
   const selectedDateJobs = getSelectedDateJobs(date, jobs);
 
   return (
-    <div className="container mx-auto px-4 py-6 space-y-8">
+    <div className="space-y-4 md:space-y-8 w-full max-w-full">
       <DashboardHeader timeSpan={timeSpan} onTimeSpanChange={setTimeSpan} />
 
       {userRole === "management" && (
         <Card className="w-full">
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="w-6 h-6" />
+              <MessageSquare className="w-5 h-5 md:w-6 md:h-6" />
               Messages
             </CardTitle>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button
                 variant="outline"
                 size="sm"
@@ -181,7 +181,8 @@ const Dashboard = () => {
                 className="gap-2"
               >
                 <Send className="h-4 w-4" />
-                New Message
+                <span className="hidden sm:inline">New Message</span>
+                <span className="sm:hidden">New</span>
               </Button>
               <button
                 onClick={() => setShowMessages(!showMessages)}
@@ -193,10 +194,10 @@ const Dashboard = () => {
           </CardHeader>
           {showMessages && (
             <CardContent>
-              <div className="space-y-6">
+              <div className="space-y-4 md:space-y-6">
                 <MessagesList />
-                <div className="border-t pt-6">
-                  <h3 className="text-lg font-medium mb-4">Direct Messages</h3>
+                <div className="border-t pt-4 md:pt-6">
+                  <h3 className="text-base md:text-lg font-medium mb-4">Direct Messages</h3>
                   <DirectMessagesList />
                 </div>
               </div>
@@ -205,7 +206,7 @@ const Dashboard = () => {
         </Card>
       )}
 
-      <div className="space-y-8">
+      <div className="space-y-4 md:space-y-8">
         {/* Calendar section - full width */}
         <div className="w-full">
           <CalendarSection 

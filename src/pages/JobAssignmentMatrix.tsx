@@ -121,20 +121,21 @@ export default function JobAssignmentMatrix() {
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
-      <div className="flex-shrink-0 border-b bg-card p-4">
-        <div className="flex items-center justify-between mb-4">
+      <div className="flex-shrink-0 border-b bg-card p-2 md:p-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-4">
           <div className="flex items-center gap-2">
-            <Calendar className="h-6 w-6" />
-            <h1 className="text-2xl font-bold">Job Assignment Matrix</h1>
+            <Calendar className="h-5 w-5 md:h-6 md:w-6" />
+            <h1 className="text-lg md:text-2xl font-bold">Job Assignment Matrix</h1>
           </div>
           <Button 
             variant="outline" 
             size="sm" 
             onClick={handleRefresh}
             disabled={isRefreshing}
+            className="shrink-0"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
         </div>
 
@@ -150,46 +151,50 @@ export default function JobAssignmentMatrix() {
         />
 
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4" />
             <span className="text-sm font-medium">Filters:</span>
           </div>
 
-          <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="Department" />
-            </SelectTrigger>
-            <SelectContent>
-              {departments.map(dept => (
-                <SelectItem key={dept} value={dept}>
-                  {dept === 'all' ? 'All Departments' : dept.charAt(0).toUpperCase() + dept.slice(1)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Department" />
+              </SelectTrigger>
+              <SelectContent>
+                {departments.map(dept => (
+                  <SelectItem key={dept} value={dept}>
+                    {dept === 'all' ? 'All Departments' : dept.charAt(0).toUpperCase() + dept.slice(1)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <Input
-            placeholder="Search technicians..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-48"
-          />
-
-          <div className="flex items-center gap-2 ml-auto">
-            <Users className="h-4 w-4" />
-            <Badge variant="secondary">
-              {filteredTechnicians.length} technicians
-            </Badge>
-            <Badge variant="outline">
-              {yearJobs.length} jobs (excluding dry hire)
-            </Badge>
-            <PerformanceIndicator
-              assignmentCount={yearJobs.length * filteredTechnicians.length}
-              availabilityCount={filteredTechnicians.length * dateRange.length}
-              cellCount={filteredTechnicians.length * dateRange.length}
-              isLoading={isLoadingTechnicians || isLoadingJobs}
+            <Input
+              placeholder="Search technicians..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-48 min-w-0 flex-1 sm:flex-none"
             />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+            <Users className="h-4 w-4" />
+            <Badge variant="secondary" className="text-xs">
+              {filteredTechnicians.length} techs
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              {yearJobs.length} jobs
+            </Badge>
+            <div className="hidden lg:block">
+              <PerformanceIndicator
+                assignmentCount={yearJobs.length * filteredTechnicians.length}
+                availabilityCount={filteredTechnicians.length * dateRange.length}
+                cellCount={filteredTechnicians.length * dateRange.length}
+                isLoading={isLoadingTechnicians || isLoadingJobs}
+              />
+            </div>
           </div>
         </div>
       </div>

@@ -254,42 +254,49 @@ const TechnicianDashboard = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-semibold">Technician Dashboard</h1>
-        <div className="flex items-center gap-4">
+    <div className="w-full max-w-full space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-xl md:text-2xl font-semibold">Technician Dashboard</h1>
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
           <Button
             variant="outline"
             size="icon"
             onClick={handleRefresh}
             disabled={isLoading || isRefreshing}
             title="Refresh assignments"
+            className="shrink-0"
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </Button>
-          <Button
-            variant={viewMode === 'upcoming' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setViewMode('upcoming')}
-          >
-            Upcoming
-          </Button>
-          <Button
-            variant={viewMode === 'past' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setViewMode('past')}
-          >
-            Past
-          </Button>
-          <TimeSpanSelector 
-            value={timeSpan} 
-            viewMode={viewMode}
-            onValueChange={(value) => {
-              console.log("TimeSpan changed to:", value);
-              setTimeSpan(value);
-            }} 
-          />
-          <MessageManagementDialog department={userDepartment} />
+          <div className="flex items-center gap-1">
+            <Button
+              variant={viewMode === 'upcoming' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('upcoming')}
+              className="text-xs sm:text-sm"
+            >
+              Upcoming
+            </Button>
+            <Button
+              variant={viewMode === 'past' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('past')}
+              className="text-xs sm:text-sm"
+            >
+              Past
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <TimeSpanSelector 
+              value={timeSpan} 
+              viewMode={viewMode}
+              onValueChange={(value) => {
+                console.log("TimeSpan changed to:", value);
+                setTimeSpan(value);
+              }} 
+            />
+            <MessageManagementDialog department={userDepartment} />
+          </div>
         </div>
       </div>
 

@@ -99,10 +99,10 @@ const Personal = () => {
   };
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">House Technician Calendar</h1>
-        <p className="text-muted-foreground">Track house tech assignments and availability</p>
+    <div className="w-full max-w-full space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+        <h1 className="text-xl md:text-3xl font-bold">House Technician Calendar</h1>
+        <p className="text-sm md:text-base text-muted-foreground">Track house tech assignments and availability</p>
       </div>
       
       <PersonalCalendar 
