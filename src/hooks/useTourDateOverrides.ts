@@ -103,6 +103,24 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
     },
   });
 
+  // Update power override
+  const updatePowerOverrideMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<TourDatePowerOverride> }) => {
+      const { data: result, error } = await supabase
+        .from("tour_date_power_overrides")
+        .update(data)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tour-date-power-overrides", tourDateId] });
+    },
+  });
+
   // Delete override
   const deleteOverrideMutation = useMutation({
     mutationFn: async ({ id, table }: { id: string; table: 'power' | 'weight' }) => {
@@ -130,6 +148,7 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
     isLoading: powerLoading || weightLoading,
     createPowerOverride: createPowerOverrideMutation.mutateAsync,
     createWeightOverride: createWeightOverrideMutation.mutateAsync,
+    updatePowerOverride: updatePowerOverrideMutation.mutateAsync,
     deleteOverride: deleteOverrideMutation.mutateAsync,
     isCreatingOverride: createPowerOverrideMutation.isPending || createWeightOverrideMutation.isPending,
     isDeletingOverride: deleteOverrideMutation.isPending,

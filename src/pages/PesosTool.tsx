@@ -663,13 +663,13 @@ const PesosTool: React.FC = () => {
         console.error("Error fetching logo:", logoError);
       }
 
-      const jobDateStr = new Date().toLocaleDateString('en-GB');
+      // For now just use the job title - location will be added later when available
       const pdfBlob = await exportToPDF(
         selectedJob.title,
         tables.map((table) => ({ ...table, toolType: 'pesos' })),
         'weight',
         selectedJob.title,
-        jobDateStr,
+        selectedJob?.start_time || new Date().toISOString(),
         summaryRows,
         undefined,
         undefined, // FIXED: Remove safety margin for weight reports

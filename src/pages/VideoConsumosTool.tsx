@@ -366,7 +366,7 @@ const VideoConsumosTool: React.FC = () => {
         allTables.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
         jobToUse.title,
-        'video',
+        jobToUse?.start_time || new Date().toISOString(),
         undefined,
         powerSummary,
         safetyMargin,

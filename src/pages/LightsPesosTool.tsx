@@ -340,7 +340,7 @@ const LightsPesosTool: React.FC = () => {
         tables.map((table) => ({ ...table, toolType: 'pesos' })),
         'weight',
         jobTitle,
-        'lights',
+        selectedJob?.start_time || new Date().toISOString(),
         summaryRows,
         undefined,
         0,

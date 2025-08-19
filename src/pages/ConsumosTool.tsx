@@ -90,6 +90,7 @@ const ConsumosTool: React.FC = () => {
   const { 
     powerOverrides = [],
     createPowerOverride,
+    updatePowerOverride,
     deleteOverride,
     isCreatingOverride 
   } = useTourDateOverrides(tourDateId || '', 'power');
@@ -376,12 +377,28 @@ const ConsumosTool: React.FC = () => {
     setTables((prev) => prev.filter((table) => table.id !== tableId));
   };
 
-  const updateTableSettings = (tableId: number | string, updates: Partial<Table>) => {
+  const updateTableSettings = async (tableId: number | string, updates: Partial<Table>) => {
     setTables((prev) =>
       prev.map((table) => {
         if (table.id === tableId) {
           const updatedTable = { ...table, ...updates };
-          if (selectedJobId) {
+          
+          // Persist changes based on mode
+          if (isJobOverrideMode && table.isOverride && table.overrideId && updatePowerOverride) {
+            // Update the override in database
+            updatePowerOverride({
+              id: table.overrideId,
+              data: {
+                pdu_type: updatedTable.customPduType || updatedTable.pduType || '',
+                custom_pdu_type: updatedTable.customPduType,
+                includes_hoist: updatedTable.includesHoist || false,
+                override_data: {
+                  rows: updatedTable.rows,
+                  safetyMargin: safetyMargin
+                }
+              }
+            });
+          } else if (selectedJobId) {
             savePowerRequirementTable(updatedTable);
           }
           return updatedTable;
@@ -415,11 +432,16 @@ const ConsumosTool: React.FC = () => {
         console.error("Error fetching logo:", logoError);
       }
 
+      // Include location info and ensure proper date format
+      const jobTitle = selectedJob?.title || 'Power Report';
+      const jobLocation = selectedJob?.location?.name || '';
+      const headerTitle = jobLocation ? `${jobTitle} - ${jobLocation}` : jobTitle;
+      
       const pdfBlob = await exportToPDF(
-        selectedJob?.title || 'Power Report',
+        headerTitle,
         tables.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
-        selectedJob?.title || 'Power Report',
+        headerTitle,
         selectedJob?.date || new Date().toISOString(),
         undefined, // summaryRows - undefined for power reports (auto-generated)
         powerSummary,

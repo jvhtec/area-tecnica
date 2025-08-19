@@ -49,8 +49,21 @@ export const exportToPDF = (
     const createdDate = new Date().toLocaleDateString('en-GB');
     const footerSpace = 40; // Space reserved for logo and created date
 
-    // Convert jobDate to a proper date string:
-    const jobDateStr = new Date(jobDate).toLocaleDateString('en-GB');
+    // Convert jobDate to a proper date string with fallback for invalid dates:
+    let jobDateStr: string;
+    try {
+      const date = new Date(jobDate);
+      if (isNaN(date.getTime())) {
+        // If the date is invalid, try parsing it as ISO string or fallback to current date
+        const fallbackDate = jobDate.includes('-') ? new Date(jobDate + 'T00:00:00') : new Date();
+        jobDateStr = fallbackDate.toLocaleDateString('en-GB');
+      } else {
+        jobDateStr = date.toLocaleDateString('en-GB');
+      }
+    } catch (error) {
+      console.warn('Invalid date provided to exportToPDF:', jobDate);
+      jobDateStr = new Date().toLocaleDateString('en-GB');
+    }
 
     // === HEADER SECTION (for main tables) ===
     doc.setFillColor(125, 1, 1);

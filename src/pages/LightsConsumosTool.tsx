@@ -373,7 +373,7 @@ const LightsConsumosTool: React.FC = () => {
         allTables.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
         jobToUse.title,
-        'lights',
+        ('start_time' in jobToUse ? jobToUse.start_time : null) || new Date().toISOString(),
         undefined,
         undefined,
         safetyMargin,

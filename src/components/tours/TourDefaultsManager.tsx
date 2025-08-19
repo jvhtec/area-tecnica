@@ -454,13 +454,13 @@ export const TourDefaultsManager = ({
     }
 
     const locationName = (tourDate.locations as any)?.name || 'Unknown Location';
-    const dateStr = new Date(tourDate.date).toLocaleDateString('en-GB');
+    const dateStr = tourDate.date; // Pass ISO string directly for proper parsing
 
     const pdfBlob = await exportToPDF(
       `${tour.name} - ${locationName} - ${department.toUpperCase()} ${type.toUpperCase()}`,
       combinedTables,
       type,
-      tour.name,
+      `${tour.name} - ${locationName}`, // Include location in jobName for header
       dateStr,
       undefined,
       powerSummary,

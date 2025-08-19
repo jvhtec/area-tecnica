@@ -291,7 +291,7 @@ const VideoPesosTool: React.FC = () => {
         allTables.map((table) => ({ ...table, toolType: 'pesos' })),
         'weight',
         jobToUse.title,
-        new Date().toISOString(),
+        jobToUse?.start_time || new Date().toISOString(),
         undefined,
         undefined,
         0,
