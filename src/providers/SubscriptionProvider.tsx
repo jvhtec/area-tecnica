@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { UnifiedSubscriptionManager } from '@/lib/unified-subscription-manager';
 import { toast } from 'sonner';
 import { TokenManager } from '@/lib/token-manager';
+import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
 
 // Context for providing subscription manager state
 interface SubscriptionContextType {
@@ -54,14 +55,31 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
   const lastConnectionStatusRef = React.useRef<string>(state.connectionStatus);
   const tokenManager = TokenManager.getInstance();
   const connectionCheckIntervalRef = React.useRef<number | null>(null);
+  const [isLeader, setIsLeader] = useState(true);
+  const multiTabCoordinator = MultiTabCoordinator.getInstance(queryClient);
+
+  // Listen for tab role changes
+  useEffect(() => {
+    const handleTabRoleChange = (event: CustomEvent) => {
+      setIsLeader(event.detail.isLeader);
+    };
+    
+    window.addEventListener('tab-leader-elected', handleTabRoleChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('tab-leader-elected', handleTabRoleChange as EventListener);
+    };
+  }, []);
 
   // Initialize the subscription manager
   useEffect(() => {
     const manager = UnifiedSubscriptionManager.getInstance(queryClient);
     
-    // Setup network status and visibility monitoring
-    manager.setupNetworkStatusRefetching();
-    manager.setupVisibilityBasedRefetching();
+    // Only setup network status and visibility monitoring for leader
+    if (isLeader) {
+      manager.setupNetworkStatusRefetching();
+      manager.setupVisibilityBasedRefetching();
+    }
     
     // Subscribe to token refreshes to update subscriptions
     const unsubscribe = tokenManager.subscribe(() => {
@@ -169,11 +187,14 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     }
     
     // Update state periodically to reflect current subscription status
+    // Reduce frequency for followers to save resources
+    const intervalTime = isLeader ? 2000 : 5000; // 2s for leader, 5s for followers
+    
     connectionCheckIntervalRef.current = window.setInterval(() => {
       const connectionStatus = manager.getConnectionStatus();
       
-      // Notify users of connection status changes
-      if (connectionStatus !== lastConnectionStatusRef.current) {
+      // Only notify users of connection status changes if we're the leader
+      if (isLeader && connectionStatus !== lastConnectionStatusRef.current) {
         if (connectionStatus === 'connected' && lastConnectionStatusRef.current !== 'connected') {
           toast.success('Connection restored', {
             description: 'Real-time updates are now active'
@@ -194,7 +215,7 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
         subscriptionCount: manager.getSubscriptionCount(),
         subscriptionsByTable: manager.getSubscriptionsByTable(),
       }));
-    }, 2000); // More frequent updates (every 2 seconds)
+    }, intervalTime);
     
     return () => {
       if (connectionCheckIntervalRef.current) {
@@ -202,20 +223,22 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
       }
       unsubscribe();
     };
-  }, [queryClient]);
+  }, [queryClient, isLeader]);
 
-  // Setup core tables subscription
+  // Setup core tables subscription (only for leader)
   useEffect(() => {
-    const manager = UnifiedSubscriptionManager.getInstance(queryClient);
-    
-    // Set up core tables that most pages need
-    manager.subscribeToTable('profiles', 'profiles', undefined, 'high');
-    manager.subscribeToTable('jobs', 'jobs', undefined, 'high');
+    if (isLeader) {
+      const manager = UnifiedSubscriptionManager.getInstance(queryClient);
+      
+      // Set up core tables that most pages need
+      manager.subscribeToTable('profiles', 'profiles', undefined, 'high');
+      manager.subscribeToTable('jobs', 'jobs', undefined, 'high');
+    }
     
     return () => {
       // Don't unsubscribe from core tables as they are needed throughout the app
     };
-  }, [queryClient]);
+  }, [queryClient, isLeader]);
 
   return (
     <SubscriptionContext.Provider value={state}>

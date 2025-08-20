@@ -1,8 +1,8 @@
 
 import { QueryClient, DefaultOptions, QueryKey } from "@tanstack/react-query";
 
-// Optimized React Query configuration for real-time data
-const optimizedQueryOptions: DefaultOptions = {
+// Optimized React Query configuration for real-time data with multi-tab support
+const createOptimizedQueryOptions = (isLeader: boolean = true): DefaultOptions => ({
   queries: {
     staleTime: 2 * 60 * 1000, // 2 minutes - reduced from 5 minutes for real-time data
     retry: (failureCount, error: any) => {
@@ -13,9 +13,9 @@ const optimizedQueryOptions: DefaultOptions = {
       return failureCount < 2; // Reduced from 3 retries
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 1.5 ** attemptIndex, 10000), // Faster backoff
-    refetchOnWindowFocus: false, // Disabled to reduce unnecessary requests
+    refetchOnWindowFocus: isLeader, // Only leader refetches on focus
     refetchOnMount: 'always', // Always refetch on mount for fresh data
-    refetchOnReconnect: true,
+    refetchOnReconnect: isLeader, // Only leader refetches on reconnect
     gcTime: 5 * 60 * 1000, // 5 minutes - reduced from 10 minutes
     networkMode: 'online', // Only make requests when online
   },
@@ -25,12 +25,16 @@ const optimizedQueryOptions: DefaultOptions = {
     gcTime: 2 * 60 * 1000, // 2 minutes - reduced from 5 minutes
     networkMode: 'online',
   },
-};
+});
 
-// Create optimized query client with deduplication
-export const createOptimizedQueryClient = () => {
+// Default options for backwards compatibility
+const optimizedQueryOptions = createOptimizedQueryOptions(true);
+
+// Create optimized query client with deduplication and multi-tab support
+export const createOptimizedQueryClient = (isLeader: boolean = true) => {
+  const queryClientOptions = createOptimizedQueryOptions(isLeader);
   const queryClient = new QueryClient({
-    defaultOptions: optimizedQueryOptions,
+    defaultOptions: queryClientOptions,
   });
 
   // Add query deduplication
@@ -56,6 +60,12 @@ export const createOptimizedQueryClient = () => {
   };
 
   return queryClient;
+};
+
+// Update query client options based on tab role
+export const updateQueryClientForRole = (queryClient: QueryClient, isLeader: boolean) => {
+  const newOptions = createOptimizedQueryOptions(isLeader);
+  queryClient.setDefaultOptions(newOptions);
 };
 
 // Query key factory for consistent key generation

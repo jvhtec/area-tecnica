@@ -1,9 +1,11 @@
 
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { queryClient } from '@/lib/react-query';
+import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
 import Layout from '@/components/layout/Layout';
 import Auth from '@/pages/Auth';
 import Dashboard from '@/pages/Dashboard';
@@ -45,6 +47,15 @@ import { TourManagementWrapper } from "@/components/tours/TourManagementWrapper"
 import Timesheets from '@/pages/Timesheets';
 
 export default function App() {
+  // Initialize multi-tab coordinator
+  React.useEffect(() => {
+    const coordinator = MultiTabCoordinator.getInstance(queryClient);
+    
+    return () => {
+      coordinator.destroy();
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system" storageKey="sector-pro-theme">

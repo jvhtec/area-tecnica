@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { UnifiedSubscriptionManager } from '@/lib/unified-subscription-manager';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
 
 // Define subscription requirements for each route
 export const ROUTE_SUBSCRIPTIONS: Record<string, Array<{
@@ -162,6 +163,8 @@ export function useEnhancedRouteSubscriptions() {
   const manager = UnifiedSubscriptionManager.getInstance(queryClient);
   const lastActiveTimestamp = useRef<number>(Date.now());
   const wasInactive = useRef<boolean>(false);
+  const multiTabCoordinator = MultiTabCoordinator.getInstance(queryClient);
+  const [isLeader, setIsLeader] = useState(true);
   
   const [status, setStatus] = useState({
     requiredTables: [] as string[],
@@ -172,6 +175,19 @@ export function useEnhancedRouteSubscriptions() {
     routeKey: '',
     formattedLastActivity: ''
   });
+
+  // Listen for tab role changes
+  useEffect(() => {
+    const handleTabRoleChange = (event: CustomEvent) => {
+      setIsLeader(event.detail.isLeader);
+    };
+    
+    window.addEventListener('tab-leader-elected', handleTabRoleChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('tab-leader-elected', handleTabRoleChange as EventListener);
+    };
+  }, []);
 
   // Find the most specific route match
   const findRoutePath = useCallback((pathname: string) => {
@@ -211,12 +227,12 @@ export function useEnhancedRouteSubscriptions() {
       .sort((a, b) => b.length - a.length)[0] || pathname;
   }, []);
   
-  // Check document visibility changes to detect when the user returns to the page
+  // Check document visibility changes to detect when the user returns to the page (only for leader)
   useEffect(() => {
     const handleVisibilityChange = () => {
       const now = Date.now();
       
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && isLeader) {
         // Calculate time since last activity
         const timeSinceLastActive = now - lastActiveTimestamp.current;
         
@@ -229,7 +245,7 @@ export function useEnhancedRouteSubscriptions() {
           const tableNames = [...status.requiredTables];
           if (tableNames.length > 0) {
             manager.forceRefreshSubscriptions(tableNames);
-            queryClient.invalidateQueries();
+            multiTabCoordinator.invalidateQueries();
             
             toast.info("Refreshing data after inactivity", {
               description: "Reconnecting to real-time updates..."
@@ -247,7 +263,7 @@ export function useEnhancedRouteSubscriptions() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [manager, queryClient, status.requiredTables]);
+  }, [manager, queryClient, status.requiredTables, isLeader, multiTabCoordinator]);
 
   // Subscribe to required tables for the current route
   useEffect(() => {
@@ -289,12 +305,18 @@ export function useEnhancedRouteSubscriptions() {
       }
     });
     
-    // Subscribe to all tables
-    allTables.forEach(({ table, priority }) => {
-      console.log(`Subscribing to ${table} with priority ${priority}`);
-      manager.subscribeToTable(table, table, undefined, priority);
-      manager.registerRouteSubscription(pathname, `${table}::${table}`);
-    });
+    // Subscribe to all tables (only if we're the leader)
+    if (isLeader) {
+      allTables.forEach(({ table, priority }) => {
+        console.log(`Subscribing to ${table} with priority ${priority}`);
+        manager.subscribeToTable(table, table, undefined, priority);
+        manager.registerRouteSubscription(pathname, `${table}::${table}`);
+      });
+    } else {
+      // If we're a follower, request the leader to handle subscriptions
+      const tableNames = allTables.map(t => t.table);
+      multiTabCoordinator.requestSubscriptions(tableNames);
+    }
     
     // Update the local state with table information
     const tableNames = allTables.map(t => t.table);
@@ -330,7 +352,7 @@ export function useEnhancedRouteSubscriptions() {
       formattedLastActivity
     });
     
-  }, [location.pathname, manager, findRoutePath, lastRefreshTime, queryClient]);
+  }, [location.pathname, manager, findRoutePath, lastRefreshTime, queryClient, isLeader, multiTabCoordinator]);
 
   // Helper to get priority value for comparison
   function getPriorityValue(priority: 'high' | 'medium' | 'low'): number {
@@ -350,10 +372,15 @@ export function useEnhancedRouteSubscriptions() {
     forceRefresh: () => {
       if (status.requiredTables.length > 0) {
         console.log('Manually forcing refresh of all subscriptions');
-        manager.forceRefreshSubscriptions(status.requiredTables);
-        queryClient.invalidateQueries();
+        if (isLeader) {
+          manager.forceRefreshSubscriptions(status.requiredTables);
+          multiTabCoordinator.invalidateQueries();
+          toast.success('Subscriptions refreshed');
+        } else {
+          // Followers can request refresh from leader
+          multiTabCoordinator.requestSubscriptions(status.requiredTables);
+        }
         wasInactive.current = false;
-        toast.success('Subscriptions refreshed');
       }
     }
   };
