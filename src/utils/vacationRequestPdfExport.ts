@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import { VacationRequest } from '@/lib/vacation-requests';
+import { supabase } from '@/integrations/supabase/client';
 
 interface VacationRequestPDFOptions {
   request: VacationRequest;
@@ -32,26 +33,59 @@ const loadImageSafely = (src: string, description: string): Promise<HTMLImageEle
   });
 };
 
+// Function to get approver name
+const getApproverName = async (approverId?: string): Promise<string> => {
+  if (!approverId) return 'Unknown';
+  
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('first_name, last_name')
+      .eq('id', approverId)
+      .single();
+    
+    if (error || !data) return 'Unknown';
+    
+    return `${data.first_name || ''} ${data.last_name || ''}`.trim() || 'Unknown';
+  } catch (error) {
+    console.error('Error fetching approver name:', error);
+    return 'Unknown';
+  }
+};
+
 // Main PDF generation function
 export const generateVacationRequestPDF = async ({ request, approverName }: VacationRequestPDFOptions): Promise<Blob> => {
   const pdf = new jsPDF();
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   
-  // Company colors
-  const primaryColor = '#1a365d';
-  const accentColor = '#2d3748';
+  // Corporate colors (matching other PDFs in the system)
+  const primaryColor: [number, number, number] = [26, 54, 93]; // Dark blue
+  const accentColor: [number, number, number] = [45, 55, 72]; // Darker blue-gray
   
-  // Load company logo
-  const logoImg = await loadImageSafely('/company-logo.png', 'company logo');
+  // Load Sector Pro logo (try multiple paths like other PDFs)
+  let logoImg: HTMLImageElement | null = null;
+  const logoPaths = [
+    '/sector pro logo.png',
+    '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png',
+    './sector pro logo.png',
+    'sector pro logo.png'
+  ];
+  
+  for (const logoPath of logoPaths) {
+    logoImg = await loadImageSafely(logoPath, 'Sector Pro logo');
+    if (logoImg) break;
+  }
   
   // Header
-  pdf.setFillColor(26, 54, 93); // primaryColor
+  pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   pdf.rect(0, 0, pageWidth, 25, 'F');
   
   // Company logo in header (if available)
   if (logoImg) {
-    pdf.addImage(logoImg, 'PNG', 15, 5, 30, 15);
+    const logoHeight = 15;
+    const logoWidth = logoHeight * (logoImg.width / logoImg.height);
+    pdf.addImage(logoImg, 'PNG', 15, 5, logoWidth, logoHeight);
   }
   
   // Header text
@@ -71,12 +105,18 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
   // Request information
   let yPosition = 60;
   
+  // Get approver name if not provided
+  let finalApproverName = approverName;
+  if (!finalApproverName && request.approved_by) {
+    finalApproverName = await getApproverName(request.approved_by);
+  }
+  
   // Technician information
   const techName = request.technicians 
     ? `${request.technicians.first_name || ''} ${request.technicians.last_name || ''}`.trim()
-    : 'Unknown Technician';
+    : 'Not Available';
     
-  const department = request.technicians?.department || 'Unknown Department';
+  const department = request.technicians?.department || 'Not Available';
   
   pdf.setFontSize(12);
   pdf.setFont('helvetica', 'normal');
@@ -128,17 +168,17 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
   };
   
   const statusColor = statusColors[request.status] || [108, 117, 125];
-  pdf.setFillColor(...statusColor);
+  pdf.setFillColor(statusColor[0], statusColor[1], statusColor[2]);
   pdf.circle(70, yPosition - 5, 3, 'F');
   
   yPosition += 5;
   
   // Approval information (if applicable)
   if (request.status === 'approved' && request.approved_at) {
-    yPosition = addInfoRow('Approved By', approverName || 'Unknown', yPosition);
+    yPosition = addInfoRow('Approved By', finalApproverName || 'Not Available', yPosition);
     yPosition = addInfoRow('Approval Date', format(new Date(request.approved_at), 'PPP'), yPosition);
   } else if (request.status === 'rejected' && request.approved_at) {
-    yPosition = addInfoRow('Rejected By', approverName || 'Unknown', yPosition);
+    yPosition = addInfoRow('Rejected By', finalApproverName || 'Not Available', yPosition);
     yPosition = addInfoRow('Rejection Date', format(new Date(request.approved_at), 'PPP'), yPosition);
     
     if (request.rejection_reason) {
@@ -156,7 +196,7 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
   
   // Footer
   const footerY = pageHeight - 30;
-  pdf.setFillColor(45, 55, 72); // accentColor
+  pdf.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
   pdf.rect(0, footerY, pageWidth, 30, 'F');
   
   // Footer content
@@ -164,9 +204,12 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
   pdf.setFontSize(10);
   pdf.setFont('helvetica', 'normal');
   
-  // Company logo in footer (smaller)
+  // Sector Pro logo in footer (centered)
   if (logoImg) {
-    pdf.addImage(logoImg, 'PNG', 15, footerY + 5, 20, 10);
+    const footerLogoHeight = 10;
+    const footerLogoWidth = footerLogoHeight * (logoImg.width / logoImg.height);
+    const logoX = (pageWidth - footerLogoWidth) / 2;
+    pdf.addImage(logoImg, 'PNG', logoX, footerY + 5, footerLogoWidth, footerLogoHeight);
   }
   
   // Footer text
@@ -174,7 +217,7 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
   pdf.text('Sector Pro Audio & Video', pageWidth - 15, footerY + 20, { align: 'right' });
   
   // Page number
-  pdf.text('Page 1 of 1', pageWidth / 2, footerY + 15, { align: 'center' });
+  pdf.text('Page 1 of 1', pageWidth / 2, footerY + 20, { align: 'center' });
   
   return new Promise((resolve) => {
     const pdfBlob = pdf.output('blob');
