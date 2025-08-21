@@ -1,18 +1,13 @@
-
 import React, { useState } from 'react';
 import { PersonalCalendar } from '@/components/personal/PersonalCalendar';
-import { VacationRequestForm } from '@/components/personal/VacationRequestForm';
-import { VacationManagement } from '@/components/personal/VacationManagement';
-import { VacationRequestHistory } from '@/components/personal/VacationRequestHistory';
+import { VacationRequestsTabs } from '@/components/personal/VacationRequestsTabs';
 import { useAuth } from '@/hooks/useAuth';
 import { useVacationRequests } from '@/hooks/useVacationRequests';
 import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CalendarDays, Settings, History } from 'lucide-react';
 
 const Personal = () => {
   const [date, setDate] = useState<Date>(new Date());
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
   const { submitRequest, isSubmitting } = useVacationRequests();
 
   console.log('Personal page: Rendering with date:', date);
@@ -32,58 +27,23 @@ const Personal = () => {
 
   // Show appropriate content based on user role
   const renderVacationContent = () => {
-    if (!user) {
+    if (!user || !userRole) {
       return (
         <Card>
           <CardContent className="text-center py-8">
-            <p className="text-muted-foreground">Please log in to access vacation features.</p>
+            <p className="text-muted-foreground">Please log in to access vacation requests.</p>
           </CardContent>
         </Card>
       );
     }
 
-    const isHouseTech = user.role === 'house_tech';
-    const isAdminOrManagement = user.role === 'admin' || user.role === 'management';
-
-    if (isHouseTech) {
+    if (userRole === 'house_tech' || userRole === 'management' || userRole === 'admin') {
       return (
-        <Tabs defaultValue="request" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="request" className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4" />
-              Request Vacation
-            </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-2">
-              <History className="h-4 w-4" />
-              My Requests
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="request">
-            <VacationRequestForm
-              onSubmit={handleVacationRequestSubmit}
-              isSubmitting={isSubmitting}
-            />
-          </TabsContent>
-          <TabsContent value="history">
-            <VacationRequestHistory />
-          </TabsContent>
-        </Tabs>
-      );
-    }
-
-    if (isAdminOrManagement) {
-      return (
-        <Tabs defaultValue="manage" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="manage" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Manage Requests
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="manage">
-            <VacationManagement />
-          </TabsContent>
-        </Tabs>
+        <VacationRequestsTabs
+          userRole={userRole}
+          onVacationRequestSubmit={handleVacationRequestSubmit}
+          isSubmitting={isSubmitting}
+        />
       );
     }
 

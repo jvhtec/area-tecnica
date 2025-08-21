@@ -13,7 +13,7 @@ export interface VacationRequest {
   approved_by?: string;
   approved_at?: string;
   rejection_reason?: string;
-  technicians?: { first_name: string; last_name: string };
+  technicians?: { first_name: string; last_name: string; department: string };
 }
 
 export interface VacationRequestSubmission {
@@ -55,13 +55,27 @@ export const vacationRequestsApi = {
     return data as VacationRequest[];
   },
 
-  // Get pending vacation requests (admin/management only)
+  // Get department vacation requests (management only)
+  async getDepartmentRequests() {
+    const { data, error } = await supabase
+      .from('vacation_requests')
+      .select(`
+        *,
+        technicians:profiles!technician_id(first_name, last_name, department)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data as VacationRequest[];
+  },
+
+  // Get pending vacation requests (admin/management only) - kept for compatibility
   async getPendingRequests() {
     const { data, error } = await supabase
       .from('vacation_requests')
       .select(`
         *,
-        technicians:profiles!technician_id(first_name, last_name)
+        technicians:profiles!technician_id(first_name, last_name, department)
       `)
       .eq('status', 'pending')
       .order('created_at', { ascending: true });

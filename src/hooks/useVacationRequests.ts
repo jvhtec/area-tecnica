@@ -12,6 +12,11 @@ export const useVacationRequests = () => {
     queryFn: vacationRequestsApi.getUserRequests,
   });
 
+  const departmentRequestsQuery = useQuery({
+    queryKey: ['vacation-requests', 'department'],
+    queryFn: vacationRequestsApi.getDepartmentRequests,
+  });
+
   const pendingRequestsQuery = useQuery({
     queryKey: ['vacation-requests', 'pending'],
     queryFn: vacationRequestsApi.getPendingRequests,
@@ -75,8 +80,10 @@ export const useVacationRequests = () => {
   return {
     userRequests: userRequestsQuery.data || [],
     pendingRequests: pendingRequestsQuery.data || [],
+    departmentRequests: departmentRequestsQuery.data || [],
     isLoadingUserRequests: userRequestsQuery.isLoading,
     isLoadingPendingRequests: pendingRequestsQuery.isLoading,
+    isLoadingDepartmentRequests: departmentRequestsQuery.isLoading,
     submitRequest: submitRequestMutation.mutate,
     approveRequests: approveRequestsMutation.mutate,
     rejectRequests: rejectRequestsMutation.mutate,
