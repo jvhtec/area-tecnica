@@ -5,10 +5,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { useVacationRequests } from '@/hooks/useVacationRequests';
 import { format } from 'date-fns';
-import { History, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { History, CheckCircle, XCircle, Clock, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { downloadVacationRequestPDF } from '@/utils/vacationRequestPdfExport';
+import type { VacationRequest } from '@/lib/vacation-requests';
 
 export const VacationRequestHistory = () => {
   const { userRequests, isLoadingUserRequests } = useVacationRequests();
+
+  const handleExportPDF = async (request: VacationRequest) => {
+    try {
+      await downloadVacationRequestPDF({ request });
+    } catch (error) {
+      console.error('Error exporting vacation request PDF:', error);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -57,6 +68,7 @@ export const VacationRequestHistory = () => {
                   <TableHead>Status</TableHead>
                   <TableHead>Submitted</TableHead>
                   <TableHead>Response</TableHead>
+                  <TableHead className="w-[80px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -72,6 +84,17 @@ export const VacationRequestHistory = () => {
                         ? format(new Date(request.approved_at), 'MMM d, yyyy')
                         : '-'
                       }
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleExportPDF(request)}
+                        className="h-8 w-8 p-0"
+                        title="Export PDF"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

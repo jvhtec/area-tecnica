@@ -275,7 +275,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                     assignment={techAssignment}
                     date={day}
                     compact={true}
-                    availabilityStatus={availabilityStatus}
+                    availabilityStatus={availabilityStatus === 'unavailable' ? 'vacation' : availabilityStatus}
                     onAvailabilityChange={handleAvailabilityChange}
                     onAvailabilityRemove={handleAvailabilityRemove}
                   />

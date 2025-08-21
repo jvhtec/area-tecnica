@@ -7,10 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useVacationRequests } from '@/hooks/useVacationRequests';
 import { format } from 'date-fns';
-import { CalendarDays, CheckCircle, XCircle, Clock, Users } from 'lucide-react';
+import { CalendarDays, CheckCircle, XCircle, Clock, Users, Download } from 'lucide-react';
 import { VacationRequestForm } from './VacationRequestForm';
 import { VacationRequestHistory } from './VacationRequestHistory';
 import type { VacationRequest } from '@/lib/vacation-requests';
+import { downloadVacationRequestPDF } from '@/utils/vacationRequestPdfExport';
 
 interface VacationRequestsTabsProps {
   userRole: 'house_tech' | 'management' | 'admin';
@@ -57,6 +58,18 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
     if (selectedRequests.length === 0) return;
     rejectRequests({ requestIds: selectedRequests });
     setSelectedRequests([]);
+  };
+
+  const handleExportPDF = async (request: VacationRequest) => {
+    try {
+      const approverName = request.technicians 
+        ? `${request.technicians.first_name} ${request.technicians.last_name}`
+        : undefined;
+      
+      await downloadVacationRequestPDF({ request, approverName });
+    } catch (error) {
+      console.error('Error exporting vacation request PDF:', error);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -134,6 +147,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
                       <TableHead className="hidden lg:table-cell">Reason</TableHead>
                       <TableHead className="hidden md:table-cell">Requested On</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="w-[80px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -159,6 +173,17 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
                         <TableCell className="hidden lg:table-cell max-w-[200px] truncate">{request.reason}</TableCell>
                         <TableCell className="hidden md:table-cell">{format(new Date(request.created_at), 'MMM d, yyyy')}</TableCell>
                         <TableCell>{getStatusBadge(request.status)}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleExportPDF(request)}
+                            className="h-8 w-8 p-0"
+                            title="Export PDF"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
