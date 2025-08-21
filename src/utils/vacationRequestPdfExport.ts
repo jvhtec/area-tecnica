@@ -83,8 +83,8 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
   const pageHeight = pdf.internal.pageSize.getHeight();
   
   // Corporate colors (matching other PDFs in the system)
-  const primaryColor: [number, number, number] = [26, 54, 93]; // Dark blue
-  const accentColor: [number, number, number] = [45, 55, 72]; // Darker blue-gray
+  const primaryColor: [number, number, number] = 125, 1, 1]; // Dark blue
+  const accentColor: [number, number, number] = [125,1, 25]; // Darker blue-gray
   
   // Load Sector Pro logo (try multiple paths like other PDFs)
   let logoImg: HTMLImageElement | null = null;
