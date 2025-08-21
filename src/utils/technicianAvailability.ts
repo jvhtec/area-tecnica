@@ -63,6 +63,22 @@ export async function getAvailableTechnicians(
       throw assignmentError;
     }
 
+    // Get availability schedules (including vacation-based unavailability)
+    const jobStartDate = new Date(jobStartTime).toISOString().split('T')[0];
+    const jobEndDate = new Date(jobEndTime).toISOString().split('T')[0];
+    
+    const { data: unavailabilityData, error: unavailabilityError } = await supabase
+      .from("availability_schedules")
+      .select("user_id, date, status, source")
+      .in("user_id", technicianIds)
+      .eq("status", "unavailable")
+      .gte("date", jobStartDate)
+      .lte("date", jobEndDate);
+
+    if (unavailabilityError) {
+      console.error("Error fetching unavailability data:", unavailabilityError);
+    }
+
     // Filter out technicians who have conflicts
     const availableTechnicians = allTechnicians.filter(technician => {
       // Check if technician is already assigned to this specific job
@@ -77,7 +93,7 @@ export async function getAvailableTechnicians(
       }
 
       // Check if technician has conflicting dates with other jobs
-      const hasDateConflict = conflictingAssignments?.some(assignment => {
+      const hasJobConflict = conflictingAssignments?.some(assignment => {
         if (assignment.technician_id !== technician.id) {
           return false;
         }
@@ -91,7 +107,20 @@ export async function getAvailableTechnicians(
         );
       });
 
-      return !hasDateConflict;
+      // Check if technician is unavailable (vacation, etc.) during job dates
+      const hasUnavailabilityConflict = unavailabilityData?.some(availability => {
+        if (availability.user_id !== technician.id) {
+          return false;
+        }
+        
+        const availDate = new Date(availability.date);
+        const jobStart = new Date(jobStartTime);
+        const jobEnd = new Date(jobEndTime);
+        
+        return availDate >= jobStart && availDate <= jobEnd;
+      });
+
+      return !hasJobConflict && !hasUnavailabilityConflict;
     });
 
     return availableTechnicians;
@@ -127,11 +156,23 @@ export async function getTechnicianConflicts(
       throw error;
     }
 
-    if (!assignments) {
-      return [];
+    // Get unavailability conflicts
+    const jobStartDate = new Date(jobStartTime).toISOString().split('T')[0];
+    const jobEndDate = new Date(jobEndTime).toISOString().split('T')[0];
+    
+    const { data: unavailabilityData, error: unavailabilityError } = await supabase
+      .from("availability_schedules")
+      .select("date, status, source, notes")
+      .eq("user_id", technicianId)
+      .eq("status", "unavailable")
+      .gte("date", jobStartDate)
+      .lte("date", jobEndDate);
+
+    if (unavailabilityError) {
+      console.error("Error fetching unavailability conflicts:", unavailabilityError);
     }
 
-    return assignments.filter(assignment => {
+    const jobConflicts = assignments?.filter(assignment => {
       const jobData = assignment.jobs as any;
       return datesOverlap(
         jobStartTime,
@@ -139,7 +180,20 @@ export async function getTechnicianConflicts(
         jobData.start_time,
         jobData.end_time
       );
-    });
+    }) || [];
+
+    // Convert unavailability data to a format similar to job conflicts
+    const unavailabilityConflicts = unavailabilityData?.map(availability => ({
+      type: 'unavailable',
+      date: availability.date,
+      reason: availability.source === 'vacation' ? 'Vacation' : 'Unavailable',
+      notes: availability.notes
+    })) || [];
+
+    return {
+      jobConflicts,
+      unavailabilityConflicts
+    };
   } catch (error) {
     console.error("Error getting technician conflicts:", error);
     throw error;

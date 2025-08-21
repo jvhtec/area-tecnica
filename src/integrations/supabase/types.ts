@@ -168,6 +168,8 @@ export type Database = {
           department: string
           id: string
           notes: string | null
+          source: string
+          source_id: string | null
           status: Database["public"]["Enums"]["global_preset_status"]
           timezone: string | null
           updated_at: string | null
@@ -179,6 +181,8 @@ export type Database = {
           department: string
           id?: string
           notes?: string | null
+          source?: string
+          source_id?: string | null
           status?: Database["public"]["Enums"]["global_preset_status"]
           timezone?: string | null
           updated_at?: string | null
@@ -190,6 +194,8 @@ export type Database = {
           department?: string
           id?: string
           notes?: string | null
+          source?: string
+          source_id?: string | null
           status?: Database["public"]["Enums"]["global_preset_status"]
           timezone?: string | null
           updated_at?: string | null

@@ -29,9 +29,17 @@ interface Assignment {
   };
 }
 
+interface VacationPeriod {
+  technician_id: string;
+  date: string;
+  source: string;
+  notes?: string;
+}
+
 export const usePersonalCalendarData = (currentMonth: Date) => {
   const [houseTechs, setHouseTechs] = useState<HouseTech[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [vacationPeriods, setVacationPeriods] = useState<VacationPeriod[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -96,6 +104,29 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
 
         console.log('PersonalCalendar: Raw assignments data:', assignmentsData);
 
+        // Fetch vacation periods (approved vacations showing as unavailable)
+        console.log('PersonalCalendar: Fetching vacation periods...');
+        const { data: vacationData, error: vacationError } = await supabase
+          .from('availability_schedules')
+          .select('user_id, date, source, notes')
+          .in('user_id', (techsData || []).map(tech => tech.id))
+          .eq('status', 'unavailable')
+          .eq('source', 'vacation')
+          .gte('date', startDate.toISOString().split('T')[0])
+          .lte('date', endDate.toISOString().split('T')[0]);
+
+        if (vacationError) {
+          console.error('PersonalCalendar: Error fetching vacation periods:', vacationError);
+        } else {
+          console.log('PersonalCalendar: Vacation periods fetched:', vacationData?.length || 0);
+          setVacationPeriods(vacationData?.map(v => ({
+            technician_id: v.user_id,
+            date: v.date,
+            source: v.source,
+            notes: v.notes
+          })) || []);
+        }
+
         // Transform the data to match our interface
         const transformedAssignments: Assignment[] = (assignmentsData || []).map(assignment => {
           // Handle the case where jobs might be an array or object
@@ -141,8 +172,8 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
     fetchData();
 
     // Set up real-time subscription for assignment changes
-    const channel = supabase
-      .channel('personal-calendar-updates')
+    const assignmentChannel = supabase
+      .channel('personal-calendar-assignments')
       .on(
         'postgres_changes',
         {
@@ -151,17 +182,34 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
           table: 'job_assignments'
         },
         () => {
-          console.log('PersonalCalendar: Real-time update received, refetching data');
-          // Refetch data when assignments change
+          console.log('PersonalCalendar: Real-time update received from job_assignments, refetching data');
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    // Set up real-time subscription for availability/vacation changes
+    const availabilityChannel = supabase
+      .channel('personal-calendar-availability')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'availability_schedules'
+        },
+        () => {
+          console.log('PersonalCalendar: Real-time update received from availability_schedules, refetching data');
           fetchData();
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(assignmentChannel);
+      supabase.removeChannel(availabilityChannel);
     };
   }, [currentMonth]);
 
-  return { houseTechs, assignments, isLoading };
+  return { houseTechs, assignments, vacationPeriods, isLoading };
 };

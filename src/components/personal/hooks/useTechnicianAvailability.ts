@@ -15,8 +15,21 @@ interface TechnicianAvailability {
   created_by?: string;
 }
 
+interface AvailabilitySchedule {
+  id: string;
+  user_id: string;
+  department: string;
+  date: string;
+  status: 'available' | 'unavailable' | 'tentative';
+  notes?: string;
+  source: string;
+  source_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export const useTechnicianAvailability = (currentMonth: Date) => {
-  const [availabilityData, setAvailabilityData] = useState<Record<string, 'vacation' | 'travel' | 'sick' | 'day_off'>>({});
+  const [availabilityData, setAvailabilityData] = useState<Record<string, 'vacation' | 'travel' | 'sick' | 'day_off' | 'unavailable'>>({});
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
@@ -30,7 +43,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
         const startOfMonthFormatted = format(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1), 'yyyy-MM-dd');
         const endOfMonthFormatted = format(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0), 'yyyy-MM-dd');
 
-        // Fetch technician_availability
+        // Fetch technician_availability (legacy)
         const { data: availabilityDataRaw, error: availabilityError } = await supabase
           .from('technician_availability')
           .select('*')
@@ -42,40 +55,39 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
           return;
         }
 
-        // Fetch approved vacation_requests
-        const { data: vacationRequestsRaw, error: vacationError } = await supabase
-          .from('vacation_requests')
+        // Fetch availability_schedules (new system with vacation integration)
+        const { data: schedulesData, error: schedulesError } = await supabase
+          .from('availability_schedules')
           .select('*')
-          .eq('status', 'approved')
-          .gte('start_date', startOfMonthFormatted)
-          .lte('end_date', endOfMonthFormatted);
+          .gte('date', startOfMonthFormatted)
+          .lte('date', endOfMonthFormatted);
 
-        if (vacationError) {
-          console.error('TechnicianAvailability: Error fetching vacation requests:', vacationError);
+        if (schedulesError) {
+          console.error('TechnicianAvailability: Error fetching schedules data:', schedulesError);
           return;
         }
 
         console.log('TechnicianAvailability: Fetched availability data:', availabilityDataRaw);
-        console.log('TechnicianAvailability: Fetched vacation requests:', vacationRequestsRaw);
+        console.log('TechnicianAvailability: Fetched schedules data:', schedulesData);
 
-        const availabilityMap: Record<string, 'vacation' | 'travel' | 'sick' | 'day_off'> = {};
+        const availabilityMap: Record<string, 'vacation' | 'travel' | 'sick' | 'day_off' | 'unavailable'> = {};
 
-        // Process technician_availability data
+        // Process legacy technician_availability data
         availabilityDataRaw?.forEach((item: TechnicianAvailability) => {
           const key = `${item.technician_id}-${item.date}`;
           availabilityMap[key] = item.status;
         });
 
-        // Process approved vacation_requests data
-        vacationRequestsRaw?.forEach((request: any) => { // Using 'any' for now, can define a type later if needed
-          let currentDate = new Date(request.start_date);
-          const endDate = new Date(request.end_date);
-
-          while (currentDate <= endDate) {
-            const dateStr = format(currentDate, 'yyyy-MM-dd');
-            const key = `${request.technician_id}-${dateStr}`;
-            availabilityMap[key] = 'vacation'; // Mark as vacation
-            currentDate = new Date(currentDate.setDate(currentDate.getDate() + 1));
+        // Process new availability_schedules data (includes vacation-based unavailability)
+        schedulesData?.forEach((item: AvailabilitySchedule) => {
+          const key = `${item.user_id}-${item.date}`;
+          if (item.status === 'unavailable') {
+            // Check if it's vacation-based unavailability
+            if (item.source === 'vacation') {
+              availabilityMap[key] = 'vacation';
+            } else {
+              availabilityMap[key] = 'unavailable';
+            }
           }
         });
 
@@ -106,6 +118,22 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
       )
       .subscribe();
 
+    const schedulesChannel = supabase
+      .channel('availability-schedules-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'availability_schedules'
+        },
+        () => {
+          console.log('TechnicianAvailability: Real-time update received from availability_schedules, refetching data');
+          fetchAvailability();
+        }
+      )
+      .subscribe();
+
     const vacationRequestsChannel = supabase
       .channel('vacation-requests-updates')
       .on(
@@ -124,6 +152,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
 
     return () => {
       supabase.removeChannel(availabilityChannel);
+      supabase.removeChannel(schedulesChannel);
       supabase.removeChannel(vacationRequestsChannel);
     };
   }, [currentMonth]);
@@ -234,7 +263,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
     }
   };
 
-  const getAvailabilityStatus = (techId: string, date: Date): 'vacation' | 'travel' | 'sick' | 'day_off' | null => {
+  const getAvailabilityStatus = (techId: string, date: Date): 'vacation' | 'travel' | 'sick' | 'day_off' | 'unavailable' | null => {
     const key = `${techId}-${format(date, 'yyyy-MM-dd')}`;
     return availabilityData[key] || null;
   };
