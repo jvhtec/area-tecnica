@@ -45,6 +45,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AppInit } from "@/components/AppInit";
 import { TourManagementWrapper } from "@/components/tours/TourManagementWrapper";
 import Timesheets from '@/pages/Timesheets';
+import { UserManual } from '@/components/UserManual';
 
 export default function App() {
   // Initialize multi-tab coordinator
@@ -90,6 +91,7 @@ export default function App() {
                     <Route path="/timesheets" element={<Timesheets />} />
                     <Route path="/tours" element={<Tours />} />
                     <Route path="/festivals" element={<Festivals />} />
+                    <Route path="/manual" element={<UserManual />} />
                     
                     {/* Tour Management Route */}
                     <Route path="/tour-management/:tourId" element={<TourManagementWrapper />} />

@@ -25,6 +25,7 @@ import { WolfensteinDialog } from "@/components/doom/WolfensteinDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { HeaderStatus } from "@/components/ui/header-status";
 import { useAuth } from "@/hooks/useAuth";
+import { HelpButton } from "@/components/layout/HelpButton";
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -143,6 +144,7 @@ const Layout = () => {
             </div>
             <div className="flex items-center gap-2">
               <HeaderStatus className="mr-3" />
+              <HelpButton />
               <ReloadButton onReload={handleReload} />
             </div>
           </header>
