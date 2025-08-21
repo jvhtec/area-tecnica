@@ -53,6 +53,29 @@ const getApproverName = async (approverId?: string): Promise<string> => {
   }
 };
 
+// Function to get technician name and department
+const getTechnicianInfo = async (technicianId: string): Promise<{ name: string; department: string }> => {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('first_name, last_name, department')
+      .eq('id', technicianId)
+      .single();
+    
+    if (error || !data) {
+      return { name: 'Not Available', department: 'Not Available' };
+    }
+    
+    const name = `${data.first_name || ''} ${data.last_name || ''}`.trim() || 'Not Available';
+    const department = data.department || 'Not Available';
+    
+    return { name, department };
+  } catch (error) {
+    console.error('Error fetching technician info:', error);
+    return { name: 'Not Available', department: 'Not Available' };
+  }
+};
+
 // Main PDF generation function
 export const generateVacationRequestPDF = async ({ request, approverName }: VacationRequestPDFOptions): Promise<Blob> => {
   const pdf = new jsPDF();
@@ -81,18 +104,11 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
   pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   pdf.rect(0, 0, pageWidth, 25, 'F');
   
-  // Company logo in header (if available)
-  if (logoImg) {
-    const logoHeight = 15;
-    const logoWidth = logoHeight * (logoImg.width / logoImg.height);
-    pdf.addImage(logoImg, 'PNG', 15, 5, logoWidth, logoHeight);
-  }
-  
-  // Header text
+  // Header text (centered)
   pdf.setTextColor(255, 255, 255);
   pdf.setFontSize(18);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('VACATION REQUEST', pageWidth - 15, 15, { align: 'right' });
+  pdf.text('VACATION REQUEST', pageWidth / 2, 15, { align: 'center' });
   
   // Reset text color
   pdf.setTextColor(0, 0, 0);
@@ -111,12 +127,10 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
     finalApproverName = await getApproverName(request.approved_by);
   }
   
-  // Technician information
-  const techName = request.technicians 
-    ? `${request.technicians.first_name || ''} ${request.technicians.last_name || ''}`.trim()
-    : 'Not Available';
-    
-  const department = request.technicians?.department || 'Not Available';
+  // Get technician information
+  const techInfo = await getTechnicianInfo(request.technician_id);
+  const techName = techInfo.name;
+  const department = techInfo.department;
   
   pdf.setFontSize(12);
   pdf.setFont('helvetica', 'normal');
