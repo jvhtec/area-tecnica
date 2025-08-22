@@ -108,7 +108,7 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
   pdf.setTextColor(255, 255, 255);
   pdf.setFontSize(18);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('VACATION REQUEST', pageWidth / 2, 15, { align: 'center' });
+  pdf.text('SOLICITUD DE VACACIONES', pageWidth / 2, 15, { align: 'center' });
   
   // Reset text color
   pdf.setTextColor(0, 0, 0);
@@ -116,7 +116,7 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
   // Document title
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('Vacation Request Details', 15, 45);
+  pdf.text('Detalles', 15, 45);
   
   // Request information
   let yPosition = 60;
@@ -144,9 +144,9 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
     return y + 10;
   };
   
-  yPosition = addInfoRow('Technician Name', techName, yPosition);
-  yPosition = addInfoRow('Department', department, yPosition);
-  yPosition = addInfoRow('Request Date', format(new Date(request.created_at), 'PPP'), yPosition);
+  yPosition = addInfoRow('Nombre del Empleado', techName, yPosition);
+  yPosition = addInfoRow('Departmento', department, yPosition);
+  yPosition = addInfoRow('Fecha de la Solicitud', format(new Date(request.created_at), 'PPP'), yPosition);
   yPosition += 5;
   
   yPosition = addInfoRow('Vacation Period', 
@@ -163,7 +163,7 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
   
   // Reason section
   pdf.setFont('helvetica', 'bold');
-  pdf.text('Reason:', 15, yPosition);
+  pdf.text('Motivo:', 15, yPosition);
   yPosition += 10;
   
   pdf.setFont('helvetica', 'normal');
@@ -172,7 +172,7 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
   yPosition += reasonLines.length * 7 + 10;
   
   // Status section
-  yPosition = addInfoRow('Status', request.status.toUpperCase(), yPosition);
+  yPosition = addInfoRow('Estado', request.status.toUpperCase(), yPosition);
   
   // Status color indicator
   const statusColors: Record<string, [number, number, number]> = {
@@ -189,16 +189,16 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
   
   // Approval information (if applicable)
   if (request.status === 'approved' && request.approved_at) {
-    yPosition = addInfoRow('Approved By', finalApproverName || 'Not Available', yPosition);
-    yPosition = addInfoRow('Approval Date', format(new Date(request.approved_at), 'PPP'), yPosition);
+    yPosition = addInfoRow('Aprobado por', finalApproverName || 'Not Available', yPosition);
+    yPosition = addInfoRow('Fecha de aprobacion', format(new Date(request.approved_at), 'PPP'), yPosition);
   } else if (request.status === 'rejected' && request.approved_at) {
-    yPosition = addInfoRow('Rejected By', finalApproverName || 'Not Available', yPosition);
-    yPosition = addInfoRow('Rejection Date', format(new Date(request.approved_at), 'PPP'), yPosition);
+    yPosition = addInfoRow('Rechazado por', finalApproverName || 'Not Available', yPosition);
+    yPosition = addInfoRow('Fecha de rechazo', format(new Date(request.approved_at), 'PPP'), yPosition);
     
     if (request.rejection_reason) {
       yPosition += 5;
       pdf.setFont('helvetica', 'bold');
-      pdf.text('Rejection Reason:', 15, yPosition);
+      pdf.text('Motivo del Rechazo', 15, yPosition);
       yPosition += 10;
       
       pdf.setFont('helvetica', 'normal');
@@ -227,8 +227,8 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
   }
   
   // Footer text
-  pdf.text('Generated on: ' + format(new Date(), 'PPP p'), pageWidth - 15, footerY + 10, { align: 'right' });
-  pdf.text('Sector Pro Audio & Video', pageWidth - 15, footerY + 20, { align: 'right' });
+  pdf.text(format(new Date(), 'PPP p'), pageWidth - 15, footerY + 10, { align: 'right' });
+  
   
   // Page number
   pdf.text('Page 1 of 1', pageWidth / 2, footerY + 20, { align: 'center' });
