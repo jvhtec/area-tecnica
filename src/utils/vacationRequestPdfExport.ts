@@ -149,7 +149,7 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
   yPosition = addInfoRow('Fecha de la Solicitud', format(new Date(request.created_at), 'PPP'), yPosition);
   yPosition += 5;
   
-  yPosition = addInfoRow('Vacation Period', 
+  yPosition = addInfoRow('Periodo', 
     `${format(new Date(request.start_date), 'PPP')} - ${format(new Date(request.end_date), 'PPP')}`, 
     yPosition);
     
@@ -158,7 +158,7 @@ export const generateVacationRequestPDF = async ({ request, approverName }: Vaca
   const endDate = new Date(request.end_date);
   const durationDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   
-  yPosition = addInfoRow('Duration', `${durationDays} day${durationDays > 1 ? 's' : ''}`, yPosition);
+  yPosition = addInfoRow('Duracion', `${durationDays} day${durationDays > 1 ? 's' : ''}`, yPosition);
   yPosition += 5;
   
   // Reason section
