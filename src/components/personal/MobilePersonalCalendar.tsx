@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, ChevronLeft, ChevronRight, Users } from "lucide-react";
@@ -20,6 +20,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   const [currentDate, setCurrentDate] = useState(date);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
 
   useEffect(() => {
     setCurrentDate(date);
@@ -100,6 +101,11 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   };
 
   const shouldShowTechOnDay = (tech: any, day: Date) => {
+    // Apply department filter if selected
+    if (selectedDepartment && (String(tech.department || '').trim() !== selectedDepartment)) {
+      return false;
+    }
+
     const dayAssignments = getAssignmentsForDate(day);
     const hasAssignment = dayAssignments.some(
       assignment => assignment.technician_id === tech.id
@@ -113,6 +119,16 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
 
     return true;
   };
+
+  const departmentCounts = useMemo(() => {
+    return houseTechs.reduce((acc: Record<string, number>, tech: any) => {
+      const dept = tech.department ? String(tech.department).trim() : 'Other';
+      acc[dept] = (acc[dept] || 0) + 1;
+      return acc;
+    }, {});
+  }, [houseTechs]);
+
+  const departments = Object.keys(departmentCounts);
 
   const visibleTechs = houseTechs.filter(tech => shouldShowTechOnDay(tech, currentDate));
 
@@ -189,6 +205,27 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
         onTouchEnd={handleTouchEnd}
       >
         <div className="space-y-4">
+          {/* Department filter chips */}
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            <Button
+              variant={selectedDepartment ? "outline" : "default"}
+              size="sm"
+              onClick={() => setSelectedDepartment(null)}
+            >
+              All
+            </Button>
+            {departments.map((dept) => (
+              <Button
+                key={dept}
+                variant={selectedDepartment === dept ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedDepartment(prev => prev === dept ? null : dept)}
+                className="capitalize"
+              >
+                {dept} <span className="ml-1 text-muted-foreground">({departmentCounts[dept]})</span>
+              </Button>
+            ))}
+          </div>
           {visibleTechs.length > 0 ? (
             <div className="space-y-2">
               {visibleTechs.map((tech) => {
@@ -203,7 +240,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
                 return (
                   <div
                     key={tech.id}
-                    className="border rounded-md p-3 flex items-start justify-between gap-3 hover:bg-accent/50 transition-colors"
+                    className="border rounded-md p-2 flex items-start justify-between gap-3 hover:bg-accent/50 transition-colors"
                   >
                     <div className="min-w-0">
                       <div className="font-medium truncate">{techName}</div>
