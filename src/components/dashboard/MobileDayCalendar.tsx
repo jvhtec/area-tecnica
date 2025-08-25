@@ -240,7 +240,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
               <div className="flex items-center gap-1">
                 <Clock className="h-3 w-3" />
                 <span>
-                  {formatInJobTimezone(job.start_time, job.timezone)} - {formatInJobTimezone(job.end_time, job.timezone)}
+                  {formatInJobTimezone(job.start_time, 'HH:mm', job.timezone)} - {formatInJobTimezone(job.end_time, 'HH:mm', job.timezone)}
                 </span>
               </div>
               {job.job_departments && job.job_departments.length > 0 && (
