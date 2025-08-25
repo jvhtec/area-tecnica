@@ -699,7 +699,7 @@ export const generatePDF = async (
       }
 
       yPosition = checkPageBreak(yPosition, 60);
-      yPosition = addSectionHeader('Arreglos de Viaje', yPosition);
+      yPosition = addSectionHeader('Viaje', yPosition);
 
       for (const arrangement of validTravelArrangements) {
         yPosition = checkPageBreak(yPosition, 120);
