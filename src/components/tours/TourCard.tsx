@@ -50,13 +50,36 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
         .maybeSingle();
 
       if (!error && data?.file_path) {
-        const { data: publicUrlData } = supabase
-          .storage
-          .from('tour-logos')
-          .getPublicUrl(data.file_path);
-          
-        if (publicUrlData?.publicUrl) {
-          setLogoUrl(publicUrlData.publicUrl);
+        try {
+          // Try signed URL first
+          const { data: signedUrlData } = await supabase
+            .storage
+            .from('tour-logos')
+            .createSignedUrl(data.file_path, 60 * 60); // 1 hour expiry
+            
+          if (signedUrlData?.signedUrl) {
+            setLogoUrl(signedUrlData.signedUrl);
+          } else {
+            // Fallback to public URL
+            const { data: publicUrlData } = supabase
+              .storage
+              .from('tour-logos')
+              .getPublicUrl(data.file_path);
+              
+            if (publicUrlData?.publicUrl) {
+              setLogoUrl(publicUrlData.publicUrl);
+            }
+          }
+        } catch (e) {
+          // Fallback to public URL on error
+          const { data: publicUrlData } = supabase
+            .storage
+            .from('tour-logos')
+            .getPublicUrl(data.file_path);
+            
+          if (publicUrlData?.publicUrl) {
+            setLogoUrl(publicUrlData.publicUrl);
+          }
         }
       }
     };
