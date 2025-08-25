@@ -25,9 +25,19 @@ export const useHojaDeRutaHandlers = (
 
   // Staff handlers
   const handleStaffChange = (index: number, field: string, value: string) => {
-    const newStaff = [...eventData.staff];
-    newStaff[index] = { ...newStaff[index], [field]: value };
-    setEventData({ ...eventData, staff: newStaff });
+    setEventData(prev => {
+      const newStaff = [...prev.staff];
+      newStaff[index] = { ...newStaff[index], [field]: value };
+      return { ...prev, staff: newStaff };
+    });
+  };
+
+  const updateStaffFields = (index: number, fields: Record<string, string>) => {
+    setEventData(prev => {
+      const newStaff = [...prev.staff];
+      newStaff[index] = { ...newStaff[index], ...fields };
+      return { ...prev, staff: newStaff };
+    });
   };
 
   const addStaffMember = () => {
@@ -175,6 +185,7 @@ export const useHojaDeRutaHandlers = (
     handleContactChange,
     addContact,
     handleStaffChange,
+    updateStaffFields,
     addStaffMember,
     updateTravelArrangement,
     addTravelArrangement,
