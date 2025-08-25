@@ -22,7 +22,9 @@ import {
   HardDrive, 
   RefreshCw, 
   Star,
-  Calendar
+  Calendar,
+  ExternalLink,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
@@ -31,6 +33,8 @@ import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { useToast } from "@/hooks/use-toast";
+import { useFlexUuidLazy } from "@/hooks/useFlexUuidLazy";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface MobileJobCardProps {
   job: any;
@@ -64,6 +68,8 @@ export function MobileJobCard({
   const [userRole, setUserRole] = useState<string | null>(null);
   const [dateTypeDialogOpen, setDateTypeDialogOpen] = useState(false);
   const [selectedDateType, setSelectedDateType] = useState<string>('show');
+  const isMobile = useIsMobile();
+  const { uuid: flexUuid, isLoading: isLoadingFlexUuid, error: flexError, hasChecked, fetchFlexUuid } = useFlexUuidLazy();
 
   // Get user role
   React.useEffect(() => {
@@ -209,6 +215,44 @@ export function MobileJobCard({
     setDateTypeDialogOpen(true);
   };
 
+  // Flex helpers for dropdown menu
+  const handleFlexClick = async () => {
+    try {
+      if (!hasChecked) {
+        await fetchFlexUuid(job.id);
+        return;
+      }
+
+      if (isLoadingFlexUuid) {
+        toast({ title: "Loading", description: "Please wait while we load the Flex folder..." });
+        return;
+      }
+
+      if (flexUuid) {
+        const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#element/${flexUuid}/view/simple-element/header`;
+        window.open(flexUrl, '_blank', 'noopener');
+      } else if (flexError) {
+        toast({ title: "Error", description: String(flexError), variant: "destructive" });
+      } else {
+        toast({ title: "Info", description: "Flex folder not available for this job" });
+      }
+    } catch (err: any) {
+      console.error('Flex navigation error', err);
+    }
+  };
+
+  const getFlexMenuText = () => {
+    if (!hasChecked) return 'Check Flex';
+    if (isLoadingFlexUuid) return 'Loading Flex...';
+    if (flexUuid) return 'Open Flex';
+    return 'Flex';
+  };
+
+  const getFlexIcon = () => {
+    if (isLoadingFlexUuid) return <Loader2 className="mr-2 h-4 w-4 animate-spin" />;
+    return <ExternalLink className="mr-2 h-4 w-4" />;
+  };
+
   return (
     <>
       <Card
@@ -270,7 +314,7 @@ export function MobileJobCard({
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuContent align="start" side="bottom" sideOffset={6} collisionPadding={8} className="w-48">
                   <DropdownMenuItem onClick={handleJobCardClick}>
                     <Calendar className="mr-2 h-4 w-4" />
                     Open Job
@@ -279,6 +323,14 @@ export function MobileJobCard({
                   <DropdownMenuItem onClick={handleDateTypeBadgeClick}>
                     <Calendar className="mr-2 h-4 w-4" />
                     Change Date Type
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem 
+                    onClick={(e) => { e.stopPropagation(); handleFlexClick(); }}
+                    disabled={isLoadingFlexUuid}
+                  >
+                    {getFlexIcon()}
+                    {getFlexMenuText()}
                   </DropdownMenuItem>
                   
                   <DropdownMenuSeparator />
@@ -332,13 +384,15 @@ export function MobileJobCard({
                     </DropdownMenuItem>
                   )}
                   
-                  <DropdownMenuItem 
-                    onClick={createLocalFoldersHandler}
-                    disabled={isCreatingLocalFolders}
-                  >
-                    <HardDrive className="mr-2 h-4 w-4" />
-                    {isCreatingLocalFolders ? 'Creating...' : 'Create Local Folders'}
-                  </DropdownMenuItem>
+                  {!isMobile && (
+                    <DropdownMenuItem 
+                      onClick={createLocalFoldersHandler}
+                      disabled={isCreatingLocalFolders}
+                    >
+                      <HardDrive className="mr-2 h-4 w-4" />
+                      {isCreatingLocalFolders ? 'Creating...' : 'Create Local Folders'}
+                    </DropdownMenuItem>
+                  )}
                   
                   <DropdownMenuItem onClick={refreshData}>
                     <RefreshCw className="mr-2 h-4 w-4" />
