@@ -252,11 +252,12 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   }
 
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-bold">House Technicians</CardTitle>
-        </div>
+    <div className="w-full max-w-[480px] mx-auto sm:max-w-lg">
+      <Card className="h-full flex flex-col">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg font-bold">House Technicians</CardTitle>
+          </div>
         
         <div className="flex items-center justify-between">
           <Button variant="ghost" size="icon" onClick={navigateToPrevious}>
@@ -410,5 +411,6 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
         </div>
       </CardContent>
     </Card>
+    </div>
   );
 };
