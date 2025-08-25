@@ -119,17 +119,24 @@ export function MobileJobCard({
     isJobBeingDeleted
   } = useJobActions(job, userRole, onDeleteClick);
 
+  // Check folder existence
   const { data: foldersExist, isLoading: isFoldersLoading } = useFolderExistence(job.id);
   const foldersAreCreated = foldersExist === true;
 
+  const dateTypesArray: any[] = Array.isArray(dateTypes)
+    ? dateTypes
+    : (Array.isArray(job?.job_date_types) ? job.job_date_types : []);
+
   // Get current date type for this job on the selected date
-  const currentDateType = dateTypes?.find(dt => {
-    const dtDate = new Date(dt.date);
-    return dtDate.toDateString() === currentDate.toDateString();
+  const currentDateType = dateTypesArray.find((dt: any) => {
+    const dtDate = dt?.date ? new Date(dt.date) : null;
+    return !!dtDate && dtDate.toDateString() === currentDate.toDateString();
   });
 
+  const currentTypeValue = currentDateType ? (currentDateType.type || currentDateType.date_type) : undefined;
+
   const currentDateTypeEmoji = DATE_TYPE_OPTIONS.find(option => 
-    option.value === currentDateType?.type
+    option.value === currentTypeValue
   )?.emoji || '🎭';
 
   const jobTitle = job.title || job.job_name || 'Untitled Job';
