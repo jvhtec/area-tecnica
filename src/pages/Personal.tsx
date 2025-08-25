@@ -6,9 +6,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { useVacationRequests } from '@/hooks/useVacationRequests';
 import { Card, CardContent } from '@/components/ui/card';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Button } from '@/components/ui/button';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 const Personal = () => {
   const [date, setDate] = useState<Date>(new Date());
+  const [isVacationSectionOpen, setIsVacationSectionOpen] = useState(false);
   const { user, userRole } = useAuth();
   const { submitRequest, isSubmitting } = useVacationRequests();
   const isMobile = useIsMobile();
@@ -81,10 +85,28 @@ const Personal = () => {
       )}
 
       {/* Vacation Management Section */}
-      <div className="space-y-4">
-        <h2 className="text-2xl font-semibold">Vacation Requests</h2>
-        {renderVacationContent()}
-      </div>
+      <Collapsible 
+        open={isVacationSectionOpen}
+        onOpenChange={setIsVacationSectionOpen}
+        className="space-y-4"
+      >
+        <CollapsibleTrigger asChild>
+          <Button 
+            variant="ghost" 
+            className="flex items-center gap-2 text-2xl font-semibold p-0 h-auto hover:bg-transparent"
+          >
+            {isVacationSectionOpen ? (
+              <ChevronDown className="h-5 w-5" />
+            ) : (
+              <ChevronRight className="h-5 w-5" />
+            )}
+            Vacation Requests
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-4">
+          {renderVacationContent()}
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 };
