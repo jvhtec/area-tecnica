@@ -294,6 +294,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
         department={department}
         onDateTypeChange={onDateTypeChange}
         selectedJobTypes={selectedJobTypes}
+        onJobTypeSelection={handleJobTypeSelection}
       />
     );
   }

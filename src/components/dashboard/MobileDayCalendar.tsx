@@ -3,6 +3,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { DateTypeContextMenu } from "./DateTypeContextMenu";
 import { supabase } from "@/lib/supabase";
 import {
@@ -29,6 +35,7 @@ import {
   Moon,
   Mic,
   Calendar,
+  Filter,
 } from "lucide-react";
 import { formatInJobTimezone, isJobOnDate } from "@/utils/timezoneUtils";
 
@@ -39,6 +46,7 @@ interface MobileDayCalendarProps {
   department?: string;
   onDateTypeChange: () => void;
   selectedJobTypes: string[];
+  onJobTypeSelection?: (type: string) => void;
 }
 
 const departmentIcons = {
@@ -65,11 +73,14 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
   department,
   onDateTypeChange,
   selectedJobTypes,
+  onJobTypeSelection,
 }) => {
   const [currentDate, setCurrentDate] = useState(date);
   const [dateTypes, setDateTypes] = useState<Record<string, any>>({});
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  const distinctJobTypes = jobs ? Array.from(new Set(jobs.map((job) => job.job_type).filter(Boolean))) : [];
 
   // Update current date when prop changes
   useEffect(() => {
@@ -199,11 +210,11 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
           <CardContent className="p-4">
             <div className="flex justify-between items-start mb-2">
               <div className="flex-1">
-                <h3 className="font-semibold text-sm leading-tight">{job.job_name}</h3>
-                {job.venue && (
+                <h3 className="font-semibold text-sm leading-tight">{job.title || job.job_name}</h3>
+                {job.location?.name && (
                   <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                     <MapPin className="h-3 w-3" />
-                    <span>{job.venue}</span>
+                    <span>{job.location.name}</span>
                   </div>
                 )}
               </div>
@@ -289,15 +300,43 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
           </Button>
         </div>
 
-        {/* Today button */}
-        {!isToday(currentDate) && (
-          <div className="flex justify-center mb-4">
+        {/* Today button and filters */}
+        <div className="flex items-center justify-between mb-4">
+          {!isToday(currentDate) && (
             <Button variant="outline" size="sm" onClick={navigateToToday}>
               <Calendar className="h-4 w-4 mr-1" />
               Today
             </Button>
-          </div>
-        )}
+          )}
+          
+          {distinctJobTypes.length > 0 && onJobTypeSelection && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="ml-auto">
+                  <Filter className="h-4 w-4 mr-1" />
+                  Filters
+                  {selectedJobTypes.length > 0 && (
+                    <Badge variant="secondary" className="ml-1 text-xs">
+                      {selectedJobTypes.length}
+                    </Badge>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                {distinctJobTypes.map((type) => (
+                  <DropdownMenuCheckboxItem
+                    key={type}
+                    checked={selectedJobTypes.length === 0 || selectedJobTypes.includes(type)}
+                    onCheckedChange={() => onJobTypeSelection(type)}
+                    className="capitalize"
+                  >
+                    {type}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
 
         {/* Swipe area for jobs */}
         <div
