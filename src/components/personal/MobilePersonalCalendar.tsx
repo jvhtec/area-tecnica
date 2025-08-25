@@ -252,196 +252,163 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   }
 
   return (
-    <div className="space-y-4">
-      {/* Personnel Summary Section */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Users className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-semibold">Sumario de Personal</h3>
-            <span className="text-sm text-muted-foreground">
-              ({format(currentDate, 'MMM d, yyyy')})
+    <Card className="h-full flex flex-col">
+      <CardHeader className="pb-4">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg font-bold">House Technicians</CardTitle>
+        </div>
+        
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" size="icon" onClick={navigateToPrevious}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 mr-1" />
+            <span className={cn(
+              "font-medium",
+              isToday(currentDate) && "text-primary"
+            )}>
+              {format(currentDate, "EEE, MMM d")}
             </span>
           </div>
+          
+          <Button variant="ghost" size="icon" onClick={navigateToNext}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+        
+        <div className="flex justify-center">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={navigateToToday}
+            className={cn(
+              isToday(currentDate) && "bg-primary text-primary-foreground"
+            )}
+          >
+            Today
+          </Button>
+        </div>
 
-          <div className="space-y-3">
+        {/* Personnel Summary Section - Moved to header */}
+        <div className="space-y-3 mt-4">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-primary" />
+            <h4 className="text-sm font-semibold">Personal Summary</h4>
+          </div>
+
+          <div className="space-y-2">
             {Object.entries(personnelSummary).map(([department, stats]) => (
               <div
                 key={department}
                 className={cn(
-                  "bg-muted/30 rounded-lg p-3 cursor-pointer transition-colors hover:bg-muted",
-                  selectedDepartment === department && "ring-2 ring-primary ring-inset bg-muted"
+                  "bg-muted/30 rounded-lg p-2 cursor-pointer transition-colors hover:bg-muted text-xs",
+                  selectedDepartment === department && "ring-1 ring-primary ring-inset bg-muted"
                 )}
                 onClick={() => {
                   setSelectedDepartment(prev => prev === department ? null : department);
                 }}
               >
-                <div className="text-sm font-medium capitalize mb-1">
+                <div className="font-medium capitalize mb-1">
                   {department}
                 </div>
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between">
                   <span className="text-green-600 font-medium">
-                    Tecnicos de bolo: {stats.assignedAndAvailable}
+                    On jobs: {stats.assignedAndAvailable}
                   </span>
                   <span className="text-muted-foreground">
-                    Tecnicos en Almacen: {stats.availableAndNotInWarehouse}
+                    Warehouse: {stats.availableAndNotInWarehouse}
                   </span>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Total: {stats.total}
                 </div>
               </div>
             ))}
 
-            {Object.keys(personnelSummary).length === 0 && (
-              <div className="text-center text-muted-foreground py-4">
-                No personnel data available
-              </div>
-            )}
-
-            {/* Personnel Totals Section */}
-            <div className="bg-muted/30 rounded-lg p-3">
-              <h4 className="text-sm font-medium mb-2">Totales</h4>
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-sm">
+            {/* Personnel Totals - Compact */}
+            <div className="bg-muted/30 rounded-lg p-2 text-xs">
+              <div className="grid grid-cols-2 gap-1">
+                <div className="flex items-center justify-between">
                   <span className="text-muted-foreground flex items-center gap-1">
-                    <Warehouse className="h-4 w-4" /> Tecnicos en Almacen:
+                    <Warehouse className="h-3 w-3" /> Warehouse:
                   </span>
                   <span>{personnelTotals.techsInWarehouse}</span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between">
                   <span className="text-green-600 font-medium flex items-center gap-1">
-                    <Briefcase className="h-4 w-4" /> Tecnicos en bolos:
+                    <Briefcase className="h-3 w-3" /> Jobs:
                   </span>
                   <span>{personnelTotals.techsOnJobs}</span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between">
                   <span className="text-red-600 font-medium flex items-center gap-1">
-                    <Sun className="h-4 w-4" /> Tecnicos de Vacaciones:
+                    <Sun className="h-3 w-3" /> Vacation:
                   </span>
                   <span>{personnelTotals.techsOnVacation}</span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between">
                   <span className="text-red-600 font-medium flex items-center gap-1">
-                    <CalendarOff className="h-4 w-4" /> Tecnicos de Dias Libres:
+                    <CalendarOff className="h-3 w-3" /> Off:
                   </span>
                   <span>{personnelTotals.techsOnDaysOff}</span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-red-600 font-medium flex items-center gap-1">
-                    <Car className="h-4 w-4" /> Tecnicos en Viaje:
-                  </span>
-                  <span>{personnelTotals.techsTravelling}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-red-600 font-medium flex items-center gap-1">
-                    <Thermometer className="h-4 w-4" /> Tecnicos Enfermos:
-                  </span>
-                  <span>{personnelTotals.techsSick}</span>
-                </div>
-              </div>
-              <div className="text-xs text-muted-foreground mt-2 pt-2 border-t">
-                Total Tecnicos: {houseTechs.length}
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </CardHeader>
 
-      {/* Calendar Section */}
-      <Card className="h-full flex flex-col">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-bold">House Technicians</CardTitle>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <Button variant="ghost" size="icon" onClick={navigateToPrevious}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 mr-1" />
-              <span className={cn(
-                "font-medium",
-                isToday(currentDate) && "text-primary"
-              )}>
-                {format(currentDate, "EEE, MMM d")}
-              </span>
-            </div>
-            
-            <Button variant="ghost" size="icon" onClick={navigateToNext}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-          
-          <div className="flex justify-center">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={navigateToToday}
-              className={cn(
-                isToday(currentDate) && "bg-primary text-primary-foreground"
-              )}
-            >
-              Today
-            </Button>
-          </div>
-        </CardHeader>
+      <CardContent 
+        className="flex-1 p-4"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div className="space-y-4">
+          {visibleTechs.length > 0 ? (
+            <div className="space-y-2">
+              {visibleTechs.map((tech) => {
+                const dayAssignments = getAssignmentsForDate(currentDate);
+                const techAssignment = dayAssignments.find(
+                  assignment => assignment.technician_id === tech.id
+                );
+                const availabilityStatus = getAvailabilityStatus(tech.id, currentDate);
+                const techName = `${tech.first_name || ''} ${tech.last_name || ''}`.trim() || "Unknown Tech";
+                const statusText = techAssignment ? "On job" : availabilityStatus ? `Unavailable (${availabilityStatus})` : "In warehouse";
 
-        <CardContent 
-          className="flex-1 p-4"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-          <div className="space-y-4">
-            {visibleTechs.length > 0 ? (
-              <div className="space-y-2">
-                {visibleTechs.map((tech) => {
-                  const dayAssignments = getAssignmentsForDate(currentDate);
-                  const techAssignment = dayAssignments.find(
-                    assignment => assignment.technician_id === tech.id
-                  );
-                  const availabilityStatus = getAvailabilityStatus(tech.id, currentDate);
-                  const techName = `${tech.first_name || ''} ${tech.last_name || ''}`.trim() || "Unknown Tech";
-                  const statusText = techAssignment ? "On job" : availabilityStatus ? `Unavailable (${availabilityStatus})` : "In warehouse";
-
-                  return (
-                    <div
-                      key={tech.id}
-                      className="border rounded-md p-3 flex items-start justify-between gap-3 hover:bg-accent/50 transition-colors"
-                    >
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{techName}</div>
-                        {tech.department && (
-                          <div className="text-sm text-muted-foreground capitalize truncate">
-                            {tech.department}
-                          </div>
-                        )}
-                      </div>
-                      <div className="text-sm font-medium text-right">
-                        <span className={cn(
-                          techAssignment ? "text-green-600" : 
-                          availabilityStatus ? "text-red-600" : "text-muted-foreground"
-                        )}>
-                          {statusText}
-                        </span>
-                      </div>
+                return (
+                  <div
+                    key={tech.id}
+                    className="border rounded-md p-3 flex items-start justify-between gap-3 hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{techName}</div>
+                      {tech.department && (
+                        <div className="text-sm text-muted-foreground capitalize truncate">
+                          {tech.department}
+                        </div>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <Calendar className="h-8 w-8 mb-2" />
-                <p className="text-muted-foreground">No technicians scheduled</p>
-                <p className="text-sm text-muted-foreground">for {format(currentDate, "MMMM d, yyyy")}</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+                    <div className="text-sm font-medium text-right">
+                      <span className={cn(
+                        techAssignment ? "text-green-600" : 
+                        availabilityStatus ? "text-red-600" : "text-muted-foreground"
+                      )}>
+                        {statusText}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Calendar className="h-8 w-8 mb-2" />
+              <p className="text-muted-foreground">No technicians scheduled</p>
+              <p className="text-sm text-muted-foreground">for {format(currentDate, "MMMM d, yyyy")}</p>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
