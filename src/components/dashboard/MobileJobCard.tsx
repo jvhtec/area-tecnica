@@ -123,7 +123,7 @@ export function MobileJobCard({
   const foldersAreCreated = foldersExist === true;
 
   // Get current date type for this job on the selected date
-  const currentDateType = dateTypes.find(dt => {
+  const currentDateType = dateTypes?.find(dt => {
     const dtDate = new Date(dt.date);
     return dtDate.toDateString() === currentDate.toDateString();
   });
