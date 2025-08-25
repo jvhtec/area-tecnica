@@ -301,7 +301,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
         </div>
 
         {/* Today button and filters */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 gap-2">
           {!isToday(currentDate) && (
             <Button variant="outline" size="sm" onClick={navigateToToday}>
               <Calendar className="h-4 w-4 mr-1" />
@@ -315,14 +315,18 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
                 <Button variant="outline" size="sm" className="ml-auto">
                   <Filter className="h-4 w-4 mr-1" />
                   Filters
-                  {selectedJobTypes.length > 0 && (
+                  {selectedJobTypes.length > 0 && selectedJobTypes.length < distinctJobTypes.length && (
                     <Badge variant="secondary" className="ml-1 text-xs">
                       {selectedJobTypes.length}
                     </Badge>
                   )}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent 
+                align="end" 
+                className="w-48 z-50 bg-background border shadow-lg"
+                sideOffset={4}
+              >
                 {distinctJobTypes.map((type) => (
                   <DropdownMenuCheckboxItem
                     key={type}
