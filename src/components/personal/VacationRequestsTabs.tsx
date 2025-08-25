@@ -211,7 +211,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
         )}
       </TabsList>
 
-      <TabsContent value="my-requests" className="space-y-4">
+      <TabsContent value="my-requests" className="space-y-4 px-0">
         {userRole === 'house_tech' && (
           <VacationRequestForm 
             onSubmit={onVacationRequestSubmit}
@@ -230,7 +230,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
       </TabsContent>
 
       {(userRole === 'management' || userRole === 'admin') && (
-        <TabsContent value="department-requests" className="space-y-4">
+        <TabsContent value="department-requests" className="space-y-4 px-0">
           {renderDepartmentRequests()}
         </TabsContent>
       )}
