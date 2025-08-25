@@ -254,7 +254,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   return (
     <div className="w-full max-w-[480px] mx-auto sm:max-w-lg">
       <Card className="h-full flex flex-col">
-        <CardHeader className="pb-4">
+        <CardHeader className="px-2 sm:px-4 py-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg font-bold">House Technicians</CardTitle>
           </div>
@@ -359,7 +359,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
       </CardHeader>
 
       <CardContent 
-        className="flex-1 p-4"
+        className="flex-1 px-2 sm:px-4 py-4"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
