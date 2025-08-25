@@ -36,13 +36,13 @@ export const VacationRequestForm: React.FC<VacationRequestFormProps> = ({ onSubm
 
   return (
     <Card>
-      <CardHeader className="px-3 sm:px-6 py-4 sm:py-6">
+      <CardHeader className="px-0 py-4 sm:py-6">
         <CardTitle className="flex items-center gap-2">
           <CalendarDays className="h-5 w-5" />
           Request Vacation Days
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-3 sm:px-6">
+      <CardContent className="px-0">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex flex-col space-y-1.5">
