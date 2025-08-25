@@ -100,13 +100,13 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
 
     return (
       <Card>
-        <CardHeader className="px-0 sm:px-6 py-4 sm:py-6">
+        <CardHeader className="px-3 sm:px-6 py-4 sm:py-6">
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
             Department Vacation Requests
           </CardTitle>
         </CardHeader>
-        <CardContent className="px-0 sm:px-6">
+        <CardContent className="px-3 sm:px-6">
           {pendingDepartmentRequests.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No pending vacation requests in your department.
