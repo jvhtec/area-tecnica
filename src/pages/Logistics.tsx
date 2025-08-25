@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LogisticsCalendar } from "@/components/logistics/LogisticsCalendar";
+import { MobileLogisticsCalendar } from "@/components/logistics/MobileLogisticsCalendar";
 import { TodayLogistics } from "@/components/logistics/TodayLogistics";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useState } from "react";
@@ -11,7 +12,7 @@ const Logistics = () => {
   return (
     <div className="container mx-auto px-4 py-6 space-y-8">
       {isMobile ? (
-        <LogisticsCalendar onDateSelect={setSelectedDate} />
+        <MobileLogisticsCalendar date={selectedDate} onDateSelect={setSelectedDate} />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-8">

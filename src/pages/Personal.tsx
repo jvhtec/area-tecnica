@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import { PersonalCalendar } from '@/components/personal/PersonalCalendar';
+import { MobilePersonalCalendar } from '@/components/personal/MobilePersonalCalendar';
 import { VacationRequestsTabs } from '@/components/personal/VacationRequestsTabs';
 import { useAuth } from '@/hooks/useAuth';
 import { useVacationRequests } from '@/hooks/useVacationRequests';
 import { Card, CardContent } from '@/components/ui/card';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Personal = () => {
   const [date, setDate] = useState<Date>(new Date());
   const { user, userRole } = useAuth();
   const { submitRequest, isSubmitting } = useVacationRequests();
+  const isMobile = useIsMobile();
 
   console.log('Personal page: Rendering with date:', date);
 
@@ -65,10 +68,17 @@ const Personal = () => {
         <p className="text-sm md:text-base text-muted-foreground">Track house tech assignments and availability</p>
       </div>
       
-      <PersonalCalendar 
-        date={date}
-        onDateSelect={setDate}
-      />
+      {isMobile ? (
+        <MobilePersonalCalendar 
+          date={date}
+          onDateSelect={setDate}
+        />
+      ) : (
+        <PersonalCalendar 
+          date={date}
+          onDateSelect={setDate}
+        />
+      )}
 
       {/* Vacation Management Section */}
       <div className="space-y-4">
