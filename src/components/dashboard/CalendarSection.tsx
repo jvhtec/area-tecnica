@@ -100,6 +100,29 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   });
   const { toast } = useToast();
 
+  const currentMonth = date || new Date();
+  const firstDayOfMonth = startOfMonth(currentMonth);
+  const lastDayOfMonth = endOfMonth(currentMonth);
+  const daysInMonth = eachDayOfInterval({ start: firstDayOfMonth, end: lastDayOfMonth });
+  const startDay = firstDayOfMonth.getDay();
+  
+  // Adjust startDay for Monday as first day (0=Sunday, 1=Monday -> 0=Monday, 6=Sunday)
+  const paddingDays = startDay === 0 ? 6 : startDay - 1;
+  const prefixDays = Array.from({ length: paddingDays }).map((_, i) => {
+    const day = new Date(firstDayOfMonth);
+    day.setDate(day.getDate() - (paddingDays - i));
+    return day;
+  });
+  const totalDaysNeeded = 42; // Ensures 6 full weeks
+  const suffixDays = Array.from({ length: totalDaysNeeded - (prefixDays.length + daysInMonth.length) }).map((_, i) => {
+    const day = new Date(lastDayOfMonth);
+    day.setDate(day.getDate() + (i + 1));
+    return day;
+  });
+  const allDays = [...prefixDays, ...daysInMonth, ...suffixDays];
+  const distinctJobTypes = jobs ? Array.from(new Set(jobs.map((job) => job.job_type).filter(Boolean))) : [];
+
+  // Load user preferences
   useEffect(() => {
     const loadUserPreferences = async () => {
       try {
@@ -123,41 +146,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     };
     loadUserPreferences();
   }, []);
-
-  // Early return for mobile view after loading preferences
-  if (isMobile) {
-    return (
-      <MobileDayCalendar
-        date={date}
-        onDateSelect={onDateSelect}
-        jobs={jobs}
-        department={department}
-        onDateTypeChange={onDateTypeChange}
-        selectedJobTypes={selectedJobTypes}
-      />
-    );
-  }
-
-  const currentMonth = date || new Date();
-  const firstDayOfMonth = startOfMonth(currentMonth);
-  const lastDayOfMonth = endOfMonth(currentMonth);
-  const daysInMonth = eachDayOfInterval({ start: firstDayOfMonth, end: lastDayOfMonth });
-  const startDay = firstDayOfMonth.getDay();
-  // Adjust startDay for Monday as first day (0=Sunday, 1=Monday -> 0=Monday, 6=Sunday)
-  const paddingDays = startDay === 0 ? 6 : startDay - 1;
-  const prefixDays = Array.from({ length: paddingDays }).map((_, i) => {
-    const day = new Date(firstDayOfMonth);
-    day.setDate(day.getDate() - (paddingDays - i));
-    return day;
-  });
-  const totalDaysNeeded = 42; // Ensures 6 full weeks
-  const suffixDays = Array.from({ length: totalDaysNeeded - (prefixDays.length + daysInMonth.length) }).map((_, i) => {
-    const day = new Date(lastDayOfMonth);
-    day.setDate(day.getDate() + (i + 1));
-    return day;
-  });
-  const allDays = [...prefixDays, ...daysInMonth, ...suffixDays];
-  const distinctJobTypes = jobs ? Array.from(new Set(jobs.map((job) => job.job_type).filter(Boolean))) : [];
 
   const saveUserPreferences = async (types: string[]) => {
     try {
@@ -295,6 +283,20 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       supabase.removeChannel(channel);
     };
   }, [allDays, getJobsForDate]); // Dependencies: if visible days or filtered jobs change, re-evaluate subscription context
+
+  // Early return for mobile view after all hooks are initialized
+  if (isMobile) {
+    return (
+      <MobileDayCalendar
+        date={date}
+        onDateSelect={onDateSelect}
+        jobs={jobs}
+        department={department}
+        onDateTypeChange={onDateTypeChange}
+        selectedJobTypes={selectedJobTypes}
+      />
+    );
+  }
 
 
   const hexToRgb = (hex: string): [number, number, number] => {
