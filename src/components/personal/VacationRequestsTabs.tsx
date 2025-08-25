@@ -34,6 +34,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
     isRejecting,
   } = useVacationRequests();
 
+  const hasDepartmentTab = userRole === 'management' || userRole === 'admin';
   const handleSelectRequest = (id: string, isChecked: boolean) => {
     setSelectedRequests(prev =>
       isChecked ? [...prev, id] : prev.filter(requestId => requestId !== id)
@@ -198,13 +199,13 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
 
   return (
     <Tabs defaultValue="my-requests" className="w-full">
-      <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="my-requests" className="flex items-center gap-2">
+      <TabsList className={`grid w-full ${hasDepartmentTab ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        <TabsTrigger value="my-requests" className="w-full flex items-center justify-center gap-2">
           <CalendarDays className="h-4 w-4" />
           My Requests
         </TabsTrigger>
         {(userRole === 'management' || userRole === 'admin') && (
-          <TabsTrigger value="department-requests" className="flex items-center gap-2">
+          <TabsTrigger value="department-requests" className="w-full flex items-center justify-center gap-2">
             <Users className="h-4 w-4" />
             Department Requests
           </TabsTrigger>
