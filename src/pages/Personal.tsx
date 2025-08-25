@@ -69,10 +69,12 @@ const Personal = () => {
       </div>
       
       {isMobile ? (
-        <MobilePersonalCalendar 
-          date={date}
-          onDateSelect={setDate}
-        />
+        <div className="-mx-4 sm:mx-0">
+          <MobilePersonalCalendar 
+            date={date}
+            onDateSelect={setDate}
+          />
+        </div>
       ) : (
         <PersonalCalendar 
           date={date}
