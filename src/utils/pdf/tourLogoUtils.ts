@@ -17,6 +17,16 @@ export const fetchTourLogo = async (tourId: string): Promise<string | undefined>
     
     if (tourLogo?.file_path) {
       try {
+        const { data: signedUrlData } = await supabase.storage
+          .from('tour-logos')
+          .createSignedUrl(tourLogo.file_path, 60 * 60); // 1 hour expiry
+          
+        if (signedUrlData?.signedUrl) {
+          console.log("Generated tour logo signed URL:", signedUrlData.signedUrl);
+          return signedUrlData.signedUrl;
+        }
+        
+        // Fallback to public URL
         const { data: publicUrlData } = supabase.storage
           .from('tour-logos')
           .getPublicUrl(tourLogo.file_path);

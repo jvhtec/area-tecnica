@@ -40,14 +40,25 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
 
       if (data?.file_path) {
         try {
-          const { data: publicUrlData } = supabase
+          const { data: signedUrlData } = await supabase
             .storage
             .from('tour-logos')
-            .getPublicUrl(data.file_path);
+            .createSignedUrl(data.file_path, 60 * 60); // 1 hour expiry
             
-          if (publicUrlData?.publicUrl) {
-            console.log("Found existing tour logo:", publicUrlData.publicUrl);
-            setLogoUrl(publicUrlData.publicUrl);
+          if (signedUrlData?.signedUrl) {
+            console.log("Found existing tour logo (signed):", signedUrlData.signedUrl);
+            setLogoUrl(signedUrlData.signedUrl);
+          } else {
+            // Fallback to public URL
+            const { data: publicUrlData } = supabase
+              .storage
+              .from('tour-logos')
+              .getPublicUrl(data.file_path);
+              
+            if (publicUrlData?.publicUrl) {
+              console.log("Found existing tour logo (public):", publicUrlData.publicUrl);
+              setLogoUrl(publicUrlData.publicUrl);
+            }
           }
         } catch (e: any) {
           console.error('Error getting logo public URL:', e);
@@ -160,14 +171,19 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
         throw new Error(`Error saving logo information: ${dbError.message}`);
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase
+      // Get signed URL for uploaded logo
+      const { data: signedUrlData } = await supabase
         .storage
         .from('tour-logos')
-        .getPublicUrl(filePath);
+        .createSignedUrl(filePath, 60 * 60); // 1 hour expiry
 
-      console.log("Uploaded new tour logo, public URL:", publicUrl);
-      setLogoUrl(publicUrl);
+      const logoUrl = signedUrlData?.signedUrl || supabase
+        .storage
+        .from('tour-logos')
+        .getPublicUrl(filePath).data.publicUrl;
+
+      console.log("Uploaded new tour logo, URL:", logoUrl);
+      setLogoUrl(logoUrl);
 
       toast({
         title: "Success",
