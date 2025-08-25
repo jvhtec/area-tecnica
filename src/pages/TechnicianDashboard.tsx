@@ -312,15 +312,17 @@ const TechnicianDashboard = () => {
         </CardHeader>
         <CardContent>
           {assignments && assignments.length > 0 ? (
-            <TodaySchedule 
-              jobs={assignments} 
-              onEditClick={handleEditClick} 
-              onDeleteClick={handleDeleteClick} 
-              onJobClick={handleJobClick} 
-              userRole="technician"
-              isLoading={isLoading}
-              hideTasks={true}
-            />
+            <div className="hidden md:block">
+              <TodaySchedule 
+                jobs={assignments} 
+                onEditClick={handleEditClick} 
+                onDeleteClick={handleDeleteClick} 
+                onJobClick={handleJobClick} 
+                userRole="technician"
+                isLoading={isLoading}
+                hideTasks={true}
+              />
+            </div>
           ) : (
             <AssignmentsList 
               assignments={assignments} 

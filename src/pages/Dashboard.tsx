@@ -217,8 +217,8 @@ const Dashboard = () => {
           />
         </div>
         
-        {/* Today's Schedule below the calendar */}
-        <div className="w-full">
+        {/* Today's Schedule below the calendar - Hidden on mobile */}
+        <div className="w-full hidden md:block">
           <TodaySchedule
             jobs={selectedDateJobs}
             onEditClick={handleEditClick}

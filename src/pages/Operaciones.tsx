@@ -160,7 +160,7 @@ const Operaciones = () => {
             onDateTypeChange={() => {}} // Add empty handler as it's required
           />
         </div>
-        <div className="lg:col-span-4">
+        <div className="lg:col-span-4 hidden md:block">
           <TodaySchedule
             jobs={getSelectedDateJobs()}
             onEditClick={handleEditClick}

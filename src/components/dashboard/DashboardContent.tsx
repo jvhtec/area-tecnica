@@ -37,11 +37,11 @@ export const DashboardContent = ({
         />
       </div>
       
-      {/* Today's Schedule below the calendar */}
-      <div className="w-full">
-        <TodaySchedule
-          jobs={selectedDateJobs}
-          onEditClick={onEditClick}
+        {/* Today's Schedule below the calendar - Hidden on mobile */}
+        <div className="w-full hidden md:block">
+          <TodaySchedule
+            jobs={selectedDateJobs}
+            onEditClick={onEditClick}
           onDeleteClick={onDeleteClick}
           onJobClick={onJobClick}
           userRole={userRole}

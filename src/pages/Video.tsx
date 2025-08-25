@@ -144,7 +144,7 @@ const Video = () => {
             onDateTypeChange={() => {}} // Add empty handler as it's required
           />
         </div>
-        <div className="lg:col-span-12">
+        <div className="lg:col-span-12 hidden md:block">
           <TodaySchedule
             jobs={getSelectedDateJobs()}
             onEditClick={handleEditClick}

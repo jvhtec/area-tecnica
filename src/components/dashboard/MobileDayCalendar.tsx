@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DateTypeContextMenu } from "./DateTypeContextMenu";
+import { MobileJobCard } from "./MobileJobCard";
+import { Department } from "@/types/department";
 import { supabase } from "@/lib/supabase";
 import {
   format,
@@ -47,6 +49,9 @@ interface MobileDayCalendarProps {
   onDateTypeChange: () => void;
   selectedJobTypes: string[];
   onJobTypeSelection?: (type: string) => void;
+  onEditClick?: (job: any) => void;
+  onDeleteClick?: (jobId: string) => void;
+  onJobClick?: (jobId: string) => void;
 }
 
 const departmentIcons = {
@@ -74,6 +79,9 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
   onDateTypeChange,
   selectedJobTypes,
   onJobTypeSelection,
+  onEditClick,
+  onDeleteClick,
+  onJobClick,
 }) => {
   const [currentDate, setCurrentDate] = useState(date);
   const [dateTypes, setDateTypes] = useState<Record<string, any>>({});
@@ -193,11 +201,6 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
   const dayJobs = getJobsForDate(currentDate);
 
   const renderJobCard = (job: any) => {
-    const jobColor = jobTypeColors[job.job_type as keyof typeof jobTypeColors] || "hsl(var(--muted))";
-    const formattedDate = format(currentDate, 'yyyy-MM-dd');
-    const dateTypeKey = `${job.id}-${formattedDate}`;
-    const dateType = dateTypes[dateTypeKey];
-
     return (
       <DateTypeContextMenu
         key={job.id}
@@ -205,71 +208,15 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
         date={currentDate}
         onTypeChange={onDateTypeChange}
       >
-        <Card className="mb-3 hover:shadow-md transition-shadow cursor-pointer border-l-4" 
-              style={{ borderLeftColor: jobColor }}>
-          <CardContent className="p-4">
-            <div className="flex justify-between items-start mb-2">
-              <div className="flex-1">
-                <h3 className="font-semibold text-sm leading-tight">{job.title || job.job_name}</h3>
-                {job.location?.name && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                    <MapPin className="h-3 w-3" />
-                    <span>{job.location.name}</span>
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                <Badge 
-                  variant="secondary" 
-                  className="text-xs px-2 py-0"
-                  style={{ backgroundColor: jobColor, color: 'white' }}
-                >
-                  {job.job_type}
-                </Badge>
-                {dateType && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Badge variant="outline" className="text-xs px-1.5 py-0">
-                          {dateType.date_type === 'travel' && '✈️'}
-                          {dateType.date_type === 'setup' && '🔧'}
-                          {dateType.date_type === 'show' && '🎵'}
-                          {dateType.date_type === 'off' && '😴'}
-                          {dateType.date_type === 'rehearsal' && '🎭'}
-                        </Badge>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="capitalize">{dateType.date_type}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                <span>
-                  {formatInJobTimezone(job.start_time, 'HH:mm', job.timezone)} - {formatInJobTimezone(job.end_time, 'HH:mm', job.timezone)}
-                </span>
-              </div>
-              {job.job_departments && job.job_departments.length > 0 && (
-                <div className="flex gap-1">
-                  {job.job_departments.slice(0, 3).map((dept: any) => {
-                    const IconComponent = departmentIcons[dept.department as keyof typeof departmentIcons] || Users;
-                    return (
-                      <IconComponent key={dept.department} className="h-3 w-3" />
-                    );
-                  })}
-                  {job.job_departments.length > 3 && (
-                    <span className="text-xs">+{job.job_departments.length - 3}</span>
-                  )}
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        <MobileJobCard
+          job={job}
+          department={department as Department || 'sound'}
+          currentDate={currentDate}
+          onDateTypeChange={onDateTypeChange}
+          onEditClick={onEditClick}
+          onDeleteClick={onDeleteClick}
+          onJobClick={onJobClick}
+        />
       </DateTypeContextMenu>
     );
   };
