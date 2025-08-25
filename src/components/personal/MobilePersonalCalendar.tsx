@@ -190,30 +190,49 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
       >
         <div className="space-y-4">
           {visibleTechs.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {visibleTechs.map((tech) => {
                 const techAssignment = currentDateAssignments.find(
                   assignment => assignment.technician_id === tech.id
                 );
                 const availabilityStatus = getAvailabilityStatus(tech.id, currentDate);
 
+                const techName = `${tech.first_name ?? ''} ${tech.last_name ?? ''}`.trim() || 'Technician';
+                const dept = tech.department ? String(tech.department) : '';
+
                 return (
-                  <HouseTechBadge
+                  <div
                     key={tech.id}
-                    technician={tech}
-                    assignment={techAssignment}
-                    date={currentDate}
-                    compact={false}
-                    availabilityStatus={availabilityStatus === 'unavailable' ? 'vacation' : availabilityStatus}
-                    onAvailabilityChange={handleAvailabilityChange}
-                    onAvailabilityRemove={handleAvailabilityRemove}
-                  />
+                    className="border rounded-md p-3 flex items-start justify-between gap-3 hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{techName}</div>
+                      {dept && (
+                        <div className="text-xs text-muted-foreground capitalize truncate">{dept}</div>
+                      )}
+                    </div>
+                    <div className="text-right text-sm min-w-[40%]">
+                      {techAssignment ? (
+                        <>
+                          <div className="font-medium text-primary">On job</div>
+                          <div className="truncate">{techAssignment.job?.title || 'Assigned'}</div>
+                        </>
+                      ) : availabilityStatus ? (
+                        <>
+                          <div className="font-medium capitalize">{String(availabilityStatus).replace('_', ' ')}</div>
+                          <div className="text-muted-foreground">Unavailable</div>
+                        </>
+                      ) : (
+                        <div className="text-muted-foreground">In warehouse</div>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Users className="h-8 w-8 mb-2 text-muted-foreground" />
+              <Calendar className="h-8 w-8 mb-2 text-muted-foreground" />
               <p className="text-muted-foreground">No technicians scheduled</p>
               <p className="text-sm text-muted-foreground">for {format(currentDate, "MMMM d, yyyy")}</p>
             </div>
