@@ -100,13 +100,13 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
 
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="px-3 sm:px-6 py-4 sm:py-6">
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
             Department Vacation Requests
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6">
           {pendingDepartmentRequests.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No pending vacation requests in your department.
@@ -213,37 +213,17 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
 
       <TabsContent value="my-requests" className="space-y-4">
         {userRole === 'house_tech' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarDays className="h-5 w-5" />
-                Request Vacation Time
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <VacationRequestForm 
-                onSubmit={onVacationRequestSubmit}
-                isSubmitting={isSubmitting}
-              />
-            </CardContent>
-          </Card>
+          <VacationRequestForm 
+            onSubmit={onVacationRequestSubmit}
+            isSubmitting={isSubmitting}
+          />
         )}
 
         {(userRole === 'management' || userRole === 'admin') && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarDays className="h-5 w-5" />
-                Request Vacation Time
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <VacationRequestForm 
-                onSubmit={onVacationRequestSubmit}
-                isSubmitting={isSubmitting}
-              />
-            </CardContent>
-          </Card>
+          <VacationRequestForm 
+            onSubmit={onVacationRequestSubmit}
+            isSubmitting={isSubmitting}
+          />
         )}
 
         <VacationRequestHistory />

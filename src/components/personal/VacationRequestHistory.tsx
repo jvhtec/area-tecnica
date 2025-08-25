@@ -46,13 +46,13 @@ export const VacationRequestHistory = () => {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="px-3 sm:px-6 py-4 sm:py-6">
         <CardTitle className="flex items-center gap-2">
           <History className="h-5 w-5" />
           Your Vacation Requests
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-3 sm:px-6">
         {userRequests.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             You haven't submitted any vacation requests yet.
