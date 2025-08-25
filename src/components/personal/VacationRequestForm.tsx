@@ -35,7 +35,7 @@ export const VacationRequestForm: React.FC<VacationRequestFormProps> = ({ onSubm
   const isFormValid = startDate && endDate && reason.trim() && new Date(startDate) <= new Date(endDate);
 
   return (
-    <Card>
+    <Card style={{border: '2px solid green', boxSizing: 'border-box'}}>
       <CardHeader className="px-3 sm:px-6 py-4 sm:py-6">
         <CardTitle className="flex items-center gap-2">
           <CalendarDays className="h-5 w-5" />

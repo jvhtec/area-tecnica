@@ -100,7 +100,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
     const pendingDepartmentRequests = departmentRequests.filter(req => req.status === 'pending');
 
     return (
-      <Card>
+      <Card style={{border: '2px solid purple', boxSizing: 'border-box'}}>
         <CardHeader className="px-3 sm:px-6 py-4 sm:py-6">
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
@@ -212,7 +212,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
         )}
       </TabsList>
 
-      <TabsContent value="my-requests" className="space-y-4 px-0">
+      <TabsContent value="my-requests" className="space-y-4 px-0" style={{border: '2px solid blue', boxSizing: 'border-box'}}>
         {userRole === 'house_tech' && (
           <VacationRequestForm 
             onSubmit={onVacationRequestSubmit}
@@ -231,7 +231,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
       </TabsContent>
 
       {(userRole === 'management' || userRole === 'admin') && (
-        <TabsContent value="department-requests" className="space-y-4 px-0">
+        <TabsContent value="department-requests" className="space-y-4 px-0" style={{border: '2px solid red', boxSizing: 'border-box'}}>
           {renderDepartmentRequests()}
         </TabsContent>
       )}
