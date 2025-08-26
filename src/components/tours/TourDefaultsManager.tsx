@@ -27,6 +27,7 @@ interface TourPowerDefault {
   current_per_phase?: number;
   pdu_type?: string;
   custom_pdu_type?: string;
+  includes_hoist?: boolean;
   department?: string;
 }
 
@@ -252,7 +253,9 @@ export const TourDefaultsManager = ({
             totalWeight: type === 'weight' ? defaultItem.total_value : undefined,
             totalWatts: type === 'power' ? defaultItem.total_value : undefined,
             currentPerPhase: type === 'power' ? defaultItem.metadata?.current_per_phase : undefined,
-            pduType: type === 'power' ? defaultItem.metadata?.pdu_type || defaultItem.metadata?.custom_pdu_type : undefined,
+            pduType: type === 'power' ? (defaultItem.metadata?.custom_pdu_type || defaultItem.metadata?.pdu_type) : undefined,
+            customPduType: type === 'power' ? defaultItem.metadata?.custom_pdu_type : undefined,
+            includesHoist: type === 'power' ? (defaultItem.metadata?.includes_hoist || false) : undefined,
             toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
             id: Date.now() + Math.random()
           };
@@ -271,7 +274,9 @@ export const TourDefaultsManager = ({
             totalWeight: type === 'weight' ? getWeightValue(defaultItem) : undefined,
             totalWatts: type === 'power' ? getPowerValue(defaultItem) : undefined,
             currentPerPhase: type === 'power' ? getCurrentPerPhase(defaultItem) : undefined,
-            pduType: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.pdu_type || defaultItem.custom_pdu_type : undefined,
+            pduType: type === 'power' && isLegacyPowerDefault(defaultItem) ? (defaultItem.custom_pdu_type || defaultItem.pdu_type) : undefined,
+            customPduType: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.custom_pdu_type : undefined,
+            includesHoist: type === 'power' && isLegacyPowerDefault(defaultItem) ? (defaultItem.includes_hoist || false) : undefined,
             toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
             id: Date.now() + Math.random()
           };
@@ -398,7 +403,9 @@ export const TourDefaultsManager = ({
         totalWeight: type === 'weight' ? (override.weight_kg || 0) * (override.quantity || 1) : undefined,
         totalWatts: type === 'power' ? override.total_watts || 0 : undefined,
         currentPerPhase: type === 'power' ? override.current_per_phase : undefined,
-        pduType: type === 'power' ? override.pdu_type || override.custom_pdu_type : undefined,
+        pduType: type === 'power' ? (override.custom_pdu_type || override.pdu_type) : undefined,
+        customPduType: type === 'power' ? override.custom_pdu_type : undefined,
+        includesHoist: type === 'power' ? (override.includes_hoist || false) : undefined,
         toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
         id: Date.now() + Math.random()
       }));
@@ -413,7 +420,9 @@ export const TourDefaultsManager = ({
             totalWeight: type === 'weight' ? defaultItem.total_value : undefined,
             totalWatts: type === 'power' ? defaultItem.total_value : undefined,
             currentPerPhase: type === 'power' ? defaultItem.metadata?.current_per_phase : undefined,
-            pduType: type === 'power' ? defaultItem.metadata?.pdu_type || defaultItem.metadata?.custom_pdu_type : undefined,
+            pduType: type === 'power' ? (defaultItem.metadata?.custom_pdu_type || defaultItem.metadata?.pdu_type) : undefined,
+            customPduType: type === 'power' ? defaultItem.metadata?.custom_pdu_type : undefined,
+            includesHoist: type === 'power' ? (defaultItem.metadata?.includes_hoist || false) : undefined,
             toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
             id: Date.now() + Math.random()
           };
@@ -432,7 +441,9 @@ export const TourDefaultsManager = ({
             totalWeight: type === 'weight' ? getWeightValue(defaultItem) : undefined,
             totalWatts: type === 'power' ? getPowerValue(defaultItem) : undefined,
             currentPerPhase: type === 'power' ? getCurrentPerPhase(defaultItem) : undefined,
-            pduType: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.pdu_type || defaultItem.custom_pdu_type : undefined,
+            pduType: type === 'power' && isLegacyPowerDefault(defaultItem) ? (defaultItem.custom_pdu_type || defaultItem.pdu_type) : undefined,
+            customPduType: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.custom_pdu_type : undefined,
+            includesHoist: type === 'power' && isLegacyPowerDefault(defaultItem) ? (defaultItem.includes_hoist || false) : undefined,
             toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
             id: Date.now() + Math.random()
           };

@@ -270,7 +270,11 @@ const ConsumosTool: React.FC = () => {
         pdu_type: table.customPduType || table.pduType || '',
         custom_pdu_type: table.customPduType,
         includes_hoist: table.includesHoist || false,
-        department: 'sound'
+        department: 'sound',
+        override_data: {
+          rows: table.rows,
+          safetyMargin: safetyMargin
+        }
       });
 
       toast({
@@ -422,6 +426,8 @@ const ConsumosTool: React.FC = () => {
             updatePowerOverride({
               id: table.overrideId,
               data: {
+                total_watts: updatedTable.totalWatts || 0,
+                current_per_phase: updatedTable.currentPerPhase || 0,
                 pdu_type: updatedTable.customPduType || updatedTable.pduType || '',
                 custom_pdu_type: updatedTable.customPduType,
                 includes_hoist: updatedTable.includesHoist || false,
@@ -922,18 +928,22 @@ const ConsumosTool: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <Label>PDU Type Override:</Label>
                     <Select
-                      value={table.customPduType || 'default'}
-                      onValueChange={(value) => 
-                        updateTableSettings(table.id as number, { 
-                          customPduType: value === 'default' ? undefined : value 
-                        })
-                      }
+                      value={table.customPduType ? (PDU_TYPES.includes(table.customPduType) ? table.customPduType : 'custom') : 'default'}
+                      onValueChange={(value) => {
+                        if (value === 'default') {
+                          updateTableSettings(table.id as number, { customPduType: undefined });
+                        } else if (value === 'custom') {
+                          updateTableSettings(table.id as number, { customPduType: '' });
+                        } else {
+                          updateTableSettings(table.id as number, { customPduType: value });
+                        }
+                      }}
                     >
                       <SelectTrigger className="w-[200px]">
                         <SelectValue placeholder="Use recommended PDU type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="default">Use recommended PDU type</SelectItem>
+                        <SelectItem value="default">Use recommended ({table.pduType})</SelectItem>
                         {PDU_TYPES.map((type) => (
                           <SelectItem key={type} value={type}>
                             {type}
@@ -942,7 +952,7 @@ const ConsumosTool: React.FC = () => {
                         <SelectItem value="custom">Custom PDU Type</SelectItem>
                       </SelectContent>
                     </Select>
-                    {table.customPduType === 'custom' && (
+                    {table.customPduType !== undefined && !PDU_TYPES.includes(table.customPduType || '') && (
                       <Input
                         placeholder="Enter custom PDU type"
                         value={table.customPduType || ''}
