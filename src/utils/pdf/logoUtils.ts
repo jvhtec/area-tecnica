@@ -3,22 +3,43 @@ import { supabase } from '@/lib/supabase';
 
 export const fetchLogoUrl = async (jobId: string): Promise<string | undefined> => {
   try {
+    console.log("Fetching logo for job ID:", jobId);
+    
     const { data: logoData, error: logoError } = await supabase
       .from("festival_logos")
-      .select("file_path")
+      .select("file_path, file_name, uploaded_at")
       .eq("job_id", jobId)
       .maybeSingle();
       
     if (logoError) {
       console.error("Error fetching festival logo:", logoError);
+      return undefined;
     }
+    
+    if (!logoData) {
+      console.log("No logo found for job ID:", jobId);
+      return undefined;
+    }
+
+    console.log("Found logo data:", logoData);
     
     if (logoData?.file_path) {
       try {
-        const { data: signedUrlData } = await supabase.storage
+        // First, check if the file exists in storage
+        const { data: fileExists } = await supabase.storage
+          .from('festival-logos')
+          .list('', { limit: 1, search: logoData.file_path.split('/').pop() });
+
+        console.log("File existence check:", fileExists);
+
+        const { data: signedUrlData, error: signedUrlError } = await supabase.storage
           .from('festival-logos')
           .createSignedUrl(logoData.file_path, 60 * 60); // 1 hour expiry
           
+        if (signedUrlError) {
+          console.error("Error creating signed URL:", signedUrlError);
+        }
+
         if (signedUrlData?.signedUrl) {
           console.log("Generated festival logo signed URL:", signedUrlData.signedUrl);
           return signedUrlData.signedUrl;
@@ -34,10 +55,11 @@ export const fetchLogoUrl = async (jobId: string): Promise<string | undefined> =
           return publicUrlData.publicUrl;
         }
       } catch (storageErr) {
-        console.error("Error getting logo public URL:", storageErr);
+        console.error("Error getting logo URLs:", storageErr);
       }
     }
     
+    console.log("No valid logo URL found for job ID:", jobId);
     return undefined;
   } catch (err) {
     console.error("Error in logo fetch:", err);
