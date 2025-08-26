@@ -195,6 +195,22 @@ export const exportToPDF = (
 
         yPosition = (doc as any).lastAutoTable.finalY + 10;
 
+        // Add dual motors disclaimer for weight reports
+        if (type === 'weight' && table.dualMotors) {
+          checkPageBreak(20);
+          doc.setFontSize(10);
+          doc.setTextColor(125, 125, 125);
+          doc.setFont(undefined, 'italic');
+          // Spanish translation of the dual motors disclaimer
+          doc.text(
+            `*Esta configuración utiliza motores duales. La carga se distribuye entre dos motores para mayor seguridad y redundancia.`,
+            14,
+            yPosition
+          );
+          yPosition += 10;
+          doc.setFont(undefined, 'normal');
+        }
+
         if (type === 'power') {
           if (table.totalWatts !== undefined) {
             checkPageBreak(30);

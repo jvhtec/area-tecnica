@@ -256,6 +256,8 @@ export const TourDefaultsManager = ({
             pduType: type === 'power' ? (defaultItem.metadata?.custom_pdu_type || defaultItem.metadata?.pdu_type) : undefined,
             customPduType: type === 'power' ? defaultItem.metadata?.custom_pdu_type : undefined,
             includesHoist: type === 'power' ? (defaultItem.metadata?.includes_hoist || false) : undefined,
+            dualMotors: type === 'weight' ? (defaultItem.metadata?.dualMotors || false) : undefined,
+            riggingPoint: type === 'weight' ? defaultItem.metadata?.riggingPoint : undefined,
             toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
             id: Date.now() + Math.random()
           };
@@ -423,6 +425,8 @@ export const TourDefaultsManager = ({
             pduType: type === 'power' ? (defaultItem.metadata?.custom_pdu_type || defaultItem.metadata?.pdu_type) : undefined,
             customPduType: type === 'power' ? defaultItem.metadata?.custom_pdu_type : undefined,
             includesHoist: type === 'power' ? (defaultItem.metadata?.includes_hoist || false) : undefined,
+            dualMotors: type === 'weight' ? (defaultItem.metadata?.dualMotors || false) : undefined,
+            riggingPoint: type === 'weight' ? defaultItem.metadata?.riggingPoint : undefined,
             toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
             id: Date.now() + Math.random()
           };
