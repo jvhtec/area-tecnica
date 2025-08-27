@@ -399,15 +399,15 @@ export function MobileJobCard({
               </DropdownMenu>
             </div>
 
-            <div className="flex-1 min-w-0 mx-3">
-              <h3 className="font-semibold text-sm leading-tight mb-1 truncate">
+            <div className="flex-1 min-w-0 mx-3 overflow-hidden">
+              <h3 className="font-semibold text-sm leading-tight mb-1 truncate max-w-full">
                 {jobTitle}
               </h3>
-              <p className="text-xs text-muted-foreground truncate mb-1">
+              <p className="text-xs text-muted-foreground truncate mb-1 max-w-full">
                 {jobVenue}
               </p>
               {timeRange && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground truncate max-w-full">
                   {timeRange}
                 </p>
               )}
