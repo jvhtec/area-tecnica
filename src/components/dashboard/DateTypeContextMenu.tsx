@@ -121,7 +121,12 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
       <ContextMenuTrigger>
         {children}
       </ContextMenuTrigger>
-      <ContextMenuContent collisionPadding={8} className="w-48">
+      <ContextMenuContent 
+        collisionPadding={8} 
+        className="w-48"
+        alignOffset={-10}
+        avoidCollisions={true}
+      >
         <ContextMenuItem onClick={() => handleSetDateType('travel')} className="flex items-center gap-2">
           <Plane className="h-4 w-4" /> Travel
         </ContextMenuItem>
