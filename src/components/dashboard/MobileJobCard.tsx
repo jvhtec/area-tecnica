@@ -145,8 +145,12 @@ export function MobileJobCard({
     option.value === currentTypeValue
   )?.emoji || '🎭';
 
-  const jobTitle = job.title || job.job_name || 'Untitled Job';
-  const jobVenue = job.location?.name || job.venue || 'No venue';
+  const jobTitle = (job.title || job.job_name || 'Untitled Job').length > 26 
+    ? (job.title || job.job_name || 'Untitled Job').substring(0, 26) + '...'
+    : (job.title || job.job_name || 'Untitled Job');
+  const jobVenue = (job.location?.name || job.venue || 'No venue').length > 26
+    ? (job.location?.name || job.venue || 'No venue').substring(0, 26) + '...'
+    : (job.location?.name || job.venue || 'No venue');
   const startTime = job.start_time ? format(new Date(job.start_time), 'HH:mm') : '';
   const endTime = job.end_time ? format(new Date(job.end_time), 'HH:mm') : '';
   const timeRange = startTime && endTime ? `${startTime} - ${endTime}` : startTime;
