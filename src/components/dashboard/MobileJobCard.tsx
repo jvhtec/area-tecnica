@@ -299,11 +299,6 @@ export function MobileJobCard({
                   avoidCollisions={true}
                   className="w-48 bg-popover border shadow-md z-50"
                 >
-                  <DropdownMenuItem onClick={handleJobCardClick}>
-                    <Calendar className="mr-2 h-4 w-4" />
-                    Open Job
-                  </DropdownMenuItem>
-                  
                   <DropdownMenuItem onClick={handleDateTypeBadgeClick}>
                     <Calendar className="mr-2 h-4 w-4" />
                     Change Date Type
@@ -381,11 +376,6 @@ export function MobileJobCard({
                       {isCreatingLocalFolders ? 'Creating...' : 'Create Local Folders'}
                     </DropdownMenuItem>
                   )}
-                  
-                  <DropdownMenuItem onClick={refreshData}>
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Refresh
-                  </DropdownMenuItem>
                   
                   <DropdownMenuSeparator />
                   
