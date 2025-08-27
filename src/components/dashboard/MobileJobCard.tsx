@@ -296,10 +296,10 @@ export function MobileJobCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent 
-                  align="start" 
+                  align="end" 
                   side="top" 
-                  sideOffset={6} 
-                  collisionPadding={16}
+                  sideOffset={-4} 
+                  collisionPadding={-8}
                   avoidCollisions={true}
                   className="w-48 bg-popover border shadow-md z-50"
                 >
