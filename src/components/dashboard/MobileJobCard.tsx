@@ -291,7 +291,14 @@ export function MobileJobCard({
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" side="bottom" sideOffset={6} collisionPadding={8} className="w-48 bg-popover border shadow-md z-50">
+                <DropdownMenuContent 
+                  align="start" 
+                  side="bottom" 
+                  sideOffset={6} 
+                  collisionPadding={16}
+                  avoidCollisions={true}
+                  className="w-48 bg-popover border shadow-md z-50"
+                >
                   <DropdownMenuItem onClick={handleJobCardClick}>
                     <Calendar className="mr-2 h-4 w-4" />
                     Open Job
