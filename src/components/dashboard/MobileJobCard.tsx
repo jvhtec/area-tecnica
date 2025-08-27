@@ -297,7 +297,7 @@ export function MobileJobCard({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent 
                   align="start" 
-                  side="bottom" 
+                  side="top" 
                   sideOffset={6} 
                   collisionPadding={16}
                   avoidCollisions={true}
