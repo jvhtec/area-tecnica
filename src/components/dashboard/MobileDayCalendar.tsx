@@ -38,7 +38,9 @@ import {
   Mic,
   Calendar,
   Filter,
+  Printer,
 } from "lucide-react";
+import jsPDF from "jspdf";
 import { formatInJobTimezone, isJobOnDate } from "@/utils/timezoneUtils";
 
 interface MobileDayCalendarProps {
@@ -85,8 +87,6 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
 }) => {
   const [currentDate, setCurrentDate] = useState(date);
   const [dateTypes, setDateTypes] = useState<Record<string, any>>({});
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
   const distinctJobTypes = jobs ? Array.from(new Set(jobs.map((job) => job.job_type).filter(Boolean))) : [];
 
@@ -155,29 +155,49 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
     fetchDateTypes();
   }, [currentDate, getJobsForDate]);
 
-  // Touch handlers for swipe navigation
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
+  const generatePDF = () => {
+    const doc = new jsPDF('portrait');
+    const dayJobs = getJobsForDate(currentDate);
     
-    const distance = touchStart - touchEnd;
-    const minSwipeDistance = 50;
-
-    if (distance > minSwipeDistance) {
-      // Swipe left - next day
-      navigateToNext();
-    } else if (distance < -minSwipeDistance) {
-      // Swipe right - previous day
-      navigateToPrevious();
+    doc.setFontSize(16);
+    doc.text(`Jobs for ${format(currentDate, 'EEEE, MMMM d, yyyy')}`, 105, 20, { align: 'center' });
+    
+    let yPos = 40;
+    
+    if (dayJobs.length === 0) {
+      doc.setFontSize(12);
+      doc.text('No jobs scheduled for this day', 105, yPos, { align: 'center' });
+    } else {
+      dayJobs.forEach((job, index) => {
+        const jobTitle = (job.title || job.job_name || 'Untitled Job').length > 26 
+          ? (job.title || job.job_name || 'Untitled Job').substring(0, 26) + '...'
+          : (job.title || job.job_name || 'Untitled Job');
+        const jobVenue = (job.location?.name || job.venue || 'No venue').length > 26
+          ? (job.location?.name || job.venue || 'No venue').substring(0, 26) + '...'
+          : (job.location?.name || job.venue || 'No venue');
+        const startTime = job.start_time ? format(new Date(job.start_time), 'HH:mm') : '';
+        const endTime = job.end_time ? format(new Date(job.end_time), 'HH:mm') : '';
+        const timeRange = startTime && endTime ? `${startTime} - ${endTime}` : startTime;
+        
+        doc.setFontSize(12);
+        doc.text(`${index + 1}. ${jobTitle}`, 20, yPos);
+        doc.setFontSize(10);
+        doc.text(`Venue: ${jobVenue}`, 30, yPos + 10);
+        if (timeRange) {
+          doc.text(`Time: ${timeRange}`, 30, yPos + 20);
+        }
+        doc.text(`Type: ${job.job_type || 'Unknown'}`, 30, yPos + 30);
+        
+        yPos += 50;
+        
+        if (yPos > 250) {
+          doc.addPage();
+          yPos = 30;
+        }
+      });
     }
+    
+    doc.save(`${department || 'jobs'}-${format(currentDate, 'yyyy-MM-dd')}.pdf`);
   };
 
   const navigateToPrevious = () => {
@@ -247,19 +267,12 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
           </Button>
         </div>
 
-        {/* Today button and filters */}
+        {/* Action buttons */}
         <div className="flex items-center justify-between mb-4 gap-2">
-          {!isToday(currentDate) && (
-            <Button variant="outline" size="sm" onClick={navigateToToday}>
-              <Calendar className="h-4 w-4 mr-1" />
-              Today
-            </Button>
-          )}
-          
-          {distinctJobTypes.length > 0 && onJobTypeSelection && (
+          {distinctJobTypes.length > 0 && onJobTypeSelection ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="ml-auto">
+                <Button variant="outline" size="sm">
                   <Filter className="h-4 w-4 mr-1" />
                   Filters
                   {selectedJobTypes.length > 0 && selectedJobTypes.length < distinctJobTypes.length && (
@@ -270,7 +283,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent 
-                align="end" 
+                align="start" 
                 className="w-48 z-50 bg-background border shadow-lg"
                 sideOffset={4}
               >
@@ -286,16 +299,21 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-          )}
+          ) : <div />}
+          
+          <Button variant="outline" size="sm" onClick={generatePDF}>
+            <Printer className="h-4 w-4 mr-1" />
+            Print
+          </Button>
+          
+          <Button variant="outline" size="sm" onClick={navigateToToday}>
+            <Calendar className="h-4 w-4 mr-1" />
+            Today
+          </Button>
         </div>
 
-        {/* Swipe area for jobs */}
-        <div
-          className="flex-grow overflow-y-auto"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
+        {/* Jobs area */}
+        <div className="flex-grow overflow-y-auto">
           {dayJobs.length > 0 ? (
             <div className="space-y-2">
               {dayJobs.map(renderJobCard)}
@@ -304,7 +322,6 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
             <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
               <Calendar className="h-8 w-8 mb-2" />
               <p className="text-sm">No jobs scheduled</p>
-              <p className="text-xs">Swipe left/right to navigate</p>
             </div>
           )}
         </div>

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, ChevronLeft, ChevronRight, Users, Warehouse, Briefcase, Sun, CalendarOff, Car, Thermometer } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Users, Warehouse, Briefcase, Sun, CalendarOff, Car, Thermometer, Printer } from "lucide-react";
+import jsPDF from "jspdf";
 import { format, addDays, subDays, isToday, isSameDay, isWithinInterval } from "date-fns";
 import { cn } from "@/lib/utils";
 import { HouseTechBadge } from "./HouseTechBadge";
@@ -18,8 +19,6 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   onDateSelect,
 }) => {
   const [currentDate, setCurrentDate] = useState(date);
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
 
   useEffect(() => {
@@ -43,31 +42,6 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   }, [assignments]);
 
   const currentDateAssignments = getAssignmentsForDate(currentDate);
-
-  // Touch handlers for swipe navigation
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > 50;
-    const isRightSwipe = distance < -50;
-
-    if (isLeftSwipe) {
-      navigateToNext();
-    }
-    if (isRightSwipe) {
-      navigateToPrevious();
-    }
-  };
 
   const navigateToPrevious = () => {
     const newDate = subDays(currentDate, 1);
@@ -224,6 +198,50 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
 
   const visibleTechs = houseTechs.filter(tech => shouldShowTechOnDay(tech, currentDate));
 
+  const generatePDF = () => {
+    const doc = new jsPDF('portrait');
+    const targetAssignments = getAssignmentsForDate(currentDate);
+    
+    doc.setFontSize(16);
+    doc.text(`House Technicians - ${format(currentDate, 'EEEE, MMMM d, yyyy')}`, 105, 20, { align: 'center' });
+    
+    let yPos = 40;
+    
+    if (visibleTechs.length === 0) {
+      doc.setFontSize(12);
+      doc.text('No technicians scheduled for this day', 105, yPos, { align: 'center' });
+    } else {
+      visibleTechs.forEach((tech, index) => {
+        const techAssignment = targetAssignments.find(
+          assignment => assignment.technician_id === tech.id
+        );
+        const availabilityStatus = getAvailabilityStatus(tech.id, currentDate);
+        const techName = `${tech.first_name || ''} ${tech.last_name || ''}`.trim() || "Unknown Tech";
+        const statusText = techAssignment ? "On job" : availabilityStatus ? `Unavailable (${availabilityStatus})` : "In warehouse";
+        
+        doc.setFontSize(12);
+        doc.text(`${index + 1}. ${techName}`, 20, yPos);
+        doc.setFontSize(10);
+        if (tech.department) {
+          doc.text(`Department: ${tech.department}`, 30, yPos + 10);
+        }
+        doc.text(`Status: ${statusText}`, 30, yPos + 20);
+        if (techAssignment && techAssignment.job.title) {
+          doc.text(`Job: ${techAssignment.job.title}`, 30, yPos + 30);
+        }
+        
+        yPos += 50;
+        
+        if (yPos > 250) {
+          doc.addPage();
+          yPos = 30;
+        }
+      });
+    }
+    
+    doc.save(`house-techs-${format(currentDate, 'yyyy-MM-dd')}.pdf`);
+  };
+
   if (isLoading || isAvailabilityLoading) {
     return (
       <Card className="h-full flex flex-col">
@@ -279,7 +297,23 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
           </Button>
         </div>
         
-        <div className="flex justify-center">
+        {/* Action buttons */}
+        <div className="flex items-center justify-between">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setSelectedDepartment(null)}
+            disabled={!selectedDepartment}
+          >
+            <Users className="h-4 w-4 mr-1" />
+            {selectedDepartment ? `${selectedDepartment}` : 'All Depts'}
+          </Button>
+          
+          <Button variant="outline" size="sm" onClick={generatePDF}>
+            <Printer className="h-4 w-4 mr-1" />
+            Print
+          </Button>
+          
           <Button 
             variant="outline" 
             size="sm" 
@@ -288,6 +322,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
               isToday(currentDate) && "bg-primary text-primary-foreground"
             )}
           >
+            <Calendar className="h-4 w-4 mr-1" />
             Today
           </Button>
         </div>
@@ -358,12 +393,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
         </div>
       </CardHeader>
 
-      <CardContent 
-        className="flex-1 px-2 sm:px-4 py-4"
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
+      <CardContent className="flex-1 px-2 sm:px-4 py-4">
         <div className="space-y-4">
           {visibleTechs.length > 0 ? (
             <div className="space-y-2">
