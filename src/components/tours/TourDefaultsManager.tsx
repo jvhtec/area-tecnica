@@ -243,8 +243,19 @@ export const TourDefaultsManager = ({
         console.error('Error fetching tour logo:', error);
       }
 
+      // Sort defaults by order_index if available, then by created_at
+      const sortedDefaults = [...relevantDefaults].sort((a, b) => {
+        if (isNewFormatTable(a) && isNewFormatTable(b)) {
+          const orderA = a.metadata?.order_index ?? 999;
+          const orderB = b.metadata?.order_index ?? 999;
+          if (orderA !== orderB) return orderA - orderB;
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        }
+        return 0;
+      });
+
       // Convert defaults to the format expected by exportToPDF
-      const tables = relevantDefaults.map(defaultItem => {
+      const tables = sortedDefaults.map(defaultItem => {
         // Check if this is new format with table_data
         if (isNewFormatTable(defaultItem) && defaultItem.table_data?.rows) {
           return {
@@ -413,7 +424,18 @@ export const TourDefaultsManager = ({
       }));
       safetyMargin = overrides[0]?.override_data?.safetyMargin || 0;
     } else {
-      combinedTables = defaultsData.map(defaultItem => {
+      // Sort defaults by order_index if available, then by created_at
+      const sortedDefaults = [...defaultsData].sort((a, b) => {
+        if (isNewFormatTable(a) && isNewFormatTable(b)) {
+          const orderA = a.metadata?.order_index ?? 999;
+          const orderB = b.metadata?.order_index ?? 999;
+          if (orderA !== orderB) return orderA - orderB;
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        }
+        return 0;
+      });
+      
+      combinedTables = sortedDefaults.map(defaultItem => {
         // Check if this is new format with table_data
         if (isNewFormatTable(defaultItem) && defaultItem.table_data?.rows) {
           return {

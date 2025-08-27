@@ -411,8 +411,44 @@ const ConsumosTool: React.FC = () => {
     }
 
     try {
-      for (const table of unsavedTables) {
-        await saveTourDefault(table);
+      // Get or create the sound set ID once for all tables to avoid race condition
+      const setId = await getOrCreateSoundSetId();
+      
+      // Save all tables with the same set ID and add ordering
+      for (let i = 0; i < unsavedTables.length; i++) {
+        const table = unsavedTables[i];
+        
+        // Add a small delay to ensure different timestamps for proper ordering
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        // Create the table with the shared set ID
+        const newDefaultTable = await createTourDefaultTable({
+          set_id: setId,
+          table_name: table.name,
+          table_data: {
+            rows: table.rows,
+            safetyMargin: safetyMargin
+          },
+          table_type: 'power',
+          total_value: table.totalWatts || 0,
+          metadata: {
+            current_per_phase: table.currentPerPhase,
+            pdu_type: table.customPduType || table.pduType,
+            custom_pdu_type: table.customPduType,
+            includes_hoist: table.includesHoist || false,
+            safetyMargin: safetyMargin,
+            order_index: i // Add explicit ordering
+          }
+        });
+
+        // Mark this table as saved
+        setTables(prev => prev.map(t => 
+          t.id === table.id 
+            ? { ...t, isDefault: true, defaultTableId: newDefaultTable.id }
+            : t
+        ));
       }
       
       toast({
