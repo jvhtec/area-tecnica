@@ -61,7 +61,7 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
         .from("tour_default_tables")
         .select("*")
         .in("set_id", setIds)
-        .order("metadata->order_index", { ascending: true, nullsLast: true })
+        .order("metadata->order_index", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: true });
 
       if (error) throw error;

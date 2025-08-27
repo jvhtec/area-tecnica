@@ -278,31 +278,8 @@ export function MobileJobCard({
 
         <div className="p-4">
           <div className="flex items-start justify-between mb-2">
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-sm leading-tight mb-1 truncate">
-                {jobTitle}
-              </h3>
-              <p className="text-xs text-muted-foreground truncate mb-1">
-                {jobVenue}
-              </p>
-              {timeRange && (
-                <p className="text-xs text-muted-foreground">
-                  {timeRange}
-                </p>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-2 ml-2">
-              {/* Date type badge */}
-              <Badge 
-                variant="secondary" 
-                className="text-xs cursor-pointer hover:bg-secondary/80 transition-colors"
-                onClick={handleDateTypeBadgeClick}
-              >
-                {currentDateTypeEmoji}
-              </Badge>
-              
-              {/* Actions menu */}
+            <div className="flex items-center gap-2">
+              {/* Actions menu - moved to left */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
@@ -314,7 +291,7 @@ export function MobileJobCard({
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" side="bottom" sideOffset={6} collisionPadding={8} className="w-48">
+                <DropdownMenuContent align="start" side="bottom" sideOffset={6} collisionPadding={8} className="w-48 bg-popover border shadow-md z-50">
                   <DropdownMenuItem onClick={handleJobCardClick}>
                     <Calendar className="mr-2 h-4 w-4" />
                     Open Job
@@ -374,13 +351,17 @@ export function MobileJobCard({
                     </DropdownMenuItem>
                   )}
                   
-                  {canCreateFlexFolders && !foldersAreCreated && (
+                  {canCreateFlexFolders && (
                     <DropdownMenuItem 
                       onClick={createFlexFoldersHandler}
-                      disabled={isCreatingFolders || isFoldersLoading}
+                      disabled={isCreatingFolders || isFoldersLoading || foldersAreCreated}
                     >
-                      <FolderPlus className="mr-2 h-4 w-4" />
-                      {isCreatingFolders ? 'Creating...' : 'Create Flex Folders'}
+                      {isCreatingFolders ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <FolderPlus className="mr-2 h-4 w-4" />
+                      )}
+                      {isCreatingFolders ? 'Creating...' : foldersAreCreated ? 'Flex Folders Created' : 'Create Flex Folders'}
                     </DropdownMenuItem>
                   )}
                   
@@ -419,6 +400,31 @@ export function MobileJobCard({
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
+            </div>
+
+            <div className="flex-1 min-w-0 mx-3">
+              <h3 className="font-semibold text-sm leading-tight mb-1 truncate">
+                {jobTitle}
+              </h3>
+              <p className="text-xs text-muted-foreground truncate mb-1">
+                {jobVenue}
+              </p>
+              {timeRange && (
+                <p className="text-xs text-muted-foreground">
+                  {timeRange}
+                </p>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {/* Date type badge - moved to right */}
+              <Badge 
+                variant="secondary" 
+                className="text-xs cursor-pointer hover:bg-secondary/80 transition-colors"
+                onClick={handleDateTypeBadgeClick}
+              >
+                {currentDateTypeEmoji}
+              </Badge>
             </div>
           </div>
           
