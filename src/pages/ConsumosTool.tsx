@@ -366,13 +366,16 @@ const ConsumosTool: React.FC = () => {
       customPduType: '',
       includesHoist: false,
       id: Date.now(),
+      // Mark as unsaved default in tour-defaults mode
+      isDefault: false,
+      defaultTableId: undefined
     };
 
     setTables((prev) => [...prev, newTable]);
 
-    // NEW: Save based on mode - tour defaults mode
+    // Save based on mode - defer saving in tour-defaults mode
     if (isTourDefaults) {
-      await saveTourDefault(newTable);
+      // Don't save immediately - let user adjust PDU/hoist settings first
     } else if (isJobOverrideMode) {
       await saveTourOverride(newTable);
     } else if (selectedJobId) {
@@ -395,13 +398,44 @@ const ConsumosTool: React.FC = () => {
     setTables((prev) => prev.filter((table) => table.id !== tableId));
   };
 
+  // NEW: Save unsaved default tables function
+  const saveDefaultTables = async () => {
+    const unsavedTables = tables.filter(table => !table.isDefault && !table.defaultTableId);
+    
+    if (unsavedTables.length === 0) {
+      toast({
+        title: "No unsaved tables",
+        description: "All tables have already been saved as defaults",
+      });
+      return;
+    }
+
+    try {
+      for (const table of unsavedTables) {
+        await saveTourDefault(table);
+      }
+      
+      toast({
+        title: "Success",
+        description: `${unsavedTables.length} default table(s) saved successfully`,
+      });
+    } catch (error: any) {
+      console.error('Error saving default tables:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save some default tables",
+        variant: "destructive"
+      });
+    }
+  };
+
   const updateTableSettings = async (tableId: number | string, updates: Partial<Table>) => {
     setTables((prev) =>
       prev.map((table) => {
         if (table.id === tableId) {
           const updatedTable = { ...table, ...updates };
           
-          // Persist changes based on mode
+          // Persist changes based on mode - only for already-saved tables
           if (isTourDefaults && table.isDefault && table.defaultTableId && updateTourDefaultTable) {
             // Update the tour default table in database
             updateTourDefaultTable({
@@ -440,6 +474,7 @@ const ConsumosTool: React.FC = () => {
           } else if (selectedJobId) {
             savePowerRequirementTable(updatedTable);
           }
+          // Note: For unsaved tables in tour-defaults mode, only update local state
           return updatedTable;
         }
         return table;
@@ -886,11 +921,17 @@ const ConsumosTool: React.FC = () => {
               variant="secondary" 
               disabled={(!isJobOverrideMode && !isTourDefaults) && isCreatingOverride}
             >
-              {editingOverride ? 'Update Override' : isTourDefaults ? 'Save Tour Default' : isJobOverrideMode ? 'Create Override' : 'Generate Table'}
+              {editingOverride ? 'Update Override' : isTourDefaults ? 'Generate Table' : isJobOverrideMode ? 'Create Override' : 'Generate Table'}
             </Button>
             <Button onClick={resetCurrentTable} variant="destructive">
               {editingOverride ? 'Cancel Edit' : 'Reset'}
             </Button>
+            {/* NEW: Save Default Tables button - only in tour-defaults mode */}
+            {isTourDefaults && tables.some(table => !table.isDefault && !table.defaultTableId) && (
+              <Button onClick={saveDefaultTables} variant="default" className="bg-green-600 hover:bg-green-700">
+                Save Default Tables
+              </Button>
+            )}
             {(tables.length > 0 && !isTourDefaults) || (tables.length > 0 && isTourDefaults) ? (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
                 <FileText className="h-4 w-4" />
