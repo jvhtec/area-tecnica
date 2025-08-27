@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, ChevronLeft, ChevronRight, Users, Warehouse, Briefcase, Sun, CalendarOff, Car, Thermometer, Printer } from "lucide-react";
-import jsPDF from "jspdf";
+import { PrintDialog, PrintSettings } from "@/components/dashboard/PrintDialog";
 import { format, addDays, subDays, isToday, isSameDay, isWithinInterval } from "date-fns";
 import { cn } from "@/lib/utils";
 import { HouseTechBadge } from "./HouseTechBadge";
@@ -20,6 +20,16 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
 }) => {
   const [currentDate, setCurrentDate] = useState(date);
   const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [printSettings, setPrintSettings] = useState<PrintSettings>({
+    jobTypes: {
+      tourdate: true,
+      tour: true,
+      single: true,
+      dryhire: true,
+      festival: true,
+    },
+  });
 
   useEffect(() => {
     setCurrentDate(date);
@@ -198,48 +208,14 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
 
   const visibleTechs = houseTechs.filter(tech => shouldShowTechOnDay(tech, currentDate));
 
-  const generatePDF = () => {
-    const doc = new jsPDF('portrait');
-    const targetAssignments = getAssignmentsForDate(currentDate);
-    
-    doc.setFontSize(16);
-    doc.text(`House Technicians - ${format(currentDate, 'EEEE, MMMM d, yyyy')}`, 105, 20, { align: 'center' });
-    
-    let yPos = 40;
-    
-    if (visibleTechs.length === 0) {
-      doc.setFontSize(12);
-      doc.text('No technicians scheduled for this day', 105, yPos, { align: 'center' });
-    } else {
-      visibleTechs.forEach((tech, index) => {
-        const techAssignment = targetAssignments.find(
-          assignment => assignment.technician_id === tech.id
-        );
-        const availabilityStatus = getAvailabilityStatus(tech.id, currentDate);
-        const techName = `${tech.first_name || ''} ${tech.last_name || ''}`.trim() || "Unknown Tech";
-        const statusText = techAssignment ? "On job" : availabilityStatus ? `Unavailable (${availabilityStatus})` : "In warehouse";
-        
-        doc.setFontSize(12);
-        doc.text(`${index + 1}. ${techName}`, 20, yPos);
-        doc.setFontSize(10);
-        if (tech.department) {
-          doc.text(`Department: ${tech.department}`, 30, yPos + 10);
-        }
-        doc.text(`Status: ${statusText}`, 30, yPos + 20);
-        if (techAssignment && techAssignment.job.title) {
-          doc.text(`Job: ${techAssignment.job.title}`, 30, yPos + 30);
-        }
-        
-        yPos += 50;
-        
-        if (yPos > 250) {
-          doc.addPage();
-          yPos = 30;
-        }
-      });
-    }
-    
-    doc.save(`house-techs-${format(currentDate, 'yyyy-MM-dd')}.pdf`);
+  const generatePDF = (range: "month" | "quarter" | "year") => {
+    console.log("Mobile house techs PDF generation not implemented for", range);
+    setShowPrintDialog(false);
+  };
+
+  const generateXLS = (range: "month" | "quarter" | "year") => {
+    console.log("Mobile house techs XLS generation not implemented for", range);
+    setShowPrintDialog(false);
   };
 
   if (isLoading || isAvailabilityLoading) {
@@ -309,7 +285,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
             {selectedDepartment ? `${selectedDepartment}` : 'All Depts'}
           </Button>
           
-          <Button variant="outline" size="sm" onClick={generatePDF}>
+          <Button variant="outline" size="sm" onClick={() => setShowPrintDialog(true)}>
             <Printer className="h-4 w-4 mr-1" />
             Print
           </Button>
@@ -440,6 +416,17 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
           )}
         </div>
       </CardContent>
+
+      <PrintDialog
+        showDialog={showPrintDialog}
+        setShowDialog={setShowPrintDialog}
+        printSettings={printSettings}
+        setPrintSettings={setPrintSettings}
+        generatePDF={generatePDF}
+        generateXLS={generateXLS}
+        currentMonth={currentDate}
+        selectedJobTypes={[]}
+      />
     </Card>
     </div>
   );

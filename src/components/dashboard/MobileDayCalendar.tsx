@@ -13,6 +13,7 @@ import { DateTypeContextMenu } from "./DateTypeContextMenu";
 import { MobileJobCard } from "./MobileJobCard";
 import { Department } from "@/types/department";
 import { supabase } from "@/lib/supabase";
+import { PrintDialog, PrintSettings } from "./PrintDialog";
 import {
   format,
   addDays,
@@ -40,7 +41,6 @@ import {
   Filter,
   Printer,
 } from "lucide-react";
-import jsPDF from "jspdf";
 import { formatInJobTimezone, isJobOnDate } from "@/utils/timezoneUtils";
 
 interface MobileDayCalendarProps {
@@ -87,6 +87,16 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
 }) => {
   const [currentDate, setCurrentDate] = useState(date);
   const [dateTypes, setDateTypes] = useState<Record<string, any>>({});
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [printSettings, setPrintSettings] = useState<PrintSettings>({
+    jobTypes: {
+      tourdate: true,
+      tour: true,
+      single: true,
+      dryhire: true,
+      festival: true,
+    },
+  });
 
   const distinctJobTypes = jobs ? Array.from(new Set(jobs.map((job) => job.job_type).filter(Boolean))) : [];
 
@@ -155,49 +165,15 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
     fetchDateTypes();
   }, [currentDate, getJobsForDate]);
 
-  const generatePDF = () => {
-    const doc = new jsPDF('portrait');
-    const dayJobs = getJobsForDate(currentDate);
-    
-    doc.setFontSize(16);
-    doc.text(`Jobs for ${format(currentDate, 'EEEE, MMMM d, yyyy')}`, 105, 20, { align: 'center' });
-    
-    let yPos = 40;
-    
-    if (dayJobs.length === 0) {
-      doc.setFontSize(12);
-      doc.text('No jobs scheduled for this day', 105, yPos, { align: 'center' });
-    } else {
-      dayJobs.forEach((job, index) => {
-        const jobTitle = (job.title || job.job_name || 'Untitled Job').length > 26 
-          ? (job.title || job.job_name || 'Untitled Job').substring(0, 26) + '...'
-          : (job.title || job.job_name || 'Untitled Job');
-        const jobVenue = (job.location?.name || job.venue || 'No venue').length > 26
-          ? (job.location?.name || job.venue || 'No venue').substring(0, 26) + '...'
-          : (job.location?.name || job.venue || 'No venue');
-        const startTime = job.start_time ? format(new Date(job.start_time), 'HH:mm') : '';
-        const endTime = job.end_time ? format(new Date(job.end_time), 'HH:mm') : '';
-        const timeRange = startTime && endTime ? `${startTime} - ${endTime}` : startTime;
-        
-        doc.setFontSize(12);
-        doc.text(`${index + 1}. ${jobTitle}`, 20, yPos);
-        doc.setFontSize(10);
-        doc.text(`Venue: ${jobVenue}`, 30, yPos + 10);
-        if (timeRange) {
-          doc.text(`Time: ${timeRange}`, 30, yPos + 20);
-        }
-        doc.text(`Type: ${job.job_type || 'Unknown'}`, 30, yPos + 30);
-        
-        yPos += 50;
-        
-        if (yPos > 250) {
-          doc.addPage();
-          yPos = 30;
-        }
-      });
-    }
-    
-    doc.save(`${department || 'jobs'}-${format(currentDate, 'yyyy-MM-dd')}.pdf`);
+  // Simple PDF/XLS generation for mobile (single day focus)
+  const generatePDF = (range: "month" | "quarter" | "year") => {
+    console.log("Mobile PDF generation not implemented for", range);
+    setShowPrintDialog(false);
+  };
+
+  const generateXLS = (range: "month" | "quarter" | "year") => {
+    console.log("Mobile XLS generation not implemented for", range);
+    setShowPrintDialog(false);
   };
 
   const navigateToPrevious = () => {
@@ -301,7 +277,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
             </DropdownMenu>
           ) : <div />}
           
-          <Button variant="outline" size="sm" onClick={generatePDF}>
+          <Button variant="outline" size="sm" onClick={() => setShowPrintDialog(true)}>
             <Printer className="h-4 w-4 mr-1" />
             Print
           </Button>
@@ -325,6 +301,17 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
             </div>
           )}
         </div>
+
+        <PrintDialog
+          showDialog={showPrintDialog}
+          setShowDialog={setShowPrintDialog}
+          printSettings={printSettings}
+          setPrintSettings={setPrintSettings}
+          generatePDF={generatePDF}
+          generateXLS={generateXLS}
+          currentMonth={currentDate}
+          selectedJobTypes={selectedJobTypes}
+        />
       </CardContent>
     </Card>
   );

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, ChevronLeft, ChevronRight, Plus, Printer } from "lucide-react";
-import jsPDF from "jspdf";
+import { PrintDialog, PrintSettings } from "@/components/dashboard/PrintDialog";
 import { format, addDays, subDays, isToday, isSameDay, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -23,6 +23,16 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
   const [currentDate, setCurrentDate] = useState(date);
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [printSettings, setPrintSettings] = useState<PrintSettings>({
+    jobTypes: {
+      tourdate: true,
+      tour: true,
+      single: true,
+      dryhire: true,
+      festival: true,
+    },
+  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -70,47 +80,14 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
 
   const currentDateEvents = getEventsForDate(currentDate);
 
-  const generatePDF = () => {
-    const doc = new jsPDF('portrait');
-    const currentDateEvents = getEventsForDate(currentDate);
-    
-    doc.setFontSize(16);
-    doc.text(`Logistics Events - ${format(currentDate, 'EEEE, MMMM d, yyyy')}`, 105, 20, { align: 'center' });
-    
-    let yPos = 40;
-    
-    if (currentDateEvents.length === 0) {
-      doc.setFontSize(12);
-      doc.text('No logistics events scheduled for this day', 105, yPos, { align: 'center' });
-    } else {
-      currentDateEvents.forEach((event, index) => {
-        doc.setFontSize(12);
-        doc.text(`${index + 1}. ${event.event_type || 'Event'}`, 20, yPos);
-        doc.setFontSize(10);
-        if (event.job?.title) {
-          doc.text(`Job: ${event.job.title}`, 30, yPos + 10);
-        }
-        if (event.transport_type) {
-          doc.text(`Transport: ${event.transport_type}`, 30, yPos + 20);
-        }
-        if (event.event_time) {
-          const eventTime = format(new Date(event.event_time), 'HH:mm');
-          doc.text(`Time: ${eventTime}`, 30, yPos + 30);
-        }
-        if (event.location) {
-          doc.text(`Location: ${event.location}`, 30, yPos + 40);
-        }
-        
-        yPos += 60;
-        
-        if (yPos > 240) {
-          doc.addPage();
-          yPos = 30;
-        }
-      });
-    }
-    
-    doc.save(`logistics-${format(currentDate, 'yyyy-MM-dd')}.pdf`);
+  const generatePDF = (range: "month" | "quarter" | "year") => {
+    console.log("Mobile logistics PDF generation not implemented for", range);
+    setShowPrintDialog(false);
+  };
+
+  const generateXLS = (range: "month" | "quarter" | "year") => {
+    console.log("Mobile logistics XLS generation not implemented for", range);
+    setShowPrintDialog(false);
   };
 
   const navigateToPrevious = () => {
@@ -181,7 +158,7 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
         <div className="flex items-center justify-between">
           <div /> {/* Spacer */}
           
-          <Button variant="outline" size="sm" onClick={generatePDF}>
+          <Button variant="outline" size="sm" onClick={() => setShowPrintDialog(true)}>
             <Printer className="h-4 w-4 mr-1" />
             Print
           </Button>
@@ -230,6 +207,17 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
         onOpenChange={setShowEventDialog}
         selectedDate={currentDate}
         selectedEvent={selectedEvent}
+      />
+
+      <PrintDialog
+        showDialog={showPrintDialog}
+        setShowDialog={setShowPrintDialog}
+        printSettings={printSettings}
+        setPrintSettings={setPrintSettings}
+        generatePDF={generatePDF}
+        generateXLS={generateXLS}
+        currentMonth={currentDate}
+        selectedJobTypes={[]}
       />
     </Card>
   );
