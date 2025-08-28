@@ -370,7 +370,10 @@ export function MobileJobCard({
                   
                   {canCreateFlexFolders && (
                     <DropdownMenuItem 
-                      onClick={createFlexFoldersHandler}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        createFlexFoldersHandler(e);
+                      }}
                       disabled={isCreatingFolders || isFoldersLoading || foldersAreCreated}
                     >
                       {isCreatingFolders ? (
@@ -384,7 +387,10 @@ export function MobileJobCard({
                   
                   {!isMobile && (
                     <DropdownMenuItem 
-                      onClick={createLocalFoldersHandler}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        createLocalFoldersHandler(e);
+                      }}
                       disabled={isCreatingLocalFolders}
                     >
                       <HardDrive className="mr-2 h-4 w-4" />
