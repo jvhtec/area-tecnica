@@ -35,6 +35,7 @@ import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useFlexUuidLazy } from "@/hooks/useFlexUuidLazy";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface MobileJobCardProps {
   job: any;
@@ -65,6 +66,7 @@ export function MobileJobCard({
 }: MobileJobCardProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [dateTypeDialogOpen, setDateTypeDialogOpen] = useState(false);
   const [selectedDateType, setSelectedDateType] = useState<string>('show');
@@ -183,6 +185,12 @@ export function MobileJobCard({
     try {
       const dateStr = format(currentDate, 'yyyy-MM-dd');
       
+      // Optimistically update the UI using the same pattern as DateTypeContextMenu
+      queryClient.setQueryData(['job-date-types', job.id], (old: any) => {
+        const key = `${job.id}-${dateStr}`;
+        return { ...old, [key]: { type: newType, job_id: job.id, date: dateStr } };
+      });
+      
       const { error } = await supabase
         .from('job_date_types')
         .upsert({
@@ -210,6 +218,9 @@ export function MobileJobCard({
         description: "Failed to update date type",
         variant: "destructive"
       });
+      
+      // Invalidate queries on error to refresh from server
+      queryClient.invalidateQueries({ queryKey: ['job-date-types', job.id] });
     }
   };
 
