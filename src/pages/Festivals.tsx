@@ -9,6 +9,7 @@ import { supabase, ensureRealtimeConnection } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
+import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { useAuth } from "@/hooks/useAuth";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { PrintOptions, PrintOptionsDialog } from "@/components/festival/pdf/PrintOptionsDialog";
@@ -103,26 +104,12 @@ const Festivals = () => {
   // Fetch festival logo for each festival job
   const fetchFestivalLogo = async (job: any) => {
     try {
-      const { data, error } = await supabase
-        .from('festival_logos')
-        .select('file_path')
-        .eq('job_id', job.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching logo:', error);
-        return;
-      }
-
-      if (data?.file_path) {
-        const { data: { publicUrl } } = supabase
-          .storage
-          .from('festival-logos')
-          .getPublicUrl(data.file_path);
-        
+      const logoUrl = await fetchJobLogo(job.id);
+      
+      if (logoUrl) {
         setFestivalLogos(prev => ({
           ...prev,
-          [job.id]: publicUrl
+          [job.id]: logoUrl
         }));
       }
     } catch (err) {
