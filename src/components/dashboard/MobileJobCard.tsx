@@ -372,6 +372,13 @@ export function MobileJobCard({
                     <DropdownMenuItem 
                       onClick={(e) => {
                         e.stopPropagation();
+                        console.log("MobileJobCard: Create Flex Folders clicked", { 
+                          canCreateFlexFolders, 
+                          isCreatingFolders, 
+                          isFoldersLoading, 
+                          foldersAreCreated,
+                          jobId: job.id 
+                        });
                         createFlexFoldersHandler(e);
                       }}
                       disabled={isCreatingFolders || isFoldersLoading || foldersAreCreated}
