@@ -12,6 +12,16 @@ interface AutoTableJsPDF extends jsPDF {
   lastAutoTable: { finalY: number };
 }
 
+interface WeatherData {
+  date: string;
+  condition: string;
+  weatherCode: number;
+  maxTemp: number;
+  minTemp: number;
+  precipitationProbability: number;
+  icon: string;
+}
+
 interface EventData {
   eventName?: string;
   eventCode?: string;
@@ -71,6 +81,7 @@ interface EventData {
   schedule?: string;
   powerRequirements?: string;
   auxiliaryNeeds?: string;
+  weather?: WeatherData[];
 }
 
 interface TravelArrangement {
@@ -1023,7 +1034,58 @@ export const generatePDF = async (
     return yPosition;
   };
 
-  // Schedule section
+  // Weather section
+  const addWeatherSection = (yPosition: number): number => {
+    if (!eventData.weather || eventData.weather.length === 0) return yPosition;
+
+    yPosition = checkPageBreak(yPosition, 80);
+    yPosition = addSectionHeader('Previsión Meteorológica', yPosition);
+
+    const weatherTableData = eventData.weather.map(day => {
+      const date = new Date(day.date);
+      const formattedDate = date.toLocaleDateString('es-ES', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+      });
+      
+      return [
+        formattedDate,
+        `${day.icon} ${day.condition}`,
+        `${day.maxTemp}°C / ${day.minTemp}°C`,
+        `${day.precipitationProbability}%`
+      ];
+    });
+
+    autoTable(doc, {
+      startY: yPosition,
+      head: [['Fecha', 'Condición', 'Temperatura', 'Lluvia']],
+      body: weatherTableData,
+      theme: 'grid',
+      styles: { fontSize: 10, cellPadding: 4 },
+      headStyles: {
+        fillColor: [14, 165, 233], // Sky blue color
+        textColor: [255, 255, 255],
+        fontStyle: 'bold'
+      },
+      columnStyles: {
+        0: { cellWidth: 35 },
+        1: { cellWidth: 65 },
+        2: { cellWidth: 50 },
+        3: { cellWidth: 30 }
+      }
+    });
+
+    yPosition = (doc as any).lastAutoTable.finalY + 10;
+
+    // Add weather source note
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.text('Fuente: Open-Meteo API', 20, yPosition);
+    yPosition += 15;
+
+    return yPosition;
+  };
   const addScheduleSection = (yPosition: number): number => {
     if (!eventData.schedule) return yPosition;
 
@@ -1130,6 +1192,7 @@ export const generatePDF = async (
 
       yPosition = addEventOverview(yPosition);
       yPosition = addVenueSection(yPosition);
+      yPosition = addWeatherSection(yPosition);
       yPosition = addContactsSection(yPosition);
       yPosition = addStaffSection(yPosition);
       yPosition = await addTravelSection(yPosition);

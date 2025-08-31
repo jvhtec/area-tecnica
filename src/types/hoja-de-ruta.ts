@@ -43,6 +43,17 @@ export interface Accommodation {
   rooms: RoomAssignment[];
 }
 
+// Weather data interface
+export interface WeatherData {
+  date: string;
+  condition: string;
+  weatherCode: number;
+  maxTemp: number;
+  minTemp: number;
+  precipitationProbability: number;
+  icon: string;
+}
+
 export interface EventData {
   eventName: string;
   eventDates: string;
@@ -66,6 +77,7 @@ export interface EventData {
   schedule: string;
   powerRequirements: string;
   auxiliaryNeeds: string;
+  weather?: WeatherData[]; // Added weather data
 }
 
 export interface HojaDeRutaTemplate {

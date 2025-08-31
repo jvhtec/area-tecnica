@@ -40,7 +40,8 @@ import {
   Database,
   AlertCircle,
   FileDown,
-  Loader2
+  Loader2,
+  CloudSun
 } from "lucide-react";
 
 // Import the working hooks
@@ -60,6 +61,7 @@ import { ModernScheduleSection } from "./sections/ModernScheduleSection";
 import { ModernTemplateManager } from "./components/ModernTemplateManager";
 import { ModernStatusIndicator } from "./components/ModernStatusIndicator";
 import { ModernProgressTracker } from "./components/ModernProgressTracker";
+import { ModernWeatherSection } from "./sections/ModernWeatherSection";
 
 export const ModernHojaDeRuta = () => {
   const { toast } = useToast();
@@ -128,15 +130,16 @@ export const ModernHojaDeRuta = () => {
     setAccommodations
   );
 
-  // Calculate completion progress
+  // Calculate completion progress including weather
   useEffect(() => {
     const calculateProgress = () => {
       let completed = 0;
-      const total = 8;
+      const total = 9;
 
       // Check completion of each section
       if (eventData.eventName && eventData.eventDates) completed++;
       if (eventData.venue.name && eventData.venue.address) completed++;
+      if (eventData.weather && eventData.weather.length > 0) completed++;
       if (eventData.contacts.some(c => c.name && c.phone)) completed++;
       if (eventData.staff.some(s => s.name && s.position)) completed++;
       if (travelArrangements.some(t => t.transportation_type)) completed++;
@@ -291,6 +294,7 @@ export const ModernHojaDeRuta = () => {
   const tabConfig = [
     { id: "event", label: "Evento", icon: Calendar, color: "text-blue-600" },
     { id: "venue", label: "Venue", icon: MapPin, color: "text-green-600" },
+    { id: "weather", label: "Clima", icon: CloudSun, color: "text-sky-600" },
     { id: "contacts", label: "Contactos", icon: Phone, color: "text-purple-600" },
     { id: "staff", label: "Personal", icon: Users, color: "text-orange-600" },
     { id: "travel", label: "Viajes", icon: Car, color: "text-cyan-600" },
@@ -521,7 +525,7 @@ export const ModernHojaDeRuta = () => {
                 {/* Modern Tab Navigation */}
                 <Card className="border-2">
                   <CardContent className="p-6">
-                    <TabsList className="grid grid-cols-8 w-full h-auto p-1 bg-muted/50">
+                    <TabsList className="grid grid-cols-9 w-full h-auto p-1 bg-muted/50">
                       {tabConfig.map((tab) => {
                         const Icon = tab.icon;
                         return (
@@ -576,6 +580,13 @@ export const ModernHojaDeRuta = () => {
                           handleVenueMapInputChange(fakeEvent);
                         }}
                         handleVenueMapUrl={handleVenueMapUrl}
+                      />
+                    </TabsContent>
+
+                    <TabsContent value="weather" className="mt-0">
+                      <ModernWeatherSection
+                        eventData={eventData}
+                        setEventData={setEventData}
                       />
                     </TabsContent>
 
