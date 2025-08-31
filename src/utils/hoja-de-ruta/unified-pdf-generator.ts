@@ -1051,7 +1051,7 @@ export const generatePDF = async (
       
       return [
         formattedDate,
-        `${day.icon} ${day.condition}`,
+        day.condition,
         `${day.maxTemp}°C / ${day.minTemp}°C`,
         `${day.precipitationProbability}%`
       ];
