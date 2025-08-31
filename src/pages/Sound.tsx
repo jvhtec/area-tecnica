@@ -11,13 +11,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
-import { Calculator, PieChart, FileText, Sparkles, Zap, FileStack, Tent } from 'lucide-react';
+import { Calculator, PieChart, FileText, Zap, FileStack, Tent } from 'lucide-react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ReportGenerator } from "../components/sound/ReportGenerator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { PdfAnalysis } from "@/components/sound/PdfAnalysis";
 import { AmplifierTool } from "@/components/sound/AmplifierTool";
 import { useNavigate } from "react-router-dom";
 import { MemoriaTecnica } from "@/components/sound/MemoriaTecnica";
@@ -34,7 +33,6 @@ const Sound = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [userRole, setUserRole] = useState<string | null>(null);
   const [showReportGenerator, setShowReportGenerator] = useState(false);
-  const [showAnalysisForm, setShowAnalysisForm] = useState(false);
   const [showAmplifierTool, setShowAmplifierTool] = useState(false);
   const [showMemoriaTecnica, setShowMemoriaTecnica] = useState(false);
   const currentDepartment = "sound";
@@ -212,15 +210,6 @@ const Sound = () => {
               <span className="text-center leading-tight">SV Report Generator</span>
             </Button>
 
-            <Button
-              variant="outline"
-              size="lg"
-              className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-              onClick={() => setShowAnalysisForm(true)}
-            >
-              <Sparkles className="h-4 w-4 sm:h-6 sm:w-6" />
-              <span className="text-center leading-tight">AI Rider Analysis</span>
-            </Button>
 
             <Button
               variant="outline"
@@ -295,14 +284,6 @@ const Sound = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showAnalysisForm} onOpenChange={setShowAnalysisForm}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Análisis de PDF</DialogTitle>
-          </DialogHeader>
-          <PdfAnalysis />
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={showAmplifierTool} onOpenChange={setShowAmplifierTool}>
         <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
