@@ -30,8 +30,8 @@ interface HouseTechBadgeProps {
   };
   date: Date;
   compact?: boolean;
-  availabilityStatus?: 'vacation' | 'travel' | 'sick' | 'day_off' | null;
-  onAvailabilityChange?: (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off', date: Date) => void;
+  availabilityStatus?: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | null;
+  onAvailabilityChange?: (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', date: Date) => void;
   onAvailabilityRemove?: (techId: string, date: Date) => void;
 }
 
@@ -69,6 +69,8 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
           return '#ef4444'; // red
         case 'day_off':
           return '#8b5cf6'; // violet
+        case 'warehouse':
+          return '#f97316'; // orange
       }
     }
     
@@ -89,6 +91,8 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
         return '🤒';
       case 'day_off':
         return '🏠';
+      case 'warehouse':
+        return '🏭';
       default:
         return null;
     }
@@ -103,7 +107,7 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
     setModalOpen(true);
   };
 
-  const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off', date: Date) => {
+  const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', date: Date) => {
     if (onAvailabilityChange) {
       onAvailabilityChange(techId, status, date);
     }

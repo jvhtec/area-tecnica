@@ -72,7 +72,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
     onDateSelect(today);
   };
 
-  const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off', targetDate: Date) => {
+  const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', targetDate: Date) => {
     updateAvailability(techId, status, targetDate);
   };
 
@@ -175,11 +175,15 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
       const availabilityStatus = getAvailabilityStatus(tech.id, targetDate);
       const isUnavailable = !!availabilityStatus;
 
-      if (!hasAssignment && !isUnavailable) {
+      // Count warehouse overrides separately
+      if (availabilityStatus === 'warehouse') {
+        techsInWarehouse++;
+      } else if (!hasAssignment && !isUnavailable) {
+        // Default warehouse (available but not assigned)
         techsInWarehouse++;
       }
 
-      if (hasAssignment) {
+      if (hasAssignment && availabilityStatus !== 'warehouse') {
         techsOnJobs++;
       }
 
@@ -381,14 +385,17 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
                 );
                 const availabilityStatus = getAvailabilityStatus(tech.id, currentDate);
                 const techName = `${tech.first_name || ''} ${tech.last_name || ''}`.trim() || "Unknown Tech";
-                const statusText = techAssignment ? "On job" : availabilityStatus ? `Unavailable (${availabilityStatus})` : "In warehouse";
+                const statusText = techAssignment ? "On job" : availabilityStatus ? 
+                  availabilityStatus === 'warehouse' ? 'In warehouse' : `Unavailable (${availabilityStatus})` : 
+                  "In warehouse";
 
                 return (
                   <TechContextMenu
                     key={tech.id}
                     technician={tech}
                     date={currentDate}
-                    onAvailabilityChange={(techId, status, date) => handleAvailabilityChange(techId, status, date)}
+                     onAvailabilityChange={(techId, status, date) => handleAvailabilityChange(techId, status, date)}
+                     onAvailabilityRemove={handleAvailabilityRemove}
                   >
                     <div className="border rounded-md p-3 flex items-start justify-between gap-3 hover:bg-accent/50 transition-colors cursor-pointer">
                       <div className="min-w-0">

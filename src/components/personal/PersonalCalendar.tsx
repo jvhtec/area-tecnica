@@ -105,7 +105,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
     });
   };
 
-  const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off', date: Date) => {
+  const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', date: Date) => {
     updateAvailability(techId, status, date);
   };
 
@@ -275,7 +275,7 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
                     assignment={techAssignment}
                     date={day}
                     compact={true}
-                    availabilityStatus={availabilityStatus === 'unavailable' ? 'vacation' : availabilityStatus}
+                    availabilityStatus={availabilityStatus === 'unavailable' ? null : availabilityStatus}
                     onAvailabilityChange={handleAvailabilityChange}
                     onAvailabilityRemove={handleAvailabilityRemove}
                   />

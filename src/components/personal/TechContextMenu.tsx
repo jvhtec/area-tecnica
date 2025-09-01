@@ -10,7 +10,7 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
-import { Calendar, Plane, Stethoscope, CalendarOff } from 'lucide-react';
+import { Calendar, Plane, Stethoscope, CalendarOff, Warehouse } from 'lucide-react';
 
 interface TechContextMenuProps {
   children: React.ReactNode;
@@ -21,7 +21,8 @@ interface TechContextMenuProps {
     department: string | null;
   };
   date: Date;
-  onAvailabilityChange: (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off', date: Date) => void;
+  onAvailabilityChange: (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', date: Date) => void;
+  onAvailabilityRemove?: (techId: string, date: Date) => void;
 }
 
 export const TechContextMenu: React.FC<TechContextMenuProps> = ({
@@ -29,9 +30,14 @@ export const TechContextMenu: React.FC<TechContextMenuProps> = ({
   technician,
   date,
   onAvailabilityChange,
+  onAvailabilityRemove,
 }) => {
-  const handleUnavailable = (reason: 'vacation' | 'travel' | 'sick' | 'day_off') => {
+  const handleUnavailable = (reason: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse') => {
     onAvailabilityChange(technician.id, reason, date);
+  };
+
+  const handleRemoveAvailability = () => {
+    onAvailabilityRemove?.(technician.id, date);
   };
 
   return (
@@ -62,8 +68,17 @@ export const TechContextMenu: React.FC<TechContextMenuProps> = ({
               <CalendarOff className="mr-2 h-4 w-4" />
               Day Off
             </ContextMenuItem>
+            <ContextMenuItem onClick={() => handleUnavailable('warehouse')}>
+              <Warehouse className="mr-2 h-4 w-4" />
+              Mark as In Warehouse
+            </ContextMenuItem>
           </ContextMenuSubContent>
         </ContextMenuSub>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={handleRemoveAvailability}>
+          <Calendar className="mr-2 h-4 w-4" />
+          Remove Override
+        </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
   );

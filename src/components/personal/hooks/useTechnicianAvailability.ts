@@ -29,7 +29,7 @@ interface AvailabilitySchedule {
 }
 
 export const useTechnicianAvailability = (currentMonth: Date) => {
-  const [availabilityData, setAvailabilityData] = useState<Record<string, 'vacation' | 'travel' | 'sick' | 'day_off' | 'unavailable'>>({});
+  const [availabilityData, setAvailabilityData] = useState<Record<string, 'vacation' | 'travel' | 'sick' | 'day_off' | 'unavailable' | 'warehouse'>>({});
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
@@ -70,7 +70,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
         console.log('TechnicianAvailability: Fetched availability data:', availabilityDataRaw);
         console.log('TechnicianAvailability: Fetched schedules data:', schedulesData);
 
-        const availabilityMap: Record<string, 'vacation' | 'travel' | 'sick' | 'day_off' | 'unavailable'> = {};
+        const availabilityMap: Record<string, 'vacation' | 'travel' | 'sick' | 'day_off' | 'unavailable' | 'warehouse'> = {};
 
         // Process legacy technician_availability data
         availabilityDataRaw?.forEach((item: TechnicianAvailability) => {
@@ -85,6 +85,8 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
             // Check if it's vacation-based unavailability
             if (item.source === 'vacation') {
               availabilityMap[key] = 'vacation';
+            } else if (item.source === 'warehouse') {
+              availabilityMap[key] = 'warehouse';
             } else {
               availabilityMap[key] = 'unavailable';
             }
@@ -157,7 +159,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
     };
   }, [currentMonth]);
 
-  const updateAvailability = async (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off', date: Date) => {
+  const updateAvailability = async (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const key = `${techId}-${dateStr}`;
 
@@ -168,38 +170,80 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
         [key]: status
       }));
 
-      const { error } = await supabase
-        .from('technician_availability')
-        .upsert({
-          technician_id: techId,
-          date: dateStr,
-          status,
-          created_by: (await supabase.auth.getUser()).data.user?.id
-        }, {
-          onConflict: 'technician_id,date'
-        });
+      // Handle warehouse status by inserting into availability_schedules
+      if (status === 'warehouse') {
+        // Get user's department
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('department')
+          .eq('id', techId)
+          .single();
 
-      if (error) {
-        console.error('TechnicianAvailability: Error updating availability:', error);
-        // Revert optimistic update
-        setAvailabilityData(prev => {
-          const newState = { ...prev };
-          delete newState[key];
-          return newState;
-        });
-        
-        toast({
-          title: "Error",
-          description: "Failed to update availability status",
-          variant: "destructive",
-        });
-        return;
+        const { error: scheduleError } = await supabase
+          .from('availability_schedules')
+          .upsert({
+            user_id: techId,
+            department: profile?.department || 'unknown',
+            date: dateStr,
+            status: 'unavailable',
+            source: 'warehouse',
+            notes: 'Warehouse override'
+          }, {
+            onConflict: 'user_id,date'
+          });
+
+        if (scheduleError) {
+          console.error('TechnicianAvailability: Error updating warehouse status:', scheduleError);
+          // Revert optimistic update
+          setAvailabilityData(prev => {
+            const newState = { ...prev };
+            delete newState[key];
+            return newState;
+          });
+          
+          toast({
+            title: "Error",
+            description: "Failed to update warehouse status",
+            variant: "destructive",
+          });
+          return;
+        }
+      } else {
+        // Handle other statuses with legacy table
+        const { error } = await supabase
+          .from('technician_availability')
+          .upsert({
+            technician_id: techId,
+            date: dateStr,
+            status,
+            created_by: (await supabase.auth.getUser()).data.user?.id
+          }, {
+            onConflict: 'technician_id,date'
+          });
+
+        if (error) {
+          console.error('TechnicianAvailability: Error updating availability:', error);
+          // Revert optimistic update
+          setAvailabilityData(prev => {
+            const newState = { ...prev };
+            delete newState[key];
+            return newState;
+          });
+          
+          toast({
+            title: "Error",
+            description: "Failed to update availability status",
+            variant: "destructive",
+          });
+          return;
+        }
       }
 
       // Show success toast
       const statusText = status === 'vacation' ? 'vacation' : 
                         status === 'travel' ? 'travel' : 
-                        status === 'sick' ? 'sick day' : 'day off';
+                        status === 'sick' ? 'sick day' : 
+                        status === 'warehouse' ? 'warehouse override' : 'day off';
       toast({
         title: "Availability Updated",
         description: `Technician marked as ${statusText} for ${format(date, 'MMM d, yyyy')}`,
@@ -233,14 +277,22 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
         return newState;
       });
 
-      const { error } = await supabase
+      // Remove from both tables to ensure cleanup
+      const { error: legacyError } = await supabase
         .from('technician_availability')
         .delete()
         .eq('technician_id', techId)
         .eq('date', dateStr);
 
-      if (error) {
-        console.error('TechnicianAvailability: Error removing availability:', error);
+      const { error: scheduleError } = await supabase
+        .from('availability_schedules')
+        .delete()
+        .eq('user_id', techId)
+        .eq('date', dateStr)
+        .in('source', ['manual', 'warehouse']); // Only remove manual/warehouse entries, not vacation
+
+      if (legacyError || scheduleError) {
+        console.error('TechnicianAvailability: Error removing availability:', legacyError || scheduleError);
         toast({
           title: "Error",
           description: "Failed to remove availability status",
@@ -263,7 +315,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
     }
   };
 
-  const getAvailabilityStatus = (techId: string, date: Date): 'vacation' | 'travel' | 'sick' | 'day_off' | 'unavailable' | null => {
+  const getAvailabilityStatus = (techId: string, date: Date): 'vacation' | 'travel' | 'sick' | 'day_off' | 'unavailable' | 'warehouse' | null => {
     const key = `${techId}-${format(date, 'yyyy-MM-dd')}`;
     return availabilityData[key] || null;
   };

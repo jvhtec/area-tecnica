@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { formatInJobTimezone } from '@/utils/timezoneUtils';
-import { MapPin, Clock, User, Phone, Briefcase, Calendar, Plane, Stethoscope, Home, X } from 'lucide-react';
+import { MapPin, Clock, User, Phone, Briefcase, Calendar, Plane, Stethoscope, Home, X, Warehouse } from 'lucide-react';
 
 interface TechDetailModalProps {
   open: boolean;
@@ -34,8 +34,8 @@ interface TechDetailModalProps {
     };
   };
   date: Date;
-  availabilityStatus?: 'vacation' | 'travel' | 'sick' | 'day_off' | null;
-  onAvailabilityChange?: (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off', date: Date) => void;
+  availabilityStatus?: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | null;
+  onAvailabilityChange?: (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', date: Date) => void;
   onAvailabilityRemove?: (techId: string, date: Date) => void;
 }
 
@@ -74,12 +74,14 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
         return 'Sick Day';
       case 'day_off':
         return 'Day Off';
+      case 'warehouse':
+        return 'In Warehouse';
       default:
         return null;
     }
   };
 
-  const handleUnavailableClick = (status: 'vacation' | 'travel' | 'sick' | 'day_off') => {
+  const handleUnavailableClick = (status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse') => {
     if (onAvailabilityChange) {
       onAvailabilityChange(technician.id, status, date);
       onOpenChange(false);
@@ -241,6 +243,15 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
                 >
                   <Home className="mr-2 h-3 w-3" />
                   Day Off
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleUnavailableClick('warehouse')}
+                  className="justify-start"
+                >
+                  <Warehouse className="mr-2 h-3 w-3" />
+                  Mark as In Warehouse
                 </Button>
               </div>
             </div>
