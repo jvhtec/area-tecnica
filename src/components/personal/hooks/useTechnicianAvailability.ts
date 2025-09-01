@@ -172,12 +172,16 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
 
       // Handle warehouse status by inserting into availability_schedules
       if (status === 'warehouse') {
+        console.log('TechnicianAvailability: Setting warehouse status for', techId, 'on', dateStr);
+        
         // Get user's department
         const { data: profile } = await supabase
           .from('profiles')
           .select('department')
           .eq('id', techId)
           .single();
+
+        console.log('TechnicianAvailability: Profile data:', profile);
 
         const { error: scheduleError } = await supabase
           .from('availability_schedules')
@@ -191,6 +195,8 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
           }, {
             onConflict: 'user_id,department,date'
           });
+
+        console.log('TechnicianAvailability: Warehouse upsert result:', { error: scheduleError });
 
         if (scheduleError) {
           console.error('TechnicianAvailability: Error updating warehouse status:', scheduleError);

@@ -389,6 +389,12 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
                   availabilityStatus === 'warehouse' ? 'In warehouse' : `Unavailable (${availabilityStatus})` : 
                   "In warehouse";
 
+                console.log('MobilePersonalCalendar: Tech status for', techName, ':', {
+                  hasAssignment: !!techAssignment,
+                  availabilityStatus,
+                  statusText
+                });
+
                 return (
                   <TechContextMenu
                     key={tech.id}
