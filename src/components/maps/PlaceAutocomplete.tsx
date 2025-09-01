@@ -48,24 +48,27 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
     setInputValue(value || '');
   }, [value]);
 
-  // Fetch Google Maps API key securely
-  useEffect(() => {
-    const fetchApiKey = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('get-secret', {
-          body: { secretName: 'GOOGLE_MAPS_API_KEY' },
-        });
-        if (error) {
-          console.error('Failed to fetch Google Maps API key:', error);
-          return;
-        }
-        if (data?.GOOGLE_MAPS_API_KEY) {
-          setApiKey(data.GOOGLE_MAPS_API_KEY);
-        }
-      } catch (err) {
-        console.error('Error fetching API key:', err);
+  // Fetch Google Maps API key securely (with retry support)
+  const fetchApiKey = async (): Promise<string | null> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('get-secret', {
+        body: { secretName: 'GOOGLE_MAPS_API_KEY' },
+      });
+      if (error) {
+        console.error('Failed to fetch Google Maps API key:', error);
+        return null;
       }
-    };
+      if (data?.GOOGLE_MAPS_API_KEY) {
+        setApiKey(data.GOOGLE_MAPS_API_KEY);
+        return data.GOOGLE_MAPS_API_KEY as string;
+      }
+    } catch (err) {
+      console.error('Error fetching API key:', err);
+    }
+    return null;
+  };
+
+  useEffect(() => {
     fetchApiKey();
   }, []);
 
@@ -80,8 +83,10 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   }, []);
 
   const searchPlaces = async (query: string) => {
-    if (!apiKey || !query || query.length < 2) {
-      console.log('PlacesAutocomplete: Search conditions not met:', { hasApiKey: !!apiKey, query, queryLength: query.length });
+    // Ensure API key is available (retry on demand)
+    const key = apiKey || (await fetchApiKey());
+    if (!key || !query || query.length < 2) {
+      console.log('PlacesAutocomplete: Search conditions not met:', { hasApiKey: !!key, query, queryLength: query?.length || 0 });
       setSuggestions([]);
       setShowSuggestions(false);
       return;
@@ -106,7 +111,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Goog-Api-Key': apiKey,
+          'X-Goog-Api-Key': key,
           'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types',
         },
         body: JSON.stringify({
@@ -141,7 +146,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Goog-Api-Key': apiKey,
+          'X-Goog-Api-Key': key,
           'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat',
         },
           body: JSON.stringify({
@@ -183,8 +188,9 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   const getPlaceDetails = async (placeId: string, fallbackName: string, fallbackAddress?: string) => {
     console.log('PlacesAutocomplete: Getting place details for:', { placeId, fallbackName, fallbackAddress });
     
-    if (!apiKey) {
-      console.log('PlacesAutocomplete: No API key, using fallback data');
+    const key = apiKey || (await fetchApiKey());
+    if (!key) {
+      console.log('PlacesAutocomplete: No API key after retry, using fallback data');
       onSelect({ name: fallbackName, address: fallbackAddress || '', place_id: placeId });
       return;
     }
@@ -192,7 +198,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
     try {
       const res = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
         headers: {
-          'X-Goog-Api-Key': apiKey,
+          'X-Goog-Api-Key': key,
           'X-Goog-FieldMask': 'id,displayName,formattedAddress,location',
         },
       });
@@ -253,7 +259,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
           onChange={handleInputChange}
           placeholder={placeholder}
           className="pl-9"
-          onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+          onFocus={() => { if (!apiKey) { fetchApiKey(); } if (suggestions.length > 0) setShowSuggestions(true); }}
         />
         <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
