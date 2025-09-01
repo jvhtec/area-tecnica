@@ -63,6 +63,11 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     return foldersAreCreated ? "Folders already exist" : "Create Flex folders";
   };
 
+  const handleManageJob = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/job-management/${job.id}`);
+  };
+
   return (
     <div className="flex flex-wrap gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
       {job.job_type === "festival" && isProjectManagementPage && canManageArtists && (
@@ -73,6 +78,16 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           className="hover:bg-accent/50"
         >
           {userRole === 'technician' || userRole === 'house_tech' ? 'View Festival' : 'Manage Festival'}
+        </Button>
+      )}
+      {job.job_type !== "festival" && job.job_type !== "dryhire" && isProjectManagementPage && canManageArtists && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleManageJob}
+          className="hover:bg-accent/50"
+        >
+          {userRole === 'technician' || userRole === 'house_tech' ? 'View Job' : 'Manage Job'}
         </Button>
       )}
       {!isHouseTech && job.job_type !== "dryhire" && isProjectManagementPage && (
