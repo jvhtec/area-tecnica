@@ -207,11 +207,16 @@ export const PersonalCalendar: React.FC<PersonalCalendarProps> = ({
       const availabilityStatus = getAvailabilityStatus(tech.id, targetDate);
       const isUnavailable = !!availabilityStatus;
 
-      if (!hasAssignment && !isUnavailable) {
+      // Count warehouse overrides explicitly
+      if (availabilityStatus === 'warehouse') {
+        techsInWarehouse++;
+      } else if (!hasAssignment && !isUnavailable) {
+        // Default warehouse (available but not assigned)
         techsInWarehouse++;
       }
 
-      if (hasAssignment) {
+      // Count job assignments only if not overridden by warehouse
+      if (hasAssignment && availabilityStatus !== 'warehouse') {
         techsOnJobs++;
       }
 
