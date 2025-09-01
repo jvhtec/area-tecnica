@@ -189,7 +189,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
             source: 'warehouse',
             notes: 'Warehouse override'
           }, {
-            onConflict: 'user_id,date'
+            onConflict: 'user_id,department,date'
           });
 
         if (scheduleError) {
