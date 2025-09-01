@@ -385,8 +385,9 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
                 );
                 const availabilityStatus = getAvailabilityStatus(tech.id, currentDate);
                 const techName = `${tech.first_name || ''} ${tech.last_name || ''}`.trim() || "Unknown Tech";
-                const statusText = techAssignment ? "On job" : availabilityStatus ? 
-                  availabilityStatus === 'warehouse' ? 'In warehouse' : `Unavailable (${availabilityStatus})` : 
+                const statusText = availabilityStatus === 'warehouse' ? 'In warehouse' :
+                  techAssignment ? "On job" : 
+                  availabilityStatus ? `Unavailable (${availabilityStatus})` : 
                   "In warehouse";
 
                 console.log('MobilePersonalCalendar: Tech status for', techName, ':', {
