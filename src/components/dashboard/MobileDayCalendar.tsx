@@ -194,7 +194,12 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
     onDateSelect(today);
   };
 
-  const dayJobs = getJobsForDate(currentDate);
+  const dayJobs = getJobsForDate(currentDate).sort((a: any, b: any) => {
+    // Sort dryhire jobs to the bottom
+    if (a.job_type === 'dryhire' && b.job_type !== 'dryhire') return 1;
+    if (a.job_type !== 'dryhire' && b.job_type === 'dryhire') return -1;
+    return 0; // Keep original order for non-dryhire jobs
+  });
 
   const renderJobCard = (job: any) => {
     return (
