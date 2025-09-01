@@ -33,20 +33,25 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
   onAutoPopulate,
 }) => {
   const handleVenueSelect = (place: PlaceResultNormalized) => {
-    setEventData(prev => ({
-      ...prev,
-      venue: {
-        ...prev.venue,
-        name: place.name || place.formatted_address,
-        address: place.formatted_address,
-        coordinates: place.location,
-        place_id: place.place_id,
-        postal_code: place.postal_code,
-        locality: place.locality,
-        admin_area_level_1: place.admin_area_level_1,
-        country: place.country,
-      }
-    }));
+    console.log('ModernEventSection: handleVenueSelect called with place:', place);
+    setEventData(prev => {
+      const updatedData = {
+        ...prev,
+        venue: {
+          ...prev.venue,
+          name: place.name || place.formatted_address,
+          address: place.formatted_address,
+          coordinates: place.location,
+          place_id: place.place_id,
+          postal_code: place.postal_code,
+          locality: place.locality,
+          admin_area_level_1: place.admin_area_level_1,
+          country: place.country,
+        }
+      };
+      console.log('ModernEventSection: Updated eventData.venue:', updatedData.venue);
+      return updatedData;
+    });
   };
   return (
     <div className="space-y-6">
@@ -188,14 +193,18 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
                 </Label>
                 <Input
                   id="venue-address"
-                  value={eventData.venue.address}
+                  value={eventData.venue.address || ''}
                   onChange={(e) => setEventData(prev => ({
                     ...prev,
                     venue: { ...prev.venue, address: e.target.value }
                   }))}
                   placeholder="Ej. Calle Mayor 123, Madrid"
                   className="border-2 focus:border-purple-300"
+                  readOnly
                 />
+                <p className="text-xs text-muted-foreground">
+                  Se completa automáticamente al seleccionar un venue
+                </p>
               </div>
             </div>
 

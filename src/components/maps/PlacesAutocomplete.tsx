@@ -45,22 +45,27 @@ export const PlacesAutocomplete: React.FC<PlacesAutocompleteProps> = ({
   // Fetch Google Maps API key
   useEffect(() => {
     const fetchApiKey = async () => {
+      console.log('PlacesAutocomplete: Fetching API key...');
       try {
         const { data, error } = await supabase.functions.invoke('get-secret', {
           body: { secretName: 'GOOGLE_MAPS_API_KEY' },
         });
         if (error) {
+          console.error('PlacesAutocomplete: Failed to fetch API key:', error);
           setError('Failed to load location services');
-          console.error('Failed to fetch Google Maps API key:', error);
           return;
         }
         if (data?.GOOGLE_MAPS_API_KEY) {
+          console.log('PlacesAutocomplete: API key received successfully');
           setApiKey(data.GOOGLE_MAPS_API_KEY);
           setError(null);
+        } else {
+          console.log('PlacesAutocomplete: No API key found in response:', data);
+          setError('Google Maps API key not available');
         }
       } catch (err) {
+        console.error('PlacesAutocomplete: Error fetching API key:', err);
         setError('Failed to load location services');
-        console.error('Error fetching API key:', err);
       }
     };
     fetchApiKey();
@@ -111,7 +116,9 @@ export const PlacesAutocomplete: React.FC<PlacesAutocompleteProps> = ({
   };
 
   const searchPlaces = useCallback(async (query: string) => {
+    console.log('PlacesAutocomplete: searchPlaces called with query:', query, 'apiKey:', !!apiKey);
     if (!apiKey || !query || query.length < minChars) {
+      console.log('PlacesAutocomplete: Search cancelled - apiKey:', !!apiKey, 'query length:', query.length, 'minChars:', minChars);
       setSuggestions([]);
       setShowSuggestions(false);
       setShowManualOption(false);

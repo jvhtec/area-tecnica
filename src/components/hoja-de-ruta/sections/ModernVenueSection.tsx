@@ -35,6 +35,8 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
   const [dragOver, setDragOver] = useState(false);
   const [staticMapUrl, setStaticMapUrl] = useState<string | null>(null);
 
+  console.log('ModernVenueSection: eventData.venue:', eventData.venue);
+
   useEffect(() => {
     if (staticMapUrl) {
       handleVenueMapUrl(staticMapUrl);
