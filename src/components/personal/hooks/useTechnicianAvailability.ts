@@ -103,6 +103,15 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
 
     fetchAvailability();
 
+    // Set up real-time subscription with debouncing to prevent excessive reloads
+    let refetchTimeout: NodeJS.Timeout;
+    const debouncedRefetch = () => {
+      clearTimeout(refetchTimeout);
+      refetchTimeout = setTimeout(() => {
+        fetchAvailability();
+      }, 500); // Debounce by 500ms
+    };
+
     // Set up real-time subscription for both tables
     const availabilityChannel = supabase
       .channel('technician-availability-updates')
@@ -115,7 +124,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
         },
         () => {
           console.log('TechnicianAvailability: Real-time update received from technician_availability, refetching data');
-          fetchAvailability();
+          debouncedRefetch();
         }
       )
       .subscribe();
@@ -131,7 +140,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
         },
         () => {
           console.log('TechnicianAvailability: Real-time update received from availability_schedules, refetching data');
-          fetchAvailability();
+          debouncedRefetch();
         }
       )
       .subscribe();
@@ -147,12 +156,13 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
         },
         () => {
           console.log('TechnicianAvailability: Real-time update received from vacation_requests, refetching data');
-          fetchAvailability();
+          debouncedRefetch();
         }
       )
       .subscribe();
 
     return () => {
+      clearTimeout(refetchTimeout);
       supabase.removeChannel(availabilityChannel);
       supabase.removeChannel(schedulesChannel);
       supabase.removeChannel(vacationRequestsChannel);
@@ -172,16 +182,12 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
 
       // Handle warehouse status by inserting into availability_schedules
       if (status === 'warehouse') {
-        console.log('TechnicianAvailability: Setting warehouse status for', techId, 'on', dateStr);
-        
         // Get user's department
         const { data: profile } = await supabase
           .from('profiles')
           .select('department')
           .eq('id', techId)
           .single();
-
-        console.log('TechnicianAvailability: Profile data:', profile);
 
         const { error: scheduleError } = await supabase
           .from('availability_schedules')
@@ -195,8 +201,6 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
           }, {
             onConflict: 'user_id,department,date'
           });
-
-        console.log('TechnicianAvailability: Warehouse upsert result:', { error: scheduleError });
 
         if (scheduleError) {
           console.error('TechnicianAvailability: Error updating warehouse status:', scheduleError);
