@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion } from "framer-motion";
 import { Calendar, MapPin, Sparkles, Zap, Building2 } from "lucide-react";
 import { EventData } from "@/types/hoja-de-ruta";
+import { PlacesAutocomplete } from "@/components/maps/PlacesAutocomplete";
+import type { PlaceResultNormalized } from "@/types/places";
 
 interface ModernEventSectionProps {
   eventData: EventData;
@@ -30,6 +32,22 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
   jobDetails,
   onAutoPopulate,
 }) => {
+  const handleVenueSelect = (place: PlaceResultNormalized) => {
+    setEventData(prev => ({
+      ...prev,
+      venue: {
+        ...prev.venue,
+        name: place.name || place.formatted_address,
+        address: place.formatted_address,
+        coordinates: place.location,
+        place_id: place.place_id,
+        postal_code: place.postal_code,
+        locality: place.locality,
+        admin_area_level_1: place.admin_area_level_1,
+        country: place.country,
+      }
+    }));
+  };
   return (
     <div className="space-y-6">
       {/* Job Selection Card */}
@@ -147,18 +165,20 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
 
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="venue-name" className="text-sm font-medium">
-                  Nombre del Venue *
-                </Label>
-                <Input
-                  id="venue-name"
+                <PlacesAutocomplete
                   value={eventData.venue.name}
-                  onChange={(e) => setEventData(prev => ({
+                  onChange={(value) => setEventData(prev => ({
                     ...prev,
-                    venue: { ...prev.venue, name: e.target.value }
+                    venue: { ...prev.venue, name: value }
                   }))}
-                  placeholder="Ej. Palacio de Congresos"
-                  className="border-2 focus:border-purple-300"
+                  onSelect={handleVenueSelect}
+                  label="Nombre del Venue"
+                  placeholder="Buscar lugar o dirección…"
+                  required={true}
+                  initialPlaceId={eventData.venue.place_id}
+                  types={['establishment', 'point_of_interest']}
+                  allowManual={true}
+                  className=""
                 />
               </div>
 
