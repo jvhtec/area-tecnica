@@ -17,12 +17,22 @@ import { JobType } from "@/types/job";
 import { SimplifiedJobColorPicker } from "./SimplifiedJobColorPicker";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
 import { localInputToUTC } from "@/utils/timezoneUtils";
+import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
+import type { LocationDetails } from "@/hooks/useLocationManagement";
 
 // Simplified schema for better performance
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
-  location_id: z.string().min(1, "Location is required"),
+  location: z.object({
+    name: z.string().min(1, "Location is required"),
+    address: z.string().min(1, "Address is required"),
+    coordinates: z.object({
+      lat: z.number(),
+      lng: z.number(),
+    }).optional(),
+    place_id: z.string().optional(),
+  }),
   start_time: z.string().min(1, "Start time is required"),
   end_time: z.string().min(1, "End time is required"),
   job_type: z.enum(["single", "tour", "festival", "dryhire", "tourdate"] as const),
@@ -48,7 +58,8 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { getOrCreateLocation } = useLocationManagement();
+  const { getOrCreateLocationWithDetails } = useLocationManagement();
+  const [locationInput, setLocationInput] = useState("");
 
   const {
     register,
@@ -62,7 +73,12 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
     defaultValues: {
       title: "",
       description: "",
-      location_id: "",
+      location: {
+        name: "",
+        address: "",
+        coordinates: undefined,
+        place_id: undefined,
+      },
       start_time: new Date().toISOString().slice(0, 16),
       end_time: new Date().toISOString().slice(0, 16),
       job_type: "single" as JobType,
@@ -79,9 +95,20 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
     try {
       console.log("CreateJobDialog: Starting job creation process");
       
+      // Validate location data before processing
+      if (!values.location.name || !values.location.address) {
+        toast({
+          title: "Error",
+          description: "Please select a valid location",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
       // Start location resolution and time conversion in parallel
       const [locationId, startTimeUTC, endTimeUTC] = await Promise.all([
-        getOrCreateLocation(values.location_id),
+        getOrCreateLocationWithDetails(values.location as LocationDetails),
         Promise.resolve(localInputToUTC(values.start_time, values.timezone)),
         Promise.resolve(localInputToUTC(values.end_time, values.timezone))
       ]);
@@ -153,7 +180,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, getOrCreateLocation, queryClient, toast, reset, onOpenChange]);
+  }, [isSubmitting, getOrCreateLocationWithDetails, queryClient, toast, reset, onOpenChange]);
 
   const departments: Department[] = ["sound", "lights", "video"];
   const selectedDepartments = watch("departments") || [];
@@ -186,11 +213,23 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
           </div>
 
           <div className="space-y-2">
-            <Label>Location</Label>
-            <Input {...register("location_id")} placeholder="Enter location" />
-            {errors.location_id && (
+            <PlaceAutocomplete
+              value={locationInput}
+              onSelect={(result) => {
+                setLocationInput(result.name);
+                setValue("location", {
+                  name: result.name,
+                  address: result.address,
+                  coordinates: result.coordinates,
+                  place_id: undefined, // PlaceAutocomplete doesn't provide place_id
+                });
+              }}
+              placeholder="Enter venue location"
+              label="Location"
+            />
+            {errors.location && (
               <p className="text-sm text-destructive">
-                {errors.location_id.message as string}
+                {errors.location.name?.message as string}
               </p>
             )}
           </div>
