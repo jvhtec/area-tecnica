@@ -64,11 +64,6 @@ export interface EventData {
       lat: number;
       lng: number;
     };
-    place_id?: string;
-    postal_code?: string;
-    locality?: string;
-    admin_area_level_1?: string;
-    country?: string;
     images?: { image_path: string; image_type: string }[];
   };
   contacts: { name: string; role: string; phone: string }[];

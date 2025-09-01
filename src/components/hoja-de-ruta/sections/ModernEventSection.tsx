@@ -8,8 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion } from "framer-motion";
 import { Calendar, MapPin, Sparkles, Zap, Building2 } from "lucide-react";
 import { EventData } from "@/types/hoja-de-ruta";
-import { PlacesAutocomplete } from "@/components/maps/PlacesAutocomplete";
-import type { PlaceResultNormalized } from "@/types/places";
 
 interface ModernEventSectionProps {
   eventData: EventData;
@@ -32,27 +30,6 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
   jobDetails,
   onAutoPopulate,
 }) => {
-  const handleVenueSelect = (place: PlaceResultNormalized) => {
-    console.log('ModernEventSection: handleVenueSelect called with place:', place);
-    setEventData(prev => {
-      const updatedData = {
-        ...prev,
-        venue: {
-          ...prev.venue,
-          name: place.name || place.formatted_address,
-          address: place.formatted_address,
-          coordinates: place.location,
-          place_id: place.place_id,
-          postal_code: place.postal_code,
-          locality: place.locality,
-          admin_area_level_1: place.admin_area_level_1,
-          country: place.country,
-        }
-      };
-      console.log('ModernEventSection: Updated eventData.venue:', updatedData.venue);
-      return updatedData;
-    });
-  };
   return (
     <div className="space-y-6">
       {/* Job Selection Card */}
@@ -170,20 +147,18 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
 
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
-                <PlacesAutocomplete
+                <Label htmlFor="venue-name" className="text-sm font-medium">
+                  Nombre del Venue *
+                </Label>
+                <Input
+                  id="venue-name"
                   value={eventData.venue.name}
-                  onChange={(value) => setEventData(prev => ({
+                  onChange={(e) => setEventData(prev => ({
                     ...prev,
-                    venue: { ...prev.venue, name: value }
+                    venue: { ...prev.venue, name: e.target.value }
                   }))}
-                  onSelect={handleVenueSelect}
-                  label="Nombre del Venue"
-                  placeholder="Buscar lugar o dirección…"
-                  required={true}
-                  initialPlaceId={eventData.venue.place_id}
-                  types={['establishment', 'point_of_interest']}
-                  allowManual={true}
-                  className=""
+                  placeholder="Ej. Palacio de Congresos"
+                  className="border-2 focus:border-purple-300"
                 />
               </div>
 
@@ -193,18 +168,14 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
                 </Label>
                 <Input
                   id="venue-address"
-                  value={eventData.venue.address || ''}
+                  value={eventData.venue.address}
                   onChange={(e) => setEventData(prev => ({
                     ...prev,
                     venue: { ...prev.venue, address: e.target.value }
                   }))}
                   placeholder="Ej. Calle Mayor 123, Madrid"
                   className="border-2 focus:border-purple-300"
-                  readOnly
                 />
-                <p className="text-xs text-muted-foreground">
-                  Se completa automáticamente al seleccionar un venue
-                </p>
               </div>
             </div>
 

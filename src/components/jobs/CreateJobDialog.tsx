@@ -17,9 +17,8 @@ import { JobType } from "@/types/job";
 import { SimplifiedJobColorPicker } from "./SimplifiedJobColorPicker";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
 import { localInputToUTC } from "@/utils/timezoneUtils";
-import { PlacesAutocomplete } from "@/components/maps/PlacesAutocomplete";
+import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import type { LocationDetails } from "@/hooks/useLocationManagement";
-import type { PlaceResultNormalized } from "@/types/places";
 
 // Simplified schema for better performance
 const formSchema = z.object({
@@ -61,7 +60,6 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { getOrCreateLocationWithDetails } = useLocationManagement();
   const [locationInput, setLocationInput] = useState("");
-  const [selectedLocationDetails, setSelectedLocationDetails] = useState<LocationDetails | null>(null);
 
   const {
     register,
@@ -194,31 +192,6 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
     setValue("departments", updatedDepartments);
   }, [selectedDepartments, setValue]);
 
-  const handleLocationInputChange = (value: string) => {
-    console.log('CreateJobDialog: Location input changed to:', value);
-    setLocationInput(value);
-  };
-
-  const handleLocationSelect = (result: PlaceResultNormalized) => {
-    console.log('CreateJobDialog: Location selected:', result);
-    const locationDetails: LocationDetails = {
-      name: result.name || result.formatted_address,
-      address: result.formatted_address,
-      coordinates: result.location.lat !== 0 && result.location.lng !== 0 ? result.location : undefined,
-      place_id: result.place_id || undefined,
-    };
-    
-    setSelectedLocationDetails(locationDetails);
-    setLocationInput(result.name || result.formatted_address);
-    
-    setValue("location", {
-      name: locationDetails.name,
-      address: locationDetails.address,
-      coordinates: locationDetails.coordinates,
-      place_id: locationDetails.place_id,
-    });
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible">
@@ -240,14 +213,19 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
           </div>
 
           <div className="space-y-2">
-            <PlacesAutocomplete
+            <PlaceAutocomplete
               value={locationInput}
-              onChange={handleLocationInputChange}
-              onSelect={handleLocationSelect}
-              placeholder="Search location, venue or address…"
+              onSelect={(result) => {
+                setLocationInput(result.name);
+                setValue("location", {
+                  name: result.name,
+                  address: result.address,
+                  coordinates: result.coordinates,
+                  place_id: undefined, // PlaceAutocomplete doesn't provide place_id
+                });
+              }}
+              placeholder="Enter venue location"
               label="Location"
-              required
-              allowManual={true}
             />
             {errors.location && (
               <p className="text-sm text-destructive">
