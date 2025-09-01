@@ -10,7 +10,7 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
-import { Calendar, Plane, Stethoscope } from 'lucide-react';
+import { Calendar, Plane, Stethoscope, CalendarOff } from 'lucide-react';
 
 interface TechContextMenuProps {
   children: React.ReactNode;
@@ -21,7 +21,7 @@ interface TechContextMenuProps {
     department: string | null;
   };
   date: Date;
-  onAvailabilityChange: (techId: string, status: 'vacation' | 'travel' | 'sick', date: Date) => void;
+  onAvailabilityChange: (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off', date: Date) => void;
 }
 
 export const TechContextMenu: React.FC<TechContextMenuProps> = ({
@@ -30,7 +30,7 @@ export const TechContextMenu: React.FC<TechContextMenuProps> = ({
   date,
   onAvailabilityChange,
 }) => {
-  const handleUnavailable = (reason: 'vacation' | 'travel' | 'sick') => {
+  const handleUnavailable = (reason: 'vacation' | 'travel' | 'sick' | 'day_off') => {
     onAvailabilityChange(technician.id, reason, date);
   };
 
@@ -57,6 +57,10 @@ export const TechContextMenu: React.FC<TechContextMenuProps> = ({
             <ContextMenuItem onClick={() => handleUnavailable('sick')}>
               <Stethoscope className="mr-2 h-4 w-4" />
               Sick Day
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => handleUnavailable('day_off')}>
+              <CalendarOff className="mr-2 h-4 w-4" />
+              Day Off
             </ContextMenuItem>
           </ContextMenuSubContent>
         </ContextMenuSub>
