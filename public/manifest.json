@@ -1,0 +1,21 @@
+{
+  "name": "Sector Pro",
+  "short_name": "Sector Pro",
+  "description": "Professional Event Management",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/lovable-uploads/2f12a6ef-587b-4049-ad53-d83fb94064e3.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/lovable-uploads/2f12a6ef-587b-4049-ad53-d83fb94064e3.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
