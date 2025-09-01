@@ -194,6 +194,31 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
     setValue("departments", updatedDepartments);
   }, [selectedDepartments, setValue]);
 
+  const handleLocationInputChange = (value: string) => {
+    console.log('CreateJobDialog: Location input changed to:', value);
+    setLocationInput(value);
+  };
+
+  const handleLocationSelect = (result: PlaceResultNormalized) => {
+    console.log('CreateJobDialog: Location selected:', result);
+    const locationDetails: LocationDetails = {
+      name: result.name || result.formatted_address,
+      address: result.formatted_address,
+      coordinates: result.location.lat !== 0 && result.location.lng !== 0 ? result.location : undefined,
+      place_id: result.place_id || undefined,
+    };
+    
+    setSelectedLocationDetails(locationDetails);
+    setLocationInput(result.name || result.formatted_address);
+    
+    setValue("location", {
+      name: locationDetails.name,
+      address: locationDetails.address,
+      coordinates: locationDetails.coordinates,
+      place_id: locationDetails.place_id,
+    });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible">
@@ -217,21 +242,8 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
           <div className="space-y-2">
             <PlacesAutocomplete
               value={locationInput}
-              onChange={setLocationInput}
-              onSelect={(result: PlaceResultNormalized) => {
-                setSelectedLocationDetails({
-                  name: result.name || result.formatted_address,
-                  address: result.formatted_address,
-                  coordinates: result.location.lat !== 0 && result.location.lng !== 0 ? result.location : undefined,
-                  place_id: result.place_id || undefined,
-                });
-                setValue("location", {
-                  name: result.name || result.formatted_address,
-                  address: result.formatted_address,
-                  coordinates: result.location.lat !== 0 && result.location.lng !== 0 ? result.location : undefined,
-                  place_id: result.place_id || undefined,
-                });
-              }}
+              onChange={handleLocationInputChange}
+              onSelect={handleLocationSelect}
               placeholder="Search location, venue or address…"
               label="Location"
               required
