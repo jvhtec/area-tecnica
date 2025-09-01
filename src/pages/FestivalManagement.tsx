@@ -55,6 +55,10 @@ const FestivalManagement = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [artistCount, setArtistCount] = useState(0);
   const [jobDates, setJobDates] = useState<Date[]>([]);
+  const [venueData, setVenueData] = useState<{
+    address?: string;
+    coordinates?: { lat: number; lng: number };
+  }>({});
   const [isPrinting, setIsPrinting] = useState(false);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const { userRole } = useAuth();
@@ -117,6 +121,27 @@ const FestivalManagement = () => {
 
         setJob(jobData);
         setArtistCount(artistCount || 0);
+
+        // Fetch venue data from hoja_de_ruta table
+        const { data: hojaData, error: hojaError } = await supabase
+          .from("hoja_de_ruta")
+          .select("venue_address, venue_latitude, venue_longitude")
+          .eq("job_id", jobId)
+          .single();
+
+        if (!hojaError && hojaData) {
+          setVenueData({
+            address: hojaData.venue_address || undefined,
+            coordinates: hojaData.venue_latitude && hojaData.venue_longitude 
+              ? { 
+                  lat: hojaData.venue_latitude, 
+                  lng: hojaData.venue_longitude 
+                }
+              : undefined
+          });
+        } else {
+          console.log("No venue data found in hoja_de_ruta for this job");
+        }
 
         const startDate = new Date(jobData.start_time);
         const endDate = new Date(jobData.end_time);
@@ -401,7 +426,7 @@ const FestivalManagement = () => {
           {/* Add Weather Section */}
           <FestivalWeatherSection
             jobId={jobId}
-            venue={{ address: job?.description }} // Using description as venue address fallback
+            venue={venueData}
             jobDates={jobDates}
           />
         </>
