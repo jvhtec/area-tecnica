@@ -6,6 +6,7 @@ import { PrintDialog, PrintSettings } from "@/components/dashboard/PrintDialog";
 import { format, addDays, subDays, isToday, isSameDay, isWithinInterval } from "date-fns";
 import { cn } from "@/lib/utils";
 import { HouseTechBadge } from "./HouseTechBadge";
+import { TechContextMenu } from "./TechContextMenu";
 import { usePersonalCalendarData } from "./hooks/usePersonalCalendarData";
 import { useTechnicianAvailability } from "./hooks/useTechnicianAvailability";
 
@@ -383,27 +384,31 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
                 const statusText = techAssignment ? "On job" : availabilityStatus ? `Unavailable (${availabilityStatus})` : "In warehouse";
 
                 return (
-                  <div
+                  <TechContextMenu
                     key={tech.id}
-                    className="border rounded-md p-3 flex items-start justify-between gap-3 hover:bg-accent/50 transition-colors"
+                    technician={tech}
+                    date={currentDate}
+                    onAvailabilityChange={(techId, status, date) => handleAvailabilityChange(techId, status, date)}
                   >
-                    <div className="min-w-0">
-                      <div className="font-medium truncate">{techName}</div>
-                      {tech.department && (
-                        <div className="text-sm text-muted-foreground capitalize truncate">
-                          {tech.department}
-                        </div>
-                      )}
+                    <div className="border rounded-md p-3 flex items-start justify-between gap-3 hover:bg-accent/50 transition-colors cursor-pointer">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{techName}</div>
+                        {tech.department && (
+                          <div className="text-sm text-muted-foreground capitalize truncate">
+                            {tech.department}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-sm font-medium text-right">
+                        <span className={cn(
+                          techAssignment ? "text-green-600" : 
+                          availabilityStatus ? "text-red-600" : "text-muted-foreground"
+                        )}>
+                          {statusText}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-sm font-medium text-right">
-                      <span className={cn(
-                        techAssignment ? "text-green-600" : 
-                        availabilityStatus ? "text-red-600" : "text-muted-foreground"
-                      )}>
-                        {statusText}
-                      </span>
-                    </div>
-                  </div>
+                  </TechContextMenu>
                 );
               })}
             </div>
