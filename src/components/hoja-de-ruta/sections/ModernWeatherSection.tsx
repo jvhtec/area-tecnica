@@ -21,16 +21,23 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
   const [lastFetch, setLastFetch] = useState<Date | null>(null);
 
   const fetchWeather = async () => {
-    if (!eventData.eventDates || !eventData.venue.address) {
-      setError("Se requieren fechas del evento y dirección del venue para obtener el clima");
+    if (!eventData.eventDates || (!eventData.venue.address && !eventData.venue.coordinates)) {
+      setError("Se requieren fechas del evento y ubicación del venue para obtener el clima");
       return;
     }
+
+    console.log('WeatherSection: Fetching weather for:', {
+      eventDates: eventData.eventDates,
+      venue: eventData.venue
+    });
 
     setIsLoading(true);
     setError(null);
 
     try {
       const weatherData = await getWeatherForJob(eventData.venue, eventData.eventDates);
+      
+      console.log('WeatherSection: Received weather data:', weatherData);
       
       setEventData(prev => ({
         ...prev,
@@ -52,10 +59,19 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
 
   // Auto-fetch weather when event data changes
   useEffect(() => {
-    if (eventData.eventDates && eventData.venue.address && !eventData.weather && !isLoading) {
+    console.log('WeatherSection: Checking if should fetch weather:', {
+      eventDates: eventData.eventDates,
+      address: eventData.venue.address,
+      coordinates: eventData.venue.coordinates,
+      hasWeather: !!eventData.weather,
+      isLoading
+    });
+    
+    if (eventData.eventDates && (eventData.venue.address || eventData.venue.coordinates) && !eventData.weather && !isLoading) {
+      console.log('WeatherSection: Auto-fetching weather...');
       fetchWeather();
     }
-  }, [eventData.eventDates, eventData.venue.address]);
+  }, [eventData.eventDates, eventData.venue.address, eventData.venue.coordinates?.lat, eventData.venue.coordinates?.lng]);
 
   const hasWeatherData = eventData.weather && eventData.weather.length > 0;
 
@@ -81,7 +97,7 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
               )}
               <Button
                 onClick={fetchWeather}
-                disabled={isLoading || !eventData.eventDates || !eventData.venue.address}
+                disabled={isLoading || !eventData.eventDates || (!eventData.venue.address && !eventData.venue.coordinates)}
                 variant="outline"
                 size="sm"
                 className="text-sky-600 border-sky-300 hover:bg-sky-50"
@@ -172,8 +188,8 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
             <div className="text-center py-6 text-gray-500">
               <CloudSun className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p className="text-sm">
-                {!eventData.eventDates || !eventData.venue.address
-                  ? "Complete las fechas del evento y la dirección del venue para ver la previsión meteorológica"
+                {!eventData.eventDates || (!eventData.venue.address && !eventData.venue.coordinates)
+                  ? "Complete las fechas del evento y el nombre del venue en la sección 'Información del Evento' para ver la previsión meteorológica automáticamente"
                   : "Haga clic en actualizar para obtener la previsión meteorológica"
                 }
               </p>

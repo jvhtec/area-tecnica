@@ -35,11 +35,13 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
   const [dragOver, setDragOver] = useState(false);
   const [staticMapUrl, setStaticMapUrl] = useState<string | null>(null);
 
+  // Update coordinates when eventData changes
   useEffect(() => {
-    if (staticMapUrl) {
-      handleVenueMapUrl(staticMapUrl);
+    if (eventData.venue.coordinates && eventData.venue.address) {
+      // Sync with coordinates from venue selection in EventDetailsSection
+      console.log('VenueLocationSection: Syncing with venue data:', eventData.venue);
     }
-  }, [staticMapUrl, handleVenueMapUrl]);
+  }, [eventData.venue.coordinates, eventData.venue.address]);
 
   const handleLocationUpdate = (coordinates: { lat: number; lng: number }, address: string) => {
     setEventData(prev => ({
@@ -248,6 +250,12 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
           <CardContent>
             {eventData.venue.address || eventData.venue.coordinates ? (
               <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <MapPin className="w-4 h-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-700">
+                    {eventData.venue.name ? `${eventData.venue.name} - Ubicación confirmada` : 'Ubicación confirmada'}
+                  </span>
+                </div>
                 <GoogleMap
                   address={eventData.venue.address}
                   coordinates={eventData.venue.coordinates}
@@ -272,7 +280,7 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
               <div className="text-center py-8 text-muted-foreground">
                 <MapPin className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                 <p className="text-lg font-medium mb-2">No hay ubicación configurada</p>
-                <p className="text-sm mb-4">Haz clic en "Editar Ubicación" para agregar la dirección del venue</p>
+                <p className="text-sm mb-4">Complete el nombre del venue en la sección "Información del Evento" para ver el mapa aquí automáticamente</p>
                 <p className="text-xs text-blue-600">✓ Integración Google Maps habilitada</p>
               </div>
             )}

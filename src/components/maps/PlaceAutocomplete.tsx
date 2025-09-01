@@ -10,6 +10,7 @@ interface PlaceAutocompleteResult {
   name: string;
   address: string;
   coordinates?: { lat: number; lng: number };
+  place_id?: string;
 }
 
 interface PlaceAutocompleteProps {
@@ -80,21 +81,27 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
 
   const searchPlaces = async (query: string) => {
     if (!apiKey || !query || query.length < 2) {
+      console.log('PlacesAutocomplete: Search conditions not met:', { hasApiKey: !!apiKey, query, queryLength: query.length });
       setSuggestions([]);
       setShowSuggestions(false);
       return;
     }
 
+    console.log('PlacesAutocomplete: Searching for:', query);
+
     if (cacheRef.current[query]) {
+      console.log('PlacesAutocomplete: Using cached results for:', query);
       setSuggestions(cacheRef.current[query]);
       setShowSuggestions(true);
       return;
     }
 
     setIsLoading(true);
+    console.log('PlacesAutocomplete: Starting API search...');
 
     try {
       // Try Places Text Search first (good for establishments)
+      console.log('PlacesAutocomplete: Trying text search...');
       const textSearchRes = await fetch('https://places.googleapis.com/v1/places:searchText', {
         method: 'POST',
         headers: {
@@ -108,14 +115,18 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
         }),
       });
 
+      console.log('PlacesAutocomplete: Text search response status:', textSearchRes.status);
+
       if (textSearchRes.ok) {
         const data = await textSearchRes.json();
+        console.log('PlacesAutocomplete: Text search data:', data);
         if (data.places && data.places.length > 0) {
           const results: PredictionItem[] = data.places.map((p: any) => ({
             place_id: p.id,
             name: p.displayName?.text || p.formattedAddress,
             formatted_address: p.formattedAddress || '',
           }));
+          console.log('PlacesAutocomplete: Text search results:', results);
           cacheRef.current[query] = results;
           setSuggestions(results);
           setShowSuggestions(true);
@@ -125,6 +136,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
       }
 
       // Fallback to Autocomplete API for broader matches (establishments + addresses)
+      console.log('PlacesAutocomplete: Trying autocomplete...');
       const acRes = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
         method: 'POST',
         headers: {
@@ -138,8 +150,11 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
           }),
       });
 
+      console.log('PlacesAutocomplete: Autocomplete response status:', acRes.status);
+
       if (acRes.ok) {
         const data = await acRes.json();
+        console.log('PlacesAutocomplete: Autocomplete data:', data);
         const results: PredictionItem[] = (data.suggestions || [])
           .filter((s: any) => s.placePrediction)
           .map((s: any) => ({
@@ -147,6 +162,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
             name: s.placePrediction.structuredFormat?.mainText?.text || s.placePrediction.text?.text,
             formatted_address: s.placePrediction.structuredFormat?.secondaryText?.text || '',
           }));
+        console.log('PlacesAutocomplete: Autocomplete results:', results);
         cacheRef.current[query] = results;
         setSuggestions(results);
         setShowSuggestions(results.length > 0);
@@ -165,10 +181,14 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   };
 
   const getPlaceDetails = async (placeId: string, fallbackName: string, fallbackAddress?: string) => {
+    console.log('PlacesAutocomplete: Getting place details for:', { placeId, fallbackName, fallbackAddress });
+    
     if (!apiKey) {
-      onSelect({ name: fallbackName, address: fallbackAddress || '' });
+      console.log('PlacesAutocomplete: No API key, using fallback data');
+      onSelect({ name: fallbackName, address: fallbackAddress || '', place_id: placeId });
       return;
     }
+    
     try {
       const res = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
         headers: {
@@ -176,22 +196,34 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
           'X-Goog-FieldMask': 'id,displayName,formattedAddress,location',
         },
       });
+      
+      console.log('PlacesAutocomplete: Place details response status:', res.status);
+      
       if (!res.ok) throw new Error(`Place Details API error: ${res.status}`);
+      
       const place = await res.json();
+      console.log('PlacesAutocomplete: Place details data:', place);
+      
       const coordinates = place.location
         ? { lat: place.location.latitude, lng: place.location.longitude }
         : undefined;
+        
       const result: PlaceAutocompleteResult = {
         name: place.displayName?.text || fallbackName,
         address: place.formattedAddress || fallbackAddress || '',
         coordinates,
+        place_id: placeId,
       };
+      
+      console.log('PlacesAutocomplete: Calling onSelect with:', result);
       onSelect(result);
       setInputValue(result.name);
       setShowSuggestions(false);
     } catch (err) {
       console.error('Error fetching place details:', err);
-      onSelect({ name: fallbackName, address: fallbackAddress || '' });
+      const fallbackResult = { name: fallbackName, address: fallbackAddress || '', place_id: placeId };
+      console.log('PlacesAutocomplete: Using fallback result:', fallbackResult);
+      onSelect(fallbackResult);
       setInputValue(fallbackName);
       setShowSuggestions(false);
     }
@@ -199,6 +231,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value;
+    console.log('PlacesAutocomplete: Input changed:', v);
     setInputValue(v);
     // Debounce
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
@@ -206,6 +239,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   };
 
   const handleSelect = (item: PredictionItem) => {
+    console.log('PlacesAutocomplete: Item selected:', item);
     getPlaceDetails(item.place_id, item.name, item.formatted_address);
   };
 

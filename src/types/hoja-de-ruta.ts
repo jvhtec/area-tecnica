@@ -64,6 +64,7 @@ export interface EventData {
       lat: number;
       lng: number;
     };
+    place_id?: string;
     images?: { image_path: string; image_type: string }[];
   };
   contacts: { name: string; role: string; phone: string }[];

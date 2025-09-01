@@ -22,6 +22,7 @@ import { ContactsDialog } from "@/components/hoja-de-ruta/dialogs/ContactsDialog
 import { StaffDialog } from "@/components/hoja-de-ruta/dialogs/StaffDialog";
 import { TravelArrangementsDialog } from "@/components/hoja-de-ruta/dialogs/TravelArrangementsDialog";
 import { ModernAccommodationSection } from "@/components/hoja-de-ruta/sections/ModernAccommodationSection";
+import { ModernWeatherSection } from "@/components/hoja-de-ruta/sections/ModernWeatherSection";
 import { uploadPdfToJob } from "@/utils/hoja-de-ruta/pdf-upload";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -354,6 +355,7 @@ const EnhancedHojaDeRutaGenerator = () => {
             setEventData={setEventData}
             isLoadingJobs={isLoadingJobs}
             jobs={jobs}
+            onAutoPopulate={handleLoadJobData}
           />
 
           <div className="space-y-6">
@@ -368,6 +370,11 @@ const EnhancedHojaDeRutaGenerator = () => {
           </div>
 
           <VenueLocationSection
+            eventData={eventData}
+            setEventData={setEventData}
+          />
+
+          <ModernWeatherSection
             eventData={eventData}
             setEventData={setEventData}
           />
