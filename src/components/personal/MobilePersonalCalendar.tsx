@@ -168,23 +168,37 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
     let techsTravelling = 0;
     let techsSick = 0;
 
+    console.log('MobilePersonalCalendar: Calculating totals for', houseTechs.length, 'technicians');
+
     houseTechs.forEach(tech => {
       const hasAssignment = targetAssignments.some(
         assignment => assignment.technician_id === tech.id
       );
       const availabilityStatus = getAvailabilityStatus(tech.id, targetDate);
       const isUnavailable = !!availabilityStatus;
+      const shouldShow = shouldShowTechOnDay(tech, targetDate);
+
+      console.log(`MobilePersonalCalendar: Totals - ${tech.first_name} ${tech.last_name}:`, {
+        hasAssignment,
+        availabilityStatus,
+        isUnavailable,
+        shouldShow,
+        department: tech.department
+      });
 
       // Count warehouse overrides separately
       if (availabilityStatus === 'warehouse') {
         techsInWarehouse++;
+        console.log(`  -> Counted as warehouse (override)`);
       } else if (!hasAssignment && !isUnavailable) {
         // Default warehouse (available but not assigned)
         techsInWarehouse++;
+        console.log(`  -> Counted as warehouse (default)`);
       }
 
       if (hasAssignment && availabilityStatus !== 'warehouse') {
         techsOnJobs++;
+        console.log(`  -> Counted as on job`);
       }
 
       if (availabilityStatus === 'vacation') {
@@ -196,6 +210,15 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
       } else if (availabilityStatus === 'sick') {
         techsSick++;
       }
+    });
+
+    console.log('MobilePersonalCalendar: Final totals:', {
+      techsInWarehouse,
+      techsOnJobs,
+      techsOnVacation,
+      techsOnDaysOff,
+      techsTravelling,
+      techsSick,
     });
 
     return {
