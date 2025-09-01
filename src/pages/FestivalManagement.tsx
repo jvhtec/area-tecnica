@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { useFlexUuid } from "@/hooks/useFlexUuid";
 import { generateIndividualStagePDFs } from "@/utils/pdf/individualStagePdfGenerator";
+import { FestivalWeatherSection } from "@/components/festival/FestivalWeatherSection";
 
 interface FestivalJob {
   id: string;
@@ -339,62 +340,71 @@ const FestivalManagement = () => {
       </Card>
 
       {!isSchedulingRoute && !isArtistRoute && !isGearRoute && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/artists`)}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Artists
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{artistCount}</p>
-              <p className="text-sm text-muted-foreground">Total Artists</p>
-              <Button className="mt-4 w-full" onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/festival-management/${jobId}/artists`);
-              }}>
-                {isViewOnly ? "View Artists" : "Manage Artists"}
-              </Button>
-            </CardContent>
-          </Card>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/artists`)}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Artists
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{artistCount}</p>
+                <p className="text-sm text-muted-foreground">Total Artists</p>
+                <Button className="mt-4 w-full" onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/festival-management/${jobId}/artists`);
+                }}>
+                  {isViewOnly ? "View Artists" : "Manage Artists"}
+                </Button>
+              </CardContent>
+            </Card>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/gear`)}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Layout className="h-5 w-5" />
-                Stages & Gear
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">Manage stages and technical equipment</p>
-              <Button className="mt-4 w-full" onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/festival-management/${jobId}/gear`);
-              }}>
-                {isViewOnly ? "View Gear" : "Manage Gear"}
-              </Button>
-            </CardContent>
-          </Card>
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/gear`)}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Layout className="h-5 w-5" />
+                  Stages & Gear
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">Manage stages and technical equipment</p>
+                <Button className="mt-4 w-full" onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/festival-management/${jobId}/gear`);
+                }}>
+                  {isViewOnly ? "View Gear" : "Manage Gear"}
+                </Button>
+              </CardContent>
+            </Card>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/scheduling`)}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Scheduling
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">Manage shifts and staff assignments</p>
-              <Button className="mt-4 w-full" onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/festival-management/${jobId}/scheduling`);
-              }}>
-                {isViewOnly ? "View Schedule" : "Manage Schedule"}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/festival-management/${jobId}/scheduling`)}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Scheduling
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">Manage shifts and staff assignments</p>
+                <Button className="mt-4 w-full" onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/festival-management/${jobId}/scheduling`);
+                }}>
+                  {isViewOnly ? "View Schedule" : "Manage Schedule"}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+          
+          {/* Add Weather Section */}
+          <FestivalWeatherSection
+            jobId={jobId}
+            venue={{ address: job?.description }} // Using description as venue address fallback
+            jobDates={jobDates}
+          />
+        </>
       )}
       
       {isSchedulingRoute && (

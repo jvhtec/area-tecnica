@@ -32,6 +32,7 @@ export interface PrintOptions {
   includeMissingRiderReport: boolean;
   includeWiredMicNeeds: boolean;
   wiredMicNeedsStages: number[];
+  includeWeatherPrediction: boolean;
   generateIndividualStagePDFs: boolean;
 }
 
@@ -68,6 +69,7 @@ export const PrintOptionsDialog = ({
     includeMissingRiderReport: true,
     includeWiredMicNeeds: true,
     wiredMicNeedsStages: Array.from({ length: maxStages }, (_, i) => i + 1),
+    includeWeatherPrediction: true,
     generateIndividualStagePDFs: false
   });
 
@@ -128,6 +130,7 @@ export const PrintOptionsDialog = ({
     if (options.includeMissingRiderReport) selectedSections.push('Missing_Riders');
     if (options.includeArtistRequirements) selectedSections.push('Artist_Requirements');
     if (options.includeWiredMicNeeds) selectedSections.push('Wired_Mics');
+    if (options.includeWeatherPrediction) selectedSections.push('Weather');
 
     // If only one section is selected, make it more specific
     if (selectedSections.length === 1) {
@@ -877,6 +880,28 @@ export const PrintOptionsDialog = ({
               {options.includeWiredMicNeeds && maxStages > 1 && renderStageSelections('wiredMicNeedsStages')}
               <div className="pl-6 text-sm text-muted-foreground dark:text-gray-300">
                 Detailed microphone inventory requirements and peak usage analysis
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="weather-prediction"
+                  checked={options.includeWeatherPrediction}
+                  onCheckedChange={(checked) => 
+                    setOptions(prev => ({ ...prev, includeWeatherPrediction: checked as boolean }))
+                  }
+                  className="data-[state=checked]:bg-primary data-[state=checked]:border-primary dark:border-gray-500 dark:data-[state=checked]:bg-primary dark:data-[state=checked]:border-primary"
+                />
+                <Label 
+                  htmlFor="weather-prediction"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 dark:text-gray-200"
+                >
+                  Include Weather Prediction
+                </Label>
+              </div>
+              <div className="pl-6 text-sm text-muted-foreground dark:text-gray-300">
+                Weather forecast for festival dates from Open-Meteo
               </div>
             </div>
 

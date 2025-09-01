@@ -12,6 +12,7 @@ import { generateTableOfContents } from './tocGenerator';
 import { mergePDFs } from './pdfMerge';
 import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArtistsByDateAndStage } from '../wiredMicrophoneNeedsPdfExport';
+import { generateWeatherPDF, WeatherPdfData } from './weatherPdfGenerator';
 
 // Helper function to sort artists chronologically across all dates
 const sortArtistsChronologically = (artists: any[]) => {
@@ -81,6 +82,7 @@ export const generateAndMergeFestivalPDFs = async (
   let infrastructureTablePdf: Blob | null = null;
   let missingRiderReportPdf: Blob | null = null;
   let wiredMicMatrixPdf: Blob | null = null;
+  let weatherPdf: Blob | null = null;
   
   try {
     const { data: artists, error: artistError } = await supabase
@@ -580,6 +582,55 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
+    // Generate weather PDF if requested
+    if (options.includeWeatherPrediction) {
+      console.log("Starting weather PDF generation");
+      
+      try {
+        // Fetch job details to get location info
+        const { data: jobData, error: jobError } = await supabase
+          .from("jobs")
+          .select("*")
+          .eq("id", jobId)
+          .single();
+        
+        if (jobError) {
+          console.error("Error fetching job data for weather:", jobError);
+        } else {
+          // Get job dates
+          const startDate = new Date(jobData.start_time);
+          const endDate = new Date(jobData.end_time);
+          const jobDates = [];
+          
+          const currentDate = new Date(startDate);
+          while (currentDate <= endDate) {
+            jobDates.push(new Date(currentDate));
+            currentDate.setDate(currentDate.getDate() + 1);
+          }
+          
+          const weatherData: WeatherPdfData = {
+            jobTitle: jobTitle || 'Festival',
+            logoUrl,
+            venue: {
+              address: jobData.description // Using description as venue address fallback
+            },
+            jobDates
+          };
+          
+          const weatherPdfBlob = await generateWeatherPDF(weatherData);
+          
+          if (weatherPdfBlob && weatherPdfBlob.size > 0) {
+            console.log(`Generated weather PDF, size: ${weatherPdfBlob.size} bytes`);
+            weatherPdf = weatherPdfBlob;
+          } else {
+            console.log('No weather data available, skipping weather PDF');
+          }
+        }
+      } catch (err) {
+        console.error('Error generating weather PDF:', err);
+      }
+    }
+    
     // Generate Missing Rider Report if option is selected
     if (options.includeMissingRiderReport) {
       console.log("Processing Missing Rider Report generation");
@@ -690,6 +741,9 @@ export const generateAndMergeFestivalPDFs = async (
     if (options.includeWiredMicNeeds && wiredMicMatrixPdf) {
       tocSections.push({ title: "Wired Microphone Requirements Matrix", pageCount: 1 });
     }
+    if (options.includeWeatherPrediction && weatherPdf) {
+      tocSections.push({ title: "Weather Forecast", pageCount: 1 });
+    }
     if (options.includeMissingRiderReport && missingRiderReportPdf) {
       tocSections.push({ title: "Missing Rider Report", pageCount: 1 });
     }
@@ -712,8 +766,9 @@ export const generateAndMergeFestivalPDFs = async (
       ...(options.includeRfIemTable && rfIemTablePdf ? [rfIemTablePdf] : []),  // 4. RF and IEM Overview
       ...(options.includeInfrastructureTable && infrastructureTablePdf ? [infrastructureTablePdf] : []),  // 5. Infrastructure Needs Overview
       ...(options.includeWiredMicNeeds && wiredMicMatrixPdf ? [wiredMicMatrixPdf] : []),  // 6. Wired Microphone Matrix
-      ...(options.includeMissingRiderReport && missingRiderReportPdf ? [missingRiderReportPdf] : []),  // 7. Missing Rider Report
-      ...(options.includeArtistRequirements ? individualArtistPdfs : [])  // 8. Individual Artist Requirements
+      ...(options.includeWeatherPrediction && weatherPdf ? [weatherPdf] : []),  // 7. Weather Forecast
+      ...(options.includeMissingRiderReport && missingRiderReportPdf ? [missingRiderReportPdf] : []),  // 8. Missing Rider Report
+      ...(options.includeArtistRequirements ? individualArtistPdfs : [])  // 9. Individual Artist Requirements
     ];
     
     console.log(`Total PDFs to merge: ${selectedPdfs.length}`);
@@ -726,6 +781,7 @@ export const generateAndMergeFestivalPDFs = async (
       rfIemTablePdf: rfIemTablePdf ? 1 : 0,
       infrastructureTablePdf: infrastructureTablePdf ? 1 : 0,
       wiredMicMatrixPdf: wiredMicMatrixPdf ? 1 : 0,
+      weatherPdf: weatherPdf ? 1 : 0,
       missingRiderReportPdf: missingRiderReportPdf ? 1 : 0,
       individualArtistPdfs: individualArtistPdfs.length
     });
@@ -739,6 +795,7 @@ export const generateAndMergeFestivalPDFs = async (
       ...(rfIemTablePdf ? [rfIemTablePdf] : []),
       ...(infrastructureTablePdf ? [infrastructureTablePdf] : []),
       ...(wiredMicMatrixPdf ? [wiredMicMatrixPdf] : []),
+      ...(weatherPdf ? [weatherPdf] : []),
       ...(missingRiderReportPdf ? [missingRiderReportPdf] : []),
       ...individualArtistPdfs
     ];
