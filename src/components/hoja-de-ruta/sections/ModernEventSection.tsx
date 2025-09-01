@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion } from "framer-motion";
 import { Calendar, MapPin, Sparkles, Zap, Building2 } from "lucide-react";
 import { EventData } from "@/types/hoja-de-ruta";
+import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 
 interface ModernEventSectionProps {
   eventData: EventData;
@@ -30,6 +31,21 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
   jobDetails,
   onAutoPopulate,
 }) => {
+  const handleVenueSelect = (place: any) => {
+    setEventData(prev => ({
+      ...prev,
+      venue: {
+        ...prev.venue,
+        name: place.name,
+        address: place.address,
+        coordinates: place.coordinates ? {
+          lat: place.coordinates.lat,
+          lng: place.coordinates.lng
+        } : prev.venue.coordinates
+      }
+    }));
+  };
+
   return (
     <div className="space-y-6">
       {/* Job Selection Card */}
@@ -150,13 +166,9 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
                 <Label htmlFor="venue-name" className="text-sm font-medium">
                   Nombre del Venue *
                 </Label>
-                <Input
-                  id="venue-name"
+                <PlaceAutocomplete
                   value={eventData.venue.name}
-                  onChange={(e) => setEventData(prev => ({
-                    ...prev,
-                    venue: { ...prev.venue, name: e.target.value }
-                  }))}
+                  onSelect={handleVenueSelect}
                   placeholder="Ej. Palacio de Congresos"
                   className="border-2 focus:border-purple-300"
                 />
