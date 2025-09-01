@@ -17,8 +17,9 @@ import { JobType } from "@/types/job";
 import { SimplifiedJobColorPicker } from "./SimplifiedJobColorPicker";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
 import { localInputToUTC } from "@/utils/timezoneUtils";
-import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
+import { PlacesAutocomplete } from "@/components/maps/PlacesAutocomplete";
 import type { LocationDetails } from "@/hooks/useLocationManagement";
+import type { PlaceResultNormalized } from "@/types/places";
 
 // Simplified schema for better performance
 const formSchema = z.object({
@@ -60,6 +61,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { getOrCreateLocationWithDetails } = useLocationManagement();
   const [locationInput, setLocationInput] = useState("");
+  const [selectedLocationDetails, setSelectedLocationDetails] = useState<LocationDetails | null>(null);
 
   const {
     register,
@@ -213,19 +215,27 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
           </div>
 
           <div className="space-y-2">
-            <PlaceAutocomplete
+            <PlacesAutocomplete
               value={locationInput}
-              onSelect={(result) => {
-                setLocationInput(result.name);
+              onChange={setLocationInput}
+              onSelect={(result: PlaceResultNormalized) => {
+                setSelectedLocationDetails({
+                  name: result.name || result.formatted_address,
+                  address: result.formatted_address,
+                  coordinates: result.location.lat !== 0 && result.location.lng !== 0 ? result.location : undefined,
+                  place_id: result.place_id || undefined,
+                });
                 setValue("location", {
-                  name: result.name,
-                  address: result.address,
-                  coordinates: result.coordinates,
-                  place_id: undefined, // PlaceAutocomplete doesn't provide place_id
+                  name: result.name || result.formatted_address,
+                  address: result.formatted_address,
+                  coordinates: result.location.lat !== 0 && result.location.lng !== 0 ? result.location : undefined,
+                  place_id: result.place_id || undefined,
                 });
               }}
-              placeholder="Enter venue location"
+              placeholder="Search location, venue or address…"
               label="Location"
+              required
+              allowManual={true}
             />
             {errors.location && (
               <p className="text-sm text-destructive">

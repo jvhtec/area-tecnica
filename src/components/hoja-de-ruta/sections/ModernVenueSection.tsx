@@ -7,8 +7,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { MapPin, Upload, X, Image as ImageIcon, Map, Plus, Settings } from "lucide-react";
 import { EventData, Images, ImagePreviews } from "@/types/hoja-de-ruta";
 import { GoogleMap } from "@/components/maps/GoogleMap";
-import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
-import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
+import { PlacesAutocomplete } from "@/components/maps/PlacesAutocomplete";
+import type { PlaceResultNormalized } from "@/types/places";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface ModernVenueSectionProps {
@@ -192,38 +192,37 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>
-                      <Label htmlFor="venue-name">Nombre del Venue</Label>
-                      <PlaceAutocomplete
-                        value={eventData.venue.name || ''}
-                        onSelect={({ name, address, coordinates }) =>
+                      <Label htmlFor="venue-location">Venue Location</Label>
+                      <PlacesAutocomplete
+                        value={eventData.venue.address || eventData.venue.name || ''}
+                        onChange={(value) => {
+                          // Handle text input changes
                           setEventData(prev => ({
                             ...prev,
                             venue: {
                               ...prev.venue,
-                              name: name || prev.venue.name,
-                              address: address || prev.venue.address,
-                              coordinates: coordinates || prev.venue.coordinates,
-                            }
-                          }))
-                        }
-                        placeholder="Buscar venue o lugar..."
-                      />
-                    </div>
-                    <div>
-                      <Label>Dirección del Venue</Label>
-                      <AddressAutocomplete
-                        value={eventData.venue.address || ''}
-                        onChange={(address, coordinates) => {
-                          setEventData(prev => ({
-                            ...prev,
-                            venue: {
-                              ...prev.venue,
-                              address,
-                              coordinates
+                              name: prev.venue.name || value,
+                              address: value
                             }
                           }));
                         }}
-                        placeholder="Buscar dirección..."
+                        onSelect={(result: PlaceResultNormalized) => {
+                          setEventData(prev => ({
+                            ...prev,
+                            venue: {
+                              ...prev.venue,
+                              name: result.name || prev.venue.name || result.formatted_address,
+                              address: result.formatted_address,
+                              coordinates: result.location.lat !== 0 && result.location.lng !== 0 ? result.location : undefined
+                            }
+                          }));
+                          if (result.location.lat !== 0 && result.location.lng !== 0) {
+                            handleLocationUpdate(result.location, result.formatted_address);
+                          }
+                        }}
+                        placeholder="Search venue name or address…"
+                        allowManual={true}
+                        className="mb-4"
                       />
                     </div>
                     {(eventData.venue.address || eventData.venue.coordinates) && (
