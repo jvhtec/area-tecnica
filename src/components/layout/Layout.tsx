@@ -90,7 +90,7 @@ const Layout = () => {
     <SidebarProvider defaultOpen={true}>
       <div className="min-h-screen flex w-full">
         <Sidebar>
-          <SidebarContent>
+          <SidebarContent className="pt-[max(0.5rem,env(safe-area-inset-top))]">
             <SidebarGroup>
               <SidebarGroupContent>
                 <SidebarNavigation userRole={userRole} />
