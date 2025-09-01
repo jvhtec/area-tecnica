@@ -138,7 +138,7 @@ const Layout = () => {
           </SidebarFooter>
         </Sidebar>
         <div className="flex-1">
-          <header className="border-b p-4 flex justify-between items-center bg-background">
+          <header className="border-b p-4 pt-[max(1rem,env(safe-area-inset-top))] flex justify-between items-center bg-background">
             <div className="flex items-center gap-2">
               <SidebarTrigger />
             </div>
