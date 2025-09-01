@@ -25,6 +25,8 @@ import {
 } from "@/components/ui/select";
 import { JobType } from "@/types/job";
 import { utcToLocalInput, localInputToUTC } from "@/utils/timezoneUtils";
+import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
+import { useLocationManagement } from "@/hooks/useLocationManagement";
 
 interface EditJobDialogProps {
   open: boolean;
@@ -42,25 +44,68 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
   const [timezone, setTimezone] = useState(job.timezone || "Europe/Madrid");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
+  
+  // Venue-related state
+  const [venueName, setVenueName] = useState("");
+  const [venueAddress, setVenueAddress] = useState("");
+  const [venueData, setVenueData] = useState<{
+    place_id?: string;
+    coordinates?: { lat: number; lng: number };
+  } | null>(null);
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { getOrCreateLocationWithDetails } = useLocationManagement();
 
-  // Reset form when job changes
+  // Reset form when job changes and fetch location data
   useEffect(() => {
-    if (job) {
-      setTitle(job.title);
-      setDescription(job.description || "");
-      setColor(job.color || "#7E69AB");
-      setJobType(job.job_type || "single");
-      setTimezone(job.timezone || "Europe/Madrid");
-      
-      // Convert UTC times to local input format using job's timezone
-      if (job.start_time && job.end_time) {
-        const jobTimezone = job.timezone || "Europe/Madrid";
-        setStartTime(utcToLocalInput(job.start_time, jobTimezone));
-        setEndTime(utcToLocalInput(job.end_time, jobTimezone));
+    const fetchJobWithLocation = async () => {
+      if (job) {
+        setTitle(job.title);
+        setDescription(job.description || "");
+        setColor(job.color || "#7E69AB");
+        setJobType(job.job_type || "single");
+        setTimezone(job.timezone || "Europe/Madrid");
+        
+        // Convert UTC times to local input format using job's timezone
+        if (job.start_time && job.end_time) {
+          const jobTimezone = job.timezone || "Europe/Madrid";
+          setStartTime(utcToLocalInput(job.start_time, jobTimezone));
+          setEndTime(utcToLocalInput(job.end_time, jobTimezone));
+        }
+
+        // Fetch location data if job has a location_id
+        if (job.location_id) {
+          try {
+            const { data: locationData, error } = await supabase
+              .from("locations")
+              .select("*")
+              .eq("id", job.location_id)
+              .single();
+
+            if (!error && locationData) {
+              setVenueName(locationData.name || "");
+              setVenueAddress(locationData.formatted_address || "");
+              setVenueData({
+                place_id: locationData.google_place_id || undefined,
+                coordinates: locationData.latitude && locationData.longitude 
+                  ? { lat: locationData.latitude, lng: locationData.longitude }
+                  : undefined,
+              });
+            }
+          } catch (error) {
+            console.error("Error fetching location data:", error);
+          }
+        } else {
+          // Clear venue data if no location
+          setVenueName("");
+          setVenueAddress("");
+          setVenueData(null);
+        }
       }
-    }
+    };
+
+    fetchJobWithLocation();
   }, [job]);
 
   // Fetch current departments when dialog opens
@@ -93,6 +138,15 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
     );
   };
 
+  const handleVenueSelect = (result: { name: string; address: string; coordinates?: { lat: number; lng: number }; place_id?: string }) => {
+    setVenueName(result.name);
+    setVenueAddress(result.address);
+    setVenueData({
+      place_id: result.place_id,
+      coordinates: result.coordinates,
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -101,6 +155,30 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
       // Convert local datetime-local input values to UTC using the job's timezone
       const startTimeUTC = localInputToUTC(startTime, timezone);
       const endTimeUTC = localInputToUTC(endTime, timezone);
+
+      // Handle venue/location updates
+      let locationId = job.location_id;
+      
+      if (venueName && venueAddress) {
+        // Create or update location using the location management hook
+        const locationDetails = {
+          name: venueName,
+          address: venueAddress,
+          coordinates: venueData?.coordinates,
+          place_id: venueData?.place_id,
+        };
+        
+        locationId = await getOrCreateLocationWithDetails(locationDetails);
+      } else if (venueName && !venueAddress) {
+        // If only venue name is provided without address, handle it
+        locationId = await getOrCreateLocationWithDetails({ 
+          name: venueName, 
+          address: venueName 
+        });
+      } else if (!venueName && !venueAddress) {
+        // If venue is cleared, remove location reference
+        locationId = null;
+      }
 
       const { error: jobError } = await supabase
         .from("jobs")
@@ -112,6 +190,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
           color,
           job_type: jobType,
           timezone,
+          location_id: locationId,
         })
         .eq("id", job.id);
 
@@ -189,6 +268,30 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
               rows={4}
             />
           </div>
+          
+          {/* Venue Section */}
+          <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
+            <Label className="text-base font-semibold">Venue Information</Label>
+            <div className="grid gap-4">
+              <PlaceAutocomplete
+                value={venueName}
+                onSelect={handleVenueSelect}
+                placeholder="Search for venue (WiZink Center Madrid, etc.)"
+                label="Venue Name"
+                className="w-full"
+              />
+              <div>
+                <Label htmlFor="venueAddress">Address</Label>
+                <Input
+                  id="venueAddress"
+                  value={venueAddress}
+                  onChange={(e) => setVenueAddress(e.target.value)}
+                  placeholder="Venue address (auto-filled from venue selection)"
+                />
+              </div>
+            </div>
+          </div>
+          
           <div>
             <Label>Timezone</Label>
             <Select
