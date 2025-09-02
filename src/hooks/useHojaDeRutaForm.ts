@@ -576,6 +576,19 @@ export const useHojaDeRutaForm = () => {
     toast,
   ]);
 
+  // Auto-save on changes with debounce
+  useEffect(() => {
+    if (!selectedJobId || !isInitialized) return;
+
+    const timer = setTimeout(() => {
+      handleSaveAll().catch((e) => {
+        console.warn("Auto-save skipped or failed:", e?.message || e);
+      });
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [selectedJobId, isInitialized, eventData, travelArrangements, accommodations, handleSaveAll]);
+
   // Improved isDirty function with better reliability
   const isDirty = useCallback(() => {
     if (!selectedJobId || !isInitialized) return false;
@@ -605,7 +618,7 @@ export const useHojaDeRutaForm = () => {
       eventData.logistics.loadingDetails?.trim() !== "" ||
       eventData.logistics.unloadingDetails?.trim() !== "" ||
       eventData.logistics.equipmentLogistics?.trim() !== "" ||
-      travelArrangements.some(t => t.pickup_address || t.pickup_time || t.departure_time || t.arrival_time || t.flight_train_number || t.notes) ||
+      travelArrangements.some(t => t.transportation_type || t.pickup_address || t.pickup_time || t.departure_time || t.arrival_time || t.flight_train_number || t.notes) ||
       accommodations.some(acc => acc.hotel_name || acc.address || acc.rooms.some(r => r.room_number || r.staff_member1_id || r.staff_member2_id));
 
     return hasContent && (hasChanges || !hasSavedData);

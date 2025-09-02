@@ -274,13 +274,19 @@ const getStaffName = (staffId: string, staffData?: any[]): string => {
 
 // Data validation helpers
 const hasMeaningfulTravelData = (arrangement: TravelArrangement): boolean => {
-  return !!(arrangement.transportation_type?.trim() && (
+  return !!(
+    arrangement.transportation_type?.trim() ||
     arrangement.pickup_address?.trim() ||
     arrangement.pickup_time?.trim() ||
     arrangement.departure_time?.trim() ||
     arrangement.arrival_time?.trim() ||
-    arrangement.flight_train_number?.trim()
-  ));
+    arrangement.flight_train_number?.trim() ||
+    arrangement.company?.trim() ||
+    arrangement.driver_name?.trim() ||
+    arrangement.driver_phone?.trim() ||
+    arrangement.plate_number?.trim() ||
+    arrangement.notes?.trim()
+  );
 };
 
 const hasMeaningfulRoomData = (room: RoomAssignment): boolean => {

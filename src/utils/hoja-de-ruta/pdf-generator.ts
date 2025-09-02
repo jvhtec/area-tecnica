@@ -213,12 +213,17 @@ export const generatePDF = async (
 
   // Helper function to check if travel arrangement has meaningful data
   const hasMeaningfulTravelData = (arrangement: TravelArrangement): boolean => {
-    return hasData(arrangement.transportation_type) && (
+    return (
+      hasData(arrangement.transportation_type) ||
       hasData(arrangement.pickup_address) || 
       hasData(arrangement.pickup_time) ||
       hasData(arrangement.departure_time) || 
       hasData(arrangement.arrival_time) ||
-      hasData(arrangement.flight_train_number)
+      hasData(arrangement.flight_train_number) ||
+      hasData(arrangement.driver_name) ||
+      hasData(arrangement.driver_phone) ||
+      hasData(arrangement.plate_number) ||
+      hasData(arrangement.notes)
     );
   };
 

@@ -43,6 +43,14 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
     }
   }, [eventData.venue.coordinates, eventData.venue.address]);
 
+  // When we receive a static map URL from GoogleMap, convert it to a preview for the PDF
+  useEffect(() => {
+    if (staticMapUrl) {
+      console.log('🗺️ ModernVenueSection: staticMapUrl received, generating preview for PDF');
+      handleVenueMapUrl(staticMapUrl);
+    }
+  }, [staticMapUrl, handleVenueMapUrl]);
+
   const handleLocationUpdate = (coordinates: { lat: number; lng: number }, address: string) => {
     setEventData(prev => ({
       ...prev,
