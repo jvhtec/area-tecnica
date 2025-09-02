@@ -119,29 +119,13 @@ export class UnifiedSubscriptionManager {
     this.unsubscribeAll(false);
     
     // Resubscribe to all tables
-    const resubscribedQueryKeys = new Set<string>();
     this.pendingSubscriptions.forEach((options, key) => {
       this.subscribeToTable(options.table, options.queryKey, options.filter, options.priority);
       this.pendingSubscriptions.delete(key);
-      
-      // Track which query keys we're resubscribing to
-      const normalizedKey = Array.isArray(options.queryKey) 
-        ? JSON.stringify(options.queryKey) 
-        : options.queryKey;
-      resubscribedQueryKeys.add(normalizedKey);
     });
     
-    // Only invalidate queries that were actually resubscribed, not all queries
-    resubscribedQueryKeys.forEach(queryKey => {
-      try {
-        const parsedKey = queryKey.startsWith('[') ? JSON.parse(queryKey) : [queryKey];
-        this.queryClient.invalidateQueries({ queryKey: parsedKey });
-      } catch (error) {
-        console.error('Error invalidating query key:', queryKey, error);
-        // Fallback to invalidating with simple key
-        this.queryClient.invalidateQueries({ queryKey: [queryKey] });
-      }
-    });
+    // Perform a full query invalidation to refresh data
+    this.queryClient.invalidateQueries();
     
     this.connectionStatus = 'connected';
     console.log('Supabase subscriptions reestablished');

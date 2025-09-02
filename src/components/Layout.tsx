@@ -94,7 +94,7 @@ const Layout = () => {
     <SidebarProvider defaultOpen={!isMobile}>
       <div className="min-h-screen flex w-full">
         <Sidebar>
-          <SidebarContent className="pt-[max(0.5rem,env(safe-area-inset-top))]">
+          <SidebarContent>
             <SidebarGroup>
               <SidebarGroupContent>
                 <SidebarNavigation userRole={userRole} />
