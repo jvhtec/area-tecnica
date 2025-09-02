@@ -41,9 +41,11 @@ export const useHojaDeRutaImages = () => {
   };
 
   const handleVenueMapUpload = (file: File) => {
+    console.log("🗺️ Venue map uploaded:", file.name, file.size);
     setVenueMap(file);
     const preview = URL.createObjectURL(file);
     setVenueMapPreview(preview);
+    console.log("🗺️ Venue map preview created:", preview);
   };
 
   const handleVenueMapInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,12 +55,12 @@ export const useHojaDeRutaImages = () => {
   };
 
   const handleVenueMapUrl = async (url: string) => {
-    console.log("Fetching venue map from URL:", url);
+    console.log("🗺️ Fetching venue map from URL:", url);
     try {
       const img = new Image();
       img.crossOrigin = "Anonymous";
       img.onload = () => {
-        console.log("Venue map image loaded successfully");
+        console.log("🗺️ Venue map image loaded successfully");
         const canvas = document.createElement("canvas");
         canvas.width = img.width;
         canvas.height = img.height;
@@ -67,7 +69,7 @@ export const useHojaDeRutaImages = () => {
           ctx.drawImage(img, 0, 0);
           canvas.toBlob((blob) => {
             if (blob) {
-              console.log("Venue map blob created");
+              console.log("🗺️ Venue map blob created, size:", blob.size);
               const file = new File([blob], "venue-map.jpg", {
                 type: "image/jpeg",
               });
@@ -77,12 +79,22 @@ export const useHojaDeRutaImages = () => {
         }
       };
       img.onerror = (error) => {
-        console.error("Error loading venue map image:", error);
+        console.error("🗺️ Error loading venue map image:", error);
       };
       img.src = url;
     } catch (error) {
-      console.error("Error fetching venue map from URL:", error);
+      console.error("🗺️ Error fetching venue map from URL:", error);
     }
+  };
+
+  // Clear venue map when needed
+  const clearVenueMap = () => {
+    console.log("🗺️ Clearing venue map");
+    if (venueMapPreview) {
+      URL.revokeObjectURL(venueMapPreview);
+    }
+    setVenueMap(null);
+    setVenueMapPreview(null);
   };
 
   return {
@@ -99,5 +111,6 @@ export const useHojaDeRutaImages = () => {
     handleVenueMapUpload,
     handleVenueMapInputChange,
     handleVenueMapUrl,
+    clearVenueMap,
   };
 };

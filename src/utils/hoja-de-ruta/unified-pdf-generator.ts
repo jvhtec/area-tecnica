@@ -602,16 +602,21 @@ export const generatePDF = async (
     yPosition = addRouteSection(yPosition);
 
     // Venue map
+    console.log("🗺️ PDF: Checking venue map preview:", venueMapPreview ? "EXISTS" : "NULL");
     if (venueMapPreview) {
       yPosition = checkPageBreak(yPosition, 85);
       try {
+        console.log("🗺️ PDF: Adding venue map to PDF");
         const mapWidth = 160;
         const mapHeight = 80;
         doc.addImage(venueMapPreview, 'JPEG', 25, yPosition, mapWidth, mapHeight);
         yPosition += mapHeight + 15;
+        console.log("✅ PDF: Venue map added successfully");
       } catch (error) {
-        console.error("Error adding venue map:", error);
+        console.error("❌ PDF: Error adding venue map:", error);
       }
+    } else {
+      console.log("⚠️ PDF: No venue map preview available");
     }
 
     return yPosition;

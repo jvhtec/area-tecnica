@@ -99,6 +99,7 @@ const EnhancedHojaDeRutaGenerator = () => {
   // Enhanced PDF generation
   const generateDocument = async () => {
     if (!selectedJobId) {
+      console.error("❌ PDF: No job selected for document generation");
       toast({
         title: "Error",
         description: "Por favor, seleccione un trabajo antes de generar el documento.",
@@ -107,12 +108,20 @@ const EnhancedHojaDeRutaGenerator = () => {
       return;
     }
 
+    console.log("🚀 PDF: Starting document generation process");
+    console.log("🗺️ PDF: Venue map preview status:", venueMapPreview ? "EXISTS" : "NULL");
+    if (venueMapPreview) {
+      console.log("🗺️ PDF: Venue map preview URL:", venueMapPreview.substring(0, 50) + "...");
+    }
+
     try {
       // Save data first if there are changes
       if (hasSavedData || eventData.eventName) {
+        console.log("💾 PDF: Saving data before generation");
         await handleSaveAll();
       }
       
+      console.log("📦 PDF: Importing PDF generator");
       const { generatePDF } = await import("@/utils/hoja-de-ruta/unified-pdf-generator");
       
       const enhancedEventData = {
