@@ -24,6 +24,7 @@ const initialEventData: EventData = {
   schedule: "",
   powerRequirements: "",
   auxiliaryNeeds: "",
+  weather: undefined,
 };
 
 export const useHojaDeRutaForm = () => {
@@ -168,6 +169,7 @@ export const useHojaDeRutaForm = () => {
         schedule: startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : "",
         powerRequirements: "",
         auxiliaryNeeds: "",
+        weather: undefined,
       };
 
       console.log("✅ FORM: Setting basic job data with assignments:", {
@@ -307,6 +309,7 @@ export const useHojaDeRutaForm = () => {
           schedule: savedEventData?.schedule || (startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : ""),
           powerRequirements: savedEventData?.powerRequirements || "",
           auxiliaryNeeds: savedEventData?.auxiliaryNeeds || "",
+          weather: savedEventData?.weather || undefined,
         });
 
         // Set travel arrangements using transformed data
@@ -351,6 +354,7 @@ export const useHojaDeRutaForm = () => {
           schedule: startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : "",
           powerRequirements: "",
           auxiliaryNeeds: "",
+          weather: undefined,
         };
         
         setEventData(basicEventData);
