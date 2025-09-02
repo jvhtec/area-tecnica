@@ -145,6 +145,55 @@ const generateQRCode = async (text: string): Promise<string> => {
   }
 };
 
+// Geocode an address to lat/lng using OpenStreetMap Nominatim (no API key required)
+const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
+    const res = await fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+        // Provide a UA as required by Nominatim usage policy
+        'User-Agent': 'LovableApp/1.0 (+https://lovable.dev)'
+      }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      const { lat, lon } = data[0];
+      return { lat: parseFloat(lat), lng: parseFloat(lon) };
+    }
+    return null;
+  } catch (e) {
+    console.warn('Geocoding failed for address:', address, e);
+    return null;
+  }
+};
+
+// Fetch a static map image (data URL) centered at lat/lng from OpenStreetMap Static Map service
+const getOsmStaticMapDataUrl = async (
+  lat: number,
+  lng: number,
+  width: number = 640,
+  height: number = 320,
+  zoom: number = 15
+): Promise<string | null> => {
+  try {
+    const mapUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=${zoom}&size=${width}x${height}&markers=${lat},${lng},red-pushpin`;
+    const res = await fetch(mapUrl);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('Failed to read map blob'));
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.warn('Static map fetch failed:', e);
+    return null;
+  }
+};
+
 const formatCurrency = (amount: number, currency: string = 'EUR'): string => {
   return new Intl.NumberFormat('es-ES', {
     style: 'currency',
@@ -757,6 +806,65 @@ export const generatePDF = async (
             }
           });
           yPosition = (doc as any).lastAutoTable.finalY + 10;
+        }
+
+        // Pickup map and QR
+        if (arrangement.pickup_address) {
+          try {
+            // Geocode pickup address
+            const coords = await geocodeAddress(arrangement.pickup_address);
+            if (coords) {
+              const mapDataUrl = await getOsmStaticMapDataUrl(coords.lat, coords.lng);
+              if (mapDataUrl) {
+                yPosition = checkPageBreak(yPosition, 100);
+                doc.setFontSize(11);
+                doc.setTextColor(125, 1, 1);
+                doc.text('Mapa de Recogida:', 20, yPosition);
+                yPosition += 10;
+                try {
+                  const mapWidth = 160;
+                  const mapHeight = 80;
+                  doc.addImage(mapDataUrl, 'JPEG', 25, yPosition, mapWidth, mapHeight);
+                  yPosition += mapHeight + 10;
+                } catch (err) {
+                  console.error('Error adding pickup map:', err);
+                }
+              }
+            }
+
+            // Generate QR to route from base to pickup
+            const pickupRouteUrl = generateRouteUrl(DEPARTURE_ADDRESS, arrangement.pickup_address);
+            const pickupQrDataUrl = await generateQRCode(pickupRouteUrl);
+            if (pickupQrDataUrl) {
+              yPosition = checkPageBreak(yPosition, 70);
+              const qrSize = 50;
+              doc.addImage(pickupQrDataUrl, 'PNG', 25, yPosition, qrSize, qrSize);
+
+              // Info box with link
+              doc.setDrawColor(200, 200, 200);
+              doc.setLineWidth(0.3);
+              doc.rect(85, yPosition, 110, qrSize);
+              doc.setFillColor(248, 249, 250);
+              doc.rect(85, yPosition, 110, 15, 'F');
+
+              doc.setFontSize(10);
+              doc.setTextColor(125, 1, 1);
+              doc.text('Ruta a punto de recogida', 90, yPosition + 10);
+
+              doc.setFontSize(9);
+              doc.setTextColor(51, 51, 51);
+              doc.text('• Escanea para abrir Google Maps', 90, yPosition + 22);
+              doc.text('• Incluye navegación GPS', 90, yPosition + 30);
+
+              doc.setFontSize(8);
+              doc.setTextColor(0, 0, 255);
+              doc.textWithLink('🔗 Abrir ruta', 90, yPosition + 46, { url: pickupRouteUrl });
+
+              yPosition += qrSize + 20;
+            }
+          } catch (e) {
+            console.warn('Pickup map/QR generation failed:', e);
+          }
         }
 
         // Notes section

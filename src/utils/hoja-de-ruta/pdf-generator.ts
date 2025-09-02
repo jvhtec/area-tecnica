@@ -151,6 +151,54 @@ export const generatePDF = async (
     }
   };
 
+  // Geocode an address to lat/lng using OpenStreetMap Nominatim (no API key required)
+  const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
+      const res = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'LovableApp/1.0 (+https://lovable.dev)'
+        }
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const { lat, lon } = data[0];
+        return { lat: parseFloat(lat), lng: parseFloat(lon) };
+      }
+      return null;
+    } catch (e) {
+      console.warn('Geocoding failed for address:', address, e);
+      return null;
+    }
+  };
+
+  // Fetch a static map image (data URL) centered at lat/lng from OpenStreetMap Static Map service
+  const getOsmStaticMapDataUrl = async (
+    lat: number,
+    lng: number,
+    width: number = 640,
+    height: number = 320,
+    zoom: number = 15
+  ): Promise<string | null> => {
+    try {
+      const mapUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=${zoom}&size=${width}x${height}&markers=${lat},${lng},red-pushpin`;
+      const res = await fetch(mapUrl);
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Failed to read map blob'));
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) {
+      console.warn('Static map fetch failed:', e);
+      return null;
+    }
+  };
+
   // Helper function to generate route URL
   const generateRouteUrl = (origin: string, destination: string): string => {
     const baseUrl = "https://www.google.com/maps/dir/";
@@ -411,39 +459,63 @@ export const generatePDF = async (
         yPosition = (doc as any).lastAutoTable.finalY + 10;
       }
 
-      // Generate QR code for pickup location
+      // Pickup map and QR code for pickup location
       if (arrangement.pickup_address) {
         try {
+          // Try to geocode and add static OSM map
+          const coords = await geocodeAddress(arrangement.pickup_address);
+          if (coords) {
+            const mapDataUrl = await getOsmStaticMapDataUrl(coords.lat, coords.lng);
+            if (mapDataUrl) {
+              yPosition = checkPageBreak(yPosition, 100);
+              doc.setFontSize(11);
+              doc.setTextColor(125, 1, 1);
+              doc.text('Mapa de Recogida:', 20, yPosition);
+              yPosition += 10;
+              try {
+                const mapWidth = 160;
+                const mapHeight = 80;
+                doc.addImage(mapDataUrl, 'JPEG', 25, yPosition, mapWidth, mapHeight);
+                yPosition += mapHeight + 10;
+              } catch (err) {
+                console.error('Error adding pickup map:', err);
+              }
+            }
+          }
+
+          // Generate QR to Google Maps route from base to pickup
           const pickupRouteUrl = generateRouteUrl("Calle Puerto Rico 6, 28971, Spain", arrangement.pickup_address);
           const pickupQrDataUrl = await generateQRCode(pickupRouteUrl);
-          
           if (pickupQrDataUrl) {
-            yPosition = checkPageBreak(yPosition, 80);
-            
-            // Add QR code and pickup info
+            yPosition = checkPageBreak(yPosition, 70);
+
             const qrSize = 50;
-            doc.addImage(pickupQrDataUrl, 'PNG', 30, yPosition, qrSize, qrSize);
-            
-            // Information box for pickup
+            doc.addImage(pickupQrDataUrl, 'PNG', 25, yPosition, qrSize, qrSize);
+
+            // Info box
             doc.setDrawColor(200, 200, 200);
             doc.setLineWidth(0.3);
-            doc.rect(90, yPosition, 100, qrSize);
+            doc.rect(85, yPosition, 110, qrSize);
             doc.setFillColor(248, 249, 250);
-            doc.rect(90, yPosition, 100, 15, 'F');
-            
+            doc.rect(85, yPosition, 110, 15, 'F');
+
             doc.setFontSize(10);
             doc.setTextColor(125, 1, 1);
-            doc.text('Mapa de Recogida', 95, yPosition + 10);
-            
+            doc.text('Ruta al punto de recogida', 90, yPosition + 10);
+
             doc.setFontSize(9);
             doc.setTextColor(51, 51, 51);
-            doc.text('• Escanea para ver ruta', 95, yPosition + 22);
-            doc.text('• Navegación GPS incluida', 95, yPosition + 30);
-            
+            doc.text('• Escanea para ver ruta', 90, yPosition + 22);
+            doc.text('• Navegación GPS incluida', 90, yPosition + 30);
+
+            doc.setFontSize(8);
+            doc.setTextColor(0, 0, 255);
+            doc.textWithLink('🔗 Abrir ruta', 90, yPosition + 46, { url: pickupRouteUrl });
+
             yPosition += qrSize + 20;
           }
         } catch (error) {
-          console.error('Error generating pickup QR:', error);
+          console.error('Error generating pickup map/QR:', error);
         }
       }
     }
