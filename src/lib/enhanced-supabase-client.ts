@@ -77,10 +77,7 @@ export function monitorConnectionHealth(
       // If we're now connected, trigger a data refresh
       if (currentStatus) {
         window.dispatchEvent(new CustomEvent('connection-restored'));
-        toast.success('Connection restored', { 
-          description: 'Real-time updates active',
-          duration: 3000
-        });
+        // Removed aggressive success toast to reduce UI noise during reconnections
       } else {
         toast.warning('Connection lost', {
           description: 'Attempting to reconnect...',
