@@ -20,7 +20,7 @@ import { ContactsDialog } from "@/components/hoja-de-ruta/dialogs/ContactsDialog
 import { StaffDialog } from "@/components/hoja-de-ruta/dialogs/StaffDialog";
 import { TravelArrangementsDialog } from "@/components/hoja-de-ruta/dialogs/TravelArrangementsDialog";
 import { ModernAccommodationSection } from "@/components/hoja-de-ruta/sections/ModernAccommodationSection";
-import { generatePDF } from "@/utils/hoja-de-ruta/pdf-generator";
+import { generatePDF } from "@/utils/hoja-de-ruta/pdf";
 import { uploadPdfToJob } from "@/utils/hoja-de-ruta/pdf-upload";
 import { useToast } from "@/hooks/use-toast";
 import { Save, FileText, Loader2, RefreshCw, Database, Download, Zap } from "lucide-react";

@@ -171,7 +171,7 @@ export const ModernHojaDeRuta = () => {
         await handleSaveAll();
       }
 
-      const { generatePDF } = await import("@/utils/hoja-de-ruta/unified-pdf-generator");
+      const { generatePDF } = await import("@/utils/hoja-de-ruta/pdf");
       
       const enhancedEventData = {
         ...eventData,
