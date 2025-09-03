@@ -105,15 +105,21 @@ export const useHojaDeRutaSave = (
     console.log("💾 SAVE: Starting comprehensive save for job:", selectedJobId);
 
     try {
+      // Get current user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("Usuario no autenticado");
+      }
+
       // Save all data in parallel for better performance
       const savePromises = [];
 
       // Always save event data
       console.log("💾 SAVE: Saving event data...");
       savePromises.push(
-        saveHojaDeRuta.mutateAsync({
-          job_id: selectedJobId,
+        saveHojaDeRuta({
           eventData,
+          userId: user.id
         })
       );
 
@@ -121,10 +127,7 @@ export const useHojaDeRutaSave = (
       if (travelArrangements.length > 0) {
         console.log("🚗 SAVE: Saving travel arrangements...", travelArrangements.length);
         savePromises.push(
-          saveTravelArrangements.mutateAsync({
-            job_id: selectedJobId,
-            arrangements: travelArrangements,
-          })
+          saveTravelArrangements(travelArrangements)
         );
       }
 
@@ -132,10 +135,7 @@ export const useHojaDeRutaSave = (
       if (accommodations.length > 0) {
         console.log("🏨 SAVE: Saving accommodations...", accommodations.length);
         savePromises.push(
-          saveAccommodations.mutateAsync({
-            job_id: selectedJobId,
-            accommodations,
-          })
+          saveAccommodations(accommodations)
         );
       }
 
