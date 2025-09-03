@@ -1,5 +1,5 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+// Legacy unified PDF generator - now uses new modular system  
+export { generatePDF } from './pdf';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import * as QRCode from 'qrcode';

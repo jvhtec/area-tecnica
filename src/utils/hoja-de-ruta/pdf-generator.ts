@@ -1,6 +1,6 @@
 
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+// Legacy PDF generator - now uses new modular system
+export { generatePDF } from './pdf';
 import { EventData, TravelArrangement, RoomAssignment, Accommodation } from "@/types/hoja-de-ruta";
 import { supabase } from "@/lib/supabase";
 import * as QRCode from 'qrcode';
