@@ -4,9 +4,9 @@ import { DataValidators } from '../utils/validators';
 import { Formatters } from '../utils/formatters';
 import { MapService } from '../services/map-service';
 import { QRService } from '../services/qr-service';
+import { DEPARTURE_ADDRESS } from '../constants';
 
 export class ContentSections {
-  private readonly DEPARTURE_ADDRESS = "Calle Puerto Rico 6, 28971, Spain";
 
   constructor(private pdfDoc: PDFDocument) {}
 
@@ -221,7 +221,7 @@ export class ContentSections {
       }
 
       // Generate QR to Google Maps route
-      const pickupRouteUrl = MapService.generateRouteUrl(this.DEPARTURE_ADDRESS, pickupAddress);
+      const pickupRouteUrl = MapService.generateRouteUrl(DEPARTURE_ADDRESS, pickupAddress);
       const pickupQrDataUrl = await QRService.generateQRCode(pickupRouteUrl);
       if (pickupQrDataUrl) {
         const { width: pageWidth } = this.pdfDoc.dimensions;

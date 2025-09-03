@@ -16,8 +16,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RoomAssignmentsDialogProps } from "@/types/hoja-de-ruta/dialogs";
+import { RoomAssignment } from "@/types/hoja-de-ruta";
 import { Trash2 } from "lucide-react";
+
+interface RoomAssignmentsDialogProps {
+  roomAssignments: RoomAssignment[];
+  eventData: any;
+  updateRoomAssignment: (index: number, field: keyof RoomAssignment, value: string) => void;
+  addRoomAssignment: () => void;
+  removeRoomAssignment: (index: number) => void;
+}
 
 export const RoomAssignmentsDialog = ({
   roomAssignments,

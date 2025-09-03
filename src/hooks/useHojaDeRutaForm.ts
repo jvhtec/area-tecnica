@@ -4,6 +4,7 @@ import { EventData, TravelArrangement, RoomAssignment, Accommodation } from "@/t
 import { useJobSelection } from "@/hooks/useJobSelection";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { useHojaDeRutaPersistence } from "./useHojaDeRutaPersistence";
 
 const initialEventData: EventData = {
   eventName: "",
@@ -55,24 +56,26 @@ export const useHojaDeRutaForm = () => {
   const saveInProgressRef = useRef<boolean>(false);
   const lastSaveDataRef = useRef<string>("");
 
-  // Get persistence functions - using inline implementation for now
-  const hojaDeRuta = null; // TODO: Implement proper data fetching
-  const isLoadingHojaDeRuta = false;
-  const fetchError = null;
-  const saveHojaDeRuta = async ({ eventData, userId }: any) => ({ id: "temp" });
-  const isSaving = false;
-  const saveTravelArrangements = async (data: any) => {};
-  const isSavingTravel = false;
-  const saveRoomAssignments = async (data: any) => {};
-  const isSavingRooms = false;
-  const saveVenueImages = async (data: any) => {};
-  const isSavingImages = false;
-  const refreshData = () => {};
-  const resetSaveMutation = () => {};
-  const resetTravelMutation = () => {};
-  const resetRoomsMutation = () => {};
-  const resetImagesMutation = () => {};
-  const saveAccommodations = async (data: any) => {};
+  // Get persistence functions
+  const {
+    hojaDeRuta,
+    isLoading: isLoadingHojaDeRuta,
+    fetchError,
+    saveHojaDeRuta,
+    isSaving,
+    saveTravelArrangements,
+    isSavingTravel,
+    saveRoomAssignments,
+    isSavingRooms,
+    saveVenueImages,
+    isSavingImages,
+    refreshData,
+    resetSaveMutation,
+    resetTravelMutation,
+    resetRoomsMutation,
+    resetImagesMutation,
+    saveAccommodations,
+  } = useHojaDeRutaPersistence(selectedJobId);
 
   console.log("🚀 FORM HOOK: Current state:", {
     selectedJobId,

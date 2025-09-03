@@ -1,10 +1,35 @@
+// Core interfaces - most comprehensive version first
+export interface WeatherData {
+  date: string;
+  condition: string;
+  weatherCode: number;
+  maxTemp: number;
+  minTemp: number;
+  precipitationProbability: number;
+  icon: string;
+}
+
+export interface HojaDeRutaMetadata {
+  id?: string;
+  document_version?: number;
+  created_by?: string;
+  approved_by?: string;
+  status?: 'draft' | 'review' | 'approved' | 'final';
+  approved_at?: string;
+  created_at?: string;
+  updated_at?: string;
+  last_modified?: string;
+  last_modified_by?: string;
+}
+
 export interface TravelArrangement {
-  transportation_type: "van" | "sleeper_bus" | "train" | "plane" | "RV";
+  transportation_type?: string;
   pickup_address?: string;
   pickup_time?: string;
-  flight_train_number?: string;
   departure_time?: string;
   arrival_time?: string;
+  flight_train_number?: string;
+  company?: string;
   driver_name?: string;
   driver_phone?: string;
   plate_number?: string;
@@ -24,18 +49,20 @@ export interface Transport {
 }
 
 export interface RoomAssignment {
-  room_type: "single" | "double";
+  room_type?: string;
   room_number?: string;
   staff_member1_id?: string;
   staff_member2_id?: string;
+  hotel_name?: string;
+  address?: string;
 }
 
 export interface Accommodation {
-  id: string;
-  hotel_name: string;
-  address: string;
-  check_in: string;
-  check_out: string;
+  id?: string;
+  hotel_name?: string;
+  address?: string;
+  check_in?: string;
+  check_out?: string;
   coordinates?: {
     lat: number;
     lng: number;
@@ -43,23 +70,28 @@ export interface Accommodation {
   rooms: RoomAssignment[];
 }
 
-// Weather data interface
-export interface WeatherData {
-  date: string;
-  condition: string;
-  weatherCode: number;
-  maxTemp: number;
-  minTemp: number;
-  precipitationProbability: number;
-  icon: string;
-}
-
+// Most comprehensive EventData interface
 export interface EventData {
-  eventName: string;
-  eventDates: string;
-  venue: {
-    name: string;
-    address: string;
+  eventName?: string;
+  eventCode?: string;
+  eventType?: string;
+  clientName?: string;
+  eventDates?: string;
+  eventStartTime?: string;
+  eventEndTime?: string;
+  setupTime?: string;
+  dismantleTime?: string;
+  estimatedAttendees?: number;
+  actualAttendees?: number;
+  budget?: number;
+  actualCost?: number;
+  currency?: string;
+  eventStatus?: string;
+  venue?: {
+    name?: string;
+    address?: string;
+    latitude?: number;
+    longitude?: number;
     coordinates?: {
       lat: number;
       lng: number;
@@ -67,18 +99,41 @@ export interface EventData {
     place_id?: string;
     images?: { image_path: string; image_type: string }[];
   };
-  contacts: { name: string; role: string; phone: string }[];
-  logistics: {
-    transport: Transport[];
-    loadingDetails: string;
-    unloadingDetails: string;
-    equipmentLogistics: string;
+  venueType?: string;
+  venueCapacity?: number;
+  venueContact?: {
+    name?: string;
+    phone?: string;
+    email?: string;
   };
-  staff: { name: string; surname1: string; surname2: string; position: string; dni?: string }[];
-  schedule: string;
-  powerRequirements: string;
-  auxiliaryNeeds: string;
-  weather?: WeatherData[]; // Added weather data
+  contacts?: Array<{
+    name?: string;
+    role?: string;
+    phone?: string;
+    email?: string;
+  }>;
+  staff?: Array<{
+    id?: string;
+    name?: string;
+    surname1?: string;
+    surname2?: string;
+    position?: string;
+    phone?: string;
+    dni?: string;
+    department?: string;
+    role?: string;
+  }>;
+  logistics?: {
+    transport?: Transport[];
+    loadingDetails?: string;
+    unloadingDetails?: string;
+    equipmentLogistics?: string;
+  };
+  schedule?: string;
+  powerRequirements?: string;
+  auxiliaryNeeds?: string;
+  weather?: WeatherData[];
+  metadata?: HojaDeRutaMetadata;
 }
 
 export interface HojaDeRutaTemplate {
@@ -90,37 +145,7 @@ export interface HojaDeRutaTemplate {
   is_active: boolean;
 }
 
-export interface HojaDeRutaMetadata {
-  id: string;
-  document_version: number;
-  created_by?: string;
-  approved_by?: string;
-  status: 'draft' | 'review' | 'approved' | 'final';
-  approved_at?: string;
-  created_at: string;
-  updated_at: string;
-  last_modified: string;
-  last_modified_by?: string;
-}
-
 export interface ComprehensiveEventData extends EventData {
-  eventCode?: string;
-  eventType?: string;
-  eventStatus?: 'draft' | 'confirmed' | 'cancelled' | 'completed';
-  clientName?: string;
-  clientContact?: string;
-  estimatedAttendees?: number;
-  actualAttendees?: number;
-  venueContact?: { name: string; phone: string; email: string; };
-  venueCapacity?: number;
-  venueType?: string;
-  setupTime?: string;
-  eventStartTime?: string;
-  eventEndTime?: string;
-  dismantleTime?: string;
-  budget?: number;
-  actualCost?: number;
-  currency?: string;
   equipmentList?: Array<{ item: string; quantity: number; supplier?: string; cost?: number; }>;
   audioVisualRequirements?: string;
   lightingRequirements?: string;
@@ -180,3 +205,16 @@ export interface ImagePreviews {
 export interface Images {
   venue: File[];
 }
+
+// Backward compatibility
+export type PDFGenerationOptions = {
+  eventData: EventData;
+  travelArrangements: TravelArrangement[];
+  roomAssignments: RoomAssignment[];
+  imagePreviews: ImagePreviews;
+  venueMapPreview: string | null;
+  selectedJobId: string;
+  jobTitle: string;
+  toast?: any;
+  accommodations?: Accommodation[];
+};
