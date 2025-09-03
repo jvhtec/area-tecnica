@@ -47,7 +47,6 @@ import {
 // Import the working hooks
 import { useHojaDeRutaForm } from "@/hooks/useHojaDeRutaForm";
 import { useHojaDeRutaImages } from "@/hooks/useHojaDeRutaImages";
-import { useHojaDeRutaHandlers } from "@/hooks/useHojaDeRutaHandlers";
 
 // Import new modern sections
 import { ModernEventSection } from "./sections/ModernEventSection";
@@ -104,6 +103,7 @@ export const ModernHojaDeRuta = () => {
     handleVenueMapUrl,
   } = useHojaDeRutaImages();
 
+  // Form handlers are now included in useHojaDeRutaForm
   const {
     handleContactChange,
     addContact,
@@ -120,15 +120,8 @@ export const ModernHojaDeRuta = () => {
     removeRoom,
     updateTransport,
     addTransport,
-    removeTransport,
-  } = useHojaDeRutaHandlers(
-    eventData,
-    setEventData,
-    travelArrangements,
-    setTravelArrangements,
-    accommodations,
-    setAccommodations
-  );
+    removeTransport
+  } = useHojaDeRutaForm();
 
   // Calculate completion progress including weather
   useEffect(() => {
@@ -190,16 +183,14 @@ export const ModernHojaDeRuta = () => {
       const legacyRoomAssignments = accommodations.flatMap(acc => acc.rooms);
       
       await generatePDF(
-        eventData,
+        enhancedEventData,
         travelArrangements,
         legacyRoomAssignments,
         imagePreviews,
         venueMapPreview,
         selectedJobId,
         jobDetails?.title || "",
-        async (jobId: string, pdfBlob: Blob, fileName: string) => {
-          // Upload PDF to job functionality - this is already handled in the function
-        },
+        toast,
         accommodations
       );
 
@@ -616,27 +607,33 @@ export const ModernHojaDeRuta = () => {
                     </TabsContent>
 
                     <TabsContent value="accommodation" className="mt-0">
-                      <ModernAccommodationSection
-                        accommodations={accommodations}
-                        eventData={eventData}
-                        onUpdateAccommodation={updateAccommodation}
-                        onUpdateRoom={updateRoom}
-                        onAddAccommodation={addAccommodation}
-                        onRemoveAccommodation={removeAccommodation}
-                        onAddRoom={addRoom}
-                        onRemoveRoom={removeRoom}
-                      />
+                       <ModernAccommodationSection
+                         accommodations={accommodations}
+                         eventData={eventData}
+                         onUpdateAccommodation={(index, data) => {
+                           setAccommodations(prev => 
+                             prev.map((acc, i) => 
+                               i === index ? { ...acc, ...data } : acc
+                             )
+                           );
+                         }}
+                         onUpdateRoom={updateRoom}
+                         onAddAccommodation={addAccommodation}
+                         onRemoveAccommodation={removeAccommodation}
+                         onAddRoom={addRoom}
+                         onRemoveRoom={removeRoom}
+                       />
                     </TabsContent>
 
-                    <TabsContent value="logistics" className="mt-0">
-                      <ModernLogisticsSection
-                        eventData={eventData}
-                        setEventData={setEventData}
-                        onUpdateTransport={updateTransport}
-                        onAddTransport={addTransport}
-                        onRemoveTransport={removeTransport}
-                      />
-                    </TabsContent>
+                     <TabsContent value="logistics" className="mt-0">
+                       <ModernLogisticsSection
+                         eventData={eventData}
+                         setEventData={setEventData}
+                         onUpdateTransport={updateTransport}
+                         onAddTransport={addTransport}
+                         onRemoveTransport={removeTransport}
+                       />
+                     </TabsContent>
 
                     <TabsContent value="schedule" className="mt-0">
                       <ModernScheduleSection
