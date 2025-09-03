@@ -35,28 +35,27 @@ export class HeaderSection {
     }
 
     // Job logo
-    if (this.logoData) {
       try {
         const logoImg = new Image();
         logoImg.src = this.logoData;
-        const logoHeight = 30;
-        const logoWidth = logoHeight * (logoImg.width / logoImg.height) || 50;
-        this.pdfDoc.addImage(this.logoData, 'PNG', 15, 8, logoWidth, logoHeight);
+        const logoHeight = 24;
+        const logoWidth = logoHeight * (logoImg.width / logoImg.height) || 48;
+        this.pdfDoc.addImage(this.logoData, 'PNG', 15, 10, logoWidth, logoHeight);
       } catch (error) {
         console.error("Error adding logo to header:", error);
       }
     }
 
     // Header text
-    this.pdfDoc.setText(18, [255, 255, 255]);
-    this.pdfDoc.addText(pageTitle || 'Hoja de Ruta', pageWidth / 2, 20, { align: 'center' });
-    
-    this.pdfDoc.setText(12, [255, 255, 255]);
-    this.pdfDoc.addText(this.eventData.eventName || this.jobTitle, pageWidth / 2, 30, { align: 'center' });
-    
-    this.pdfDoc.setText(10, [255, 255, 255]);
+    this.pdfDoc.setText(16, [0, 0, 0]);
+    this.pdfDoc.addText(pageTitle || 'HOJA DE RUTA', pageWidth / 2, 18, { align: 'center' });
+
+    this.pdfDoc.setText(12, [0, 0, 0]);
+    this.pdfDoc.addText(this.eventData.eventName || this.jobTitle, pageWidth / 2, 28, { align: 'center' });
+
+    this.pdfDoc.setText(10, [80, 80, 80]);
     const jobDateStr = format(new Date(), 'dd/MM/yyyy', { locale: es });
-    this.pdfDoc.addText(jobDateStr, pageWidth / 2, 40, { align: 'center' });
+    this.pdfDoc.addText(jobDateStr, pageWidth / 2, 36, { align: 'center' });
   }
 
   addSectionHeader(title: string, yPosition: number): number {
