@@ -5,10 +5,17 @@ import { Formatters } from '../utils/formatters';
 import { MapService } from '../services/map-service';
 import { QRService } from '../services/qr-service';
 import { DEPARTURE_ADDRESS } from '../constants';
+import { LogisticsSection } from './logistics';
+import { WeatherSection } from './weather';
 
 export class ContentSections {
+  private logisticsSection: LogisticsSection;
+  private weatherSection: WeatherSection;
 
-  constructor(private pdfDoc: PDFDocument) {}
+  constructor(private pdfDoc: PDFDocument) {
+    this.logisticsSection = new LogisticsSection(pdfDoc);
+    this.weatherSection = new WeatherSection(pdfDoc);
+  }
 
   addContactsSection(eventData: EventData, yPosition: number): number {
     const validContacts = eventData.contacts?.filter(contact => 
@@ -410,5 +417,13 @@ export class ContentSections {
     }
 
     return yPosition;
+  }
+
+  addLogisticsSection(eventData: EventData, yPosition: number): number {
+    return this.logisticsSection.addLogisticsSection(eventData, yPosition);
+  }
+
+  addWeatherSection(eventData: EventData, yPosition: number): number {
+    return this.weatherSection.addWeatherSection(eventData, yPosition);
   }
 }

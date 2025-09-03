@@ -59,6 +59,12 @@ export class PDFEngine {
       yPosition = this.contentSections.addAccommodationSection(accommodations, eventData, yPosition);
       yPosition = this.contentSections.addStaffSection(eventData, yPosition);
       yPosition = this.contentSections.addScheduleSection(eventData, yPosition);
+      
+      // Add logistics
+      yPosition = this.contentSections.addLogisticsSection(eventData, yPosition);
+      
+      // Add weather
+      yPosition = this.contentSections.addWeatherSection(eventData, yPosition);
 
       // Save and upload PDF
       await this.saveAndUploadPDF();
