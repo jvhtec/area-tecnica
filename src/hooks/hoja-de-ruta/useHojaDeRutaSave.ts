@@ -72,6 +72,13 @@ export const useHojaDeRutaSave = (
 
   // Comprehensive save function that saves all form data
   const handleSaveAll = useCallback(async () => {
+    console.log("🔍 DEBUG: handleSaveAll called with:", {
+      selectedJobId,
+      saveHojaDeRuta: typeof saveHojaDeRuta,
+      saveTravelArrangements: typeof saveTravelArrangements,
+      saveAccommodations: typeof saveAccommodations
+    });
+
     if (!selectedJobId) {
       console.log("❌ SAVE: No job selected");
       toast({
@@ -110,6 +117,11 @@ export const useHojaDeRutaSave = (
       if (!user) {
         throw new Error("Usuario no autenticado");
       }
+
+      console.log("🔍 DEBUG: About to call saveHojaDeRuta with:", {
+        eventData: eventData.eventName,
+        userId: user.id
+      });
 
       // Save all data in parallel for better performance
       const savePromises = [];
