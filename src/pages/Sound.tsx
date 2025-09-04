@@ -11,7 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
-import { Calculator, PieChart, FileText, Zap, FileStack, Tent } from 'lucide-react';
+import { Calculator, PieChart, FileText, Zap, FileStack, Tent, AlertTriangle } from 'lucide-react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AmplifierTool } from "@/components/sound/AmplifierTool";
 import { useNavigate } from "react-router-dom";
 import { MemoriaTecnica } from "@/components/sound/MemoriaTecnica";
+import { IncidentReport } from "@/components/sound/tools/IncidentReport";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 
 const Sound = () => {
@@ -35,6 +36,7 @@ const Sound = () => {
   const [showReportGenerator, setShowReportGenerator] = useState(false);
   const [showAmplifierTool, setShowAmplifierTool] = useState(false);
   const [showMemoriaTecnica, setShowMemoriaTecnica] = useState(false);
+  const [showIncidentReport, setShowIncidentReport] = useState(false);
   const currentDepartment = "sound";
   
   const { data: jobs } = useJobs();
@@ -235,6 +237,16 @@ const Sound = () => {
               variant="outline"
               size="lg"
               className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+              onClick={() => setShowIncidentReport(true)}
+            >
+              <AlertTriangle className="h-4 w-4 sm:h-6 sm:w-6" />
+              <span className="text-center leading-tight">Incident Report</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full h-auto py-3 sm:py-4 flex flex-col items-center gap-1 sm:gap-2 text-xs sm:text-sm"
               onClick={() => navigate('/festivals')}
             >
               <Tent className="h-4 w-4 sm:h-6 sm:w-6" />
@@ -300,6 +312,15 @@ const Sound = () => {
             <DialogTitle>Memoria Técnica</DialogTitle>
           </DialogHeader>
           <MemoriaTecnica />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showIncidentReport} onOpenChange={setShowIncidentReport}>
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Reporte de Incidencia</DialogTitle>
+          </DialogHeader>
+          <IncidentReport />
         </DialogContent>
       </Dialog>
     </div>
