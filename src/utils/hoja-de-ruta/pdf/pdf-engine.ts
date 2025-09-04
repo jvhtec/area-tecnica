@@ -40,31 +40,78 @@ export class PDFEngine {
       // Generate cover page
       this.coverSection.generateCoverPage();
 
-      // Start content pages
+      // Add content sections with fresh pages for major sections
+      
+      // Contacts - Fresh page
       this.pdfDoc.addPage();
-      this.headerSection.addHeader();
+      this.headerSection.addHeader('CONTACTOS');
       let yPosition = 75;
-
-      // Add all content sections
       yPosition = this.contentSections.addContactsSection(eventData, yPosition);
-      
+
+      // Event details - Fresh page
       this.pdfDoc.addPage();
-      this.headerSection.addHeader();
+      this.headerSection.addHeader('INFORMACIÓN DEL EVENTO');
       yPosition = 75;
-      
       yPosition = this.contentSections.addEventDetailsSection(eventData, yPosition);
-      yPosition = this.contentSections.addVenueSection(eventData, venueMapPreview, yPosition);
+
+      // Venue information - Fresh page
+      this.pdfDoc.addPage();
+      this.headerSection.addHeader('INFORMACIÓN DEL LUGAR');
+      yPosition = 75;
+      yPosition = await this.contentSections.addVenueSection(eventData, venueMapPreview, yPosition);
+
+      // Travel arrangements - Fresh page
+      if (travelArrangements && travelArrangements.length > 0) {
+        this.pdfDoc.addPage();
+        this.headerSection.addHeader('ARREGLOS DE VIAJE');
+        yPosition = 75;
+        yPosition = await this.contentSections.addTravelSection(travelArrangements, yPosition);
+      }
+
+      // Accommodation - Fresh page
+      if (accommodations && accommodations.length > 0) {
+        this.pdfDoc.addPage();
+        this.headerSection.addHeader('ALOJAMIENTO');
+        yPosition = 75;
+        yPosition = await this.contentSections.addAccommodationSection(accommodations, eventData, yPosition);
+      }
+
+      // Staff - Fresh page
+      if (eventData.staff && eventData.staff.length > 0) {
+        this.pdfDoc.addPage();
+        this.headerSection.addHeader('PERSONAL');
+        yPosition = 75;
+        yPosition = this.contentSections.addStaffSection(eventData, yPosition);
+      }
       
-      yPosition = await this.contentSections.addTravelSection(travelArrangements, yPosition);
-      yPosition = this.contentSections.addAccommodationSection(accommodations, eventData, yPosition);
-      yPosition = this.contentSections.addStaffSection(eventData, yPosition);
-      yPosition = this.contentSections.addScheduleSection(eventData, yPosition);
+      // Schedule - Fresh page
+      if (eventData.schedule || eventData.powerRequirements || eventData.auxiliaryNeeds) {
+        this.pdfDoc.addPage();
+        this.headerSection.addHeader('PROGRAMA Y REQUERIMIENTOS');
+        yPosition = 75;
+        yPosition = this.contentSections.addScheduleSection(eventData, yPosition);
+      }
+
+      // Logistics - Fresh page
+      const hasLogisticsData = eventData.logistics?.transport?.length > 0 ||
+        eventData.logistics?.loadingDetails ||
+        eventData.logistics?.unloadingDetails ||
+        eventData.logistics?.equipmentLogistics;
       
-      // Add logistics
-      yPosition = this.contentSections.addLogisticsSection(eventData, yPosition);
-      
-      // Add weather
-      yPosition = this.contentSections.addWeatherSection(eventData, yPosition);
+      if (hasLogisticsData) {
+        this.pdfDoc.addPage();
+        this.headerSection.addHeader('LOGÍSTICA');
+        yPosition = 75;
+        yPosition = this.contentSections.addLogisticsSection(eventData, yPosition);
+      }
+
+      // Weather - Fresh page
+      if (eventData.weather && eventData.weather.length > 0) {
+        this.pdfDoc.addPage();
+        this.headerSection.addHeader('METEOROLOGÍA');
+        yPosition = 75;
+        yPosition = this.contentSections.addWeatherSection(eventData, yPosition);
+      }
 
       // Save and upload PDF
       await this.saveAndUploadPDF();

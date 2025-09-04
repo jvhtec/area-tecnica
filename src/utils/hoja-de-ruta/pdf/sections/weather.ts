@@ -14,8 +14,8 @@ export class WeatherSection {
     currentY = this.pdfDoc.checkPageBreak(currentY, 40);
 
     // Add section header
-    this.pdfDoc.setText(14, [0, 0, 0]);
-    this.pdfDoc.addText('METEOROLOGÍA', 20, currentY);
+    this.pdfDoc.setText(14, [125, 1, 1]);
+    this.pdfDoc.addText('Meteorología', 20, currentY);
     currentY += 15;
 
     // Prepare weather data for table
@@ -31,7 +31,7 @@ export class WeatherSection {
       head: [['Fecha', 'Condición', 'Temperatura', 'Precipitación']],
       body: weatherData,
       theme: 'grid',
-      headStyles: { fillColor: [200, 200, 200], textColor: [0, 0, 0] },
+      headStyles: { fillColor: [125, 1, 1], textColor: [255, 255, 255], fontSize: 10, fontStyle: 'bold' },
       margin: { left: 20, right: 20 }
     });
 

@@ -1,11 +1,14 @@
 import { PDFDocument } from '../core/pdf-document';
 import { EventData } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
+import { MapService } from '../services/map-service';
+import { QRService } from '../services/qr-service';
+import { DEPARTURE_ADDRESS } from '../constants';
 
 export class VenueSection {
   constructor(private pdfDoc: PDFDocument) {}
 
-  addVenueSection(eventData: EventData, venueMapPreview: string | null, yPosition: number): number {
+  async addVenueSection(eventData: EventData, venueMapPreview: string | null, yPosition: number): Promise<number> {
     if (!DataValidators.hasData(eventData.venue?.name) && !DataValidators.hasData(eventData.venue?.address)) {
       return yPosition;
     }
@@ -39,13 +42,40 @@ export class VenueSection {
       yPosition = this.pdfDoc.getLastAutoTableY() + 10;
     }
 
-    // Add venue map if available
-    if (venueMapPreview) {
+    // Add venue map and route QR
+    const venueAddress = eventData.venue?.address;
+    let mapDataUrl = venueMapPreview;
+
+    // Generate map if not provided and address exists
+    if (!mapDataUrl && venueAddress) {
       try {
-        yPosition = this.pdfDoc.checkPageBreak(yPosition, 80);
-        const mapWidth = 120;
+        const coords = await MapService.geocodeAddress(venueAddress);
+        if (coords) {
+          mapDataUrl = await MapService.getStaticMapDataUrl(coords.lat, coords.lng, 160, 80);
+        }
+      } catch (error) {
+        console.error("Error generating venue map:", error);
+      }
+    }
+
+    if (mapDataUrl && venueAddress) {
+      try {
+        yPosition = this.pdfDoc.checkPageBreak(yPosition, 100);
+        
+        // Add map
+        const mapWidth = 160;
         const mapHeight = 80;
-        this.pdfDoc.addImage(venueMapPreview, "JPEG", 30, yPosition, mapWidth, mapHeight);
+        this.pdfDoc.addImage(mapDataUrl, "JPEG", 20, yPosition, mapWidth, mapHeight);
+        
+        // Generate and add route QR
+        const routeUrl = MapService.generateRouteUrl(DEPARTURE_ADDRESS, venueAddress);
+        const qrCode = await QRService.generateQRCode(routeUrl);
+        this.pdfDoc.addImage(qrCode, "PNG", mapWidth + 30, yPosition, 50, 50);
+        
+        // Add QR info text
+        this.pdfDoc.setText(8, [80, 80, 80]);
+        this.pdfDoc.addText("Ruta al lugar", mapWidth + 30, yPosition + 55);
+        
         yPosition += mapHeight + 15;
       } catch (error) {
         console.error("Error adding venue map to PDF:", error);

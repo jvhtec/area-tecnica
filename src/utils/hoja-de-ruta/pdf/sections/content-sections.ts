@@ -41,16 +41,16 @@ export class ContentSections {
     return this.eventSection.addEventDetailsSection(eventData, yPosition);
   }
 
-  addVenueSection(eventData: EventData, venueMapPreview: string | null, yPosition: number): number {
-    return this.venueSection.addVenueSection(eventData, venueMapPreview, yPosition);
+  async addVenueSection(eventData: EventData, venueMapPreview: string | null, yPosition: number): Promise<number> {
+    return await this.venueSection.addVenueSection(eventData, venueMapPreview, yPosition);
   }
 
   async addTravelSection(travelArrangements: TravelArrangement[], yPosition: number): Promise<number> {
     return await this.travelSection.addTravelSection(travelArrangements, yPosition);
   }
 
-  addAccommodationSection(accommodations: Accommodation[], eventData: EventData, yPosition: number): number {
-    return this.accommodationSection.addAccommodationSection(accommodations, eventData, yPosition);
+  async addAccommodationSection(accommodations: any[], eventData: EventData, yPosition: number): Promise<number> {
+    return await this.accommodationSection.addAccommodationSection(accommodations, eventData, yPosition);
   }
 
   addStaffSection(eventData: EventData, yPosition: number): number {

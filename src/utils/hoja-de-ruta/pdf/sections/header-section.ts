@@ -35,6 +35,7 @@ export class HeaderSection {
     }
 
     // Job logo
+    if (this.logoData) {
       try {
         const logoImg = new Image();
         logoImg.src = this.logoData;
@@ -46,14 +47,14 @@ export class HeaderSection {
       }
     }
 
-    // Header text
-    this.pdfDoc.setText(16, [0, 0, 0]);
+    // Header text - White text on red background
+    this.pdfDoc.setText(16, [255, 255, 255]);
     this.pdfDoc.addText(pageTitle || 'HOJA DE RUTA', pageWidth / 2, 18, { align: 'center' });
 
-    this.pdfDoc.setText(12, [0, 0, 0]);
+    this.pdfDoc.setText(12, [255, 255, 255]);
     this.pdfDoc.addText(this.eventData.eventName || this.jobTitle, pageWidth / 2, 28, { align: 'center' });
 
-    this.pdfDoc.setText(10, [80, 80, 80]);
+    this.pdfDoc.setText(10, [255, 255, 255]);
     const jobDateStr = format(new Date(), 'dd/MM/yyyy', { locale: es });
     this.pdfDoc.addText(jobDateStr, pageWidth / 2, 36, { align: 'center' });
   }

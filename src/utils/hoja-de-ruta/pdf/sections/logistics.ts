@@ -20,8 +20,8 @@ export class LogisticsSection {
     currentY = this.pdfDoc.checkPageBreak(currentY, 40);
 
     // Add section header
-    this.pdfDoc.setText(14, [0, 0, 0]);
-    this.pdfDoc.addText('LOGÍSTICA', 20, currentY);
+    this.pdfDoc.setText(14, [125, 1, 1]);
+    this.pdfDoc.addText('Logística', 20, currentY);
     currentY += 15;
 
     // Add transport details if available
@@ -39,7 +39,7 @@ export class LogisticsSection {
         head: [['Tipo', 'Conductor', 'Teléfono', 'Matrícula', 'Empresa']],
         body: transportData,
         theme: 'grid',
-        headStyles: { fillColor: [200, 200, 200], textColor: [0, 0, 0] },
+        headStyles: { fillColor: [125, 1, 1], textColor: [255, 255, 255], fontSize: 10, fontStyle: 'bold' },
         margin: { left: 20, right: 20 }
       });
 
@@ -49,7 +49,7 @@ export class LogisticsSection {
     // Add loading details
     if (eventData.logistics?.loadingDetails) {
       currentY = this.pdfDoc.checkPageBreak(currentY, 20);
-      this.pdfDoc.setText(12, [0, 0, 0]);
+      this.pdfDoc.setText(12, [125, 1, 1]);
       this.pdfDoc.addText('Detalles de Carga:', 20, currentY);
       currentY += 8;
       
@@ -66,7 +66,7 @@ export class LogisticsSection {
     // Add unloading details
     if (eventData.logistics?.unloadingDetails) {
       currentY = this.pdfDoc.checkPageBreak(currentY, 20);
-      this.pdfDoc.setText(12, [0, 0, 0]);
+      this.pdfDoc.setText(12, [125, 1, 1]);
       this.pdfDoc.addText('Detalles de Descarga:', 20, currentY);
       currentY += 8;
       
@@ -83,7 +83,7 @@ export class LogisticsSection {
     // Add equipment logistics
     if (eventData.logistics?.equipmentLogistics) {
       currentY = this.pdfDoc.checkPageBreak(currentY, 20);
-      this.pdfDoc.setText(12, [0, 0, 0]);
+      this.pdfDoc.setText(12, [125, 1, 1]);
       this.pdfDoc.addText('Logística de Equipos:', 20, currentY);
       currentY += 8;
       

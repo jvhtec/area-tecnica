@@ -2,11 +2,14 @@ import { PDFDocument } from '../core/pdf-document';
 import { EventData, Accommodation } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 import { Formatters } from '../utils/formatters';
+import { MapService } from '../services/map-service';
+import { QRService } from '../services/qr-service';
+import { DEPARTURE_ADDRESS } from '../constants';
 
 export class AccommodationSection {
   constructor(private pdfDoc: PDFDocument) {}
 
-  addAccommodationSection(accommodations: Accommodation[], eventData: EventData, yPosition: number): number {
+  async addAccommodationSection(accommodations: Accommodation[], eventData: EventData, yPosition: number): Promise<number> {
     const validAccommodations = accommodations.filter(acc => 
       DataValidators.hasData(acc.hotel_name) || acc.rooms.some(DataValidators.hasMeaningfulRoomData)
     );
@@ -40,6 +43,43 @@ export class AccommodationSection {
         this.pdfDoc.addText(checkInfo.join(' | '), 35, yPosition);
         yPosition += 15;
       }
+
+      // Add hotel map and route QR if address exists
+      if (accommodation.address) {
+        try {
+          yPosition = this.pdfDoc.checkPageBreak(yPosition, 100);
+          
+          const coords = await MapService.geocodeAddress(accommodation.address);
+          if (coords) {
+            const mapDataUrl = await MapService.getStaticMapDataUrl(coords.lat, coords.lng, 160, 80);
+            if (mapDataUrl) {
+              // Add map
+              const mapWidth = 160;
+              const mapHeight = 80;
+              this.pdfDoc.addImage(mapDataUrl, "JPEG", 20, yPosition, mapWidth, mapHeight);
+              
+              // Generate and add route QR
+              const routeUrl = MapService.generateRouteUrl(DEPARTURE_ADDRESS, accommodation.address);
+              const qrCode = await QRService.generateQRCode(routeUrl);
+              this.pdfDoc.addImage(qrCode, "PNG", mapWidth + 30, yPosition, 50, 50);
+              
+              // Add QR info text
+              this.pdfDoc.setText(8, [80, 80, 80]);
+              this.pdfDoc.addText("Ruta al hotel", mapWidth + 30, yPosition + 55);
+              
+              yPosition += mapHeight + 15;
+            }
+          }
+        } catch (error) {
+          console.error("Error adding hotel map:", error);
+        }
+      }
+
+      // Rooming subheader
+      yPosition = this.pdfDoc.checkPageBreak(yPosition, 20);
+      this.pdfDoc.setText(12, [125, 1, 1]);
+      this.pdfDoc.addText("Asignación de habitaciones", 20, yPosition);
+      yPosition += 12;
 
       // Room assignments
       const validRooms = accommodation.rooms.filter(DataValidators.hasMeaningfulRoomData);
