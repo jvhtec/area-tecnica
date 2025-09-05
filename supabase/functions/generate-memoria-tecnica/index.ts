@@ -290,7 +290,7 @@ serve(async (req) => {
       throw new Error('Missing Supabase configuration');
     }
 
-    const uploadResponse = await fetch(`${supabaseUrl}/storage/v1/object/memoria-tecnica/${fileName}`, {
+    const uploadResponse = await fetch(`${supabaseUrl}/storage/v1/object/Memoria%20Tecnica/${fileName}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${supabaseKey}`,
@@ -303,7 +303,7 @@ serve(async (req) => {
       throw new Error('Failed to upload merged PDF');
     }
 
-    const publicUrl = `${supabaseUrl}/storage/v1/object/public/memoria-tecnica/${fileName}`;
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/Memoria%20Tecnica/${fileName}`;
     
     return new Response(
       JSON.stringify({ url: publicUrl }),

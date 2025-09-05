@@ -121,13 +121,13 @@ export const MemoriaTecnica = () => {
 
   const uploadToStorage = async (file: File, path: string) => {
     const { error: uploadError, data } = await supabase.storage
-      .from('memoria-tecnica')
+      .from('Memoria Tecnica')
       .upload(path, file);
 
     if (uploadError) throw uploadError;
 
     const { data: { publicUrl } } = supabase.storage
-      .from('memoria-tecnica')
+      .from('Memoria Tecnica')
       .getPublicUrl(path);
 
     return publicUrl;
