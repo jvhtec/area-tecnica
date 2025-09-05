@@ -120,17 +120,19 @@ export const MemoriaTecnica = () => {
   };
 
   const uploadToStorage = async (file: File, path: string) => {
-    const { error: uploadError, data } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('Memoria Tecnica')
       .upload(path, file);
 
     if (uploadError) throw uploadError;
 
-    const { data: { publicUrl } } = supabase.storage
+    const { data: signed, error: signError } = await supabase.storage
       .from('Memoria Tecnica')
-      .getPublicUrl(path);
+      .createSignedUrl(path, 60 * 60); // 1 hour
 
-    return publicUrl;
+    if (signError || !signed?.signedUrl) throw signError || new Error('No signed URL');
+
+    return signed.signedUrl;
   };
 
   const generateMemoriaTecnica = async () => {
