@@ -1,7 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { PDFDocument, rgb } from "https://cdn.skypack.dev/pdf-lib@1.17.1?dts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -63,7 +62,8 @@ serve(async (req) => {
       try {
         console.log('Fetching customer logo from URL:', logoUrl);
         
-        const fetchWithRetry = async (url: string, retries = 3, timeout = 10000) => {
+        // Add retry mechanism for logo fetch with timeout
+        const fetchWithRetry = async (url: string, retries = 3, timeout = 5000) => {
           for (let i = 0; i < retries; i++) {
             try {
               const controller = new AbortController();
@@ -72,7 +72,6 @@ serve(async (req) => {
               const response = await fetch(url, { 
                 signal: controller.signal,
                 headers: {
-                  'Authorization': `Bearer ${supabaseKey}`,
                   'Cache-Control': 'no-cache',
                   'Pragma': 'no-cache'
                 }
@@ -81,7 +80,7 @@ serve(async (req) => {
               clearTimeout(timeoutId);
               
               if (!response.ok) {
-                throw new Error(`Failed to fetch logo: ${response.status} ${response.statusText}`);
+                throw new Error(`Failed to fetch logo: ${response.statusText}`);
               }
               
               return response;
@@ -150,12 +149,11 @@ serve(async (req) => {
 
     // Add Sector Pro logo at the bottom
     try {
-      const sectorProLogoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/company-assets/sector-pro-logo.png`;
+      const sectorProLogoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/company-assets/sector-pro-logo.png`;
       console.log('Fetching Sector Pro logo from:', sectorProLogoUrl);
       
       const logoResponse = await fetch(sectorProLogoUrl, {
         headers: {
-          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         }
@@ -203,10 +201,9 @@ serve(async (req) => {
 
     // Add Sector Pro logo to index page
     try {
-      const sectorProLogoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/company-assets/sector-pro-logo.png`;
+      const sectorProLogoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/company-assets/sector-pro-logo.png`;
       const logoResponse = await fetch(sectorProLogoUrl, {
         headers: {
-          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         }
@@ -264,7 +261,6 @@ serve(async (req) => {
         console.log(`Fetching PDF from URL: ${url}`);
         const pdfResponse = await fetch(url, {
           headers: {
-            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'
           }
@@ -294,31 +290,23 @@ serve(async (req) => {
       throw new Error('Missing Supabase configuration');
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const uploadResponse = await fetch(`${supabaseUrl}/storage/v1/object/memoria-tecnica/${fileName}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/pdf',
+      },
+      body: pdfBytes,
+    });
 
-    const bucketName = 'Memoria Tecnica';
-    const objectPath = `${fileName}`;
-
-    // Upload the merged PDF to Storage
-    const { error: uploadError } = await supabase.storage
-      .from(bucketName)
-      .upload(objectPath, new Blob([pdfBytes], { type: 'application/pdf' }));
-
-    if (uploadError) {
-      throw new Error(`Failed to upload merged PDF: ${uploadError.message}`);
+    if (!uploadResponse.ok) {
+      throw new Error('Failed to upload merged PDF');
     }
 
-    // Create a signed URL since bucket is private
-    const { data: signedData, error: signedError } = await supabase.storage
-      .from(bucketName)
-      .createSignedUrl(objectPath, 60 * 60); // 1 hour
-
-    if (signedError || !signedData?.signedUrl) {
-      throw new Error(`Failed to create signed URL: ${signedError?.message}`);
-    }
-
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/memoria-tecnica/${fileName}`;
+    
     return new Response(
-      JSON.stringify({ url: signedData.signedUrl }),
+      JSON.stringify({ url: publicUrl }),
       { 
         headers: { 
           ...corsHeaders,
