@@ -62,8 +62,7 @@ serve(async (req) => {
       try {
         console.log('Fetching customer logo from URL:', logoUrl);
         
-        // Add retry mechanism for logo fetch with timeout
-        const fetchWithRetry = async (url: string, retries = 3, timeout = 5000) => {
+        const fetchWithRetry = async (url: string, retries = 3, timeout = 10000) => {
           for (let i = 0; i < retries; i++) {
             try {
               const controller = new AbortController();
@@ -72,6 +71,7 @@ serve(async (req) => {
               const response = await fetch(url, { 
                 signal: controller.signal,
                 headers: {
+                  'Authorization': `Bearer ${supabaseKey}`,
                   'Cache-Control': 'no-cache',
                   'Pragma': 'no-cache'
                 }
@@ -80,7 +80,7 @@ serve(async (req) => {
               clearTimeout(timeoutId);
               
               if (!response.ok) {
-                throw new Error(`Failed to fetch logo: ${response.statusText}`);
+                throw new Error(`Failed to fetch logo: ${response.status} ${response.statusText}`);
               }
               
               return response;
@@ -154,6 +154,7 @@ serve(async (req) => {
       
       const logoResponse = await fetch(sectorProLogoUrl, {
         headers: {
+          'Authorization': `Bearer ${supabaseKey}`,
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         }
@@ -204,6 +205,7 @@ serve(async (req) => {
       const sectorProLogoUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/company-assets/sector-pro-logo.png`;
       const logoResponse = await fetch(sectorProLogoUrl, {
         headers: {
+          'Authorization': `Bearer ${supabaseKey}`,
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         }
@@ -261,6 +263,7 @@ serve(async (req) => {
         console.log(`Fetching PDF from URL: ${url}`);
         const pdfResponse = await fetch(url, {
           headers: {
+            'Authorization': `Bearer ${supabaseKey}`,
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'
           }
@@ -290,7 +293,7 @@ serve(async (req) => {
       throw new Error('Missing Supabase configuration');
     }
 
-    const uploadResponse = await fetch(`${supabaseUrl}/storage/v1/object/Memoria%20Tecnica/${fileName}`, {
+    const uploadResponse = await fetch(`${supabaseUrl}/storage/v1/object/Memoria Tecnica/${encodeURIComponent(fileName)}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${supabaseKey}`,
@@ -303,7 +306,7 @@ serve(async (req) => {
       throw new Error('Failed to upload merged PDF');
     }
 
-    const publicUrl = `${supabaseUrl}/storage/v1/object/public/Memoria%20Tecnica/${fileName}`;
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/Memoria Tecnica/${encodeURIComponent(fileName)}`;
     
     return new Response(
       JSON.stringify({ url: publicUrl }),
