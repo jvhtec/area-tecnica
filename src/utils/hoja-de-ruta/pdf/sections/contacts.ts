@@ -7,43 +7,56 @@ export class ContactsSection {
   constructor(private pdfDoc: PDFDocument) {}
 
   addContactsSection(eventData: EventData, yPosition: number): number {
+    yPosition = this.pdfDoc.checkPageBreak(yPosition, 50);
+    
+    this.pdfDoc.setText(14, [125, 1, 1]);
+    this.pdfDoc.addText("Contactos", 20, yPosition);
+    yPosition += 15;
+
     const validContacts = eventData.contacts?.filter(contact => 
       DataValidators.hasData(contact.name) || 
       DataValidators.hasData(contact.role) || 
       DataValidators.hasData(contact.phone)
     ) || [];
     
-    if (validContacts.length === 0) return yPosition;
-
-    yPosition = this.pdfDoc.checkPageBreak(yPosition);
-    
-    this.pdfDoc.setText(14, [125, 1, 1]);
-    this.pdfDoc.addText("Contactos", 20, yPosition);
-    yPosition += 10;
+    if (validContacts.length === 0) {
+      // Show placeholder
+      this.pdfDoc.setText(10, [128, 128, 128]);
+      this.pdfDoc.addText("No hay contactos disponibles", 30, yPosition);
+      return yPosition + 20;
+    }
 
     const contactsTableData = validContacts.map((contact) => [
       contact.name || '',
       contact.role || '',
       Formatters.formatPhone(contact.phone || ''),
+      contact.email || '—'
     ]);
     
     this.pdfDoc.addTable({
       startY: yPosition,
-      head: [["Nombre", "Rol", "Teléfono"]],
+      head: [["Nombre", "Rol", "Teléfono", "Email"]],
       body: contactsTableData,
       theme: "grid",
       styles: {
-        fontSize: 10,
+        fontSize: 9,
         cellPadding: 3,
         valign: 'top',
+        overflow: 'linebreak'
       },
       headStyles: {
         fillColor: [125, 1, 1],
         textColor: [255, 255, 255],
-        fontSize: 11,
+        fontSize: 10,
         fontStyle: 'bold',
       },
-      margin: { left: 10, right: 10 },
+      columnStyles: {
+        0: { cellWidth: 40 }, // Nombre
+        1: { cellWidth: 35 }, // Rol
+        2: { cellWidth: 35 }, // Teléfono
+        3: { cellWidth: 50 }  // Email
+      },
+      margin: { left: 20, right: 20 },
     });
     
     return this.pdfDoc.getLastAutoTableY() + 15;

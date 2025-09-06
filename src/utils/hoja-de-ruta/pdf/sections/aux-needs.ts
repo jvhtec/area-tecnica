@@ -1,0 +1,34 @@
+import { PDFDocument } from '../core/pdf-document';
+import { EventData } from '../core/pdf-types';
+import { DataValidators } from '../utils/validators';
+
+export class AuxNeedsSection {
+  constructor(private pdfDoc: PDFDocument) {}
+
+  addAuxNeedsSection(eventData: EventData, yPosition: number): number {
+    yPosition = this.pdfDoc.checkPageBreak(yPosition, 30);
+    
+    this.pdfDoc.setText(14, [125, 1, 1]);
+    this.pdfDoc.addText("Necesidades Auxiliares", 20, yPosition);
+    yPosition += 15;
+
+    this.pdfDoc.setText(10, [51, 51, 51]);
+
+    if (DataValidators.hasData(eventData.auxiliaryNeeds)) {
+      const auxLines = eventData.auxiliaryNeeds!.split('\n');
+      for (const line of auxLines) {
+        if (line.trim()) {
+          this.pdfDoc.addText(line.trim(), 30, yPosition);
+          yPosition += 12;
+        }
+      }
+    } else {
+      // Show placeholder
+      this.pdfDoc.setText(10, [128, 128, 128]);
+      this.pdfDoc.addText("No hay necesidades auxiliares especificadas", 30, yPosition);
+      yPosition += 15;
+    }
+
+    return yPosition + 10;
+  }
+}

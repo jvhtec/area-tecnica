@@ -5,6 +5,7 @@ import { uploadPdfToJob } from '../pdf-upload';
 import { HeaderSection } from './sections/header-section';
 import { CoverSection } from './sections/cover-section';
 import { ContentSections } from './sections/content-sections';
+import { FooterService } from './services/footer-service';
 
 export class PDFEngine {
   private pdfDoc: PDFDocument;
@@ -40,78 +41,79 @@ export class PDFEngine {
       // Generate cover page
       this.coverSection.generateCoverPage();
 
-      // Add content sections with fresh pages for major sections
+      // EXACT 12-SECTION STRUCTURE - Each section on new page
       
-      // Contacts - Fresh page
+      // 1. Cover page (already generated above)
+      
+      // 2. Job details and Venue (combined on same page)
+      this.pdfDoc.addPage();
+      this.headerSection.addHeader('INFORMACIÓN DEL TRABAJO Y LUGAR');
+      let yPosition = 75;
+      yPosition = this.contentSections.addEventDetailsSection(eventData, yPosition);
+      yPosition = await this.contentSections.addVenueSection(eventData, venueMapPreview, yPosition + 10);
+
+      // 3. Weather section - Fresh page
+      this.pdfDoc.addPage();
+      this.headerSection.addHeader('METEOROLOGÍA');
+      yPosition = 75;
+      yPosition = this.contentSections.addWeatherSection(eventData, yPosition);
+
+      // 4. Contactos - Fresh page
       this.pdfDoc.addPage();
       this.headerSection.addHeader('CONTACTOS');
-      let yPosition = 75;
+      yPosition = 75;
       yPosition = this.contentSections.addContactsSection(eventData, yPosition);
 
-      // Event details - Fresh page
+      // 5. Personal - Fresh page
       this.pdfDoc.addPage();
-      this.headerSection.addHeader('INFORMACIÓN DEL EVENTO');
+      this.headerSection.addHeader('PERSONAL');
       yPosition = 75;
-      yPosition = this.contentSections.addEventDetailsSection(eventData, yPosition);
+      yPosition = this.contentSections.addStaffSection(eventData, yPosition);
 
-      // Venue information - Fresh page
+      // 6. Viajes - Fresh page
       this.pdfDoc.addPage();
-      this.headerSection.addHeader('INFORMACIÓN DEL LUGAR');
+      this.headerSection.addHeader('VIAJES');
       yPosition = 75;
-      yPosition = await this.contentSections.addVenueSection(eventData, venueMapPreview, yPosition);
+      yPosition = await this.contentSections.addTravelSection(travelArrangements || [], yPosition);
 
-      // Travel arrangements - Fresh page
-      if (travelArrangements && travelArrangements.length > 0) {
-        this.pdfDoc.addPage();
-        this.headerSection.addHeader('ARREGLOS DE VIAJE');
-        yPosition = 75;
-        yPosition = await this.contentSections.addTravelSection(travelArrangements, yPosition);
-      }
+      // 7. Alojamientos - Fresh page
+      this.pdfDoc.addPage();
+      this.headerSection.addHeader('ALOJAMIENTOS');
+      yPosition = 75;
+      yPosition = await this.contentSections.addAccommodationSection(accommodations || [], eventData, yPosition);
 
-      // Accommodation - Fresh page
-      if (accommodations && accommodations.length > 0) {
-        this.pdfDoc.addPage();
-        this.headerSection.addHeader('ALOJAMIENTO');
-        yPosition = 75;
-        yPosition = await this.contentSections.addAccommodationSection(accommodations, eventData, yPosition);
-      }
+      // 8. Rooming - Fresh page
+      this.pdfDoc.addPage();
+      this.headerSection.addHeader('ROOMING');
+      yPosition = 75;
+      yPosition = this.contentSections.addRoomingSection(accommodations || [], eventData, yPosition);
 
-      // Staff - Fresh page
-      if (eventData.staff && eventData.staff.length > 0) {
-        this.pdfDoc.addPage();
-        this.headerSection.addHeader('PERSONAL');
-        yPosition = 75;
-        yPosition = this.contentSections.addStaffSection(eventData, yPosition);
-      }
-      
-      // Schedule - Fresh page
-      if (eventData.schedule || eventData.powerRequirements || eventData.auxiliaryNeeds) {
-        this.pdfDoc.addPage();
-        this.headerSection.addHeader('PROGRAMA Y REQUERIMIENTOS');
-        yPosition = 75;
-        yPosition = this.contentSections.addScheduleSection(eventData, yPosition);
-      }
+      // 9. Transportes - Fresh page
+      this.pdfDoc.addPage();
+      this.headerSection.addHeader('TRANSPORTES');
+      yPosition = 75;
+      yPosition = this.contentSections.addLogisticsSection(eventData, yPosition);
 
-      // Logistics - Fresh page
-      const hasLogisticsData = eventData.logistics?.transport?.length > 0 ||
-        eventData.logistics?.loadingDetails ||
-        eventData.logistics?.unloadingDetails ||
-        eventData.logistics?.equipmentLogistics;
-      
-      if (hasLogisticsData) {
-        this.pdfDoc.addPage();
-        this.headerSection.addHeader('LOGÍSTICA');
-        yPosition = 75;
-        yPosition = this.contentSections.addLogisticsSection(eventData, yPosition);
-      }
+      // 10. Power requirements - Fresh page
+      this.pdfDoc.addPage();
+      this.headerSection.addHeader('POWER REQUIREMENTS');
+      yPosition = 75;
+      yPosition = this.contentSections.addPowerSection(eventData, yPosition);
 
-      // Weather - Fresh page
-      if (eventData.weather && eventData.weather.length > 0) {
-        this.pdfDoc.addPage();
-        this.headerSection.addHeader('METEOROLOGÍA');
-        yPosition = 75;
-        yPosition = this.contentSections.addWeatherSection(eventData, yPosition);
-      }
+      // 11. Necesidades auxiliares - Fresh page
+      this.pdfDoc.addPage();
+      this.headerSection.addHeader('NECESIDADES AUXILIARES');
+      yPosition = 75;
+      yPosition = this.contentSections.addAuxNeedsSection(eventData, yPosition);
+
+      // 12. Programa - Fresh page
+      this.pdfDoc.addPage();
+      this.headerSection.addHeader('PROGRAMA');
+      yPosition = 75;
+      yPosition = this.contentSections.addProgramSection(eventData, yPosition);
+
+      // Add Sector-Pro footer to all pages
+      await FooterService.addFooterToAllPages(this.pdfDoc);
 
       // Save and upload PDF
       await this.saveAndUploadPDF();

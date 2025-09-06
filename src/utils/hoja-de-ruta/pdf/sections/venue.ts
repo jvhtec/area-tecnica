@@ -78,7 +78,12 @@ export class VenueSection {
         
         yPosition += mapHeight + 15;
       } catch (error) {
-        console.error("Error adding venue map to PDF:", error);
+        console.error("Error generating venue map:", error);
+        // Add placeholders for failed map/QR generation
+        this.pdfDoc.setText(10, [128, 128, 128]);
+        this.pdfDoc.addText("[MAP NOT AVAILABLE]", 20, yPosition);
+        this.pdfDoc.addText("[QR NOT AVAILABLE]", 190, yPosition);
+        yPosition += 25;
       }
     }
     

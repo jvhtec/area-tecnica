@@ -21,7 +21,7 @@ export class LogisticsSection {
 
     // Add section header
     this.pdfDoc.setText(14, [125, 1, 1]);
-    this.pdfDoc.addText('Logística', 20, currentY);
+    this.pdfDoc.addText('Transportes', 20, currentY);
     currentY += 15;
 
     // Add transport details if available

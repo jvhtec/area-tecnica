@@ -7,39 +7,59 @@ export class StaffSection {
   constructor(private pdfDoc: PDFDocument) {}
 
   addStaffSection(eventData: EventData, yPosition: number): number {
+    yPosition = this.pdfDoc.checkPageBreak(yPosition, 50);
+    
+    this.pdfDoc.setText(14, [125, 1, 1]);
+    this.pdfDoc.addText("Personal", 20, yPosition);
+    yPosition += 15;
+
     const validStaff = eventData.staff?.filter(staff => 
       DataValidators.hasData(staff.name) || 
       DataValidators.hasData(staff.position) || 
       DataValidators.hasData(staff.department)
     ) || [];
 
-    if (validStaff.length === 0) return yPosition;
-
-    yPosition = this.pdfDoc.checkPageBreak(yPosition);
-    
-    this.pdfDoc.setText(14, [125, 1, 1]);
-    this.pdfDoc.addText("Personal", 20, yPosition);
-    yPosition += 10;
+    if (validStaff.length === 0) {
+      // Show placeholder
+      this.pdfDoc.setText(10, [128, 128, 128]);
+      this.pdfDoc.addText("No hay personal asignado", 30, yPosition);
+      return yPosition + 20;
+    }
 
     const staffData = validStaff.map(staff => [
       `${staff.name || ''} ${staff.surname1 || ''} ${staff.surname2 || ''}`.trim(),
       staff.position || '',
       staff.department || '',
-      Formatters.formatPhone(staff.phone || '')
+      Formatters.formatPhone(staff.phone || ''),
+      staff.dni || '—',
+      '—' // Email placeholder - field doesn't exist yet in interface
     ]);
 
     this.pdfDoc.addTable({
       startY: yPosition,
-      head: [["Nombre", "Posición", "Departamento", "Teléfono"]],
+      head: [["Nombre", "Posición", "Departamento", "Teléfono", "DNI", "Email"]],
       body: staffData,
       theme: "grid",
-      styles: { fontSize: 9, cellPadding: 3 },
+      styles: { 
+        fontSize: 8, 
+        cellPadding: 2,
+        overflow: 'linebreak'
+      },
       headStyles: {
         fillColor: [125, 1, 1],
         textColor: [255, 255, 255],
-        fontSize: 10,
+        fontSize: 9,
         fontStyle: 'bold'
-      }
+      },
+      columnStyles: {
+        0: { cellWidth: 30 }, // Nombre
+        1: { cellWidth: 25 }, // Posición
+        2: { cellWidth: 25 }, // Departamento
+        3: { cellWidth: 25 }, // Teléfono
+        4: { cellWidth: 20 }, // DNI
+        5: { cellWidth: 35 }  // Email
+      },
+      margin: { left: 15, right: 15 }
     });
 
     return this.pdfDoc.getLastAutoTableY() + 15;
