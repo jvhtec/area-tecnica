@@ -121,16 +121,18 @@ export const MemoriaTecnica = () => {
 
   const uploadToStorage = async (file: File, path: string) => {
     const { error: uploadError, data } = await supabase.storage
-      .from('memoria-tecnica')
+      .from('Memoria Tecnica')
       .upload(path, file);
 
     if (uploadError) throw uploadError;
 
-    const { data: { publicUrl } } = supabase.storage
-      .from('memoria-tecnica')
-      .getPublicUrl(path);
+    const { data: signedUrlData, error: signUrlError } = await supabase.storage
+      .from('Memoria Tecnica')
+      .createSignedUrl(path, 3600); // 1 hour expiration
 
-    return publicUrl;
+    if (signUrlError) throw signUrlError;
+
+    return signedUrlData.signedUrl;
   };
 
   const generateMemoriaTecnica = async () => {
@@ -204,7 +206,7 @@ export const MemoriaTecnica = () => {
       setProgress(60);
 
       const response = await supabase.functions.invoke('generate-memoria-tecnica', {
-        body: { documentUrls, projectName, logoUrl }
+        body: { documentUrls, projectName, logoUrl, expiresIn: 3600 }
       });
 
       if (response.error) {
@@ -237,7 +239,7 @@ export const MemoriaTecnica = () => {
 
       toast({
         title: "Éxito",
-        description: "Memoria técnica generada correctamente",
+        description: `Memoria técnica generada correctamente. Expira en ${Math.round(response.data.expiresIn / 60)} minutos.`,
       });
 
       window.open(response.data.url, '_blank');
