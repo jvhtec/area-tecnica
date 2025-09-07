@@ -20,10 +20,7 @@ export class ContactsSection {
     ) || [];
     
     if (validContacts.length === 0) {
-      // Show placeholder
-      this.pdfDoc.setText(10, [128, 128, 128]);
-      this.pdfDoc.addText("No hay contactos disponibles", 30, yPosition);
-      return yPosition + 20;
+      return yPosition;
     }
 
     const contactsTableData = validContacts.map((contact) => [

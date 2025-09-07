@@ -14,19 +14,16 @@ export class AuxNeedsSection {
 
     this.pdfDoc.setText(10, [51, 51, 51]);
 
-    if (DataValidators.hasData(eventData.auxiliaryNeeds)) {
-      const auxLines = eventData.auxiliaryNeeds!.split('\n');
-      for (const line of auxLines) {
-        if (line.trim()) {
-          this.pdfDoc.addText(line.trim(), 30, yPosition);
-          yPosition += 12;
-        }
+    if (!DataValidators.hasData(eventData.auxiliaryNeeds)) {
+      return yPosition;
+    }
+
+    const auxLines = eventData.auxiliaryNeeds!.split('\n');
+    for (const line of auxLines) {
+      if (line.trim()) {
+        this.pdfDoc.addText(line.trim(), 30, yPosition);
+        yPosition += 12;
       }
-    } else {
-      // Show placeholder
-      this.pdfDoc.setText(10, [128, 128, 128]);
-      this.pdfDoc.addText("No hay necesidades auxiliares especificadas", 30, yPosition);
-      yPosition += 15;
     }
 
     return yPosition + 10;

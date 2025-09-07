@@ -20,10 +20,7 @@ export class StaffSection {
     ) || [];
 
     if (validStaff.length === 0) {
-      // Show placeholder
-      this.pdfDoc.setText(10, [128, 128, 128]);
-      this.pdfDoc.addText("No hay personal asignado", 30, yPosition);
-      return yPosition + 20;
+      return yPosition;
     }
 
     const staffData = validStaff.map(staff => [

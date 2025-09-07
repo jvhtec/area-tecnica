@@ -12,10 +12,7 @@ export class WeatherSection {
     yPosition += 15;
 
     if (!eventData.weather || eventData.weather.length === 0) {
-      // Show placeholder
-      this.pdfDoc.setText(10, [128, 128, 128]);
-      this.pdfDoc.addText("No hay datos meteorológicos disponibles", 30, yPosition);
-      return yPosition + 20;
+      return yPosition;
     }
 
     // Prepare weather data for table with all required columns

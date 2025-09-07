@@ -96,4 +96,54 @@ export class ContentSections {
   addProgramSection(eventData: EventData, yPosition: number): number {
     return this.programSection.addProgramSection(eventData, yPosition);
   }
+
+  // Data validation methods
+  hasWeatherData(eventData: EventData): boolean {
+    return eventData.weather && eventData.weather.length > 0;
+  }
+
+  hasContactsData(eventData: EventData): boolean {
+    return eventData.contacts && eventData.contacts.some(contact => 
+      contact.name || contact.role || contact.phone || contact.email
+    );
+  }
+
+  hasStaffData(eventData: EventData): boolean {
+    return eventData.staff && eventData.staff.some(staff => 
+      staff.name || staff.role || staff.dni
+    );
+  }
+
+  hasTravelData(travelArrangements: any[]): boolean {
+    return travelArrangements && travelArrangements.length > 0;
+  }
+
+  hasAccommodationData(accommodations: any[]): boolean {
+    return accommodations && accommodations.some(acc => 
+      acc.hotel_name || acc.hotel_address
+    );
+  }
+
+  hasRoomingData(accommodations: any[]): boolean {
+    return accommodations && accommodations.some(acc => 
+      acc.rooms && acc.rooms.length > 0
+    );
+  }
+
+  hasLogisticsData(eventData: EventData): boolean {
+    return eventData.logistics && eventData.logistics.transport && 
+           eventData.logistics.transport.length > 0;
+  }
+
+  hasPowerData(eventData: EventData): boolean {
+    return eventData.powerRequirements && eventData.powerRequirements.trim().length > 0;
+  }
+
+  hasAuxNeedsData(eventData: EventData): boolean {
+    return eventData.auxiliaryNeeds && eventData.auxiliaryNeeds.trim().length > 0;
+  }
+
+  hasProgramData(eventData: EventData): boolean {
+    return eventData.schedule && eventData.schedule.trim().length > 0;
+  }
 }

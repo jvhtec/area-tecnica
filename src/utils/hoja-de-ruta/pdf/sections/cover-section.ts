@@ -24,11 +24,9 @@ export class CoverSection {
     // Job logo on cover
     if (this.logoData) {
       try {
-        const logoImg = new Image();
-        logoImg.src = this.logoData;
         const logoHeight = 60;
-        const logoWidth = logoHeight * (logoImg.width / logoImg.height) || 120;
-        this.pdfDoc.addImage(this.logoData, 'PNG', (pageWidth - logoWidth) / 2, 40, logoWidth, logoHeight);
+        const logoWidth = 120; // Default width
+        this.pdfDoc.addImage(this.logoData, 'PNG', (pageWidth - logoWidth) / 2, pageHeight - 180, logoWidth, logoHeight);
       } catch (error) {
         console.error("Error adding logo to cover:", error);
       }
