@@ -40,9 +40,10 @@ export class CoverSection {
     this.pdfDoc.setText(24, [255, 255, 255]);
     this.pdfDoc.addText(this.eventData.eventName || this.jobTitle || 'Evento sin título', pageWidth / 2, pageHeight / 2 + 20, { align: 'center' });
 
-    // Date
+    // Date - use event dates if available, otherwise current date
     this.pdfDoc.setText(14, [255, 255, 255]);
-    this.pdfDoc.addText(new Date().toLocaleDateString('es-ES'), pageWidth / 2, pageHeight / 2 + 50, { align: 'center' });
+    const displayDate = this.eventData.eventDates || new Date().toLocaleDateString('es-ES');
+    this.pdfDoc.addText(displayDate, pageWidth / 2, pageHeight / 2 + 50, { align: 'center' });
 
     // Client info
     if (this.eventData.clientName) {

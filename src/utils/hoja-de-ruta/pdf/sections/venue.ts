@@ -9,18 +9,14 @@ export class VenueSection {
   constructor(private pdfDoc: PDFDocument) {}
 
   async addVenueSection(eventData: EventData, venueMapPreview: string | null, yPosition: number): Promise<number> {
-    if (!DataValidators.hasData(eventData.venue?.name) && !DataValidators.hasData(eventData.venue?.address)) {
-      return yPosition;
-    }
-
-    yPosition = this.pdfDoc.checkPageBreak(yPosition);
+    yPosition = this.pdfDoc.checkPageBreak(yPosition, 50);
     
     this.pdfDoc.setText(14, [125, 1, 1]);
-    this.pdfDoc.addText("Información del Lugar", 20, yPosition);
+    this.pdfDoc.addText("Venue", 20, yPosition);
     yPosition += 15;
-    
+
     this.pdfDoc.setText(10, [51, 51, 51]);
-    
+
     const venueDetails = [
       ['Nombre', eventData.venue?.name],
       ['Dirección', eventData.venue?.address],
@@ -39,54 +35,84 @@ export class VenueSection {
           1: { cellWidth: 140 }
         }
       });
-      yPosition = this.pdfDoc.getLastAutoTableY() + 10;
+      yPosition = this.pdfDoc.getLastAutoTableY() + 15;
     }
 
-    // Add venue map and route QR
-    const venueAddress = eventData.venue?.address;
-    let mapDataUrl = venueMapPreview;
+    // Add venue images if available
+    if (eventData.venue?.images && eventData.venue.images.length > 0) {
+      yPosition = this.pdfDoc.checkPageBreak(yPosition, 80);
+      
+      this.pdfDoc.setText(12, [125, 1, 1]);
+      this.pdfDoc.addText("Imágenes del Venue", 20, yPosition);
+      yPosition += 15;
 
-    // Generate map if not provided and address exists
-    if (!mapDataUrl && venueAddress) {
       try {
-        const coords = await MapService.geocodeAddress(venueAddress);
-        if (coords) {
-          mapDataUrl = await MapService.getStaticMapDataUrl(coords.lat, coords.lng, 160, 80);
+        // Show up to 2 venue images side by side
+        const imagesToShow = eventData.venue.images.slice(0, 2);
+        let xPosition = 20;
+        
+        for (const image of imagesToShow) {
+          try {
+            // For now, just show placeholder - actual image loading would need signed URLs
+            this.pdfDoc.setText(8, [51, 51, 51]);
+            this.pdfDoc.addText(`[VENUE IMAGE: ${image.image_type}]`, xPosition, yPosition);
+            xPosition += 90;
+          } catch (error) {
+            console.error("Error adding venue image:", error);
+          }
         }
+        yPosition += 20;
       } catch (error) {
-        console.error("Error generating venue map:", error);
+        console.error("Error processing venue images:", error);
       }
     }
 
-    if (mapDataUrl && venueAddress) {
-      try {
-        yPosition = this.pdfDoc.checkPageBreak(yPosition, 100);
-        
-        // Add map
-        const mapWidth = 160;
-        const mapHeight = 80;
-        this.pdfDoc.addImage(mapDataUrl, "JPEG", 20, yPosition, mapWidth, mapHeight);
-        
-        // Generate and add route QR
-        const routeUrl = MapService.generateRouteUrl(DEPARTURE_ADDRESS, venueAddress);
-        const qrCode = await QRService.generateQRCode(routeUrl);
-        this.pdfDoc.addImage(qrCode, "PNG", mapWidth + 30, yPosition, 50, 50);
-        
-        // Add QR info text
-        this.pdfDoc.setText(8, [80, 80, 80]);
-        this.pdfDoc.addText("Ruta al lugar", mapWidth + 30, yPosition + 55);
-        
-        yPosition += mapHeight + 15;
-      } catch (error) {
-        console.error("Error generating venue map:", error);
-        // Add placeholders for failed map/QR generation
-        this.pdfDoc.setText(10, [128, 128, 128]);
-        this.pdfDoc.addText("[MAP NOT AVAILABLE]", 20, yPosition);
-        this.pdfDoc.addText("[QR NOT AVAILABLE]", 190, yPosition);
-        yPosition += 25;
+    // Add map preview and QR code if venue has address
+    if (eventData.venue?.address) {
+      let mapDataUrl = venueMapPreview;
+      
+      if (!mapDataUrl) {
+        try {
+          const coords = await MapService.geocodeAddress(eventData.venue.address);
+          if (coords) {
+            mapDataUrl = await MapService.getStaticMapDataUrl(coords.lat, coords.lng, 400, 200);
+          }
+        } catch (error) {
+          console.error('Error generating venue map:', error);
+        }
       }
+
+      yPosition = this.pdfDoc.checkPageBreak(yPosition, 120);
+
+      if (mapDataUrl) {
+        try {
+          this.pdfDoc.addImage(mapDataUrl, 'PNG', 20, yPosition, 100, 60);
+        } catch (error) {
+          console.error("Error adding venue map:", error);
+          this.pdfDoc.addText('[MAP NOT AVAILABLE]', 20, yPosition);
+        }
+      } else {
+        this.pdfDoc.addText('[MAP NOT AVAILABLE]', 20, yPosition);
+      }
+
+      // Add QR code for directions
+      try {
+        const routeUrl = MapService.generateRouteUrl(
+          DEPARTURE_ADDRESS, // Sector-Pro warehouse
+          eventData.venue.address
+        );
+        const qrData = await QRService.generateQRCode(routeUrl);
+        this.pdfDoc.addImage(qrData, 'PNG', 130, yPosition, 50, 50);
+        
+        this.pdfDoc.setText(8, [51, 51, 51]);
+        this.pdfDoc.addText('Escanea para direcciones', 130, yPosition + 55);
+      } catch (error) {
+        console.error("Error generating QR code:", error);
+      }
+
+      yPosition += 80;
     }
-    
+
     return yPosition;
   }
 }

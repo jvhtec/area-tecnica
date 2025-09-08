@@ -34,102 +34,95 @@ export class PDFEngine {
       // Load logo
       this.logoData = await LogoService.loadJobLogo(selectedJobId);
       
-      // Initialize sections with logo
-      this.headerSection = new HeaderSection(this.pdfDoc, eventData, jobTitle, this.logoData);
-      this.coverSection = new CoverSection(this.pdfDoc, eventData, jobTitle, this.logoData);
-
       // Generate cover page
-      this.coverSection.generateCoverPage();
+      const coverSection = new CoverSection(this.pdfDoc, this.options.eventData, this.options.jobTitle, this.logoData);
+      coverSection.generateCoverPage();
 
-      // Generate only sections with data
-      
-      // 1. Cover page (already generated above)
-      
-      // 2. Job details and Venue (always include)
-      this.pdfDoc.addPage();
-      this.headerSection.addHeader('INFORMACIÓN DEL TRABAJO Y LUGAR');
-      let yPosition = 75;
-      yPosition = this.contentSections.addEventDetailsSection(eventData, yPosition);
-      yPosition = await this.contentSections.addVenueSection(eventData, venueMapPreview, yPosition + 10);
-
-      // 3. Weather section (if weather data exists)
-      if (this.contentSections.hasWeatherData(eventData)) {
+      // Each major section starts on a new page as per requirements
+      // 2. Job Details and Venue (combined on same page)
+      if (this.contentSections.hasEventDetailsData(this.options.eventData) || this.contentSections.hasVenueData(this.options.eventData)) {
         this.pdfDoc.addPage();
-        this.headerSection.addHeader('METEOROLOGÍA');
-        yPosition = 75;
-        yPosition = this.contentSections.addWeatherSection(eventData, yPosition);
+        let currentY = 75;
+        
+        if (this.contentSections.hasEventDetailsData(this.options.eventData)) {
+          currentY = this.contentSections.addEventDetailsSection(this.options.eventData, currentY);
+        }
+        
+        if (this.contentSections.hasVenueData(this.options.eventData)) {
+          currentY = await this.contentSections.addVenueSection(
+            this.options.eventData, 
+            this.options.venueMapPreview, 
+            currentY
+          );
+        }
       }
 
-      // 4. Contactos (if contacts exist)
-      if (this.contentSections.hasContactsData(eventData)) {
+      // 3. Weather section
+      if (this.contentSections.hasWeatherData(this.options.eventData)) {
         this.pdfDoc.addPage();
-        this.headerSection.addHeader('CONTACTOS');
-        yPosition = 75;
-        yPosition = this.contentSections.addContactsSection(eventData, yPosition);
+        this.contentSections.addWeatherSection(this.options.eventData, 75);
       }
 
-      // 5. Personal (if staff exists)
-      if (this.contentSections.hasStaffData(eventData)) {
+      // 4. Contactos
+      if (this.contentSections.hasContactsData(this.options.eventData)) {
         this.pdfDoc.addPage();
-        this.headerSection.addHeader('PERSONAL');
-        yPosition = 75;
-        yPosition = this.contentSections.addStaffSection(eventData, yPosition);
+        this.contentSections.addContactsSection(this.options.eventData, 75);
       }
 
-      // 6. Viajes (if travel arrangements exist)
-      if (this.contentSections.hasTravelData(travelArrangements || [])) {
+      // 5. Personal
+      if (this.contentSections.hasStaffData(this.options.eventData)) {
         this.pdfDoc.addPage();
-        this.headerSection.addHeader('VIAJES');
-        yPosition = 75;
-        yPosition = await this.contentSections.addTravelSection(travelArrangements || [], yPosition);
+        this.contentSections.addStaffSection(this.options.eventData, 75);
       }
 
-      // 7. Alojamientos (if accommodations exist)
-      if (this.contentSections.hasAccommodationData(accommodations || [])) {
+      // 6. Viajes
+      if (this.contentSections.hasTravelData(this.options.travelArrangements)) {
         this.pdfDoc.addPage();
-        this.headerSection.addHeader('ALOJAMIENTOS');
-        yPosition = 75;
-        yPosition = await this.contentSections.addAccommodationSection(accommodations || [], eventData, yPosition);
+        await this.contentSections.addTravelSection(this.options.travelArrangements, 75);
       }
 
-      // 8. Rooming (if room assignments exist)
-      if (this.contentSections.hasRoomingData(accommodations || [])) {
+      // 7. Alojamientos
+      if (this.contentSections.hasAccommodationData(this.options.accommodations)) {
         this.pdfDoc.addPage();
-        this.headerSection.addHeader('ROOMING');
-        yPosition = 75;
-        yPosition = this.contentSections.addRoomingSection(accommodations || [], eventData, yPosition);
+        await this.contentSections.addAccommodationSection(
+          this.options.accommodations || [], 
+          this.options.eventData, 
+          75
+        );
       }
 
-      // 9. Transportes (if transport data exists)
-      if (this.contentSections.hasLogisticsData(eventData)) {
+      // 8. Rooming
+      if (this.contentSections.hasRoomingData(this.options.accommodations)) {
         this.pdfDoc.addPage();
-        this.headerSection.addHeader('TRANSPORTES');
-        yPosition = 75;
-        yPosition = this.contentSections.addLogisticsSection(eventData, yPosition);
+        this.contentSections.addRoomingSection(
+          this.options.accommodations || [], 
+          this.options.eventData, 
+          75
+        );
       }
 
-      // 10. Power requirements (if power data exists)
-      if (this.contentSections.hasPowerData(eventData)) {
+      // 9. Transportes
+      if (this.contentSections.hasLogisticsData(this.options.eventData)) {
         this.pdfDoc.addPage();
-        this.headerSection.addHeader('POWER REQUIREMENTS');
-        yPosition = 75;
-        yPosition = this.contentSections.addPowerSection(eventData, yPosition);
+        this.contentSections.addLogisticsSection(this.options.eventData, 75);
       }
 
-      // 11. Necesidades auxiliares (if aux needs exist)
-      if (this.contentSections.hasAuxNeedsData(eventData)) {
+      // 10. Power Requirements
+      if (this.contentSections.hasPowerData(this.options.eventData)) {
         this.pdfDoc.addPage();
-        this.headerSection.addHeader('NECESIDADES AUXILIARES');
-        yPosition = 75;
-        yPosition = this.contentSections.addAuxNeedsSection(eventData, yPosition);
+        this.contentSections.addPowerSection(this.options.eventData, 75);
       }
 
-      // 12. Programa (if program data exists)
-      if (this.contentSections.hasProgramData(eventData)) {
+      // 11. Necesidades Auxiliares
+      if (this.contentSections.hasAuxNeedsData(this.options.eventData)) {
         this.pdfDoc.addPage();
-        this.headerSection.addHeader('PROGRAMA');
-        yPosition = 75;
-        yPosition = this.contentSections.addProgramSection(eventData, yPosition);
+        this.contentSections.addAuxNeedsSection(this.options.eventData, 75);
+      }
+
+      // 12. Programa
+      if (this.contentSections.hasProgramData(this.options.eventData)) {
+        this.pdfDoc.addPage();
+        this.contentSections.addProgramSection(this.options.eventData, 75);
       }
 
       // Add Sector-Pro footer to all pages

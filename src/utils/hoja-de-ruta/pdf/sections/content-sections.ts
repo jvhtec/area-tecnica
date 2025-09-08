@@ -98,6 +98,14 @@ export class ContentSections {
   }
 
   // Data validation methods
+  hasEventDetailsData(eventData: EventData): boolean {
+    return !!(eventData.eventName || eventData.clientName || eventData.eventDates || eventData.eventStartTime);
+  }
+
+  hasVenueData(eventData: EventData): boolean {
+    return !!(eventData.venue?.name || eventData.venue?.address || eventData.venueType);
+  }
+
   hasWeatherData(eventData: EventData): boolean {
     return eventData.weather && eventData.weather.length > 0;
   }
