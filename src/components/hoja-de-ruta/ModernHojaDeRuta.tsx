@@ -68,7 +68,7 @@ export const ModernHojaDeRuta = () => {
   const [completionProgress, setCompletionProgress] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Use the working hooks
+  // Use the working hooks - single call to avoid state conflicts
   const {
     eventData,
     setEventData,
@@ -91,20 +91,7 @@ export const ModernHojaDeRuta = () => {
     isDirty,
     autoPopulateFromJob,
     refreshData,
-  } = useHojaDeRutaForm();
-
-  const {
-    images,
-    imagePreviews,
-    venueMapPreview,
-    handleImageUpload,
-    removeImage,
-    handleVenueMapInputChange,
-    handleVenueMapUrl,
-  } = useHojaDeRutaImages();
-
-  // Form handlers are now included in useHojaDeRutaForm
-  const {
+    // Form handlers
     handleContactChange,
     addContact,
     handleStaffChange,
@@ -122,6 +109,16 @@ export const ModernHojaDeRuta = () => {
     addTransport,
     removeTransport
   } = useHojaDeRutaForm();
+
+  const {
+    images,
+    imagePreviews,
+    venueMapPreview,
+    handleImageUpload,
+    removeImage,
+    handleVenueMapInputChange,
+    handleVenueMapUrl,
+  } = useHojaDeRutaImages();
 
   // Calculate completion progress including weather
   useEffect(() => {

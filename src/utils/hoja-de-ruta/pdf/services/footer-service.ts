@@ -43,14 +43,32 @@ export class FooterService {
 
   private static async loadSectorProLogo(): Promise<string | null> {
     try {
-      // Load the actual sector-pro-logo.png from public folder
-      const response = await fetch('/sector-pro-logo.png');
-      if (response.ok) {
-        const blob = await response.blob();
-        return await this.blobToDataURL(blob);
+      // Try multiple possible paths for the Sector Pro logo
+      const possiblePaths = [
+        '/sector-pro-logo.png',
+        '/images/sector-pro-logo.png',
+        '/assets/sector-pro-logo.png',
+        '/public/sector-pro-logo.png',
+        '/lovable-uploads/2f12a6ef-587b-4049-ad53-d83fb94064e3.png' // Fallback to app icon
+      ];
+
+      for (const path of possiblePaths) {
+        try {
+          const response = await fetch(path);
+          if (response.ok) {
+            const blob = await response.blob();
+            return await this.blobToDataURL(blob);
+          }
+        } catch (error) {
+          // Continue to next path
+          continue;
+        }
       }
+      
+      // If no logo found, return null (fallback text will be used)
+      console.warn('Sector Pro logo not found in any of the expected paths');
     } catch (error) {
-      console.error('Error loading sector-pro-logo.png:', error);
+      console.error('Error loading Sector Pro logo:', error);
     }
     return null;
   }

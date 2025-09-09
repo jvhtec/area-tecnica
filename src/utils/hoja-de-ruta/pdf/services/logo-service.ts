@@ -6,17 +6,24 @@ export class LogoService {
       // Try to load festival logo first
       const { data: festivalData, error: festivalError } = await supabase
         .from('festival_logos')
-        .select('logo_url, job_id')
+        .select('file_path, job_id')
         .eq('job_id', jobId)
         .order('uploaded_at', { ascending: false })
         .limit(1);
 
-      if (festivalData && festivalData.length > 0 && festivalData[0].logo_url) {
+      if (festivalData && festivalData.length > 0 && festivalData[0].file_path) {
         try {
-          const response = await fetch(festivalData[0].logo_url);
-          if (response.ok) {
-            const blob = await response.blob();
-            return await this.blobToDataURL(blob);
+          // Get signed URL for private bucket
+          const { data: signedUrlData } = await supabase.storage
+            .from('festival-logos')
+            .createSignedUrl(festivalData[0].file_path, 60);
+          
+          if (signedUrlData?.signedUrl) {
+            const response = await fetch(signedUrlData.signedUrl);
+            if (response.ok) {
+              const blob = await response.blob();
+              return await this.blobToDataURL(blob);
+            }
           }
         } catch (error) {
           console.warn('Error loading festival logo, trying tour logo:', error);
@@ -28,22 +35,29 @@ export class LogoService {
         .from('jobs')
         .select('tour_id')
         .eq('id', jobId)
-        .single();
+        .maybeSingle();
 
       if (jobData?.tour_id) {
         const { data: tourData, error: tourError } = await supabase
           .from('tour_logos')
-          .select('logo_url')
+          .select('file_path')
           .eq('tour_id', jobData.tour_id)
           .order('uploaded_at', { ascending: false })
           .limit(1);
 
-        if (tourData && tourData.length > 0 && tourData[0].logo_url) {
+        if (tourData && tourData.length > 0 && tourData[0].file_path) {
           try {
-            const response = await fetch(tourData[0].logo_url);
-            if (response.ok) {
-              const blob = await response.blob();
-              return await this.blobToDataURL(blob);
+            // Get signed URL for private bucket
+            const { data: signedUrlData } = await supabase.storage
+              .from('tour-logos')
+              .createSignedUrl(tourData[0].file_path, 60);
+            
+            if (signedUrlData?.signedUrl) {
+              const response = await fetch(signedUrlData.signedUrl);
+              if (response.ok) {
+                const blob = await response.blob();
+                return await this.blobToDataURL(blob);
+              }
             }
           } catch (error) {
             console.error('Error loading tour logo:', error);

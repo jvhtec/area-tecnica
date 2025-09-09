@@ -26,9 +26,15 @@ export class CoverSection {
       try {
         const logoHeight = 60;
         const logoWidth = 120; // Default width
-        this.pdfDoc.addImage(this.logoData, 'PNG', (pageWidth - logoWidth) / 2, pageHeight - 180, logoWidth, logoHeight);
+        // Detect image format from data URL
+        const format = this.logoData.includes('data:image/png') ? 'PNG' : 
+                      this.logoData.includes('data:image/jpeg') ? 'JPEG' : 'PNG';
+        this.pdfDoc.addImage(this.logoData, format, (pageWidth - logoWidth) / 2, pageHeight - 180, logoWidth, logoHeight);
       } catch (error) {
         console.error("Error adding logo to cover:", error);
+        // Add fallback text
+        this.pdfDoc.setText(12, [255, 255, 255]);
+        this.pdfDoc.addText('[LOGO MISSING]', pageWidth / 2, pageHeight - 150, { align: 'center' });
       }
     }
 
