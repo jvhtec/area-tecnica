@@ -38,6 +38,16 @@ export const fetchLogoUrl = async (jobId: string): Promise<string | undefined> =
           
         if (signedUrlError) {
           console.error("Error creating signed URL:", signedUrlError);
+          // Try fallback to public URL if signed URL fails
+          const { data: publicUrlData } = supabase.storage
+            .from('festival-logos')
+            .getPublicUrl(logoData.file_path);
+            
+          if (publicUrlData?.publicUrl) {
+            console.log("Generated logo public URL (fallback):", publicUrlData.publicUrl);
+            return publicUrlData.publicUrl;
+          }
+          return undefined;
         }
 
         if (signedUrlData?.signedUrl) {
@@ -83,9 +93,23 @@ export const fetchTourLogo = async (tourId: string): Promise<string | undefined>
     
     if (tourLogo?.file_path) {
       try {
-        const { data: signedUrlData } = await supabase.storage
+        const { data: signedUrlData, error: signedUrlError } = await supabase.storage
           .from('tour-logos')
           .createSignedUrl(tourLogo.file_path, 60 * 60); // 1 hour expiry
+          
+        if (signedUrlError) {
+          console.error("Error creating tour logo signed URL:", signedUrlError);
+          // Try fallback to public URL if signed URL fails
+          const { data: publicUrlData } = supabase.storage
+            .from('tour-logos')
+            .getPublicUrl(tourLogo.file_path);
+            
+          if (publicUrlData?.publicUrl) {
+            console.log("Generated tour logo public URL (fallback):", publicUrlData.publicUrl);
+            return publicUrlData.publicUrl;
+          }
+          return undefined;
+        }
           
         if (signedUrlData?.signedUrl) {
           console.log("Generated tour logo signed URL:", signedUrlData.signedUrl);

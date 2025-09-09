@@ -40,14 +40,25 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
 
       if (data?.file_path) {
         try {
-          const { data: publicUrlData } = supabase
-            .storage
+          // Try signed URL first for private bucket
+          const { data: signedUrlData } = await supabase.storage
             .from('festival-logos')
-            .getPublicUrl(data.file_path);
+            .createSignedUrl(data.file_path, 60 * 60); // 1 hour expiry
             
-          if (publicUrlData?.publicUrl) {
-            console.log("Found existing festival logo:", publicUrlData.publicUrl);
-            setLogoUrl(publicUrlData.publicUrl);
+          if (signedUrlData?.signedUrl) {
+            console.log("Found existing festival logo:", signedUrlData.signedUrl);
+            setLogoUrl(signedUrlData.signedUrl);
+          } else {
+            // Fallback to public URL
+            const { data: publicUrlData } = supabase
+              .storage
+              .from('festival-logos')
+              .getPublicUrl(data.file_path);
+              
+            if (publicUrlData?.publicUrl) {
+              console.log("Found existing festival logo (public):", publicUrlData.publicUrl);
+              setLogoUrl(publicUrlData.publicUrl);
+            }
           }
         } catch (e: any) {
           console.error('Error getting logo public URL:', e);
@@ -157,14 +168,23 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
         throw new Error(`Error saving logo information: ${dbError.message}`);
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase
-        .storage
+      // Get signed URL for private bucket
+      const { data: signedUrlData } = await supabase.storage
         .from('festival-logos')
-        .getPublicUrl(filePath);
+        .createSignedUrl(filePath, 60 * 60); // 1 hour expiry
 
-      console.log("Uploaded new festival logo, public URL:", publicUrl);
-      setLogoUrl(publicUrl);
+      if (signedUrlData?.signedUrl) {
+        console.log("Uploaded new festival logo, signed URL:", signedUrlData.signedUrl);
+        setLogoUrl(signedUrlData.signedUrl);
+      } else {
+        // Fallback to public URL
+        const { data: { publicUrl } } = supabase
+          .storage
+          .from('festival-logos')
+          .getPublicUrl(filePath);
+        console.log("Uploaded new festival logo, public URL:", publicUrl);
+        setLogoUrl(publicUrl);
+      }
 
       toast({
         title: "Success",
