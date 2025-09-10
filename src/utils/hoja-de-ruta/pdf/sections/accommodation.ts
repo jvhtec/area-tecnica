@@ -46,33 +46,45 @@ export class AccommodationSection {
 
       // Add hotel map and route QR if address exists
       if (accommodation.address) {
+        yPosition = this.pdfDoc.checkPageBreak(yPosition, 100);
+        
+        const mapWidth = 160;
+        const mapHeight = 80;
+        let mapAdded = false;
+        
         try {
-          yPosition = this.pdfDoc.checkPageBreak(yPosition, 100);
-          
           const coords = await MapService.geocodeAddress(accommodation.address);
           if (coords) {
-            const mapDataUrl = await MapService.getStaticMapDataUrl(coords.lat, coords.lng, 160, 80);
+            const mapDataUrl = await MapService.getStaticMapDataUrl(coords.lat, coords.lng, mapWidth, mapHeight);
             if (mapDataUrl) {
-              // Add map
-              const mapWidth = 160;
-              const mapHeight = 80;
               this.pdfDoc.addImage(mapDataUrl, "JPEG", 20, yPosition, mapWidth, mapHeight);
-              
-              // Generate and add route QR
-              const routeUrl = MapService.generateRouteUrl(DEPARTURE_ADDRESS, accommodation.address);
-              const qrCode = await QRService.generateQRCode(routeUrl);
-              this.pdfDoc.addImage(qrCode, "PNG", mapWidth + 30, yPosition, 50, 50);
-              
-              // Add QR info text
-              this.pdfDoc.setText(8, [80, 80, 80]);
-              this.pdfDoc.addText("Ruta al hotel", mapWidth + 30, yPosition + 55);
-              
-              yPosition += mapHeight + 15;
+              mapAdded = true;
             }
           }
         } catch (error) {
           console.error("Error adding hotel map:", error);
         }
+        
+        // Add fallback if map failed
+        if (!mapAdded) {
+          this.pdfDoc.setText(10, [125, 1, 1]);
+          this.pdfDoc.addText("[MAPA NO DISPONIBLE]", 20, yPosition + 35);
+        }
+        
+        // Always generate and add route QR
+        try {
+          const routeUrl = MapService.generateRouteUrl(DEPARTURE_ADDRESS, accommodation.address);
+          const qrCode = await QRService.generateQRCode(routeUrl);
+          this.pdfDoc.addImage(qrCode, "PNG", mapWidth + 30, yPosition, 50, 50);
+          
+          // Add QR info text
+          this.pdfDoc.setText(8, [80, 80, 80]);
+          this.pdfDoc.addText("Ruta al hotel", mapWidth + 30, yPosition + 55);
+        } catch (qrError) {
+          console.error("Error generating hotel QR:", qrError);
+        }
+        
+        yPosition += mapHeight + 15;
       }
 
       // Rooming subheader

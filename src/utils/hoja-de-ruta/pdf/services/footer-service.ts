@@ -43,13 +43,12 @@ export class FooterService {
 
   private static async loadSectorProLogo(): Promise<string | null> {
     try {
-      // Try multiple possible paths for the Sector Pro logo
+      // Try multiple possible paths for the Sector Pro logo (match other PDFs)
       const possiblePaths = [
-        '/sector-pro-logo.png',
-        '/images/sector-pro-logo.png',
-        '/assets/sector-pro-logo.png',
-        '/public/sector-pro-logo.png',
-        '/lovable-uploads/2f12a6ef-587b-4049-ad53-d83fb94064e3.png' // Fallback to app icon
+        '/sector pro logo.png', // Primary path with spaces (matches other PDFs)
+        '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', // Known fallback
+        '/sector%20pro%20logo.png', // URL encoded version
+        '/sector-pro-logo.png'
       ];
 
       for (const path of possiblePaths) {

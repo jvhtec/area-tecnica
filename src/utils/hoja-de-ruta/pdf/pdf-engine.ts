@@ -16,6 +16,7 @@ export class PDFEngine {
 
   constructor(private options: PDFGenerationOptions) {
     this.pdfDoc = new PDFDocument();
+    this.headerSection = new HeaderSection(this.pdfDoc);
     this.contentSections = new ContentSections(this.pdfDoc);
   }
 
@@ -41,8 +42,7 @@ export class PDFEngine {
       // Each major section starts on a new page as per requirements
       // 2. Job Details and Venue (combined on same page)
       if (this.contentSections.hasEventDetailsData(this.options.eventData) || this.contentSections.hasVenueData(this.options.eventData)) {
-        this.pdfDoc.addPage();
-        let currentY = 75;
+        let currentY = this.headerSection.addSectionHeader("Detalles y Venue");
         
         if (this.contentSections.hasEventDetailsData(this.options.eventData)) {
           currentY = this.contentSections.addEventDetailsSection(this.options.eventData, currentY);
@@ -59,70 +59,70 @@ export class PDFEngine {
 
       // 3. Weather section
       if (this.contentSections.hasWeatherData(this.options.eventData)) {
-        this.pdfDoc.addPage();
-        this.contentSections.addWeatherSection(this.options.eventData, 75);
+        const currentY = this.headerSection.addSectionHeader("Clima");
+        this.contentSections.addWeatherSection(this.options.eventData, currentY);
       }
 
       // 4. Contactos
       if (this.contentSections.hasContactsData(this.options.eventData)) {
-        this.pdfDoc.addPage();
-        this.contentSections.addContactsSection(this.options.eventData, 75);
+        const currentY = this.headerSection.addSectionHeader("Contactos");
+        this.contentSections.addContactsSection(this.options.eventData, currentY);
       }
 
       // 5. Personal
       if (this.contentSections.hasStaffData(this.options.eventData)) {
-        this.pdfDoc.addPage();
-        this.contentSections.addStaffSection(this.options.eventData, 75);
+        const currentY = this.headerSection.addSectionHeader("Personal");
+        this.contentSections.addStaffSection(this.options.eventData, currentY);
       }
 
       // 6. Viajes
       if (this.contentSections.hasTravelData(this.options.travelArrangements)) {
-        this.pdfDoc.addPage();
-        await this.contentSections.addTravelSection(this.options.travelArrangements, 75);
+        const currentY = this.headerSection.addSectionHeader("Viajes");
+        await this.contentSections.addTravelSection(this.options.travelArrangements, currentY);
       }
 
       // 7. Alojamientos
       if (this.contentSections.hasAccommodationData(this.options.accommodations)) {
-        this.pdfDoc.addPage();
+        const currentY = this.headerSection.addSectionHeader("Alojamientos");
         await this.contentSections.addAccommodationSection(
           this.options.accommodations || [], 
           this.options.eventData, 
-          75
+          currentY
         );
       }
 
       // 8. Rooming
       if (this.contentSections.hasRoomingData(this.options.accommodations)) {
-        this.pdfDoc.addPage();
+        const currentY = this.headerSection.addSectionHeader("Rooming");
         this.contentSections.addRoomingSection(
           this.options.accommodations || [], 
           this.options.eventData, 
-          75
+          currentY
         );
       }
 
       // 9. Transportes
       if (this.contentSections.hasLogisticsData(this.options.eventData)) {
-        this.pdfDoc.addPage();
-        this.contentSections.addLogisticsSection(this.options.eventData, 75);
+        const currentY = this.headerSection.addSectionHeader("Transportes");
+        this.contentSections.addLogisticsSection(this.options.eventData, currentY);
       }
 
       // 10. Power Requirements
       if (this.contentSections.hasPowerData(this.options.eventData)) {
-        this.pdfDoc.addPage();
-        this.contentSections.addPowerSection(this.options.eventData, 75);
+        const currentY = this.headerSection.addSectionHeader("Requerimientos eléctricos");
+        this.contentSections.addPowerSection(this.options.eventData, currentY);
       }
 
       // 11. Necesidades Auxiliares
       if (this.contentSections.hasAuxNeedsData(this.options.eventData)) {
-        this.pdfDoc.addPage();
-        this.contentSections.addAuxNeedsSection(this.options.eventData, 75);
+        const currentY = this.headerSection.addSectionHeader("Necesidades auxiliares");
+        this.contentSections.addAuxNeedsSection(this.options.eventData, currentY);
       }
 
       // 12. Programa
       if (this.contentSections.hasProgramData(this.options.eventData)) {
-        this.pdfDoc.addPage();
-        this.contentSections.addProgramSection(this.options.eventData, 75);
+        const currentY = this.headerSection.addSectionHeader("Programa");
+        this.contentSections.addProgramSection(this.options.eventData, currentY);
       }
 
       // Add Sector-Pro footer to all pages
