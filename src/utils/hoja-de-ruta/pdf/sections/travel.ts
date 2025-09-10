@@ -68,65 +68,54 @@ export class TravelSection {
   }
 
   private async addPickupMapAndQR(pickupAddress: string, yPosition: number): Promise<void> {
-    yPosition = this.pdfDoc.checkPageBreak(yPosition, 100);
-    
-    this.pdfDoc.setText(11, [125, 1, 1]);
-    this.pdfDoc.addText('Mapa de Recogida:', 20, yPosition);
-    yPosition += 10;
-    
     try {
       // Try to geocode and add static OSM map
       const coords = await MapService.geocodeAddress(pickupAddress);
-      let mapAdded = false;
-      
       if (coords) {
         const mapDataUrl = await MapService.getStaticMapDataUrl(coords.lat, coords.lng);
         if (mapDataUrl) {
+          yPosition = this.pdfDoc.checkPageBreak(yPosition, 100);
+          
+          this.pdfDoc.setText(11, [125, 1, 1]);
+          this.pdfDoc.addText('Mapa de Recogida:', 20, yPosition);
+          yPosition += 10;
+          
           try {
             const mapWidth = 160;
             const mapHeight = 80;
             this.pdfDoc.addImage(mapDataUrl, 'JPEG', 25, yPosition, mapWidth, mapHeight);
-            mapAdded = true;
           } catch (err) {
             console.error('Error adding pickup map:', err);
           }
         }
       }
-      
-      // If map failed, show placeholder
-      if (!mapAdded) {
-        this.pdfDoc.setText(10, [80, 80, 80]);
-        this.pdfDoc.addText('[MAPA NO DISPONIBLE]', 25, yPosition);
-        this.pdfDoc.addText(pickupAddress, 25, yPosition + 12);
-      }
 
-      // Always generate QR to Google Maps route
+      // Generate QR to Google Maps route
       const pickupRouteUrl = MapService.generateRouteUrl(DEPARTURE_ADDRESS, pickupAddress);
       const pickupQrDataUrl = await QRService.generateQRCode(pickupRouteUrl);
-      
-      yPosition = this.pdfDoc.checkPageBreak(yPosition, 70);
-      const qrSize = 50;
-      this.pdfDoc.addImage(pickupQrDataUrl, 'PNG', 25, yPosition, qrSize, qrSize);
+      if (pickupQrDataUrl) {
+        const { width: pageWidth } = this.pdfDoc.dimensions;
+        yPosition = this.pdfDoc.checkPageBreak(yPosition, 70);
 
-      // Info box
-      this.pdfDoc.document.setDrawColor(200, 200, 200);
-      this.pdfDoc.document.setLineWidth(0.3);
-      this.pdfDoc.document.rect(85, yPosition, 110, qrSize);
-      this.pdfDoc.setFillColor(248, 249, 250);
-      this.pdfDoc.addRect(85, yPosition, 110, 15, 'F');
+        const qrSize = 50;
+        this.pdfDoc.addImage(pickupQrDataUrl, 'PNG', 25, yPosition, qrSize, qrSize);
 
-      this.pdfDoc.setText(10, [125, 1, 1]);
-      this.pdfDoc.addText('Ruta a Recogida', 90, yPosition + 10);
+        // Info box
+        this.pdfDoc.document.setDrawColor(200, 200, 200);
+        this.pdfDoc.document.setLineWidth(0.3);
+        this.pdfDoc.document.rect(85, yPosition, 110, qrSize);
+        this.pdfDoc.setFillColor(248, 249, 250);
+        this.pdfDoc.addRect(85, yPosition, 110, 15, 'F');
 
-      this.pdfDoc.setText(8, [51, 51, 51]);
-      this.pdfDoc.addText('Escanea para obtener', 90, yPosition + 25);
-      this.pdfDoc.addText('direcciones en Google Maps', 90, yPosition + 35);
-      
+        this.pdfDoc.setText(10, [125, 1, 1]);
+        this.pdfDoc.addText('Ruta a Recogida', 90, yPosition + 10);
+
+        this.pdfDoc.setText(8, [51, 51, 51]);
+        this.pdfDoc.addText('Escanea para obtener', 90, yPosition + 25);
+        this.pdfDoc.addText('direcciones en Google Maps', 90, yPosition + 35);
+      }
     } catch (error) {
       console.error('Error adding pickup map and QR:', error);
-      // Show minimal fallback
-      this.pdfDoc.setText(10, [80, 80, 80]);
-      this.pdfDoc.addText('[ERROR CARGANDO MAPA/QR]', 25, yPosition);
     }
   }
 }

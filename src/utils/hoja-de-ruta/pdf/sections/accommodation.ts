@@ -46,12 +46,10 @@ export class AccommodationSection {
 
       // Add hotel map and route QR if address exists
       if (accommodation.address) {
-        yPosition = this.pdfDoc.checkPageBreak(yPosition, 100);
-        
         try {
-          const coords = await MapService.geocodeAddress(accommodation.address);
-          let mapAdded = false;
+          yPosition = this.pdfDoc.checkPageBreak(yPosition, 100);
           
+          const coords = await MapService.geocodeAddress(accommodation.address);
           if (coords) {
             const mapDataUrl = await MapService.getStaticMapDataUrl(coords.lat, coords.lng, 160, 80);
             if (mapDataUrl) {
@@ -59,41 +57,21 @@ export class AccommodationSection {
               const mapWidth = 160;
               const mapHeight = 80;
               this.pdfDoc.addImage(mapDataUrl, "JPEG", 20, yPosition, mapWidth, mapHeight);
-              mapAdded = true;
+              
+              // Generate and add route QR
+              const routeUrl = MapService.generateRouteUrl(DEPARTURE_ADDRESS, accommodation.address);
+              const qrCode = await QRService.generateQRCode(routeUrl);
+              this.pdfDoc.addImage(qrCode, "PNG", mapWidth + 30, yPosition, 50, 50);
+              
+              // Add QR info text
+              this.pdfDoc.setText(8, [80, 80, 80]);
+              this.pdfDoc.addText("Ruta al hotel", mapWidth + 30, yPosition + 55);
+              
+              yPosition += mapHeight + 15;
             }
           }
-          
-          // If map failed, show placeholder
-          if (!mapAdded) {
-            this.pdfDoc.setText(10, [80, 80, 80]);
-            this.pdfDoc.addText("[MAPA NO DISPONIBLE]", 20, yPosition);
-            this.pdfDoc.addText(accommodation.address, 20, yPosition + 12);
-          }
-          
-          // Always generate and add route QR
-          const routeUrl = MapService.generateRouteUrl(DEPARTURE_ADDRESS, accommodation.address);
-          const qrCode = await QRService.generateQRCode(routeUrl);
-          const mapWidth = 160;
-          this.pdfDoc.addImage(qrCode, "PNG", mapWidth + 30, yPosition, 50, 50);
-          
-          // Add QR info text
-          this.pdfDoc.setText(8, [80, 80, 80]);
-          this.pdfDoc.addText("Ruta al hotel", mapWidth + 30, yPosition + 55);
-          
-          yPosition += 80 + 15;
         } catch (error) {
-          console.error("Error adding hotel map/QR:", error);
-          // Always show QR even if map fails
-          try {
-            const routeUrl = MapService.generateRouteUrl(DEPARTURE_ADDRESS, accommodation.address);
-            const qrCode = await QRService.generateQRCode(routeUrl);
-            this.pdfDoc.addImage(qrCode, "PNG", 20, yPosition, 50, 50);
-            this.pdfDoc.setText(8, [80, 80, 80]);
-            this.pdfDoc.addText("Ruta al hotel", 80, yPosition + 25);
-            yPosition += 65;
-          } catch (qrError) {
-            console.error("Error adding QR code:", qrError);
-          }
+          console.error("Error adding hotel map:", error);
         }
       }
 
