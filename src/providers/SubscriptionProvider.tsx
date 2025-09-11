@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { PerformanceOptimizedSubscriptionManager } from '@/lib/performance-optimized-subscription-manager';
+import { UnifiedSubscriptionManager } from '@/lib/unified-subscription-manager';
 import { toast } from 'sonner';
 import { TokenManager } from '@/lib/token-manager';
 import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
@@ -71,28 +71,41 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     };
   }, []);
 
-  // Initialize the performance-optimized subscription manager
+  // Initialize the subscription manager
   useEffect(() => {
-    const manager = PerformanceOptimizedSubscriptionManager.getInstance(queryClient);
+    const manager = UnifiedSubscriptionManager.getInstance(queryClient);
     
-    // Performance optimization: Only leader handles heavy operations
+    // Only setup network status and visibility monitoring for leader
+    if (isLeader) {
+      manager.setupNetworkStatusRefetching();
+      manager.setupVisibilityBasedRefetching();
+    }
     
     // Subscribe to token refreshes to update subscriptions
     const unsubscribe = tokenManager.subscribe(() => {
       console.log("Token refreshed, updating subscriptions");
       
-      // Force refresh all subscriptions with the optimized manager
-      manager.forceRefresh();
+      // Get current subscriptions by table
+      const tables = Object.keys(manager.getSubscriptionsByTable());
+      
+      // Force refresh all subscriptions
+      manager.forceRefreshSubscriptions(tables);
+      queryClient.invalidateQueries();
       setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
     });
     
-    // Define refresh function with performance optimization
+    // Define refresh function
     const refreshSubscriptions = () => {
       console.log("Manually refreshing subscriptions...");
       
-      manager.forceRefresh();
+      // Get current subscriptions by table
+      const tables = Object.keys(manager.getSubscriptionsByTable());
+      
+      // Force refresh all subscriptions
+      manager.forceRefreshSubscriptions(tables);
       setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
       
+      // Show toast notification
       toast.success("Subscriptions refreshed");
     };
     
@@ -107,36 +120,48 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
       setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
     };
     
-    // Define force refresh function - simplified for performance
+    // Define force refresh function for specific tables
     const forceRefresh = (tables?: string[]) => {
-      manager.forceRefresh();
-      
       if (tables && tables.length > 0) {
+        // Refresh specific tables
+        manager.forceRefreshSubscriptions(tables);
+        
+        // Invalidate related queries
+        tables.forEach(table => {
+          queryClient.invalidateQueries({ queryKey: [table] });
+        });
+        
         toast.success(`Refreshed ${tables.join(', ')} tables`);
       } else {
+        // Refresh all tables
+        const allTables = Object.keys(manager.getSubscriptionsByTable());
+        manager.forceRefreshSubscriptions(allTables);
+        queryClient.invalidateQueries();
         toast.success('All subscriptions refreshed');
       }
       
       setState(prev => ({ ...prev, lastRefreshTime: Date.now() }));
     };
     
-    // Define force subscribe function - simplified for performance
+    // Define force subscribe function for specific tables
     const forceSubscribe = (tables: string[]) => {
       if (!tables || tables.length === 0) return;
       
       console.log(`Ensuring subscriptions for tables: ${tables.join(', ')}`);
       
-      // Subscribe to each table with optimized manager
+      // Subscribe to each table, ensuring they're active
       tables.forEach(table => {
-        manager.subscribeToTable(table, table, 'medium');
+        if (!manager.getSubscriptionsByTable()[table]?.length) {
+          manager.subscribeToTable(table, table);
+        }
       });
       
-      // Update state with current stats
-      const stats = manager.getStats();
+      // Update state to reflect new subscriptions
       setState(prev => ({ 
         ...prev, 
-        subscriptionCount: stats.subscriptionCount,
-        activeSubscriptions: [] // Simplified for performance
+        subscriptionsByTable: manager.getSubscriptionsByTable(),
+        subscriptionCount: manager.getSubscriptionCount(),
+        activeSubscriptions: manager.getActiveSubscriptions()
       }));
     };
     
@@ -150,10 +175,10 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
       lastRefreshTime: Date.now()
     }));
     
-    // Set initial connection status - simplified
+    // Set initial connection status from manager
     setState(prev => ({
       ...prev, 
-      connectionStatus: 'connecting'
+      connectionStatus: manager.getConnectionStatus()
     }));
     
     // Clear any existing interval
@@ -166,28 +191,29 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     const intervalTime = isLeader ? 2000 : 5000; // 2s for leader, 5s for followers
     
     connectionCheckIntervalRef.current = window.setInterval(() => {
-      const stats = manager.getStats();
+      const connectionStatus = manager.getConnectionStatus();
       
-      // Only notify users of critical issues if we're the leader
-      if (isLeader && stats.circuitBreakerOpen && !lastConnectionStatusRef.current.includes('circuit')) {
-        toast.error('Database connection issues detected', {
-          description: 'Performance may be degraded. We\'re working to resolve this.',
-          duration: 8000,
-        });
-        lastConnectionStatusRef.current = 'circuit-open';
-      } else if (isLeader && !stats.circuitBreakerOpen && lastConnectionStatusRef.current.includes('circuit')) {
-        toast.success('Database performance restored', {
-          description: 'All systems are operating normally.'
-        });
-        lastConnectionStatusRef.current = 'connected';
+      // Only notify users of connection status changes if we're the leader
+      if (isLeader && connectionStatus !== lastConnectionStatusRef.current) {
+        if (connectionStatus === 'connected' && lastConnectionStatusRef.current !== 'connected') {
+          toast.success('Connection restored', {
+            description: 'Real-time updates are now active'
+          });
+        } else if (connectionStatus === 'disconnected' && lastConnectionStatusRef.current === 'connected') {
+          toast.error('Connection lost', {
+            description: 'Attempting to reconnect...'
+          });
+        }
+        
+        lastConnectionStatusRef.current = connectionStatus;
       }
       
       setState(prev => ({
         ...prev,
-        connectionStatus: stats.circuitBreakerOpen ? 'disconnected' : 'connected',
-        subscriptionCount: stats.subscriptionCount,
-        activeSubscriptions: [], // Simplified for performance
-        subscriptionsByTable: {}, // Simplified for performance
+        connectionStatus: manager.getConnectionStatus(),
+        activeSubscriptions: manager.getActiveSubscriptions(),
+        subscriptionCount: manager.getSubscriptionCount(),
+        subscriptionsByTable: manager.getSubscriptionsByTable(),
       }));
     }, intervalTime);
     
@@ -199,18 +225,18 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     };
   }, [queryClient, isLeader]);
 
-  // Setup core tables subscription with performance optimization
+  // Setup core tables subscription (only for leader)
   useEffect(() => {
     if (isLeader) {
-      const manager = PerformanceOptimizedSubscriptionManager.getInstance(queryClient);
+      const manager = UnifiedSubscriptionManager.getInstance(queryClient);
       
-      // Set up only essential core tables with high priority
-      manager.subscribeToTable('profiles', 'profiles', 'high');
-      manager.subscribeToTable('jobs', 'jobs', 'high');
+      // Set up core tables that most pages need
+      manager.subscribeToTable('profiles', 'profiles', undefined, 'high');
+      manager.subscribeToTable('jobs', 'jobs', undefined, 'high');
     }
     
     return () => {
-      // Cleanup handled by the manager
+      // Don't unsubscribe from core tables as they are needed throughout the app
     };
   }, [queryClient, isLeader]);
 

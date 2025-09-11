@@ -31,7 +31,7 @@ const Festivals = () => {
     error, 
     isRefreshing, 
     refetch,
-    realtimeStatus
+    subscriptionStatus
   } = useJobsRealtime();
   
   const [festivalJobs, setFestivalJobs] = useState<any[]>([]);

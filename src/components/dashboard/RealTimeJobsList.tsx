@@ -35,7 +35,7 @@ export function RealTimeJobsList({
   onDeleteClick,
   userRole 
 }: RealTimeJobsListProps) {
-  const { jobs, isLoading, isRefreshing, refetch, realtimeStatus } = useJobsRealtime();
+  const { jobs, isLoading, isRefreshing, refetch, subscriptionStatus } = useJobsRealtime();
   const [timeFilter, setTimeFilter] = useState<"upcoming" | "past" | "all">("upcoming");
 
   // Filter jobs based on department if needed
