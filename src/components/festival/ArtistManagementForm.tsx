@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { BasicInfoSection } from "./form/sections/BasicInfoSection";
 import { ConsoleSetupSection } from "./form/sections/ConsoleSetupSection";
 import { WirelessSetupSection } from "./form/sections/WirelessSetupSection";

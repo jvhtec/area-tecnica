@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { Save } from "lucide-react";
 import { GearSetupFormData } from "@/types/festival-gear";
 import { StageGearSetup } from "@/types/festival";

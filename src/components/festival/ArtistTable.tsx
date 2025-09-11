@@ -10,7 +10,7 @@ import { ArtistFileDialog } from "./ArtistFileDialog";
 import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
 import { sortArtistsChronologically } from "@/utils/artistSorting";
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { compareArtistRequirements, ArtistGearComparison } from "@/utils/gearComparisonService";

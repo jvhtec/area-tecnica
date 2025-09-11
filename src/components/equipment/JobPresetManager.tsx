@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Equipment, PresetItem } from '@/types/equipment';
+import { Equipment } from '@/types/equipment';
 import { useToast } from '@/hooks/use-toast';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Minus, Save } from 'lucide-react';
 
@@ -17,41 +17,10 @@ interface JobPresetManagerProps {
 
 export const JobPresetManager = ({ jobId }: JobPresetManagerProps) => {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [localItems, setLocalItems] = useState<Record<string, number>>({});
 
-  // Fetch job preset and items
-  const { data: preset } = useQuery({
-    queryKey: ['job-preset', jobId],
-    queryFn: async () => {
-      const { data: presetData, error: presetError } = await supabase
-        .from('job_equipment_presets')
-        .select('*')
-        .eq('job_id', jobId)
-        .single();
-
-      if (presetError) throw presetError;
-
-      if (presetData) {
-        const { data: items, error: itemsError } = await supabase
-          .from('job_preset_items')
-          .select(`
-            *,
-            equipment:equipment (*)
-          `)
-          .eq('preset_id', presetData.id);
-
-        if (itemsError) throw itemsError;
-
-        return {
-          ...presetData,
-          items: items || []
-        };
-      }
-
-      return null;
-    }
-  });
+  // Note: This is a temporary stub - job equipment preset tables don't exist yet
+  const preset = null;
 
   // Fetch available equipment
   const { data: equipmentList = [] } = useQuery<Equipment[]>({
@@ -68,74 +37,14 @@ export const JobPresetManager = ({ jobId }: JobPresetManagerProps) => {
     }
   });
 
-  // Initialize local items from preset
-  useState(() => {
-    if (preset?.items) {
-      const initialItems: Record<string, number> = {};
-      preset.items.forEach((item: PresetItem) => {
-        initialItems[item.equipment_id] = item.quantity;
-      });
-      setLocalItems(initialItems);
-    }
-  });
-
-  // Save preset mutation
-  const savePresetMutation = useMutation({
-    mutationFn: async () => {
-      // Create preset if it doesn't exist
-      let presetId = preset?.id;
-      if (!presetId) {
-        const { data: newPreset, error: presetError } = await supabase
-          .from('job_equipment_presets')
-          .insert({ job_id: jobId })
-          .select()
-          .single();
-
-        if (presetError) throw presetError;
-        presetId = newPreset.id;
-      }
-
-      // Update preset items
-      const items = Object.entries(localItems).map(([equipmentId, quantity]) => ({
-        preset_id: presetId,
-        equipment_id: equipmentId,
-        quantity,
-        notes: '', // Add empty notes field
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }));
-
-      // Delete existing items
-      const { error: deleteError } = await supabase
-        .from('job_preset_items')
-        .delete()
-        .eq('preset_id', presetId);
-
-      if (deleteError) throw deleteError;
-
-      // Insert new items
-      const { error: insertError } = await supabase
-        .from('job_preset_items')
-        .insert(items);
-
-      if (insertError) throw insertError;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['job-preset'] });
-      toast({
-        title: "Success",
-        description: "Preset saved successfully"
-      });
-    },
-    onError: (error) => {
-      console.error('Error saving preset:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save preset",
-        variant: "destructive"
-      });
-    }
-  });
+  // Save preset function (placeholder)
+  const handleSavePreset = () => {
+    toast({
+      title: "Coming Soon",
+      description: "Job equipment presets will be available soon",
+      variant: "default"
+    });
+  };
 
   const handleQuantityChange = (equipmentId: string, newQuantity: number) => {
     setLocalItems(prev => ({
@@ -161,9 +70,8 @@ export const JobPresetManager = ({ jobId }: JobPresetManagerProps) => {
       </CardHeader>
       <CardContent>
         <Button
-          onClick={() => savePresetMutation.mutate()}
+          onClick={handleSavePreset}
           className="w-full mb-4"
-          disabled={savePresetMutation.isPending}
         >
           <Save className="mr-2 h-4 w-4" />
           Save Preset

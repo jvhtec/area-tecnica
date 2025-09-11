@@ -31,13 +31,20 @@ export function StockMovementDialog({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const stockMovementMutation = useMutation({
-    mutationFn: async () => {
-      if (!session?.user?.id) throw new Error('Not authenticated');
-      
-      // Get current stock entry
+  const handleStockMovement = async () => {
+    if (!session?.user?.id) {
+      toast({
+        variant: "destructive",
+        title: "Error", 
+        description: "Not authenticated"
+      });
+      return;
+    }
+
+    try {
+      // Get current stock entry from global_stock_entries
       const { data: stockEntry } = await supabase
-        .from('stock_entries')
+        .from('global_stock_entries')
         .select('*')
         .eq('equipment_id', equipment.id)
         .maybeSingle();
@@ -52,30 +59,17 @@ export function StockMovementDialog({
         throw new Error('Not enough stock available');
       }
 
-      // Begin transaction
-      const { error: stockMovementError } = await supabase
-        .from('stock_movements')
-        .insert({
-          equipment_id: equipment.id,
-          quantity: movementQty,
-          movement_type: isAddition ? 'addition' : 'subtraction',
-          notes: notes.trim() || null,
-          user_id: session.user.id  // Added this line to include the user_id
-        });
-
-      if (stockMovementError) throw stockMovementError;
-
       // Update or insert stock entry
       if (stockEntry) {
         const { error: updateError } = await supabase
-          .from('stock_entries')
+          .from('global_stock_entries')
           .update({ base_quantity: newBaseQty })
           .eq('id', stockEntry.id);
 
         if (updateError) throw updateError;
       } else {
         const { error: insertError } = await supabase
-          .from('stock_entries')
+          .from('global_stock_entries')
           .insert({
             equipment_id: equipment.id,
             base_quantity: newBaseQty
@@ -83,29 +77,26 @@ export function StockMovementDialog({
 
         if (insertError) throw insertError;
       }
-    },
-    onSuccess: () => {
-      // Invalidate both queries to refresh the UI
+
+      // Invalidate queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ['current-stock-levels'] });
-      queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
       toast({
         title: "Success",
         description: `Stock ${isAddition ? 'added' : 'removed'} successfully`
       });
       handleClose();
-    },
-    onError: (error) => {
+    } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Error",
         description: error.message
       });
     }
-  });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    stockMovementMutation.mutate();
+    handleStockMovement();
   };
 
   const handleClose = () => {
@@ -157,15 +148,14 @@ export function StockMovementDialog({
               type="button"
               variant="outline"
               onClick={handleClose}
-              disabled={stockMovementMutation.isPending}
             >
               Cancel
             </Button>
             <Button 
               type="submit"
-              disabled={stockMovementMutation.isPending || (!isAddition && quantity > currentStock)}
+              disabled={(!isAddition && quantity > currentStock)}
             >
-              {stockMovementMutation.isPending ? "Processing..." : "Confirm"}
+              Confirm
             </Button>
           </DialogFooter>
         </form>

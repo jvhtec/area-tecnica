@@ -28,22 +28,9 @@ interface StockMovement {
 }
 
 export function StockMovementHistory() {
-  const { data: movements, isLoading } = useQuery({
-    queryKey: ['stock-movements'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('stock_movements')
-        .select(`
-          *,
-          equipment (name),
-          profiles (first_name, last_name)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data as StockMovement[];
-    }
-  });
+  // Note: Stock movements table doesn't exist yet - showing placeholder
+  const movements: any[] = [];
+  const isLoading = false;
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -66,24 +53,11 @@ export function StockMovementHistory() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {movements?.map((movement) => (
-              <TableRow key={movement.id}>
-                <TableCell>
-                  {format(new Date(movement.created_at), 'dd/MM/yyyy HH:mm')}
-                </TableCell>
-                <TableCell>{movement.equipment.name}</TableCell>
-                <TableCell>
-                  <span className={movement.movement_type === 'addition' ? 'text-green-600' : 'text-red-600'}>
-                    {movement.movement_type === 'addition' ? 'Addition' : 'Subtraction'}
-                  </span>
-                </TableCell>
-                <TableCell>{Math.abs(movement.quantity)}</TableCell>
-                <TableCell>
-                  {movement.profiles.first_name} {movement.profiles.last_name}
-                </TableCell>
-                <TableCell>{movement.notes || '-'}</TableCell>
-              </TableRow>
-            ))}
+            <TableRow>
+              <TableCell colSpan={6} className="text-center text-muted-foreground">
+                Stock movement tracking coming soon
+              </TableCell>
+            </TableRow>
           </TableBody>
         </Table>
       </div>
