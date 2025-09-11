@@ -124,8 +124,17 @@ export class TravelSection {
       if (coords) {
         const mapDataUrl = await MapService.getStaticMapDataUrl(coords.lat, coords.lng, mapWidth, mapHeight);
         if (mapDataUrl) {
-          this.pdfDoc.addImage(mapDataUrl, 'JPEG', mapX, mapY, mapWidth, mapHeight);
-          mapAdded = true;
+          try {
+            this.pdfDoc.addImage(mapDataUrl, 'PNG', mapX, mapY, mapWidth, mapHeight);
+            mapAdded = true;
+          } catch (errPng) {
+            try {
+              this.pdfDoc.addImage(mapDataUrl, 'JPEG', mapX, mapY, mapWidth, mapHeight);
+              mapAdded = true;
+            } catch (err) {
+              console.error('Error adding pickup map:', err);
+            }
+          }
         }
       }
     } catch (error) {

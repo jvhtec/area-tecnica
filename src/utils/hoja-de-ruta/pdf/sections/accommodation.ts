@@ -89,8 +89,17 @@ export class AccommodationSection {
           if (coords) {
             const mapDataUrl = await MapService.getStaticMapDataUrl(coords.lat, coords.lng, mapW, mapHeight);
             if (mapDataUrl) {
-              this.pdfDoc.addImage(mapDataUrl, "JPEG", mapX, mapY, mapW, mapHeight);
-              mapAdded = true;
+              try {
+                this.pdfDoc.addImage(mapDataUrl, 'PNG', mapX, mapY, mapW, mapHeight);
+                mapAdded = true;
+              } catch (errPng) {
+                try {
+                  this.pdfDoc.addImage(mapDataUrl, 'JPEG', mapX, mapY, mapW, mapHeight);
+                  mapAdded = true;
+                } catch (err) {
+                  console.error('Error adding accommodation map:', err);
+                }
+              }
             }
           }
         } catch (error) {
