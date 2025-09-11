@@ -16,6 +16,8 @@ export const DatabaseHealthIndicator = () => {
   });
   const [isChecking, setIsChecking] = useState(false);
   const [lastCheck, setLastCheck] = useState<Date | null>(null);
+  
+  // Force refresh to clear any cached references
 
   const checkHealth = async () => {
     setIsChecking(true);
