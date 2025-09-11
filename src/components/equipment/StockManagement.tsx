@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { supabase } from '@/lib/supabase';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -10,7 +10,7 @@ import { Plus, Minus } from 'lucide-react';
 import { StockMovementDialog } from './StockMovementDialog';
 
 export function StockManagement() {
-  const { session } = useAuth();
+  const { session } = useOptimizedAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);

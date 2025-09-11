@@ -8,7 +8,7 @@ import { PresetWithItems, Equipment, PresetItem } from '@/types/equipment';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Save, X } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 
 interface PresetEditorProps {
   preset?: PresetWithItems;
@@ -18,7 +18,7 @@ interface PresetEditorProps {
 }
 
 export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel }: PresetEditorProps) => {
-  const { session } = useAuth();
+  const { session } = useOptimizedAuth();
   const [name, setName] = useState(preset?.name || '');
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
     if (!preset?.items) return {};

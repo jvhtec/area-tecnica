@@ -108,24 +108,30 @@ export const useUserPreferences = () => {
 
     loadPreferences();
 
-    // Set up activity tracking
+    // Set up activity tracking with throttling to prevent API spam
     const updateActivity = () => {
-      updatePreferences({ last_activity: new Date().toISOString() });
+      const now = Date.now();
+      const lastUpdate = localStorage.getItem('lastActivityUpdate');
+      const timeSinceLastUpdate = now - (lastUpdate ? parseInt(lastUpdate) : 0);
+      
+      // Only update activity every 5 minutes to prevent API spam
+      if (timeSinceLastUpdate > 5 * 60 * 1000) {
+        localStorage.setItem('lastActivityUpdate', now.toString());
+        updatePreferences({ last_activity: new Date().toISOString() });
+      }
     };
 
     // Check inactivity every minute
     const inactivityInterval = setInterval(checkInactivity, 60000);
 
-    // Track user activity
-    window.addEventListener('mousemove', updateActivity);
-    window.addEventListener('keypress', updateActivity);
+    // Track user activity with throttling (every 5 minutes max)
     window.addEventListener('click', updateActivity);
+    window.addEventListener('keydown', updateActivity);
 
     return () => {
       clearInterval(inactivityInterval);
-      window.removeEventListener('mousemove', updateActivity);
-      window.removeEventListener('keypress', updateActivity);
       window.removeEventListener('click', updateActivity);
+      window.removeEventListener('keydown', updateActivity);
     };
   }, []);
 

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { AvailabilitySchedule } from '@/types/availability';
@@ -16,7 +16,7 @@ interface DisponibilidadCalendarProps {
 }
 
 export function DisponibilidadCalendar({ selectedDate, onDateSelect }: DisponibilidadCalendarProps) {
-  const { session, userDepartment } = useAuth();
+  const { session, userDepartment } = useOptimizedAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
