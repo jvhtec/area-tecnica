@@ -38,6 +38,7 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
           start_date,
           end_date,
           color,
+          status,
           flex_folders_created,
           flex_main_folder_id,
           tour_dates (
@@ -47,7 +48,8 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
           )
         `)
         .order("created_at", { ascending: false })
-        .eq("deleted", false);
+        .eq("deleted", false)
+        .eq("status", "active");
 
       if (toursError) {
         console.error("Error fetching tours:", toursError);

@@ -39,7 +39,8 @@ export const useJobs = () => {
                 )
               ),
               job_documents(*),
-              tour_date:tour_dates(*)
+              tour_date:tour_dates(*),
+              tours(status)
             `)
             .order("start_time", { ascending: true });
 
@@ -49,7 +50,16 @@ export const useJobs = () => {
           }
 
           console.log("Jobs fetched successfully:", jobs);
-          return jobs;
+          
+          // Filter out jobs from cancelled tours
+          const filteredJobs = jobs?.filter(job => {
+            // If job has no tour, include it
+            if (!job.tours) return true;
+            // If job has tour, only include if tour is active
+            return job.tours.status === 'active';
+          }) || [];
+          
+          return filteredJobs;
         } catch (error) {
           if (retries > 0) {
             console.log(`Retrying... ${retries} attempts remaining`);

@@ -1,9 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, MoreVertical, Settings, FileText, Printer, FolderPlus, Image, HardDrive } from "lucide-react";
+import { Calendar, MapPin, MoreVertical, Settings, FileText, Printer, FolderPlus, Image, HardDrive, XCircle, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 import { createSafeFolderName, sanitizeFolderName } from "@/utils/folderNameSanitizer";
 import { useState, useEffect } from "react";
@@ -14,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { createTourRootFolders, createTourDateFolders, createTourRootFoldersManual } from "@/utils/tourFolders";
+import { useQueryClient } from "@tanstack/react-query";
 
 // File System Access API types
 declare global {
@@ -32,6 +34,7 @@ interface TourCardProps {
 export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCardProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isManagementOpen, setIsManagementOpen] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -397,6 +400,38 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
     setIsMobileMenuOpen(false);
   };
 
+  const handleToggleTourStatus = async () => {
+    const newStatus = tour.status === 'active' ? 'cancelled' : 'active';
+    const actionWord = newStatus === 'cancelled' ? 'cancel' : 'reactivate';
+    
+    try {
+      const { error } = await supabase
+        .from('tours')
+        .update({ status: newStatus })
+        .eq('id', tour.id);
+
+      if (error) throw error;
+
+      // Invalidate queries to refresh the UI
+      await queryClient.invalidateQueries({ queryKey: ['tours'] });
+      await queryClient.invalidateQueries({ queryKey: ['tour', tour.id] });
+
+      toast({
+        title: "Success",
+        description: `Tour ${actionWord}ed successfully`,
+      });
+    } catch (error: any) {
+      console.error(`Error ${actionWord}ing tour:`, error);
+      toast({
+        title: "Error",
+        description: `Failed to ${actionWord} tour: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+    
+    setIsMobileMenuOpen(false);
+  };
+
   const MenuItems = () => (
     <>
       <div 
@@ -413,6 +448,23 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
         <Calendar className="h-4 w-4 mr-3" />
         <span>Manage Dates</span>
       </div>
+      {tour.status === 'active' ? (
+        <div 
+          className="flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors text-red-600"
+          onClick={handleToggleTourStatus}
+        >
+          <XCircle className="h-4 w-4 mr-3" />
+          <span>Mark as Not Happening</span>
+        </div>
+      ) : (
+        <div 
+          className="flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors text-green-600"
+          onClick={handleToggleTourStatus}
+        >
+          <CheckCircle className="h-4 w-4 mr-3" />
+          <span>Reactivate Tour</span>
+        </div>
+      )}
       {!tour.flex_folders_created && (
         <div 
           className="flex items-center p-3 hover:bg-accent cursor-pointer rounded-md transition-colors"
@@ -539,6 +591,23 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
                     <Calendar className="h-4 w-4 mr-2" />
                     Manage Dates
                   </DropdownMenuItem>
+                  {tour.status === 'active' ? (
+                    <DropdownMenuItem 
+                      onClick={handleToggleTourStatus}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Mark as Not Happening
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem 
+                      onClick={handleToggleTourStatus}
+                      className="text-green-600 hover:text-green-700"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Reactivate Tour
+                    </DropdownMenuItem>
+                  )}
                   {!tour.flex_folders_created && (
                     <DropdownMenuItem onClick={handleCreateTourRootFolders}>
                       <FolderPlus className="h-4 w-4 mr-2" />
@@ -610,6 +679,12 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
 
             {/* Status badges */}
             <div className="flex gap-2 flex-wrap">
+              {tour.status === 'cancelled' && (
+                <Badge variant="destructive" className="text-xs">
+                  <XCircle className="h-3 w-3 mr-1" />
+                  Cancelled
+                </Badge>
+              )}
               {tour.flex_folders_created ? (
                 <Badge variant="secondary" className="text-xs">
                   <FileText className="h-3 w-3 mr-1" />

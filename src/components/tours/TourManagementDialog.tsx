@@ -3,13 +3,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { TourColorSection } from "./TourColorSection";
 import { TourDeleteSection } from "./TourDeleteSection";
 import { TourDefaultsManager } from "./TourDefaultsManager";
 import { useTourManagement } from "./hooks/useTourManagement";
 import { TourLogoManager } from "./TourLogoManager";
 import { useNavigate } from "react-router-dom";
-import { Calculator, Weight, Settings, Package } from "lucide-react";
+import { Calculator, Weight, Settings, Package, XCircle, CheckCircle } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +35,7 @@ export const TourManagementDialog = ({
   const { handleColorChange, handleNameChange, handleDescriptionChange, handleDelete } = useTourManagement(tour, () => onOpenChange(false));
   const [defaultsManagerOpen, setDefaultsManagerOpen] = useState(false);
   const [isUpdatingTourPack, setIsUpdatingTourPack] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   const handlePowerDefaults = () => {
     // Navigate to ConsumosTool with tour context
@@ -99,6 +101,39 @@ export const TourManagementDialog = ({
     }
   };
 
+  const handleToggleTourStatus = async () => {
+    const newStatus = tour.status === 'active' ? 'cancelled' : 'active';
+    const actionWord = newStatus === 'cancelled' ? 'cancel' : 'reactivate';
+    
+    setIsUpdatingStatus(true);
+    try {
+      const { error } = await supabase
+        .from('tours')
+        .update({ status: newStatus })
+        .eq('id', tour.id);
+
+      if (error) throw error;
+
+      // Refresh tour data
+      await queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
+      await queryClient.invalidateQueries({ queryKey: ["tours"] });
+
+      toast({
+        title: "Success",
+        description: `Tour ${actionWord}ed successfully`,
+      });
+    } catch (error: any) {
+      console.error(`Error ${actionWord}ing tour:`, error);
+      toast({
+        title: "Error",
+        description: `Failed to ${actionWord} tour: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -116,6 +151,53 @@ export const TourManagementDialog = ({
               <TourLogoManager tourId={tour.id} />
             </div>
             
+            <div className="border-b pb-4">
+              <h3 className="text-sm font-medium mb-3">Tour Status</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div className="flex items-center gap-3">
+                    {tour.status === 'cancelled' ? (
+                      <>
+                        <XCircle className="h-4 w-4 text-red-600" />
+                        <div>
+                          <p className="text-sm font-medium">Tour Cancelled</p>
+                          <p className="text-xs text-muted-foreground">This tour is hidden from main views</p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <div>
+                          <p className="text-sm font-medium">Tour Active</p>
+                          <p className="text-xs text-muted-foreground">This tour is visible in all views</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <Button
+                    variant={tour.status === 'cancelled' ? 'default' : 'destructive'}
+                    size="sm"
+                    onClick={handleToggleTourStatus}
+                    disabled={isUpdatingStatus}
+                  >
+                    {isUpdatingStatus ? (
+                      'Updating...'
+                    ) : tour.status === 'cancelled' ? (
+                      'Reactivate Tour'
+                    ) : (
+                      'Mark as Not Happening'
+                    )}
+                  </Button>
+                </div>
+                {tour.status === 'cancelled' && (
+                  <Badge variant="destructive" className="text-xs">
+                    <XCircle className="h-3 w-3 mr-1" />
+                    This tour and its dates are hidden from main views
+                  </Badge>
+                )}
+              </div>
+            </div>
+
             <div className="border-b pb-4">
               <TourColorSection 
                 color={tour.color} 

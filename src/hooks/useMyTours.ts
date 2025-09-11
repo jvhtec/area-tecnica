@@ -36,6 +36,7 @@ export const useMyTours = () => {
             name,
             description,
             color,
+            status,
             start_date,
             end_date,
             tour_dates (
@@ -45,6 +46,7 @@ export const useMyTours = () => {
           )
         `)
         .eq('technician_id', user.id)
+        .eq('tours.status', 'active')
         .order('tours(start_date)', { ascending: true });
 
       if (error) throw error;

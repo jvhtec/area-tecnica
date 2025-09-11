@@ -3809,6 +3809,7 @@ export type Database = {
           id: string
           name: string
           start_date: string | null
+          status: string
         }
         Insert: {
           color?: string | null
@@ -3835,6 +3836,7 @@ export type Database = {
           id?: string
           name: string
           start_date?: string | null
+          status?: string
         }
         Update: {
           color?: string | null
@@ -3861,6 +3863,7 @@ export type Database = {
           id?: string
           name?: string
           start_date?: string | null
+          status?: string
         }
         Relationships: []
       }

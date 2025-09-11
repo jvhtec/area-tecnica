@@ -81,7 +81,8 @@ export const useOptimizedJobs = (
           element_id,
           department,
           folder_type
-        )
+        ),
+        tours(status)
       `)
       .in('job_type', ['single', 'festival', 'tourdate'])
       .order('start_time', { ascending: true });
@@ -121,7 +122,14 @@ export const useOptimizedJobs = (
       flex_folders_exist: (job.flex_folders?.length || 0) > 0,
       // Flatten assignments for easier access
       assignments: job.job_assignments || []
-    })) || [];
+    }))
+      // Filter out jobs from cancelled tours
+      ?.filter(job => {
+        // If job has no tour, include it
+        if (!job.tours) return true;
+        // If job has tour, only include if tour is active
+        return job.tours.status === 'active';
+      }) || [];
 
     const duration = Date.now() - startTime;
     console.log(`useOptimizedJobs: Successfully fetched ${processedJobs.length} jobs in ${duration}ms`);
