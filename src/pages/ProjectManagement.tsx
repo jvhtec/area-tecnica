@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus, FileText, Filter } from "lucide-react";
+import { Loader2, Plus, FileText, Filter, CheckCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Department } from "@/types/department";
 import { startOfMonth, endOfMonth, addMonths, isToday } from "date-fns";
@@ -12,9 +12,12 @@ import { DepartmentTabs } from "@/components/project-management/DepartmentTabs";
 import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
+import { autoCompleteJobs } from "@/utils/jobStatusUtils";
+import { useToast } from "@/hooks/use-toast";
 
 const ProjectManagement = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [selectedDepartment, setSelectedDepartment] = useState<Department>("sound");
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -24,6 +27,7 @@ const ProjectManagement = () => {
   const [allJobTypes, setAllJobTypes] = useState<string[]>([]);
   const [allJobStatuses, setAllJobStatuses] = useState<string[]>([]);
   const [highlightToday, setHighlightToday] = useState(false);
+  const [isAutoCompleting, setIsAutoCompleting] = useState(false);
   const { forceSubscribe } = useSubscriptionContext();
 
   const startDate = startOfMonth(currentDate);
@@ -43,6 +47,34 @@ const ProjectManagement = () => {
     startDate,
     endDate
   );
+
+  // Check user permissions early
+  const canCreateItems = ['admin', 'management', 'logistics'].includes(userRole || '');
+
+  // Auto-complete past jobs when data loads
+  useEffect(() => {
+    const handleAutoComplete = async () => {
+      if (!optimizedJobs?.length || !canCreateItems) return;
+      
+      setIsAutoCompleting(true);
+      try {
+        const { updatedJobs, updatedCount } = await autoCompleteJobs(optimizedJobs);
+        
+        if (updatedCount > 0) {
+          toast({
+            title: "Jobs Auto-Completed",
+            description: `${updatedCount} past job(s) automatically marked as completed`,
+          });
+        }
+      } catch (error) {
+        console.error('Auto-complete error:', error);
+      } finally {
+        setIsAutoCompleting(false);
+      }
+    };
+
+    handleAutoComplete();
+  }, [optimizedJobs, canCreateItems, toast]);
 
   // Filter jobs by selected job type and status with database-level optimization
   const jobs = (optimizedJobs || []).filter((job: any) => {
@@ -132,7 +164,36 @@ const ProjectManagement = () => {
   }
 
   // Check if user has permissions to create new items
-  const canCreateItems = ['admin', 'management', 'logistics'].includes(userRole || '');
+  // (Already declared above for use in useEffect)
+
+  const handleAutoCompleteAll = async () => {
+    if (!canCreateItems) return;
+    
+    setIsAutoCompleting(true);
+    try {
+      const { updatedJobs, updatedCount } = await autoCompleteJobs(optimizedJobs);
+      
+      if (updatedCount > 0) {
+        toast({
+          title: "Jobs Auto-Completed",
+          description: `${updatedCount} past job(s) marked as completed`,
+        });
+      } else {
+        toast({
+          title: "No Updates Needed",
+          description: "All past jobs are already completed or cancelled",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to auto-complete jobs",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAutoCompleting(false);
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 space-y-6">
@@ -176,6 +237,20 @@ const ProjectManagement = () => {
             </div>
             {canCreateItems && (
               <>
+                <Button 
+                  onClick={handleAutoCompleteAll}
+                  disabled={isAutoCompleting || jobsLoading}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  {isAutoCompleting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4" />
+                  )}
+                  Auto-Complete Past Jobs
+                </Button>
                 <Button 
                   onClick={() => navigate("/hoja-de-ruta")} 
                   className="flex items-center gap-2"
