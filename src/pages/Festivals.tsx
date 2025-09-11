@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
-import { useAuth } from "@/hooks/useAuth";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { PrintOptions, PrintOptionsDialog } from "@/components/festival/pdf/PrintOptionsDialog";
 import { useConnectionStatus } from "@/hooks/useConnectionStatus";
@@ -41,7 +41,7 @@ const Festivals = () => {
   const [highlightedFestivalId, setHighlightedFestivalId] = useState<string | null>(null);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [selectedJobForPrint, setSelectedJobForPrint] = useState<{ id: string; title: string } | null>(null);
-  const { userRole } = useAuth();
+  const { userRole } = useOptimizedAuth();
   const { status: connectionStatus, recoverConnection } = useConnectionStatus();
   const festivalRefs = useRef<Record<string, HTMLDivElement | null>>({});
 

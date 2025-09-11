@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CalendarDays, Clock, FileText, Download, Plus, User, Trash2, AlertTriangle } from "lucide-react";
 import { useTimesheets } from "@/hooks/useTimesheets";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
-import { useAuth } from "@/hooks/useAuth";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { Timesheet, TimesheetFormData } from "@/types/timesheet";
 import { TimesheetSignature } from "./TimesheetSignature";
 import { format, parseISO } from "date-fns";
@@ -25,7 +25,7 @@ interface TimesheetViewProps {
 export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetViewProps) => {
   const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, refetch } = useTimesheets(jobId);
   const { assignments } = useJobAssignmentsRealtime(jobId);
-  const { user, userRole } = useAuth();
+  const { user, userRole } = useOptimizedAuth();
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [editingTimesheet, setEditingTimesheet] = useState<string | null>(null);

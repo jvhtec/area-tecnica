@@ -1,7 +1,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/hooks/useAuth";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { toast } from "sonner";
 
 export interface TourDocument {
@@ -16,7 +16,7 @@ export interface TourDocument {
 }
 
 export const useTourDocuments = (tourId: string) => {
-  const { user, userRole } = useAuth();
+  const { user, userRole } = useOptimizedAuth();
   const queryClient = useQueryClient();
 
   const { data: documents = [], isLoading, error } = useQuery({

@@ -10,7 +10,7 @@ import { format, isValid, parseISO } from "date-fns";
 import { FestivalLogoManager } from "@/components/festival/FestivalLogoManager";
 import { FestivalScheduling } from "@/components/festival/scheduling/FestivalScheduling";
 import { PrintOptionsDialog, PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
-import { useAuth } from "@/hooks/useAuth";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { useFlexUuid } from "@/hooks/useFlexUuid";
 import { generateIndividualStagePDFs } from "@/utils/pdf/individualStagePdfGenerator";
@@ -61,7 +61,7 @@ const FestivalManagement = () => {
   }>({});
   const [isPrinting, setIsPrinting] = useState(false);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
-  const { userRole } = useAuth();
+  const { userRole } = useOptimizedAuth();
   const [maxStages, setMaxStages] = useState(1);
   const { flexUuid, isLoading: isFlexLoading, error: flexError, folderExists } = useFlexUuid(jobId || '');
 

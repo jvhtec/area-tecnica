@@ -1,7 +1,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/hooks/useAuth";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 export interface MyTour {
   id: string;
@@ -18,7 +18,7 @@ export interface MyTour {
 }
 
 export const useMyTours = () => {
-  const { user } = useAuth();
+  const { user } = useOptimizedAuth();
 
   const { data: tours = [], isLoading, error, refetch } = useQuery({
     queryKey: ['my-tours', user?.id],

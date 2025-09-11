@@ -30,7 +30,7 @@ import { TourAssignmentDialog } from "@/components/tours/TourAssignmentDialog";
 import { TourDocumentsDialog } from "@/components/tours/TourDocumentsDialog";
 import { format } from "date-fns";
 import { useTourAssignments } from "@/hooks/useTourAssignments";
-import { useAuth } from "@/hooks/useAuth";
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { fetchTourLogo } from "@/utils/pdf/tourLogoUtils";
 import { exportTourPDF } from "@/lib/tourPdfExport";
 import { useToast } from "@/hooks/use-toast";
@@ -45,7 +45,7 @@ interface TourManagementProps {
 export const TourManagement = ({ tour }: TourManagementProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { userRole } = useAuth();
+  const { userRole } = useOptimizedAuth();
   const [searchParams] = useSearchParams();
   const mode = searchParams.get('mode');
   const isTechnicianView = mode === 'technician' || ['technician', 'house_tech'].includes(userRole || '');

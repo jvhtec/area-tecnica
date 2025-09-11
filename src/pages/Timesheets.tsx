@@ -7,7 +7,7 @@ import { TimesheetView } from "@/components/timesheet/TimesheetView";
 import { downloadTimesheetPDF } from "@/utils/timesheet-pdf";
 import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { useTimesheets } from "@/hooks/useTimesheets";
-import { useAuth } from "@/hooks/useAuth";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { format } from "date-fns";
 import { useSearchParams } from "react-router-dom";
 
@@ -16,7 +16,7 @@ export default function Timesheets() {
   const jobIdFromUrl = searchParams.get('jobId');
   const [selectedJobId, setSelectedJobId] = useState<string>(jobIdFromUrl || "");
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
-  const { user, userRole } = useAuth();
+  const { user, userRole } = useOptimizedAuth();
   const { data: jobs = [], isLoading: jobsLoading } = useOptimizedJobs();
   const { timesheets } = useTimesheets(selectedJobId || "");
 

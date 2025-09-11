@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { PersonalCalendar } from '@/components/personal/PersonalCalendar';
 import { MobilePersonalCalendar } from '@/components/personal/MobilePersonalCalendar';
 import { VacationRequestsTabs } from '@/components/personal/VacationRequestsTabs';
-import { useAuth } from '@/hooks/useAuth';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useVacationRequests } from '@/hooks/useVacationRequests';
 import { Card, CardContent } from '@/components/ui/card';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -13,7 +13,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 const Personal = () => {
   const [date, setDate] = useState<Date>(new Date());
   const [isVacationSectionOpen, setIsVacationSectionOpen] = useState(false);
-  const { user, userRole } = useAuth();
+  const { user, userRole } = useOptimizedAuth();
   const { submitRequest, isSubmitting } = useVacationRequests();
   const isMobile = useIsMobile();
 

@@ -39,7 +39,7 @@ import { supabase } from "@/lib/supabase";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
 import { useAvailableTechnicians } from "@/hooks/useAvailableTechnicians";
-import { useAuth } from "@/hooks/useAuth";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 
@@ -90,7 +90,7 @@ const formatAvailableTechnicianName = (technician: { first_name: string; last_na
 
 export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId, department }: JobAssignmentDialogProps) => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user } = useOptimizedAuth();
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
   const [soundRole, setSoundRole] = useState<string>("none");
   const [lightsRole, setLightsRole] = useState<string>("none");

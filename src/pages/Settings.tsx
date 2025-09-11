@@ -8,7 +8,7 @@ import { FilterBar } from "@/components/users/filters/FilterBar";
 import { ImportUsersDialog } from "@/components/users/import/ImportUsersDialog";
 import { CompanyLogoUploader } from "@/components/CompanyLogoUploader";
 import { EquipmentModelsList } from "@/components/equipment/EquipmentModelsList";
-import { useAuth } from "@/hooks/useAuth";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 const Settings = () => {
   const [createUserOpen, setCreateUserOpen] = useState(false);
@@ -17,7 +17,7 @@ const Settings = () => {
   const [selectedRole, setSelectedRole] = useState("all");
   const [selectedDepartment, setSelectedDepartment] = useState("all");
   
-  const { userRole } = useAuth();
+  const { userRole } = useOptimizedAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
 
   const handleClearFilters = () => {

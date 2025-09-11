@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Image, Upload, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/hooks/useAuth";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 interface TourLogoManagerProps {
   tourId: string;
@@ -12,7 +12,7 @@ interface TourLogoManagerProps {
 
 export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user } = useOptimizedAuth();
   const [isUploading, setIsUploading] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
