@@ -78,9 +78,9 @@ export const useLogoOptions = (jobId?: string) => {
                 jobTitle = logo.jobs.length > 0 && logo.jobs[0] && typeof logo.jobs[0].title === 'string' 
                   ? logo.jobs[0].title 
                   : 'Unknown Job';
-              } else if (typeof logo.jobs === 'object') {
+              } else if (logo.jobs && typeof logo.jobs === 'object' && 'title' in logo.jobs) {
                 // If it's an object, get the title directly
-                jobTitle = logo.jobs.title || 'Unknown Job';
+                jobTitle = (logo.jobs as { title: string }).title || 'Unknown Job';
               }
             }
               
@@ -120,9 +120,9 @@ export const useLogoOptions = (jobId?: string) => {
                 tourName = logo.tours.length > 0 && logo.tours[0] && typeof logo.tours[0].name === 'string' 
                   ? logo.tours[0].name 
                   : 'Unknown Tour';
-              } else if (typeof logo.tours === 'object') {
+              } else if (logo.tours && typeof logo.tours === 'object' && 'name' in logo.tours) {
                 // If it's an object, get the name directly
-                tourName = logo.tours.name || 'Unknown Tour';
+                tourName = (logo.tours as { name: string }).name || 'Unknown Tour';
               }
             }
               
