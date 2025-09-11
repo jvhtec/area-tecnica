@@ -37,6 +37,7 @@ import JobAssignmentMatrix from '@/pages/JobAssignmentMatrix';
 import { EquipmentManagement } from '@/pages/EquipmentManagement';
 import { ArtistRequirementsForm } from '@/components/festival/ArtistRequirementsForm';
 import { FormSubmitted } from '@/components/festival/FormSubmitted';
+import { RequireAuth } from '@/components/RequireAuth';
 import FestivalGearManagement from '@/pages/FestivalGearManagement';
 import Festivals from '@/pages/Festivals';
 import { AuthProvider } from "@/hooks/useAuth";
@@ -76,7 +77,7 @@ export default function App() {
                   </Route>
                   
                   {/* Protected Routes */}
-                  <Route element={<Layout />}>
+                  <Route element={<RequireAuth><Layout /></RequireAuth>}>
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/technician-dashboard" element={<TechnicianDashboard />} />
                     <Route path="/personal" element={<Personal />} />
