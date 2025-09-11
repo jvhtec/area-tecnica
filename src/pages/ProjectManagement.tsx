@@ -9,6 +9,7 @@ import { Department } from "@/types/department";
 import { startOfMonth, endOfMonth, addMonths, isToday } from "date-fns";
 import { MonthNavigation } from "@/components/project-management/MonthNavigation";
 import { DepartmentTabs } from "@/components/project-management/DepartmentTabs";
+import { StatusFilter } from "@/components/project-management/StatusFilter";
 import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
@@ -23,7 +24,7 @@ const ProjectManagement = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [userRole, setUserRole] = useState<string | null>(null);
   const [selectedJobType, setSelectedJobType] = useState("All");
-  const [selectedJobStatus, setSelectedJobStatus] = useState("All");
+  const [selectedJobStatuses, setSelectedJobStatuses] = useState<string[]>([]);
   const [allJobTypes, setAllJobTypes] = useState<string[]>([]);
   const [allJobStatuses, setAllJobStatuses] = useState<string[]>([]);
   const [highlightToday, setHighlightToday] = useState(false);
@@ -76,10 +77,10 @@ const ProjectManagement = () => {
     handleAutoComplete();
   }, [optimizedJobs, canCreateItems, toast]);
 
-  // Filter jobs by selected job type and status with database-level optimization
+  // Filter jobs by selected job type and statuses with database-level optimization
   const jobs = (optimizedJobs || []).filter((job: any) => {
     const matchesType = selectedJobType === "All" || job.job_type?.toLowerCase() === selectedJobType.toLowerCase();
-    const matchesStatus = selectedJobStatus === "All" || job.status === selectedJobStatus;
+    const matchesStatus = selectedJobStatuses.length === 0 || selectedJobStatuses.includes(job.status);
     return matchesType && matchesStatus;
   });
 
@@ -195,6 +196,16 @@ const ProjectManagement = () => {
     }
   };
 
+  const handleJobStatusSelection = (status: string) => {
+    setSelectedJobStatuses(prev => {
+      if (prev.includes(status)) {
+        return prev.filter(s => s !== status);
+      } else {
+        return [...prev, status];
+      }
+    });
+  };
+
   return (
     <div className="container mx-auto px-4 space-y-6">
       <Card>
@@ -217,23 +228,11 @@ const ProjectManagement = () => {
                   ))}
                 </select>
               </div>
-              <div className="flex items-center gap-2">
-                <select
-                  value={selectedJobStatus}
-                  onChange={(e) => setSelectedJobStatus(e.target.value)}
-                  className="border border-gray-300 rounded-md py-1 px-2 text-sm"
-                >
-                  <option value="All">All Status</option>
-                  {allJobStatuses.map((status) => (
-                    <option key={status} value={status}>
-                      {status === "Tentativa" ? "Tentative" : 
-                       status === "Confirmado" ? "Confirmed" :
-                       status === "Completado" ? "Completed" :
-                       status === "Cancelado" ? "Cancelled" : status}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <StatusFilter
+                allJobStatuses={allJobStatuses}
+                selectedJobStatuses={selectedJobStatuses}
+                onStatusSelection={handleJobStatusSelection}
+              />
             </div>
             {canCreateItems && (
               <>
