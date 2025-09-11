@@ -123,9 +123,11 @@ export const useOptimizedJobs = (
       // Flatten assignments for easier access
       assignments: job.job_assignments || []
     }))
-      // Filter out jobs from cancelled tours
+      // Filter out cancelled jobs and jobs from cancelled tours
       ?.filter(job => {
-        // If job has no tour, include it
+        // Exclude cancelled jobs
+        if (job.status === 'Cancelado') return false;
+        // If job has no tour, include it (regular job)
         if (!job.tours) return true;
         // If job has tour, only include if tour is active
         return job.tours.status === 'active';
