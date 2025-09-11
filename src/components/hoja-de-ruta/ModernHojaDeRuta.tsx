@@ -362,27 +362,6 @@ export const ModernHojaDeRuta = () => {
               <ModernProgressTracker progress={completionProgress} />
               
               {/* Action Buttons */}
-              <Button
-                onClick={handleLoadJobData}
-                disabled={!selectedJobId || !isInitialized}
-                variant="outline"
-                size="sm"
-                className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Cargar Datos
-              </Button>
-
-              <Button
-                onClick={refreshData}
-                disabled={!selectedJobId || isLoadingHojaDeRuta}
-                variant="outline"
-                size="sm"
-                className="border-2 border-purple-500 text-purple-600 hover:bg-purple-50"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Actualizar
-              </Button>
 
               {/* Simplified Save Button - Always enabled when job is selected */}
               <Button
