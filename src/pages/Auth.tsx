@@ -4,12 +4,12 @@ import { Card } from "@/components/ui/card";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { SignUpForm } from "@/components/auth/SignUpForm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useAuth } from "@/hooks/useAuth";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
 import { UserRole } from "@/types/user";
 
 const Auth = () => {
-  const { session, userRole, isLoading, error } = useAuth();
+  const { session, userRole, isLoading, error } = useOptimizedAuth();
   const [showSignUp, setShowSignUp] = useState(false);
   
   useEffect(() => {

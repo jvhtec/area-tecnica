@@ -24,7 +24,7 @@ import { useKonamiCode } from "@/hooks/useKonamiCode";
 import { WolfensteinDialog } from "@/components/doom/WolfensteinDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { HeaderStatus } from "@/components/ui/header-status";
-import { useAuth } from "@/hooks/useAuth";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { HelpButton } from "@/components/layout/HelpButton";
 
 const Layout = () => {
@@ -42,7 +42,7 @@ const Layout = () => {
     userDepartment,
     isLoading,
     logout
-  } = useAuth();
+  } = useOptimizedAuth();
 
   // Redirect technicians and house techs to technician dashboard if they somehow get to the regular dashboard
   useEffect(() => {

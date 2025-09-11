@@ -5,14 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useAuth } from "@/hooks/useAuth";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 interface LoginFormProps {
   onShowSignUp: () => void;
 }
 
 export const LoginForm = ({ onShowSignUp }: LoginFormProps) => {
-  const { login, isLoading, error: authError } = useAuth();
+  const { login, isLoading, error: authError } = useOptimizedAuth();
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: "",

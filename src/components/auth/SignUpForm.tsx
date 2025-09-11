@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SignUpFormFields } from "./signup/SignUpFormFields";
 import { SignUpFormActions } from "./signup/SignUpFormActions";
@@ -11,7 +11,7 @@ interface SignUpFormProps {
 }
 
 export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps) => {
-  const { signUp, isLoading, error: authError } = useAuth();
+  const { signUp, isLoading, error: authError } = useOptimizedAuth();
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (formData: any) => {
