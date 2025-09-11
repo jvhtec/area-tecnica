@@ -76,10 +76,11 @@ export class RoomingSection {
         0: { cellWidth: 35 }, // Hotel
         1: { cellWidth: 25 }, // Habitación  
         2: { cellWidth: 25 }, // Tipo
-        3: { cellWidth: 60 }, // Ocupantes
+        3: { cellWidth: 50 }, // Ocupantes
         4: { cellWidth: 35 }  // Notas
       },
-      margin: { left: 20, right: 20 }
+      margin: { left: 20, right: 20 },
+      tableWidth: 'auto'
     });
 
     return this.pdfDoc.getLastAutoTableY() + 15;

@@ -2,47 +2,67 @@ import { PDFDocument } from '../core/pdf-document';
 
 export class FooterService {
   private static readonly FOOTER_HEIGHT = 30;
-  private static readonly LOGO_HEIGHT = 20;
+  // Target maximum size for footer logo (smaller to avoid stretching)
+  private static readonly LOGO_MAX_HEIGHT = 12;
+  private static readonly LOGO_MAX_WIDTH = 80;
+  private static cachedLogoData: string | null = null;
+  private static cachedLogoDims: { width: number; height: number } | null = null;
 
   static async addFooterToAllPages(pdfDoc: PDFDocument): Promise<void> {
     try {
       // Load Sector Pro logo from public assets
       const logoData = await this.loadSectorProLogo();
       const totalPages = pdfDoc.document.getNumberOfPages();
-      const { width: pageWidth } = pdfDoc.dimensions;
+      const { width: pageWidth, height: pageHeight } = pdfDoc.dimensions;
+      const bottomMargin = 10;
+
+      // Determine intrinsic logo dimensions once
+      let drawWidth = 0;
+      let drawHeight = 0;
+      if (logoData) {
+        const dims = await this.getImageDimensions(logoData);
+        const scale = Math.min(
+          this.LOGO_MAX_HEIGHT / dims.height,
+          this.LOGO_MAX_WIDTH / dims.width,
+        );
+        drawWidth = Math.max(1, Math.round(dims.width * scale));
+        drawHeight = Math.max(1, Math.round(dims.height * scale));
+      }
 
       for (let i = 1; i <= totalPages; i++) {
         pdfDoc.document.setPage(i);
         
-        if (logoData) {
+        if (logoData && drawWidth > 0 && drawHeight > 0) {
           // Calculate logo dimensions and center position
-          const logoWidth = this.LOGO_HEIGHT * 3; // Approximate aspect ratio
-          const xPosition = (pageWidth - logoWidth) / 2;
-          const yPosition = 15; // Bottom margin
+          const xPosition = (pageWidth - drawWidth) / 2;
+          // Position the logo at the bottom of the page
+          const yPosition = pageHeight - drawHeight - bottomMargin;
           
-          pdfDoc.addImage(logoData, 'PNG', xPosition, yPosition, logoWidth, this.LOGO_HEIGHT);
+          pdfDoc.addImage(logoData, 'PNG', xPosition, yPosition, drawWidth, drawHeight);
         } else {
           // Fallback text if logo fails to load
           pdfDoc.setText(8, [125, 1, 1]);
-          pdfDoc.addText('[LOGO MISSING]', pageWidth / 2, 20, { align: 'center' });
+          pdfDoc.addText('[LOGO MISSING]', pageWidth / 2, pageHeight - bottomMargin, { align: 'center' });
         }
       }
     } catch (error) {
       console.error('Error adding footer to pages:', error);
       // Add fallback text footer
       const totalPages = pdfDoc.document.getNumberOfPages();
-      const { width: pageWidth } = pdfDoc.dimensions;
+      const { width: pageWidth, height: pageHeight } = pdfDoc.dimensions;
+      const bottomMargin = 10;
 
       for (let i = 1; i <= totalPages; i++) {
         pdfDoc.document.setPage(i);
         pdfDoc.setText(8, [125, 1, 1]);
-        pdfDoc.addText('[LOGO MISSING]', pageWidth / 2, 20, { align: 'center' });
+        pdfDoc.addText('[LOGO MISSING]', pageWidth / 2, pageHeight - bottomMargin, { align: 'center' });
       }
     }
   }
 
   private static async loadSectorProLogo(): Promise<string | null> {
     try {
+      if (this.cachedLogoData) return this.cachedLogoData;
       // Try multiple possible paths for the Sector Pro logo (match other PDFs)
       const possiblePaths = [
         '/sector pro logo.png', // Primary path with spaces (matches other PDFs)
@@ -56,7 +76,9 @@ export class FooterService {
           const response = await fetch(path);
           if (response.ok) {
             const blob = await response.blob();
-            return await this.blobToDataURL(blob);
+            const dataUrl = await this.blobToDataURL(blob);
+            this.cachedLogoData = dataUrl;
+            return dataUrl;
           }
         } catch (error) {
           // Continue to next path
@@ -78,6 +100,20 @@ export class FooterService {
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = reject;
       reader.readAsDataURL(blob);
+    });
+  }
+
+  private static getImageDimensions(dataUrl: string): Promise<{ width: number; height: number }> {
+    if (this.cachedLogoDims) return Promise.resolve(this.cachedLogoDims);
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const dims = { width: img.naturalWidth || img.width, height: img.naturalHeight || img.height };
+        this.cachedLogoDims = dims;
+        resolve(dims);
+      };
+      img.onerror = () => resolve({ width: this.LOGO_MAX_WIDTH, height: this.LOGO_MAX_HEIGHT });
+      img.src = dataUrl;
     });
   }
 }

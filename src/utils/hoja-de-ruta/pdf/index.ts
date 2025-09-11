@@ -11,6 +11,8 @@ export const generatePDF = async (
   venueMapPreview: string | null,
   selectedJobId: string,
   jobTitle: string,
+  // Optional parameters to enhance headers without breaking callers
+  jobDate?: string,
   toast?: any,
   accommodations?: any[]
 ): Promise<void> => {
@@ -22,6 +24,7 @@ export const generatePDF = async (
     venueMapPreview,
     selectedJobId,
     jobTitle,
+    jobDate,
     toast,
     accommodations
   });

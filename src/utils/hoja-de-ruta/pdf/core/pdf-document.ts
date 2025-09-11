@@ -36,7 +36,8 @@ export class PDFDocument {
   checkPageBreak(currentY: number, requiredHeight: number = 25): number {
     if (currentY + requiredHeight > this.pageHeight - this.footerSpace) {
       this.addPage();
-      return 75; // Account for header space
+      // Minimal top margin on continued pages within a section
+      return 30;
     }
     return currentY;
   }

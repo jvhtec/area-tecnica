@@ -53,16 +53,30 @@ export class ContentSections {
     return this.eventSection.addEventDetailsSection(eventData, yPosition);
   }
 
-  async addVenueSection(eventData: EventData, venueMapPreview: string | null, yPosition: number): Promise<number> {
-    return await this.venueSection.addVenueSection(eventData, venueMapPreview, yPosition);
+  async addVenueSection(
+    eventData: EventData,
+    venueMapPreview: string | null,
+    yPosition: number,
+    venueImagePreviews?: string[]
+  ): Promise<number> {
+    return await this.venueSection.addVenueSection(eventData, venueMapPreview, yPosition, venueImagePreviews);
   }
 
-  async addTravelSection(travelArrangements: TravelArrangement[], yPosition: number): Promise<number> {
-    return await this.travelSection.addTravelSection(travelArrangements, yPosition);
+  async addTravelSection(
+    travelArrangements: TravelArrangement[], 
+    eventVenueAddress: string | undefined,
+    yPosition: number
+  ): Promise<number> {
+    return await this.travelSection.addTravelSection(travelArrangements, yPosition, eventVenueAddress);
   }
 
-  async addAccommodationSection(accommodations: any[], eventData: EventData, yPosition: number): Promise<number> {
-    return await this.accommodationSection.addAccommodationSection(accommodations, eventData, yPosition);
+  async addAccommodationSection(
+    accommodations: any[], 
+    eventData: EventData, 
+    yPosition: number,
+    suppressRoomTable: boolean = false
+  ): Promise<number> {
+    return await this.accommodationSection.addAccommodationSection(accommodations, eventData, yPosition, suppressRoomTable);
   }
 
   addStaffSection(eventData: EventData, yPosition: number): number {

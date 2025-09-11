@@ -7,16 +7,13 @@ export class StaffSection {
   constructor(private pdfDoc: PDFDocument) {}
 
   addStaffSection(eventData: EventData, yPosition: number): number {
-    yPosition = this.pdfDoc.checkPageBreak(yPosition, 50);
-    
-    this.pdfDoc.setText(14, [125, 1, 1]);
-    this.pdfDoc.addText("Personal", 20, yPosition);
-    yPosition += 15;
+    // Start directly after the section header; no repeated subtitle
+    yPosition = this.pdfDoc.checkPageBreak(yPosition, 30);
 
     const validStaff = eventData.staff?.filter(staff => 
       DataValidators.hasData(staff.name) || 
       DataValidators.hasData(staff.position) || 
-      DataValidators.hasData(staff.department)
+      DataValidators.hasData(staff.dni)
     ) || [];
 
     if (validStaff.length === 0) {
@@ -24,41 +21,34 @@ export class StaffSection {
     }
 
     const staffData = validStaff.map(staff => [
-      `${staff.name || ''} ${staff.surname1 || ''} ${staff.surname2 || ''}`.trim(),
+      (staff.name || '').trim(),
+      `${staff.surname1 || ''} ${staff.surname2 || ''}`.trim(),
       staff.position || '',
-      staff.department || '',
-      Formatters.formatPhone(staff.phone || ''),
       staff.dni || '—',
-      '—' // Email placeholder - field doesn't exist yet in interface
     ]);
 
     this.pdfDoc.addTable({
       startY: yPosition,
-      head: [["Nombre", "Posición", "Departamento", "Teléfono", "DNI", "Email"]],
+      head: [["Nombre", "Apellidos", "Posición", "DNI"]],
       body: staffData,
       theme: "grid",
-      styles: { 
-        fontSize: 8, 
-        cellPadding: 2,
-        overflow: 'linebreak'
-      },
+      styles: { fontSize: 9, cellPadding: 3, overflow: 'linebreak' },
       headStyles: {
         fillColor: [125, 1, 1],
         textColor: [255, 255, 255],
-        fontSize: 9,
+        fontSize: 10,
         fontStyle: 'bold'
       },
       columnStyles: {
-        0: { cellWidth: 30 }, // Nombre
-        1: { cellWidth: 25 }, // Posición
-        2: { cellWidth: 25 }, // Departamento
-        3: { cellWidth: 25 }, // Teléfono
-        4: { cellWidth: 20 }, // DNI
-        5: { cellWidth: 35 }  // Email
+        0: { cellWidth: 35 }, // Nombre
+        1: { cellWidth: 40 }, // Apellidos
+        2: { cellWidth: 35 }, // Posición
+        3: { cellWidth: 25 }, // DNI
       },
-      margin: { left: 15, right: 15 }
+      margin: { left: 20, right: 20 },
+      tableWidth: 'auto'
     });
 
-    return this.pdfDoc.getLastAutoTableY() + 15;
+    return this.pdfDoc.getLastAutoTableY() + 10;
   }
 }

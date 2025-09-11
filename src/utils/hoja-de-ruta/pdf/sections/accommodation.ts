@@ -4,12 +4,16 @@ import { DataValidators } from '../utils/validators';
 import { Formatters } from '../utils/formatters';
 import { MapService } from '../services/map-service';
 import { QRService } from '../services/qr-service';
-import { DEPARTURE_ADDRESS } from '../constants';
 
 export class AccommodationSection {
   constructor(private pdfDoc: PDFDocument) {}
 
-  async addAccommodationSection(accommodations: Accommodation[], eventData: EventData, yPosition: number): Promise<number> {
+  async addAccommodationSection(
+    accommodations: Accommodation[], 
+    eventData: EventData, 
+    yPosition: number,
+    suppressRoomTable: boolean = false
+  ): Promise<number> {
     const validAccommodations = accommodations.filter(acc => 
       DataValidators.hasData(acc.hotel_name) || acc.rooms.some(DataValidators.hasMeaningfulRoomData)
     );
@@ -46,77 +50,116 @@ export class AccommodationSection {
 
       // Add hotel map and route QR if address exists
       if (accommodation.address) {
-        yPosition = this.pdfDoc.checkPageBreak(yPosition, 100);
-        
-        const mapWidth = 160;
+        yPosition = this.pdfDoc.checkPageBreak(yPosition, 110);
+
+        const desiredMapWidth = 160;
         const mapHeight = 80;
+        const qrSize = 50;
+        const gap = 10;
+        const leftMargin = 20;
+        const rightMargin = 20;
+        const { width: pageWidth } = this.pdfDoc.dimensions;
+
+        const availableWidth = pageWidth - leftMargin - rightMargin;
+        const sideBySide = availableWidth >= (desiredMapWidth + gap + qrSize);
+
+        let mapX = leftMargin;
+        let mapY = yPosition;
+        let mapW = desiredMapWidth;
+        let qrX = leftMargin + desiredMapWidth + gap;
+        let qrY = yPosition;
+
+        if (!sideBySide) {
+          // stack vertically
+          mapW = availableWidth;
+          mapX = leftMargin;
+          mapY = yPosition;
+          qrX = leftMargin;
+          qrY = yPosition + mapHeight + 10;
+        } else {
+          // side-by-side, clamp QR within right margin
+          mapW = desiredMapWidth;
+          qrX = Math.min(leftMargin + mapW + gap, pageWidth - rightMargin - qrSize);
+          qrY = yPosition;
+        }
+
         let mapAdded = false;
-        
         try {
           const coords = await MapService.geocodeAddress(accommodation.address);
           if (coords) {
-            const mapDataUrl = await MapService.getStaticMapDataUrl(coords.lat, coords.lng, mapWidth, mapHeight);
+            const mapDataUrl = await MapService.getStaticMapDataUrl(coords.lat, coords.lng, mapW, mapHeight);
             if (mapDataUrl) {
-              this.pdfDoc.addImage(mapDataUrl, "JPEG", 20, yPosition, mapWidth, mapHeight);
+              this.pdfDoc.addImage(mapDataUrl, "JPEG", mapX, mapY, mapW, mapHeight);
               mapAdded = true;
             }
           }
         } catch (error) {
           console.error("Error adding hotel map:", error);
         }
-        
-        // Add fallback if map failed
+
         if (!mapAdded) {
           this.pdfDoc.setText(10, [125, 1, 1]);
-          this.pdfDoc.addText("[MAPA NO DISPONIBLE]", 20, yPosition + 35);
+          this.pdfDoc.addText("[MAPA NO DISPONIBLE]", mapX + 5, mapY + mapHeight / 2);
         }
-        
-        // Always generate and add route QR
+
         try {
-          const routeUrl = MapService.generateRouteUrl(DEPARTURE_ADDRESS, accommodation.address);
-          const qrCode = await QRService.generateQRCode(routeUrl);
-          this.pdfDoc.addImage(qrCode, "PNG", mapWidth + 30, yPosition, 50, 50);
-          
-          // Add QR info text
+          const destUrl = MapService.generateDestinationUrl(accommodation.address);
+          const qrCode = await QRService.generateQRCode(destUrl);
+          this.pdfDoc.addImage(qrCode, "PNG", qrX, qrY, qrSize, qrSize);
+
+          // QR captions
+          this.pdfDoc.setText(9, [125, 1, 1]);
+          this.pdfDoc.addText("Ruta al hotel", qrX, qrY + qrSize + 6);
           this.pdfDoc.setText(8, [80, 80, 80]);
-          this.pdfDoc.addText("Ruta al hotel", mapWidth + 30, yPosition + 55);
+          this.pdfDoc.addText("Escanea para direcciones", qrX, qrY + qrSize + 12);
         } catch (qrError) {
           console.error("Error generating hotel QR:", qrError);
         }
-        
-        yPosition += mapHeight + 15;
+
+        // advance yPosition past the lower of map/QR blocks
+        const blockBottom = sideBySide
+          ? Math.max(mapY + mapHeight, qrY + qrSize)
+          : (qrY + qrSize);
+        yPosition = blockBottom + 15;
       }
 
-      // Rooming subheader
-      yPosition = this.pdfDoc.checkPageBreak(yPosition, 20);
-      this.pdfDoc.setText(12, [125, 1, 1]);
-      this.pdfDoc.addText("Asignación de habitaciones", 20, yPosition);
-      yPosition += 12;
+      if (!suppressRoomTable) {
+        // Rooming subheader (ensure minimal top padding on continued pages)
+        yPosition = this.pdfDoc.checkPageBreak(yPosition, 20);
+        if (yPosition > 20 && yPosition <= 30) {
+          yPosition = 20;
+        }
+        this.pdfDoc.setText(12, [125, 1, 1]);
+        this.pdfDoc.addText("Rooming", 20, yPosition);
+        yPosition += 12;
 
-      // Room assignments
-      const validRooms = accommodation.rooms.filter(DataValidators.hasMeaningfulRoomData);
-      if (validRooms.length > 0) {
-        const roomData = validRooms.map(room => [
-          room.room_type || 'N/A',
-          room.room_number || 'Por asignar',
-          Formatters.getStaffName(room.staff_member1_id || '', eventData.staff),
-          Formatters.getStaffName(room.staff_member2_id || '', eventData.staff)
-        ]);
+        // Room assignments
+        const validRooms = accommodation.rooms.filter(DataValidators.hasMeaningfulRoomData);
+        if (validRooms.length > 0) {
+          const roomData = validRooms.map(room => [
+            room.room_type || 'N/A',
+            room.room_number || 'Por asignar',
+            Formatters.getStaffName(room.staff_member1_id || '', eventData.staff),
+            Formatters.getStaffName(room.staff_member2_id || '', eventData.staff)
+          ]);
 
-        this.pdfDoc.addTable({
-          startY: yPosition,
-          head: [["Tipo", "Habitación", "Huésped 1", "Huésped 2"]],
-          body: roomData,
-          theme: "grid",
-          styles: { fontSize: 9, cellPadding: 3 },
-          headStyles: {
-            fillColor: [125, 1, 1],
-            textColor: [255, 255, 255],
-            fontSize: 10,
-            fontStyle: 'bold'
-          }
-        });
-        yPosition = this.pdfDoc.getLastAutoTableY() + 15;
+          this.pdfDoc.addTable({
+            startY: yPosition,
+            head: [["Tipo", "Habitación", "Huésped 1", "Huésped 2"]],
+            body: roomData,
+            theme: "grid",
+            styles: { fontSize: 9, cellPadding: 3 },
+            headStyles: {
+              fillColor: [125, 1, 1],
+              textColor: [255, 255, 255],
+              fontSize: 10,
+              fontStyle: 'bold'
+            },
+            margin: { left: 20, right: 20 },
+            tableWidth: 'auto'
+          });
+          yPosition = this.pdfDoc.getLastAutoTableY() + 15;
+        }
       }
     }
 

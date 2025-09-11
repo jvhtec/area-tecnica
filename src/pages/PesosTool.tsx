@@ -49,7 +49,7 @@ const soundComponentDatabase = [
   { id: 29, name: ' CABLEADO L ', weight: 100 },
   { id: 30, name: ' CABLEADO H ', weight: 250 },
 ];
-
+  
 // Global counter for generating SX numbers.
 let soundTableCounter = 0;
 

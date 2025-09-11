@@ -9,7 +9,7 @@ export class CoverSection {
     private logoData?: string
   ) {}
 
-  generateCoverPage(): void {
+  async generateCoverPage(): Promise<void> {
     const { width: pageWidth, height: pageHeight } = this.pdfDoc.dimensions;
 
     // Background
@@ -21,15 +21,29 @@ export class CoverSection {
     this.pdfDoc.document.circle(pageWidth - 30, 30, 50, 'F');
     this.pdfDoc.document.circle(30, pageHeight - 50, 40, 'F');
 
-    // Job logo on cover
+    // Job logo on cover (scaled with aspect ratio, placed above the main title text)
     if (this.logoData) {
       try {
-        const logoHeight = 60;
-        const logoWidth = 120; // Default width
-        // Detect image format from data URL
-        const format = this.logoData.includes('data:image/png') ? 'PNG' : 
-                      this.logoData.includes('data:image/jpeg') ? 'JPEG' : 'PNG';
-        this.pdfDoc.addImage(this.logoData, format, (pageWidth - logoWidth) / 2, pageHeight - 180, logoWidth, logoHeight);
+        const dims = await new Promise<{ width: number; height: number }>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            resolve({ width: img.naturalWidth || img.width, height: img.naturalHeight || img.height });
+          };
+          img.onerror = () => resolve({ width: 120, height: 40 });
+          img.src = this.logoData!;
+        });
+        const MAX_H = 60;
+        const MAX_W = 200;
+        const scale = Math.min(MAX_H / dims.height, MAX_W / dims.width);
+        const drawW = Math.max(1, Math.round(dims.width * scale));
+        const drawH = Math.max(1, Math.round(dims.height * scale));
+        // Position above the main title (which sits around pageHeight/2 - 20)
+        const titleY = pageHeight / 2 - 20;
+        const gap = 16; // space between logo and title
+        const yPos = Math.max(40, titleY - gap - drawH);
+        const xPos = (pageWidth - drawW) / 2;
+        const format = this.logoData.includes('data:image/png') ? 'PNG' : this.logoData.includes('data:image/jpeg') ? 'JPEG' : 'PNG';
+        this.pdfDoc.addImage(this.logoData, format, xPos, yPos, drawW, drawH);
       } catch (error) {
         console.error("Error adding logo to cover:", error);
         // Add fallback text

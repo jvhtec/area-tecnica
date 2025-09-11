@@ -9,13 +9,11 @@ export class LogisticsSection {
     const logistics = eventData.logistics;
     if (!logistics) return yPosition;
 
-    yPosition = this.pdfDoc.checkPageBreak(yPosition, 50);
+    yPosition = this.pdfDoc.checkPageBreak(yPosition, 30);
 
     // Transportes section with complete field set
     if (logistics.transport && logistics.transport.length > 0) {
-      this.pdfDoc.setText(14, [125, 1, 1]);
-      this.pdfDoc.addText("Transportes", 20, yPosition);
-      yPosition += 15;
+      // Start table immediately; section header is already printed by the page header
 
       const transportData = logistics.transport.map(transport => [
         transport.transport_type || '',
@@ -50,10 +48,10 @@ export class LogisticsSection {
           6: { cellWidth: 15 }, // Retorno
           7: { cellWidth: 25 }  // Vuelta
         },
-        margin: { left: 15, right: 15 }
+        margin: { left: 20, right: 20 }
       });
 
-      yPosition = this.pdfDoc.getLastAutoTableY() + 15;
+      yPosition = this.pdfDoc.getLastAutoTableY() + 10;
     }
 
     // Loading details

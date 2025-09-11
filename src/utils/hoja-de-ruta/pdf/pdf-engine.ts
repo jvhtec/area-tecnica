@@ -16,7 +16,7 @@ export class PDFEngine {
 
   constructor(private options: PDFGenerationOptions) {
     this.pdfDoc = new PDFDocument();
-    this.headerSection = new HeaderSection(this.pdfDoc);
+    // headerSection will be initialized after logo loading so we can pass logo
     this.contentSections = new ContentSections(this.pdfDoc);
   }
 
@@ -32,12 +32,44 @@ export class PDFEngine {
     } = this.options;
 
     try {
-      // Load logo
+      // Load logo first (used on cover and in page header)
       this.logoData = await LogoService.loadJobLogo(selectedJobId);
+
+      // Compute header logo scaled dimensions to keep aspect ratio
+      let headerLogoDims: { width: number; height: number } | undefined = undefined;
+      if (this.logoData) {
+        headerLogoDims = await new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const MAX_H = 24;
+            const MAX_W = 140;
+            const w = img.naturalWidth || img.width;
+            const h = img.naturalHeight || img.height;
+            if (w > 0 && h > 0) {
+              const scale = Math.min(MAX_H / h, MAX_W / w);
+              resolve({ width: Math.round(w * scale), height: Math.round(h * scale) });
+            } else {
+              resolve({ width: 72, height: 24 });
+            }
+          };
+          img.onerror = () => resolve({ width: 72, height: 24 });
+          img.src = this.logoData!;
+        });
+      }
+
+      // Initialize header section now that we have job info and logo
+      this.headerSection = new HeaderSection(
+        this.pdfDoc,
+        jobTitle,
+        this.options.jobDate,
+        'Hoja de Ruta',
+        this.logoData || undefined,
+        headerLogoDims
+      );
       
       // Generate cover page
       const coverSection = new CoverSection(this.pdfDoc, this.options.eventData, this.options.jobTitle, this.logoData);
-      coverSection.generateCoverPage();
+      await coverSection.generateCoverPage();
 
       // Each major section starts on a new page as per requirements
       // 2. Job Details and Venue (combined on same page)
@@ -52,7 +84,8 @@ export class PDFEngine {
           currentY = await this.contentSections.addVenueSection(
             this.options.eventData, 
             this.options.venueMapPreview, 
-            currentY
+            currentY,
+            this.options.imagePreviews?.venue
           );
         }
       }
@@ -75,10 +108,20 @@ export class PDFEngine {
         this.contentSections.addStaffSection(this.options.eventData, currentY);
       }
 
+      // Defaults for rendering options
+      const includeAccommodationRooming = this.options.includeAccommodationRooming ?? true;
+      const includeAggregatedRooming = this.options.includeAggregatedRooming ?? false;
+      const includeTravelArrangements = this.options.includeTravelArrangements ?? true;
+      const includeLogisticsTransport = this.options.includeLogisticsTransport ?? true;
+
       // 6. Viajes
-      if (this.contentSections.hasTravelData(this.options.travelArrangements)) {
+      if (includeTravelArrangements && this.contentSections.hasTravelData(this.options.travelArrangements)) {
         const currentY = this.headerSection.addSectionHeader("Viajes");
-        await this.contentSections.addTravelSection(this.options.travelArrangements, currentY);
+        await this.contentSections.addTravelSection(
+          this.options.travelArrangements, 
+          this.options.eventData?.venue?.address,
+          currentY
+        );
       }
 
       // 7. Alojamientos
@@ -87,12 +130,13 @@ export class PDFEngine {
         await this.contentSections.addAccommodationSection(
           this.options.accommodations || [], 
           this.options.eventData, 
-          currentY
+          currentY,
+          includeAccommodationRooming === false && includeAggregatedRooming === true // suppress per-hotel rooms when we show aggregated
         );
       }
 
-      // 8. Rooming
-      if (this.contentSections.hasRoomingData(this.options.accommodations)) {
+      // 8. Rooming (aggregated)
+      if (includeAggregatedRooming && this.contentSections.hasRoomingData(this.options.accommodations)) {
         const currentY = this.headerSection.addSectionHeader("Rooming");
         this.contentSections.addRoomingSection(
           this.options.accommodations || [], 
@@ -102,7 +146,7 @@ export class PDFEngine {
       }
 
       // 9. Transportes
-      if (this.contentSections.hasLogisticsData(this.options.eventData)) {
+      if (includeLogisticsTransport && this.contentSections.hasLogisticsData(this.options.eventData)) {
         const currentY = this.headerSection.addSectionHeader("Transportes");
         this.contentSections.addLogisticsSection(this.options.eventData, currentY);
       }

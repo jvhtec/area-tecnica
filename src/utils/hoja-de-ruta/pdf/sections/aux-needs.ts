@@ -6,11 +6,8 @@ export class AuxNeedsSection {
   constructor(private pdfDoc: PDFDocument) {}
 
   addAuxNeedsSection(eventData: EventData, yPosition: number): number {
+    // Start directly after the section header; no repeated subtitle
     yPosition = this.pdfDoc.checkPageBreak(yPosition, 30);
-    
-    this.pdfDoc.setText(14, [125, 1, 1]);
-    this.pdfDoc.addText("Necesidades Auxiliares", 20, yPosition);
-    yPosition += 15;
 
     this.pdfDoc.setText(10, [51, 51, 51]);
 

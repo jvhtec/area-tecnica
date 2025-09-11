@@ -26,6 +26,13 @@ export interface PDFGenerationOptions {
   venueMapPreview: string | null;
   selectedJobId: string;
   jobTitle: string;
+  jobDate?: string;
   toast?: any;
   accommodations?: Accommodation[];
+  // Rendering options (defaults applied in engine)
+  includeAccommodationRooming?: boolean;
+  includeAggregatedRooming?: boolean;
+  includeTravelArrangements?: boolean;
+  includeLogisticsTransport?: boolean;
+  dedupeTransportAcrossSections?: boolean;
 }

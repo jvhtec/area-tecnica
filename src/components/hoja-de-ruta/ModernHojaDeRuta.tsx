@@ -187,6 +187,7 @@ export const ModernHojaDeRuta = () => {
         venueMapPreview,
         selectedJobId,
         jobDetails?.title || "",
+        jobDetails?.start_time || undefined,
         toast,
         accommodations
       );

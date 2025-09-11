@@ -7,11 +7,8 @@ export class ContactsSection {
   constructor(private pdfDoc: PDFDocument) {}
 
   addContactsSection(eventData: EventData, yPosition: number): number {
-    yPosition = this.pdfDoc.checkPageBreak(yPosition, 50);
-    
-    this.pdfDoc.setText(14, [125, 1, 1]);
-    this.pdfDoc.addText("Contactos", 20, yPosition);
-    yPosition += 15;
+    // Start directly after the section header; no repeated subtitle
+    yPosition = this.pdfDoc.checkPageBreak(yPosition, 30);
 
     const validContacts = eventData.contacts?.filter(contact => 
       DataValidators.hasData(contact.name) || 
@@ -27,12 +24,11 @@ export class ContactsSection {
       contact.name || '',
       contact.role || '',
       Formatters.formatPhone(contact.phone || ''),
-      contact.email || '—'
     ]);
     
     this.pdfDoc.addTable({
       startY: yPosition,
-      head: [["Nombre", "Rol", "Teléfono", "Email"]],
+      head: [["Nombre", "Cargo", "Teléfono"]],
       body: contactsTableData,
       theme: "grid",
       styles: {
@@ -48,14 +44,14 @@ export class ContactsSection {
         fontStyle: 'bold',
       },
       columnStyles: {
-        0: { cellWidth: 40 }, // Nombre
-        1: { cellWidth: 35 }, // Rol
-        2: { cellWidth: 35 }, // Teléfono
-        3: { cellWidth: 50 }  // Email
+        0: { cellWidth: 60 }, // Nombre
+        1: { cellWidth: 40 }, // Cargo
+        2: { cellWidth: 40 }, // Teléfono
       },
       margin: { left: 20, right: 20 },
+      tableWidth: 'auto',
     });
-    
-    return this.pdfDoc.getLastAutoTableY() + 15;
+
+    return this.pdfDoc.getLastAutoTableY() + 10;
   }
 }

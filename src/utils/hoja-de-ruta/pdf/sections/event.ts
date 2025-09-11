@@ -31,9 +31,11 @@ export class EventSection {
         theme: "plain",
         styles: { fontSize: 10, cellPadding: 4 },
         columnStyles: {
-          0: { cellWidth: 40, fontStyle: 'bold', textColor: [125, 1, 1] },
-          1: { cellWidth: 140 }
-        }
+          0: { cellWidth: 50, fontStyle: 'bold', textColor: [125, 1, 1] },
+          1: { cellWidth: 120 }
+        },
+        margin: { left: 20, right: 20 },
+        tableWidth: 'auto'
       });
       yPosition = this.pdfDoc.getLastAutoTableY() + 15;
     }
