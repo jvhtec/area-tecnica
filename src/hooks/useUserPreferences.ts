@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from './use-toast';
-import { safeQuery } from "@/lib/supabaseRetry";
 
 interface UserPreferences {
   dark_mode: boolean;
@@ -35,20 +34,13 @@ export const useUserPreferences = () => {
 
       if (error) {
         console.error('Error updating preferences:', error);
-        // Don't throw on database errors during preference updates
-        return;
+        throw error;
       }
 
       setPreferences(prev => prev ? { ...prev, ...newPreferences } : null);
       console.log('Preferences updated successfully');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating preferences:', error);
-      // Check if it's a network error and fail silently
-      if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
-        console.log('Network error detected, skipping preference update');
-        return;
-      }
-      
       toast({
         title: "Error",
         description: "Failed to update preferences",
@@ -85,38 +77,30 @@ export const useUserPreferences = () => {
           return;
         }
 
-        try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('dark_mode, time_span, last_activity, custom_folder_structure, custom_tour_folder_structure')
-            .eq('id', session.user.id)
-            .maybeSingle();
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('dark_mode, time_span, last_activity, custom_folder_structure, custom_tour_folder_structure')
+          .eq('id', session.user.id)
+          .maybeSingle();
 
-          if (error) {
-            console.error('Error loading preferences:', error);
-            // Don't throw on database errors, just log and continue
-            return;
-          }
-
-          if (data) {
-            console.log('Preferences loaded:', data);
-            setPreferences(data);
-            
-            // Apply dark mode if saved
-            if (data.dark_mode) {
-              document.documentElement.classList.add('dark');
-            } else {
-              document.documentElement.classList.remove('dark');
-            }
-          }
-        } catch (error: any) {
+        if (error) {
           console.error('Error loading preferences:', error);
-          // Check if it's a network error
-          if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
-            console.log('Network error detected, skipping preferences load');
-            return;
+          throw error;
+        }
+
+        if (data) {
+          console.log('Preferences loaded:', data);
+          setPreferences(data);
+          
+          // Apply dark mode if saved
+          if (data.dark_mode) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
           }
         }
+      } catch (error) {
+        console.error('Error loading preferences:', error);
       } finally {
         setIsLoading(false);
       }

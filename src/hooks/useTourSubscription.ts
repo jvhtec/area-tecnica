@@ -8,11 +8,7 @@ import { supabase } from '@/lib/supabase';
  */
 export const useTourSubscription = () => {
   const queryClient = useQueryClient();
-  
-  // Temporarily disabled to reduce database load during connectivity issues
-  console.log('Tour subscriptions temporarily disabled due to database connectivity issues');
-  
-  /*
+
   useEffect(() => {
     console.log('Setting up tours realtime subscription');
     
@@ -28,9 +24,8 @@ export const useTourSubscription = () => {
         (payload) => {
           console.log('Tours table change detected:', payload);
           
-          // Invalidate optimized tours query to refresh the data
-          queryClient.invalidateQueries({ queryKey: ['tours-optimized'] });
-          queryClient.invalidateQueries({ queryKey: ['tour-dates-batch'] });
+          // Invalidate tours query to refresh the data
+          queryClient.invalidateQueries({ queryKey: ['tours'] });
         }
       )
       .subscribe();
@@ -40,5 +35,4 @@ export const useTourSubscription = () => {
       supabase.removeChannel(channel);
     };
   }, [queryClient]);
-  */
 };
