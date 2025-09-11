@@ -41,18 +41,18 @@ export class PDFEngine {
         headerLogoDims = await new Promise((resolve) => {
           const img = new Image();
           img.onload = () => {
-            const MAX_H = 24;
-            const MAX_W = 140;
+            const MAX_H = 28;
+            const MAX_W = 160;
             const w = img.naturalWidth || img.width;
             const h = img.naturalHeight || img.height;
             if (w > 0 && h > 0) {
               const scale = Math.min(MAX_H / h, MAX_W / w);
               resolve({ width: Math.round(w * scale), height: Math.round(h * scale) });
             } else {
-              resolve({ width: 72, height: 24 });
+              resolve({ width: 84, height: 28 });
             }
           };
-          img.onerror = () => resolve({ width: 72, height: 24 });
+          img.onerror = () => resolve({ width: 84, height: 28 });
           img.src = this.logoData!;
         });
       }
@@ -94,6 +94,24 @@ export class PDFEngine {
       if (this.contentSections.hasWeatherData(this.options.eventData)) {
         const currentY = this.headerSection.addSectionHeader("Clima");
         this.contentSections.addWeatherSection(this.options.eventData, currentY);
+      } else {
+        // Attempt to fetch weather on-the-fly if missing
+        try {
+          const { getWeatherForJob } = await import('@/utils/weather/weatherApi');
+          if (this.options.eventData?.venue && this.options.eventData?.eventDates) {
+            const weather = await getWeatherForJob(
+              this.options.eventData.venue,
+              this.options.eventData.eventDates
+            );
+            if (weather && weather.length > 0) {
+              (this.options.eventData as any).weather = weather;
+              const currentY = this.headerSection.addSectionHeader("Clima");
+              this.contentSections.addWeatherSection(this.options.eventData, currentY);
+            }
+          }
+        } catch (e) {
+          console.warn('Weather fetch during PDF generation failed:', e);
+        }
       }
 
       // 4. Contactos

@@ -21,8 +21,8 @@ export class HeaderService {
     // Optional small logo on left
     if (logoData) {
       try {
-        const MAX_H = 24;
-        const MAX_W = 140;
+        const MAX_H = 28;
+        const MAX_W = 160;
         let drawW = 24;
         let drawH = 8;
         if (logoDims && logoDims.width > 0 && logoDims.height > 0) {

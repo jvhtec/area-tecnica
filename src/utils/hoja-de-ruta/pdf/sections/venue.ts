@@ -2,6 +2,7 @@ import { PDFDocument } from '../core/pdf-document';
 import { EventData } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 import { MapService } from '../services/map-service';
+import { PlacesImageService } from '../services/places-image-service';
 import { QRService } from '../services/qr-service';
 
 export class VenueSection {
@@ -44,8 +45,16 @@ export class VenueSection {
       yPosition = this.pdfDoc.getLastAutoTableY() + 15;
     }
 
-    // Add venue images from previews if available (up to 2 side by side)
+    // Add venue images: use previews if present; otherwise, fetch via Places API
+    let imagesToRender: string[] = [];
     if (venueImagePreviews && venueImagePreviews.length > 0) {
+      imagesToRender = venueImagePreviews.slice(0, 2);
+    } else if (eventData.venue?.name || eventData.venue?.address) {
+      const q = eventData.venue?.name || eventData.venue?.address || '';
+      imagesToRender = await PlacesImageService.getPhotosForQuery(q, 2, 500, 300);
+    }
+
+    if (imagesToRender.length > 0) {
       yPosition = this.pdfDoc.checkPageBreak(yPosition, 90);
       this.pdfDoc.setText(12, [125, 1, 1]);
       this.pdfDoc.addText("Imágenes del Venue", 20, yPosition);
@@ -58,9 +67,8 @@ export class VenueSection {
       const availableWidth = pageWidth - leftMargin - rightMargin;
       const maxPerImage = Math.floor((availableWidth - gap) / 2);
       const imgHeight = 60;
-      const imgs = venueImagePreviews.slice(0, 2);
       let x = leftMargin;
-      for (const dataUrl of imgs) {
+      for (const dataUrl of imagesToRender) {
         try {
           this.pdfDoc.addImage(dataUrl, 'JPEG', x, yPosition, maxPerImage, imgHeight);
         } catch (e) {
@@ -70,6 +78,10 @@ export class VenueSection {
             console.error('Error adding venue image preview:', err);
           }
         }
+        // Optional border for images
+        this.pdfDoc.document.setDrawColor(210, 210, 210);
+        this.pdfDoc.document.setLineWidth(0.3);
+        this.pdfDoc.document.rect(x, yPosition, maxPerImage, imgHeight);
         x += maxPerImage + gap;
       }
       yPosition += imgHeight + 10;
@@ -96,12 +108,9 @@ export class VenueSection {
 
       let mapDataUrl: string | null = null;
       try {
-        const coords = await MapService.geocodeAddress(eventData.venue.address);
-        if (coords) {
-          mapDataUrl = await MapService.getStaticMapDataUrl(coords.lat, coords.lng, mapW, mapHeight);
-        }
+        mapDataUrl = await MapService.getMapImageForAddress(eventData.venue.address, mapW, mapHeight);
       } catch (e) {
-        console.warn('Venue map geocode/static failed, will fallback to preview:', e);
+        console.warn('Venue map fetch failed, will fallback to preview:', e);
       }
       if (!mapDataUrl && venueMapPreview) {
         mapDataUrl = venueMapPreview;
@@ -118,6 +127,10 @@ export class VenueSection {
             this.pdfDoc.addText('[MAPA NO DISPONIBLE]', mapX, mapY + mapHeight / 2);
           }
         }
+        // Add border around the map
+        this.pdfDoc.document.setDrawColor(200, 200, 200);
+        this.pdfDoc.document.setLineWidth(0.3);
+        this.pdfDoc.document.rect(mapX, mapY, mapW, mapHeight);
       } else {
         this.pdfDoc.addText('[MAPA NO DISPONIBLE]', mapX, mapY + mapHeight / 2);
       }

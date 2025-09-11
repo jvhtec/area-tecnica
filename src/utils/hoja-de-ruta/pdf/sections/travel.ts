@@ -119,23 +119,23 @@ export class TravelSection {
 
     let mapAdded = false;
     try {
-      // Try to geocode and add static OSM map
-      const coords = await MapService.geocodeAddress(pickupAddress);
-      if (coords) {
-        const mapDataUrl = await MapService.getStaticMapDataUrl(coords.lat, coords.lng, mapWidth, mapHeight);
-        if (mapDataUrl) {
+      const mapDataUrl = await MapService.getMapImageForAddress(pickupAddress, mapWidth, mapHeight);
+      if (mapDataUrl) {
+        try {
+          this.pdfDoc.addImage(mapDataUrl, 'PNG', mapX, mapY, mapWidth, mapHeight);
+          mapAdded = true;
+        } catch (errPng) {
           try {
-            this.pdfDoc.addImage(mapDataUrl, 'PNG', mapX, mapY, mapWidth, mapHeight);
+            this.pdfDoc.addImage(mapDataUrl, 'JPEG', mapX, mapY, mapWidth, mapHeight);
             mapAdded = true;
-          } catch (errPng) {
-            try {
-              this.pdfDoc.addImage(mapDataUrl, 'JPEG', mapX, mapY, mapWidth, mapHeight);
-              mapAdded = true;
-            } catch (err) {
-              console.error('Error adding pickup map:', err);
-            }
+          } catch (err) {
+            console.error('Error adding pickup map:', err);
           }
         }
+        // Add a subtle border around the map
+        this.pdfDoc.document.setDrawColor(200, 200, 200);
+        this.pdfDoc.document.setLineWidth(0.3);
+        this.pdfDoc.document.rect(mapX, mapY, mapWidth, mapHeight);
       }
     } catch (error) {
       console.error('Error adding pickup map:', error);

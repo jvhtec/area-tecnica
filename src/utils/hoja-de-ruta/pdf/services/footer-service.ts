@@ -3,8 +3,8 @@ import { PDFDocument } from '../core/pdf-document';
 export class FooterService {
   private static readonly FOOTER_HEIGHT = 30;
   // Target maximum size for footer logo (smaller to avoid stretching)
-  private static readonly LOGO_MAX_HEIGHT = 12;
-  private static readonly LOGO_MAX_WIDTH = 80;
+  private static readonly LOGO_MAX_HEIGHT = 6;
+  private static readonly LOGO_MAX_WIDTH = 50;
   private static cachedLogoData: string | null = null;
   private static cachedLogoDims: { width: number; height: number } | null = null;
 
