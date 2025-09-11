@@ -24,8 +24,9 @@ export const useTourSubscription = () => {
         (payload) => {
           console.log('Tours table change detected:', payload);
           
-          // Invalidate tours query to refresh the data
-          queryClient.invalidateQueries({ queryKey: ['tours'] });
+          // Invalidate optimized tours query to refresh the data
+          queryClient.invalidateQueries({ queryKey: ['tours-optimized'] });
+          queryClient.invalidateQueries({ queryKey: ['tour-dates-batch'] });
         }
       )
       .subscribe();

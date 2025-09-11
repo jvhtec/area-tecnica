@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { createTourRootFolders, createTourDateFolders, createTourRootFoldersManual } from "@/utils/tourFolders";
+import { useTourLogo } from "@/hooks/useTourLogo";
 
 // File System Access API types
 declare global {
@@ -33,59 +34,13 @@ export const TourCard = ({ tour, onTourClick, onManageDates, onPrint }: TourCard
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isManagementOpen, setIsManagementOpen] = useState(false);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCreatingLocalFolders, setIsCreatingLocalFolders] = useState(false);
   const isMobile = useIsMobile();
-
-  // Fetch tour logo
-  useEffect(() => {
-    const fetchTourLogo = async () => {
-      if (!tour.id) return;
-      
-      const { data, error } = await supabase
-        .from('tour_logos')
-        .select('file_path')
-        .eq('tour_id', tour.id)
-        .maybeSingle();
-
-      if (!error && data?.file_path) {
-        try {
-          // Try signed URL first
-          const { data: signedUrlData } = await supabase
-            .storage
-            .from('tour-logos')
-            .createSignedUrl(data.file_path, 60 * 60); // 1 hour expiry
-            
-          if (signedUrlData?.signedUrl) {
-            setLogoUrl(signedUrlData.signedUrl);
-          } else {
-            // Fallback to public URL
-            const { data: publicUrlData } = supabase
-              .storage
-              .from('tour-logos')
-              .getPublicUrl(data.file_path);
-              
-            if (publicUrlData?.publicUrl) {
-              setLogoUrl(publicUrlData.publicUrl);
-            }
-          }
-        } catch (e) {
-          // Fallback to public URL on error
-          const { data: publicUrlData } = supabase
-            .storage
-            .from('tour-logos')
-            .getPublicUrl(data.file_path);
-            
-          if (publicUrlData?.publicUrl) {
-            setLogoUrl(publicUrlData.publicUrl);
-          }
-        }
-      }
-    };
-
-    fetchTourLogo();
-  }, [tour.id]);
+  
+  // Use optimized logo hook
+  const { logoUrl, isLoading: logoLoading } = useTourLogo(tour.id);
 
   const getUpcomingDates = () => {
     if (!tour.tour_dates) return [];

@@ -1,7 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { Plus, Eye, EyeOff, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { TourDateManagementDialog } from "../tours/TourDateManagementDialog";
 import { TourCard } from "../tours/TourCard";
@@ -9,7 +7,7 @@ import CreateTourDialog from "../tours/CreateTourDialog";
 import { toast } from "@/hooks/use-toast";
 import { exportTourPDF } from "@/lib/tourPdfExport";
 import { BulkTourFolderActions } from "../tours/BulkTourFolderActions";
-import { useTourSubscription } from "@/hooks/useTourSubscription";
+import { useOptimizedTours } from "@/hooks/useOptimizedTours";
 
 interface TourChipsProps {
   onTourClick: (tourId: string) => void;
@@ -22,42 +20,7 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
   const [showCompletedTours, setShowCompletedTours] = useState(false);
   const [showLegacyDisclaimer, setShowLegacyDisclaimer] = useState(true);
 
-  // Set up realtime subscription for tours
-  useTourSubscription();
-
-  const { data: tours = [], refetch: refetchTours } = useQuery({
-    queryKey: ["tours"],
-    queryFn: async () => {
-      console.log("Fetching tours...");
-      const { data: toursData, error: toursError } = await supabase
-        .from("tours")
-        .select(`
-          id,
-          name,
-          description,
-          start_date,
-          end_date,
-          color,
-          flex_folders_created,
-          flex_main_folder_id,
-          tour_dates (
-            id,
-            date,
-            location:locations (name)
-          )
-        `)
-        .order("created_at", { ascending: false })
-        .eq("deleted", false);
-
-      if (toursError) {
-        console.error("Error fetching tours:", toursError);
-        throw toursError;
-      }
-
-      console.log("Tours fetched successfully:", toursData);
-      return toursData;
-    },
-  });
+  const { tours, activeTours, completedTours, isLoading, refetch: refetchTours } = useOptimizedTours();
 
   const handleManageDates = (tourId: string) => {
     setSelectedTourId(tourId);
@@ -102,23 +65,7 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
     );
   };
 
-  // Filter tours based on completion status
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  const activeTours = tours.filter((tour: any) => {
-    if (!tour.end_date) return true; // Tours without end_date are considered active
-    const endDate = new Date(tour.end_date);
-    endDate.setHours(0, 0, 0, 0);
-    return endDate >= today;
-  });
-
-  const completedTours = tours.filter((tour: any) => {
-    if (!tour.end_date) return false;
-    const endDate = new Date(tour.end_date);
-    endDate.setHours(0, 0, 0, 0);
-    return endDate < today;
-  });
+  // Tours are already filtered by the useOptimizedTours hook
 
   const displayedTours = showCompletedTours ? tours : activeTours;
   
@@ -165,22 +112,29 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-4">
-        {displayedTours.map((tour: any) => (
-          <div
-            key={tour.id}
-            className={`w-full sm:w-[calc(50%-1rem)] md:w-[calc(33.33%-1rem)] lg:w-[calc(25%-1rem)] ${
-              completedTours.some(ct => ct.id === tour.id) ? 'opacity-75' : ''
-            }`}
-          >
-            <TourCard
-              tour={tour}
-              onManageDates={() => handleManageDates(tour.id)}
-              onPrint={() => handlePrint(tour)}
-            />
-          </div>
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="flex justify-center items-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          <span className="ml-2 text-muted-foreground">Loading tours...</span>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-4">
+          {displayedTours.map((tour: any) => (
+            <div
+              key={tour.id}
+              className={`w-full sm:w-[calc(50%-1rem)] md:w-[calc(33.33%-1rem)] lg:w-[calc(25%-1rem)] ${
+                completedTours.some(ct => ct.id === tour.id) ? 'opacity-75' : ''
+              }`}
+            >
+              <TourCard
+                tour={tour}
+                onManageDates={() => handleManageDates(tour.id)}
+                onPrint={() => handlePrint(tour)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       {selectedTourId && (
         <TourDateManagementDialog
