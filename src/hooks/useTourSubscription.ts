@@ -8,7 +8,11 @@ import { supabase } from '@/lib/supabase';
  */
 export const useTourSubscription = () => {
   const queryClient = useQueryClient();
-
+  
+  // Temporarily disabled to reduce database load during connectivity issues
+  console.log('Tour subscriptions temporarily disabled due to database connectivity issues');
+  
+  /*
   useEffect(() => {
     console.log('Setting up tours realtime subscription');
     
@@ -36,4 +40,5 @@ export const useTourSubscription = () => {
       supabase.removeChannel(channel);
     };
   }, [queryClient]);
+  */
 };

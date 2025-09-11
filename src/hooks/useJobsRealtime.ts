@@ -30,6 +30,17 @@ export function useJobsRealtime() {
       
       if (error) {
         console.error("Error fetching jobs:", error);
+        
+        // Handle network connectivity issues gracefully
+        if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+          console.log('Network connectivity issue detected, reducing retry frequency');
+          if (retryCount >= maxRetries) {
+            setIsPaused(true);
+            return []; // Return empty array instead of throwing
+          }
+          throw error;
+        }
+        
         if (error.code === '401') {
           // Authorization error, trigger token refresh
           window.dispatchEvent(new CustomEvent('token-refresh-needed'));
@@ -49,6 +60,7 @@ export function useJobsRealtime() {
         throw error;
       } else {
         setIsPaused(true);
+        console.log('Max retries reached, pausing job fetching to reduce database load');
         return [];
       }
     }
@@ -67,8 +79,9 @@ export function useJobsRealtime() {
     retry: maxRetries,
     retryDelay: attemptIndex => Math.min(1000 * (2 ** attemptIndex), 10000),
     enabled: !isPaused,
-    staleTime: 2 * 60 * 1000, // 2 minutes - reduced for better performance
+    staleTime: 5 * 60 * 1000, // 5 minutes - increased to reduce database load
     refetchOnWindowFocus: false, // Disable to reduce load
+    refetchInterval: isPaused ? false : 10 * 60 * 1000, // 10 minutes when not paused
   });
   
   // Set up optimized realtime subscription

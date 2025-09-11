@@ -26,6 +26,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { HeaderStatus } from "@/components/ui/header-status";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { HelpButton } from "@/components/layout/HelpButton";
+import { DatabaseHealthIndicator } from "@/components/DatabaseHealthIndicator";
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -149,6 +150,7 @@ const Layout = () => {
             </div>
           </header>
           <main className="p-6">
+            <DatabaseHealthIndicator />
             <Outlet />
           </main>
         </div>
