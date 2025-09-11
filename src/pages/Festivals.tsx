@@ -4,7 +4,7 @@ import { useJobsRealtime } from "@/hooks/useJobsRealtime";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { JobCard } from "@/components/jobs/JobCard";
 import { Separator } from "@/components/ui/separator";
-import { Tent, Printer, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
+import { Tent, Printer, Loader2, RefreshCw, AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { supabase, ensureRealtimeConnection } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -41,19 +41,33 @@ const Festivals = () => {
   const [highlightedFestivalId, setHighlightedFestivalId] = useState<string | null>(null);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [selectedJobForPrint, setSelectedJobForPrint] = useState<{ id: string; title: string } | null>(null);
+  const [showCompleted, setShowCompleted] = useState(false);
   const { userRole } = useOptimizedAuth();
   const { status: connectionStatus, recoverConnection } = useConnectionStatus();
   const festivalRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // Filter jobs to only show festivals
+  // Filter jobs to only show festivals, excluding cancelled ones, and optionally completed ones
   useEffect(() => {
     if (jobs) {
-      const festivals = jobs.filter(job => job.job_type === 'festival');
+      let festivals = jobs.filter(job => 
+        job.job_type === 'festival' && 
+        job.status !== 'Cancelado'
+      );
+      
+      // Filter out completed festivals if showCompleted is false
+      if (!showCompleted) {
+        const now = new Date();
+        festivals = festivals.filter(job => {
+          const endDate = new Date(job.end_time);
+          return endDate >= now || job.status !== 'Completado';
+        });
+      }
+      
       setFestivalJobs(festivals);
       
       festivals.forEach(fetchFestivalLogo);
     }
-  }, [jobs]);
+  }, [jobs, showCompleted]);
 
   // Auto-center on closest festival when festivals are loaded
   useEffect(() => {
@@ -214,6 +228,15 @@ const Festivals = () => {
           </div>
           
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCompleted(!showCompleted)}
+              className="mr-2"
+            >
+              {showCompleted ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+              {showCompleted ? 'Hide Completed' : 'Show Completed'}
+            </Button>
             <SubscriptionIndicator 
               tables={['jobs', 'job_assignments', 'job_departments', 'job_date_types', 'festival_logos']} 
               showRefreshButton 
