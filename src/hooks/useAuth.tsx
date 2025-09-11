@@ -58,7 +58,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [idleTime, setIdleTime] = useState(0);
   const tokenManager = TokenManager.getInstance();
 
   const fetchUserProfile = useCallback(async (userId: string) => {
@@ -111,14 +110,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const refreshSession = useCallback(async (): Promise<Session | null> => {
     try {
       console.log("Starting session refresh");
-      setIdleTime(0);
       
       const { session: refreshedSession, error } = await tokenManager.refreshToken();
       
       if (error) {
         console.error("Session refresh error:", error);
         
-        if (error.message && error.message.includes('expired')) {
+        if (error.message && (error.message.includes('expired') || error.message.includes('invalid'))) {
           setSession(null);
           setUser(null);
           setUserRole(null);
@@ -192,31 +190,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, [fetchUserProfile]);
 
-  useEffect(() => {
-    const idleInterval = setInterval(() => {
-      setIdleTime((prevIdleTime) => prevIdleTime + 1);
-    }, 60000);
-
-    return () => clearInterval(idleInterval);
-  }, []);
-
-  useEffect(() => {
-    if (idleTime >= 15) {
-      refreshSession();
-      setIdleTime(0);
-    }
-  }, [idleTime, refreshSession]);
-
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      if (session?.user?.id) {
-        console.log("Periodic session refresh");
-        await refreshSession();
-      }
-    }, 4 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [refreshSession, session]);
+  // Token Manager handles all refresh timing - no competing timers needed here
 
   const login = async (email: string, password: string) => {
     try {
@@ -361,19 +335,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  useEffect(() => {
-    if (!session) return;
-    
-    const refreshTime = tokenManager.calculateRefreshTime(session);
-    console.log(`Scheduling token refresh in ${Math.round(refreshTime/1000)} seconds`);
-    
-    const refreshTimer = setTimeout(() => {
-      console.log("Executing scheduled token refresh");
-      refreshSession();
-    }, refreshTime);
-    
-    return () => clearTimeout(refreshTimer);
-  }, [session, refreshSession, tokenManager]);
+  // Token Manager handles refresh scheduling automatically
 
   useEffect(() => {
     const handleOnline = () => {

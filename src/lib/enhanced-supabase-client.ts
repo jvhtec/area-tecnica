@@ -1,6 +1,7 @@
 
 // Re-export the main Supabase client and utilities
 import { supabase, checkNetworkConnection, getRealtimeConnectionStatus } from './supabase-client';
+import { retryWithBackoff, isOnline } from './network-utils';
 import { toast } from '@/hooks/use-toast';
 
 export { 
@@ -15,14 +16,24 @@ export {
  * and attempts recovery if needed
  */
 export async function ensureRealtimeConnection(): Promise<boolean> {
-  const status = getRealtimeConnectionStatus();
-  console.log('Current realtime connection status:', status);
-  
-  if (status === 'DISCONNECTED') {
-    console.log('Realtime connection is disconnected, attempting recovery');
-    const isNetworkAvailable = await checkNetworkConnection();
+  try {
+    // Check network connectivity first with retry
+    const isConnected = await retryWithBackoff(
+      () => checkNetworkConnection(),
+      { maxRetries: 2, baseDelay: 500 }
+    );
     
-    if (isNetworkAvailable) {
+    if (!isConnected) {
+      console.log('No network connection detected after retries');
+      return false;
+    }
+
+    const status = getRealtimeConnectionStatus();
+    console.log('Current realtime connection status:', status);
+    
+    if (status === 'DISCONNECTED') {
+      console.log('Realtime connection is disconnected, attempting recovery');
+      
       console.log('Network connection available, triggering reconnect event');
       // Dispatch reconnect event to trigger subscription recovery
       window.dispatchEvent(new CustomEvent('supabase-reconnect'));
@@ -42,17 +53,13 @@ export async function ensureRealtimeConnection(): Promise<boolean> {
       
       console.log('Realtime connection recovery in progress...');
       return false;
-    } else {
-      console.log('Network connection unavailable, cannot recover realtime connection');
-      toast.error('Network connection issue', { 
-        description: 'Please check your internet connection',
-        duration: 5000
-      });
-      return false;
     }
+    
+    return status === 'CONNECTED';
+  } catch (error) {
+    console.error('Error ensuring realtime connection:', error);
+    return false;
   }
-  
-  return status === 'CONNECTED';
 }
 
 /**

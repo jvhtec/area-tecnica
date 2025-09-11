@@ -108,30 +108,49 @@ export const useUserPreferences = () => {
 
     loadPreferences();
 
-    // Set up activity tracking with throttling to prevent API spam
-    const updateActivity = () => {
-      const now = Date.now();
-      const lastUpdate = localStorage.getItem('lastActivityUpdate');
-      const timeSinceLastUpdate = now - (lastUpdate ? parseInt(lastUpdate) : 0);
+    // Throttle activity updates to prevent spam - increased to 15 minutes
+    let lastActivityUpdate = 0;
+    const ACTIVITY_UPDATE_THROTTLE = 15 * 60 * 1000; // 15 minutes
+    let isOnline = true;
+
+    const trackActivity = () => {
+      if (!isOnline) return; // Skip if offline
       
-      // Only update activity every 5 minutes to prevent API spam
-      if (timeSinceLastUpdate > 5 * 60 * 1000) {
-        localStorage.setItem('lastActivityUpdate', now.toString());
-        updatePreferences({ last_activity: new Date().toISOString() });
+      const now = Date.now();
+      if (now - lastActivityUpdate >= ACTIVITY_UPDATE_THROTTLE) {
+        lastActivityUpdate = now;
+        updatePreferences({ 
+          last_activity: new Date().toISOString() 
+        });
       }
+    };
+
+    // Monitor online/offline status
+    const handleOnline = () => {
+      isOnline = true;
+      console.log('Network restored, resuming preference updates');
+    };
+    
+    const handleOffline = () => {
+      isOnline = false;
+      console.log('Network offline, pausing preference updates');
     };
 
     // Check inactivity every minute
     const inactivityInterval = setInterval(checkInactivity, 60000);
 
-    // Track user activity with throttling (every 5 minutes max)
-    window.addEventListener('click', updateActivity);
-    window.addEventListener('keydown', updateActivity);
+    // Track meaningful user interactions instead of constant activity
+    window.addEventListener('click', trackActivity);
+    window.addEventListener('keydown', trackActivity);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
 
     return () => {
       clearInterval(inactivityInterval);
-      window.removeEventListener('click', updateActivity);
-      window.removeEventListener('keydown', updateActivity);
+      window.removeEventListener('click', trackActivity);
+      window.removeEventListener('keydown', trackActivity);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, []);
 

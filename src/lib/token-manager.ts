@@ -18,7 +18,15 @@ export class TokenManager {
   // Session caching properties
   private cachedSession: Session | null = null;
   private sessionCacheTime: number = 0;
-  private readonly CACHE_DURATION = 10 * 60 * 1000; // 10 minutes (increased from 5)
+  private readonly CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+  
+  // Exponential backoff and circuit breaker properties
+  private failureCount = 0;
+  private lastFailureTime = 0;
+  private readonly MAX_FAILURES = 3;
+  private readonly BACKOFF_BASE = 1000; // 1 second base
+  private readonly MAX_BACKOFF = 60000; // 1 minute max
+  private readonly CIRCUIT_BREAKER_TIMEOUT = 5 * 60 * 1000; // 5 minutes
   
   private constructor() {
     // Set up auth state change listener
@@ -115,6 +123,12 @@ export class TokenManager {
       return { session: null, error: false };
     }
     
+    // Circuit breaker check
+    if (this.isCircuitBreakerOpen()) {
+      console.log('Circuit breaker is open, skipping refresh');
+      return { session: null, error: new Error('Circuit breaker open') };
+    }
+    
     try {
       this.isRefreshing = true;
       
@@ -122,12 +136,14 @@ export class TokenManager {
       
       if (error) {
         console.error('Error refreshing token:', error);
+        this.recordFailure();
         return { session: null, error };
       }
       
       if (data.session) {
         this.lastRefresh = Date.now();
         this.updateCachedSession(data.session);
+        this.recordSuccess();
         this.notifySubscribers();
         this.scheduleNextRefresh(data.session);
         return { session: data.session, error: null };
@@ -136,6 +152,7 @@ export class TokenManager {
       return { session: null, error: null };
     } catch (error) {
       console.error('Exception during token refresh:', error);
+      this.recordFailure();
       return { session: null, error };
     } finally {
       this.isRefreshing = false;
@@ -317,5 +334,64 @@ export class TokenManager {
       cacheAge,
       isValid: this.isCacheValid()
     };
+  }
+
+  /**
+   * Record a failure for circuit breaker pattern
+   */
+  private recordFailure(): void {
+    this.failureCount++;
+    this.lastFailureTime = Date.now();
+    console.log(`Token refresh failure count: ${this.failureCount}`);
+  }
+
+  /**
+   * Record a success and reset failure count
+   */
+  private recordSuccess(): void {
+    this.failureCount = 0;
+    this.lastFailureTime = 0;
+  }
+
+  /**
+   * Check if circuit breaker is open
+   */
+  private isCircuitBreakerOpen(): boolean {
+    if (this.failureCount < this.MAX_FAILURES) {
+      return false;
+    }
+    
+    const timeSinceLastFailure = Date.now() - this.lastFailureTime;
+    return timeSinceLastFailure < this.CIRCUIT_BREAKER_TIMEOUT;
+  }
+
+  /**
+   * Calculate exponential backoff delay
+   */
+  private calculateBackoffDelay(): number {
+    if (this.failureCount === 0) return 0;
+    
+    const delay = Math.min(
+      this.BACKOFF_BASE * Math.pow(2, this.failureCount - 1),
+      this.MAX_BACKOFF
+    );
+    
+    // Add jitter to prevent thundering herd
+    const jitter = Math.random() * 0.1 * delay;
+    return delay + jitter;
+  }
+
+  /**
+   * Enhanced refresh with backoff
+   */
+  public async refreshTokenWithBackoff(): Promise<any> {
+    const backoffDelay = this.calculateBackoffDelay();
+    
+    if (backoffDelay > 0) {
+      console.log(`Waiting ${backoffDelay}ms before token refresh (backoff)`);
+      await new Promise(resolve => setTimeout(resolve, backoffDelay));
+    }
+    
+    return this.refreshToken();
   }
 }
