@@ -16,12 +16,16 @@ const DAYS_OF_WEEK = [
   'Saturday'
 ];
 
-// Define AvailabilityPreference type inline
+// Define AvailabilityPreference type to match global_availability_presets
 type AvailabilityPreference = {
-  user_id: string;
+  id: string;
+  name: string;
   department: string;
   day_of_week: number;
   status: 'available' | 'tentative' | 'unavailable';
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 type AvailabilityStatus = 'available' | 'tentative' | 'unavailable';
@@ -37,9 +41,8 @@ export function PresetManagement() {
       if (!session?.user?.id || !userDepartment) return null;
 
       const { data, error } = await supabase
-        .from('availability_preferences')
+        .from('global_availability_presets')
         .select('*')
-        .eq('user_id', session.user.id)
         .eq('department', userDepartment);
 
       if (error) {
@@ -63,14 +66,14 @@ export function PresetManagement() {
       }
 
       const { data, error } = await supabase
-        .from('availability_preferences')
+        .from('global_availability_presets')
         .upsert({
-          user_id: session.user.id,
+          name: `${DAYS_OF_WEEK[dayOfWeek]} Default`,
           department: userDepartment,
           day_of_week: dayOfWeek,
           status
         }, {
-          onConflict: 'user_id,department,day_of_week'
+          onConflict: 'department,day_of_week'
         });
 
       if (error) throw error;
@@ -102,9 +105,8 @@ export function PresetManagement() {
       }
 
       const { error } = await supabase
-        .from('availability_preferences')
+        .from('global_availability_presets')
         .delete()
-        .eq('user_id', session.user.id)
         .eq('department', userDepartment)
         .eq('day_of_week', dayOfWeek);
 

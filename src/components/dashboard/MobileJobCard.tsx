@@ -47,7 +47,9 @@ interface MobileJobCardProps {
   onJobClick?: (jobId: string) => void;
 }
 
-const DATE_TYPE_OPTIONS = [
+type DateType = 'travel' | 'setup' | 'show' | 'off' | 'rehearsal';
+
+const DATE_TYPE_OPTIONS: { value: DateType; label: string; emoji: string }[] = [
   { value: 'travel', label: 'Travel', emoji: '✈️' },
   { value: 'setup', label: 'Setup', emoji: '🔧' },
   { value: 'show', label: 'Show', emoji: '🎭' },
@@ -181,7 +183,7 @@ export function MobileJobCard({
     navigate(`/festival-management/${job.id}`);
   };
 
-  const handleDateTypeChange = async (newType: string) => {
+  const handleDateTypeChange = async (newType: DateType) => {
     try {
       const dateStr = format(currentDate, 'yyyy-MM-dd');
       
