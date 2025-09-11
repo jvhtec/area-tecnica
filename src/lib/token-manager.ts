@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase-client';
+import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
 
 /**

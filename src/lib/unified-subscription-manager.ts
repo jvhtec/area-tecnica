@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import { supabase } from "./supabase-client";
+import { supabase } from "./supabase";
 
 /**
  * Enhanced subscription manager that centralizes all Supabase realtime subscriptions

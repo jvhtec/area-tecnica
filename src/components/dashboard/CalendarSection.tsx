@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react"; // Import useCallback
+import React, { useState, useEffect, useCallback, useMemo } from "react"; // Import useCallback and useMemo
 import { Card, CardContent } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileDayCalendar } from "./MobileDayCalendar";
@@ -178,7 +178,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   };
 
   // Memoize getJobsForDate to prevent unnecessary re-renders and stabilize its reference for effects
-  const getJobsForDate = useCallback((date: Date) => {
+  const getJobsForDate = useMemo(() => (date: Date) => {
     if (!jobs) return [];
     return jobs.filter((job) => {
       try {
@@ -229,7 +229,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       [`${curr.job_id}-${curr.date}`]: curr,
     }), {});
     setDateTypes(typesMap);
-  }, [allDays, getJobsForDate]); // Dependencies for this specific fetch function
+  }, [allDays]); // Remove getJobsForDate from dependencies to prevent loop
 
   // Initial fetch of date types when dependencies change
   useEffect(() => {
@@ -282,7 +282,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       console.log("Cleaning up date type subscription...");
       supabase.removeChannel(channel);
     };
-  }, [allDays, getJobsForDate]); // Dependencies: if visible days or filtered jobs change, re-evaluate subscription context
+  }, [allDays]); // Remove getJobsForDate dependency to prevent subscription loop
 
   // Early return for mobile view after all hooks are initialized
   if (isMobile) {
