@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,7 @@ import { GoogleMap } from "@/components/maps/GoogleMap";
 import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { PlacesImageService } from "@/utils/hoja-de-ruta/pdf/services/places-image-service";
 
 interface ModernVenueSectionProps {
   eventData: EventData;
@@ -20,6 +21,7 @@ interface ModernVenueSectionProps {
   onRemoveImage: (type: keyof Images, index: number) => void;
   onVenueMapUpload: (file: File) => void;
   handleVenueMapUrl: (url: string) => void;
+  appendVenuePreviews: (dataUrls: string[]) => void;
 }
 
 export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
@@ -31,9 +33,11 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
   onRemoveImage,
   onVenueMapUpload,
   handleVenueMapUrl,
+  appendVenuePreviews,
 }) => {
   const [dragOver, setDragOver] = useState(false);
   const [staticMapUrl, setStaticMapUrl] = useState<string | null>(null);
+  const fetchedQueriesRef = useRef<Set<string>>(new Set());
 
   // Update coordinates when eventData changes
   useEffect(() => {
@@ -50,6 +54,37 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
       handleVenueMapUrl(staticMapUrl);
     }
   }, [staticMapUrl, handleVenueMapUrl]);
+
+  // Auto-fetch venue photos from Google Places and append to gallery (max 2)
+  useEffect(() => {
+    const name = eventData.venue?.name?.trim();
+    const address = eventData.venue?.address?.trim();
+    const query = name || address;
+    if (!query) return;
+    // Only fetch if we have room for suggestions
+    if ((imagePreviews.venue?.length || 0) >= 2) return;
+    const key = `${query.toLowerCase()}`;
+    if (fetchedQueriesRef.current.has(key)) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        console.log('📸 Fetching venue suggestion photos for:', query);
+        const photos = await PlacesImageService.getPhotosForQuery(query, 2, 500, 300);
+        if (!cancelled && photos && photos.length) {
+          appendVenuePreviews(photos);
+          fetchedQueriesRef.current.add(key);
+          console.log(`📸 Added ${photos.length} suggested photo(s) for venue`);
+        }
+      } catch (e) {
+        console.warn('Failed to fetch venue suggestion photos:', e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [eventData.venue?.name, eventData.venue?.address, imagePreviews.venue, appendVenuePreviews]);
 
   const handleLocationUpdate = (coordinates: { lat: number; lng: number }, address: string) => {
     setEventData(prev => ({
