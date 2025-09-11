@@ -243,7 +243,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
             <ChevronLeft className="h-4 w-4" />
           </Button>
           
-          <div className="text-center">
+          <div className="text-center flex-1">
             <div className="text-lg font-semibold">
               {format(currentDate, 'EEEE')}
             </div>
@@ -253,6 +253,34 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
             )}>
               {format(currentDate, 'MMM d, yyyy')}
             </div>
+          </div>
+          
+          <div className="flex gap-1">
+            <Button variant="outline" size="sm" onClick={navigateToToday}>
+              <Calendar className="h-4 w-4" />
+            </Button>
+            
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Calendar className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 pointer-events-auto" align="end">
+                <CalendarComponent
+                  mode="single"
+                  selected={currentDate}
+                  onSelect={(date) => {
+                    if (date) {
+                      setCurrentDate(date);
+                      onDateSelect(date);
+                    }
+                  }}
+                  initialFocus
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
           </div>
           
           <Button variant="ghost" size="sm" onClick={navigateToNext} className="p-2">
@@ -332,35 +360,6 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
             <Printer className="h-4 w-4 mr-1" />
             Print
           </Button>
-          
-          <div className="flex gap-1">
-            <Button variant="outline" size="sm" onClick={navigateToToday}>
-              <Calendar className="h-4 w-4 mr-1" />
-              Today
-            </Button>
-            
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Calendar className="h-4 w-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 pointer-events-auto" align="end">
-                <CalendarComponent
-                  mode="single"
-                  selected={currentDate}
-                  onSelect={(date) => {
-                    if (date) {
-                      setCurrentDate(date);
-                      onDateSelect(date);
-                    }
-                  }}
-                  initialFocus
-                  className="pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
         </div>
 
         {/* Jobs area */}
