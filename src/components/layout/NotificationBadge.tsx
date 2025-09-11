@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { BellDot } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
 
 interface NotificationBadgeProps {

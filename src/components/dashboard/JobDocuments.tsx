@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Download, Trash2, FileText } from "lucide-react";
 import { format } from "date-fns";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { toast } from "@/hooks/use-toast";
 import { Department } from "@/types/department";
 import { SubscriptionIndicator } from "../ui/subscription-indicator";

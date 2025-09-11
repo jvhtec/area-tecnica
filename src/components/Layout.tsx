@@ -27,7 +27,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/useAuth";
 import { HeaderStatus } from "./ui/header-status";
 import { useRouteSubscriptions } from "@/hooks/useRouteSubscriptions";
-import { useSubscriptionContext } from "@/components/layout/simple-stub-provider";
+import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 
 const Layout = () => {
   const navigate = useNavigate();

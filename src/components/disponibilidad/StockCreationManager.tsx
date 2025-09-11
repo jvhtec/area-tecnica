@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Minus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { EquipmentCreationManager } from '@/components/equipment/EquipmentCreationManager';
 import { StockMovementDialog } from '@/components/equipment/StockMovementDialog';
 

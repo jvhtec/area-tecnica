@@ -3,7 +3,7 @@ import { useTheme } from "next-themes";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { createSafeFolderName, sanitizeFolderName } from "@/utils/folderNameSanitizer";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Department } from "@/types/department";

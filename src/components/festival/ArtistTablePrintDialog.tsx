@@ -15,7 +15,7 @@ import { exportArtistTablePDF, ArtistTablePdfData } from "@/utils/artistTablePdf
 import { sortArtistsChronologically } from "@/utils/artistSorting";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { compareArtistRequirements, calculateEquipmentNeeds } from "@/utils/gearComparisonService";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 import { Checkbox } from "@/components/ui/checkbox";
 

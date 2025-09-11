@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
 import { useJobActions } from '@/hooks/useJobActions';
 import { useFolderExistence } from "@/hooks/useFolderExistence";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
 import { 
   MoreVertical, 
@@ -47,9 +47,7 @@ interface MobileJobCardProps {
   onJobClick?: (jobId: string) => void;
 }
 
-type DateType = 'travel' | 'setup' | 'show' | 'off' | 'rehearsal';
-
-const DATE_TYPE_OPTIONS: { value: DateType; label: string; emoji: string }[] = [
+const DATE_TYPE_OPTIONS = [
   { value: 'travel', label: 'Travel', emoji: '✈️' },
   { value: 'setup', label: 'Setup', emoji: '🔧' },
   { value: 'show', label: 'Show', emoji: '🎭' },
@@ -183,7 +181,7 @@ export function MobileJobCard({
     navigate(`/festival-management/${job.id}`);
   };
 
-  const handleDateTypeChange = async (newType: DateType) => {
+  const handleDateTypeChange = async (newType: string) => {
     try {
       const dateStr = format(currentDate, 'yyyy-MM-dd');
       

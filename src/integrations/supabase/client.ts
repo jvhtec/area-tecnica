@@ -1,56 +1,22 @@
 
-import { createClient } from '@supabase/supabase-js';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/api-config';
+// Import the unified client from the canonical location
+import { supabase as baseClient } from '@/lib/supabase-client';
 import type { Database } from './types';
 
 /**
- * Main Supabase client with simplified configuration
- * Single source of truth for all Supabase operations
+ * Main Supabase client with type support
+ * This is a typed wrapper around the unified client instance
  */
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce',
-  },
-  realtime: {
-    params: {
-      eventsPerSecond: 2,
-    },
-  },
-});
+export const supabase = baseClient as unknown as ReturnType<typeof import('@supabase/supabase-js').createClient<Database>>;
 
-/**
- * Checks network connection to Supabase
- */
-export const checkNetworkConnection = async (): Promise<boolean> => {
-  try {
-    const response = await fetch(`${SUPABASE_URL}/health`, {
-      method: 'HEAD',
-      headers: { 'Cache-Control': 'no-cache' },
-    });
-    return response.ok;
-  } catch (error) {
-    return false;
-  }
-};
+// Re-export utility functions from all client modules
+export { 
+  checkNetworkConnection, 
+  getRealtimeConnectionStatus 
+} from '@/lib/supabase-client';
 
-/**
- * Returns the current realtime connection status
- */
-export const getRealtimeConnectionStatus = (): 'CONNECTED' | 'CONNECTING' | 'DISCONNECTED' => {
-  const channels = supabase.getChannels();
-  
-  if (channels.length === 0) {
-    return 'DISCONNECTED';
-  }
-  
-  const hasConnected = channels.some(channel => channel.state === 'joined');
-  
-  if (hasConnected) {
-    return 'CONNECTED';
-  }
-  
-  return 'CONNECTING';
-};
+export { 
+  ensureRealtimeConnection,
+  monitorConnectionHealth,
+  forceRefreshSubscriptions 
+} from '@/lib/enhanced-supabase-client';

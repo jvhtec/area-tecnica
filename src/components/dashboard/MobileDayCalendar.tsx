@@ -12,7 +12,7 @@ import {
 import { DateTypeContextMenu } from "./DateTypeContextMenu";
 import { MobileJobCard } from "./MobileJobCard";
 import { Department } from "@/types/department";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { PrintDialog, PrintSettings } from "./PrintDialog";
 import {
   format,

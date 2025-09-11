@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 const DAYS_OF_WEEK = [
@@ -16,16 +16,12 @@ const DAYS_OF_WEEK = [
   'Saturday'
 ];
 
-// Define AvailabilityPreference type to match global_availability_presets
+// Define AvailabilityPreference type inline
 type AvailabilityPreference = {
-  id: string;
-  name: string;
+  user_id: string;
   department: string;
   day_of_week: number;
   status: 'available' | 'tentative' | 'unavailable';
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
 };
 
 type AvailabilityStatus = 'available' | 'tentative' | 'unavailable';
@@ -41,8 +37,9 @@ export function PresetManagement() {
       if (!session?.user?.id || !userDepartment) return null;
 
       const { data, error } = await supabase
-        .from('global_availability_presets')
+        .from('availability_preferences')
         .select('*')
+        .eq('user_id', session.user.id)
         .eq('department', userDepartment);
 
       if (error) {
@@ -66,14 +63,14 @@ export function PresetManagement() {
       }
 
       const { data, error } = await supabase
-        .from('global_availability_presets')
+        .from('availability_preferences')
         .upsert({
-          name: `${DAYS_OF_WEEK[dayOfWeek]} Default`,
+          user_id: session.user.id,
           department: userDepartment,
           day_of_week: dayOfWeek,
           status
         }, {
-          onConflict: 'department,day_of_week'
+          onConflict: 'user_id,department,day_of_week'
         });
 
       if (error) throw error;
@@ -105,8 +102,9 @@ export function PresetManagement() {
       }
 
       const { error } = await supabase
-        .from('global_availability_presets')
+        .from('availability_preferences')
         .delete()
+        .eq('user_id', session.user.id)
         .eq('department', userDepartment)
         .eq('day_of_week', dayOfWeek);
 

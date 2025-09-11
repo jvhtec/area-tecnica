@@ -4,7 +4,7 @@ import { useFestival } from '@/hooks/useFestival';
 import { TimeoutLoader } from '@/components/ui/timeout-loader';
 import { FestivalManagement } from './FestivalManagement';
 import { useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ensureRealtimeConnection } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
@@ -31,19 +31,27 @@ export function FestivalManagementWrapper() {
       console.log('Festival fetch failed, attempting to recover connection');
       
       const attemptRecovery = async () => {
-        // Full connection recovery
-        console.log('Attempting full recovery');
-        const fullRecoverySuccess = await recoverConnection();
+        // First try simple realtime reconnection
+        const recovered = await ensureRealtimeConnection();
         
-        if (fullRecoverySuccess) {
-          console.log('Full connection recovery succeeded, retrying fetch');
+        if (recovered) {
+          console.log('Connection recovered with ensureRealtimeConnection, retrying fetch');
           refetch();
-          toast.success('Connection restored');
         } else {
-          console.log('All recovery attempts failed');
-          toast.error('Connection issues persist', {
-            description: 'Please check your network connection and try again'
-          });
+          // If that fails, try full connection recovery
+          console.log('Simple reconnection failed, attempting full recovery');
+          const fullRecoverySuccess = await recoverConnection();
+          
+          if (fullRecoverySuccess) {
+            console.log('Full connection recovery succeeded, retrying fetch');
+            refetch();
+            toast.success('Connection restored');
+          } else {
+            console.log('All recovery attempts failed');
+            toast.error('Connection issues persist', {
+              description: 'Please check your network connection and try again'
+            });
+          }
         }
       };
       

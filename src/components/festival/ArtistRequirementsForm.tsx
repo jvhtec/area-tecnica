@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { BasicInfoSection } from "./form/sections/BasicInfoSection";
 import { ConsoleSetupSection } from "./form/sections/ConsoleSetupSection";
 import { ArtistWirelessSetupSection } from "./form/sections/ArtistWirelessSetupSection";
