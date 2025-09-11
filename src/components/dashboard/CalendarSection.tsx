@@ -53,6 +53,7 @@ import {
   Printer,
   Table, // Added for XLS icon
 } from "lucide-react";
+import { useOptimizedDateTypes } from "@/hooks/useOptimizedDateTypes";
 import { useToast } from "@/hooks/use-toast";
 import { formatInJobTimezone, isJobOnDate } from "@/utils/timezoneUtils";
 
@@ -84,7 +85,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
 }) => {
   const isMobile = useIsMobile();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [dateTypes, setDateTypes] = useState<Record<string, any>>({});
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -202,93 +202,29 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     });
   }, [jobs, department, selectedJobTypes]); // Dependencies for getJobsForDate
 
-  // Memoize visible job IDs and dates to optimize date type fetching
-  const visibleJobData = useMemo(() => {
-    const jobIdsInView = Array.from(new Set(
-      allDays.flatMap(day => getJobsForDate(day).map(job => job.id))
-    ));
-    const formattedDatesInView = Array.from(new Set(allDays.map(d => format(d, 'yyyy-MM-dd'))));
-    
-    return { jobIdsInView, formattedDatesInView };
-  }, [allDays, getJobsForDate]);
+  // Simplified date type fetching optimization
+  const jobIdsInView = useMemo(() => 
+    Array.from(new Set(allDays.flatMap(day => getJobsForDate(day).map(job => job.id)))),
+    [allDays, getJobsForDate]
+  );
+  
+  const formattedDatesInView = useMemo(() => 
+    Array.from(new Set(allDays.map(d => format(d, 'yyyy-MM-dd')))),
+    [allDays]
+  );
 
-  // Function to fetch date types for the currently visible jobs/dates
-  const fetchDateTypesForVisibleJobs = useCallback(async () => {
-    const { jobIdsInView, formattedDatesInView } = visibleJobData;
-
-    if (!jobIdsInView.length || !formattedDatesInView.length) {
-      setDateTypes({});
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("job_date_types")
-      .select("*")
-      .in("job_id", jobIdsInView)
-      .in("date", formattedDatesInView);
-
-    if (error) {
-      console.error("Error fetching date types:", error);
-      return;
-    }
-    const typesMap = data.reduce((acc: Record<string, any>, curr) => ({
-      ...acc,
-      [`${curr.job_id}-${curr.date}`]: curr,
-    }), {});
-    setDateTypes(typesMap);
-  }, [visibleJobData]);
-
-  // Initial fetch of date types when dependencies change
-  useEffect(() => {
-    console.log("Fetching date types for visible jobs...");
-    fetchDateTypesForVisibleJobs();
-  }, [fetchDateTypesForVisibleJobs]); // Use the memoized fetch function as dependency
-
-  // Optimized real-time subscription for date type updates
-  useEffect(() => {
-    console.log("Setting up real-time subscription for date types...");
-
-    const channel = supabase.channel('date-type-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'job_date_types'
-        },
-        async (payload) => {
-          console.log("Date type change detected:", payload);
-
-          const changedJobId = (payload.new as any)?.job_id || (payload.old as any)?.job_id;
-          const changedDate = (payload.new as any)?.date || (payload.old as any)?.date;
-
-          // Use memoized visible job data to check relevance
-          const { jobIdsInView, formattedDatesInView } = visibleJobData;
-          const isRelevant = changedJobId && changedDate && 
-            jobIdsInView.includes(changedJobId) && 
-            formattedDatesInView.includes(changedDate);
-
-          if (isRelevant) {
-            setDateTypes((prev) => {
-              const newTypes = { ...prev };
-              const key = `${changedJobId}-${changedDate}`;
-              if (payload.eventType === 'DELETE') {
-                delete newTypes[key];
-              } else {
-                newTypes[key] = payload.new;
-              }
-              return newTypes;
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      console.log("Cleaning up date type subscription...");
-      supabase.removeChannel(channel);
-    };
-  }, [visibleJobData]); // Use memoized data instead of direct dependencies
+  // Optimized date types fetching
+  const jobIdsInView = useMemo(() => 
+    Array.from(new Set(allDays.flatMap(day => getJobsForDate(day).map(job => job.id)))),
+    [allDays, getJobsForDate]
+  );
+  
+  const formattedDatesInView = useMemo(() => 
+    Array.from(new Set(allDays.map(d => format(d, 'yyyy-MM-dd')))),
+    [allDays]
+  );
+  
+  const { data: dateTypes = {} } = useOptimizedDateTypes(jobIdsInView, formattedDatesInView);
 
   // Early return for mobile view after all hooks are initialized
   if (isMobile) {
@@ -830,7 +766,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       job={job}
       date={day}
       dateTypes={dateTypes}
-      setDateTypes={setDateTypes}
     />
   );
 
@@ -1120,14 +1055,12 @@ interface JobCardProps {
   job: any;
   date: Date;
   dateTypes: Record<string, any>;
-  setDateTypes: React.Dispatch<React.SetStateAction<Record<string, any>>>;
 }
 
 const JobCard: React.FC<JobCardProps> = ({
   job,
   date,
   dateTypes,
-  setDateTypes,
 }) => {
   const getDateTypeIcon = (jobId: string, date: Date) => {
     const key = `${jobId}-${format(date, "yyyy-MM-dd")}`;
@@ -1197,23 +1130,9 @@ const JobCard: React.FC<JobCardProps> = ({
       key={job.id}
       jobId={job.id}
       date={date}
-      onTypeChange={async () => {
-        // After a date type change, we re-fetch only the date types relevant to this job
-        // This is already efficient as it's for a single job
-        const { data } = await supabase.from("job_date_types").select("*").eq("job_id", job.id).eq("date", format(date, 'yyyy-MM-dd'));
-        if (data && data.length > 0) {
-          setDateTypes((prev) => ({
-            ...prev,
-            [`${job.id}-${format(date, 'yyyy-MM-dd')}`]: data[0],
-          }));
-        } else {
-          // If the date type was removed/no longer exists for this date
-          setDateTypes((prev) => {
-            const newTypes = { ...prev };
-            delete newTypes[`${job.id}-${format(date, 'yyyy-MM-dd')}`];
-            return newTypes;
-          });
-        }
+      onTypeChange={() => {
+        // The useOptimizedDateTypes hook will automatically refresh via React Query
+        // No manual state updates needed
       }}
     >
       <TooltipProvider>

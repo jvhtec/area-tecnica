@@ -194,13 +194,17 @@ export class UnifiedSubscriptionManager {
       
     const subscriptionKey = `${table}::${normalizedQueryKey}`;
     
-    // Check if we already have this subscription
+    // Check if we already have this subscription (deduplication)
     if (this.subscriptions.has(subscriptionKey)) {
-      console.log(`Already subscribed to ${table} with query key ${normalizedQueryKey}`);
+      if (priority === 'high') {
+        console.log(`Already subscribed to ${table} with query key ${normalizedQueryKey}`);
+      }
       return this.subscriptions.get(subscriptionKey);
     }
     
-    console.log(`Subscribing to ${table} with query key ${normalizedQueryKey} (priority: ${priority})`);
+    if (priority === 'high') {
+      console.log(`Subscribing to ${table} with query key ${normalizedQueryKey} (priority: ${priority})`);
+    }
     
     try {
       // Configure the subscription
@@ -225,7 +229,10 @@ export class UnifiedSubscriptionManager {
       
       const channelSubscription = channel
         .on('postgres_changes', subscriptionConfig, (payload) => {
-          console.log(`Received ${payload.eventType} for ${table}:`, payload);
+          // Reduced logging for performance
+          if (priority === 'high') {
+            console.log(`Received ${payload.eventType} for ${table}:`, payload);
+          }
           
           // Update last activity timestamp
           this.tableLastActivity.set(subscriptionKey, Date.now());

@@ -1,12 +1,10 @@
 
 import { useState, useEffect } from "react";
 import { Department } from "@/types/department";
-import { useJobs } from "@/hooks/useJobs";
+import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { format } from "date-fns";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
-import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { supabase } from "@/lib/supabase";
-import { useDashboardSubscriptions } from "@/hooks/useUnifiedSubscriptions";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
@@ -53,23 +51,12 @@ const Dashboard = () => {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<any>(null);
 
-  // Data fetching
-  const { data: jobs, isLoading } = useJobs();
-  const { forceSubscribe } = useSubscriptionContext();
+  // Data fetching with optimized hook
+  const { data: jobs, isLoading } = useOptimizedJobs();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  useDashboardSubscriptions();
   
-  // Setup subscriptions
-  useEffect(() => {
-    forceSubscribe([
-      'jobs', 
-      'job_assignments', 
-      'job_date_types', 
-      'messages', 
-      'direct_messages'
-    ]);
-  }, [forceSubscribe]);
+  // No manual subscriptions needed - useOptimizedJobs handles job-related subscriptions
 
   // Fetch user data
   useEffect(() => {
