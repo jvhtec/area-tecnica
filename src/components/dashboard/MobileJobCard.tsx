@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
 import { useJobActions } from '@/hooks/useJobActions';
 import { useFolderExistence } from "@/hooks/useFolderExistence";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { 
   MoreVertical, 

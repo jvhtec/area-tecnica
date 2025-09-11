@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Plane, Wrench, Star, Moon, Mic, ExternalLink, Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format, startOfDay } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";

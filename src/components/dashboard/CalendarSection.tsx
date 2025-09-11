@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { DateTypeContextMenu } from "./DateTypeContextMenu";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import jsPDF from "jspdf";
 import * as XLSX from 'xlsx'; // Import xlsx library
 import {
