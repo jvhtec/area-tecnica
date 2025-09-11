@@ -56,11 +56,7 @@ const Festivals = () => {
       
       // Filter out completed festivals if showCompleted is false
       if (!showCompleted) {
-        const now = new Date();
-        festivals = festivals.filter(job => {
-          const endDate = new Date(job.end_time);
-          return endDate >= now || job.status !== 'Completado';
-        });
+        festivals = festivals.filter(job => job.status !== 'Completado');
       }
       
       setFestivalJobs(festivals);
