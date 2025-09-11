@@ -202,12 +202,19 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     });
   }, [jobs, department, selectedJobTypes]); // Dependencies for getJobsForDate
 
-  // Function to fetch date types for the currently visible jobs/dates
-  const fetchDateTypesForVisibleJobs = useCallback(async () => {
+  // Memoize visible job IDs and dates to optimize date type fetching
+  const visibleJobData = useMemo(() => {
     const jobIdsInView = Array.from(new Set(
       allDays.flatMap(day => getJobsForDate(day).map(job => job.id))
     ));
     const formattedDatesInView = Array.from(new Set(allDays.map(d => format(d, 'yyyy-MM-dd'))));
+    
+    return { jobIdsInView, formattedDatesInView };
+  }, [allDays, getJobsForDate]);
+
+  // Function to fetch date types for the currently visible jobs/dates
+  const fetchDateTypesForVisibleJobs = useCallback(async () => {
+    const { jobIdsInView, formattedDatesInView } = visibleJobData;
 
     if (!jobIdsInView.length || !formattedDatesInView.length) {
       setDateTypes({});
@@ -217,8 +224,8 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     const { data, error } = await supabase
       .from("job_date_types")
       .select("*")
-      .in("job_id", jobIdsInView) // Filter by visible job IDs
-      .in("date", formattedDatesInView); // Filter by visible dates
+      .in("job_id", jobIdsInView)
+      .in("date", formattedDatesInView);
 
     if (error) {
       console.error("Error fetching date types:", error);
@@ -229,7 +236,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       [`${curr.job_id}-${curr.date}`]: curr,
     }), {});
     setDateTypes(typesMap);
-  }, [allDays]); // Remove getJobsForDate from dependencies to prevent loop
+  }, [visibleJobData]);
 
   // Initial fetch of date types when dependencies change
   useEffect(() => {
@@ -237,7 +244,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     fetchDateTypesForVisibleJobs();
   }, [fetchDateTypesForVisibleJobs]); // Use the memoized fetch function as dependency
 
-  // Real-time subscription for date type updates
+  // Optimized real-time subscription for date type updates
   useEffect(() => {
     console.log("Setting up real-time subscription for date types...");
 
@@ -252,28 +259,27 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
         async (payload) => {
           console.log("Date type change detected:", payload);
 
-          // Use optional chaining and type guards to safely access properties
           const changedJobId = (payload.new as any)?.job_id || (payload.old as any)?.job_id;
           const changedDate = (payload.new as any)?.date || (payload.old as any)?.date;
 
-          // Get current visible jobs and dates to check relevance
-          const jobIdsInView = new Set(allDays.flatMap(day => getJobsForDate(day).map(job => job.id)));
-          const formattedDatesInView = new Set(allDays.map(d => format(d, 'yyyy-MM-dd')));
+          // Use memoized visible job data to check relevance
+          const { jobIdsInView, formattedDatesInView } = visibleJobData;
+          const isRelevant = changedJobId && changedDate && 
+            jobIdsInView.includes(changedJobId) && 
+            formattedDatesInView.includes(changedDate);
 
-          if (changedJobId && changedDate && jobIdsInView.has(changedJobId) && formattedDatesInView.has(changedDate)) {
-            // If the change is relevant to the current view, update the state directly
+          if (isRelevant) {
             setDateTypes((prev) => {
               const newTypes = { ...prev };
               const key = `${changedJobId}-${changedDate}`;
               if (payload.eventType === 'DELETE') {
                 delete newTypes[key];
-              } else { // INSERT or UPDATE
+              } else {
                 newTypes[key] = payload.new;
               }
               return newTypes;
             });
           }
-          // If the change is not relevant to the current view, we do nothing to avoid unnecessary re-fetches.
         }
       )
       .subscribe();
@@ -282,7 +288,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       console.log("Cleaning up date type subscription...");
       supabase.removeChannel(channel);
     };
-  }, [allDays]); // Remove getJobsForDate dependency to prevent subscription loop
+  }, [visibleJobData]); // Use memoized data instead of direct dependencies
 
   // Early return for mobile view after all hooks are initialized
   if (isMobile) {

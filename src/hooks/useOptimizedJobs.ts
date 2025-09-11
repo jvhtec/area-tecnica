@@ -76,49 +76,14 @@ export const useOptimizedJobs = (
           file_size,
           uploaded_at
         ),
-        job_date_types(
-          type,
-          date
-        ),
-        sound_job_tasks(
-          id,
-          task_type,
-          status,
-          progress,
-          assigned_to,
-          created_at,
-          updated_at,
-          task_documents(*)
-        ),
-        lights_job_tasks(
-          id, 
-          task_type,
-          status,
-          progress,
-          assigned_to,
-          created_at,
-          updated_at
-        ),
-        video_job_tasks(
-          id,
-          task_type, 
-          status,
-          progress,
-          assigned_to,
-          created_at,
-          updated_at
-        ),
-        sound_job_personnel(*),
-        lights_job_personnel(*),
-        video_job_personnel(*),
         flex_folders(
           id,
           element_id,
           department,
           folder_type
-        ),
-        tour_date:tour_dates(*)
+        )
       `)
+      .in('job_type', ['single', 'festival', 'tourdate'])
       .order('start_time', { ascending: true });
 
     // Apply filters efficiently using indexes
@@ -141,7 +106,7 @@ export const useOptimizedJobs = (
       throw error;
     }
 
-    // Process the data to match expected format
+    // Process the data to match expected format with optimized processing
     const processedJobs = data?.map(job => ({
       ...job,
       // Filter documents by department if specified with security validation
@@ -155,18 +120,7 @@ export const useOptimizedJobs = (
       // Add computed properties
       flex_folders_exist: (job.flex_folders?.length || 0) > 0,
       // Flatten assignments for easier access
-      assignments: job.job_assignments || [],
-      // Consolidate tasks by department
-      tasks: {
-        sound: job.sound_job_tasks || [],
-        lights: job.lights_job_tasks || [],
-        video: job.video_job_tasks || []
-      },
-      personnel: {
-        sound: job.sound_job_personnel?.[0] || null,
-        lights: job.lights_job_personnel?.[0] || null, 
-        video: job.video_job_personnel?.[0] || null
-      }
+      assignments: job.job_assignments || []
     })) || [];
 
     const duration = Date.now() - startTime;
@@ -183,7 +137,8 @@ export const useOptimizedJobs = (
   return useQuery({
     queryKey: ['optimized-jobs', department, startDate?.toISOString(), endDate?.toISOString()],
     queryFn: fetchOptimizedJobs,
-    staleTime: 1000 * 60 * 2, // 2 minutes
+    staleTime: 1000 * 60 * 5, // 5 minutes - increased for better caching
+    gcTime: 1000 * 60 * 10, // 10 minutes - cache jobs longer
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
     retry: 2,

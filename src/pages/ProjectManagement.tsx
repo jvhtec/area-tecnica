@@ -9,7 +9,7 @@ import { Department } from "@/types/department";
 import { startOfMonth, endOfMonth, addMonths, isToday } from "date-fns";
 import { MonthNavigation } from "@/components/project-management/MonthNavigation";
 import { DepartmentTabs } from "@/components/project-management/DepartmentTabs";
-import { useJobManagement } from "@/hooks/useJobManagement";
+import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 
@@ -35,16 +35,15 @@ const ProjectManagement = () => {
     forceSubscribe(['jobs', 'job_assignments', 'job_departments']);
   }, [forceSubscribe]);
 
-  // Retrieve jobs using the custom hook. The hook already applies department and date filters.
-  const { jobs: unfilteredJobs = [], jobsLoading, handleDeleteDocument } = useJobManagement(
+  // Use optimized jobs hook with built-in filtering and caching
+  const { data: optimizedJobs = [], isLoading: jobsLoading, error: jobsError } = useOptimizedJobs(
     selectedDepartment,
     startDate,
-    endDate,
-    true
+    endDate
   );
 
-  // Filter jobs by selected job type using a case-insensitive comparison.
-  const jobs = (unfilteredJobs || []).filter((job: any) => {
+  // Filter jobs by selected job type with database-level optimization
+  const jobs = (optimizedJobs || []).filter((job: any) => {
     if (selectedJobType === "All") return true;
     return job.job_type?.toLowerCase() === selectedJobType.toLowerCase();
   });
@@ -103,30 +102,17 @@ const ProjectManagement = () => {
     checkAccess();
   }, [navigate]);
 
-  // Fetch all distinct job types (ignoring current filters) for the dropdown.
+  // Extract job types from optimized jobs data to avoid extra query
   useEffect(() => {
-    const fetchJobTypes = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("jobs")
-          .select("job_type");
-        if (error) {
-          console.error("Error fetching job types:", error);
-          return;
-        }
-        const types = Array.from(
-          new Set((data || [])
-            .map((job: any) => job.job_type)
-            .filter(Boolean))
-        );
-        setAllJobTypes(types);
-      } catch (error) {
-        console.error("Error in fetchJobTypes:", error);
-      }
-    };
-
-    fetchJobTypes();
-  }, []);
+    if (optimizedJobs?.length > 0) {
+      const types = Array.from(
+        new Set(optimizedJobs
+          .map((job: any) => job.job_type)
+          .filter(Boolean))
+      );
+      setAllJobTypes(types);
+    }
+  }, [optimizedJobs]);
 
   if (loading || jobsLoading) {
     return (
@@ -192,7 +178,7 @@ const ProjectManagement = () => {
             onDepartmentChange={(value) => setSelectedDepartment(value as Department)}
             jobs={jobs}
             jobsLoading={jobsLoading}
-            onDeleteDocument={handleDeleteDocument}
+            onDeleteDocument={undefined} // Will be handled by optimized jobs hook
             userRole={userRole}
             highlightToday={highlightToday}
           />
