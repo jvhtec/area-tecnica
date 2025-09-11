@@ -46,6 +46,7 @@ import {
   Calendar,
   Filter,
   Printer,
+  Target,
 } from "lucide-react";
 import { formatInJobTimezone, isJobOnDate } from "@/utils/timezoneUtils";
 
@@ -257,7 +258,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
           
           <div className="flex gap-1">
             <Button variant="outline" size="sm" onClick={navigateToToday}>
-              <Calendar className="h-4 w-4" />
+              <Target className="h-4 w-4" />
             </Button>
             
             <Popover>
