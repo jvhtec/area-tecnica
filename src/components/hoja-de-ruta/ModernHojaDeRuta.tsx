@@ -118,7 +118,6 @@ export const ModernHojaDeRuta = () => {
     removeImage,
     handleVenueMapInputChange,
     handleVenueMapUrl,
-    appendVenuePreviews,
   } = useHojaDeRutaImages();
 
   // Calculate completion progress including weather
@@ -549,7 +548,6 @@ export const ModernHojaDeRuta = () => {
                           handleVenueMapInputChange(fakeEvent);
                         }}
                         handleVenueMapUrl={handleVenueMapUrl}
-                        appendVenuePreviews={appendVenuePreviews}
                       />
                     </TabsContent>
 

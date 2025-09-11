@@ -87,20 +87,6 @@ export const useHojaDeRutaImages = () => {
     }
   };
 
-  // Append externally-fetched previews (e.g., Google Places photos)
-  const appendVenuePreviews = (dataUrls: string[]) => {
-    if (!dataUrls || dataUrls.length === 0) return;
-    setImagePreviews((prev) => {
-      const existing = new Set(prev.venue);
-      const toAdd: string[] = [];
-      for (const url of dataUrls) {
-        if (!existing.has(url)) toAdd.push(url);
-      }
-      if (toAdd.length === 0) return prev;
-      return { ...prev, venue: [...prev.venue, ...toAdd] };
-    });
-  };
-
   // Clear venue map when needed
   const clearVenueMap = () => {
     console.log("🗺️ Clearing venue map");
@@ -125,7 +111,6 @@ export const useHojaDeRutaImages = () => {
     handleVenueMapUpload,
     handleVenueMapInputChange,
     handleVenueMapUrl,
-    appendVenuePreviews,
     clearVenueMap,
   };
 };
