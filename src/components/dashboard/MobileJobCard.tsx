@@ -132,15 +132,14 @@ export function MobileJobCard({
   const { data: foldersExist, isLoading: isFoldersLoading } = useFolderExistence(job.id);
   const foldersAreCreated = foldersExist === true;
 
-  const dateTypesArray: any[] = Array.isArray(propDateTypes)
-    ? Object.values(propDateTypes)
-    : (Array.isArray(job?.job_date_types) ? job.job_date_types : []);
-
-  // Get current date type for this job on the selected date
-  const currentDateType = dateTypesArray.find((dt: any) => {
-    const dtDate = dt?.date ? new Date(dt.date) : null;
-    return !!dtDate && dtDate.toDateString() === currentDate.toDateString();
-  });
+  // Get current date type for this job on the selected date using the key format
+  const dateTypeKey = `${job.id}-${format(currentDate, 'yyyy-MM-dd')}`;
+  const currentDateType = propDateTypes?.[dateTypeKey] || 
+    (Array.isArray(job?.job_date_types) ? 
+      job.job_date_types.find((dt: any) => {
+        const dtDate = dt?.date ? new Date(dt.date) : null;
+        return !!dtDate && dtDate.toDateString() === currentDate.toDateString();
+      }) : null);
 
   const currentTypeValue = currentDateType ? (currentDateType.type || currentDateType.date_type) : undefined;
 
