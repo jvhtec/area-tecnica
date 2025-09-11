@@ -87,7 +87,9 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
+  const [selectedJobStatuses, setSelectedJobStatuses] = useState<string[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [printSettings, setPrintSettings] = useState<PrintSettings>({
     range: "month",
     jobTypes: {
@@ -121,6 +123,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   });
   const allDays = [...prefixDays, ...daysInMonth, ...suffixDays];
   const distinctJobTypes = jobs ? Array.from(new Set(jobs.map((job) => job.job_type).filter(Boolean))) : [];
+  const distinctJobStatuses = jobs ? Array.from(new Set(jobs.map((job) => job.status).filter(Boolean))) : [];
 
   // Load user preferences
   useEffect(() => {
@@ -130,7 +133,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
         if (!session?.user?.id) return;
         const { data: profile, error } = await supabase
           .from("profiles")
-          .select("selected_job_types")
+          .select("selected_job_types, selected_job_statuses")
           .eq("id", session.user.id)
           .single();
         if (error) {
@@ -140,6 +143,9 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
         if (profile?.selected_job_types) {
           setSelectedJobTypes(profile.selected_job_types);
         }
+        if (profile?.selected_job_statuses) {
+          setSelectedJobStatuses(profile.selected_job_statuses);
+        }
       } catch (error) {
         console.error("Error in loadUserPreferences:", error);
       }
@@ -147,13 +153,18 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     loadUserPreferences();
   }, []);
 
-  const saveUserPreferences = async (types: string[]) => {
+  const saveUserPreferences = async (types: string[], statuses?: string[]) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user?.id) return;
+      
+      const updateData = statuses !== undefined 
+        ? { selected_job_types: types, selected_job_statuses: statuses }
+        : { selected_job_types: types };
+      
       const { error } = await supabase
         .from("profiles")
-        .update({ selected_job_types: types })
+        .update(updateData)
         .eq("id", session.user.id);
       if (error) {
         console.error("Error saving user preferences:", error);
@@ -177,6 +188,15 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     setIsDropdownOpen(false);
   };
 
+  const handleJobStatusSelection = (status: string) => {
+    const newStatuses = selectedJobStatuses.includes(status)
+      ? selectedJobStatuses.filter((s) => s !== status)
+      : [...selectedJobStatuses, status];
+    setSelectedJobStatuses(newStatuses);
+    saveUserPreferences(selectedJobTypes, newStatuses);
+    setIsStatusDropdownOpen(false);
+  };
+
   // Memoize getJobsForDate to prevent unnecessary re-renders and stabilize its reference for effects
   const getJobsForDate = useMemo(() => (date: Date) => {
     if (!jobs) return [];
@@ -194,13 +214,14 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
           ? isWithinDuration && job.job_departments.some((d: any) => d.department === department)
           : isWithinDuration;
         const matchesJobType = selectedJobTypes.length === 0 || selectedJobTypes.includes(job.job_type);
-        return matchesDepartment && matchesJobType;
+        const matchesJobStatus = selectedJobStatuses.length === 0 || selectedJobStatuses.includes(job.status);
+        return matchesDepartment && matchesJobType && matchesJobStatus;
       } catch (error) {
         console.error("Error processing job dates:", error, job);
         return false;
       }
     });
-  }, [jobs, department, selectedJobTypes]); // Dependencies for getJobsForDate
+  }, [jobs, department, selectedJobTypes, selectedJobStatuses]); // Dependencies for getJobsForDate
 
   // Simplified date type fetching optimization
   const jobIdsInView = useMemo(() => 
@@ -226,6 +247,8 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
         onDateTypeChange={onDateTypeChange}
         selectedJobTypes={selectedJobTypes}
         onJobTypeSelection={handleJobTypeSelection}
+        selectedJobStatuses={selectedJobStatuses}
+        onJobStatusSelection={handleJobStatusSelection}
       />
     );
   }
@@ -786,6 +809,11 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
           isDropdownOpen={isDropdownOpen}
           setIsDropdownOpen={setIsDropdownOpen}
           onJobTypeSelection={handleJobTypeSelection}
+          distinctJobStatuses={distinctJobStatuses}
+          selectedJobStatuses={selectedJobStatuses}
+          isStatusDropdownOpen={isStatusDropdownOpen}
+          setIsStatusDropdownOpen={setIsStatusDropdownOpen}
+          onJobStatusSelection={handleJobStatusSelection}
         />
         {!isCollapsed && (
           <CalendarGrid
@@ -951,6 +979,11 @@ interface CalendarFiltersProps {
   isDropdownOpen: boolean;
   setIsDropdownOpen: (open: boolean) => void;
   onJobTypeSelection: (type: string) => void;
+  distinctJobStatuses: string[];
+  selectedJobStatuses: string[];
+  isStatusDropdownOpen: boolean;
+  setIsStatusDropdownOpen: (open: boolean) => void;
+  onJobStatusSelection: (status: string) => void;
 }
 
 const CalendarFilters: React.FC<CalendarFiltersProps> = ({
@@ -959,10 +992,16 @@ const CalendarFilters: React.FC<CalendarFiltersProps> = ({
   isDropdownOpen,
   setIsDropdownOpen,
   onJobTypeSelection,
+  distinctJobStatuses,
+  selectedJobStatuses,
+  isStatusDropdownOpen,
+  setIsStatusDropdownOpen,
+  onJobStatusSelection,
 }) => {
   return (
-    <div className="relative mb-4">
-      <button
+    <div className="flex gap-4 mb-4">
+      <div className="relative">
+        <button
         className="border border-gray-300 rounded-md py-1 px-2 text-sm w-full flex items-center justify-between"
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
       >
@@ -984,6 +1023,31 @@ const CalendarFilters: React.FC<CalendarFiltersProps> = ({
         </div>
       )}
     </div>
+    
+    <div className="relative">
+      <button
+        className="border border-gray-300 rounded-md py-1 px-2 text-sm w-full flex items-center justify-between"
+        onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+      >
+        {selectedJobStatuses.length > 0 ? selectedJobStatuses.join(", ") : "Select Job Status"}
+        <ChevronDown className="h-4 w-4 ml-2" />
+      </button>
+      {isStatusDropdownOpen && (
+        <div className="absolute z-10 mt-2 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-md">
+          {distinctJobStatuses.map((status) => (
+            <div
+              key={status}
+              className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+              onClick={() => onJobStatusSelection(status)}
+            >
+              <span className="text-sm text-black dark:text-white">{status}</span>
+              {selectedJobStatuses.includes(status) && <Check className="h-4 w-4 text-blue-500" />}
+            </div>
+          ))}
+        </div>
+      )}
+     </div>
+  </div>
   );
 };
 

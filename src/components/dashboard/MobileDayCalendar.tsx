@@ -57,6 +57,8 @@ interface MobileDayCalendarProps {
   onDateTypeChange: () => void;
   selectedJobTypes: string[];
   onJobTypeSelection?: (type: string) => void;
+  selectedJobStatuses?: string[];
+  onJobStatusSelection?: (status: string) => void;
   onEditClick?: (job: any) => void;
   onDeleteClick?: (jobId: string) => void;
   onJobClick?: (jobId: string) => void;
@@ -87,6 +89,8 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
   onDateTypeChange,
   selectedJobTypes,
   onJobTypeSelection,
+  selectedJobStatuses = [],
+  onJobStatusSelection,
   onEditClick,
   onDeleteClick,
   onJobClick,
@@ -105,6 +109,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
   });
 
   const distinctJobTypes = jobs ? Array.from(new Set(jobs.map((job) => job.job_type).filter(Boolean))) : [];
+  const distinctJobStatuses = jobs ? Array.from(new Set(jobs.map((job) => job.status).filter(Boolean))) : [];
 
   // Update current date when prop changes
   useEffect(() => {
@@ -130,13 +135,14 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
           ? isWithinDuration && job.job_departments.some((d: any) => d.department === department)
           : isWithinDuration;
         const matchesJobType = selectedJobTypes.length === 0 || selectedJobTypes.includes(job.job_type);
-        return matchesDepartment && matchesJobType;
+        const matchesJobStatus = selectedJobStatuses.length === 0 || selectedJobStatuses.includes(job.status);
+        return matchesDepartment && matchesJobType && matchesJobStatus;
       } catch (error) {
         console.error("Error processing job dates:", error, job);
         return false;
       }
     });
-  }, [jobs, department, selectedJobTypes]);
+  }, [jobs, department, selectedJobTypes, selectedJobStatuses]);
 
   // Fetch date types for current date jobs
   useEffect(() => {
@@ -256,37 +262,71 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
 
         {/* Action buttons */}
         <div className="flex items-center justify-between mb-4 gap-2">
-          {distinctJobTypes.length > 0 && onJobTypeSelection ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Filter className="h-4 w-4 mr-1" />
-                  Filters
-                  {selectedJobTypes.length > 0 && selectedJobTypes.length < distinctJobTypes.length && (
-                    <Badge variant="secondary" className="ml-1 text-xs">
-                      {selectedJobTypes.length}
-                    </Badge>
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent 
-                align="start" 
-                className="w-48 z-50 bg-background border shadow-lg"
-                sideOffset={4}
-              >
-                {distinctJobTypes.map((type) => (
-                  <DropdownMenuCheckboxItem
-                    key={type}
-                    checked={selectedJobTypes.length === 0 || selectedJobTypes.includes(type)}
-                    onCheckedChange={() => onJobTypeSelection(type)}
-                    className="capitalize"
-                  >
-                    {type}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : <div />}
+          <div className="flex gap-2">
+            {distinctJobTypes.length > 0 && onJobTypeSelection ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Filter className="h-4 w-4 mr-1" />
+                    Types
+                    {selectedJobTypes.length > 0 && selectedJobTypes.length < distinctJobTypes.length && (
+                      <Badge variant="secondary" className="ml-1 text-xs">
+                        {selectedJobTypes.length}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent 
+                  align="start" 
+                  className="w-48 z-50 bg-background border shadow-lg"
+                  sideOffset={4}
+                >
+                  {distinctJobTypes.map((type) => (
+                    <DropdownMenuCheckboxItem
+                      key={type}
+                      checked={selectedJobTypes.length === 0 || selectedJobTypes.includes(type)}
+                      onCheckedChange={() => onJobTypeSelection(type)}
+                      className="capitalize"
+                    >
+                      {type}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+
+            {distinctJobStatuses.length > 0 && onJobStatusSelection ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Filter className="h-4 w-4 mr-1" />
+                    Status
+                    {selectedJobStatuses.length > 0 && selectedJobStatuses.length < distinctJobStatuses.length && (
+                      <Badge variant="secondary" className="ml-1 text-xs">
+                        {selectedJobStatuses.length}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent 
+                  align="start" 
+                  className="w-48 z-50 bg-background border shadow-lg"
+                  sideOffset={4}
+                >
+                  {distinctJobStatuses.map((status) => (
+                    <DropdownMenuCheckboxItem
+                      key={status}
+                      checked={selectedJobStatuses.length === 0 || selectedJobStatuses.includes(status)}
+                      onCheckedChange={() => onJobStatusSelection(status)}
+                      className="capitalize"
+                    >
+                      {status}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+          </div>
           
           <Button variant="outline" size="sm" onClick={() => setShowPrintDialog(true)}>
             <Printer className="h-4 w-4 mr-1" />
