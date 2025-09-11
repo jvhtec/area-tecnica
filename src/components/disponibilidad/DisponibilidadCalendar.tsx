@@ -2,6 +2,13 @@
 import { useState } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,6 +16,7 @@ import { supabase } from '@/lib/supabase';
 import type { AvailabilitySchedule } from '@/types/availability';
 import { format } from 'date-fns';
 import type { PresetWithItems } from '@/types/equipment';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface DisponibilidadCalendarProps {
   selectedDate?: Date;
@@ -19,6 +27,7 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
   const { session, userDepartment } = useOptimizedAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
 
   const { data: availabilityData, isLoading: isLoadingAvailability } = useQuery({
     queryKey: ['availability', session?.user?.id, userDepartment],
@@ -150,8 +159,42 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
 
   const isLoading = isLoadingAvailability || isLoadingAssignments;
 
+  const navigateToToday = () => {
+    const today = new Date();
+    if (onDateSelect) {
+      onDateSelect(today);
+    }
+  };
+
   return (
     <Card className="p-4">
+      {/* Mobile controls */}
+      {isMobile && (
+        <div className="flex items-center justify-between mb-4">
+          <Button variant="outline" size="sm" onClick={navigateToToday}>
+            <CalendarIcon className="h-4 w-4 mr-1" />
+            Today
+          </Button>
+          
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <CalendarIcon className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 pointer-events-auto" align="end">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={onDateSelect}
+                initialFocus
+                className="pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+      )}
+      
       <Calendar
         mode="single"
         selected={selectedDate}

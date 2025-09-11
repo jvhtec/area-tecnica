@@ -9,6 +9,12 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { DateTypeContextMenu } from "./DateTypeContextMenu";
 import { MobileJobCard } from "./MobileJobCard";
 import { Department } from "@/types/department";
@@ -287,10 +293,34 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
             Print
           </Button>
           
-          <Button variant="outline" size="sm" onClick={navigateToToday}>
-            <Calendar className="h-4 w-4 mr-1" />
-            Today
-          </Button>
+          <div className="flex gap-1">
+            <Button variant="outline" size="sm" onClick={navigateToToday}>
+              <Calendar className="h-4 w-4 mr-1" />
+              Today
+            </Button>
+            
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Calendar className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 pointer-events-auto" align="end">
+                <CalendarComponent
+                  mode="single"
+                  selected={currentDate}
+                  onSelect={(date) => {
+                    if (date) {
+                      setCurrentDate(date);
+                      onDateSelect(date);
+                    }
+                  }}
+                  initialFocus
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
 
         {/* Jobs area */}
