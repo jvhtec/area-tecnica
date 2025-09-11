@@ -20,7 +20,9 @@ const ProjectManagement = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [userRole, setUserRole] = useState<string | null>(null);
   const [selectedJobType, setSelectedJobType] = useState("All");
+  const [selectedJobStatus, setSelectedJobStatus] = useState("All");
   const [allJobTypes, setAllJobTypes] = useState<string[]>([]);
+  const [allJobStatuses, setAllJobStatuses] = useState<string[]>([]);
   const [highlightToday, setHighlightToday] = useState(false);
   const { forceSubscribe } = useSubscriptionContext();
 
@@ -42,10 +44,11 @@ const ProjectManagement = () => {
     endDate
   );
 
-  // Filter jobs by selected job type with database-level optimization
+  // Filter jobs by selected job type and status with database-level optimization
   const jobs = (optimizedJobs || []).filter((job: any) => {
-    if (selectedJobType === "All") return true;
-    return job.job_type?.toLowerCase() === selectedJobType.toLowerCase();
+    const matchesType = selectedJobType === "All" || job.job_type?.toLowerCase() === selectedJobType.toLowerCase();
+    const matchesStatus = selectedJobStatus === "All" || job.status === selectedJobStatus;
+    return matchesType && matchesStatus;
   });
 
   // Highlight today's jobs when page loads
@@ -102,7 +105,7 @@ const ProjectManagement = () => {
     checkAccess();
   }, [navigate]);
 
-  // Extract job types from optimized jobs data to avoid extra query
+  // Extract job types and statuses from optimized jobs data to avoid extra query
   useEffect(() => {
     if (optimizedJobs?.length > 0) {
       const types = Array.from(
@@ -110,7 +113,13 @@ const ProjectManagement = () => {
           .map((job: any) => job.job_type)
           .filter(Boolean))
       );
+      const statuses = Array.from(
+        new Set(optimizedJobs
+          .map((job: any) => job.status)
+          .filter(Boolean))
+      );
       setAllJobTypes(types);
+      setAllJobStatuses(statuses);
     }
   }, [optimizedJobs]);
 
@@ -131,20 +140,39 @@ const ProjectManagement = () => {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle>Project Management</CardTitle>
           <div className="flex gap-2">
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <select
-                value={selectedJobType}
-                onChange={(e) => setSelectedJobType(e.target.value)}
-                className="border border-gray-300 rounded-md py-1 px-2 text-sm"
-              >
-                <option value="All">All Types</option>
-                {allJobTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <select
+                  value={selectedJobType}
+                  onChange={(e) => setSelectedJobType(e.target.value)}
+                  className="border border-gray-300 rounded-md py-1 px-2 text-sm"
+                >
+                  <option value="All">All Types</option>
+                  {allJobTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedJobStatus}
+                  onChange={(e) => setSelectedJobStatus(e.target.value)}
+                  className="border border-gray-300 rounded-md py-1 px-2 text-sm"
+                >
+                  <option value="All">All Status</option>
+                  {allJobStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {status === "Tentativa" ? "Tentative" : 
+                       status === "Confirmado" ? "Confirmed" :
+                       status === "Completado" ? "Completed" :
+                       status === "Cancelado" ? "Cancelled" : status}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             {canCreateItems && (
               <>

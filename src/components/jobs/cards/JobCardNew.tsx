@@ -436,6 +436,8 @@ export function JobCardNew({
           appliedBgColor={appliedBgColor}
           dateTypes={job.job_date_types || {}}
           department={department}
+          isProjectManagementPage={isProjectManagementPage}
+          userRole={userRole}
         />
 
         <div className="flex items-center justify-between px-6">

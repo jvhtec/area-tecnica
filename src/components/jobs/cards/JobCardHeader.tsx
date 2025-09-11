@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, Clock, MapPin, Plane, Wrench, Star, Moon, Mic } from "lucide-react";
 import { Department } from "@/types/department";
+import { JobStatusSelector } from "@/components/jobs/JobStatusSelector";
 
 interface JobCardHeaderProps {
   job: any;
@@ -15,6 +16,8 @@ interface JobCardHeaderProps {
   appliedBgColor: string;
   dateTypes: Record<string, any>;
   department: Department;
+  isProjectManagementPage?: boolean;
+  userRole?: string | null;
 }
 
 export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
@@ -24,7 +27,9 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
   appliedBorderColor,
   appliedBgColor,
   dateTypes,
-  department
+  department,
+  isProjectManagementPage = false,
+  userRole
 }) => {
   const getDateTypeIcon = (jobId: string, date: Date, dateTypes: Record<string, any>) => {
     const key = `${jobId}-${format(date, "yyyy-MM-dd")}`;
@@ -70,6 +75,13 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
             {getDateTypeIcon(job.id, new Date(job.start_time), dateTypes)}
             <h3 className="font-medium text-lg break-words leading-tight">{job.title}</h3>
             {getBadgeForJobType(job.job_type)}
+            {isProjectManagementPage && (
+              <JobStatusSelector
+                jobId={job.id}
+                currentStatus={job.status}
+                disabled={!['admin', 'management', 'logistics'].includes(userRole || '')}
+              />
+            )}
           </div>
         </div>
         <Button
