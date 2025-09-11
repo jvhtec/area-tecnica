@@ -4070,6 +4070,10 @@ export type Database = {
       }
     }
     Functions: {
+      auto_complete_past_jobs: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       can_manage_users: {
         Args: Record<PropertyKey, never>
         Returns: boolean
