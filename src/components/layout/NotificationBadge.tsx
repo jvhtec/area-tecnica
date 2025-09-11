@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { BellDot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
@@ -13,17 +13,22 @@ interface NotificationBadgeProps {
 
 export const NotificationBadge = ({ userId, userRole, userDepartment }: NotificationBadgeProps) => {
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const fetchUnreadMessages = async () => {
+  const fetchUnreadMessages = useCallback(async () => {
+    if (isLoading) return; // Prevent concurrent requests
+
     try {
+      setIsLoading(true);
       console.log("Checking for unread messages...");
       
-      // Check for unread department messages
+      // Check for unread department messages with optimized query
       let deptQuery = supabase
         .from('messages')
-        .select('*')
-        .eq('status', 'unread');
+        .select('id') // Only select ID to minimize data transfer
+        .eq('status', 'unread')
+        .limit(1); // We only need to know if any exist
 
       if (userRole === 'management') {
         deptQuery = deptQuery.eq('department', userDepartment);
@@ -31,12 +36,13 @@ export const NotificationBadge = ({ userId, userRole, userDepartment }: Notifica
         deptQuery = deptQuery.eq('sender_id', userId);
       }
 
-      // Check for unread direct messages
+      // Check for unread direct messages with optimized query
       const directQuery = supabase
         .from('direct_messages')
-        .select('*')
+        .select('id') // Only select ID to minimize data transfer
         .eq('recipient_id', userId)
-        .eq('status', 'unread');
+        .eq('status', 'unread')
+        .limit(1); // We only need to know if any exist
 
       const [deptMessages, directMessages] = await Promise.all([
         deptQuery,
@@ -63,14 +69,18 @@ export const NotificationBadge = ({ userId, userRole, userDepartment }: Notifica
       setHasUnreadMessages(hasUnread);
     } catch (error) {
       console.error("Error checking unread messages:", error);
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, [userId, userRole, userDepartment, isLoading]);
 
   useEffect(() => {
-    // Initial fetch
-    fetchUnreadMessages();
+    // Delay initial fetch to give priority to other sidebar components
+    const timeoutId = setTimeout(() => {
+      fetchUnreadMessages();
+    }, 500);
 
-    // Set up real-time subscription for both tables
+    // Set up real-time subscription for both tables  
     const channel = supabase
       .channel('realtime-notifications')
       .on(
@@ -82,7 +92,8 @@ export const NotificationBadge = ({ userId, userRole, userDepartment }: Notifica
         },
         (payload) => {
           console.log("Messages table changed:", payload);
-          fetchUnreadMessages();
+          // Debounce the fetch to avoid too many calls
+          setTimeout(fetchUnreadMessages, 200);
         }
       )
       .on(
@@ -94,7 +105,8 @@ export const NotificationBadge = ({ userId, userRole, userDepartment }: Notifica
         },
         (payload) => {
           console.log("Direct messages changed:", payload);
-          fetchUnreadMessages();
+          // Debounce the fetch to avoid too many calls
+          setTimeout(fetchUnreadMessages, 200);
         }
       )
       .subscribe((status) => {
@@ -102,10 +114,11 @@ export const NotificationBadge = ({ userId, userRole, userDepartment }: Notifica
       });
 
     return () => {
+      clearTimeout(timeoutId);
       console.log("Cleaning up realtime subscription");
       supabase.removeChannel(channel);
     };
-  }, [userId, userRole, userDepartment]);
+  }, [fetchUnreadMessages]);
 
   const handleMessageNotificationClick = () => {
     if (userRole === 'management') {
@@ -122,6 +135,7 @@ export const NotificationBadge = ({ userId, userRole, userDepartment }: Notifica
       variant="ghost"
       className="w-full justify-start gap-2 text-yellow-500"
       onClick={handleMessageNotificationClick}
+      disabled={isLoading}
     >
       <BellDot className="h-4 w-4" />
       <span>New Messages</span>

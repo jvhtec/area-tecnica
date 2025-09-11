@@ -16,6 +16,7 @@ import {
   Clock
 } from "lucide-react";
 import { TimesheetSidebarTrigger } from "@/components/timesheet/TimesheetSidebarTrigger";
+import { SidebarNavigationSkeleton } from './SidebarNavigationSkeleton';
 
 interface SidebarNavigationProps {
   userRole: string | null;
@@ -39,10 +40,10 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
   // Check if user is house tech from sound department
   const isSoundHouseTech = userRole === 'house_tech' && isSoundDepartment;
 
-  // Don't render navigation until role is loaded
+  // Show skeleton instead of nothing while role loads
   if (!userRole) {
-    console.log('User role not yet loaded, waiting...');
-    return null;
+    console.log('User role not yet loaded, showing skeleton...');
+    return <SidebarNavigationSkeleton />;
   }
 
   const getDepartmentIcon = (department: string) => {

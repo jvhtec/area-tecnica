@@ -40,7 +40,7 @@ import { FormSubmitted } from '@/components/festival/FormSubmitted';
 import { RequireAuth } from '@/components/RequireAuth';
 import FestivalGearManagement from '@/pages/FestivalGearManagement';
 import Festivals from '@/pages/Festivals';
-import { AuthProvider } from "@/hooks/useAuth";
+import { OptimizedAuthProvider } from "@/hooks/useOptimizedAuth";
 import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AppInit } from "@/components/AppInit";
@@ -64,7 +64,7 @@ export default function App() {
       <ThemeProvider defaultTheme="system" storageKey="sector-pro-theme">
         <SubscriptionProvider>
           <Router>
-            <AuthProvider>
+            <OptimizedAuthProvider>
               <AppInit />
               <div className="app">
                 <Routes>
@@ -147,7 +147,7 @@ export default function App() {
                 </Routes>
                 <Toaster />
               </div>
-            </AuthProvider>
+            </OptimizedAuthProvider>
           </Router>
         </SubscriptionProvider>
       </ThemeProvider>

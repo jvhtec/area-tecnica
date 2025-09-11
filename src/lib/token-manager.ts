@@ -18,7 +18,7 @@ export class TokenManager {
   // Session caching properties
   private cachedSession: Session | null = null;
   private sessionCacheTime: number = 0;
-  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  private readonly CACHE_DURATION = 10 * 60 * 1000; // 10 minutes (increased from 5)
   
   private constructor() {
     // Set up auth state change listener
@@ -90,16 +90,17 @@ export class TokenManager {
   
   /**
    * Get cached session if valid, otherwise fetch fresh session
+   * Enhanced with smarter caching and reduced redundant calls
    */
   public async getCachedSession(): Promise<Session | null> {
     // Return cached session if it's still valid
     if (this.cachedSession && this.isCacheValid()) {
-      console.log('Returning cached session');
+      console.log('✅ Returning cached session');
       return this.cachedSession;
     }
     
     // Cache is invalid or empty, fetch fresh session
-    console.log('Fetching fresh session (cache miss or expired)');
+    console.log('🔄 Fetching fresh session (cache miss or expired)');
     const { data } = await supabase.auth.getSession();
     this.updateCachedSession(data.session);
     return data.session;

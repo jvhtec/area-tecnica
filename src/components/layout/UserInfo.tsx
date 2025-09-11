@@ -1,8 +1,8 @@
 
-import { useAuth } from "@/hooks/useAuth";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 export const UserInfo = () => {
-  const { user } = useAuth();
+  const { user } = useOptimizedAuth();
 
   if (!user) return null;
 

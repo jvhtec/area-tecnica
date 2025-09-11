@@ -17,14 +17,14 @@ import { ThemeToggle } from "./layout/ThemeToggle";
 import { UserInfo } from "./layout/UserInfo";
 import { SidebarNavigation } from "./layout/SidebarNavigation";
 import { AboutCard } from "./layout/AboutCard";
-import { NotificationBadge } from "./layout/NotificationBadge";
+import { LazyNotificationBadge } from "./layout/LazyNotificationBadge";
 import { useToast } from "@/hooks/use-toast";
 import { ReloadButton } from "./ui/reload-button";
 import { useQueryClient } from "@tanstack/react-query";
 import { useKonamiCode } from "@/hooks/useKonamiCode";
 import { WolfensteinDialog } from "./doom/WolfensteinDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useAuth } from "@/hooks/useAuth";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { HeaderStatus } from "./ui/header-status";
 import { useRouteSubscriptions } from "@/hooks/useRouteSubscriptions";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
@@ -44,7 +44,7 @@ const Layout = () => {
     userDepartment,
     isLoading,
     logout
-  } = useAuth();
+  } = useOptimizedAuth();
   
   // Get route-specific subscription info
   const { requiredTables } = useRouteSubscriptions();
@@ -105,7 +105,7 @@ const Layout = () => {
             <ThemeToggle />
             <UserInfo />
             {session?.user?.id && (
-              <NotificationBadge 
+              <LazyNotificationBadge 
                 userId={session.user.id}
                 userRole={userRole}
                 userDepartment={userDepartment}
