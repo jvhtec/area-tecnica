@@ -24,7 +24,7 @@ const ProjectManagement = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [userRole, setUserRole] = useState<string | null>(null);
   const [selectedJobType, setSelectedJobType] = useState("All");
-  const [selectedJobStatuses, setSelectedJobStatuses] = useState<string[]>([]);
+  const [selectedJobStatuses, setSelectedJobStatuses] = useState<string[]>(["Confirmado", "Tentativa"]);
   const [allJobTypes, setAllJobTypes] = useState<string[]>([]);
   const [allJobStatuses, setAllJobStatuses] = useState<string[]>([]);
   const [highlightToday, setHighlightToday] = useState(false);
@@ -138,6 +138,54 @@ const ProjectManagement = () => {
     checkAccess();
   }, [navigate]);
 
+  // Load user preferences for job status selection
+  useEffect(() => {
+    const loadUserPreferences = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.id) return;
+        
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("selected_job_statuses")
+          .eq("id", session.user.id)
+          .single();
+          
+        if (error) {
+          console.error("Error loading user preferences:", error);
+          return;
+        }
+        
+        if (profile?.selected_job_statuses) {
+          setSelectedJobStatuses(profile.selected_job_statuses);
+        }
+      } catch (error) {
+        console.error("Error in loadUserPreferences:", error);
+      }
+    };
+    
+    loadUserPreferences();
+  }, []);
+
+  // Save user preferences when status selection changes
+  const saveUserPreferences = async (statuses: string[]) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) return;
+      
+      const { error } = await supabase
+        .from("profiles")
+        .update({ selected_job_statuses: statuses })
+        .eq("id", session.user.id);
+        
+      if (error) {
+        console.error("Error saving user preferences:", error);
+      }
+    } catch (error) {
+      console.error("Error in saveUserPreferences:", error);
+    }
+  };
+
   // Extract job types and statuses from optimized jobs data to avoid extra query
   useEffect(() => {
     if (optimizedJobs?.length > 0) {
@@ -197,13 +245,12 @@ const ProjectManagement = () => {
   };
 
   const handleJobStatusSelection = (status: string) => {
-    setSelectedJobStatuses(prev => {
-      if (prev.includes(status)) {
-        return prev.filter(s => s !== status);
-      } else {
-        return [...prev, status];
-      }
-    });
+    const newStatuses = selectedJobStatuses.includes(status)
+      ? selectedJobStatuses.filter(s => s !== status)
+      : [...selectedJobStatuses, status];
+      
+    setSelectedJobStatuses(newStatuses);
+    saveUserPreferences(newStatuses);
   };
 
   return (

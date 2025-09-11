@@ -2837,6 +2837,7 @@ export type Database = {
           phone: string | null
           residencia: string | null
           role: Database["public"]["Enums"]["user_role"]
+          selected_job_statuses: string[] | null
           selected_job_types: string[] | null
           time_span: string | null
           timezone: string | null
@@ -2860,6 +2861,7 @@ export type Database = {
           phone?: string | null
           residencia?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          selected_job_statuses?: string[] | null
           selected_job_types?: string[] | null
           time_span?: string | null
           timezone?: string | null
@@ -2883,6 +2885,7 @@ export type Database = {
           phone?: string | null
           residencia?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          selected_job_statuses?: string[] | null
           selected_job_types?: string[] | null
           time_span?: string | null
           timezone?: string | null
