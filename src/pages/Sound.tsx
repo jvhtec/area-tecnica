@@ -148,13 +148,15 @@ const Sound = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 space-y-4 sm:space-y-6">
-      <LightsHeader 
-        onCreateJob={() => setIsJobDialogOpen(true)}
-        department="Sound"
-      />
+    <div className="space-y-4 md:space-y-8 w-full max-w-full">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <LightsHeader 
+          onCreateJob={() => setIsJobDialogOpen(true)}
+          department="Sound"
+        />
+      </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:gap-8">
+      <div className="space-y-4 md:space-y-8">
         <div className="w-full">
           <CalendarSection 
             date={date} 
@@ -176,11 +178,12 @@ const Sound = () => {
         </div>
       </div>
 
-      <Card className="mt-4 sm:mt-8">
-        <div className="p-4 sm:p-6">
-          <h2 className="text-xl sm:text-2xl font-semibold mb-3 sm:mb-4">Tools</h2>
-          <Separator className="mb-4 sm:mb-6" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <Card className="mt-4 sm:mt-8">
+          <div className="p-4 sm:p-6">
+            <h2 className="text-xl sm:text-2xl font-semibold mb-3 sm:mb-4">Tools</h2>
+            <Separator className="mb-4 sm:mb-6" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4">
             <Button
               variant="outline"
               size="lg"
@@ -251,70 +254,70 @@ const Sound = () => {
               <Tent className="h-4 w-4 sm:h-6 sm:w-6" />
               <span className="text-center leading-tight">Festivals</span>
             </Button>
-          </div>
-        </div>
-      </Card>
+           </div>
+         </div>
+       </Card>
 
-      {isJobDialogOpen && (
-        <CreateJobDialog 
-          open={isJobDialogOpen} 
-          onOpenChange={setIsJobDialogOpen}
-          currentDepartment={currentDepartment}
-        />
-      )}
-      {selectedJobId && (
-        <JobAssignmentDialog
-          isOpen={isAssignmentDialogOpen}
-          onClose={() => setIsAssignmentDialogOpen(false)}
-          onAssignmentChange={() => {}}
-          jobId={selectedJobId}
-          department={currentDepartment}
-        />
-      )}
-      {selectedJob && (
-        <EditJobDialog
-          open={isEditDialogOpen}
-          onOpenChange={setIsEditDialogOpen}
-          job={selectedJob}
-        />
-      )}
-      
-      <Dialog open={showReportGenerator} onOpenChange={setShowReportGenerator}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Generador de Reportes</DialogTitle>
-          </DialogHeader>
-          <ReportGenerator />
-        </DialogContent>
-      </Dialog>
+       {isJobDialogOpen && (
+         <CreateJobDialog 
+           open={isJobDialogOpen} 
+           onOpenChange={setIsJobDialogOpen}
+           currentDepartment={currentDepartment}
+         />
+       )}
+       {selectedJobId && (
+         <JobAssignmentDialog
+           isOpen={isAssignmentDialogOpen}
+           onClose={() => setIsAssignmentDialogOpen(false)}
+           onAssignmentChange={() => {}}
+           jobId={selectedJobId}
+           department={currentDepartment}
+         />
+       )}
+       {selectedJob && (
+         <EditJobDialog
+           open={isEditDialogOpen}
+           onOpenChange={setIsEditDialogOpen}
+           job={selectedJob}
+         />
+       )}
+       
+       <Dialog open={showReportGenerator} onOpenChange={setShowReportGenerator}>
+         <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+           <DialogHeader>
+             <DialogTitle>Generador de Reportes</DialogTitle>
+           </DialogHeader>
+           <ReportGenerator />
+         </DialogContent>
+       </Dialog>
 
+       <Dialog open={showAmplifierTool} onOpenChange={setShowAmplifierTool}>
+         <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+           <DialogHeader>
+             <DialogTitle>Calculadora de Amplificadores</DialogTitle>
+           </DialogHeader>
+           <AmplifierTool />
+         </DialogContent>
+       </Dialog>
 
-      <Dialog open={showAmplifierTool} onOpenChange={setShowAmplifierTool}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Calculadora de Amplificadores</DialogTitle>
-          </DialogHeader>
-          <AmplifierTool />
-        </DialogContent>
-      </Dialog>
+       <Dialog open={showMemoriaTecnica} onOpenChange={setShowMemoriaTecnica}>
+         <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+           <DialogHeader>
+             <DialogTitle>Memoria Técnica</DialogTitle>
+           </DialogHeader>
+           <MemoriaTecnica />
+         </DialogContent>
+       </Dialog>
 
-      <Dialog open={showMemoriaTecnica} onOpenChange={setShowMemoriaTecnica}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Memoria Técnica</DialogTitle>
-          </DialogHeader>
-          <MemoriaTecnica />
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showIncidentReport} onOpenChange={setShowIncidentReport}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Reporte de Incidencia</DialogTitle>
-          </DialogHeader>
-          <IncidentReport />
-        </DialogContent>
-      </Dialog>
+       <Dialog open={showIncidentReport} onOpenChange={setShowIncidentReport}>
+         <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+           <DialogHeader>
+             <DialogTitle>Reporte de Incidencia</DialogTitle>
+           </DialogHeader>
+           <IncidentReport />
+         </DialogContent>
+        </Dialog>
+      </div>
     </div>
   );
 };
