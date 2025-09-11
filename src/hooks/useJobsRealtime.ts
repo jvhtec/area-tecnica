@@ -1,8 +1,8 @@
 
-import { useState, useCallback, useEffect } from 'react';
-import { useRealtimeQuery } from './useRealtimeQuery';
-import { supabase, ensureRealtimeConnection } from '@/lib/supabase';
-import { useSubscriptionStatus } from './useSubscriptionStatus';
+import { useState, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
+import { useOptimizedRealtime } from './useOptimizedRealtime';
 import { toast } from 'sonner';
 
 /**
@@ -13,25 +13,12 @@ export function useJobsRealtime() {
   const [isPaused, setIsPaused] = useState(false);
   const maxRetries = 3;
   
-  // Tables we need to monitor for changes
-  const requiredTables = ['jobs', 'job_assignments', 'job_departments', 'job_date_types'];
-  
-  // Use subscription status hook to monitor connection status
-  const subscriptionStatus = useSubscriptionStatus(requiredTables);
-  
-  // Fetch jobs with enhanced error handling
+  // Fetch jobs with optimized error handling
   const fetchJobs = useCallback(async () => {
     try {
       console.log("Fetching jobs data...");
       
-      // Check realtime connection before fetch
-      if (await ensureRealtimeConnection()) {
-        console.log("Realtime connection established, proceeding with fetch");
-      } else {
-        console.warn("Realtime connection couldn't be established, proceeding with fetch anyway");
-      }
-      
-      // Fetch the jobs with joined data
+      // Fetch the jobs with joined data - simplified query for performance
       const { data, error } = await supabase
         .from('jobs')
         .select(`
@@ -58,76 +45,58 @@ export function useJobsRealtime() {
       console.error("Error in fetchJobs:", error);
       
       if (retryCount < maxRetries) {
-        // Increment retry count and throw to trigger retry
         setRetryCount(prev => prev + 1);
         throw error;
       } else {
-        // Max retries reached, pause fetching
         setIsPaused(true);
         return [];
       }
     }
   }, [retryCount, maxRetries]);
   
-  // Use our enhanced real-time query hook
+  // Use optimized React Query with realtime subscriptions
   const {
     data: jobs,
     isLoading,
     isError,
     error,
-    refetch: reactQueryRefetch,
-    isRefreshing,
-    manualRefresh,
-    isSubscribed,
-    isStale
-  } = useRealtimeQuery(
-    ['jobs'],
-    fetchJobs,
-    'jobs', // Primary table to subscribe to
-    {
-      retry: maxRetries,
-      retryDelay: attemptIndex => Math.min(1000 * (2 ** attemptIndex), 10000),
-      enabled: !isPaused,
-      staleTime: 5 * 60 * 1000, // 5 minutes
-    }
-  );
+    refetch
+  } = useQuery({
+    queryKey: ['jobs'],
+    queryFn: fetchJobs,
+    retry: maxRetries,
+    retryDelay: attemptIndex => Math.min(1000 * (2 ** attemptIndex), 10000),
+    enabled: !isPaused,
+    staleTime: 2 * 60 * 1000, // 2 minutes - reduced for better performance
+    refetchOnWindowFocus: false, // Disable to reduce load
+  });
   
-  // Effect to handle stale data
-  useEffect(() => {
-    if (isStale && !isLoading && !isError) {
-      console.log("Data is stale, refreshing...");
-      manualRefresh().catch(err => {
-        console.error("Error refreshing stale data:", err);
+  // Set up optimized realtime subscription
+  const realtimeStatus = useOptimizedRealtime('jobs', 'jobs', {
+    enabled: !isPaused,
+    priority: 'high'
+  });
+  
+  // Show toast notifications for connection issues
+  useState(() => {
+    if (realtimeStatus.error && !isLoading) {
+      toast.warning("Real-time updates experiencing issues", {
+        description: "Data will still update, but may be slightly delayed.",
+        duration: 3000,
       });
     }
-  }, [isStale, isLoading, isError, manualRefresh]);
+  });
   
-  // Effect to show toast notifications for subscription status
-  useEffect(() => {
-    if (!isSubscribed && !isLoading && jobs?.length) {
-      toast.warning("Real-time updates are not active. Data might be stale.", {
-        description: "We're trying to reconnect. Click refresh to force update.",
-        duration: 5000,
-      });
-    }
-  }, [isSubscribed, isLoading, jobs]);
-  
-  // Manual refresh function with enhanced error handling
-  const refetch = async () => {
+  // Manual refresh function with simplified error handling
+  const manualRefetch = async () => {
     try {
-      await manualRefresh();
+      setIsPaused(false);
+      setRetryCount(0);
+      await refetch();
+      toast.success("Data refreshed successfully");
     } catch (error) {
       console.error("Error in manual refresh:", error);
-      toast.error("Failed to refresh data. Trying to reconnect...");
-      
-      // Try to recover the connection
-      const recovered = await ensureRealtimeConnection();
-      if (recovered) {
-        toast.success("Connection restored. Refreshing data...");
-        setIsPaused(false);
-        setRetryCount(0);
-        await manualRefresh();
-      }
+      toast.error("Failed to refresh data");
     }
   };
   
@@ -136,9 +105,9 @@ export function useJobsRealtime() {
     isLoading,
     isError,
     error,
-    refetch,
-    isRefreshing,
-    subscriptionStatus,
+    refetch: manualRefetch,
+    isRefreshing: isLoading,
+    realtimeStatus,
     isPaused,
     retryCount,
     maxRetries
