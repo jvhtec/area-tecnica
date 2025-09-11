@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
-import CreateTourDialog from "@/components/tours/CreateTourDialog";
+
 import { useJobs } from "@/hooks/useJobs";
 import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
@@ -26,7 +26,7 @@ import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService
 const Sound = () => {
   const navigate = useNavigate();
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
-  const [isTourDialogOpen, setIsTourDialogOpen] = useState(false);
+  
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
@@ -151,7 +151,6 @@ const Sound = () => {
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 space-y-4 sm:space-y-6">
       <LightsHeader 
         onCreateJob={() => setIsJobDialogOpen(true)}
-        onCreateTour={() => setIsTourDialogOpen(true)}
         department="Sound"
       />
 
@@ -260,13 +259,6 @@ const Sound = () => {
         <CreateJobDialog 
           open={isJobDialogOpen} 
           onOpenChange={setIsJobDialogOpen}
-          currentDepartment={currentDepartment}
-        />
-      )}
-      {isTourDialogOpen && (
-        <CreateTourDialog 
-          open={isTourDialogOpen} 
-          onOpenChange={setIsTourDialogOpen}
           currentDepartment={currentDepartment}
         />
       )}

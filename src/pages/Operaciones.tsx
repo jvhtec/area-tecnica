@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
-import CreateTourDialog from "@/components/tours/CreateTourDialog";
+
 import { useJobs } from "@/hooks/useJobs";
 import { format } from "date-fns";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
@@ -19,7 +19,7 @@ import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 
 const Operaciones = () => {
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
-  const [isTourDialogOpen, setIsTourDialogOpen] = useState(false);
+  
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
@@ -146,7 +146,6 @@ const Operaciones = () => {
     <div className="max-w-7xl mx-auto space-y-6">
       <LightsHeader 
         onCreateJob={() => setIsJobDialogOpen(true)}
-        onCreateTour={() => setIsTourDialogOpen(true)}
         department="Video"
       />
 
@@ -199,11 +198,6 @@ const Operaciones = () => {
         currentDepartment={currentDepartment}
       />
       
-      <CreateTourDialog
-        open={isTourDialogOpen}
-        onOpenChange={setIsTourDialogOpen}
-        currentDepartment={currentDepartment}
-      />
 
       {selectedJob && (
         <EditJobDialog

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
-import CreateTourDialog from "@/components/tours/CreateTourDialog";
+
 import { useJobs } from "@/hooks/useJobs";
 import { format } from "date-fns";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
@@ -19,7 +19,7 @@ import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService
 const Lights = () => {
   const navigate = useNavigate();
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
-  const [isTourDialogOpen, setIsTourDialogOpen] = useState(false);
+  
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
@@ -132,7 +132,6 @@ const Lights = () => {
     <div className="max-w-7xl mx-auto space-y-6">
       <LightsHeader 
         onCreateJob={() => setIsJobDialogOpen(true)}
-        onCreateTour={() => setIsTourDialogOpen(true)}
         department="Luces"
       />
 
@@ -199,11 +198,6 @@ const Lights = () => {
         currentDepartment={currentDepartment}
       />
       
-      <CreateTourDialog
-        open={isTourDialogOpen}
-        onOpenChange={setIsTourDialogOpen}
-        currentDepartment={currentDepartment}
-      />
 
       {selectedJobId && (
         <JobAssignmentDialog
