@@ -176,7 +176,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
     };
 
     fetchDateTypes();
-  }, [currentDate, getJobsForDate]);
+  }, [currentDate, getJobsForDate, onDateTypeChange]); // Add onDateTypeChange to trigger refetch
 
   // Simple PDF/XLS generation for mobile (single day focus)
   const generatePDF = (range: "month" | "quarter" | "year") => {
@@ -220,13 +220,81 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
         key={job.id}
         jobId={job.id}
         date={currentDate}
-        onTypeChange={onDateTypeChange}
+        onTypeChange={() => {
+          // Force a refetch of date types when changed
+          const fetchDateTypes = async () => {
+            const dayJobs = getJobsForDate(currentDate);
+            const jobIds = dayJobs.map(job => job.id);
+            const formattedDate = format(currentDate, 'yyyy-MM-dd');
+
+            if (jobIds.length === 0) {
+              setDateTypes({});
+              return;
+            }
+
+            const { data, error } = await supabase
+              .from("job_date_types")
+              .select("*")
+              .in("job_id", jobIds)
+              .eq("date", formattedDate);
+
+            if (error) {
+              console.error("Error fetching date types:", error);
+              return;
+            }
+
+            const typesMap = data.reduce((acc: Record<string, any>, curr) => ({
+              ...acc,
+              [`${curr.job_id}-${curr.date}`]: curr,
+            }), {});
+            setDateTypes(typesMap);
+          };
+          
+          // Refetch date types immediately
+          fetchDateTypes();
+          // Also call the parent callback
+          onDateTypeChange();
+        }}
       >
         <MobileJobCard
           job={job}
           department={department as Department || 'sound'}
           currentDate={currentDate}
-          onDateTypeChange={onDateTypeChange}
+          onDateTypeChange={() => {
+            // Force a refetch of date types when changed
+            const fetchDateTypes = async () => {
+              const dayJobs = getJobsForDate(currentDate);
+              const jobIds = dayJobs.map(job => job.id);
+              const formattedDate = format(currentDate, 'yyyy-MM-dd');
+
+              if (jobIds.length === 0) {
+                setDateTypes({});
+                return;
+              }
+
+              const { data, error } = await supabase
+                .from("job_date_types")
+                .select("*")
+                .in("job_id", jobIds)
+                .eq("date", formattedDate);
+
+              if (error) {
+                console.error("Error fetching date types:", error);
+                return;
+              }
+
+              const typesMap = data.reduce((acc: Record<string, any>, curr) => ({
+                ...acc,
+                [`${curr.job_id}-${curr.date}`]: curr,
+              }), {});
+              setDateTypes(typesMap);
+            };
+            
+            // Refetch date types immediately
+            fetchDateTypes();
+            // Also call the parent callback
+            onDateTypeChange();
+          }}
           onEditClick={onEditClick}
           onDeleteClick={onDeleteClick}
           onJobClick={onJobClick}
