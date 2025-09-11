@@ -33,10 +33,11 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 export const checkNetworkConnection = async (): Promise<boolean> => {
   try {
     const response = await fetch(`${SUPABASE_URL}/health`, {
-      method: 'HEAD',
+      method: 'GET',
       headers: { 'Cache-Control': 'no-cache' },
     });
-    return response.ok;
+    // Consider any HTTP response as network available (401 is common here)
+    return !!response.status;
   } catch (error) {
     return false;
   }

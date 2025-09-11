@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { logoUrlCache } from "@/lib/logo-url-cache";
 
 export interface LogoOption {
   value: string;
@@ -66,10 +67,8 @@ export const useLogoOptions = (jobId?: string) => {
         if (tourLogoError) throw tourLogoError;
 
         // Format festival logos for dropdown
-        const festivalOptions: LogoOption[] = await Promise.all(
-          (festivalLogos || [])
-            .filter(logo => logo.jobs !== null)
-            .map(async (logo: any) => {
+        const festivalOptions: LogoOption[] = [];
+        for (const logo of (festivalLogos || []).filter(l => l.jobs !== null)) {
             // Handle different possible shapes of the jobs object
             let jobTitle = 'Unknown Job';
             
@@ -85,24 +84,33 @@ export const useLogoOptions = (jobId?: string) => {
               }
             }
               
-            const { data: signedUrlData } = await supabase.storage
-              .from('festival-logos')
-              .createSignedUrl(logo.file_path, 60 * 60); // 1 hour expiry
-              
-            return {
+            let url = logoUrlCache.get('festival-logos', logo.file_path);
+            if (!url) {
+              const { data: signedUrlData, error: signErr } = await supabase.storage
+                .from('festival-logos')
+                .createSignedUrl(logo.file_path, 60 * 60);
+              if (signedUrlData?.signedUrl) {
+                url = signedUrlData.signedUrl;
+                logoUrlCache.set('festival-logos', logo.file_path, url, 45 * 60 * 1000);
+              } else {
+                const { data: publicUrlData } = supabase.storage
+                  .from('festival-logos')
+                  .getPublicUrl(logo.file_path);
+                url = publicUrlData?.publicUrl ?? '';
+                if (url) logoUrlCache.set('festival-logos', logo.file_path, url, 15 * 60 * 1000);
+              }
+            }
+            festivalOptions.push({
               value: `job-${logo.id}`,
               label: `Job: ${jobTitle}`,
-              url: signedUrlData?.signedUrl || supabase.storage.from('festival-logos').getPublicUrl(logo.file_path).data.publicUrl,
-              type: "job" as const
-            };
-            })
-        );
+              url,
+              type: 'job'
+            });
+        }
 
         // Format tour logos for dropdown
-        const tourOptions: LogoOption[] = await Promise.all(
-          (tourLogos || [])
-            .filter(logo => logo.tours !== null)
-            .map(async (logo: any) => {
+        const tourOptions: LogoOption[] = [];
+        for (const logo of (tourLogos || []).filter(l => l.tours !== null)) {
             // Handle different possible shapes of the tours object
             let tourName = 'Unknown Tour';
             
@@ -118,18 +126,29 @@ export const useLogoOptions = (jobId?: string) => {
               }
             }
               
-            const { data: signedUrlData } = await supabase.storage
-              .from('tour-logos')
-              .createSignedUrl(logo.file_path, 60 * 60); // 1 hour expiry
-              
-            return {
+            let url = logoUrlCache.get('tour-logos', logo.file_path);
+            if (!url) {
+              const { data: signedUrlData } = await supabase.storage
+                .from('tour-logos')
+                .createSignedUrl(logo.file_path, 60 * 60);
+              if (signedUrlData?.signedUrl) {
+                url = signedUrlData.signedUrl;
+                logoUrlCache.set('tour-logos', logo.file_path, url, 45 * 60 * 1000);
+              } else {
+                const { data: publicUrlData } = supabase.storage
+                  .from('tour-logos')
+                  .getPublicUrl(logo.file_path);
+                url = publicUrlData?.publicUrl ?? '';
+                if (url) logoUrlCache.set('tour-logos', logo.file_path, url, 15 * 60 * 1000);
+              }
+            }
+            tourOptions.push({
               value: `tour-${logo.id}`,
               label: `Tour: ${tourName}`,
-              url: signedUrlData?.signedUrl || supabase.storage.from('tour-logos').getPublicUrl(logo.file_path).data.publicUrl,
-              type: "tour" as const
-            };
-            })
-        );
+              url,
+              type: 'tour'
+            });
+        }
         
         // Combine and set options
         setLogoOptions([...festivalOptions, ...tourOptions]);
