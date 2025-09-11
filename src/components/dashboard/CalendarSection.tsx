@@ -212,17 +212,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     Array.from(new Set(allDays.map(d => format(d, 'yyyy-MM-dd')))),
     [allDays]
   );
-
-  // Optimized date types fetching
-  const jobIdsInView = useMemo(() => 
-    Array.from(new Set(allDays.flatMap(day => getJobsForDate(day).map(job => job.id)))),
-    [allDays, getJobsForDate]
-  );
-  
-  const formattedDatesInView = useMemo(() => 
-    Array.from(new Set(allDays.map(d => format(d, 'yyyy-MM-dd')))),
-    [allDays]
-  );
   
   const { data: dateTypes = {} } = useOptimizedDateTypes(jobIdsInView, formattedDatesInView);
 
