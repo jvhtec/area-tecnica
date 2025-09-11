@@ -75,7 +75,6 @@ export function JobCardNew({
     collapsed,
     assignments,
     documents,
-    dateTypes,
     soundTaskDialogOpen,
     lightsTaskDialogOpen,
     videoTaskDialogOpen,
@@ -435,7 +434,7 @@ export function JobCardNew({
           onToggleCollapse={toggleCollapse}
           appliedBorderColor={appliedBorderColor}
           appliedBgColor={appliedBgColor}
-          dateTypes={dateTypes}
+          dateTypes={job.job_date_types || {}}
           department={department}
         />
 

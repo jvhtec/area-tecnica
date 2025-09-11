@@ -31,7 +31,6 @@ export const useOptimizedJobCard = (
   const [collapsed, setCollapsed] = useState(true);
   const [assignments] = useState(job.job_assignments || []);
   const [documents] = useState(job.job_documents || []);
-  const [dateTypes, setDateTypes] = useState<Record<string, any>>({});
   const [soundTaskDialogOpen, setSoundTaskDialogOpen] = useState(false);
   const [lightsTaskDialogOpen, setLightsTaskDialogOpen] = useState(false);
   const [videoTaskDialogOpen, setVideoTaskDialogOpen] = useState(false);
@@ -196,7 +195,6 @@ export const useOptimizedJobCard = (
     collapsed,
     assignments,
     documents,
-    dateTypes,
     soundTaskDialogOpen,
     lightsTaskDialogOpen,
     videoTaskDialogOpen,

@@ -41,6 +41,7 @@ interface MobileJobCardProps {
   job: any;
   department?: Department;
   currentDate: Date;
+  dateTypes?: Record<string, any>;
   onDateTypeChange?: () => void;
   onEditClick?: (job: any) => void;
   onDeleteClick?: (jobId: string) => void;
@@ -59,6 +60,7 @@ export function MobileJobCard({
   job,
   department = "sound",
   currentDate,
+  dateTypes: propDateTypes,
   onDateTypeChange,
   onEditClick,
   onDeleteClick,
@@ -94,7 +96,6 @@ export function MobileJobCard({
     appliedBgColor,
     assignments,
     documents,
-    dateTypes,
     soundTaskDialogOpen,
     lightsTaskDialogOpen,
     videoTaskDialogOpen,
@@ -131,8 +132,8 @@ export function MobileJobCard({
   const { data: foldersExist, isLoading: isFoldersLoading } = useFolderExistence(job.id);
   const foldersAreCreated = foldersExist === true;
 
-  const dateTypesArray: any[] = Array.isArray(dateTypes)
-    ? dateTypes
+  const dateTypesArray: any[] = Array.isArray(propDateTypes)
+    ? Object.values(propDateTypes)
     : (Array.isArray(job?.job_date_types) ? job.job_date_types : []);
 
   // Get current date type for this job on the selected date
@@ -185,12 +186,6 @@ export function MobileJobCard({
     try {
       const dateStr = format(currentDate, 'yyyy-MM-dd');
       
-      // Optimistically update the UI using the same pattern as DateTypeContextMenu
-      queryClient.setQueryData(['job-date-types', job.id], (old: any) => {
-        const key = `${job.id}-${dateStr}`;
-        return { ...old, [key]: { type: newType, job_id: job.id, date: dateStr } };
-      });
-      
       const { error } = await supabase
         .from('job_date_types')
         .upsert({
@@ -218,9 +213,6 @@ export function MobileJobCard({
         description: "Failed to update date type",
         variant: "destructive"
       });
-      
-      // Invalidate queries on error to refresh from server
-      queryClient.invalidateQueries({ queryKey: ['job-date-types', job.id] });
     }
   };
 

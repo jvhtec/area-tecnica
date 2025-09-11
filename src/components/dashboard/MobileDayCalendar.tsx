@@ -260,6 +260,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
           job={job}
           department={department as Department || 'sound'}
           currentDate={currentDate}
+          dateTypes={dateTypes}
           onDateTypeChange={() => {
             // Force a refetch of date types when changed
             const fetchDateTypes = async () => {
