@@ -1,87 +1,79 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, CheckCircle, Loader2, RefreshCw } from 'lucide-react';
-import { checkDatabaseHealth } from '@/lib/supabaseRetry';
+import { AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
+import { checkDatabaseHealth } from '@/lib/emergency-database-client';
 
 export const DatabaseHealthIndicator = () => {
-  const [isHealthy, setIsHealthy] = useState<boolean | null>(null);
+  const [healthStatus, setHealthStatus] = useState<{
+    isHealthy: boolean | null;
+    responseTime: number;
+    connectionStats: any;
+  }>({
+    isHealthy: null,
+    responseTime: 0,
+    connectionStats: {}
+  });
   const [isChecking, setIsChecking] = useState(false);
   const [lastCheck, setLastCheck] = useState<Date | null>(null);
 
   const checkHealth = async () => {
     setIsChecking(true);
     try {
-      const healthy = await checkDatabaseHealth();
-      setIsHealthy(healthy);
+      const result = await checkDatabaseHealth();
+      setHealthStatus(result);
       setLastCheck(new Date());
     } catch (error) {
-      setIsHealthy(false);
+      console.error('Health check failed:', error);
+      setHealthStatus({
+        isHealthy: false,
+        responseTime: 0,
+        connectionStats: {}
+      });
       setLastCheck(new Date());
     } finally {
       setIsChecking(false);
     }
   };
 
+  // Initial check and set up interval (less frequent in emergency mode)
   useEffect(() => {
     checkHealth();
     
-    // Check health every 2 minutes
-    const interval = setInterval(checkHealth, 2 * 60 * 1000);
+    const interval = setInterval(checkHealth, 5 * 60 * 1000); // Check every 5 minutes
     
     return () => clearInterval(interval);
   }, []);
 
-  if (isHealthy === null && !isChecking) {
-    return null; // Don't show anything initially
-  }
-
-  if (isHealthy === true) {
-    return null; // Don't show when everything is working
-  }
-
+  // Show emergency mode alert
   return (
-    <Card className="w-full max-w-md mx-auto mb-4 border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
-      <CardContent className="pt-4">
-        <div className="flex items-center gap-3">
-          {isChecking ? (
-            <Loader2 className="h-5 w-5 animate-spin text-orange-600" />
-          ) : isHealthy === false ? (
-            <AlertTriangle className="h-5 w-5 text-orange-600" />
-          ) : (
-            <CheckCircle className="h-5 w-5 text-green-600" />
-          )}
-          
-          <div className="flex-1">
-            <p className="text-sm font-medium text-orange-800 dark:text-orange-200">
-              {isChecking 
-                ? "Checking database connection..." 
-                : isHealthy === false 
-                ? "Database connectivity issues detected"
-                : "Database connection restored"
-              }
-            </p>
-            {!isChecking && (
-              <p className="text-xs text-orange-600 dark:text-orange-400">
-                {isHealthy === false 
-                  ? "Some features may be temporarily unavailable. Data will sync when connection is restored."
-                  : lastCheck && `Last checked: ${lastCheck.toLocaleTimeString()}`
-                }
-              </p>
+    <Alert variant="destructive" className="mb-4">
+      <AlertTriangle className="h-4 w-4" />
+      <AlertTitle>Emergency Mode Active</AlertTitle>
+      <AlertDescription className="flex items-center justify-between">
+        <div className="space-y-2">
+          <span>
+            Real-time features disabled to restore database performance.
+          </span>
+          <div className="text-sm text-muted-foreground space-y-1">
+            <div>Health: {healthStatus.isHealthy === null ? 'Checking...' : healthStatus.isHealthy ? 'OK' : 'Issues Detected'}</div>
+            <div>Response Time: {healthStatus.responseTime}ms</div>
+            <div>Active Connections: {healthStatus.connectionStats?.activeConnections || 0}/{healthStatus.connectionStats?.maxConnections || 3}</div>
+            {lastCheck && (
+              <div>Last Check: {lastCheck.toLocaleTimeString()}</div>
             )}
           </div>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={checkHealth}
-            disabled={isChecking}
-            className="border-orange-300 text-orange-700 hover:bg-orange-100 dark:border-orange-700 dark:text-orange-300 dark:hover:bg-orange-900"
-          >
-            <RefreshCw className={`h-4 w-4 ${isChecking ? 'animate-spin' : ''}`} />
-          </Button>
         </div>
-      </CardContent>
-    </Card>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={checkHealth}
+          disabled={isChecking}
+        >
+          {isChecking ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+          Check
+        </Button>
+      </AlertDescription>
+    </Alert>
   );
 };

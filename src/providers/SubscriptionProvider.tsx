@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { PerformanceOptimizedSubscriptionManager } from '@/lib/performance-optimized-subscription-manager';
+import { EmergencySubscriptionManager } from '@/lib/emergency-subscription-manager';
 import { toast } from 'sonner';
 import { TokenManager } from '@/lib/token-manager';
 import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
@@ -71,9 +71,9 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     };
   }, []);
 
-  // Initialize the performance-optimized subscription manager
+  // Initialize the emergency subscription manager (real-time disabled)
   useEffect(() => {
-    const manager = PerformanceOptimizedSubscriptionManager.getInstance(queryClient);
+    const manager = EmergencySubscriptionManager.getInstance(queryClient);
     
     // Performance optimization: Only leader handles heavy operations
     
@@ -150,10 +150,10 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
       lastRefreshTime: Date.now()
     }));
     
-    // Set initial connection status - simplified
+    // Set initial connection status - emergency mode
     setState(prev => ({
       ...prev, 
-      connectionStatus: 'connecting'
+      connectionStatus: 'disconnected' // Always disconnected in emergency mode
     }));
     
     // Clear any existing interval
@@ -161,33 +161,27 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
       clearInterval(connectionCheckIntervalRef.current);
     }
     
-    // Update state periodically to reflect current subscription status
-    // Reduce frequency for followers to save resources
-    const intervalTime = isLeader ? 2000 : 5000; // 2s for leader, 5s for followers
+    // Much longer intervals to reduce database load
+    const intervalTime = 30000; // 30 seconds for everyone
     
     connectionCheckIntervalRef.current = window.setInterval(() => {
       const stats = manager.getStats();
       
-      // Only notify users of critical issues if we're the leader
-      if (isLeader && stats.circuitBreakerOpen && !lastConnectionStatusRef.current.includes('circuit')) {
-        toast.error('Database connection issues detected', {
-          description: 'Performance may be degraded. We\'re working to resolve this.',
-          duration: 8000,
+      // Only show emergency mode notification once
+      if (isLeader && !lastConnectionStatusRef.current.includes('emergency')) {
+        toast.warning('Emergency Mode Active', {
+          description: 'Real-time updates disabled to restore database performance.',
+          duration: 10000,
         });
-        lastConnectionStatusRef.current = 'circuit-open';
-      } else if (isLeader && !stats.circuitBreakerOpen && lastConnectionStatusRef.current.includes('circuit')) {
-        toast.success('Database performance restored', {
-          description: 'All systems are operating normally.'
-        });
-        lastConnectionStatusRef.current = 'connected';
+        lastConnectionStatusRef.current = 'emergency-mode';
       }
       
       setState(prev => ({
         ...prev,
-        connectionStatus: stats.circuitBreakerOpen ? 'disconnected' : 'connected',
-        subscriptionCount: stats.subscriptionCount,
-        activeSubscriptions: [], // Simplified for performance
-        subscriptionsByTable: {}, // Simplified for performance
+        connectionStatus: 'disconnected', // Always disconnected in emergency mode
+        subscriptionCount: 0,
+        activeSubscriptions: [],
+        subscriptionsByTable: {},
       }));
     }, intervalTime);
     
@@ -199,18 +193,14 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     };
   }, [queryClient, isLeader]);
 
-  // Setup core tables subscription with performance optimization
+  // No subscriptions in emergency mode
   useEffect(() => {
     if (isLeader) {
-      const manager = PerformanceOptimizedSubscriptionManager.getInstance(queryClient);
-      
-      // Set up only essential core tables with high priority
-      manager.subscribeToTable('profiles', 'profiles', 'high');
-      manager.subscribeToTable('jobs', 'jobs', 'high');
+      console.log('Emergency mode: Core subscriptions disabled');
     }
     
     return () => {
-      // Cleanup handled by the manager
+      // No cleanup needed in emergency mode
     };
   }, [queryClient, isLeader]);
 
