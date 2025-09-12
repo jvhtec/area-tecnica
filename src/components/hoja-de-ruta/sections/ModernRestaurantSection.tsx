@@ -17,7 +17,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { PlacesRestaurantService } from '@/utils/hoja-de-ruta/services/places-restaurant-service';
-import type { Restaurant, EventData } from '@/types/hoja-de-ruta';
+import type { Restaurant, EventData, Accommodation } from '@/types/hoja-de-ruta';
 import { useToast } from '@/hooks/use-toast';
 import {
   Select,
@@ -30,9 +30,10 @@ import {
 interface ModernRestaurantSectionProps {
   eventData: EventData;
   onUpdateEventData: (data: EventData) => void;
+  accommodations?: Accommodation[];
 }
 
-export function ModernRestaurantSection({ eventData, onUpdateEventData }: ModernRestaurantSectionProps) {
+export function ModernRestaurantSection({ eventData, onUpdateEventData, accommodations = [] }: ModernRestaurantSectionProps) {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchRadius, setSearchRadius] = useState('2000');
@@ -42,18 +43,40 @@ export function ModernRestaurantSection({ eventData, onUpdateEventData }: Modern
 
   const selectedRestaurants = eventData.selectedRestaurants || [];
   const venueAddress = eventData.venue?.address || '';
+  const venueCoords = eventData.venue?.coordinates
+    ? { lat: eventData.venue.coordinates.lat, lng: eventData.venue.coordinates.lng }
+    : (typeof eventData.venue?.latitude === 'number' && typeof eventData.venue?.longitude === 'number'
+        ? { lat: eventData.venue.latitude, lng: eventData.venue.longitude }
+        : undefined);
+
+  // Build origin options: venue + hotels with address
+  const hotelOptions = (accommodations || []).map((acc, idx) => ({
+    key: `hotel-${idx}`,
+    label: acc.hotel_name ? `Hotel: ${acc.hotel_name}` : `Hotel ${idx + 1}`,
+    address: acc.address || '',
+    coords: acc.coordinates ? { lat: acc.coordinates.lat, lng: acc.coordinates.lng } : undefined,
+    type: 'hotel' as const,
+  })).filter(h => h.address || h.coords);
+
+  const originOptions = [
+    ...(venueAddress || venueCoords ? [{ key: 'venue', label: 'Cerca del Venue', address: venueAddress, coords: venueCoords, type: 'venue' as const }] : []),
+    ...hotelOptions,
+  ];
+
+  const [selectedOriginKeys, setSelectedOriginKeys] = useState<string[]>(originOptions.length ? [originOptions[0].key] : []);
 
   useEffect(() => {
-    if (venueAddress) {
+    if (selectedOriginKeys.length > 0) {
       searchRestaurants();
     }
-  }, [venueAddress]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedOriginKeys.join('|')]);
 
   const searchRestaurants = async () => {
-    if (!venueAddress.trim()) {
+    if (selectedOriginKeys.length === 0) {
       toast({
         title: 'Dirección requerida',
-        description: 'Introduce una dirección del evento para buscar restaurantes cercanos',
+        description: 'Selecciona al menos un origen (venue u hotel) para buscar restaurantes cercanos',
         variant: 'destructive',
       });
       return;
@@ -61,24 +84,38 @@ export function ModernRestaurantSection({ eventData, onUpdateEventData }: Modern
 
     setIsLoading(true);
     try {
-      const results = await PlacesRestaurantService.searchRestaurantsNearVenue(
-        venueAddress,
-        parseInt(searchRadius),
-        20
-      );
+      const radiusNum = parseInt(searchRadius);
+      const allResults: Restaurant[] = [];
+      for (const key of selectedOriginKeys) {
+        const origin = originOptions.find(o => o.key === key);
+        if (!origin) continue;
+        const results = await PlacesRestaurantService.searchRestaurantsNearVenue(
+          origin.address || '',
+          radiusNum,
+          20,
+          origin.coords
+        );
+        const annotated = results.map(r => ({
+          ...r,
+          id: `${r.googlePlaceId || r.id}::${key}`,
+          originType: origin.type,
+          originLabel: origin.type === 'venue' ? 'Venue' : origin.label.replace(/^Hotel:\s*/, 'Hotel '),
+        }));
+        allResults.push(...annotated);
+      }
       
       // Mark previously selected restaurants
-      const updatedResults = results.map(restaurant => ({
+      const updatedResults = allResults.map(restaurant => ({
         ...restaurant,
         isSelected: selectedRestaurants.includes(restaurant.id)
       }));
       
       setRestaurants(updatedResults);
       
-      if (results.length === 0) {
+      if (allResults.length === 0) {
         toast({
           title: 'Sin resultados',
-          description: 'No se encontraron restaurantes cerca del evento',
+          description: 'No se encontraron restaurantes cerca del/los origen/es seleccionados',
         });
       }
     } catch (error) {
@@ -154,7 +191,29 @@ export function ModernRestaurantSection({ eventData, onUpdateEventData }: Modern
           <CardTitle className="text-sm">Configuración de Búsqueda</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Buscar cerca de</label>
+              <div className="flex flex-col gap-2 border rounded-md p-3">
+                {originOptions.length === 0 && (
+                  <span className="text-xs text-muted-foreground">Configura un venue u hotel con dirección</span>
+                )}
+                {originOptions.map((opt) => (
+                  <label key={opt.key} className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={selectedOriginKeys.includes(opt.key)}
+                      onCheckedChange={(v) => {
+                        setSelectedOriginKeys((prev) => {
+                          if (v) return Array.from(new Set([...prev, opt.key]));
+                          return prev.filter(k => k !== opt.key);
+                        });
+                      }}
+                    />
+                    <span>{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Radio de búsqueda</label>
               <Select value={searchRadius} onValueChange={setSearchRadius}>
@@ -205,7 +264,7 @@ export function ModernRestaurantSection({ eventData, onUpdateEventData }: Modern
           <div className="flex gap-2">
             <Button 
               onClick={searchRestaurants} 
-              disabled={isLoading || !venueAddress}
+              disabled={isLoading || selectedOriginKeys.length === 0}
               className="flex items-center gap-2"
             >
               {isLoading ? (
@@ -253,7 +312,14 @@ export function ModernRestaurantSection({ eventData, onUpdateEventData }: Modern
                         checked={restaurant.isSelected}
                         onCheckedChange={() => toggleRestaurant(restaurant)}
                       />
-                      <h3 className="font-medium text-sm">{restaurant.name}</h3>
+                      <div className="flex items-center gap-2">
+                        {restaurant.originLabel && (
+                          <Badge variant="outline" className="text-[10px] px-1 py-0">
+                            {restaurant.originLabel}
+                          </Badge>
+                        )}
+                        <h3 className="font-medium text-sm">{restaurant.name}</h3>
+                      </div>
                     </div>
                     {restaurant.rating && (
                       <div className="flex items-center gap-1">
@@ -317,25 +383,25 @@ export function ModernRestaurantSection({ eventData, onUpdateEventData }: Modern
         </div>
       )}
 
-      {!isLoading && restaurants.length === 0 && venueAddress && (
+      {!isLoading && restaurants.length === 0 && selectedOriginKeys.length > 0 && (
         <Card>
           <CardContent className="p-8 text-center">
             <UtensilsCrossed className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-2">No hay restaurantes</h3>
             <p className="text-muted-foreground">
-              Haz clic en "Buscar restaurantes" para encontrar opciones cerca del evento
+              Haz clic en "Buscar restaurantes" para encontrar opciones cerca de los orígenes seleccionados
             </p>
           </CardContent>
         </Card>
       )}
 
-      {!venueAddress && (
+      {selectedOriginKeys.length === 0 && (
         <Card>
           <CardContent className="p-8 text-center">
             <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">Dirección del evento requerida</h3>
+            <h3 className="text-lg font-medium mb-2">Dirección requerida</h3>
             <p className="text-muted-foreground">
-              Completa la información del evento en la sección "Evento" para buscar restaurantes cercanos
+              Selecciona el venue y/o uno o más hoteles para buscar restaurantes cercanos
             </p>
           </CardContent>
         </Card>

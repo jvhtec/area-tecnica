@@ -115,7 +115,7 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
 
     try {
       // First, try the more specific Text Search
-      const searchResponse = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      let searchResponse = await fetch('https://places.googleapis.com/v1/places:searchText', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -128,6 +128,24 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
           maxResultCount: 5
         })
       });
+
+      if (!searchResponse.ok) {
+        // Retry without includedType to avoid 400s from strict filters
+        const errTxt = await searchResponse.text().catch(() => '');
+        console.warn('Text Search error, retrying without includedType:', searchResponse.status, errTxt);
+        searchResponse = await fetch('https://places.googleapis.com/v1/places:searchText', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': apiKey,
+            'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.types'
+          },
+          body: JSON.stringify({
+            textQuery: query,
+            maxResultCount: 5
+          })
+        });
+      }
 
       if (searchResponse.ok) {
         const data = await searchResponse.json();
@@ -149,7 +167,7 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
 
       // If Text Search fails or returns no results, fallback to Autocomplete
       console.log('Fallback to autocomplete for:', query);
-      const autocompleteResponse = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+      let autocompleteResponse = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -162,6 +180,24 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
           maxResultCount: 5
         })
       });
+
+      if (!autocompleteResponse.ok) {
+        const txt = await autocompleteResponse.text().catch(() => '');
+        console.warn('Autocomplete API error with lodging filter, retrying without filter:', autocompleteResponse.status, txt);
+        // Retry without includedPrimaryTypes if API rejects the filter
+        autocompleteResponse = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': apiKey,
+            'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat'
+          },
+          body: JSON.stringify({
+            input: query,
+            maxResultCount: 5
+          })
+        });
+      }
 
       if (autocompleteResponse.ok) {
         const data = await autocompleteResponse.json();
@@ -179,7 +215,8 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
           searchCache.current[query] = hotelPredictions;
         }
       } else {
-        throw new Error(`Autocomplete API error: ${autocompleteResponse.status}`);
+        const txt = await autocompleteResponse.text().catch(() => '');
+        throw new Error(`Autocomplete API error: ${autocompleteResponse.status} ${txt}`);
       }
     } catch (error) {
       console.error('Error searching hotels:', error);

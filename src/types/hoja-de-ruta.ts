@@ -217,6 +217,9 @@ export interface Restaurant {
   distance?: number;
   googlePlaceId: string;
   isSelected?: boolean;
+  // Optional origin metadata to indicate where it was searched from
+  originType?: 'venue' | 'hotel' | 'custom';
+  originLabel?: string;
 }
 
 export interface ImagePreviews {

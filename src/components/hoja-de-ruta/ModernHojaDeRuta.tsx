@@ -629,6 +629,7 @@ export const ModernHojaDeRuta = () => {
                       <ModernRestaurantSection
                         eventData={eventData}
                         onUpdateEventData={setEventData}
+                        accommodations={accommodations}
                       />
                     </TabsContent>
                   </motion.div>
