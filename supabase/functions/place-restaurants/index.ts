@@ -12,7 +12,11 @@ serve(async (req) => {
   }
 
   try {
-    const { location, radius = 2000, maxResults = 20, placeId, details = false } = await req.json();
+    console.log('Place restaurants function called with method:', req.method);
+    const body = await req.json();
+    console.log('Request body:', JSON.stringify(body, null, 2));
+    
+    const { location, radius = 2000, maxResults = 20, placeId, details = false } = body;
 
     // Get Google Maps API key directly from environment
     const apiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');

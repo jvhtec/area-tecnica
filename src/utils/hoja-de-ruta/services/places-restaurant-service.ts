@@ -16,10 +16,21 @@ export class PlacesRestaurantService {
     maxResults: number = 20
   ): Promise<Restaurant[]> {
     try {
+      console.log('SearchRestaurantsNearVenue called with:', { venueAddress, radius, maxResults });
+      
+      if (!venueAddress?.trim()) {
+        console.warn('No venue address provided');
+        return [];
+      }
+
       const cacheKey = `${venueAddress.trim().toLowerCase()}::${radius}::${maxResults}`;
       const cached = this.restaurantCache.get(cacheKey);
-      if (cached) return cached;
+      if (cached) {
+        console.log('Returning cached results for:', cacheKey);
+        return cached;
+      }
 
+      console.log('Calling Supabase function place-restaurants');
       // Use Supabase edge function for restaurant search
       const { data, error } = await supabase.functions.invoke('place-restaurants', {
         body: { 
@@ -29,16 +40,24 @@ export class PlacesRestaurantService {
         },
       });
 
-      if (!error && data?.restaurants) {
+      console.log('Supabase function response:', { data, error });
+
+      if (error) {
+        console.error('Supabase function error:', error);
+        return [];
+      }
+
+      if (data?.restaurants) {
+        console.log('Found restaurants:', data.restaurants.length);
         const restaurants = data.restaurants.map(this.formatRestaurantData);
         this.restaurantCache.set(cacheKey, restaurants);
         return restaurants;
       }
 
-      console.warn('Restaurant search function failed:', error);
+      console.warn('No restaurants in response:', data);
       return [];
     } catch (e) {
-      console.warn('searchRestaurantsNearVenue failed:', e);
+      console.error('searchRestaurantsNearVenue failed:', e);
       return [];
     }
   }
