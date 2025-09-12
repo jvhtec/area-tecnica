@@ -53,7 +53,11 @@ const Layout = () => {
   // Subscribe to route-specific tables whenever the route changes
   useEffect(() => {
     if (requiredTables.length > 0) {
-      forceSubscribe(requiredTables);
+      const subscriptionObjects = requiredTables.map(table => ({
+        table: table,
+        queryKey: table
+      }));
+      forceSubscribe(subscriptionObjects);
     }
   }, [location.pathname, requiredTables, forceSubscribe]);
 

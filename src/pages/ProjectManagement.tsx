@@ -39,7 +39,11 @@ const ProjectManagement = () => {
   
   // Force subscription to required tables
   useEffect(() => {
-    forceSubscribe(['jobs', 'job_assignments', 'job_departments']);
+    forceSubscribe([
+      { table: 'jobs', queryKey: 'jobs' },
+      { table: 'job_assignments', queryKey: 'job_assignments' },
+      { table: 'job_departments', queryKey: 'job_departments' }
+    ]);
   }, [forceSubscribe]);
 
   // Use optimized jobs hook with built-in filtering and caching

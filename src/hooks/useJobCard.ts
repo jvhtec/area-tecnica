@@ -251,6 +251,15 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
     });
   };
 
+  // Sync with job prop updates
+  useEffect(() => {
+    setAssignments(job.job_assignments || []);
+  }, [job.job_assignments]);
+
+  useEffect(() => {
+    setDocuments(job.job_documents || []);
+  }, [job.job_documents]);
+
   return {
     // Styling
     borderColor,
@@ -299,11 +308,3 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
     updateFolderStatus
   };
 };
-  // Sync with job prop updates
-  useEffect(() => {
-    setAssignments(job.job_assignments || []);
-  }, [job.job_assignments]);
-
-  useEffect(() => {
-    setDocuments(job.job_documents || []);
-  }, [job.job_documents]);
