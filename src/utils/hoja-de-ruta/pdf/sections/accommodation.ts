@@ -146,6 +146,9 @@ export class AccommodationSection {
           const destUrl = MapService.generateDestinationUrl(accommodation.address);
           const qrCode = await QRService.generateQRCode(destUrl);
           this.pdfDoc.addImage(qrCode, "PNG", qrX, qrY, qrSize, qrSize);
+          
+          // Make QR code clickable
+          this.pdfDoc.addLink(destUrl, qrX, qrY, qrSize, qrSize);
 
           // QR captions
           this.pdfDoc.setText(9, [125, 1, 1]);

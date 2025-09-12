@@ -153,6 +153,9 @@ export class TravelSection {
       const pickupQrDataUrl = await QRService.generateQRCode(pickupUrl);
       if (pickupQrDataUrl) {
         this.pdfDoc.addImage(pickupQrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+        
+        // Make QR code clickable
+        this.pdfDoc.addLink(pickupUrl, qrX, qrY, qrSize, qrSize);
 
         // Caption below QR (kept simple to avoid overflow)
         this.pdfDoc.setText(9, [125, 1, 1]);

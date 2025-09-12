@@ -105,4 +105,13 @@ export class PDFDocument {
   getLastAutoTableY(): number {
     return this.doc.lastAutoTable?.finalY || 0;
   }
+
+  // Add clickable link to PDF
+  addLink(url: string, x: number, y: number, width: number, height: number): void {
+    try {
+      this.doc.link(x, y, width, height, { url });
+    } catch (error) {
+      console.error('Error adding link to PDF:', error);
+    }
+  }
 }

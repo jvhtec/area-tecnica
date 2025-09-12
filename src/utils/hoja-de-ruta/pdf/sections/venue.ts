@@ -140,6 +140,10 @@ export class VenueSection {
         const destUrl = MapService.generateDestinationUrl(eventData.venue.address);
         const qrData = await QRService.generateQRCode(destUrl);
         this.pdfDoc.addImage(qrData, 'PNG', qrX, qrY, qrSize, qrSize);
+        
+        // Make QR code clickable
+        this.pdfDoc.addLink(destUrl, qrX, qrY, qrSize, qrSize);
+        
         this.pdfDoc.setText(8, [51, 51, 51]);
         this.pdfDoc.addText('Escanea para direcciones', qrX, qrY + qrSize + 6);
       } catch (error) {
