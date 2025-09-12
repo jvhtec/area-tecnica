@@ -6,183 +6,72 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log('Place restaurants function called with method:', req.method);
+  console.log('Function called with method:', req.method);
   
   if (req.method === 'OPTIONS') {
-    console.log('Handling CORS preflight');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('Processing restaurant search request');
     const body = await req.json();
-    console.log('Request body:', JSON.stringify(body, null, 2));
+    console.log('Request body:', body);
     
-    const { location, radius = 2000, maxResults = 20, placeId, details = false } = body;
+    const { location, radius = 2000, maxResults = 20 } = body;
 
-    // Get Google Maps API key directly from environment
-    const apiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
-    
-    if (!apiKey) {
-      console.error('Google Maps API key not found in environment');
-      return new Response(
-        JSON.stringify({ error: 'API key not available' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log('API key found, proceeding with search');
-
-    // If requesting details for a specific place
-    if (details && placeId) {
-      console.log('Requesting place details for:', placeId);
-      const detailsUrl = `https://places.googleapis.com/v1/places/${placeId}`;
-      
-      const detailsResponse = await fetch(detailsUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask': 'id,displayName,formattedAddress,rating,priceLevel,types,internationalPhoneNumber,websiteUri,location,photos'
-        }
-      });
-
-      if (!detailsResponse.ok) {
-        console.error('Place details API error:', detailsResponse.status);
-        const errorText = await detailsResponse.text();
-        console.error('Error response:', errorText);
-        throw new Error(`Place details API error: ${detailsResponse.status}`);
-      }
-
-      const detailsData = await detailsResponse.json();
-      
-      return new Response(
-        JSON.stringify({ restaurant: detailsData }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Search for restaurants near location
-    if (!location) {
-      console.error('No location provided');
-      return new Response(
-        JSON.stringify({ error: 'Location is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log('Geocoding location:', location);
-    // First, geocode the location to get coordinates
-    const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(location)}&key=${apiKey}`;
-    
-    const geocodeResponse = await fetch(geocodeUrl);
-    const geocodeData = await geocodeResponse.json();
-    
-    console.log('Geocode response status:', geocodeData.status);
-    console.log('Geocode results count:', geocodeData.results?.length || 0);
-    
-    if (!geocodeData.results || geocodeData.results.length === 0) {
-      console.error('Location not found:', geocodeData);
-      return new Response(
-        JSON.stringify({ error: 'Location not found', details: geocodeData }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const { lat, lng } = geocodeData.results[0].geometry.location;
-    console.log('Coordinates:', { lat, lng });
-
-    // Search for nearby restaurants using Places API (New)
-    const searchUrl = 'https://places.googleapis.com/v1/places:searchNearby';
-    
-    console.log('Searching for restaurants near coordinates');
-    const searchResponse = await fetch(searchUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.rating,places.priceLevel,places.types,places.internationalPhoneNumber,places.websiteUri,places.location,places.photos'
-      },
-      body: JSON.stringify({
-        includedPrimaryTypes: ['restaurant'],
-        maxResultCount: Math.min(maxResults, 20),
-        rankPreference: 'DISTANCE',
-        locationRestriction: {
-          circle: {
-            center: {
-              latitude: lat,
-              longitude: lng
-            },
-            radius: radius
-          }
-        },
-        languageCode: 'es',
-        regionCode: 'ES'
-      })
-    });
-
-    console.log('Places API response status:', searchResponse.status);
-
-    if (!searchResponse.ok) {
-      const errorText = await searchResponse.text();
-      console.error('Places search API error:', searchResponse.status, errorText);
-      throw new Error(`Places search API error: ${searchResponse.status} - ${errorText}`);
-    }
-
-    const searchData = await searchResponse.json();
-    const places = searchData.places || [];
-    
-    console.log('Found places:', places.length);
-
-    // Calculate distances and format data
-    const restaurants = places.map((place: any) => {
-      const distance = calculateDistance(
-        lat, lng,
-        place.location.latitude, place.location.longitude
-      );
-
-      // Get photos if available
-      let photos: string[] = [];
-      if (place.photos && place.photos.length > 0) {
-        photos = place.photos.slice(0, 3).map((photo: any) => photo.name);
-      }
-
-      return {
-        id: place.id,
-        place_id: place.id,
-        name: place.displayName?.text || '',
-        formatted_address: place.formattedAddress || '',
-        rating: place.rating,
-        price_level: mapPriceLevel(place.priceLevel),
-        types: place.types || [],
-        formatted_phone_number: place.internationalPhoneNumber,
-        website: place.websiteUri,
+    // Test response
+    const testRestaurants = [
+      {
+        id: "test-1",
+        place_id: "test-1",
+        name: "Test Restaurant 1",
+        formatted_address: "Test Address 1, Madrid, Spain",
+        rating: 4.5,
+        price_level: 2,
+        types: ["restaurant", "food"],
+        formatted_phone_number: "+34 123 456 789",
+        website: "https://test1.com",
         geometry: {
           location: {
-            lat: place.location.latitude,
-            lng: place.location.longitude
+            lat: 40.4168,
+            lng: -3.7038
           }
         },
-        distance,
-        photos
-      };
-    });
+        distance: 500,
+        photos: []
+      },
+      {
+        id: "test-2", 
+        place_id: "test-2",
+        name: "Test Restaurant 2",
+        formatted_address: "Test Address 2, Madrid, Spain",
+        rating: 4.2,
+        price_level: 1,
+        types: ["restaurant", "food"],
+        formatted_phone_number: "+34 987 654 321",
+        website: "https://test2.com",
+        geometry: {
+          location: {
+            lat: 40.4178,
+            lng: -3.7048
+          }
+        },
+        distance: 750,
+        photos: []
+      }
+    ];
 
-    // Sort by distance
-    restaurants.sort((a: any, b: any) => a.distance - b.distance);
-
-    console.log('Returning restaurants:', restaurants.length);
+    console.log('Returning test data');
+    
     return new Response(
-      JSON.stringify({ restaurants }),
+      JSON.stringify({ restaurants: testRestaurants }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('Error in place-restaurants function:', error);
-    console.error('Error stack:', error.stack);
+    console.error('Error:', error);
     return new Response(
       JSON.stringify({ 
-        error: 'Failed to search restaurants', 
+        error: 'Function error', 
         details: error.message 
       }),
       { 
@@ -192,30 +81,3 @@ serve(async (req) => {
     );
   }
 });
-
-// Calculate distance between two coordinates in meters
-function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371000; // Earth's radius in meters
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-            Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return Math.round(R * c);
-}
-
-// Map price level enum to numeric value
-function mapPriceLevel(priceLevel: string | undefined): number | undefined {
-  if (!priceLevel) return undefined;
-  
-  const priceLevelMap: { [key: string]: number } = {
-    'PRICE_LEVEL_FREE': 0,
-    'PRICE_LEVEL_INEXPENSIVE': 1,
-    'PRICE_LEVEL_MODERATE': 2,
-    'PRICE_LEVEL_EXPENSIVE': 3,
-    'PRICE_LEVEL_VERY_EXPENSIVE': 4
-  };
-  
-  return priceLevelMap[priceLevel] ?? undefined;
-}
