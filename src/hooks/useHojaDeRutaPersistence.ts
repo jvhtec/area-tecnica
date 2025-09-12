@@ -88,11 +88,40 @@ export const useHojaDeRutaPersistence = (
 
       console.log("🔄 FETCH: Transforming data to frontend format");
 
+      // Attempt to get venue from the job's location as the primary source
+      let venueFromJob: { name?: string; address?: string; coordinates?: { lat: number; lng: number } } | null = null;
+      try {
+        const { data: jobRec, error: jobErr } = await supabase
+          .from('jobs')
+          .select('location_id')
+          .eq('id', jobId)
+          .maybeSingle();
+
+        if (!jobErr && jobRec?.location_id) {
+          const { data: loc, error: locErr } = await supabase
+            .from('locations')
+            .select('name, formatted_address, latitude, longitude')
+            .eq('id', jobRec.location_id)
+            .maybeSingle();
+          if (!locErr && loc) {
+            venueFromJob = {
+              name: loc.name || undefined,
+              address: (loc.formatted_address || loc.name) || undefined,
+              coordinates: (typeof loc.latitude === 'number' && typeof loc.longitude === 'number')
+                ? { lat: loc.latitude, lng: loc.longitude }
+                : undefined,
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('FETCH: Unable to read job location, falling back to hoja_de_ruta venue:', e);
+      }
+
       // Transform the data back to the frontend format
       const eventData: EventData = {
         eventName: mainData.event_name || '',
         eventDates: mainData.event_dates || '',
-        venue: {
+        venue: venueFromJob || {
           name: mainData.venue_name || '',
           address: mainData.venue_address || '',
           coordinates: mainData.venue_latitude && mainData.venue_longitude ? {

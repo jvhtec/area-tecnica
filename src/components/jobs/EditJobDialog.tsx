@@ -44,6 +44,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
   const [timezone, setTimezone] = useState(job.timezone || "Europe/Madrid");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
+  const [isVenueBusy, setIsVenueBusy] = useState(false);
   
   // Venue-related state
   const [venueName, setVenueName] = useState("");
@@ -227,7 +228,9 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
         description: "The job has been updated.",
       });
       
+      // Refresh jobs and Hoja de Ruta that depends on the job location
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["hoja-de-ruta", job.id] });
       onOpenChange(false);
     } catch (error: any) {
       console.error("Error updating job:", error);
@@ -276,6 +279,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
               <PlaceAutocomplete
                 value={venueName}
                 onSelect={handleVenueSelect}
+                onBusyChange={setIsVenueBusy}
                 placeholder="Search for venue (WiZink Center Madrid, etc.)"
                 label="Venue Name"
                 className="w-full"
@@ -379,7 +383,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading || isVenueBusy}>
               {isLoading ? "Saving..." : "Save Changes"}
             </Button>
           </div>

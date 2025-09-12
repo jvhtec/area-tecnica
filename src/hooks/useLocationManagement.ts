@@ -57,7 +57,7 @@ export const useLocationManagement = () => {
     // First try to get the existing location by name
     const { data: existingLocation, error: fetchError } = await supabase
       .from('locations')
-      .select('id')
+      .select('id, formatted_address, latitude, longitude, google_place_id')
       .eq('name', location.name)
       .maybeSingle();
 
@@ -66,9 +66,31 @@ export const useLocationManagement = () => {
       throw fetchError;
     }
 
-    // If location exists, return its ID
+    // If location exists, update missing details if we have better data
     if (existingLocation) {
       console.log("Found existing location:", existingLocation);
+      const needsUpdate = (
+        (location.address && location.address !== existingLocation.formatted_address) ||
+        (location.coordinates?.lat && location.coordinates?.lat !== existingLocation.latitude) ||
+        (location.coordinates?.lng && location.coordinates?.lng !== existingLocation.longitude) ||
+        (location.place_id && location.place_id !== existingLocation.google_place_id)
+      );
+      
+      if (needsUpdate) {
+        console.log("Updating existing location details with new info");
+        const { error: updateError } = await supabase
+          .from('locations')
+          .update({
+            formatted_address: location.address ?? existingLocation.formatted_address,
+            latitude: location.coordinates?.lat ?? existingLocation.latitude,
+            longitude: location.coordinates?.lng ?? existingLocation.longitude,
+            google_place_id: location.place_id ?? existingLocation.google_place_id,
+          })
+          .eq('id', existingLocation.id);
+        if (updateError) {
+          console.error("Error updating existing location:", updateError);
+        }
+      }
       return existingLocation.id;
     }
 

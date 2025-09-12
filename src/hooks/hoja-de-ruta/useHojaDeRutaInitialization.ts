@@ -28,6 +28,7 @@ export const useHojaDeRutaInitialization = (
         .from('jobs')
         .select(`
           *,
+          location:locations(name, formatted_address, latitude, longitude),
           job_assignments(
             *,
             profiles:technician_id(first_name, last_name)
@@ -86,8 +87,11 @@ export const useHojaDeRutaInitialization = (
         eventName: jobData.title || "",
         eventDates,
         venue: {
-          name: jobData.venue || "",
-          address: jobData.location || "",
+          name: jobData.location?.name || "",
+          address: jobData.location?.formatted_address || "",
+          coordinates: jobData.location?.latitude != null && jobData.location?.longitude != null
+            ? { lat: jobData.location.latitude, lng: jobData.location.longitude }
+            : undefined,
         },
         contacts: jobData.client_name ? [{
           name: jobData.client_name,
@@ -176,9 +180,13 @@ export const useHojaDeRutaInitialization = (
           eventName: savedEventData?.eventName || jobData.title || "",
           eventDates: savedEventData?.eventDates || eventDates,
           venue: {
-            name: savedEventData?.venue?.name || jobData.venue || "",
-            address: savedEventData?.venue?.address || jobData.location || "",
-            coordinates: savedEventData?.venue?.coordinates
+            name: savedEventData?.venue?.name || jobData.location?.name || "",
+            address: savedEventData?.venue?.address || jobData.location?.formatted_address || "",
+            coordinates: savedEventData?.venue?.coordinates || (
+              jobData.location?.latitude != null && jobData.location?.longitude != null
+                ? { lat: jobData.location.latitude, lng: jobData.location.longitude }
+                : undefined
+            )
           },
           contacts: savedEventData?.contacts?.length > 0 
             ? savedEventData.contacts
@@ -229,8 +237,11 @@ export const useHojaDeRutaInitialization = (
           eventName: jobData.title || "",
           eventDates,
           venue: {
-            name: jobData.venue || "",
-            address: jobData.location || "",
+            name: jobData.location?.name || "",
+            address: jobData.location?.formatted_address || "",
+            coordinates: jobData.location?.latitude != null && jobData.location?.longitude != null
+              ? { lat: jobData.location.latitude, lng: jobData.location.longitude }
+              : undefined,
           },
           contacts: jobData.client_name ? [{
             name: jobData.client_name,

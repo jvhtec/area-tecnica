@@ -19,6 +19,7 @@ interface PlaceAutocompleteProps {
   placeholder?: string;
   label?: string;
   className?: string;
+  onBusyChange?: (busy: boolean) => void;
 }
 
 interface PredictionItem {
@@ -33,6 +34,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   placeholder = 'Buscar lugar (establecimiento, venue, etc.)',
   label = 'Lugar',
   className,
+  onBusyChange,
 }) => {
   const [inputValue, setInputValue] = useState(value || '');
   const [suggestions, setSuggestions] = useState<PredictionItem[]>([]);
@@ -102,6 +104,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
     }
 
     setIsLoading(true);
+    onBusyChange?.(true);
     console.log('PlacesAutocomplete: Starting API search...');
 
     try {
@@ -182,6 +185,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
       setShowSuggestions(false);
     } finally {
       setIsLoading(false);
+      onBusyChange?.(false);
     }
   };
 
@@ -196,6 +200,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
     }
     
     try {
+      onBusyChange?.(true);
       const res = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
         headers: {
           'X-Goog-Api-Key': key,
@@ -232,6 +237,8 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
       onSelect(fallbackResult);
       setInputValue(fallbackName);
       setShowSuggestions(false);
+    } finally {
+      onBusyChange?.(false);
     }
   };
 
@@ -259,6 +266,13 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
           onChange={handleInputChange}
           placeholder={placeholder}
           className="pl-9"
+          onKeyDown={(e) => {
+            // Prevent form submission when pressing Enter inside the autocomplete
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }}
           onFocus={() => { if (!apiKey) { fetchApiKey(); } if (suggestions.length > 0) setShowSuggestions(true); }}
         />
         <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -275,6 +289,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
                 <Button
                   key={s.place_id}
                   variant="ghost"
+                  type="button"
                   className="w-full h-auto justify-start px-3 py-2 text-left"
                   onClick={() => handleSelect(s)}
                 >
