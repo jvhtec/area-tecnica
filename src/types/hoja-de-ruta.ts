@@ -130,12 +130,21 @@ export interface EventData {
     equipmentLogistics?: string;
   };
   schedule?: string;
+  // Structured program schedule (component-driven)
+  programSchedule?: ProgramRow[];
   powerRequirements?: string;
   auxiliaryNeeds?: string;
   weather?: WeatherData[];
   restaurants?: Restaurant[];
   selectedRestaurants?: string[];
   metadata?: HojaDeRutaMetadata;
+}
+
+export interface ProgramRow {
+  time: string; // HH:mm
+  item: string;
+  dept?: string;
+  notes?: string;
 }
 
 export interface HojaDeRutaTemplate {

@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
@@ -495,27 +495,6 @@ export const ModernHojaDeRuta = () => {
               transition={{ delay: 0.1 }}
             >
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                {/* Modern Tab Navigation */}
-                <Card className="border-2">
-                  <CardContent className="p-6">
-                    <TabsList className="grid grid-cols-9 w-full h-auto p-1 bg-muted/50">
-                      {tabConfig.map((tab) => {
-                        const Icon = tab.icon;
-                        return (
-                          <TabsTrigger
-                            key={tab.id}
-                            value={tab.id}
-                            className="flex-col gap-2 py-3 data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                          >
-                            <Icon className={`w-5 h-5 ${tab.color}`} />
-                            <span className="text-xs font-medium">{tab.label}</span>
-                          </TabsTrigger>
-                        );
-                      })}
-                    </TabsList>
-                  </CardContent>
-                </Card>
-
                 {/* Tab Contents */}
                 <AnimatePresence mode="wait">
                   <motion.div

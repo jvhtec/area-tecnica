@@ -174,7 +174,9 @@ export class ContentSections {
   }
 
   hasProgramData(eventData: EventData): boolean {
-    return eventData.schedule && eventData.schedule.trim().length > 0;
+    const hasStructured = Array.isArray(eventData.programSchedule) && eventData.programSchedule.length > 0;
+    const hasLegacy = !!(eventData.schedule && eventData.schedule.trim().length > 0);
+    return hasStructured || hasLegacy;
   }
 
   hasRestaurantsData(eventData: EventData): boolean {

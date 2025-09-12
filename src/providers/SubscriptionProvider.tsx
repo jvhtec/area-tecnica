@@ -55,6 +55,7 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
   const lastConnectionStatusRef = React.useRef<string>(state.connectionStatus);
   const tokenManager = TokenManager.getInstance();
   const connectionCheckIntervalRef = React.useRef<number | null>(null);
+  const lastStatsRef = React.useRef<{ status: 'connected' | 'disconnected' | 'connecting'; count: number }>({ status: 'connecting', count: 0 });
   const [isLeader, setIsLeader] = useState(true);
   const multiTabCoordinator = MultiTabCoordinator.getInstance(queryClient);
 
@@ -139,20 +140,15 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
       }));
     };
     
-    // Update state with functions
+    // Update state with functions and initial connection status in a single update
     setState(prev => ({
       ...prev,
       refreshSubscriptions,
       invalidateQueries,
       forceRefresh,
       forceSubscribe,
-      lastRefreshTime: Date.now()
-    }));
-    
-    // Set initial connection status - simplified
-    setState(prev => ({
-      ...prev, 
-      connectionStatus: 'connecting'
+      lastRefreshTime: Date.now(),
+      connectionStatus: 'connecting',
     }));
     
     // Clear any existing interval
@@ -181,13 +177,19 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
         lastConnectionStatusRef.current = 'connected';
       }
       
-      setState(prev => ({
-        ...prev,
-        connectionStatus: stats.circuitBreakerOpen ? 'disconnected' : 'connected',
-        subscriptionCount: stats.subscriptionCount,
-        activeSubscriptions: [], // Simplified for performance
-        subscriptionsByTable: {}, // Simplified for performance
-      }));
+      const nextStatus: 'connected' | 'disconnected' = stats.circuitBreakerOpen ? 'disconnected' : 'connected';
+      const nextCount = stats.subscriptionCount;
+      // Only update state if something actually changed to avoid render loops
+      if (lastStatsRef.current.status !== nextStatus || lastStatsRef.current.count !== nextCount) {
+        lastStatsRef.current = { status: nextStatus, count: nextCount };
+        setState(prev => ({
+          ...prev,
+          connectionStatus: nextStatus,
+          subscriptionCount: nextCount,
+          activeSubscriptions: [], // Simplified for performance
+          subscriptionsByTable: {}, // Simplified for performance
+        }));
+      }
     }, intervalTime);
     
     return () => {

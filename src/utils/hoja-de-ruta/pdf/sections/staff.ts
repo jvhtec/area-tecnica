@@ -40,13 +40,13 @@ export class StaffSection {
         fontStyle: 'bold'
       },
       columnStyles: {
-        0: { cellWidth: 35 }, // Nombre
-        1: { cellWidth: 40 }, // Apellidos
-        2: { cellWidth: 35 }, // Posición
-        3: { cellWidth: 25 }, // DNI
+        0: { cellWidth: 30 }, // Nombre
+        1: { cellWidth: 45 }, // Apellidos
+        2: { cellWidth: 32 }, // Posición
+        3: { cellWidth: 22 }, // DNI
       },
       margin: { left: 20, right: 20 },
-      tableWidth: 'auto'
+      tableWidth: 'wrap'
     });
 
     return this.pdfDoc.getLastAutoTableY() + 10;
