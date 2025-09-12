@@ -133,6 +133,8 @@ export interface EventData {
   powerRequirements?: string;
   auxiliaryNeeds?: string;
   weather?: WeatherData[];
+  restaurants?: Restaurant[];
+  selectedRestaurants?: string[];
   metadata?: HojaDeRutaMetadata;
 }
 
@@ -196,6 +198,25 @@ export interface EnhancedRoomAssignment extends RoomAssignment {
 export interface EnhancedEventData extends ComprehensiveEventData {
   metadata?: HojaDeRutaMetadata;
   accommodations?: Accommodation[];
+}
+
+export interface Restaurant {
+  id: string;
+  name: string;
+  address: string;
+  rating?: number;
+  priceLevel?: number;
+  photos?: string[];
+  cuisine?: string[];
+  phone?: string;
+  website?: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
+  distance?: number;
+  googlePlaceId: string;
+  isSelected?: boolean;
 }
 
 export interface ImagePreviews {

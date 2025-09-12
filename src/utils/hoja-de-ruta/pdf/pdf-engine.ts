@@ -187,6 +187,12 @@ export class PDFEngine {
         this.contentSections.addProgramSection(this.options.eventData, currentY);
       }
 
+      // 13. Restaurantes
+      if (this.contentSections.hasRestaurantsData(this.options.eventData)) {
+        const currentY = this.headerSection.addSectionHeader("Restaurantes");
+        await this.contentSections.addRestaurantsSection(this.options.eventData, currentY);
+      }
+
       // Add Sector-Pro footer to all pages
       await FooterService.addFooterToAllPages(this.pdfDoc);
 

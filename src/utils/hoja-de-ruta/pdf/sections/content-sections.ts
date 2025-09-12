@@ -13,6 +13,7 @@ import { RoomingSection } from './rooming';
 import { PowerSection } from './power';
 import { AuxNeedsSection } from './aux-needs';
 import { ProgramSection } from './program';
+import { RestaurantsSection } from './restaurants';
 
 export class ContentSections {
   private eventSection: EventSection;
@@ -28,6 +29,7 @@ export class ContentSections {
   private powerSection: PowerSection;
   private auxNeedsSection: AuxNeedsSection;
   private programSection: ProgramSection;
+  private restaurantsSection: RestaurantsSection;
 
   constructor(private pdfDoc: PDFDocument) {
     this.eventSection = new EventSection(pdfDoc);
@@ -43,6 +45,7 @@ export class ContentSections {
     this.powerSection = new PowerSection(pdfDoc);
     this.auxNeedsSection = new AuxNeedsSection(pdfDoc);
     this.programSection = new ProgramSection(pdfDoc);
+    this.restaurantsSection = new RestaurantsSection(pdfDoc);
   }
 
   addContactsSection(eventData: EventData, yPosition: number): number {
@@ -111,6 +114,11 @@ export class ContentSections {
     return this.programSection.addProgramSection(eventData, yPosition);
   }
 
+  async addRestaurantsSection(eventData: EventData, yPosition: number): Promise<number> {
+    const restaurants = (eventData.restaurants || []).filter(r => r.isSelected);
+    return await this.restaurantsSection.addRestaurantsSection(restaurants, yPosition);
+  }
+
   // Data validation methods
   hasEventDetailsData(eventData: EventData): boolean {
     return !!(eventData.eventName || eventData.clientName || eventData.eventDates || eventData.eventStartTime);
@@ -167,5 +175,10 @@ export class ContentSections {
 
   hasProgramData(eventData: EventData): boolean {
     return eventData.schedule && eventData.schedule.trim().length > 0;
+  }
+
+  hasRestaurantsData(eventData: EventData): boolean {
+    return eventData.restaurants && 
+           eventData.restaurants.some(r => r.isSelected) || false;
   }
 }

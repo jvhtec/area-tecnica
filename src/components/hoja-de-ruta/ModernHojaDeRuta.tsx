@@ -38,6 +38,7 @@ import {
   MoreHorizontal,
   RefreshCw,
   Database,
+  UtensilsCrossed,
   AlertCircle,
   FileDown,
   Loader2,
@@ -61,6 +62,7 @@ import { ModernTemplateManager } from "./components/ModernTemplateManager";
 import { ModernStatusIndicator } from "./components/ModernStatusIndicator";
 import { ModernProgressTracker } from "./components/ModernProgressTracker";
 import { ModernWeatherSection } from "./sections/ModernWeatherSection";
+import { ModernRestaurantSection } from "./sections/ModernRestaurantSection";
 
 export const ModernHojaDeRuta = () => {
   const { toast } = useToast();
@@ -291,6 +293,7 @@ export const ModernHojaDeRuta = () => {
     { id: "accommodation", label: "Alojamiento", icon: Bed, color: "text-pink-600" },
     { id: "logistics", label: "Logística", icon: Building2, color: "text-indigo-600" },
     { id: "schedule", label: "Programa", icon: Activity, color: "text-red-600" },
+    { id: "restaurants", label: "Restaurantes", icon: UtensilsCrossed, color: "text-emerald-600" },
   ];
 
   if (isLoadingHojaDeRuta) {
@@ -618,6 +621,13 @@ export const ModernHojaDeRuta = () => {
                       <ModernScheduleSection
                         eventData={eventData}
                         setEventData={setEventData}
+                      />
+                    </TabsContent>
+
+                    <TabsContent value="restaurants" className="mt-0">
+                      <ModernRestaurantSection
+                        eventData={eventData}
+                        onUpdateEventData={setEventData}
                       />
                     </TabsContent>
                   </motion.div>
