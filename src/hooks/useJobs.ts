@@ -11,7 +11,9 @@ export const useJobs = () => {
   useMultiTableSubscription([
     { table: 'jobs', queryKey: 'jobs' },
     { table: 'job_date_types', queryKey: 'jobs' },
-    { table: 'job_assignments', queryKey: 'jobs' }
+    { table: 'job_assignments', queryKey: 'jobs' },
+    { table: 'job_departments', queryKey: 'jobs' },
+    { table: 'job_documents', queryKey: 'jobs' },
   ]);
 
   return useQuery({

@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Assignment } from "@/types/assignment";
 import { toast } from "sonner";
@@ -9,6 +10,7 @@ import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
 export const useJobAssignmentsRealtime = (jobId: string) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isRemoving, setIsRemoving] = useState<Record<string, boolean>>({});
+  const queryClient = useQueryClient();
   
   // Use our enhanced real-time query hook for better reliability
   const { 
@@ -85,6 +87,8 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
           console.log(`Assignment change detected for job ${jobId}:`, payload);
           // Force immediate refresh
           manualRefresh();
+          // Also invalidate jobs to update JobCard lists that depend on job relations
+          queryClient.invalidateQueries({ queryKey: ["jobs"] });
         }
       )
       .subscribe();
@@ -99,6 +103,23 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
 
   const addAssignment = async (technicianId: string, soundRole: string, lightsRole: string) => {
     try {
+      // Optimistic cache update for 'jobs' list so cards update instantly
+      queryClient.setQueryData(['jobs'], (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((j) => {
+          if (j.id !== jobId) return j;
+          const optimist = {
+            job_id: jobId,
+            technician_id: technicianId,
+            sound_role: soundRole !== 'none' ? soundRole : null,
+            lights_role: lightsRole !== 'none' ? lightsRole : null,
+            profiles: { first_name: '', last_name: '' },
+          };
+          const current = Array.isArray(j.job_assignments) ? j.job_assignments : [];
+          return { ...j, job_assignments: [...current, optimist] };
+        });
+      });
+
       const { error } = await supabase
         .from('job_assignments')
         .insert({
@@ -126,6 +147,8 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
       }
 
       toast.success("Assignment added successfully");
+      // Invalidate jobs so JobCard lists refresh assignments relation
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
     } catch (error: any) {
       console.error('Error in addAssignment:', error);
       toast.error("Failed to add assignment");
@@ -135,6 +158,19 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
   const removeAssignment = async (technicianId: string) => {
     try {
       setIsRemoving(prev => ({ ...prev, [technicianId]: true }));
+
+      // Optimistic cache update for 'jobs'
+      queryClient.setQueryData(['jobs'], (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((j) => {
+          if (j.id !== jobId) return j;
+          const current = Array.isArray(j.job_assignments) ? j.job_assignments : [];
+          return {
+            ...j,
+            job_assignments: current.filter((a: any) => a.technician_id !== technicianId),
+          };
+        });
+      });
 
       // Get the assignment details before removal for Flex cleanup
       const assignmentToRemove = assignments.find(a => a.technician_id === technicianId);
@@ -164,6 +200,8 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
       }
 
       toast.success("Assignment removed successfully");
+      // Invalidate jobs so JobCard lists refresh assignments relation
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
     } catch (error: any) {
       console.error('Error in removeAssignment:', error);
       toast.error("Failed to remove assignment");

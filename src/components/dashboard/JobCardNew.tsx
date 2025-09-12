@@ -145,6 +145,43 @@ export function JobCardNew({
     }
   };
 
+  // Keep local state in sync with incoming props
+  useEffect(() => {
+    setAssignments(job.job_assignments || []);
+  }, [job.job_assignments]);
+
+  useEffect(() => {
+    setDocuments(job.job_documents || []);
+  }, [job.job_documents]);
+
+  // Realtime subscription for assignment changes (instant UI refresh)
+  useEffect(() => {
+    if (!job?.id) return;
+    const channel = supabase
+      .channel(`dashboard-card-assignments-${job.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'job_assignments',
+        filter: `job_id=eq.${job.id}`,
+      }, async () => {
+        try {
+          const { data, error } = await supabase
+            .from('job_assignments')
+            .select(`*, profiles(first_name, last_name)`) 
+            .eq('job_id', job.id);
+          if (!error) {
+            setAssignments(data || []);
+          }
+        } catch {}
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [job?.id]);
+
   useEffect(() => {
     async function fetchDateTypes() {
       if (isJobBeingDeleted) return; // Prevent queries during deletion

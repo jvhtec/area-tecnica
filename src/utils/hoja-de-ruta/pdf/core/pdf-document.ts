@@ -59,6 +59,25 @@ export class PDFDocument {
     this.doc.text(text, x, y, options);
   }
 
+  // Split a long text into multiple lines that fit within maxWidth
+  splitText(text: string, maxWidth: number): string[] {
+    try {
+      return this.doc.splitTextToSize(text, maxWidth) as unknown as string[];
+    } catch {
+      return [text];
+    }
+  }
+
+  // Draw wrapped text centered (or aligned) with custom line height
+  addWrappedText(text: string, centerX: number, startY: number, maxWidth: number, lineHeight = 10, align: 'center' | 'left' | 'right' = 'center'): number {
+    const lines = this.splitText(text, maxWidth);
+    lines.forEach((line, idx) => {
+      const y = startY + idx * lineHeight;
+      this.doc.text(line, centerX, y, { align });
+    });
+    return lines.length;
+  }
+
   addTable(options: any): void {
     autoTable(this.doc, options);
   }

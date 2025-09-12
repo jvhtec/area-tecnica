@@ -677,14 +677,12 @@ const PesosTool: React.FC = () => {
       );
 
       const fileName = `Pesos Report - ${selectedJob.title}.pdf`;
-      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-      const filePath = `sound/${selectedJobId}/${crypto.randomUUID()}.pdf`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('task_documents')
-        .upload(filePath, file);
-      
-      if (uploadError) throw uploadError;
+      try {
+        const { uploadJobPdfWithCleanup } = await import('@/utils/jobDocumentsUpload');
+        await uploadJobPdfWithCleanup(selectedJobId, pdfBlob, fileName, 'calculators/pesos');
+      } catch (uploadErr) {
+        throw uploadErr;
+      }
 
       toast({
         title: 'Success',

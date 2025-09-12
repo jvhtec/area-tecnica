@@ -569,13 +569,11 @@ const ConsumosTool: React.FC = () => {
       const fileName = isTourDefaults 
         ? `${tourName} - Sound Power Defaults.pdf`
         : `Sound Power Report - ${selectedJob?.title || 'Report'}.pdf`;
-      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
       
-      // Only upload to storage if we have a job selected (not in tour defaults mode)
+      // Only upload to job documents when a job is selected (not in tour defaults mode)
       if (selectedJobId) {
-        const filePath = `sound/${selectedJobId}/${crypto.randomUUID()}.pdf`;
-        const { error: uploadError } = await supabase.storage.from('task_documents').upload(filePath, file);
-        if (uploadError) throw uploadError;
+        const { uploadJobPdfWithCleanup } = await import('@/utils/jobDocumentsUpload');
+        await uploadJobPdfWithCleanup(selectedJobId, pdfBlob, fileName, 'calculators/consumos');
       }
 
       toast({

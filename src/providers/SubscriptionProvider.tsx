@@ -16,7 +16,7 @@ interface SubscriptionContextType {
   invalidateQueries: (queryKey?: string | string[]) => void;
   lastRefreshTime: number;
   forceRefresh: (tables?: string[]) => void;
-  forceSubscribe: (tables: string[]) => void;
+  forceSubscribe: (tables: Array<{ table: string; queryKey: string | string[]; priority?: 'high' | 'medium' | 'low' }>) => void;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType>({
@@ -121,14 +121,13 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
     };
     
     // Define force subscribe function - simplified for performance
-    const forceSubscribe = (tables: string[]) => {
+    const forceSubscribe = (tables: Array<{ table: string; queryKey: string | string[]; priority?: 'high' | 'medium' | 'low' }>) => {
       if (!tables || tables.length === 0) return;
-      
-      console.log(`Ensuring subscriptions for tables: ${tables.join(', ')}`);
-      
-      // Subscribe to each table with optimized manager
-      tables.forEach(table => {
-        manager.subscribeToTable(table, table, 'medium');
+      const names = tables.map(t => t.table).join(', ');
+      console.log(`Ensuring subscriptions for tables: ${names}`);
+      // Subscribe to each table with correct invalidation key
+      tables.forEach(({ table, queryKey, priority }) => {
+        manager.subscribeToTable(table, queryKey, priority ?? 'medium');
       });
       
       // Update state with current stats

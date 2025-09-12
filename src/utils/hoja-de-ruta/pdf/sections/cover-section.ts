@@ -54,16 +54,22 @@ export class CoverSection {
 
     // Main title
     this.pdfDoc.setText(36, [255, 255, 255]);
-    this.pdfDoc.addText('HOJA DE RUTA', pageWidth / 2, pageHeight / 2 - 20, { align: 'center' });
+    const titleY = pageHeight / 2 - 20;
+    this.pdfDoc.addText('HOJA DE RUTA', pageWidth / 2, titleY, { align: 'center' });
 
-    // Event name
+    // Event name (wrapped to fit margins)
+    const eventName = this.eventData.eventName || this.jobTitle || 'Evento sin título';
     this.pdfDoc.setText(24, [255, 255, 255]);
-    this.pdfDoc.addText(this.eventData.eventName || this.jobTitle || 'Evento sin título', pageWidth / 2, pageHeight / 2 + 20, { align: 'center' });
+    const sideMargin = 30; // 30pt margins on both sides
+    const maxTextWidth = pageWidth - sideMargin * 2;
+    const nameStartY = pageHeight / 2 + 20;
+    const linesUsed = this.pdfDoc.addWrappedText(eventName, pageWidth / 2, nameStartY, maxTextWidth, 12, 'center');
 
-    // Date - use event dates if available, otherwise current date
+    // Date - use event dates if available, otherwise current date (placed after wrapped name)
     this.pdfDoc.setText(14, [255, 255, 255]);
     const displayDate = this.eventData.eventDates || new Date().toLocaleDateString('es-ES');
-    this.pdfDoc.addText(displayDate, pageWidth / 2, pageHeight / 2 + 50, { align: 'center' });
+    const dateY = nameStartY + linesUsed * 12 + 10; // add small gap after name block
+    this.pdfDoc.addText(displayDate, pageWidth / 2, dateY, { align: 'center' });
 
     // Client info
     if (this.eventData.clientName) {

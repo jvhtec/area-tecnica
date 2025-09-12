@@ -1,8 +1,8 @@
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { createQueryKey } from '@/lib/optimized-react-query';
 
@@ -29,13 +29,50 @@ export const useOptimizedJobCard = (
 
   // Local state
   const [collapsed, setCollapsed] = useState(true);
-  const [assignments] = useState(job.job_assignments || []);
-  const [documents] = useState(job.job_documents || []);
+  const [assignments, setAssignments] = useState(job.job_assignments || []);
+  const [documents, setDocuments] = useState(job.job_documents || []);
   const [soundTaskDialogOpen, setSoundTaskDialogOpen] = useState(false);
   const [lightsTaskDialogOpen, setLightsTaskDialogOpen] = useState(false);
   const [videoTaskDialogOpen, setVideoTaskDialogOpen] = useState(false);
   const [editJobDialogOpen, setEditJobDialogOpen] = useState(false);
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
+
+  // Keep local state in sync with incoming job prop updates for instant UI
+  useEffect(() => {
+    setAssignments(job.job_assignments || []);
+  }, [job.job_assignments]);
+
+  useEffect(() => {
+    setDocuments(job.job_documents || []);
+  }, [job.job_documents]);
+
+  // Realtime: subscribe to assignment changes for this job and refresh local state instantly
+  useEffect(() => {
+    if (!job?.id) return;
+    const channel = supabase
+      .channel(`job-card-assignments-${job.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'job_assignments',
+        filter: `job_id=eq.${job.id}`,
+      }, async () => {
+        try {
+          const { data, error } = await supabase
+            .from('job_assignments')
+            .select(`*, profiles(first_name, last_name)`) 
+            .eq('job_id', job.id);
+          if (!error) {
+            setAssignments(data || []);
+          }
+        } catch {}
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [job?.id]);
 
   // Memoized permission checks
   const permissions = useMemo(() => {

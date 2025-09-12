@@ -1,6 +1,8 @@
 
 // Re-export from the unified table subscription hook
 import { useTableSubscription } from './useTableSubscription';
+import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
+import { useEffect } from 'react';
 
 // Export the useTableSubscription hook
 export { useTableSubscription };
@@ -14,6 +16,19 @@ export function useRelatedTablesSubscription(
   schema: string = 'public',
   priority: 'high' | 'medium' | 'low' = 'medium'
 ) {
+  const { forceSubscribe } = useSubscriptionContext();
+
+  // Ensure subscriptions are established for the given tables with the right invalidation key
+  useEffect(() => {
+    try {
+      const entries = tables.map(table => ({ table, queryKey, priority }));
+      forceSubscribe(entries);
+    } catch (e) {
+      console.warn('useRelatedTablesSubscription: forceSubscribe not available:', e);
+    }
+    // We only want to run when tables or key/priority changes
+  }, [JSON.stringify(tables), JSON.stringify(queryKey), priority, forceSubscribe]);
+
   // Create an array of table configurations
   const tableConfigs = tables.map(table => ({
     table,
