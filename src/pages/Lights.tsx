@@ -10,7 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
-import { Scale, Zap, Calendar, FileText } from "lucide-react";
+import { Scale, Zap, Calendar, FileText, Plus } from "lucide-react";
+import type { JobType } from "@/types/job";
 import { Button } from "@/components/ui/button";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
@@ -19,6 +20,7 @@ import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService
 const Lights = () => {
   const navigate = useNavigate();
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
+  const [presetJobType, setPresetJobType] = useState<JobType | undefined>(undefined);
   
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -54,6 +56,21 @@ const Lights = () => {
     };
 
     fetchUserRole();
+  }, []);
+
+  // Keyboard shortcut: c or Cmd/Ctrl+N to open
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const metaN = (e.key.toLowerCase() === 'n') && (e.metaKey || e.ctrlKey);
+      const simpleC = e.key.toLowerCase() === 'c';
+      if ((metaN || simpleC)) {
+        e.preventDefault();
+        setPresetJobType(undefined);
+        setIsJobDialogOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, []);
 
   const getDepartmentJobs = () => {
@@ -131,8 +148,9 @@ const Lights = () => {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <LightsHeader 
-        onCreateJob={() => setIsJobDialogOpen(true)}
+        onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
         department="Luces"
+        canCreate={userRole ? ["admin","management"].includes(userRole) : true}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -196,6 +214,12 @@ const Lights = () => {
         open={isJobDialogOpen}
         onOpenChange={setIsJobDialogOpen}
         currentDepartment={currentDepartment}
+        initialDate={date}
+        initialJobType={presetJobType}
+        onCreated={(job) => {
+          setSelectedJobId(job.id);
+          setIsAssignmentDialogOpen(true);
+        }}
       />
       
 
@@ -216,6 +240,14 @@ const Lights = () => {
           job={selectedJob}
         />
       )}
+
+      {/* Mobile FAB */}
+      <Button 
+        className="sm:hidden fixed bottom-6 right-6 rounded-full h-12 w-12 p-0 shadow-lg"
+        onClick={() => { setPresetJobType(undefined); setIsJobDialogOpen(true); }}
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
     </div>
   );
 };

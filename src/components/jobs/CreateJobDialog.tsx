@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { Loader2 } from "lucide-react";
 import { Department } from "@/types/department";
 import { JobType } from "@/types/job";
 import { SimplifiedJobColorPicker } from "./SimplifiedJobColorPicker";
@@ -52,14 +53,52 @@ interface CreateJobDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentDepartment?: string;
+  initialDate?: Date;
+  initialJobType?: JobType;
+  onCreated?: (job: any) => void;
 }
 
-export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: CreateJobDialogProps) => {
+export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initialDate, initialJobType, onCreated }: CreateJobDialogProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { getOrCreateLocationWithDetails } = useLocationManagement();
   const [locationInput, setLocationInput] = useState("");
+
+  const formatInput = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const getDefaultTimes = () => {
+    const base = initialDate ? new Date(initialDate) : new Date();
+    const start = new Date(base);
+    start.setHours(10, 0, 0, 0);
+    const end = new Date(base);
+    end.setHours(18, 0, 0, 0);
+    return { start: formatInput(start), end: formatInput(end) };
+  };
+
+  const COLOR_PALETTE = [
+    "#ef4444", // red-500
+    "#f97316", // orange-500
+    "#f59e0b", // amber-500
+    "#84cc16", // lime-500
+    "#22c55e", // green-500
+    "#10b981", // emerald-500
+    "#06b6d4", // cyan-500
+    "#0ea5e9", // sky-500
+    "#3b82f6", // blue-500
+    "#8b5cf6", // violet-500
+    "#a855f7", // purple-500
+    "#ec4899", // pink-500
+    "#f43f5e", // rose-500
+  ] as const;
+
+  const getRandomColor = () => {
+    const idx = Math.floor(Math.random() * COLOR_PALETTE.length);
+    return COLOR_PALETTE[idx];
+  };
 
   const {
     register,
@@ -79,14 +118,44 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
         coordinates: undefined,
         place_id: undefined,
       },
-      start_time: new Date().toISOString().slice(0, 16),
-      end_time: new Date().toISOString().slice(0, 16),
-      job_type: "single" as JobType,
+      start_time: getDefaultTimes().start,
+      end_time: getDefaultTimes().end,
+      job_type: (initialJobType ?? "single") as JobType,
       departments: currentDepartment ? [currentDepartment] : [],
-      color: "#7E69AB",
+      color: getRandomColor(),
       timezone: "Europe/Madrid",
     },
   });
+
+  // Reset defaults when opening to reflect latest props
+  const resetWithProps = useCallback(() => {
+    const times = getDefaultTimes();
+    reset({
+      title: "",
+      description: "",
+      location: {
+        name: "",
+        address: "",
+        coordinates: undefined,
+        place_id: undefined,
+      },
+      start_time: times.start,
+      end_time: times.end,
+      job_type: (initialJobType ?? "single") as JobType,
+      departments: currentDepartment ? [currentDepartment] : [],
+      color: getRandomColor(),
+      timezone: "Europe/Madrid",
+    });
+    setLocationInput("");
+  }, [getDefaultTimes, initialJobType, currentDepartment, reset]);
+
+  // Refresh defaults when the dialog opens or when the preset/date changes while closed
+  useEffect(() => {
+    if (open) {
+      resetWithProps();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialDate, initialJobType]);
 
   const onSubmit = useCallback(async (values: z.infer<typeof formSchema>) => {
     if (isSubmitting) return;
@@ -168,6 +237,11 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
         description: "Job created successfully",
       });
 
+      // Let parent know a job was created (for follow-up actions)
+      try {
+        onCreated?.(job);
+      } catch {}
+
       reset();
       onOpenChange(false);
     } catch (error) {
@@ -180,7 +254,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, getOrCreateLocationWithDetails, queryClient, toast, reset, onOpenChange]);
+  }, [isSubmitting, getOrCreateLocationWithDetails, queryClient, toast, reset, onOpenChange, onCreated]);
 
   const departments: Department[] = ["sound", "lights", "video"];
   const selectedDepartments = watch("departments") || [];
@@ -340,9 +414,12 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment }: Creat
             )}
           </div>
 
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Creating..." : "Create Job"}
-          </Button>
+          <div className="w-full flex justify-end">
+            <Button type="submit" disabled={isSubmitting} className="gap-2">
+              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isSubmitting ? "Creating..." : "Create Job"}
+            </Button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

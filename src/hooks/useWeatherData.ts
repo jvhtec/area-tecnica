@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getWeatherForJob } from '@/utils/weather/weatherApi';
+import { getWeatherForJob, parseEventDates } from '@/utils/weather/weatherApi';
 import { WeatherData } from '@/types/hoja-de-ruta';
 
 interface UseWeatherDataProps {
@@ -24,6 +24,22 @@ export const useWeatherData = ({ venue, eventDates, onWeatherUpdate }: UseWeathe
       setError("Se requieren fechas del evento y ubicación para obtener el clima");
       return null;
     }
+
+    // Check forecast horizon (~16 days ahead) and notify if out of range
+    try {
+      const range = parseEventDates(eventDates);
+      if (range) {
+        const today = new Date();
+        const horizon = new Date(today);
+        horizon.setDate(horizon.getDate() + 16);
+        if (range.startDate > horizon) {
+          const msg = `Requested weather starts beyond available forecast horizon: ${eventDates}`;
+          setError(msg);
+          onWeatherUpdate(undefined);
+          return null;
+        }
+      }
+    } catch {}
 
     setIsLoading(true);
     setError(null);

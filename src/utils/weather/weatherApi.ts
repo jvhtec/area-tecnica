@@ -114,12 +114,15 @@ const fetchWeatherFromApi = async (lat: number, lng: number, startDate: Date, en
   const start = formatDate(startDate);
   const end = formatDate(endDate);
 
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_mean,weathercode&timezone=auto&start_date=${start}&end_date=${end}`;
+  // Use precipitation_sum instead of precipitation_probability_mean for better API compatibility
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode&timezone=auto&start_date=${start}&end_date=${end}`;
 
   const response = await fetch(url);
   
   if (!response.ok) {
-    throw new Error(`Weather API failed: ${response.status}`);
+    let detail = '';
+    try { detail = await response.text(); } catch {}
+    throw new Error(`Weather API failed: ${response.status}${detail ? ` - ${detail}` : ''}`);
   }
 
   const data: WeatherApiResponse = await response.json();
@@ -134,7 +137,8 @@ const fetchWeatherFromApi = async (lat: number, lng: number, startDate: Date, en
       weatherCode,
       maxTemp: Math.round(data.daily.temperature_2m_max[index]),
       minTemp: Math.round(data.daily.temperature_2m_min[index]),
-      precipitationProbability: Math.round(data.daily.precipitation_probability_mean[index] || 0),
+      // Approximate precipitation chance: 100% if any precipitation expected, otherwise 0%
+      precipitationProbability: ((data as any).daily?.precipitation_sum?.[index] || 0) > 0 ? 100 : 0,
       icon: weatherInfo.icon
     };
   });
@@ -203,6 +207,19 @@ export const getWeatherForJob = async (
     if (!dateRange) {
       console.log('Could not parse event dates:', eventDates);
       return null;
+    }
+
+    // Respect forecast horizon (~16 days). If range starts beyond horizon, skip request.
+    const today = new Date();
+    const horizon = new Date(today);
+    horizon.setDate(horizon.getDate() + 16);
+    if (dateRange.startDate > horizon) {
+      console.warn('Requested weather starts beyond available forecast horizon:', eventDates);
+      return null;
+    }
+    // Clamp end date to horizon if needed
+    if (dateRange.endDate > horizon) {
+      dateRange.endDate = horizon;
     }
 
     let coordinates: { lat: number; lng: number } | null = null;

@@ -11,7 +11,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { CalendarSection } from "@/components/dashboard/CalendarSection";
-import { Calculator, PieChart, FileText, Zap, FileStack, Tent, AlertTriangle } from 'lucide-react';
+import { Calculator, PieChart, FileText, Zap, FileStack, Tent, AlertTriangle, Plus } from 'lucide-react';
+import type { JobType } from "@/types/job";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -26,6 +27,7 @@ import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService
 const Sound = () => {
   const navigate = useNavigate();
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
+  const [presetJobType, setPresetJobType] = useState<JobType | undefined>(undefined);
   
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -65,6 +67,21 @@ const Sound = () => {
     };
 
     fetchUserRole();
+  }, []);
+
+  // Keyboard shortcut: c or Cmd/Ctrl+N to open
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const metaN = (e.key.toLowerCase() === 'n') && (e.metaKey || e.ctrlKey);
+      const simpleC = e.key.toLowerCase() === 'c';
+      if ((metaN || simpleC)) {
+        e.preventDefault();
+        setPresetJobType(undefined);
+        setIsJobDialogOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, []);
 
   const getDepartmentJobs = () => {
@@ -151,8 +168,9 @@ const Sound = () => {
     <div className="space-y-4 md:space-y-8 w-full max-w-full">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <LightsHeader 
-          onCreateJob={() => setIsJobDialogOpen(true)}
+          onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
           department="Sound"
+          canCreate={userRole ? ["admin","management"].includes(userRole) : true}
         />
       </div>
 
@@ -263,6 +281,12 @@ const Sound = () => {
            open={isJobDialogOpen} 
            onOpenChange={setIsJobDialogOpen}
            currentDepartment={currentDepartment}
+           initialDate={date}
+           initialJobType={presetJobType}
+           onCreated={(job) => {
+             setSelectedJobId(job.id);
+             setIsAssignmentDialogOpen(true);
+           }}
          />
        )}
        {selectedJobId && (
@@ -318,6 +342,13 @@ const Sound = () => {
          </DialogContent>
         </Dialog>
       </div>
+      {/* Mobile FAB */}
+      <Button 
+        className="sm:hidden fixed bottom-6 right-6 rounded-full h-12 w-12 p-0 shadow-lg"
+        onClick={() => { setPresetJobType(undefined); setIsJobDialogOpen(true); }}
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
     </div>
   );
 };

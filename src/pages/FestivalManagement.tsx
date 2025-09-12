@@ -122,25 +122,58 @@ const FestivalManagement = () => {
         setJob(jobData);
         setArtistCount(artistCount || 0);
 
-        // Fetch venue data from hoja_de_ruta table
-        const { data: hojaData, error: hojaError } = await supabase
-          .from("hoja_de_ruta")
-          .select("venue_address, venue_latitude, venue_longitude")
-          .eq("job_id", jobId)
-          .single();
+        // Fetch venue/location from the job itself (locations table)
+        if (jobData.location_id) {
+          const { data: loc, error: locError } = await supabase
+            .from("locations")
+            .select("name, formatted_address, latitude, longitude")
+            .eq("id", jobData.location_id)
+            .single();
 
-        if (!hojaError && hojaData) {
-          setVenueData({
-            address: hojaData.venue_address || undefined,
-            coordinates: hojaData.venue_latitude && hojaData.venue_longitude 
-              ? { 
-                  lat: hojaData.venue_latitude, 
-                  lng: hojaData.venue_longitude 
-                }
-              : undefined
-          });
+          if (!locError && loc) {
+            setVenueData({
+              address: (loc.formatted_address || loc.name || undefined) as string | undefined,
+              coordinates:
+                typeof loc.latitude === 'number' && typeof loc.longitude === 'number'
+                  ? { lat: loc.latitude, lng: loc.longitude }
+                  : undefined,
+            });
+          } else {
+            console.log("No location found for job; falling back to hoja_de_ruta if available");
+            // Fallback: fetch venue data from hoja_de_ruta table
+            const { data: hojaData, error: hojaError } = await supabase
+              .from("hoja_de_ruta")
+              .select("venue_address, venue_latitude, venue_longitude")
+              .eq("job_id", jobId)
+              .maybeSingle();
+
+            if (!hojaError && hojaData) {
+              setVenueData({
+                address: hojaData.venue_address || undefined,
+                coordinates:
+                  typeof hojaData.venue_latitude === 'number' && typeof hojaData.venue_longitude === 'number'
+                    ? { lat: hojaData.venue_latitude, lng: hojaData.venue_longitude }
+                    : undefined,
+              });
+            }
+          }
         } else {
-          console.log("No venue data found in hoja_de_ruta for this job");
+          console.log("Job has no location_id; attempting hoja_de_ruta fallback");
+          const { data: hojaData, error: hojaError } = await supabase
+            .from("hoja_de_ruta")
+            .select("venue_address, venue_latitude, venue_longitude")
+            .eq("job_id", jobId)
+            .maybeSingle();
+
+          if (!hojaError && hojaData) {
+            setVenueData({
+              address: hojaData.venue_address || undefined,
+              coordinates:
+                typeof hojaData.venue_latitude === 'number' && typeof hojaData.venue_longitude === 'number'
+                  ? { lat: hojaData.venue_latitude, lng: hojaData.venue_longitude }
+                  : undefined,
+            });
+          }
         }
 
         const startDate = new Date(jobData.start_time);
@@ -217,6 +250,26 @@ const FestivalManagement = () => {
     };
 
     fetchJobDetails();
+
+    // Subscribe to job updates to refresh location/dates if they change
+    if (jobId) {
+      const channel = supabase
+        .channel(`job-${jobId}-updates`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'jobs',
+          filter: `id=eq.${jobId}`,
+        }, () => {
+          // Re-fetch details on any job change (e.g., location_id, dates)
+          fetchJobDetails();
+        })
+        .subscribe();
+
+      return () => {
+        channel.unsubscribe();
+      };
+    }
   }, [jobId]);
 
   const handlePrintAllDocumentation = async (options: PrintOptions, filename: string) => {
