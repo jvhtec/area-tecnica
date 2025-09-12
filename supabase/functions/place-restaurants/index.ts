@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,12 +6,15 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log('Place restaurants function called with method:', req.method);
+  
   if (req.method === 'OPTIONS') {
+    console.log('Handling CORS preflight');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('Place restaurants function called with method:', req.method);
+    console.log('Processing restaurant search request');
     const body = await req.json();
     console.log('Request body:', JSON.stringify(body, null, 2));
     
@@ -29,8 +31,11 @@ serve(async (req) => {
       );
     }
 
+    console.log('API key found, proceeding with search');
+
     // If requesting details for a specific place
     if (details && placeId) {
+      console.log('Requesting place details for:', placeId);
       const detailsUrl = `https://places.googleapis.com/v1/places/${placeId}`;
       
       const detailsResponse = await fetch(detailsUrl, {
@@ -43,6 +48,9 @@ serve(async (req) => {
       });
 
       if (!detailsResponse.ok) {
+        console.error('Place details API error:', detailsResponse.status);
+        const errorText = await detailsResponse.text();
+        console.error('Error response:', errorText);
         throw new Error(`Place details API error: ${detailsResponse.status}`);
       }
 
@@ -56,30 +64,38 @@ serve(async (req) => {
 
     // Search for restaurants near location
     if (!location) {
+      console.error('No location provided');
       return new Response(
         JSON.stringify({ error: 'Location is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    console.log('Geocoding location:', location);
     // First, geocode the location to get coordinates
     const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(location)}&key=${apiKey}`;
     
     const geocodeResponse = await fetch(geocodeUrl);
     const geocodeData = await geocodeResponse.json();
     
+    console.log('Geocode response status:', geocodeData.status);
+    console.log('Geocode results count:', geocodeData.results?.length || 0);
+    
     if (!geocodeData.results || geocodeData.results.length === 0) {
+      console.error('Location not found:', geocodeData);
       return new Response(
-        JSON.stringify({ error: 'Location not found' }),
+        JSON.stringify({ error: 'Location not found', details: geocodeData }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const { lat, lng } = geocodeData.results[0].geometry.location;
+    console.log('Coordinates:', { lat, lng });
 
     // Search for nearby restaurants using Places API (New)
     const searchUrl = 'https://places.googleapis.com/v1/places:searchNearby';
     
+    console.log('Searching for restaurants near coordinates');
     const searchResponse = await fetch(searchUrl, {
       method: 'POST',
       headers: {
@@ -105,12 +121,18 @@ serve(async (req) => {
       })
     });
 
+    console.log('Places API response status:', searchResponse.status);
+
     if (!searchResponse.ok) {
-      throw new Error(`Places search API error: ${searchResponse.status}`);
+      const errorText = await searchResponse.text();
+      console.error('Places search API error:', searchResponse.status, errorText);
+      throw new Error(`Places search API error: ${searchResponse.status} - ${errorText}`);
     }
 
     const searchData = await searchResponse.json();
     const places = searchData.places || [];
+    
+    console.log('Found places:', places.length);
 
     // Calculate distances and format data
     const restaurants = places.map((place: any) => {
@@ -149,6 +171,7 @@ serve(async (req) => {
     // Sort by distance
     restaurants.sort((a: any, b: any) => a.distance - b.distance);
 
+    console.log('Returning restaurants:', restaurants.length);
     return new Response(
       JSON.stringify({ restaurants }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -156,6 +179,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in place-restaurants function:', error);
+    console.error('Error stack:', error.stack);
     return new Response(
       JSON.stringify({ 
         error: 'Failed to search restaurants', 
