@@ -14,25 +14,16 @@ serve(async (req) => {
   try {
     const { location, radius = 2000, maxResults = 20, placeId, details = false } = await req.json();
 
-    // Get Google Maps API key from secrets
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    const { data: secretData, error: secretError } = await supabase.functions.invoke('get-secret', {
-      body: { secretName: 'GOOGLE_MAPS_API_KEY' },
-    });
-
-    if (secretError || !secretData?.GOOGLE_MAPS_API_KEY) {
-      console.error('Failed to get Google Maps API key:', secretError);
+    // Get Google Maps API key directly from environment
+    const apiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
+    
+    if (!apiKey) {
+      console.error('Google Maps API key not found in environment');
       return new Response(
         JSON.stringify({ error: 'API key not available' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    const apiKey = secretData.GOOGLE_MAPS_API_KEY;
 
     // If requesting details for a specific place
     if (details && placeId) {
@@ -93,8 +84,9 @@ serve(async (req) => {
         'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.rating,places.priceLevel,places.types,places.internationalPhoneNumber,places.websiteUri,places.location,places.photos'
       },
       body: JSON.stringify({
-        includedTypes: ['restaurant'],
+        includedPrimaryTypes: ['restaurant'],
         maxResultCount: Math.min(maxResults, 20),
+        rankPreference: 'DISTANCE',
         locationRestriction: {
           circle: {
             center: {
@@ -103,7 +95,9 @@ serve(async (req) => {
             },
             radius: radius
           }
-        }
+        },
+        languageCode: 'es',
+        regionCode: 'ES'
       })
     });
 
@@ -133,7 +127,7 @@ serve(async (req) => {
         name: place.displayName?.text || '',
         formatted_address: place.formattedAddress || '',
         rating: place.rating,
-        price_level: place.priceLevel,
+        price_level: mapPriceLevel(place.priceLevel),
         types: place.types || [],
         formatted_phone_number: place.internationalPhoneNumber,
         website: place.websiteUri,
@@ -181,4 +175,19 @@ function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
             Math.sin(dLng / 2) * Math.sin(dLng / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return Math.round(R * c);
+}
+
+// Map price level enum to numeric value
+function mapPriceLevel(priceLevel: string | undefined): number | undefined {
+  if (!priceLevel) return undefined;
+  
+  const priceLevelMap: { [key: string]: number } = {
+    'PRICE_LEVEL_FREE': 0,
+    'PRICE_LEVEL_INEXPENSIVE': 1,
+    'PRICE_LEVEL_MODERATE': 2,
+    'PRICE_LEVEL_EXPENSIVE': 3,
+    'PRICE_LEVEL_VERY_EXPENSIVE': 4
+  };
+  
+  return priceLevelMap[priceLevel] ?? undefined;
 }
