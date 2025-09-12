@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { EventData, TravelArrangement, Accommodation } from '@/types/hoja-de-ruta';
+import { EventData, TravelArrangement, Accommodation, Restaurant } from '@/types/hoja-de-ruta';
 
 export const useHojaDeRutaData = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -108,7 +108,8 @@ export const useHojaDeRutaData = () => {
         saveContacts(savedHoja.id, eventData.contacts || []),
         saveStaff(savedHoja.id, eventData.staff || []),
         saveTravelArrangements(savedHoja.id, travelArrangements),
-        saveAccommodations(savedHoja.id, accommodations)
+        saveAccommodations(savedHoja.id, accommodations),
+        saveRestaurants(savedHoja.id, eventData.restaurants || [])
       ]);
 
       return savedHoja;
@@ -245,6 +246,37 @@ const saveAccommodations = async (hojaId: string, accommodations: Accommodation[
           await supabase.from('hoja_de_ruta_room_assignments').insert(roomsData);
         }
       }
+    }
+  }
+};
+
+const saveRestaurants = async (hojaId: string, restaurants: Restaurant[]) => {
+  // Delete existing restaurants
+  await supabase.from('hoja_de_ruta_restaurants').delete().eq('hoja_de_ruta_id', hojaId);
+  
+  // Insert new restaurants
+  if (restaurants.length > 0) {
+    const restaurantsData = restaurants
+      .filter(restaurant => restaurant.name?.trim() && restaurant.googlePlaceId)
+      .map(restaurant => ({
+        hoja_de_ruta_id: hojaId,
+        google_place_id: restaurant.googlePlaceId,
+        name: restaurant.name,
+        address: restaurant.address,
+        rating: restaurant.rating,
+        price_level: restaurant.priceLevel,
+        cuisine: restaurant.cuisine || [],
+        phone: restaurant.phone,
+        website: restaurant.website,
+        latitude: restaurant.coordinates?.lat,
+        longitude: restaurant.coordinates?.lng,
+        distance: restaurant.distance,
+        photos: restaurant.photos || [],
+        is_selected: restaurant.isSelected || false
+      }));
+    
+    if (restaurantsData.length > 0) {
+      await supabase.from('hoja_de_ruta_restaurants').insert(restaurantsData);
     }
   }
 };

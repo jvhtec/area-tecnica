@@ -1564,6 +1564,74 @@ export type Database = {
           },
         ]
       }
+      hoja_de_ruta_restaurants: {
+        Row: {
+          address: string | null
+          created_at: string
+          cuisine: string[] | null
+          distance: number | null
+          google_place_id: string
+          hoja_de_ruta_id: string
+          id: string
+          is_selected: boolean | null
+          latitude: number | null
+          longitude: number | null
+          name: string
+          phone: string | null
+          photos: string[] | null
+          price_level: number | null
+          rating: number | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          cuisine?: string[] | null
+          distance?: number | null
+          google_place_id: string
+          hoja_de_ruta_id: string
+          id?: string
+          is_selected?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          name: string
+          phone?: string | null
+          photos?: string[] | null
+          price_level?: number | null
+          rating?: number | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          cuisine?: string[] | null
+          distance?: number | null
+          google_place_id?: string
+          hoja_de_ruta_id?: string
+          id?: string
+          is_selected?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          name?: string
+          phone?: string | null
+          photos?: string[] | null
+          price_level?: number | null
+          rating?: number | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hoja_de_ruta_restaurants_hoja_de_ruta_id_fkey"
+            columns: ["hoja_de_ruta_id"]
+            isOneToOne: false
+            referencedRelation: "hoja_de_ruta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hoja_de_ruta_room_assignments: {
         Row: {
           accommodation_id: string | null

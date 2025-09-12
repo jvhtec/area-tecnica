@@ -123,11 +123,11 @@ export const ModernHojaDeRuta = () => {
     appendVenuePreviews,
   } = useHojaDeRutaImages();
 
-  // Calculate completion progress including weather
+  // Calculate completion progress including weather and restaurants
   useEffect(() => {
     const calculateProgress = () => {
       let completed = 0;
-      const total = 9;
+      const total = 10; // Updated to include restaurants
 
       // Check completion of each section
       if (eventData.eventName && eventData.eventDates) completed++;
@@ -139,6 +139,7 @@ export const ModernHojaDeRuta = () => {
       if (accommodations.some(acc => acc.hotel_name || acc.rooms.some(r => r.room_type))) completed++;
       if (eventData.logistics.transport || eventData.logistics.loadingDetails) completed++;
       if (eventData.schedule) completed++;
+      if (eventData.restaurants && eventData.restaurants.some(r => r.isSelected)) completed++;
 
       setCompletionProgress((completed / total) * 100);
     };
