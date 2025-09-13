@@ -111,37 +111,18 @@ export const useOptimizedJobCard = (
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 
-  // Optimized personnel query
+  // Optimized personnel query - get actual personnel/profiles data
   const { data: personnel } = useQuery({
-    queryKey: [...createQueryKey.tasks.byDepartment('sound', job.id), 'personnel'],
+    queryKey: ['personnel', job.id, department],
     queryFn: async () => {
-      if (department !== 'sound') return null;
-      const { data: existingData, error: fetchError } = await supabase
-        .from('sound_job_personnel')
-        .select('*')
-        .eq('job_id', job.id)
-        .maybeSingle();
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, display_name')
+        .order('display_name');
       
-      if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
-      
-      if (!existingData) {
-        const { data: newData, error: insertError } = await supabase
-          .from('sound_job_personnel')
-          .insert({
-            job_id: job.id,
-            foh_engineers: 0,
-            mon_engineers: 0,
-            pa_techs: 0,
-            rf_techs: 0
-          })
-          .select()
-          .single();
-        if (insertError) throw insertError;
-        return newData;
-      }
-      return existingData;
+      if (error) throw error;
+      return profiles || [];
     },
-    enabled: department === 'sound',
     staleTime: 5 * 60 * 1000, // 5 minutes for personnel data
   });
 
