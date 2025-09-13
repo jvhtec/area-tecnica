@@ -3068,6 +3068,89 @@ export type Database = {
           },
         ]
       }
+      staffing_events: {
+        Row: {
+          created_at: string
+          event: string
+          id: string
+          meta: Json | null
+          staffing_request_id: string
+        }
+        Insert: {
+          created_at?: string
+          event: string
+          id?: string
+          meta?: Json | null
+          staffing_request_id: string
+        }
+        Update: {
+          created_at?: string
+          event?: string
+          id?: string
+          meta?: Json | null
+          staffing_request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staffing_events_staffing_request_id_fkey"
+            columns: ["staffing_request_id"]
+            isOneToOne: false
+            referencedRelation: "staffing_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staffing_requests: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string
+          phase: string
+          profile_id: string
+          status: string
+          token_expires_at: string
+          token_hash: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id: string
+          phase: string
+          profile_id: string
+          status: string
+          token_expires_at: string
+          token_hash: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string
+          phase?: string
+          profile_id?: string
+          status?: string
+          token_expires_at?: string
+          token_hash?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staffing_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staffing_requests_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_movements: {
         Row: {
           created_at: string | null
@@ -4133,6 +4216,31 @@ export type Database = {
       }
     }
     Views: {
+      assignment_matrix_staffing: {
+        Row: {
+          availability_status: string | null
+          job_id: string | null
+          last_change: string | null
+          offer_status: string | null
+          profile_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staffing_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staffing_requests_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       current_stock_levels: {
         Row: {
           category: Database["public"]["Enums"]["equipment_category"] | null
