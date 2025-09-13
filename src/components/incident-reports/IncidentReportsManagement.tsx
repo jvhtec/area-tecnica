@@ -1,19 +1,40 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import React, { useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { FileText, Download, Trash2, Search, Filter, Calendar } from "lucide-react";
-import { useIncidentReports, type IncidentReport } from "@/hooks/useIncidentReports";
+import { Search, Download, Trash2, Calendar, Filter, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { useIncidentReports } from "@/hooks/useIncidentReports";
+import { IncidentReportsNotificationBadge } from "./IncidentReportsNotificationBadge";
+import { supabase } from "@/integrations/supabase/client";
 
 export const IncidentReportsManagement = () => {
   const { reports, isLoading, deleteReport, isDeleting, downloadReport } = useIncidentReports();
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortField, setSortField] = useState<keyof IncidentReport>("uploaded_at");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [sortField, setSortField] = useState<'uploaded_at' | 'file_name' | 'job_title'>('uploaded_at');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [userRole, setUserRole] = useState<string>('');
+
+  // Get user role for notifications
+  React.useEffect(() => {
+    const getUserRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        if (profile) {
+          setUserRole(profile.role);
+        }
+      }
+    };
+    getUserRole();
+  }, []);
 
   const filteredReports = reports
     .filter(report => {
@@ -26,8 +47,8 @@ export const IncidentReportsManagement = () => {
       );
     })
     .sort((a, b) => {
-      const aValue = a[sortField as keyof IncidentReport];
-      const bValue = b[sortField as keyof IncidentReport];
+      const aValue = a[sortField];
+      const bValue = b[sortField];
       
       if (sortDirection === "asc") {
         return aValue > bValue ? 1 : -1;
@@ -56,10 +77,18 @@ export const IncidentReportsManagement = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Gestión de Reportes de Incidencias
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Incident Reports Management
+              </CardTitle>
+              <CardDescription>
+                View, download, and manage incident reports from all jobs
+              </CardDescription>
+            </div>
+            <IncidentReportsNotificationBadge userRole={userRole} />
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-4 mb-6">

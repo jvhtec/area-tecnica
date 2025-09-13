@@ -455,7 +455,7 @@ export function JobCardNew({
             canManageArtists={canManageArtists}
             isCreatingFolders={isCreatingFolders}
             isCreatingLocalFolders={isCreatingLocalFolders}
-            currentFolderStep=""
+            techName={personnel?.find(p => p.id === assignments.find(a => a.technician_id)?.technician_id)?.display_name || ''}
             onRefreshData={refreshData}
             onEditButtonClick={handleEditButtonClick}
             onDeleteClick={handleDeleteClick}

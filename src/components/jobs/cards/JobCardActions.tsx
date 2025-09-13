@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
 
 interface JobCardActionsProps {
   job: any;
@@ -18,6 +19,7 @@ interface JobCardActionsProps {
   isCreatingFolders?: boolean;
   isCreatingLocalFolders?: boolean;
   currentFolderStep?: string;
+  techName?: string;
   onRefreshData: (e: React.MouseEvent) => void;
   onEditButtonClick: (e: React.MouseEvent) => void;
   onDeleteClick: (e: React.MouseEvent) => void;
@@ -41,6 +43,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   canManageArtists,
   isCreatingFolders = false,
   isCreatingLocalFolders = false,
+  techName,
   onRefreshData,
   onEditButtonClick,
   onDeleteClick,
@@ -119,6 +122,12 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       >
         <Clock className="h-4 w-4" />
       </Button>
+      {userRole === 'technician' && job.job_type !== "dryhire" && (
+        <TechnicianIncidentReportDialog 
+          job={job} 
+          techName={techName}
+        />
+      )}
       {canEditJobs && (
         <>
           <Button

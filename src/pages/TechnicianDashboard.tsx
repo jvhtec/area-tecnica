@@ -328,6 +328,7 @@ const TechnicianDashboard = () => {
               assignments={assignments} 
               loading={isLoading} 
               onRefresh={handleRefresh}
+              techName={userDepartment ? `${userDepartment} Technician` : 'Technician'}
             />
           )}
         </CardContent>

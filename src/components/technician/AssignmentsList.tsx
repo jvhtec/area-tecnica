@@ -3,17 +3,20 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { RefreshCw } from "lucide-react";
+import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
 
 interface AssignmentsListProps {
   assignments: any[];
   loading: boolean;
   onRefresh: () => void;
+  techName?: string;
 }
 
 export const AssignmentsList = ({ 
   assignments = [], 
   loading = false,
-  onRefresh 
+  onRefresh,
+  techName = ''
 }: AssignmentsListProps) => {
   console.log("AssignmentsList rendered with:", { assignments, loading });
 
@@ -95,7 +98,7 @@ export const AssignmentsList = ({
             className={`border rounded-lg p-4 ${bgColor} hover:bg-secondary/10 transition-colors`}
           >
             <div className="flex items-start justify-between">
-              <div>
+              <div className="flex-1">
                 <h3 className="font-semibold">{jobData.title || "Sin título"}</h3>
                 <p className="text-sm text-muted-foreground">{location}</p>
                 <p className="text-sm text-muted-foreground">{formattedDate}</p>
@@ -111,13 +114,20 @@ export const AssignmentsList = ({
                 </div>
               </div>
               
-              {jobData.job_documents && jobData.job_documents.length > 0 && (
-                <div className="flex flex-col items-end">
+              <div className="flex flex-col items-end gap-2">
+                {jobData.job_documents && jobData.job_documents.length > 0 && (
                   <span className="text-xs text-muted-foreground">
                     {jobData.job_documents.length} documento{jobData.job_documents.length !== 1 ? 's' : ''}
                   </span>
-                </div>
-              )}
+                )}
+                {jobData.job_type !== "dryhire" && (
+                  <TechnicianIncidentReportDialog 
+                    job={jobData} 
+                    techName={techName}
+                    className="h-8 w-8"
+                  />
+                )}
+              </div>
             </div>
           </div>
         );
