@@ -71,6 +71,10 @@ export function useStaffingRealtime() {
           qc.invalidateQueries({ 
             queryKey: ['staffing', jobId, profileId] 
           })
+          // Also invalidate date-based queries for this profile
+          qc.invalidateQueries({ 
+            queryKey: ['staffing-by-date', profileId] 
+          })
         }
       }
       

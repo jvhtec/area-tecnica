@@ -6,6 +6,7 @@ import { Calendar, Clock, Check, X, UserX, Mail, CheckCircle } from 'lucide-reac
 import { format, isToday, isWeekend } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useStaffingStatus, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
+import { useStaffingStatusByDate } from '@/features/staffing/hooks/useStaffingStatusByDate';
 import { toast } from 'sonner';
 
 interface OptimizedMatrixCellProps {
@@ -55,11 +56,15 @@ export const OptimizedMatrixCell = memo(({
   const isUnavailable = availability?.status === 'unavailable';
 
   // Staffing status hooks
-  const { data: staffingStatus } = useStaffingStatus(
+  const { data: staffingStatusByJob } = useStaffingStatus(
     jobId || assignment?.job_id || '', 
     technician.id
   );
+  const { data: staffingStatusByDate } = useStaffingStatusByDate(technician.id, date);
   const { mutate: sendStaffingEmail, isPending: isSendingEmail } = useSendStaffingEmail();
+  
+  // Use job-specific status for assigned cells, date-based status for empty cells
+  const staffingStatus = hasAssignment ? staffingStatusByJob : staffingStatusByDate;
 
   // Handle staffing email actions
   const handleStaffingEmail = useCallback((e: React.MouseEvent, phase: 'availability' | 'offer') => {
@@ -154,6 +159,20 @@ export const OptimizedMatrixCell = memo(({
       return 'bg-yellow-50 dark:bg-yellow-900/20';
     }
     if (isUnavailable) return 'bg-gray-100 dark:bg-gray-800/50';
+    
+    // Show staffing status colors for empty cells
+    if (!hasAssignment && staffingStatus) {
+      if (staffingStatus.availability_status === 'confirmed') {
+        if (staffingStatus.offer_status === 'confirmed') {
+          return 'bg-purple-50 dark:bg-purple-900/20'; // Confirmed offer
+        }
+        return 'bg-blue-50 dark:bg-blue-900/20'; // Confirmed availability
+      }
+      if (staffingStatus.availability_status === 'declined') {
+        return 'bg-red-50 dark:bg-red-900/20'; // Declined availability
+      }
+    }
+    
     if (isTodayCell) return 'bg-orange-50 dark:bg-orange-900/20';
     if (isWeekendCell) return 'bg-muted/30';
     return 'bg-card hover:bg-accent/50';
