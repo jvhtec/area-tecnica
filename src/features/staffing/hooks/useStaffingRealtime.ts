@@ -18,13 +18,13 @@ export function useStaffingRealtime() {
       })
       .subscribe()
 
-    const matrixStaffingChannel = supabase.channel('assignment-matrix-staffing')
+    const staffingEventsChannel = supabase.channel('staffing-events')
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
-        table: 'assignment_matrix_staffing' 
+        table: 'staffing_events' 
       }, (payload) => {
-        console.log('Assignment matrix staffing realtime update:', payload)
+        console.log('Staffing events realtime update:', payload)
         handleStaffingUpdate(payload)
       })
       .subscribe()
@@ -44,7 +44,7 @@ export function useStaffingRealtime() {
       
     return () => { 
       supabase.removeChannel(staffingRequestsChannel)
-      supabase.removeChannel(matrixStaffingChannel)
+      supabase.removeChannel(staffingEventsChannel)
     }
   }, [qc])
 }
