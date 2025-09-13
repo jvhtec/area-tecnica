@@ -95,9 +95,6 @@ export const OptimizedAssignmentMatrix = ({
     isLoading
   } = useOptimizedMatrixData({ technicians, dates, jobs });
 
-  // Add staffing realtime updates
-  useStaffingRealtime();
-
   // Listen for assignment updates and refresh data
   useEffect(() => {
     const handleAssignmentUpdate = () => {

@@ -5,15 +5,19 @@ export function useStaffingStatus(jobId: string, profileId: string) {
   return useQuery({
     queryKey: ['staffing', jobId, profileId],
     queryFn: async () => {
+      console.log('🔍 Fetching staffing status for:', { jobId, profileId })
       const { data } = await supabase
         .from('assignment_matrix_staffing')
         .select('*')
         .eq('job_id', jobId)
         .eq('profile_id', profileId)
         .maybeSingle()
+      
+      console.log('📋 Staffing status result:', data)
       return data ?? { availability_status: null, offer_status: null }
     },
-    staleTime: 10_000,
+    staleTime: 1_000, // Reduced from 10 seconds to 1 second for faster updates
+    refetchOnWindowFocus: true, // Refetch when window becomes focused
     enabled: !!jobId && !!profileId
   })
 }
