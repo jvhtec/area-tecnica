@@ -7,7 +7,7 @@ import { useHojaDeRutaState } from "./hoja-de-ruta/useHojaDeRutaState";
 import { useHojaDeRutaInitialization } from "./hoja-de-ruta/useHojaDeRutaInitialization";
 import { useHojaDeRutaSave } from "./hoja-de-ruta/useHojaDeRutaSave";
 
-export const useHojaDeRutaForm = () => {
+export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type: string }[] = []) => {
   const { toast } = useToast();
   const { data: jobs, isLoading: isLoadingJobs } = useJobSelection();
   const [showAlert, setShowAlert] = useState(false);
@@ -96,6 +96,8 @@ export const useHojaDeRutaForm = () => {
     saveHojaDeRuta,
     saveTravelArrangements,
     saveAccommodations,
+    saveVenueImages,
+    venueImages, // Pass venue images for saving
     isSaving,
     isSavingTravel,
     setLastSaveTime

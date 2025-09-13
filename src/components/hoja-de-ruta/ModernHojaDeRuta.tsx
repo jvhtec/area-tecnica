@@ -70,6 +70,41 @@ export const ModernHojaDeRuta = () => {
   const [completionProgress, setCompletionProgress] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Get image management functions first (needed for form hook)
+  const {
+    images,
+    imagePreviews,
+    venueMapPreview,
+    handleImageUpload,
+    removeImage,
+    handleVenueMapInputChange,
+    handleVenueMapUrl,
+    appendVenuePreviews,
+  } = useHojaDeRutaImages();
+
+  // Convert image previews to database format
+  const venueImagesForSave = React.useMemo(() => {
+    const imageList: { image_path: string; image_type: string }[] = [];
+    
+    // Add venue images
+    imagePreviews.venue?.forEach((preview) => {
+      imageList.push({
+        image_path: preview,
+        image_type: 'venue'
+      });
+    });
+    
+    // Add venue map if available
+    if (venueMapPreview) {
+      imageList.push({
+        image_path: venueMapPreview,
+        image_type: 'venue_map'
+      });
+    }
+    
+    return imageList;
+  }, [imagePreviews.venue, venueMapPreview]);
+
   // Use the working hooks - single call to avoid state conflicts
   const {
     eventData,
@@ -110,18 +145,7 @@ export const ModernHojaDeRuta = () => {
     updateTransport,
     addTransport,
     removeTransport
-  } = useHojaDeRutaForm();
-
-  const {
-    images,
-    imagePreviews,
-    venueMapPreview,
-    handleImageUpload,
-    removeImage,
-    handleVenueMapInputChange,
-    handleVenueMapUrl,
-    appendVenuePreviews,
-  } = useHojaDeRutaImages();
+  } = useHojaDeRutaForm(venueImagesForSave);
 
   // Calculate completion progress including weather and restaurants
   useEffect(() => {

@@ -12,6 +12,8 @@ export const useHojaDeRutaSave = (
   saveHojaDeRuta: any,
   saveTravelArrangements: any,
   saveAccommodations: any,
+  saveVenueImages: any,
+  venueImages: { image_path: string; image_type: string }[],
   isSaving: boolean,
   isSavingTravel: boolean,
   setLastSaveTime: React.Dispatch<React.SetStateAction<number>>
@@ -99,6 +101,7 @@ export const useHojaDeRutaSave = (
       eventData,
       travelArrangements,
       accommodations,
+      venueImages,
       selectedJobId
     });
 
@@ -151,6 +154,14 @@ export const useHojaDeRutaSave = (
         );
       }
 
+      // Save venue images if any exist
+      if (venueImages.length > 0) {
+        console.log("📸 SAVE: Saving venue images...", venueImages.length);
+        savePromises.push(
+          saveVenueImages(venueImages)
+        );
+      }
+
       // Execute all saves in parallel
       await Promise.all(savePromises);
 
@@ -190,9 +201,11 @@ export const useHojaDeRutaSave = (
     eventData,
     travelArrangements,
     accommodations,
+    venueImages,
     saveHojaDeRuta,
     saveTravelArrangements,
     saveAccommodations,
+    saveVenueImages,
     setLastSaveTime,
     toast
   ]);

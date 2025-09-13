@@ -1290,6 +1290,7 @@ export type Database = {
           venue_latitude: number | null
           venue_longitude: number | null
           venue_name: string | null
+          weather_data: Json | null
         }
         Insert: {
           approved_at?: string | null
@@ -1312,6 +1313,7 @@ export type Database = {
           venue_latitude?: number | null
           venue_longitude?: number | null
           venue_name?: string | null
+          weather_data?: Json | null
         }
         Update: {
           approved_at?: string | null
@@ -1334,6 +1336,7 @@ export type Database = {
           venue_latitude?: number | null
           venue_longitude?: number | null
           venue_name?: string | null
+          weather_data?: Json | null
         }
         Relationships: [
           {

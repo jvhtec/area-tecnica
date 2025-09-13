@@ -159,7 +159,8 @@ export const useHojaDeRutaPersistence = (
         })) : [{ name: '', surname1: '', surname2: '', position: '', dni: '' }],
         schedule: mainData.schedule || '',
         powerRequirements: mainData.power_requirements || '',
-        auxiliaryNeeds: mainData.auxiliary_needs || ''
+        auxiliaryNeeds: mainData.auxiliary_needs || '',
+        weather: mainData.weather_data || []
       };
 
       // Transform accommodations data
@@ -242,6 +243,7 @@ export const useHojaDeRutaPersistence = (
         schedule: eventData.schedule || '',
         power_requirements: eventData.powerRequirements || '',
         auxiliary_needs: eventData.auxiliaryNeeds || '',
+        weather_data: eventData.weather || null,
         updated_at: now,
         last_modified: now,
         last_modified_by: userId
