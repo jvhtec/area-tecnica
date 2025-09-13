@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.place-restaurants]
 verify_jwt = false
+
+[functions.staffing-click]
+verify_jwt = false
