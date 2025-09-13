@@ -1,5 +1,6 @@
 import { PDFDocument } from '../hoja-de-ruta/pdf/core/pdf-document';
 import { LogoService } from '../hoja-de-ruta/pdf/services/logo-service';
+import { uploadJobPdfWithCleanup } from '../jobDocumentsUpload';
 
 interface IncidentReportPDFData {
   jobId: string;
@@ -14,7 +15,10 @@ interface IncidentReportPDFData {
   signature: string;
 }
 
-export const generateIncidentReportPDF = async (data: IncidentReportPDFData): Promise<void> => {
+export const generateIncidentReportPDF = async (
+  data: IncidentReportPDFData, 
+  options: { saveToDatabase?: boolean; downloadLocal?: boolean } = { saveToDatabase: false, downloadLocal: true }
+): Promise<{ documentId?: string; filename: string }> => {
   const pdfDoc = new PDFDocument();
   const { width: pageWidth, height: pageHeight } = pdfDoc.dimensions;
   
@@ -215,8 +219,34 @@ export const generateIncidentReportPDF = async (data: IncidentReportPDFData): Pr
   // Generate filename
   const safeJobTitle = data.jobTitle.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
   const timestamp = currentDate.toISOString().split('T')[0];
-  const filename = `reporte_incidencia_${safeJobTitle}_${timestamp}.pdf`;
+  const timeStamp = currentDate.toISOString().replace(/[:.]/g, '-');
+  const filename = `reporte_incidencia_${safeJobTitle}_${timeStamp}.pdf`;
 
-  // Save the PDF
-  pdfDoc.save(filename);
+  // Handle saving/downloading based on options
+  if (options.saveToDatabase) {
+    // Get PDF as blob for upload using the native jsPDF method
+    const pdfOutput = pdfDoc.document.output('blob');
+    
+    try {
+      await uploadJobPdfWithCleanup(
+        data.jobId,
+        pdfOutput,
+        filename,
+        'incident-reports'
+      );
+      
+      if (options.downloadLocal) {
+        pdfDoc.save(filename);
+      }
+      
+      return { filename };
+    } catch (error) {
+      console.error('Error uploading incident report to database:', error);
+      throw error;
+    }
+  } else {
+    // Default behavior - just download locally
+    pdfDoc.save(filename);
+    return { filename };
+  }
 };

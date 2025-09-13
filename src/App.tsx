@@ -48,6 +48,7 @@ import { TourManagementWrapper } from "@/components/tours/TourManagementWrapper"
 import Timesheets from '@/pages/Timesheets';
 import JobManagement from '@/pages/JobManagement';
 import { UserManual } from '@/components/UserManual';
+import IncidentReports from '@/pages/IncidentReports';
 
 export default function App() {
   // Initialize multi-tab coordinator
@@ -93,6 +94,7 @@ export default function App() {
                     <Route path="/timesheets" element={<Timesheets />} />
                     <Route path="/tours" element={<Tours />} />
                     <Route path="/festivals" element={<Festivals />} />
+                    <Route path="/incident-reports" element={<IncidentReports />} />
                     <Route path="/manual" element={<UserManual />} />
                     
                     {/* Tour Management Route */}

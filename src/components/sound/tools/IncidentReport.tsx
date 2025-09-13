@@ -112,16 +112,19 @@ export const IncidentReport = () => {
         throw new Error("Job no encontrado");
       }
 
-      await generateIncidentReportPDF({
-        ...formData,
-        jobTitle: selectedJob.title,
-        jobStartDate: selectedJob.start_time,
-        jobEndDate: selectedJob.end_time
-      });
+      const result = await generateIncidentReportPDF(
+        {
+          ...formData,
+          jobTitle: selectedJob.title,
+          jobStartDate: selectedJob.start_time,
+          jobEndDate: selectedJob.end_time
+        },
+        { saveToDatabase: true, downloadLocal: true }
+      );
       
       toast({
-        title: "✅ Reporte generado",
-        description: "El reporte de incidencia ha sido generado y descargado correctamente.",
+        title: "✅ Reporte generado y guardado",
+        description: "El reporte de incidencia ha sido generado, guardado en el sistema y descargado correctamente.",
       });
       
       clearForm();

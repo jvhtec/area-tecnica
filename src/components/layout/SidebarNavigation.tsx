@@ -13,7 +13,8 @@ import {
   Calendar,
   MapPin,
   Grid3X3,
-  Clock
+  Clock,
+  FileText
 } from "lucide-react";
 import { TimesheetSidebarTrigger } from "@/components/timesheet/TimesheetSidebarTrigger";
 import { SidebarNavigationSkeleton } from './SidebarNavigationSkeleton';
@@ -257,17 +258,31 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
 
         {/* Settings Access - Available to admin and management */}
         {(['admin', 'management'].includes(userRole)) && (
-          <Link to="/settings">
-            <Button
-              variant="ghost"
-              className={`w-full justify-start gap-2 ${
-                location.pathname === "/settings" ? "bg-accent" : ""
-              }`}
-            >
-              <Settings className="h-4 w-4" />
-              <span>Settings</span>
-            </Button>
-          </Link>
+          <>
+            <Link to="/incident-reports">
+              <Button
+                variant="ghost"
+                className={`w-full justify-start gap-2 ${
+                  location.pathname === "/incident-reports" ? "bg-accent" : ""
+                }`}
+              >
+                <FileText className="h-4 w-4" />
+                <span>Incident Reports</span>
+              </Button>
+            </Link>
+            
+            <Link to="/settings">
+              <Button
+                variant="ghost"
+                className={`w-full justify-start gap-2 ${
+                  location.pathname === "/settings" ? "bg-accent" : ""
+                }`}
+              >
+                <Settings className="h-4 w-4" />
+                <span>Settings</span>
+              </Button>
+            </Link>
+          </>
         )}
       </div>
     </div>
