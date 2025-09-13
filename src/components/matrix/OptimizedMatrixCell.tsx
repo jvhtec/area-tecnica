@@ -76,9 +76,9 @@ export const OptimizedMatrixCell = memo(({
       clickEvent: 'MAIL_ICON_CLICKED'
     });
     
-    // For availability requests on empty cells, we need to select a job first
-    if (phase === 'availability' && !hasAssignment && !jobId) {
-      console.log('📋 No job selected for availability request, calling onClick with select-job-for-staffing');
+    // For requests on empty cells, we need to select a job first
+    if ((phase === 'availability' || phase === 'offer') && !hasAssignment && !jobId) {
+      console.log('📋 No job selected for request, calling onClick with select-job-for-staffing');
       onClick('select-job-for-staffing');
       return;
     }
@@ -172,7 +172,7 @@ export const OptimizedMatrixCell = memo(({
 
   // Get staffing button states
   const canAskAvailability = !hasAssignment && !isUnavailable && (!staffingStatus?.availability_status || staffingStatus.availability_status === 'declined' || staffingStatus.availability_status === 'expired');
-  const canSendOffer = hasAssignment && staffingStatus?.availability_status === 'confirmed' && (!staffingStatus?.offer_status || staffingStatus.offer_status === 'declined' || staffingStatus.offer_status === 'expired');
+  const canSendOffer = staffingStatus?.availability_status === 'confirmed' && (!staffingStatus?.offer_status || staffingStatus.offer_status === 'declined' || staffingStatus.offer_status === 'expired');
 
   // Debug logging for staffing button visibility
   React.useEffect(() => {
