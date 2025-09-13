@@ -117,7 +117,16 @@ serve(async (req) => {
       // Step 2: Fetch job and profile data
       console.log('🔍 FETCHING JOB AND PROFILE DATA...');
       const [jobResult, techResult] = await Promise.all([
-        supabase.from("jobs").select("id,title,venue_address,call_time").eq("id", job_id).maybeSingle(),
+        supabase.from("jobs")
+          .select(`
+            id,
+            title,
+            start_time,
+            end_time,
+            locations!inner(formatted_address)
+          `)
+          .eq("id", job_id)
+          .maybeSingle(),
         supabase.from("profiles").select("id,first_name,last_name,email").eq("id", profile_id).maybeSingle()
       ]);
       
@@ -241,7 +250,7 @@ serve(async (req) => {
           <a href="${confirmUrl}" style="color: #10b981; text-decoration: none;">✅ ${phase === "availability" ? "I am available" : "I accept the offer"}</a><br/>
           <a href="${declineUrl}" style="color: #ef4444; text-decoration: none;">❌ ${phase === "availability" ? "Not available" : "I decline"}</a>
         </p>
-        <p>Venue: ${job.venue_address ?? ""}<br/>Call: ${job.call_time ?? ""}</p>
+        <p>Venue: ${job.locations?.formatted_address ?? "TBD"}<br/>Call: ${job.start_time ? new Date(job.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : "TBD"}</p>
       `;
 
       // Step 6: Send email via Brevo
