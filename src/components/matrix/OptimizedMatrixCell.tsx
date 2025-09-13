@@ -152,6 +152,20 @@ export const OptimizedMatrixCell = memo(({
   const canAskAvailability = !hasAssignment && !isUnavailable && (!staffingStatus?.availability_status || staffingStatus.availability_status === 'declined' || staffingStatus.availability_status === 'expired');
   const canSendOffer = hasAssignment && staffingStatus?.availability_status === 'confirmed' && (!staffingStatus?.offer_status || staffingStatus.offer_status === 'declined' || staffingStatus.offer_status === 'expired');
 
+  // Debug logging
+  React.useEffect(() => {
+    if (canAskAvailability || canSendOffer) {
+      console.log('Staffing buttons available:', {
+        technician: `${technician.first_name} ${technician.last_name}`,
+        date: format(date, 'yyyy-MM-dd'),
+        canAskAvailability,
+        canSendOffer,
+        hasAssignment,
+        staffingStatus
+      });
+    }
+  }, [canAskAvailability, canSendOffer, technician, date, hasAssignment, staffingStatus]);
+
   return (
     <div
       className={cn(
