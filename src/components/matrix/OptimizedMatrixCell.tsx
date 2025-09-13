@@ -65,19 +65,20 @@ export const OptimizedMatrixCell = memo(({
   const handleStaffingEmail = useCallback((e: React.MouseEvent, phase: 'availability' | 'offer') => {
     e.stopPropagation();
     
-    console.log('🚀 STAFFING EMAIL CLICKED:', {
+    console.log('🔥 MAIL ICON CLICKED! handleStaffingEmail called', {
       phase,
       technician: `${technician.first_name} ${technician.last_name}`,
       technicianId: technician.id,
       date: format(date, 'yyyy-MM-dd'),
       jobId: jobId || assignment?.job_id,
       hasAssignment,
-      assignment
+      assignment,
+      clickEvent: 'MAIL_ICON_CLICKED'
     });
     
     // For availability requests on empty cells, we need to select a job first
     if (phase === 'availability' && !hasAssignment && !jobId) {
-      console.log('📋 No job selected for availability request, opening staffing job selection dialog first...');
+      console.log('📋 No job selected for availability request, calling onClick with select-job-for-staffing');
       onClick('select-job-for-staffing');
       return;
     }
@@ -173,19 +174,24 @@ export const OptimizedMatrixCell = memo(({
   const canAskAvailability = !hasAssignment && !isUnavailable && (!staffingStatus?.availability_status || staffingStatus.availability_status === 'declined' || staffingStatus.availability_status === 'expired');
   const canSendOffer = hasAssignment && staffingStatus?.availability_status === 'confirmed' && (!staffingStatus?.offer_status || staffingStatus.offer_status === 'declined' || staffingStatus.offer_status === 'expired');
 
-  // Debug logging
+  // Debug logging for staffing button visibility
   React.useEffect(() => {
-    if (canAskAvailability || canSendOffer) {
-      console.log('Staffing buttons available:', {
-        technician: `${technician.first_name} ${technician.last_name}`,
-        date: format(date, 'yyyy-MM-dd'),
-        canAskAvailability,
-        canSendOffer,
-        hasAssignment,
-        staffingStatus
-      });
-    }
-  }, [canAskAvailability, canSendOffer, technician, date, hasAssignment, staffingStatus]);
+    console.log('🔍 STAFFING BUTTON DEBUG:', {
+      technician: `${technician.first_name} ${technician.last_name}`,
+      date: format(date, 'yyyy-MM-dd'),
+      hasAssignment,
+      isUnavailable,
+      staffingStatus,
+      jobId: jobId || assignment?.job_id || '',
+      canAskAvailability,
+      canSendOffer,
+      conditions: {
+        noAssignment: !hasAssignment,
+        notUnavailable: !isUnavailable,
+        staffingStatusCheck: (!staffingStatus?.availability_status || staffingStatus.availability_status === 'declined' || staffingStatus.availability_status === 'expired')
+      }
+    });
+  }, [canAskAvailability, canSendOffer, technician, date, hasAssignment, isUnavailable, staffingStatus, jobId, assignment]);
 
   return (
     <div
