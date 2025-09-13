@@ -219,8 +219,15 @@ export const OptimizedAssignmentMatrix = ({
   }, [selectedCells]);
 
   const handleStaffingActionSelected = useCallback((jobId: string, action: 'availability' | 'offer') => {
+    console.log('🚀 OptimizedAssignmentMatrix: handleStaffingActionSelected called', { 
+      jobId, 
+      action, 
+      cellAction,
+      technicianId: cellAction?.technicianId 
+    });
+    
     if (cellAction?.type === 'select-job-for-staffing') {
-      console.log('🚀 SENDING STAFFING EMAIL:', { jobId, action, technicianId: cellAction.technicianId });
+      console.log('🚀 ABOUT TO SEND STAFFING EMAIL:', { jobId, action, technicianId: cellAction.technicianId });
       
       // Send the staffing email using the hook
       sendStaffingEmail(
@@ -249,6 +256,8 @@ export const OptimizedAssignmentMatrix = ({
           }
         }
       );
+    } else {
+      console.log('❌ cellAction is not select-job-for-staffing:', cellAction);
     }
   }, [cellAction, sendStaffingEmail, toast, closeDialogs]);
 

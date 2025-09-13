@@ -51,19 +51,18 @@ export const StaffingJobSelectionDialog = ({
 
   const handleContinue = () => {
     if (selectedJobId) {
-      // Extract technician ID from the onStaffingActionSelected callback parameters
-      // We need to get this from the parent component since we don't have it directly
-      console.log('🚀 SENDING STAFFING EMAIL:', {
+      console.log('🚀 StaffingJobSelectionDialog: handleContinue called', {
         job_id: selectedJobId,
         action: selectedAction,
         technician: technicianName,
         date: format(date, 'yyyy-MM-dd')
       });
       
-      // For now, just call the callback to let parent handle it
-      // The parent component should have access to the technician ID
+      // Call the callback to let parent handle it
       onStaffingActionSelected(selectedJobId, selectedAction);
       handleClose();
+    } else {
+      console.log('❌ StaffingJobSelectionDialog: No job selected');
     }
   };
 
