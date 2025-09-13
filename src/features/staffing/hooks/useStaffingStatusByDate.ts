@@ -8,43 +8,61 @@ export function useStaffingStatusByDate(profileId: string, date: Date) {
     queryFn: async () => {
       console.log('🔍 Fetching staffing status by date for:', { profileId, date: format(date, 'yyyy-MM-dd') })
       
-      // Query staffing_requests for this technician on this date
-      const { data } = await supabase
+      // First, find all jobs that span this date
+      const { data: jobs } = await supabase
+        .from('jobs')
+        .select('id')
+        .lte('start_date', format(date, 'yyyy-MM-dd'))
+        .gte('end_date', format(date, 'yyyy-MM-dd'))
+      
+      if (!jobs || jobs.length === 0) {
+        return { availability_status: null, offer_status: null }
+      }
+      
+      // Then check staffing requests for this technician for any of these jobs
+      const { data: staffingData } = await supabase
         .from('staffing_requests')
         .select(`
           *,
           staffing_events(*)
         `)
         .eq('profile_id', profileId)
-        .gte('requested_date', format(date, 'yyyy-MM-dd'))
-        .lte('requested_date', format(date, 'yyyy-MM-dd'))
+        .in('job_id', jobs.map(job => job.id))
         .order('created_at', { ascending: false })
-        .limit(1)
       
-      console.log('📋 Staffing status by date result:', data)
+      console.log('📋 Staffing status by date result:', staffingData)
       
-      if (!data || data.length === 0) {
+      if (!staffingData || staffingData.length === 0) {
         return { availability_status: null, offer_status: null }
       }
       
-      // Get the latest status from staffing_events
-      const request = data[0]
-      const events = request.staffing_events || []
-      
+      // Process all staffing requests to find the latest status
       let availability_status = null
       let offer_status = null
       
-      // Find the latest availability and offer events
-      for (const eventRecord of events) {
-        if (eventRecord.event === 'availability_requested' || 
-            eventRecord.event === 'availability_confirmed' || 
-            eventRecord.event === 'availability_declined') {
-          availability_status = eventRecord.event.replace('availability_', '')
-        }
-        if (eventRecord.event === 'offer_sent' || 
-            eventRecord.event === 'offer_confirmed' || 
-            eventRecord.event === 'offer_declined') {
-          offer_status = eventRecord.event.replace('offer_', '')
+      for (const request of staffingData) {
+        const events = request.staffing_events || []
+        
+        // Find the latest availability and offer events
+        for (const eventRecord of events) {
+          if (eventRecord.event === 'email_sent') {
+            availability_status = 'requested'
+          }
+          if (eventRecord.event === 'clicked_confirm') {
+            availability_status = 'confirmed'
+          }
+          if (eventRecord.event === 'clicked_decline') {
+            availability_status = 'declined'
+          }
+          if (eventRecord.event === 'offer_sent') {
+            offer_status = 'sent'
+          }
+          if (eventRecord.event === 'offer_confirmed') {
+            offer_status = 'confirmed'
+          }
+          if (eventRecord.event === 'offer_declined') {
+            offer_status = 'declined'
+          }
         }
       }
       

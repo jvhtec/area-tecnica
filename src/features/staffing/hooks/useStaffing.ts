@@ -6,15 +6,56 @@ export function useStaffingStatus(jobId: string, profileId: string) {
     queryKey: ['staffing', jobId, profileId],
     queryFn: async () => {
       console.log('🔍 Fetching staffing status for:', { jobId, profileId })
-      const { data } = await supabase
-        .from('assignment_matrix_staffing')
-        .select('*')
+      
+      // Query staffing_requests for this job and technician
+      const { data: staffingData } = await supabase
+        .from('staffing_requests')
+        .select(`
+          *,
+          staffing_events(*)
+        `)
         .eq('job_id', jobId)
         .eq('profile_id', profileId)
-        .maybeSingle()
+        .order('created_at', { ascending: false })
+        .limit(1)
       
-      console.log('📋 Staffing status result:', data)
-      return data ?? { availability_status: null, offer_status: null }
+      if (!staffingData || staffingData.length === 0) {
+        console.log('📋 No staffing data found')
+        return { availability_status: null, offer_status: null }
+      }
+      
+      // Get the latest status from staffing_events
+      const request = staffingData[0]
+      const events = request.staffing_events || []
+      
+      let availability_status = null
+      let offer_status = null
+      
+      // Find the latest availability and offer events
+      for (const eventRecord of events) {
+        if (eventRecord.event === 'email_sent') {
+          availability_status = 'requested'
+        }
+        if (eventRecord.event === 'clicked_confirm') {
+          availability_status = 'confirmed'
+        }
+        if (eventRecord.event === 'clicked_decline') {
+          availability_status = 'declined'
+        }
+        if (eventRecord.event === 'offer_sent') {
+          offer_status = 'sent'
+        }
+        if (eventRecord.event === 'offer_confirmed') {
+          offer_status = 'confirmed'
+        }
+        if (eventRecord.event === 'offer_declined') {
+          offer_status = 'declined'
+        }
+      }
+      
+      const result = { availability_status, offer_status }
+      console.log('📋 Staffing status result:', result)
+      return result
     },
     staleTime: 1_000, // Reduced from 10 seconds to 1 second for faster updates
     refetchOnWindowFocus: true, // Refetch when window becomes focused
@@ -54,6 +95,7 @@ export function useSendStaffingEmail() {
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ['staffing', vars.job_id, vars.profile_id] })
+      qc.invalidateQueries({ queryKey: ['staffing-by-date', vars.profile_id] })
       qc.invalidateQueries({ queryKey: ['assignment-matrix'] })
       qc.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] })
     }
