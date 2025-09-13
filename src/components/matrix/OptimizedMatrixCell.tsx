@@ -23,7 +23,7 @@ interface OptimizedMatrixCellProps {
   height: number;
   isSelected: boolean;
   onSelect: (selected: boolean) => void;
-  onClick: (action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline') => void;
+  onClick: (action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details', selectedJobId?: string) => void;
   onPrefetch?: () => void;
   onOptimisticUpdate?: (status: string) => void;
   onRender?: () => void;
@@ -82,31 +82,43 @@ export const OptimizedMatrixCell = memo(({
     });
     
     // For requests on empty cells, we need to select a job first
-    if ((phase === 'availability' || phase === 'offer') && !hasAssignment && !jobId) {
+    if (phase === 'availability' && !hasAssignment && !jobId) {
       console.log('📋 No job selected for request, calling onClick with select-job-for-staffing');
       onClick('select-job-for-staffing');
       return;
     }
     
-    if (!jobId && !assignment?.job_id) {
-      console.error('❌ ERROR: No job ID available for staffing request');
-      toast.error('No job ID available for staffing request');
+    if (phase === 'offer') {
+      // Determine target job id: assignment > prop > availability job from date hook
+      const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.availability_job_id;
+      if (!targetJobId) {
+        console.log('📋 No resolvable job for offer; opening job selection');
+        onClick('select-job-for-staffing');
+        return;
+      }
+      // Open offer details dialog
+      onClick('offer-details', targetJobId);
       return;
     }
 
-    const targetJobId = jobId || assignment.job_id;
+    // Availability path sends immediately
+    const targetJobId = jobId || assignment?.job_id;
+    if (!targetJobId) {
+      console.error('❌ ERROR: No job ID available for availability request');
+      toast.error('No job ID available for staffing request');
+      return;
+    }
     console.log('📧 Sending staffing email with:', { targetJobId, profile_id: technician.id, phase });
-    
     sendStaffingEmail(
       { job_id: targetJobId, profile_id: technician.id, phase },
       {
         onSuccess: (data) => {
           console.log('✅ EMAIL SUCCESS:', data);
-          toast.success(`${phase === 'availability' ? 'Availability' : 'Offer'} email sent to ${technician.first_name} ${technician.last_name}`);
+          toast.success('Availability email sent');
         },
         onError: (error) => {
           console.error('❌ EMAIL ERROR:', error);
-          toast.error(`Failed to send ${phase} email: ${error.message}`);
+          toast.error(`Failed to send availability email: ${error.message}`);
         }
       }
     );
@@ -152,27 +164,29 @@ export const OptimizedMatrixCell = memo(({
 
   const getCellBackground = () => {
     if (isSelected) return 'bg-blue-100 dark:bg-blue-900/30';
+    // Assignment present
     if (hasAssignment) {
       const status = assignment.status;
-      if (status === 'confirmed') return 'bg-green-50 dark:bg-green-900/20';
-      if (status === 'declined') return 'bg-red-50 dark:bg-red-900/20';
-      return 'bg-yellow-50 dark:bg-yellow-900/20';
+      if (status === 'confirmed') return ''; // we will paint with job color inline
+      if (status === 'declined') return 'bg-rose-50 dark:bg-rose-900/20'; // declined assignment
+      return 'bg-yellow-50 dark:bg-yellow-900/20'; // invited/pending -> availability-like pending
     }
+    // Explicit unavailable
     if (isUnavailable) return 'bg-gray-100 dark:bg-gray-800/50';
-    
-    // Show staffing status colors for empty cells
+
+    // Staffing hints for empty cells
     if (!hasAssignment && staffingStatus) {
-      if (staffingStatus.availability_status === 'confirmed') {
-        if (staffingStatus.offer_status === 'confirmed') {
-          return 'bg-purple-50 dark:bg-purple-900/20'; // Confirmed offer
-        }
-        return 'bg-blue-50 dark:bg-blue-900/20'; // Confirmed availability
-      }
-      if (staffingStatus.availability_status === 'declined') {
-        return 'bg-red-50 dark:bg-red-900/20'; // Declined availability
-      }
+      const a = (staffingStatus as any).availability_status;
+      const o = (staffingStatus as any).offer_status;
+      if (o === 'sent' || o === 'pending') return 'bg-blue-50 dark:bg-blue-900/20'; // offer sent
+      if (o === 'confirmed') return 'bg-indigo-50 dark:bg-indigo-900/20'; // offer confirmed (should soon auto-assign)
+      if (o === 'declined') return 'bg-rose-50 dark:bg-rose-900/20'; // offer declined
+      if (a === 'requested' || a === 'pending') return 'bg-yellow-50 dark:bg-yellow-900/20'; // availability request sent
+      if (a === 'confirmed') return 'bg-green-50 dark:bg-green-900/20'; // availability confirmed
+      if (a === 'declined') return 'bg-red-50 dark:bg-red-900/20'; // availability declined
+      if (a === 'expired' || o === 'expired') return 'bg-gray-100 dark:bg-gray-800/50'; // expired
     }
-    
+
     if (isTodayCell) return 'bg-orange-50 dark:bg-orange-900/20';
     if (isWeekendCell) return 'bg-muted/30';
     return 'bg-card hover:bg-accent/50';
@@ -181,7 +195,7 @@ export const OptimizedMatrixCell = memo(({
   const getBorderColor = () => {
     if (isSelected) return 'border-blue-500';
     if (hasAssignment) {
-      if (assignment.jobs?.color) return 'border-l-4';
+      if (assignment.job?.color) return 'border-l-4';
       return 'border-yellow-300';
     }
     if (isUnavailable) return 'border-gray-300';
@@ -223,8 +237,12 @@ export const OptimizedMatrixCell = memo(({
       style={{ 
         width: `${width}px`, 
         height: `${height}px`,
-        borderLeftColor: assignment?.jobs?.color,
-        borderLeftWidth: hasAssignment && assignment?.jobs?.color ? '3px' : '1px'
+        borderLeftColor: assignment?.job?.color,
+        borderLeftWidth: hasAssignment && assignment?.job?.color ? '3px' : '1px',
+        // If assignment is confirmed, paint background with the job color
+        background: hasAssignment && assignment.status === 'confirmed' && assignment?.job?.color
+          ? assignment.job.color
+          : undefined
       }}
       onClick={handleCellClick}
       onMouseEnter={handleMouseEnter}
@@ -305,10 +323,10 @@ export const OptimizedMatrixCell = memo(({
       {/* Assignment Content */}
       {hasAssignment && (
         <div className="flex-1 overflow-hidden">
-          <div className="font-medium truncate text-xs">
-            {assignment.jobs?.title || 'Assignment'}
+          <div className={cn('font-medium truncate text-xs', assignment.status === 'confirmed' ? 'text-white' : '')}>
+            {assignment.job?.title || 'Assignment'}
           </div>
-          <div className="text-xs text-muted-foreground truncate">
+          <div className={cn('text-xs truncate', assignment.status === 'confirmed' ? 'text-white/90' : 'text-muted-foreground')}>
             {assignment.sound_role || assignment.lights_role || assignment.video_role}
           </div>
           

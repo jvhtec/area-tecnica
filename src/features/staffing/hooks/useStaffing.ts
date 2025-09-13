@@ -5,60 +5,45 @@ export function useStaffingStatus(jobId: string, profileId: string) {
   return useQuery({
     queryKey: ['staffing', jobId, profileId],
     queryFn: async () => {
-      console.log('🔍 Fetching staffing status for:', { jobId, profileId })
-      
-      // Query staffing_requests for this job and technician
-      const { data: staffingData } = await supabase
-        .from('staffing_requests')
-        .select(`
-          *,
-          staffing_events(*)
-        `)
+      console.log('🔍 Fetching staffing status (view) for:', { jobId, profileId })
+
+      // Prefer the aggregated view which reflects the latest statuses
+      const { data, error } = await supabase
+        .from('assignment_matrix_staffing')
+        .select('availability_status, offer_status')
         .eq('job_id', jobId)
         .eq('profile_id', profileId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-      
-      if (!staffingData || staffingData.length === 0) {
-        console.log('📋 No staffing data found')
+        .maybeSingle()
+
+      if (error) {
+        console.warn('⚠️ staffing view error, falling back to null:', error)
+      }
+
+      if (!data) {
         return { availability_status: null, offer_status: null }
       }
-      
-      // Get the latest status from staffing_events
-      const request = staffingData[0]
-      const events = request.staffing_events || []
-      
-      let availability_status = null
-      let offer_status = null
-      
-      // Find the latest availability and offer events
-      for (const eventRecord of events) {
-        if (eventRecord.event === 'email_sent') {
-          availability_status = 'requested'
-        }
-        if (eventRecord.event === 'clicked_confirm') {
-          availability_status = 'confirmed'
-        }
-        if (eventRecord.event === 'clicked_decline') {
-          availability_status = 'declined'
-        }
-        if (eventRecord.event === 'offer_sent') {
-          offer_status = 'sent'
-        }
-        if (eventRecord.event === 'offer_confirmed') {
-          offer_status = 'confirmed'
-        }
-        if (eventRecord.event === 'offer_declined') {
-          offer_status = 'declined'
-        }
+
+      // Map DB statuses to UI statuses
+      const mapAvailability = (s: string | null) => {
+        if (!s) return null
+        if (s === 'pending') return 'requested'
+        return s
       }
-      
-      const result = { availability_status, offer_status }
-      console.log('📋 Staffing status result:', result)
+      const mapOffer = (s: string | null) => {
+        if (!s) return null
+        if (s === 'pending') return 'sent'
+        return s
+      }
+
+      const result = {
+        availability_status: mapAvailability(data.availability_status as any),
+        offer_status: mapOffer(data.offer_status as any)
+      }
+      console.log('📋 Staffing status (view) result:', result)
       return result
     },
-    staleTime: 1_000, // Reduced from 10 seconds to 1 second for faster updates
-    refetchOnWindowFocus: true, // Refetch when window becomes focused
+    staleTime: 1_000,
+    refetchOnWindowFocus: true,
     enabled: !!jobId && !!profileId
   })
 }
@@ -66,7 +51,7 @@ export function useStaffingStatus(jobId: string, profileId: string) {
 export function useSendStaffingEmail() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (payload: { job_id: string, profile_id: string, phase: 'availability'|'offer' }) => {
+    mutationFn: async (payload: { job_id: string, profile_id: string, phase: 'availability'|'offer', role?: string | null, message?: string | null }) => {
       console.log('🚀 SENDING STAFFING EMAIL:', {
         payload,
         job_id_type: typeof payload.job_id,

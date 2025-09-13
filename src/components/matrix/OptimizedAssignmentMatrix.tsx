@@ -14,6 +14,8 @@ import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useStaffingRealtime } from '@/features/staffing/hooks/useStaffingRealtime';
 import { useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
 import { useToast } from '@/hooks/use-toast';
+import { OfferDetailsDialog } from './OfferDetailsDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
 interface MatrixJob {
@@ -40,7 +42,7 @@ interface OptimizedAssignmentMatrixProps {
 }
 
 interface CellAction {
-  type: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline';
+  type: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details';
   technicianId: string;
   date: Date;
   assignment?: any;
@@ -110,7 +112,7 @@ export const OptimizedAssignmentMatrix = ({
   useEffect(() => {
     startRenderTimer();
     return () => endRenderTimer();
-  }, [startRenderTimer, endRenderTimer]);
+  }, []);
 
   // Calculate matrix dimensions
   const matrixWidth = dates.length * CELL_WIDTH;
@@ -178,11 +180,11 @@ export const OptimizedAssignmentMatrix = ({
     syncScrollPositions(mainScrollRef.current?.scrollLeft || 0, scrollTop, 'technician');
   }, [syncScrollPositions]);
 
-  const handleCellClick = useCallback((technicianId: string, date: Date, action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline') => {
+  const handleCellClick = useCallback((technicianId: string, date: Date, action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details', selectedJobId?: string) => {
     console.log('Matrix handling cell click:', { technicianId, date: format(date, 'yyyy-MM-dd'), action });
     const assignment = getAssignmentForCell(technicianId, date);
     console.log('Assignment data:', assignment);
-    setCellAction({ type: action, technicianId, date, assignment });
+    setCellAction({ type: action, technicianId, date, assignment, selectedJobId });
   }, [getAssignmentForCell]);
 
   const handleJobSelected = useCallback((jobId: string) => {
@@ -224,35 +226,39 @@ export const OptimizedAssignmentMatrix = ({
     });
     
     if (cellAction?.type === 'select-job-for-staffing') {
-      console.log('🚀 ABOUT TO SEND STAFFING EMAIL:', { jobId, action, technicianId: cellAction.technicianId });
-      
-      // Send the staffing email using the hook
-      sendStaffingEmail(
-        { 
-          job_id: jobId, 
-          profile_id: cellAction.technicianId, 
-          phase: action 
-        },
-        {
-          onSuccess: (data) => {
-            console.log('✅ STAFFING EMAIL SUCCESS:', data);
-            toast({
-              title: "Email sent!",
-              description: `${action === 'availability' ? 'Availability request' : 'Job offer'} sent successfully.`,
-            });
-            closeDialogs();
-          },
-          onError: (error) => {
-            console.error('❌ STAFFING EMAIL ERROR:', error);
-            toast({
-              title: "Email failed",
-              description: `Failed to send ${action} email: ${error.message}`,
-              variant: "destructive",
-            });
-            closeDialogs();
-          }
+      if (action === 'offer') {
+        // Open offer details dialog; do not send immediately
+        setCellAction({ ...cellAction, type: 'offer-details', selectedJobId: jobId });
+        return;
+      }
+      // Availability: pre-check conflicts, then send
+      (async () => {
+        const conflict = await checkTimeConflict(cellAction.technicianId, jobId);
+        if (conflict) {
+          toast({
+            title: 'Conflicto de horarios',
+            description: `Ya tiene confirmado: ${conflict.title} (${new Date(conflict.start_time).toLocaleString()} - ${new Date(conflict.end_time).toLocaleString()})`,
+            variant: 'destructive'
+          });
+          return;
         }
-      );
+        console.log('🚀 ABOUT TO SEND STAFFING EMAIL:', { jobId, action, technicianId: cellAction.technicianId });
+        sendStaffingEmail(
+          { job_id: jobId, profile_id: cellAction.technicianId, phase: action },
+          {
+            onSuccess: (data) => {
+              console.log('✅ STAFFING EMAIL SUCCESS:', data);
+              toast({ title: "Email sent!", description: `Availability request sent successfully.` });
+              closeDialogs();
+            },
+            onError: (error) => {
+              console.error('❌ STAFFING EMAIL ERROR:', error);
+              toast({ title: "Email failed", description: `Failed to send availability email: ${error.message}`, variant: "destructive" });
+              closeDialogs();
+            }
+          }
+        );
+      })();
     } else {
       console.log('❌ cellAction is not select-job-for-staffing:', cellAction);
     }
@@ -477,7 +483,7 @@ export const OptimizedAssignmentMatrix = ({
                         height={CELL_HEIGHT}
                         isSelected={isSelected}
                         onSelect={(selected) => handleCellSelect(technician.id, date, selected)}
-                        onClick={(action) => handleCellClick(technician.id, date, action)}
+                        onClick={(action, selectedJobId) => handleCellClick(technician.id, date, action, selectedJobId)}
                         onPrefetch={() => handleCellPrefetch(technician.id)}
                         onOptimisticUpdate={(status) => assignment && handleOptimisticUpdate(technician.id, assignment.job_id, status)}
                         onRender={() => incrementCellRender()}
@@ -538,6 +544,42 @@ export const OptimizedAssignmentMatrix = ({
         />
       )}
 
+      {cellAction?.type === 'offer-details' && currentTechnician && (
+        <OfferDetailsDialog
+          open={true}
+          onClose={closeDialogs}
+          technicianName={`${currentTechnician.first_name} ${currentTechnician.last_name}`}
+          jobTitle={jobs.find(j => j.id === cellAction.selectedJobId)?.title}
+          technicianDepartment={currentTechnician.department}
+          onSubmit={({ role, message }) => {
+            if (!cellAction.selectedJobId) return;
+            (async () => {
+              const conflict = await checkTimeConflict(currentTechnician.id, cellAction.selectedJobId!);
+              if (conflict) {
+                toast({
+                  title: 'Conflicto de horarios',
+                  description: `Ya tiene confirmado: ${conflict.title} (${new Date(conflict.start_time).toLocaleString()} - ${new Date(conflict.end_time).toLocaleString()})`,
+                  variant: 'destructive'
+                });
+                return;
+              }
+              sendStaffingEmail(
+                { job_id: cellAction.selectedJobId, profile_id: currentTechnician.id, phase: 'offer', role, message },
+                {
+                  onSuccess: () => {
+                    toast({ title: 'Offer email sent', description: `${role} offer sent to ${currentTechnician.first_name}` });
+                    closeDialogs();
+                  },
+                  onError: (error: any) => {
+                    toast({ title: 'Failed to send offer', description: error.message, variant: 'destructive' });
+                  }
+                }
+              )
+            })();
+          }}
+        />
+      )}
+
       {cellAction?.type === 'unavailable' && (
         <MarkUnavailableDialog
           open={true}
@@ -550,3 +592,39 @@ export const OptimizedAssignmentMatrix = ({
     </div>
   );
 };
+
+// Helper: check if technician has a confirmed overlapping job
+async function checkTimeConflict(technicianId: string, targetJobId: string): Promise<{ id: string, title: string, start_time: string, end_time: string } | null> {
+  try {
+    const { data: targetJob, error: jErr } = await supabase
+      .from('jobs')
+      .select('id,title,start_time,end_time')
+      .eq('id', targetJobId)
+      .maybeSingle();
+    if (jErr || !targetJob) return null;
+
+    const { data: assignments, error: aErr } = await supabase
+      .from('job_assignments')
+      .select('job_id,status')
+      .eq('technician_id', technicianId)
+      .eq('status', 'confirmed');
+    if (aErr || !assignments?.length) return null;
+
+    const otherIds = assignments.map(a => a.job_id).filter(id => id !== targetJobId);
+    if (!otherIds.length) return null;
+    const { data: jobs, error: jobsErr } = await supabase
+      .from('jobs')
+      .select('id,title,start_time,end_time')
+      .in('id', otherIds);
+    if (jobsErr || !jobs?.length) return null;
+
+    const ts = targetJob.start_time ? new Date(targetJob.start_time) : null;
+    const te = targetJob.end_time ? new Date(targetJob.end_time) : null;
+    if (!ts || !te) return null;
+    const overlap = jobs.find(j => j.start_time && j.end_time && (new Date(j.start_time) < te) && (new Date(j.end_time) > ts));
+    return overlap ? { id: overlap.id, title: overlap.title, start_time: overlap.start_time!, end_time: overlap.end_time! } : null;
+  } catch (e) {
+    console.warn('Conflict pre-check error', e);
+    return null;
+  }
+}

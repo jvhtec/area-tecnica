@@ -89,7 +89,7 @@ export default function JobAssignmentMatrix() {
         `)
         .gte('start_time', startDate.toISOString())
         .lte('end_time', endDate.toISOString())
-        .neq('job_type', 'dryhire')
+        .in('job_type', ['single', 'festival', 'tourdate'])
         .limit(500); // Limit for performance
 
       // Add department filter if selected
