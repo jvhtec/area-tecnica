@@ -65,25 +65,47 @@ export const OptimizedMatrixCell = memo(({
   const handleStaffingEmail = useCallback((e: React.MouseEvent, phase: 'availability' | 'offer') => {
     e.stopPropagation();
     
+    console.log('🚀 STAFFING EMAIL CLICKED:', {
+      phase,
+      technician: `${technician.first_name} ${technician.last_name}`,
+      technicianId: technician.id,
+      date: format(date, 'yyyy-MM-dd'),
+      jobId: jobId || assignment?.job_id,
+      hasAssignment,
+      assignment
+    });
+    
+    // For availability requests on empty cells, we need to select a job first
+    if (phase === 'availability' && !hasAssignment && !jobId) {
+      console.log('📋 No job selected for availability request, opening job selection dialog first...');
+      toast.info('Please select a job first, then ask for availability');
+      onClick('select-job');
+      return;
+    }
+    
     if (!jobId && !assignment?.job_id) {
+      console.error('❌ ERROR: No job ID available for staffing request');
       toast.error('No job ID available for staffing request');
       return;
     }
 
     const targetJobId = jobId || assignment.job_id;
+    console.log('📧 Sending staffing email with:', { targetJobId, profile_id: technician.id, phase });
     
     sendStaffingEmail(
       { job_id: targetJobId, profile_id: technician.id, phase },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
+          console.log('✅ EMAIL SUCCESS:', data);
           toast.success(`${phase === 'availability' ? 'Availability' : 'Offer'} email sent to ${technician.first_name} ${technician.last_name}`);
         },
         onError: (error) => {
+          console.error('❌ EMAIL ERROR:', error);
           toast.error(`Failed to send ${phase} email: ${error.message}`);
         }
       }
     );
-  }, [jobId, assignment?.job_id, technician.id, technician.first_name, technician.last_name, sendStaffingEmail]);
+  }, [jobId, assignment?.job_id, technician.id, technician.first_name, technician.last_name, sendStaffingEmail, hasAssignment, assignment, date, onClick]);
 
   const handleMouseEnter = useCallback(() => {
     // Prefetch data when hovering over cell
@@ -219,28 +241,40 @@ export const OptimizedMatrixCell = memo(({
       {(canAskAvailability || canSendOffer) && (
         <div className="absolute top-1 right-1 flex gap-1 z-10">
           {canAskAvailability && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 hover:bg-blue-100"
-              onClick={(e) => handleStaffingEmail(e, 'availability')}
-              disabled={isSendingEmail}
-              title="Ask availability"
-            >
-              <Mail className="h-3 w-3 text-blue-600" />
-            </Button>
+            <>
+              {console.log('🔵 Rendering ASK AVAILABILITY button for:', `${technician.first_name} ${technician.last_name}`, format(date, 'yyyy-MM-dd'))}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0 hover:bg-blue-100"
+                onClick={(e) => {
+                  console.log('📧 ASK AVAILABILITY CLICKED!');
+                  handleStaffingEmail(e, 'availability');
+                }}
+                disabled={isSendingEmail}
+                title="Ask availability"
+              >
+                <Mail className="h-3 w-3 text-blue-600" />
+              </Button>
+            </>
           )}
           {canSendOffer && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 hover:bg-green-100"
-              onClick={(e) => handleStaffingEmail(e, 'offer')}
-              disabled={isSendingEmail}
-              title="Send offer"
-            >
-              <CheckCircle className="h-3 w-3 text-green-600" />
-            </Button>
+            <>
+              {console.log('🟢 Rendering SEND OFFER button for:', `${technician.first_name} ${technician.last_name}`, format(date, 'yyyy-MM-dd'))}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0 hover:bg-green-100"
+                onClick={(e) => {
+                  console.log('✅ SEND OFFER CLICKED!');
+                  handleStaffingEmail(e, 'offer');
+                }}
+                disabled={isSendingEmail}
+                title="Send offer"
+              >
+                <CheckCircle className="h-3 w-3 text-green-600" />
+              </Button>
+            </>
           )}
         </div>
       )}
