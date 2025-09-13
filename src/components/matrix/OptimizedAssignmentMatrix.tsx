@@ -10,6 +10,7 @@ import { AssignmentStatusDialog } from './AssignmentStatusDialog';
 import { MarkUnavailableDialog } from './MarkUnavailableDialog';
 import { useOptimizedMatrixData } from '@/hooks/useOptimizedMatrixData';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
+import { useStaffingRealtime } from '@/features/staffing/hooks/useStaffingRealtime';
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
 interface MatrixJob {
@@ -85,6 +86,9 @@ export const OptimizedAssignmentMatrix = ({
     invalidateAssignmentQueries,
     isLoading
   } = useOptimizedMatrixData({ technicians, dates, jobs });
+
+  // Add staffing realtime updates
+  useStaffingRealtime();
 
   // Listen for assignment updates and refresh data
   useEffect(() => {
@@ -429,6 +433,7 @@ export const OptimizedAssignmentMatrix = ({
                         onPrefetch={() => handleCellPrefetch(technician.id)}
                         onOptimisticUpdate={(status) => assignment && handleOptimisticUpdate(technician.id, assignment.job_id, status)}
                         onRender={() => incrementCellRender()}
+                        jobId={assignment?.job_id}
                       />
                     </div>
                   );

@@ -2,9 +2,11 @@
 import React, { memo, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, Check, X, UserX } from 'lucide-react';
+import { Calendar, Clock, Check, X, UserX, Mail, CheckCircle } from 'lucide-react';
 import { format, isToday, isWeekend } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useStaffingStatus, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
+import { toast } from 'sonner';
 
 interface OptimizedMatrixCellProps {
   technician: {
@@ -24,6 +26,7 @@ interface OptimizedMatrixCellProps {
   onPrefetch?: () => void;
   onOptimisticUpdate?: (status: string) => void;
   onRender?: () => void;
+  jobId?: string;
 }
 
 export const OptimizedMatrixCell = memo(({
@@ -38,16 +41,49 @@ export const OptimizedMatrixCell = memo(({
   onClick,
   onPrefetch,
   onOptimisticUpdate,
-  onRender
+  onRender,
+  jobId
 }: OptimizedMatrixCellProps) => {
   // Track cell renders for performance monitoring
   React.useEffect(() => {
     onRender?.();
   }, [onRender]);
+  
   const isTodayCell = isToday(date);
   const isWeekendCell = isWeekend(date);
   const hasAssignment = !!assignment;
   const isUnavailable = availability?.status === 'unavailable';
+
+  // Staffing status hooks
+  const { data: staffingStatus } = useStaffingStatus(
+    jobId || assignment?.job_id || '', 
+    technician.id
+  );
+  const { mutate: sendStaffingEmail, isPending: isSendingEmail } = useSendStaffingEmail();
+
+  // Handle staffing email actions
+  const handleStaffingEmail = useCallback((e: React.MouseEvent, phase: 'availability' | 'offer') => {
+    e.stopPropagation();
+    
+    if (!jobId && !assignment?.job_id) {
+      toast.error('No job ID available for staffing request');
+      return;
+    }
+
+    const targetJobId = jobId || assignment.job_id;
+    
+    sendStaffingEmail(
+      { job_id: targetJobId, profile_id: technician.id, phase },
+      {
+        onSuccess: () => {
+          toast.success(`${phase === 'availability' ? 'Availability' : 'Offer'} email sent to ${technician.first_name} ${technician.last_name}`);
+        },
+        onError: (error) => {
+          toast.error(`Failed to send ${phase} email: ${error.message}`);
+        }
+      }
+    );
+  }, [jobId, assignment?.job_id, technician.id, technician.first_name, technician.last_name, sendStaffingEmail]);
 
   const handleMouseEnter = useCallback(() => {
     // Prefetch data when hovering over cell
@@ -112,6 +148,10 @@ export const OptimizedMatrixCell = memo(({
     return 'border-border';
   };
 
+  // Get staffing button states
+  const canAskAvailability = !hasAssignment && !isUnavailable && (!staffingStatus?.availability_status || staffingStatus.availability_status === 'declined' || staffingStatus.availability_status === 'expired');
+  const canSendOffer = hasAssignment && staffingStatus?.availability_status === 'confirmed' && (!staffingStatus?.offer_status || staffingStatus.offer_status === 'declined' || staffingStatus.offer_status === 'expired');
+
   return (
     <div
       className={cn(
@@ -129,6 +169,67 @@ export const OptimizedMatrixCell = memo(({
       onClick={handleCellClick}
       onMouseEnter={handleMouseEnter}
     >
+      {/* Staffing Status Badges */}
+      {(staffingStatus?.availability_status || staffingStatus?.offer_status) && (
+        <div className="absolute top-1 left-1 flex gap-1 z-10">
+          {staffingStatus.availability_status && (
+            <Badge 
+              variant={
+                staffingStatus.availability_status === 'confirmed' ? 'default' : 
+                staffingStatus.availability_status === 'declined' ? 'destructive' : 
+                'secondary'
+              }
+              className="text-xs px-1 py-0 h-3"
+            >
+              A:{staffingStatus.availability_status === 'confirmed' ? '✓' : 
+                 staffingStatus.availability_status === 'declined' ? '✗' : '?'}
+            </Badge>
+          )}
+          {staffingStatus.offer_status && (
+            <Badge 
+              variant={
+                staffingStatus.offer_status === 'confirmed' ? 'default' : 
+                staffingStatus.offer_status === 'declined' ? 'destructive' : 
+                'secondary'
+              }
+              className="text-xs px-1 py-0 h-3"
+            >
+              O:{staffingStatus.offer_status === 'confirmed' ? '✓' : 
+                 staffingStatus.offer_status === 'declined' ? '✗' : '?'}
+            </Badge>
+          )}
+        </div>
+      )}
+
+      {/* Staffing Action Buttons */}
+      {(canAskAvailability || canSendOffer) && (
+        <div className="absolute top-1 right-1 flex gap-1 z-10">
+          {canAskAvailability && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 hover:bg-blue-100"
+              onClick={(e) => handleStaffingEmail(e, 'availability')}
+              disabled={isSendingEmail}
+              title="Ask availability"
+            >
+              <Mail className="h-3 w-3 text-blue-600" />
+            </Button>
+          )}
+          {canSendOffer && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 hover:bg-green-100"
+              onClick={(e) => handleStaffingEmail(e, 'offer')}
+              disabled={isSendingEmail}
+              title="Send offer"
+            >
+              <CheckCircle className="h-3 w-3 text-green-600" />
+            </Button>
+          )}
+        </div>
+      )}
       {/* Assignment Content */}
       {hasAssignment && (
         <div className="flex-1 overflow-hidden">
@@ -163,16 +264,18 @@ export const OptimizedMatrixCell = memo(({
             </div>
           )}
           
-          {/* Status Badge */}
-          <div className="absolute top-1 right-1">
-            <Badge 
-              variant={assignment.status === 'confirmed' ? 'default' : 'secondary'}
-              className="text-xs px-1 py-0 h-4"
-            >
-              {assignment.status === 'confirmed' ? 'C' : 
-               assignment.status === 'declined' ? 'D' : 'P'}
-            </Badge>
-          </div>
+          {/* Status Badge - moved to not conflict with staffing badges */}
+          {hasAssignment && (
+            <div className="absolute bottom-1 right-1">
+              <Badge 
+                variant={assignment.status === 'confirmed' ? 'default' : 'secondary'}
+                className="text-xs px-1 py-0 h-4"
+              >
+                {assignment.status === 'confirmed' ? 'C' : 
+                 assignment.status === 'declined' ? 'D' : 'P'}
+              </Badge>
+            </div>
+          )}
         </div>
       )}
 
