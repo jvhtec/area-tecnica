@@ -28,11 +28,33 @@ serve(async (req) => {
   
   try {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
-    const { job_id, profile_id, phase } = await req.json(); // 'availability' | 'offer'
+    const body = await req.json();
+    console.log('📥 RECEIVED PAYLOAD:', JSON.stringify(body, null, 2));
+    
+    const { job_id, profile_id, phase } = body;
+    
+    // Enhanced validation logging
+    console.log('🔍 VALIDATING FIELDS:', {
+      job_id: { value: job_id, type: typeof job_id, isValid: !!job_id },
+      profile_id: { value: profile_id, type: typeof profile_id, isValid: !!profile_id },
+      phase: { value: phase, type: typeof phase, isValidPhase: ["availability","offer"].includes(phase) }
+    });
     
     if (!job_id || !profile_id || !["availability","offer"].includes(phase)) {
-      return new Response("Bad Request", { status: 400, headers: corsHeaders });
+      const errorDetails = {
+        missing_job_id: !job_id,
+        missing_profile_id: !profile_id,
+        invalid_phase: !["availability","offer"].includes(phase),
+        received: { job_id, profile_id, phase }
+      };
+      console.error('❌ VALIDATION FAILED:', errorDetails);
+      return new Response(JSON.stringify({ error: "Bad Request", details: errorDetails }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
+    
+    console.log('✅ VALIDATION PASSED - Proceeding with email send...');
 
     // Simple daily cap against events table
     const since = new Date(Date.now() - 24*60*60*1000).toISOString();
