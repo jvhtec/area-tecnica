@@ -5,12 +5,15 @@ import { TechnicianRow } from './TechnicianRow';
 import { OptimizedMatrixCell } from './OptimizedMatrixCell';
 import { DateHeader } from './DateHeader';
 import { SelectJobDialog } from './SelectJobDialog';
+import { StaffingJobSelectionDialog } from './StaffingJobSelectionDialog';
 import { AssignJobDialog } from './AssignJobDialog';
 import { AssignmentStatusDialog } from './AssignmentStatusDialog';
 import { MarkUnavailableDialog } from './MarkUnavailableDialog';
 import { useOptimizedMatrixData } from '@/hooks/useOptimizedMatrixData';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useStaffingRealtime } from '@/features/staffing/hooks/useStaffingRealtime';
+import { useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
+import { useToast } from '@/hooks/use-toast';
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
 interface MatrixJob {
@@ -37,7 +40,7 @@ interface OptimizedAssignmentMatrixProps {
 }
 
 interface CellAction {
-  type: 'select-job' | 'assign' | 'unavailable' | 'confirm' | 'decline';
+  type: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline';
   technicianId: string;
   date: Date;
   assignment?: any;
@@ -69,6 +72,11 @@ export const OptimizedAssignmentMatrix = ({
   
   // Performance monitoring
   const { startRenderTimer, endRenderTimer, incrementCellRender } = usePerformanceMonitor('AssignmentMatrix');
+  
+  // Staffing functionality
+  useStaffingRealtime();
+  const { toast } = useToast();
+  const { mutate: sendStaffingEmail } = useSendStaffingEmail();
   
   // Cell dimensions
   const CELL_WIDTH = 160;
@@ -173,7 +181,7 @@ export const OptimizedAssignmentMatrix = ({
     syncScrollPositions(mainScrollRef.current?.scrollLeft || 0, scrollTop, 'technician');
   }, [syncScrollPositions]);
 
-  const handleCellClick = useCallback((technicianId: string, date: Date, action: 'select-job' | 'assign' | 'unavailable' | 'confirm' | 'decline') => {
+  const handleCellClick = useCallback((technicianId: string, date: Date, action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline') => {
     console.log('Matrix handling cell click:', { technicianId, date: format(date, 'yyyy-MM-dd'), action });
     const assignment = getAssignmentForCell(technicianId, date);
     console.log('Assignment data:', assignment);
@@ -190,6 +198,13 @@ export const OptimizedAssignmentMatrix = ({
     }
   }, [cellAction]);
 
+  const closeDialogs = useCallback(() => {
+    setCellAction(null);
+    setSelectedCells(new Set());
+    // Invalidate queries when closing dialogs to refresh data
+    invalidateAssignmentQueries();
+  }, [invalidateAssignmentQueries]);
+
   const handleCellSelect = useCallback((technicianId: string, date: Date, selected: boolean) => {
     const cellKey = `${technicianId}-${format(date, 'yyyy-MM-dd')}`;
     const newSelected = new Set(selectedCells);
@@ -203,12 +218,39 @@ export const OptimizedAssignmentMatrix = ({
     setSelectedCells(newSelected);
   }, [selectedCells]);
 
-  const closeDialogs = useCallback(() => {
-    setCellAction(null);
-    setSelectedCells(new Set());
-    // Invalidate queries when closing dialogs to refresh data
-    invalidateAssignmentQueries();
-  }, [invalidateAssignmentQueries]);
+  const handleStaffingActionSelected = useCallback((jobId: string, action: 'availability' | 'offer') => {
+    if (cellAction?.type === 'select-job-for-staffing') {
+      console.log('🚀 SENDING STAFFING EMAIL:', { jobId, action, technicianId: cellAction.technicianId });
+      
+      // Send the staffing email using the hook
+      sendStaffingEmail(
+        { 
+          job_id: jobId, 
+          profile_id: cellAction.technicianId, 
+          phase: action 
+        },
+        {
+          onSuccess: (data) => {
+            console.log('✅ STAFFING EMAIL SUCCESS:', data);
+            toast({
+              title: "Email sent!",
+              description: `${action === 'availability' ? 'Availability request' : 'Job offer'} sent successfully.`,
+            });
+            closeDialogs();
+          },
+          onError: (error) => {
+            console.error('❌ STAFFING EMAIL ERROR:', error);
+            toast({
+              title: "Email failed",
+              description: `Failed to send ${action} email: ${error.message}`,
+              variant: "destructive",
+            });
+            closeDialogs();
+          }
+        }
+      );
+    }
+  }, [cellAction, sendStaffingEmail, toast, closeDialogs]);
 
   const handleCellPrefetch = useCallback((technicianId: string) => {
     prefetchTechnicianData(technicianId);
@@ -450,6 +492,17 @@ export const OptimizedAssignmentMatrix = ({
           open={true}
           onClose={closeDialogs}
           onJobSelected={handleJobSelected}
+          technicianName={`${currentTechnician.first_name} ${currentTechnician.last_name}`}
+          date={cellAction.date}
+          availableJobs={getJobsForDate(cellAction.date)}
+        />
+      )}
+
+      {cellAction?.type === 'select-job-for-staffing' && currentTechnician && (
+        <StaffingJobSelectionDialog
+          open={true}
+          onClose={closeDialogs}
+          onStaffingActionSelected={handleStaffingActionSelected}
           technicianName={`${currentTechnician.first_name} ${currentTechnician.last_name}`}
           date={cellAction.date}
           availableJobs={getJobsForDate(cellAction.date)}

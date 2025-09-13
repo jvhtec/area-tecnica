@@ -1,0 +1,167 @@
+import React, { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { Clock, Mail, CheckCircle } from 'lucide-react';
+import { format } from 'date-fns';
+import { useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
+import { useToast } from '@/hooks/use-toast';
+
+interface StaffingJobSelectionDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onStaffingActionSelected: (jobId: string, action: 'availability' | 'offer') => void;
+  technicianName: string;
+  date: Date;
+  availableJobs: Array<{
+    id: string;
+    title: string;
+    start_time: string;
+    end_time: string;
+    color?: string;
+    status: string;
+  }>;
+}
+
+export const StaffingJobSelectionDialog = ({ 
+  open, 
+  onClose, 
+  onStaffingActionSelected,
+  technicianName,
+  date,
+  availableJobs
+}: StaffingJobSelectionDialogProps) => {
+  const [selectedJobId, setSelectedJobId] = useState<string>('');
+  const [selectedAction, setSelectedAction] = useState<'availability' | 'offer'>('availability');
+  const { toast } = useToast();
+  const { mutate: sendStaffingEmail, isPending: isSendingEmail } = useSendStaffingEmail();
+
+  const handleJobSelect = (jobId: string) => {
+    setSelectedJobId(jobId);
+  };
+
+  const handleContinue = () => {
+    if (selectedJobId) {
+      // Extract technician ID from the onStaffingActionSelected callback parameters
+      // We need to get this from the parent component since we don't have it directly
+      console.log('🚀 SENDING STAFFING EMAIL:', {
+        job_id: selectedJobId,
+        action: selectedAction,
+        technician: technicianName,
+        date: format(date, 'yyyy-MM-dd')
+      });
+      
+      // For now, just call the callback to let parent handle it
+      // The parent component should have access to the technician ID
+      onStaffingActionSelected(selectedJobId, selectedAction);
+      handleClose();
+    }
+  };
+
+  const handleClose = () => {
+    setSelectedJobId('');
+    setSelectedAction('availability');
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Staffing Request</DialogTitle>
+          <DialogDescription>
+            Select a job and action for {technicianName} on{' '}
+            {format(date, 'EEEE, MMMM d, yyyy')}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Job Selection */}
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium">Select Job</h4>
+            {availableJobs.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">
+                  No jobs available for this date
+                </p>
+              </div>
+            ) : (
+              availableJobs.map((job) => (
+                <div
+                  key={job.id}
+                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                    selectedJobId === job.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:bg-accent/50'
+                  }`}
+                  onClick={() => handleJobSelect(job.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="font-medium">{job.title}</div>
+                      <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                        <Clock className="h-3 w-3" />
+                        {format(new Date(job.start_time), 'HH:mm')} - {format(new Date(job.end_time), 'HH:mm')}
+                      </div>
+                    </div>
+                    <Badge variant="secondary">{job.status}</Badge>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Action Selection */}
+          {selectedJobId && (
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium">Choose Action</h4>
+              <RadioGroup value={selectedAction} onValueChange={(value) => setSelectedAction(value as 'availability' | 'offer')}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="availability" id="availability" />
+                  <Label htmlFor="availability" className="flex items-center gap-2 cursor-pointer">
+                    <Mail className="h-4 w-4 text-blue-600" />
+                    Ask Availability
+                    <span className="text-sm text-muted-foreground">
+                      Send email to check if technician is available
+                    </span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="offer" id="offer" />
+                  <Label htmlFor="offer" className="flex items-center gap-2 cursor-pointer">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    Send Job Offer
+                    <span className="text-sm text-muted-foreground">
+                      Send email offering the job to technician
+                    </span>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleContinue}
+            disabled={!selectedJobId}
+          >
+            {selectedAction === 'availability' ? 'Ask Availability' : 'Send Offer'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};

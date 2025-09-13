@@ -22,7 +22,7 @@ interface OptimizedMatrixCellProps {
   height: number;
   isSelected: boolean;
   onSelect: (selected: boolean) => void;
-  onClick: (action: 'select-job' | 'assign' | 'unavailable' | 'confirm' | 'decline') => void;
+  onClick: (action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline') => void;
   onPrefetch?: () => void;
   onOptimisticUpdate?: (status: string) => void;
   onRender?: () => void;
@@ -77,9 +77,8 @@ export const OptimizedMatrixCell = memo(({
     
     // For availability requests on empty cells, we need to select a job first
     if (phase === 'availability' && !hasAssignment && !jobId) {
-      console.log('📋 No job selected for availability request, opening job selection dialog first...');
-      toast.info('Please select a job first, then ask for availability');
-      onClick('select-job');
+      console.log('📋 No job selected for availability request, opening staffing job selection dialog first...');
+      onClick('select-job-for-staffing');
       return;
     }
     
