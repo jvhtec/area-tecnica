@@ -254,60 +254,69 @@ function renderPage(opts: { title: string, status: 'success'|'warning'|'error'|'
     : opts.status === 'warning' ? '⚠️'
     : opts.status === 'error' ? '❌'
     : 'ℹ️';
-  return `<!doctype html>
-  <html>
-    <head>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>${opts.title}</title>
-      <style>
-        body { margin:0; padding:0; background:#f5f7fb; font-family: Arial, Helvetica, sans-serif; color:#111827; }
-        .card { background:#ffffff; border-radius:10px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,0.06); max-width:640px; margin:24px auto; }
-        .header { padding:16px 20px; background:#0b0b0b; }
-        .logos { display:flex; align-items:center; justify-content:space-between; }
-        .logos img { display:block; border:0; max-height:36px; }
-        .content { padding:24px; text-align:center; }
-        .emoji { font-size:48px; margin-bottom:8px; }
-        .heading { margin:0 0 8px 0; font-size:22px; color:${color}; }
-        .message { margin:0; color:#374151; }
-        .sub { margin:12px 0 0 0; color:#9ca3af; font-size:14px; }
-        .footer { padding:16px 24px; background:#f9fafb; color:#6b7280; font-size:12px; line-height:1.5; border-top:1px solid #e5e7eb; }
-        .links a { color:#6b7280; text-decoration:underline; }
-      </style>
-    </head>
-    <body>
-      <div class="card">
-        <div class="header">
-          <div class="logos">
-            <a href="https://www.sector-pro.com" target="_blank" rel="noopener noreferrer">
-              <img src="${COMPANY_LOGO_URL}" alt="Sector Pro" height="36" />
-            </a>
-            <a href="https://area-tecnica.lovable.app" target="_blank" rel="noopener noreferrer">
-              <img src="${AT_LOGO_URL}" alt="Área Técnica" height="36" />
-            </a>
-          </div>
-        </div>
-        <div class="content">
-          <div class="emoji">${emoji}</div>
-          <h2 class="heading">${opts.heading}</h2>
-          <p class="message">${opts.message}</p>
-          ${opts.submessage ? `<p class="sub">${opts.submessage}</p>` : ''}
-        </div>
-        <div class="footer">
-          <div style="margin-bottom:8px;">Este contenido es confidencial y puede contener información privilegiada. Si no eres el destinatario, por favor notifícanos y elimina este mensaje.</div>
-          <div class="links">Sector Pro · <a href="https://www.sector-pro.com">www.sector-pro.com</a> &nbsp;|&nbsp; Área Técnica · <a href="https://area-tecnica.lovable.app">area-tecnica.lovable.app</a></div>
-        </div>
-      </div>
-    </body>
-  </html>`;
+  
+  const submessageHtml = opts.submessage ? `<p class="sub">${opts.submessage}</p>` : '';
+  
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${opts.title}</title>
+<style>
+body { margin:0; padding:0; background:#f5f7fb; font-family: Arial, Helvetica, sans-serif; color:#111827; }
+.card { background:#ffffff; border-radius:10px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,0.06); max-width:640px; margin:24px auto; }
+.header { padding:16px 20px; background:#0b0b0b; }
+.logos { display:flex; align-items:center; justify-content:space-between; }
+.logos img { display:block; border:0; max-height:36px; }
+.content { padding:24px; text-align:center; }
+.emoji { font-size:48px; margin-bottom:8px; }
+.heading { margin:0 0 8px 0; font-size:22px; color:${color}; }
+.message { margin:0; color:#374151; }
+.sub { margin:12px 0 0 0; color:#9ca3af; font-size:14px; }
+.footer { padding:16px 24px; background:#f9fafb; color:#6b7280; font-size:12px; line-height:1.5; border-top:1px solid #e5e7eb; }
+.links a { color:#6b7280; text-decoration:underline; }
+</style>
+</head>
+<body>
+<div class="card">
+<div class="header">
+<div class="logos">
+<a href="https://www.sector-pro.com" target="_blank" rel="noopener noreferrer">
+<img src="${COMPANY_LOGO_URL}" alt="Sector Pro" height="36">
+</a>
+<a href="https://area-tecnica.lovable.app" target="_blank" rel="noopener noreferrer">
+<img src="${AT_LOGO_URL}" alt="Área Técnica" height="36">
+</a>
+</div>
+</div>
+<div class="content">
+<div class="emoji">${emoji}</div>
+<h2 class="heading">${opts.heading}</h2>
+<p class="message">${opts.message}</p>
+${submessageHtml}
+</div>
+<div class="footer">
+<div style="margin-bottom:8px;">Este contenido es confidencial y puede contener información privilegiada. Si no eres el destinatario, por favor notifícanos y elimina este mensaje.</div>
+<div class="links">Sector Pro · <a href="https://www.sector-pro.com">www.sector-pro.com</a> &nbsp;|&nbsp; Área Técnica · <a href="https://area-tecnica.lovable.app">area-tecnica.lovable.app</a></div>
+</div>
+</div>
+</body>
+</html>`;
 }
 
 function htmlResponse(html: string, status = 200) {
-  return new Response(html, {
+  const encoder = new TextEncoder();
+  const htmlBytes = encoder.encode(html);
+  
+  return new Response(htmlBytes, {
     status,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'no-store',
+      'Content-Length': htmlBytes.length.toString(),
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
     }
   });
 }

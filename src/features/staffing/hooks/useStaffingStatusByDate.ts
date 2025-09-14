@@ -33,11 +33,11 @@ export function useStaffingStatusByDate(profileId: string, date: Date) {
         return { availability_status: null, offer_status: null }
       }
 
-      // Then check the aggregated staffing view for this technician for any of these jobs
+      // Then check staffing requests for this technician for any of these jobs
       const jobIds = jobs.map(j => j.id)
-      const { data: statuses, error: statusesError } = await supabase
-        .from('assignment_matrix_staffing')
-        .select('job_id, availability_status, availability_updated_at, offer_status, offer_updated_at')
+      const { data: rawStatuses, error: statusesError } = await supabase
+        .from('staffing_requests')
+        .select('job_id, phase, status, updated_at')
         .eq('profile_id', profileId)
         .in('job_id', jobIds)
 
@@ -45,9 +45,18 @@ export function useStaffingStatusByDate(profileId: string, date: Date) {
         console.warn('⚠️ staffing view by date error:', statusesError)
       }
 
-      if (!statuses || statuses.length === 0) {
+      if (!rawStatuses || rawStatuses.length === 0) {
         return { availability_status: null, offer_status: null }
       }
+
+      // Transform raw statuses to separate availability and offer statuses
+      const statuses = rawStatuses.map(r => ({
+        job_id: r.job_id,
+        availability_status: r.phase === 'availability' ? (r.status === 'pending' ? 'requested' : r.status) : null,
+        availability_updated_at: r.phase === 'availability' ? r.updated_at : null,
+        offer_status: r.phase === 'offer' ? (r.status === 'pending' ? 'sent' : r.status) : null,
+        offer_updated_at: r.phase === 'offer' ? r.updated_at : null
+      }))
 
       // Combine statuses across matching jobs preferring the most recent per phase
       const pickAvailability = () => {
@@ -59,17 +68,13 @@ export function useStaffingStatusByDate(profileId: string, date: Date) {
             return t > accT ? s : acc
           }, withAvail[0])
           return { 
-            status: latest.availability_status === 'pending' ? 'requested' : latest.availability_status,
+            status: latest.availability_status,
             job_id: latest.job_id as string
           }
         }
-        // Fallback precedence: confirmed > declined > expired > pending
-        if (statuses.some(s => s.availability_status === 'confirmed')) return { status: 'confirmed' as const, job_id: (statuses.find(s => s.availability_status === 'confirmed') as any)?.job_id }
-        if (statuses.some(s => s.availability_status === 'declined')) return { status: 'declined' as const, job_id: (statuses.find(s => s.availability_status === 'declined') as any)?.job_id }
-        if (statuses.some(s => s.availability_status === 'expired')) return { status: 'expired' as const, job_id: (statuses.find(s => s.availability_status === 'expired') as any)?.job_id }
-        if (statuses.some(s => s.availability_status === 'pending')) return { status: 'requested' as const, job_id: (statuses.find(s => s.availability_status === 'pending') as any)?.job_id }
         return { status: null, job_id: null }
       }
+      
       const pickOffer = () => {
         const withOffer = statuses.filter(s => s.offer_status)
         if (withOffer.length > 0) {
@@ -79,15 +84,10 @@ export function useStaffingStatusByDate(profileId: string, date: Date) {
             return t > accT ? s : acc
           }, withOffer[0])
           return { 
-            status: latest.offer_status === 'pending' ? 'sent' : latest.offer_status,
+            status: latest.offer_status,
             job_id: latest.job_id as string
           }
         }
-        // Fallback precedence
-        if (statuses.some(s => s.offer_status === 'confirmed')) return { status: 'confirmed' as const, job_id: (statuses.find(s => s.offer_status === 'confirmed') as any)?.job_id }
-        if (statuses.some(s => s.offer_status === 'declined')) return { status: 'declined' as const, job_id: (statuses.find(s => s.offer_status === 'declined') as any)?.job_id }
-        if (statuses.some(s => s.offer_status === 'expired')) return { status: 'expired' as const, job_id: (statuses.find(s => s.offer_status === 'expired') as any)?.job_id }
-        if (statuses.some(s => s.offer_status === 'pending')) return { status: 'sent' as const, job_id: (statuses.find(s => s.offer_status === 'pending') as any)?.job_id }
         return { status: null, job_id: null }
       }
 
@@ -95,8 +95,8 @@ export function useStaffingStatusByDate(profileId: string, date: Date) {
       const offer = pickOffer()
 
       return { 
-        availability_status: availability.status,
-        offer_status: offer.status,
+        availability_status: availability.status as 'confirmed' | 'declined' | 'expired' | 'requested' | null,
+        offer_status: offer.status as 'confirmed' | 'declined' | 'expired' | 'sent' | null,
         availability_job_id: availability.job_id,
         offer_job_id: offer.job_id
       }
