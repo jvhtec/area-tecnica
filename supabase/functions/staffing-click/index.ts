@@ -306,14 +306,14 @@ ${submessageHtml}
 }
 
 function htmlResponse(html: string, status = 200) {
-  const encoder = new TextEncoder();
-  const htmlBytes = encoder.encode(html);
-  
-  return new Response(htmlBytes, {
+  return new Response(html, {
     status,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
-      'Content-Length': htmlBytes.length.toString(),
+      'Accept-Ranges': 'bytes',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'Content-Security-Policy': "default-src 'self'; style-src 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'",
       'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
       'Pragma': 'no-cache',
       'Expires': '0',
