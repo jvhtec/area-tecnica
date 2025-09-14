@@ -305,41 +305,27 @@ ${submessageHtml}
 }
 
 /**
- * Creates a redirect response to a static HTML template with URL parameters
+ * Creates a redirect response to external short URLs based on status
  */
 function redirectResponse(opts: { title: string, status: 'success'|'warning'|'error'|'neutral', heading: string, message: string, submessage?: string }) {
-  // Determine which template to use based on status
-  let templateFile = '';
+  // Map status to external short URLs
+  let redirectUrl = '';
   switch(opts.status) {
     case 'success':
-      templateFile = 'temp_success.html';
+      redirectUrl = 'https://sl1nk.com/successok';
       break;
     case 'error':
-      templateFile = 'temp_error.html';
+      redirectUrl = 'https://sl1nk.com/unexpectederror';
       break;
     case 'warning':
-      templateFile = 'temp_warning.html';
+      redirectUrl = 'https://sl1nk.com/warningwtf';
       break;
     case 'neutral':
-      templateFile = 'temp_neutral.html';
+      redirectUrl = 'https://l1nq.com/neutralm';
       break;
     default:
-      templateFile = 'temp_neutral.html';
+      redirectUrl = 'https://l1nq.com/neutralm';
   }
-
-  // Build URL with parameters
-  const params = new URLSearchParams({
-    title: opts.title,
-    status: opts.status,
-    heading: opts.heading,
-    message: opts.message,
-  });
-  
-  if (opts.submessage) {
-    params.append('submessage', opts.submessage);
-  }
-
-  const redirectUrl = `https://syldobdcdsgfgjtbuwxm.supabase.co/storage/v1/object/public/public%20logos/${templateFile}?${params.toString()}`;
 
   return Response.redirect(redirectUrl, 302);
 }
