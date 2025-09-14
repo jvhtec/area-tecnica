@@ -309,14 +309,9 @@ function htmlResponse(html: string, status = 200) {
   return new Response(html, {
     status,
     headers: {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Accept-Ranges': 'bytes',
-      'X-Content-Type-Options': 'nosniff',
-      'X-Frame-Options': 'DENY',
-      'Content-Security-Policy': "default-src 'self'; style-src 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'",
-      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-      'Pragma': 'no-cache',
-      'Expires': '0',
+      'Content-Type': 'text/html',
+      'Cache-Control': 'no-cache',
+      'Vary': 'User-Agent',
     }
   });
 }
