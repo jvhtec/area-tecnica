@@ -305,27 +305,22 @@ ${submessageHtml}
 }
 
 /**
- * Creates a redirect response to external short URLs based on status
+ * Creates a redirect response to the parametric HTML page with URL parameters
  */
 function redirectResponse(opts: { title: string, status: 'success'|'warning'|'error'|'neutral', heading: string, message: string, submessage?: string }) {
-  // Map status to external short URLs
-  let redirectUrl = '';
-  switch(opts.status) {
-    case 'success':
-      redirectUrl = 'https://sl1nk.com/successok';
-      break;
-    case 'error':
-      redirectUrl = 'https://sl1nk.com/unexpectederror';
-      break;
-    case 'warning':
-      redirectUrl = 'https://sl1nk.com/warningwtf';
-      break;
-    case 'neutral':
-      redirectUrl = 'https://l1nq.com/neutralm';
-      break;
-    default:
-      redirectUrl = 'https://l1nq.com/neutralm';
+  // Use single parametric URL with query parameters
+  const baseUrl = 'https://sl1nk.com/unexpectederror';
+  const params = new URLSearchParams();
+  
+  params.set('title', opts.title);
+  params.set('heading', opts.heading);
+  params.set('message', opts.message);
+  params.set('status', opts.status);
+  
+  if (opts.submessage) {
+    params.set('submessage', opts.submessage);
   }
 
+  const redirectUrl = `${baseUrl}?${params.toString()}`;
   return Response.redirect(redirectUrl, 302);
 }
