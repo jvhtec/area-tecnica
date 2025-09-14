@@ -23,33 +23,33 @@ serve(async (req) => {
     const t = url.searchParams.get("t");
     
     if (!rid || !action || !exp || !t) {
-      return htmlResponse(renderPage({
+      return redirectResponse({
         title: 'Enlace inválido',
         status: 'error',
         heading: 'Enlace inválido',
         message: 'Este enlace está incompleto o le faltan parámetros.'
-      }), 400);
+      });
     }
     
     if (new Date(exp).getTime() < Date.now()) {
-      return htmlResponse(renderPage({
+      return redirectResponse({
         title: 'Enlace caducado',
         status: 'warning',
         heading: 'Enlace caducado',
         message: 'Este enlace ha caducado. Contacta con tu responsable para solicitar uno nuevo.'
-      }), 410);
+      });
     }
 
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
     const { data: row } = await supabase.from("staffing_requests").select("*").eq("id", rid).maybeSingle();
     
     if (!row) {
-      return htmlResponse(renderPage({
+      return redirectResponse({
         title: 'No encontrado',
         status: 'error',
         heading: 'Solicitud no encontrada',
         message: 'No hemos podido localizar esta solicitud.'
-      }), 404);
+      });
     }
 
     // Recompute expected token hash (HMAC over rid:phase:exp)
@@ -65,25 +65,25 @@ serve(async (req) => {
       .map(x=>x.toString(16).padStart(2,'0')).join('');
 
     if (token_hash_expected !== row.token_hash && providedHash !== row.token_hash) {
-      return htmlResponse(renderPage({
+      return redirectResponse({
         title: 'Token inválido',
         status: 'error',
         heading: 'Token inválido',
         message: 'Este enlace no es válido. Utiliza el enlace original de tu correo.'
-      }), 403);
+      });
     }
 
     // Check if already responded
     if (row.status !== 'pending') {
       const statusText = row.status === 'confirmed' ? 'confirmado' : 'rechazado';
       const phase = row.phase === 'offer' ? 'la oferta' : 'la disponibilidad';
-      return htmlResponse(renderPage({
+      return redirectResponse({
         title: 'Respuesta registrada',
         status: 'warning',
         heading: 'Respuesta ya registrada',
         message: `Ya has ${statusText} ${phase}.`,
         submessage: 'Puedes cerrar esta pestaña.'
-      }));
+      });
     }
 
     const newStatus = action === "confirm" ? "confirmed" : "declined";
@@ -225,22 +225,21 @@ serve(async (req) => {
 
     const phaseText = row.phase === 'offer' ? 'la oferta' : 'la disponibilidad';
     const isOk = newStatus === 'confirmed';
-    const html = renderPage({
+    return redirectResponse({
       title: isOk ? '¡Confirmado!' : 'Respuesta registrada',
       status: isOk ? 'success' : 'neutral',
       heading: isOk ? '¡Gracias! Confirmado' : 'Respuesta registrada',
       message: `Tu respuesta sobre ${phaseText} ha sido registrada.`,
       submessage: 'Puedes cerrar esta pestaña.'
     });
-    return htmlResponse(html);
   } catch (error) {
     console.error("Server error:", error);
-    return htmlResponse(renderPage({
+    return redirectResponse({
       title: 'Error del servidor',
       status: 'error',
       heading: 'Error del servidor',
       message: 'Ha ocurrido un error inesperado. Inténtalo de nuevo más tarde.'
-    }), 500);
+    });
   }
 });
 
@@ -305,13 +304,42 @@ ${submessageHtml}
 </html>`;
 }
 
-function htmlResponse(html: string, status = 200) {
-  return new Response(html, {
-    status,
-    headers: {
-      'Content-Type': 'text/html',
-      'Cache-Control': 'no-cache',
-      'Vary': 'User-Agent',
-    }
+/**
+ * Creates a redirect response to a static HTML template with URL parameters
+ */
+function redirectResponse(opts: { title: string, status: 'success'|'warning'|'error'|'neutral', heading: string, message: string, submessage?: string }) {
+  // Determine which template to use based on status
+  let templateFile = '';
+  switch(opts.status) {
+    case 'success':
+      templateFile = 'temp_success.html';
+      break;
+    case 'error':
+      templateFile = 'temp_error.html';
+      break;
+    case 'warning':
+      templateFile = 'temp_warning.html';
+      break;
+    case 'neutral':
+      templateFile = 'temp_neutral.html';
+      break;
+    default:
+      templateFile = 'temp_neutral.html';
+  }
+
+  // Build URL with parameters
+  const params = new URLSearchParams({
+    title: opts.title,
+    status: opts.status,
+    heading: opts.heading,
+    message: opts.message,
   });
+  
+  if (opts.submessage) {
+    params.append('submessage', opts.submessage);
+  }
+
+  const redirectUrl = `https://syldobdcdsgfgjtbuwxm.supabase.co/storage/v1/object/public/public%20logos/${templateFile}?${params.toString()}`;
+
+  return Response.redirect(redirectUrl, 302);
 }

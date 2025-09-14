@@ -4219,9 +4219,11 @@ export type Database = {
       assignment_matrix_staffing: {
         Row: {
           availability_status: string | null
+          availability_updated_at: string | null
           job_id: string | null
           last_change: string | null
           offer_status: string | null
+          offer_updated_at: string | null
           profile_id: string | null
         }
         Relationships: [
