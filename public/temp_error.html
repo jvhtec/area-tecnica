@@ -5,17 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title id="page-title">Error – SECTOR-PRO</title>
   <style>
-    /* Reset & base */
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      background: #f5f5f5;
-      color: #333;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #232526, #414345);
+      color: #fff;
       min-height: 100vh;
       display: flex;
       align-items: center;
@@ -23,80 +21,98 @@
       padding: 20px;
     }
 
-    /* Main container styling */
-    .container {
-      background: #ffffff;
-      border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-      max-width: 500px;
-      width: 100%;
-      padding: 40px 30px;
-      text-align: center;
-    }
-
-    /* Logo + spacing */
+    /* Logo positioned above card */
     .logo-container {
-      margin-bottom: 30px;
+      text-align: center;
+      margin-bottom: 20px;
     }
     .logo {
-      width: 35%;
-      max-width: 160px;
+      width: 140px;
+      max-width: 40%;
       height: auto;
-      display: inline-block;
     }
 
-    /* Status icon */
+    /* Glassmorphism container */
+    .container {
+      backdrop-filter: blur(15px);
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 40px 30px;
+      text-align: center;
+      max-width: 480px;
+      width: 100%;
+      animation: fadeIn 0.6s ease-out;
+    }
+
+    /* Icon styling */
     .icon {
-      width: 72px;
-      height: 72px;
+      width: 90px;
+      height: 90px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin: 0 auto 24px;
-      font-size: 40px;
+      margin: 0 auto 25px;
+      font-size: 42px;
+      font-weight: bold;
       color: #fff;
+      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
     }
     .icon.error {
-      background: #e63946; /* more muted red from your palette */
+      background: linear-gradient(135deg, #e53935, #b71c1c);
     }
     .icon.success {
-      background: #2a9d8f;
+      background: linear-gradient(135deg, #43a047, #2e7d32);
     }
     .icon.warning {
-      background: #f4a261;
+      background: linear-gradient(135deg, #fb8c00, #ef6c00);
     }
     .icon.neutral {
-      background: #457b9d;
+      background: linear-gradient(135deg, #1e88e5, #1565c0);
     }
 
-    /* Headings and text */
     h1 {
-      font-size: 24px;
+      font-size: 26px;
       font-weight: 700;
-      color: #1d1d1d;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
+      color: #fff;
     }
     .message {
       font-size: 18px;
-      line-height: 1.5;
-      color: #555;
-      margin-bottom: 14px;
+      margin-bottom: 10px;
+      color: #e0e0e0;
     }
     .submessage {
       font-size: 15px;
-      color: #777;
+      color: #bdbdbd;
       font-style: italic;
     }
 
-    /* Responsive adjustments */
+    /* Animations */
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Responsive */
     @media (max-width: 480px) {
       .container {
         padding: 30px 20px;
       }
       .logo {
-        width: 50%;
-        max-width: 140px;
+        width: 100px;
+      }
+      .icon {
+        width: 70px;
+        height: 70px;
+        font-size: 32px;
       }
       h1 {
         font-size: 22px;
@@ -104,28 +120,22 @@
       .message {
         font-size: 16px;
       }
-      .icon {
-        width: 60px;
-        height: 60px;
-        font-size: 32px;
-        margin-bottom: 20px;
-      }
     }
   </style>
 </head>
 <body>
-  <div class="container">
+  <div>
     <div class="logo-container">
       <img src="https://syldobdcdsgfgjtbuwxm.supabase.co/storage/v1/object/public/public%20logos/sectorpro.png"
            alt="Sector-Pro Logo"
            class="logo">
     </div>
-
-    <div class="icon error" id="status-icon">✗</div>
-
-    <h1 id="heading">Error</h1>
-    <div class="message" id="message">Ha ocurrido un error.</div>
-    <div class="submessage" id="submessage">Por favor, inténtalo de nuevo más tarde.</div>
+    <div class="container">
+      <div class="icon error" id="status-icon">✗</div>
+      <h1 id="heading">Error</h1>
+      <div class="message" id="message">Ha ocurrido un error.</div>
+      <div class="submessage" id="submessage">Por favor, inténtalo de nuevo más tarde.</div>
+    </div>
   </div>
 
   <script>
