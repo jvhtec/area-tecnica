@@ -66,12 +66,19 @@ const Operaciones = () => {
     fetchUserRole();
   }, []);
 
-  // Keyboard shortcut: c or Cmd/Ctrl+N to open
+  // Keyboard shortcut: Cmd/Ctrl+N to open (disable plain 'c')
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement as HTMLElement | null;
+      const isTyping = !!activeEl && (
+        activeEl.tagName === 'INPUT' ||
+        activeEl.tagName === 'TEXTAREA' ||
+        activeEl.isContentEditable
+      );
+      if (isTyping) return;
+
       const metaN = (e.key.toLowerCase() === 'n') && (e.metaKey || e.ctrlKey);
-      const simpleC = e.key.toLowerCase() === 'c';
-      if ((metaN || simpleC)) {
+      if (metaN) {
         e.preventDefault();
         setPresetJobType(undefined);
         setIsJobDialogOpen(true);

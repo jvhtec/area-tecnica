@@ -1,6 +1,7 @@
 import { PDFDocument } from '../core/pdf-document';
 import { EventData } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
+import { Formatters } from '../utils/formatters';
 
 export class LogisticsSection {
   constructor(private pdfDoc: PDFDocument) {}
@@ -20,7 +21,7 @@ export class LogisticsSection {
         transport.driver_name || '',
         transport.driver_phone || '',
         transport.license_plate || '',
-        transport.company || '',
+        Formatters.translateCompany(transport.company || ''),
         transport.date_time || '',
         transport.has_return ? 'Sí' : 'No',
         transport.return_date_time || ''

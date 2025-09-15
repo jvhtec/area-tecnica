@@ -35,7 +35,7 @@ export class TravelSection {
         ['Hora Salida', Formatters.formatTime(arrangement.departure_time || '')],
         ['Hora Llegada', Formatters.formatTime(arrangement.arrival_time || '')],
         ['Vuelo/Tren', arrangement.flight_train_number],
-        ['Compañía', arrangement.company],
+        ['Compañía', Formatters.translateCompany(arrangement.company)],
         ['Conductor', arrangement.driver_name],
         ['Teléfono', Formatters.formatPhone(arrangement.driver_phone || '')],
         ['Matrícula', arrangement.plate_number],

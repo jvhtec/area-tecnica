@@ -158,6 +158,8 @@ export const useHojaDeRutaPersistence = (
           dni: s.dni || ''
         })) : [{ name: '', surname1: '', surname2: '', position: '', dni: '' }],
         schedule: mainData.schedule || '',
+        // Load multi-day program if available
+        programScheduleDays: (mainData as any).program_schedule_json || undefined,
         powerRequirements: mainData.power_requirements || '',
         auxiliaryNeeds: mainData.auxiliary_needs || '',
         weather: mainData.weather_data || []
@@ -241,6 +243,8 @@ export const useHojaDeRutaPersistence = (
         venue_latitude: eventData.venue?.coordinates?.lat || null,
         venue_longitude: eventData.venue?.coordinates?.lng || null,
         schedule: eventData.schedule || '',
+        // Save multi-day program as JSONB
+        program_schedule_json: eventData.programScheduleDays && eventData.programScheduleDays.length > 0 ? eventData.programScheduleDays : null,
         power_requirements: eventData.powerRequirements || '',
         auxiliary_needs: eventData.auxiliaryNeeds || '',
         weather_data: eventData.weather || null,

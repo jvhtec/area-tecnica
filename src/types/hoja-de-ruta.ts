@@ -132,6 +132,8 @@ export interface EventData {
   schedule?: string;
   // Structured program schedule (component-driven)
   programSchedule?: ProgramRow[];
+  // Multi-day structured program
+  programScheduleDays?: ProgramDay[];
   powerRequirements?: string;
   auxiliaryNeeds?: string;
   weather?: WeatherData[];
@@ -145,6 +147,13 @@ export interface ProgramRow {
   item: string;
   dept?: string;
   notes?: string;
+}
+
+export interface ProgramDay {
+  id?: string;
+  label?: string; // e.g., "Día 1", "Montaje", etc.
+  date?: string;  // YYYY-MM-DD (optional)
+  rows: ProgramRow[];
 }
 
 export interface HojaDeRutaTemplate {

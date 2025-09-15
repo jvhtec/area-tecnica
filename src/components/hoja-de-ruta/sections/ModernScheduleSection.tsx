@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Activity, Zap, Calendar } from "lucide-react";
 import { EventData } from "@/types/hoja-de-ruta";
 import { ScheduleBuilder } from "@/components/schedule/ScheduleBuilder";
+import { MultiDayScheduleBuilder } from "@/components/schedule/MultiDayScheduleBuilder";
 import { useMemo } from "react";
 
 interface ModernScheduleSectionProps {
@@ -18,6 +19,7 @@ export const ModernScheduleSection: React.FC<ModernScheduleSectionProps> = ({
   setEventData,
 }) => {
   const programRows = useMemo(() => eventData.programSchedule ?? [], [eventData.programSchedule]);
+  const programDays = useMemo(() => eventData.programScheduleDays ?? [], [eventData.programScheduleDays]);
 
   return (
     <motion.div
@@ -25,13 +27,11 @@ export const ModernScheduleSection: React.FC<ModernScheduleSectionProps> = ({
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      {/* New: Schedule Builder */}
-      <ScheduleBuilder
-        value={programRows}
-        onChange={(rows) => setEventData(prev => ({ ...prev, programSchedule: rows }))}
-        snapMinutes={15}
-        title="Programa del Día"
-        hideExport
+      {/* New: Multi-Day Schedule Builder (wraps single-day builder) */}
+      <MultiDayScheduleBuilder
+        value={programDays.length ? programDays : [{ label: 'Día 1', rows: programRows }]}
+        onChange={(days) => setEventData(prev => ({ ...prev, programScheduleDays: days, programSchedule: days?.[0]?.rows || [] }))}
+        dayTitle="Programa"
         subtitle={eventData.eventName ? `${eventData.eventName}${eventData.eventDates ? ' • ' + eventData.eventDates : ''}` : undefined}
       />
 
