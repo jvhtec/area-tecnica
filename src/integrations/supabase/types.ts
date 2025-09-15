@@ -1283,6 +1283,7 @@ export type Database = {
           last_modified: string | null
           last_modified_by: string | null
           power_requirements: string | null
+          program_schedule_json: Json | null
           schedule: string | null
           status: string | null
           updated_at: string | null
@@ -1306,6 +1307,7 @@ export type Database = {
           last_modified?: string | null
           last_modified_by?: string | null
           power_requirements?: string | null
+          program_schedule_json?: Json | null
           schedule?: string | null
           status?: string | null
           updated_at?: string | null
@@ -1329,6 +1331,7 @@ export type Database = {
           last_modified?: string | null
           last_modified_by?: string | null
           power_requirements?: string | null
+          program_schedule_json?: Json | null
           schedule?: string | null
           status?: string | null
           updated_at?: string | null
