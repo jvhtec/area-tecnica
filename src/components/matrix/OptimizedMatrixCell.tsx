@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useStaffingStatus, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
 import { useStaffingStatusByDate } from '@/features/staffing/hooks/useStaffingStatusByDate';
 import { toast } from 'sonner';
+import { labelForCode } from '@/utils/roles';
 
 interface OptimizedMatrixCellProps {
   technician: {
@@ -379,7 +380,7 @@ export const OptimizedMatrixCell = memo(({
             {assignment.job?.title || 'Assignment'}
           </div>
           <div className={cn('text-xs truncate', assignment.status === 'confirmed' ? 'text-white/90' : 'text-muted-foreground')}>
-            {assignment.sound_role || assignment.lights_role || assignment.video_role}
+            {labelForCode(assignment.sound_role || assignment.lights_role || assignment.video_role)}
           </div>
           
           {/* Status Actions */}

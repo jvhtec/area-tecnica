@@ -3,6 +3,7 @@ import React from 'react';
 import { Badge } from "@/components/ui/badge";
 import { Users } from "lucide-react";
 import { Department } from "@/types/department";
+import { labelForCode } from '@/utils/roles';
 
 interface JobCardAssignmentsProps {
   assignments: any[];
@@ -41,7 +42,7 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({
       return {
         id: assignment.technician_id || assignment.id,
         name,
-        role,
+        role: role ? labelForCode(role) : null,
         isFromTour,
         isExternal: !assignment.profiles && assignment.external_technician_name
       };

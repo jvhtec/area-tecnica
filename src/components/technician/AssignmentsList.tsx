@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAssignmentsListSubscriptions } from "@/hooks/useMobileRealtimeSubscriptions";
+import { labelForCode } from '@/utils/roles';
 
 interface AssignmentsListProps {
   assignments: any[];
@@ -194,9 +195,9 @@ export const AssignmentsList = ({
         if (isFestivalJob) {
           role = assignment.role || "Técnico";
         } else {
-          if (assignment.sound_role) role = assignment.sound_role;
-          else if (assignment.lights_role) role = assignment.lights_role;
-          else if (assignment.video_role) role = assignment.video_role;
+          if (assignment.sound_role) role = labelForCode(assignment.sound_role) || assignment.sound_role;
+          else if (assignment.lights_role) role = labelForCode(assignment.lights_role) || assignment.lights_role;
+          else if (assignment.video_role) role = labelForCode(assignment.video_role) || assignment.video_role;
         }
         
         // Determine card background color based on job color or department

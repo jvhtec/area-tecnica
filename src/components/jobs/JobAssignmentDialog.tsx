@@ -42,6 +42,7 @@ import { useAvailableTechnicians } from "@/hooks/useAvailableTechnicians";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
+import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
 
 interface JobAssignmentDialogProps {
   isOpen: boolean;
@@ -57,19 +58,7 @@ interface Assignment {
   lights_role: string;
 }
 
-// Department-specific role options
-const getDepartmentRoles = (department: string) => {
-  switch (department) {
-    case "sound":
-      return ["FOH Engineer", "Monitor Engineer", "RF Technician", "PA Technician"];
-    case "lights":
-      return ["Lighting Designer", "Lighting Technician", "Follow Spot", "Rigger"];
-    case "video":
-      return ["Video Director", "Video Technician", "Camera Operator", "Playback Technician"];
-    default:
-      return ["FOH Engineer", "Monitor Engineer", "RF Technician", "PA Technician"];
-  }
-};
+// Role options from centralized registry (codes with labels)
 
 // Helper function to format technician name from assignment
 const formatAssignmentTechnicianName = (assignment: any) => {
@@ -236,9 +225,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     }
   };
 
-  const getDepartmentRoleOptions = () => {
-    return getDepartmentRoles(currentDepartment);
-  };
+  const getDepartmentRoleOptions = () => roleOptionsForDiscipline(currentDepartment);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -306,9 +293,9 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
-                  {getDepartmentRoleOptions().map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {role}
+                  {getDepartmentRoleOptions().map((opt) => (
+                    <SelectItem key={opt.code} value={opt.code}>
+                      {opt.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -327,9 +314,9 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
-                  {getDepartmentRoleOptions().map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {role}
+                  {getDepartmentRoleOptions().map((opt) => (
+                    <SelectItem key={opt.code} value={opt.code}>
+                      {opt.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -366,8 +353,8 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                   <div>
                     {formatAssignmentTechnicianName(assignment)}
                     <p className="text-sm text-muted-foreground">
-                      {currentDepartment === "sound" && `Sound: ${assignment.sound_role || "None"}`}
-                      {currentDepartment === "lights" && `Lights: ${assignment.lights_role || "None"}`}
+                      {currentDepartment === "sound" && `Sound: ${labelForCode(assignment.sound_role) || "None"}`}
+                      {currentDepartment === "lights" && `Lights: ${labelForCode(assignment.lights_role) || "None"}`}
                     </p>
                   </div>
                   <AlertDialog>

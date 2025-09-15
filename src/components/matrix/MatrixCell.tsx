@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar, User, X, Plus, Check, AlertCircle, Ban } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { labelForCode } from '@/utils/roles';
 
 interface MatrixCellProps {
   technician: {
@@ -162,6 +163,7 @@ export const MatrixCell = ({
   };
 
   const role = getRoleForDepartment();
+  const displayRole = role ? labelForCode(role) : null;
 
   return (
     <Popover>
@@ -187,10 +189,10 @@ export const MatrixCell = ({
                     {assignment.jobs.title}
                   </div>
                 </div>
-                {role && (
+                {displayRole && (
                   <div className="text-xs text-muted-foreground w-full mb-1 leading-tight">
-                    <div className="truncate text-center" title={role}>
-                      {role}
+                    <div className="truncate text-center" title={displayRole}>
+                      {displayRole}
                     </div>
                   </div>
                 )}
@@ -268,8 +270,8 @@ export const MatrixCell = ({
             <div className="border-t pt-2">
               <div className="font-medium text-sm">Assigned to:</div>
               <div className="text-sm">{assignment.jobs.title}</div>
-              {role && (
-                <div className="text-xs text-muted-foreground">Role: {role}</div>
+              {displayRole && (
+                <div className="text-xs text-muted-foreground">Role: {displayRole}</div>
               )}
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-xs text-muted-foreground">Status:</span>

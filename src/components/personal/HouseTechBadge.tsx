@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { TechDetailModal } from './TechDetailModal';
+import { labelForCode } from '@/utils/roles';
 
 interface HouseTechBadgeProps {
   technician: {
@@ -54,7 +55,8 @@ export const HouseTechBadge: React.FC<HouseTechBadgeProps> = ({
 
   const getRole = () => {
     if (!assignment) return null;
-    return assignment.sound_role || assignment.lights_role || assignment.video_role;
+    const raw = assignment.sound_role || assignment.lights_role || assignment.video_role;
+    return raw ? labelForCode(raw) : null;
   };
 
   const getBadgeColor = () => {

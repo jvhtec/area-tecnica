@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { formatInJobTimezone } from '@/utils/timezoneUtils';
 import { MapPin, Clock, User, Phone, Briefcase } from 'lucide-react';
+import { labelForCode } from '@/utils/roles';
 
 interface TechnicianTooltipProps {
   technician: {
@@ -48,7 +49,8 @@ export const TechnicianTooltip: React.FC<TechnicianTooltipProps> = ({
 
   const getRole = () => {
     if (!assignment) return null;
-    return assignment.sound_role || assignment.lights_role || assignment.video_role;
+    const raw = assignment.sound_role || assignment.lights_role || assignment.video_role;
+    return raw ? labelForCode(raw) : null;
   };
 
   const getDepartmentRole = () => {

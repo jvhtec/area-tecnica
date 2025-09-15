@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { SubscriptionIndicator } from "../ui/subscription-indicator";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useEffect } from "react";
+import { labelForCode } from '@/utils/roles';
 
 interface JobAssignmentsProps {
   jobId: string;
@@ -132,7 +133,8 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
       </div>
       {filteredAssignments.map((assignment) => {
         const role = getRoleForDepartment(assignment);
-        if (!role) return null;
+        const displayRole = role ? labelForCode(role) : null;
+        if (!displayRole) return null;
         
         // Add null check for profiles before rendering
         if (!assignment.profiles) {
@@ -150,7 +152,7 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
               <span className="font-medium">
                 {assignment.profiles.first_name} {assignment.profiles.last_name}
               </span>
-              <span className="text-xs">({role})</span>
+              <span className="text-xs">({displayRole})</span>
             </div>
             {userRole !== 'logistics' && (
               <Button

@@ -22,7 +22,7 @@ import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { getDepartmentRoles } from '@/utils/roles';
+import { roleOptionsForDiscipline, codeForLabel, isRoleCode, labelForCode } from '@/utils/roles';
 
 interface AssignJobDialogProps {
   open: boolean;
@@ -80,17 +80,22 @@ export const AssignJobDialog = ({
   }, [availableJobs, existingAssignment?.status, existingAssignment?.job_id]);
 
   const selectedJob = filteredJobs.find(job => job.id === selectedJobId);
-  const roles = technician ? getDepartmentRoles(technician.department) : [];
+  const roleOptions = technician ? roleOptionsForDiscipline(technician.department) : [];
   const isReassignment = !!existingAssignment;
 
   // Set initial role if reassigning
   React.useEffect(() => {
     if (existingAssignment && technician) {
-      const currentRole = existingAssignment.sound_role || 
-                         existingAssignment.lights_role || 
+      const currentRole = existingAssignment.sound_role ||
+                         existingAssignment.lights_role ||
                          existingAssignment.video_role;
       if (currentRole) {
-        setSelectedRole(currentRole);
+        if (isRoleCode(currentRole)) {
+          setSelectedRole(currentRole);
+        } else {
+          const mapped = codeForLabel(currentRole, technician.department) || '';
+          setSelectedRole(mapped);
+        }
       }
     }
   }, [existingAssignment, technician]);
@@ -332,9 +337,9 @@ export const AssignJobDialog = ({
                   <SelectValue placeholder="Choose a role..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {roles.map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {role}
+                  {roleOptions.map((opt) => (
+                    <SelectItem key={opt.code} value={opt.code}>
+                      {opt.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -371,6 +376,11 @@ export const AssignJobDialog = ({
                   {format(new Date(selectedJob.start_time), 'HH:mm')} - {format(new Date(selectedJob.end_time), 'HH:mm')}
                 </div>
               </div>
+              {selectedRole && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  Role: {labelForCode(selectedRole)}
+                </div>
+              )}
               {assignAsConfirmed && (
                 <div className="text-xs text-green-600 mt-1 font-medium">
                   Will be assigned as confirmed

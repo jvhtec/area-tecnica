@@ -52,10 +52,50 @@ export class PlacesRestaurantService {
         return cached;
       }
 
-      // FRONTEND IMPLEMENTATION USING GOOGLE PLACES API (browser)
+      // Preferred: server-side edge function (keeps API key private and works for technicians)
+      try {
+        const { data, error } = await supabase.functions.invoke('place-restaurants', {
+          body: {
+            location: venueAddress?.trim() || undefined,
+            radius,
+            maxResults,
+            coordinates,
+          },
+        });
+        if (!error && data?.restaurants) {
+          const restaurants: Restaurant[] = (data.restaurants as any[]).map((r: any) => this.formatRestaurantData({
+            id: r.id || r.place_id,
+            name: r.name || r.displayName?.text,
+            displayName: r.displayName,
+            formattedAddress: r.formatted_address || r.formattedAddress,
+            rating: r.rating,
+            price_level: r.price_level,
+            priceLevel: r.priceLevel,
+            types: r.types,
+            formatted_phone_number: r.formatted_phone_number,
+            internationalPhoneNumber: r.internationalPhoneNumber,
+            website: r.website || r.websiteUri,
+            websiteUri: r.websiteUri,
+            geometry: r.geometry,
+            location: r.location || (r.geometry?.location ? { latitude: r.geometry.location.lat, longitude: r.geometry.location.lng } : undefined),
+            photos: r.photos,
+            distance: r.distance,
+          }));
+
+          restaurants.sort((a: any, b: any) => (a.distance || 0) - (b.distance || 0));
+          this.restaurantCache.set(cacheKey, restaurants);
+          return restaurants;
+        } else if (error) {
+          console.warn('place-restaurants edge call failed, will attempt browser fallback:', error);
+        }
+      } catch (edgeErr) {
+        console.warn('place-restaurants edge call threw, will attempt browser fallback:', edgeErr);
+      }
+
+      // Fallback: browser-based Places API (may not work for technician role if key access is blocked)
       const apiKey = await this.ensureApiKey();
       if (!apiKey) {
-        console.warn('No Google API key available');
+        console.warn('No Google API key available (fallback)');
         return [];
       }
 
@@ -85,7 +125,6 @@ export class PlacesRestaurantService {
         return [];
       }
 
-      // Nearby search via Places API v1
       const searchUrl = 'https://places.googleapis.com/v1/places:searchNearby';
       const searchRes = await fetch(searchUrl, {
         method: 'POST',
@@ -111,7 +150,7 @@ export class PlacesRestaurantService {
 
       if (!searchRes.ok) {
         const txt = await searchRes.text().catch(() => '');
-        console.error('Places search API error:', searchRes.status, txt);
+        console.error('Places search API error (fallback):', searchRes.status, txt);
         return [];
       }
 
@@ -120,7 +159,7 @@ export class PlacesRestaurantService {
 
       const restaurants = places.map((place: any) => {
         const distance = this.calculateDistance(
-          { lat, lng },
+          { lat: lat!, lng: lng! },
           { lat: place.location.latitude, lng: place.location.longitude }
         );
 
@@ -158,9 +197,20 @@ export class PlacesRestaurantService {
    */
   static async getRestaurantDetails(placeId: string): Promise<Restaurant | null> {
     try {
+      // Prefer edge function
+      try {
+        const { data, error } = await supabase.functions.invoke('place-restaurants', {
+          body: { details: true, placeId },
+        });
+        if (!error && data?.restaurant) {
+          return this.formatRestaurantData(data.restaurant);
+        }
+      } catch (err) {
+        console.warn('place-restaurants details failed, falling back to client call:', err);
+      }
+
       const apiKey = await this.ensureApiKey();
       if (!apiKey) return null;
-
       const res = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
         method: 'GET',
         headers: {
@@ -169,12 +219,10 @@ export class PlacesRestaurantService {
           'X-Goog-FieldMask': 'id,displayName,formattedAddress,rating,priceLevel,types,internationalPhoneNumber,websiteUri,location,photos'
         }
       });
-
       if (!res.ok) {
         console.error('Place details API error:', res.status, await res.text().catch(() => ''));
         return null;
       }
-
       const data = await res.json();
       return this.formatRestaurantData(data);
     } catch (e) {

@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { labelForCode } from '@/utils/roles';
 
 interface AssignmentStatusDialogProps {
   open: boolean;
@@ -189,7 +190,7 @@ export const AssignmentStatusDialog = ({
                 <Calendar className="h-4 w-4" />
                 <span className="font-medium">{assignment.jobs.title}</span>
                 <Badge variant="secondary">
-                  {assignment.sound_role || assignment.lights_role || assignment.video_role}
+                  {labelForCode(assignment.sound_role || assignment.lights_role || assignment.video_role)}
                 </Badge>
               </div>
               <div className="text-sm text-muted-foreground">

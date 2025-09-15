@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Department } from '@/types/department';
-import { getDepartmentRoles } from '@/utils/roles';
+import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
 
 interface OfferDetailsDialogProps {
   open: boolean;
@@ -18,7 +18,7 @@ interface OfferDetailsDialogProps {
 }
 
 export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, onClose, technicianName, jobTitle, technicianDepartment, onSubmit, defaultSingleDay }) => {
-  const [role, setRole] = useState('');
+  const [role, setRole] = useState(''); // stores code
   const [message, setMessage] = useState('');
   const [singleDay, setSingleDay] = useState(false);
 
@@ -26,9 +26,9 @@ export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, on
     onSubmit({ role: role.trim(), message: message.trim(), singleDay });
   };
 
-  const roleOptions = getDepartmentRoles(String(technicianDepartment));
+  const roleOptions = roleOptionsForDiscipline(String(technicianDepartment));
   React.useEffect(() => {
-    if (open && roleOptions.length && !role) setRole(roleOptions[0]);
+    if (open && roleOptions.length && !role) setRole(roleOptions[0].code);
   }, [open, technicianDepartment]);
 
   React.useEffect(() => {
@@ -56,7 +56,7 @@ export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, on
               </SelectTrigger>
               <SelectContent>
                 {roleOptions.map((opt) => (
-                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  <SelectItem key={opt.code} value={opt.code}>{opt.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

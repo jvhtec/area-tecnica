@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { formatInJobTimezone } from '@/utils/timezoneUtils';
 import { MapPin, Clock, User, Phone, Briefcase, Calendar, Plane, Stethoscope, Home, X, Warehouse } from 'lucide-react';
+import { labelForCode } from '@/utils/roles';
 
 interface TechDetailModalProps {
   open: boolean;
@@ -55,7 +56,8 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
 
   const getRole = () => {
     if (!assignment) return null;
-    return assignment.sound_role || assignment.lights_role || assignment.video_role;
+    const raw = assignment.sound_role || assignment.lights_role || assignment.video_role;
+    return raw ? labelForCode(raw) : null;
   };
 
   const getDepartmentRole = () => {

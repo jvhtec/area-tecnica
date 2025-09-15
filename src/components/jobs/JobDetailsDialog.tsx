@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { PlacesRestaurantService } from "@/utils/hoja-de-ruta/services/places-restaurant-service";
 import type { Restaurant } from "@/types/hoja-de-ruta";
+import { labelForCode } from '@/utils/roles';
 
 interface JobDetailsDialogProps {
   open: boolean;
@@ -97,6 +98,48 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     },
     enabled: open && !!(jobDetails?.locations?.formatted_address || jobDetails?.locations?.address)
   });
+
+  // Static map preview via Edge Function (technician-safe)
+  const [mapPreviewUrl, setMapPreviewUrl] = useState<string | null>(null);
+  const [isMapLoading, setIsMapLoading] = useState<boolean>(false);
+  useEffect(() => {
+    const loadStaticMap = async () => {
+      try {
+        if (!open) return;
+        const loc = jobDetails?.locations;
+        if (!loc) {
+          setMapPreviewUrl(null);
+          return;
+        }
+        const lat = typeof loc.latitude === 'number' ? loc.latitude : (typeof loc.latitude === 'string' ? parseFloat(loc.latitude) : undefined);
+        const lng = typeof loc.longitude === 'number' ? loc.longitude : (typeof loc.longitude === 'string' ? parseFloat(loc.longitude) : undefined);
+        const address = loc.formatted_address || (loc as any).address || loc.name;
+        setIsMapLoading(true);
+        const { data, error } = await supabase.functions.invoke('static-map', {
+          body: {
+            lat: Number.isFinite(lat) ? lat : undefined,
+            lng: Number.isFinite(lng) ? lng : undefined,
+            address: (!Number.isFinite(lat) || !Number.isFinite(lng)) ? address : undefined,
+            width: 600,
+            height: 300,
+            zoom: 15,
+            scale: 2,
+          }
+        });
+        if (!error && data?.dataUrl) {
+          setMapPreviewUrl(data.dataUrl);
+        } else {
+          setMapPreviewUrl(null);
+        }
+      } catch (e) {
+        console.warn('Failed to load static map preview:', e);
+        setMapPreviewUrl(null);
+      } finally {
+        setIsMapLoading(false);
+      }
+    };
+    loadStaticMap();
+  }, [open, jobDetails]);
 
   const handleDownloadDocument = async (doc: any) => {
     try {
@@ -233,15 +276,31 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                       </Button>
                     </div>
 
-                    {jobDetails.locations.latitude && jobDetails.locations.longitude && (
+                    {(isMapLoading) && (
+                      <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                          <p className="text-sm text-muted-foreground">Loading map preview...</p>
+                        </div>
+                      </div>
+                    )}
+                    {!isMapLoading && mapPreviewUrl && (
+                      <div className="rounded-lg overflow-hidden border">
+                        <img src={mapPreviewUrl} alt="Venue Map" className="w-full h-auto" />
+                        <div className="p-2 flex justify-end">
+                          <Button onClick={openGoogleMaps} size="sm">
+                            View directions
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    {!isMapLoading && !mapPreviewUrl && (
                       <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
                         <div className="text-center">
                           <MapPin className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground">
-                            Coordinates: {jobDetails.locations.latitude}, {jobDetails.locations.longitude}
-                          </p>
+                          <p className="text-sm text-muted-foreground">Map preview unavailable</p>
                           <Button onClick={openGoogleMaps} size="sm" className="mt-2">
-                            View on Google Maps
+                            Open Google Maps
                           </Button>
                         </div>
                       </div>
@@ -306,17 +365,17 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                         <div className="flex gap-1">
                           {assignment.sound_role && (
                             <Badge variant="outline" className="text-xs">
-                              Sound: {assignment.sound_role}
+                              Sound: {labelForCode(assignment.sound_role)}
                             </Badge>
                           )}
                           {assignment.lights_role && (
                             <Badge variant="outline" className="text-xs">
-                              Lights: {assignment.lights_role}
+                              Lights: {labelForCode(assignment.lights_role)}
                             </Badge>
                           )}
                           {assignment.video_role && (
                             <Badge variant="outline" className="text-xs">
-                              Video: {assignment.video_role}
+                              Video: {labelForCode(assignment.video_role)}
                             </Badge>
                           )}
                         </div>

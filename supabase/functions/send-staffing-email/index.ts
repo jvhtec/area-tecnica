@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { labelForCode as labelForRoleCode } from "../_shared/roles.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -305,9 +306,10 @@ serve(async (req) => {
       const confirmUrl = `${CONFIRM_BASE}?rid=${encodeURIComponent(insertedId)}&a=confirm&exp=${encodeURIComponent(exp)}&t=${token}`;
       const declineUrl = `${CONFIRM_BASE}?rid=${encodeURIComponent(insertedId)}&a=decline&exp=${encodeURIComponent(exp)}&t=${token}`;
 
+      const roleLabel = labelForRoleCode(role) || null;
       const subject = phase === "availability"
         ? `Disponibilidad para ${job.title}`
-        : `Oferta: ${job.title}${role ? ` — ${role}` : ''}`;
+        : `Oferta: ${job.title}${roleLabel ? ` — ${roleLabel}` : ''}`;
 
       // Spanish date/time formatting
       const fmtDate = (d?: string | null) => d ? new Intl.DateTimeFormat('es-ES', { dateStyle: 'full', timeStyle: undefined }).format(new Date(d)) : 'TBD';
@@ -375,6 +377,7 @@ serve(async (req) => {
                             <div><b>Fechas:</b> ${startDate}${job.end_time ? ` — ${endDate}` : ''}</div>
                             <div><b>Horario:</b> ${callTime}</div>
                             <div><b>Ubicación:</b> ${loc}</div>
+                            ${roleLabel ? `<div><b>Rol:</b> ${roleLabel}</div>` : ''}
                           </div>
                         </td>
                       </tr>
