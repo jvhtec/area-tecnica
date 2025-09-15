@@ -30,6 +30,7 @@ interface OptimizedMatrixCellProps {
   onRender?: () => void;
   jobId?: string;
   allowDirectAssign?: boolean;
+  declinedJobIds?: string[];
 }
 
 export const OptimizedMatrixCell = memo(({
@@ -46,7 +47,8 @@ export const OptimizedMatrixCell = memo(({
   onOptimisticUpdate,
   onRender,
   jobId,
-  allowDirectAssign = false
+  allowDirectAssign = false,
+  declinedJobIds = []
 }: OptimizedMatrixCellProps) => {
   // Track cell renders for performance monitoring
   React.useEffect(() => {
@@ -102,33 +104,20 @@ export const OptimizedMatrixCell = memo(({
         onClick('select-job-for-staffing');
         return;
       }
+      // Block staffing for jobs previously declined by this technician
+      if (declinedJobIds.includes(targetJobId)) {
+        toast.error('This job was already declined; choose a different job.');
+        return;
+      }
       // Open offer details dialog
       onClick('offer-details', targetJobId);
       return;
     }
 
-    // Availability path sends immediately
-    const targetJobId = jobId || assignment?.job_id;
-    if (!targetJobId) {
-      console.error('❌ ERROR: No job ID available for availability request');
-      toast.error('No job ID available for staffing request');
-      return;
-    }
-    console.log('📧 Sending staffing email with:', { targetJobId, profile_id: technician.id, phase });
-    sendStaffingEmail(
-      { job_id: targetJobId, profile_id: technician.id, phase },
-      {
-        onSuccess: (data) => {
-          console.log('✅ EMAIL SUCCESS:', data);
-          toast.success('Availability email sent');
-        },
-        onError: (error) => {
-          console.error('❌ EMAIL ERROR:', error);
-          toast.error(`Failed to send availability email: ${error.message}`);
-        }
-      }
-    );
-  }, [jobId, assignment?.job_id, technician.id, technician.first_name, technician.last_name, sendStaffingEmail, hasAssignment, assignment, date, onClick]);
+    // Availability path: open job selection and scope dialog; preselect target job when resolvable
+    const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.availability_job_id;
+    onClick('select-job-for-staffing', targetJobId);
+  }, [jobId, assignment?.job_id, technician.id, technician.first_name, technician.last_name, hasAssignment, assignment, date, onClick, staffingStatusByDate]);
 
   const handleMouseEnter = useCallback(() => {
     // Prefetch data when hovering over cell
@@ -284,12 +273,12 @@ export const OptimizedMatrixCell = memo(({
               title="Retry availability email"
               className="focus:outline-none"
             >
-              <Badge 
-                variant={
-                  staffingStatus.availability_status === 'confirmed' ? 'default' : 
-                  staffingStatus.availability_status === 'declined' ? 'destructive' : 
-                  'secondary'
-                }
+      <Badge 
+        variant={
+          staffingStatus.availability_status === 'confirmed' ? 'default' : 
+          staffingStatus.availability_status === 'declined' ? 'destructive' : 
+          'secondary'
+        }
                 className={`text-xs px-1 py-0 h-3 ${availabilityRetrying ? 'ring-1 ring-blue-400' : ''}`}
               >
                 {availabilityRetrying ? 'A:↻' : `A:${staffingStatus.availability_status === 'confirmed' ? '✓' : staffingStatus.availability_status === 'declined' ? '✗' : '?'}`}
@@ -464,7 +453,7 @@ export const OptimizedMatrixCell = memo(({
                 if (!pendingRetry) return;
                 setAvailabilityRetrying(true);
                 sendStaffingEmail(
-                  { job_id: pendingRetry.jobId, profile_id: technician.id, phase: 'availability' },
+                  ({ job_id: pendingRetry.jobId, profile_id: technician.id, phase: 'availability', target_date: date.toISOString(), single_day: true } as any),
                   {
                     onSuccess: () => {
                       setAvailabilityRetrying(false);

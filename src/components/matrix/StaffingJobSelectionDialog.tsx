@@ -18,7 +18,7 @@ import { format } from 'date-fns';
 interface StaffingJobSelectionDialogProps {
   open: boolean;
   onClose: () => void;
-  onStaffingActionSelected: (jobId: string, action: 'availability' | 'offer') => void;
+  onStaffingActionSelected: (jobId: string, action: 'availability' | 'offer', options?: { singleDay?: boolean }) => void;
   technicianName: string;
   date: Date;
   availableJobs: Array<{
@@ -29,6 +29,8 @@ interface StaffingJobSelectionDialogProps {
     color?: string;
     status: string;
   }>;
+  declinedJobIds?: string[];
+  preselectedJobId?: string | null;
 }
 
 export const StaffingJobSelectionDialog = ({ 
@@ -37,10 +39,13 @@ export const StaffingJobSelectionDialog = ({
   onStaffingActionSelected,
   technicianName,
   date,
-  availableJobs
+  availableJobs,
+  declinedJobIds = [],
+  preselectedJobId = null
 }: StaffingJobSelectionDialogProps) => {
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedAction, setSelectedAction] = useState<'availability' | 'offer'>('availability');
+  const [singleDay, setSingleDay] = useState<boolean>(false);
   // No direct email sending here; parent handles the action.
 
   const handleJobSelect = (jobId: string) => {
@@ -53,12 +58,13 @@ export const StaffingJobSelectionDialog = ({
         job_id: selectedJobId,
         action: selectedAction,
         technician: technicianName,
-        date: format(date, 'yyyy-MM-dd')
+        date: format(date, 'yyyy-MM-dd'),
+        singleDay
       });
       
       // Call the callback to let parent handle it.
       // Do NOT call onClose() here to avoid racing with parent state transitions (e.g., opening OfferDetails).
-      onStaffingActionSelected(selectedJobId, selectedAction);
+      onStaffingActionSelected(selectedJobId, selectedAction, { singleDay });
     } else {
       console.log('❌ StaffingJobSelectionDialog: No job selected');
     }
@@ -67,8 +73,15 @@ export const StaffingJobSelectionDialog = ({
   const handleClose = () => {
     setSelectedJobId('');
     setSelectedAction('availability');
+    setSingleDay(false);
     onClose();
   };
+
+  React.useEffect(() => {
+    if (open && preselectedJobId) {
+      setSelectedJobId(preselectedJobId);
+    }
+  }, [open, preselectedJobId]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -92,28 +105,37 @@ export const StaffingJobSelectionDialog = ({
                 </p>
               </div>
             ) : (
-              availableJobs.map((job) => (
-                <div
-                  key={job.id}
-                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                    selectedJobId === job.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:bg-accent/50'
-                  }`}
-                  onClick={() => handleJobSelect(job.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="font-medium">{job.title}</div>
-                      <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                        <Clock className="h-3 w-3" />
-                        {format(new Date(job.start_time), 'HH:mm')} - {format(new Date(job.end_time), 'HH:mm')}
+              availableJobs.map((job) => {
+                const isDeclined = declinedJobIds.includes(job.id);
+                const selected = selectedJobId === job.id;
+                return (
+                  <div
+                    key={job.id}
+                    className={`p-3 border rounded-lg transition-colors ${
+                      selected ? 'border-primary bg-primary/5' : 'border-border hover:bg-accent/50'
+                    } ${isDeclined ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                    onClick={() => {
+                      if (isDeclined) return;
+                      handleJobSelect(job.id);
+                    }}
+                    title={isDeclined ? 'Technician declined this job' : undefined}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="font-medium">{job.title}</div>
+                        <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                          <Clock className="h-3 w-3" />
+                          {format(new Date(job.start_time), 'HH:mm')} - {format(new Date(job.end_time), 'HH:mm')}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isDeclined && <Badge variant="destructive">Declined</Badge>}
+                        <Badge variant="secondary">{job.status}</Badge>
                       </div>
                     </div>
-                    <Badge variant="secondary">{job.status}</Badge>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
@@ -143,6 +165,11 @@ export const StaffingJobSelectionDialog = ({
                   </Label>
                 </div>
               </RadioGroup>
+
+              <div className="flex items-center gap-2">
+                <input id="scope-single-day" type="checkbox" checked={singleDay} onChange={(e) => setSingleDay(e.target.checked)} />
+                <Label htmlFor="scope-single-day">Substitute only for this day</Label>
+              </div>
             </div>
           )}
         </div>

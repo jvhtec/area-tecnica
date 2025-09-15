@@ -47,6 +47,7 @@ interface CellAction {
   date: Date;
   assignment?: any;
   selectedJobId?: string;
+  singleDay?: boolean;
 }
 
 interface OptimizedAssignmentMatrixExtendedProps extends OptimizedAssignmentMatrixProps {
@@ -90,6 +91,7 @@ export const OptimizedAssignmentMatrix = ({
 
   // Use optimized data hook
   const {
+    allAssignments,
     getAssignmentForCell,
     getAvailabilityForCell,
     getJobsForDate,
@@ -119,6 +121,18 @@ export const OptimizedAssignmentMatrix = ({
   // Calculate matrix dimensions
   const matrixWidth = dates.length * CELL_WIDTH;
   const matrixHeight = technicians.length * CELL_HEIGHT;
+
+  // Build declined job sets per technician for targeted staffing blocking
+  const declinedJobsByTech = React.useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    (allAssignments as any[])?.forEach((a: any) => {
+      if (a?.status === 'declined' && a.technician_id && a.job_id) {
+        if (!map.has(a.technician_id)) map.set(a.technician_id, new Set());
+        map.get(a.technician_id)!.add(a.job_id);
+      }
+    });
+    return map;
+  }, [allAssignments]);
 
   // Optimized scroll synchronization
   const syncScrollPositions = useCallback((scrollLeft: number, scrollTop: number, source: string) => {
@@ -224,7 +238,7 @@ export const OptimizedAssignmentMatrix = ({
     setSelectedCells(newSelected);
   }, [selectedCells]);
 
-  const handleStaffingActionSelected = useCallback((jobId: string, action: 'availability' | 'offer') => {
+  const handleStaffingActionSelected = useCallback((jobId: string, action: 'availability' | 'offer', options?: { singleDay?: boolean }) => {
     console.log('🚀 OptimizedAssignmentMatrix: handleStaffingActionSelected called', { 
       jobId, 
       action, 
@@ -233,9 +247,15 @@ export const OptimizedAssignmentMatrix = ({
     });
     
     if (cellAction?.type === 'select-job-for-staffing') {
+      // If the technician already declined this job, block staffing for this job only
+      const declinedSet = declinedJobsByTech.get(cellAction.technicianId);
+      if (declinedSet?.has(jobId)) {
+        toast({ title: 'Job already declined', description: 'Choose another job for this technician on this date.', variant: 'destructive' });
+        return;
+      }
       if (action === 'offer') {
         // Open offer details dialog; do not send immediately
-        setCellAction({ ...cellAction, type: 'offer-details', selectedJobId: jobId });
+        setCellAction({ ...cellAction, type: 'offer-details', selectedJobId: jobId, singleDay: options?.singleDay });
         return;
       }
       // Availability: pre-check conflicts, then send
@@ -251,7 +271,7 @@ export const OptimizedAssignmentMatrix = ({
         }
         console.log('🚀 ABOUT TO SEND STAFFING EMAIL:', { jobId, action, technicianId: cellAction.technicianId });
         sendStaffingEmail(
-          { job_id: jobId, profile_id: cellAction.technicianId, phase: action },
+          ({ job_id: jobId, profile_id: cellAction.technicianId, phase: action, target_date: cellAction.date.toISOString(), single_day: !!options?.singleDay } as any),
           {
             onSuccess: (data) => {
               console.log('✅ STAFFING EMAIL SUCCESS:', data);
@@ -495,6 +515,7 @@ export const OptimizedAssignmentMatrix = ({
                         onOptimisticUpdate={(status) => assignment && handleOptimisticUpdate(technician.id, assignment.job_id, status)}
                         onRender={() => incrementCellRender()}
                         jobId={assignment?.job_id}
+                        declinedJobIds={Array.from(declinedJobsByTech.get(technician.id) || [])}
                         allowDirectAssign={allowDirectAssign}
                       />
                     </div>
@@ -526,6 +547,8 @@ export const OptimizedAssignmentMatrix = ({
           technicianName={`${currentTechnician.first_name} ${currentTechnician.last_name}`}
           date={cellAction.date}
           availableJobs={getJobsForDate(cellAction.date)}
+          declinedJobIds={Array.from(declinedJobsByTech.get(cellAction.technicianId) || [])}
+          preselectedJobId={cellAction.selectedJobId || null}
         />
       )}
 
@@ -559,7 +582,8 @@ export const OptimizedAssignmentMatrix = ({
           technicianName={`${currentTechnician.first_name} ${currentTechnician.last_name}`}
           jobTitle={jobs.find(j => j.id === cellAction.selectedJobId)?.title}
           technicianDepartment={currentTechnician.department}
-          onSubmit={({ role, message }) => {
+          defaultSingleDay={cellAction.singleDay}
+          onSubmit={({ role, message, singleDay }) => {
             if (!cellAction.selectedJobId) return;
             (async () => {
               const conflict = await checkTimeConflict(currentTechnician.id, cellAction.selectedJobId!);
@@ -572,7 +596,7 @@ export const OptimizedAssignmentMatrix = ({
                 return;
               }
               sendStaffingEmail(
-                { job_id: cellAction.selectedJobId, profile_id: currentTechnician.id, phase: 'offer', role, message },
+                ({ job_id: cellAction.selectedJobId, profile_id: currentTechnician.id, phase: 'offer', role, message, target_date: cellAction.date.toISOString(), single_day: !!singleDay } as any),
                 {
                   onSuccess: () => {
                     toast({ title: 'Offer email sent', description: `${role} offer sent to ${currentTechnician.first_name}` });

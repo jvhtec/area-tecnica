@@ -13,21 +13,29 @@ interface OfferDetailsDialogProps {
   technicianName: string;
   jobTitle?: string;
   technicianDepartment: Department | string;
-  onSubmit: (details: { role: string; message: string }) => void;
+  onSubmit: (details: { role: string; message: string; singleDay?: boolean }) => void;
+  defaultSingleDay?: boolean;
 }
 
-export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, onClose, technicianName, jobTitle, technicianDepartment, onSubmit }) => {
+export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, onClose, technicianName, jobTitle, technicianDepartment, onSubmit, defaultSingleDay }) => {
   const [role, setRole] = useState('');
   const [message, setMessage] = useState('');
+  const [singleDay, setSingleDay] = useState(false);
 
   const handleSubmit = () => {
-    onSubmit({ role: role.trim(), message: message.trim() });
+    onSubmit({ role: role.trim(), message: message.trim(), singleDay });
   };
 
   const roleOptions = getDepartmentRoles(String(technicianDepartment));
   React.useEffect(() => {
     if (open && roleOptions.length && !role) setRole(roleOptions[0]);
   }, [open, technicianDepartment]);
+
+  React.useEffect(() => {
+    if (open && typeof defaultSingleDay === 'boolean') {
+      setSingleDay(defaultSingleDay);
+    }
+  }, [open, defaultSingleDay]);
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -56,6 +64,10 @@ export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, on
           <div>
             <Label htmlFor="message">Message (optional)</Label>
             <Textarea id="message" placeholder="Additional details to include in the email" value={message} onChange={(e) => setMessage(e.target.value)} />
+          </div>
+          <div className="flex items-center gap-2">
+            <input id="single-day" type="checkbox" checked={singleDay} onChange={(e) => setSingleDay(e.target.checked)} />
+            <Label htmlFor="single-day">Substitute only for this day</Label>
           </div>
         </div>
         <DialogFooter>
