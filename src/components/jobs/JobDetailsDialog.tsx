@@ -290,8 +290,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 
                 {jobDetails?.job_assignments && jobDetails.job_assignments.length > 0 ? (
                   <div className="space-y-3">
+                    {console.log('Job assignments:', jobDetails.job_assignments)}
                     {jobDetails.job_assignments.map((assignment: any) => (
-                      <div key={assignment.id} className="flex items-center justify-between p-3 bg-muted rounded">
+                      <div key={assignment.technician_id} className="flex items-center justify-between p-3 bg-muted rounded">
                         <div>
                           <p className="font-medium">
                             {assignment.profiles 
