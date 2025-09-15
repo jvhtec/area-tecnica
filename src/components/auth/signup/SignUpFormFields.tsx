@@ -21,9 +21,11 @@ interface SignUpFormFieldsProps {
   onSubmit: (data: SignUpFormData) => void;
   error: string | null;
   isLoading: boolean;
+  hidePassword?: boolean;
+  submitLabel?: string;
 }
 
-export const SignUpFormFields = ({ onSubmit, error, isLoading }: SignUpFormFieldsProps) => {
+export const SignUpFormFields = ({ onSubmit, error, isLoading, hidePassword = false, submitLabel = 'Sign Up' }: SignUpFormFieldsProps) => {
   const [formData, setFormData] = useState<SignUpFormData>({
     email: "",
     password: "",
@@ -61,16 +63,18 @@ export const SignUpFormFields = ({ onSubmit, error, isLoading }: SignUpFormField
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          type="password"
-          value={formData.password}
-          onChange={(e) => handleChange("password", e.target.value)}
-          required
-        />
-      </div>
+      {!hidePassword && (
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            value={formData.password}
+            onChange={(e) => handleChange("password", e.target.value)}
+            required
+          />
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="firstName">First Name</Label>
@@ -148,7 +152,7 @@ export const SignUpFormFields = ({ onSubmit, error, isLoading }: SignUpFormField
             Creating account...
           </>
         ) : (
-          'Sign Up'
+          submitLabel
         )}
       </Button>
     </form>

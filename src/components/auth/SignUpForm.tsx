@@ -4,6 +4,8 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SignUpFormFields } from "./signup/SignUpFormFields";
 import { SignUpFormActions } from "./signup/SignUpFormActions";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
 interface SignUpFormProps {
   onBack?: () => void;
@@ -13,6 +15,7 @@ interface SignUpFormProps {
 export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps) => {
   const { signUp, isLoading, error: authError } = useOptimizedAuth();
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const handleSubmit = async (formData: any) => {
     setError(null);
@@ -21,8 +24,30 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
       console.log("Starting user creation process");
       
       if (preventAutoLogin) {
-        // TODO: Handle admin user creation flow (if needed)
-        console.log("Admin user creation flow");
+        // Create user via Edge Function with default password, without logging in
+        const payload = {
+          email: formData.email,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phone: formData.phone,
+          department: formData.department,
+          dni: formData.dni,
+          residencia: formData.residencia,
+        };
+
+        const { data, error: fnError } = await supabase.functions.invoke("create-user", {
+          body: payload,
+        });
+
+        if (fnError) {
+          throw fnError;
+        }
+
+        toast({
+          title: "User created",
+          description: `Account created for ${payload.email} with default password`,
+        });
+        if (onBack) onBack();
         return;
       }
       
@@ -54,6 +79,8 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
         onSubmit={handleSubmit}
         error={error || authError}
         isLoading={isLoading}
+        hidePassword={preventAutoLogin}
+        submitLabel={preventAutoLogin ? 'Create User' : 'Sign Up'}
       />
       {onBack && <SignUpFormActions onBack={onBack} loading={isLoading} />}
     </div>
