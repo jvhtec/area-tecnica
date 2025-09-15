@@ -240,6 +240,25 @@ export function JobCardNew({
     staleTime: 60_000
   });
 
+  // Realtime: invalidate timesheet status cache when timesheets for this job change
+  useEffect(() => {
+    if (job.job_type === 'dryhire' || job.job_type === 'tourdate' || isJobBeingDeleted) return;
+    const channel = supabase
+      .channel(`job-timesheets-${job.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'timesheets', filter: `job_id=eq.${job.id}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["job-timesheets-status", job.id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [job.id, job.job_type, isJobBeingDeleted, queryClient]);
+
   const getTechTimesheetState = (techId: string): 'none' | 'draft' | 'partial' | 'submitted' | 'approved' => {
     const list = (jobTimesheets || []).filter(t => t.technician_id === techId);
     if (list.length === 0) return 'none';
