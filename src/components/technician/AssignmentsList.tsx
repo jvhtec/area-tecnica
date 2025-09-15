@@ -2,11 +2,13 @@
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { RefreshCw, Clock, Eye, Download, FileText } from "lucide-react";
+import { RefreshCw, Clock, Eye, Download, FileText, ChevronDown, ChevronRight } from "lucide-react";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface AssignmentsListProps {
   assignments: any[];
@@ -25,56 +27,104 @@ export const AssignmentsList = ({
   
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [expandedDocuments, setExpandedDocuments] = useState<Set<string>>(new Set());
+  const [documentLoading, setDocumentLoading] = useState<Set<string>>(new Set());
 
   const handleViewDocument = async (doc: any) => {
+    const docId = doc.id;
+    setDocumentLoading(prev => new Set(prev).add(docId));
+    
     try {
+      console.log("Viewing document:", doc.file_name, "at path:", doc.file_path);
+      
       const { data, error } = await supabase.storage
-        .from('job-documents')
-        .createSignedUrl(doc.file_path, 3600); // 1 hour expiry
+        .from('job_documents')
+        .createSignedUrl(doc.file_path, 60);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error creating signed URL:", error);
+        throw error;
+      }
 
       if (data?.signedUrl) {
+        console.log("Opening document:", data.signedUrl);
         window.open(data.signedUrl, '_blank');
+      } else {
+        throw new Error('No signed URL generated');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error in handleViewDocument:", err);
       toast({
         title: "Error",
-        description: "No se pudo abrir el documento.",
+        description: `No se pudo abrir el documento: ${err.message}`,
         variant: "destructive"
+      });
+    } finally {
+      setDocumentLoading(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(docId);
+        return newSet;
       });
     }
   };
 
   const handleDownload = async (doc: any) => {
+    const docId = doc.id;
+    setDocumentLoading(prev => new Set(prev).add(docId));
+    
     try {
+      console.log("Downloading document:", doc.file_name, "from path:", doc.file_path);
+      
       const { data, error } = await supabase.storage
-        .from('job-documents')
-        .createSignedUrl(doc.file_path, 3600);
+        .from('job_documents')
+        .createSignedUrl(doc.file_path, 60);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error creating signed URL for download:", error);
+        throw error;
+      }
 
       if (data?.signedUrl) {
+        console.log("Download URL created:", data.signedUrl);
         const link = document.createElement('a');
         link.href = data.signedUrl;
         link.download = doc.file_name;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+      } else {
+        throw new Error('No signed URL generated');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error downloading document:", err);
       toast({
         title: "Error",
-        description: "No se pudo descargar el documento.",
+        description: `No se pudo descargar el documento: ${err.message}`,
         variant: "destructive"
+      });
+    } finally {
+      setDocumentLoading(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(docId);
+        return newSet;
       });
     }
   };
 
   const handleTimesheetClick = (jobId: string) => {
     navigate(`/timesheets?jobId=${jobId}`);
+  };
+
+  const toggleDocuments = (assignmentId: string) => {
+    setExpandedDocuments(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(assignmentId)) {
+        newSet.delete(assignmentId);
+      } else {
+        newSet.add(assignmentId);
+      }
+      return newSet;
+    });
   };
 
   if (loading) {
@@ -188,38 +238,68 @@ export const AssignmentsList = ({
                 {/* Documents */}
                 {jobData.job_documents && jobData.job_documents.length > 0 && (
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs text-muted-foreground text-right">
-                      {jobData.job_documents.length} documento{jobData.job_documents.length !== 1 ? 's' : ''}
-                    </span>
-                    <div className="flex gap-1">
-                      {jobData.job_documents.slice(0, 2).map((doc: any) => (
-                        <div key={doc.id} className="flex gap-1">
-                          <Button
-                            onClick={() => handleViewDocument(doc)}
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0"
-                            title={`Ver ${doc.file_name}`}
-                          >
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            onClick={() => handleDownload(doc)}
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0"
-                            title={`Descargar ${doc.file_name}`}
-                          >
-                            <Download className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
-                      {jobData.job_documents.length > 2 && (
-                        <span className="text-xs text-muted-foreground">
-                          +{jobData.job_documents.length - 2} más
-                        </span>
-                      )}
-                    </div>
+                    <Collapsible 
+                      open={expandedDocuments.has(assignment.id)} 
+                      onOpenChange={() => toggleDocuments(assignment.id)}
+                    >
+                      <CollapsibleTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          <FileText className="h-3 w-3" />
+                          {jobData.job_documents.length} doc{jobData.job_documents.length !== 1 ? 's' : ''}
+                          {expandedDocuments.has(assignment.id) ? (
+                            <ChevronDown className="h-3 w-3" />
+                          ) : (
+                            <ChevronRight className="h-3 w-3" />
+                          )}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-1 mt-1">
+                        {jobData.job_documents.map((doc: any) => (
+                          <div key={doc.id} className="flex items-center justify-between gap-2 p-2 bg-secondary/20 rounded text-xs">
+                            <div className="flex-1 min-w-0">
+                              <p className="truncate font-medium">{doc.file_name}</p>
+                              <p className="text-muted-foreground text-xs">
+                                {doc.uploaded_at && format(new Date(doc.uploaded_at), "dd/MM/yyyy")}
+                              </p>
+                            </div>
+                            <div className="flex gap-1 flex-shrink-0">
+                              <Button
+                                onClick={() => handleViewDocument(doc)}
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                title={`Ver ${doc.file_name}`}
+                                disabled={documentLoading.has(doc.id)}
+                              >
+                                {documentLoading.has(doc.id) ? (
+                                  <RefreshCw className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Eye className="h-3 w-3" />
+                                )}
+                              </Button>
+                              <Button
+                                onClick={() => handleDownload(doc)}
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                title={`Descargar ${doc.file_name}`}
+                                disabled={documentLoading.has(doc.id)}
+                              >
+                                {documentLoading.has(doc.id) ? (
+                                  <RefreshCw className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Download className="h-3 w-3" />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </CollapsibleContent>
+                    </Collapsible>
                   </div>
                 )}
                 
