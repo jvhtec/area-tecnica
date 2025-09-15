@@ -49,6 +49,8 @@ import {
   Target,
 } from "lucide-react";
 import { formatInJobTimezone, isJobOnDate } from "@/utils/timezoneUtils";
+import { useMobileDayCalendarSubscriptions } from "@/hooks/useMobileRealtimeSubscriptions";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface MobileDayCalendarProps {
   date: Date | undefined;
@@ -97,7 +99,10 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
   onJobClick,
 }) => {
   const [currentDate, setCurrentDate] = useState(date);
-  const [dateTypes, setDateTypes] = useState<Record<string, any>>({});
+  const queryClient = useQueryClient();
+  
+  // Set up realtime subscriptions for all mobile calendar data
+  useMobileDayCalendarSubscriptions();
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [printSettings, setPrintSettings] = useState<PrintSettings>({
     jobTypes: {
@@ -145,16 +150,16 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
     });
   }, [jobs, department, selectedJobTypes, selectedJobStatuses]);
 
-  // Fetch date types for current date jobs
-  useEffect(() => {
-    const fetchDateTypes = async () => {
+  // Use realtime query for date types instead of manual fetch
+  const { data: dateTypes = {} } = useQuery({
+    queryKey: ['job_date_types', format(currentDate, 'yyyy-MM-dd')],
+    queryFn: async () => {
       const dayJobs = getJobsForDate(currentDate);
       const jobIds = dayJobs.map(job => job.id);
       const formattedDate = format(currentDate, 'yyyy-MM-dd');
 
       if (jobIds.length === 0) {
-        setDateTypes({});
-        return;
+        return {};
       }
 
       const { data, error } = await supabase
@@ -165,18 +170,17 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
 
       if (error) {
         console.error("Error fetching date types:", error);
-        return;
+        return {};
       }
 
-      const typesMap = data.reduce((acc: Record<string, any>, curr) => ({
+      return data.reduce((acc: Record<string, any>, curr) => ({
         ...acc,
         [`${curr.job_id}-${curr.date}`]: curr,
       }), {});
-      setDateTypes(typesMap);
-    };
-
-    fetchDateTypes();
-  }, [currentDate, getJobsForDate, onDateTypeChange]); // Add onDateTypeChange to trigger refetch
+    },
+    enabled: getJobsForDate(currentDate).length > 0,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
 
   // Simple PDF/XLS generation for mobile (single day focus)
   const generatePDF = (range: "month" | "quarter" | "year") => {
@@ -221,37 +225,10 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
         jobId={job.id}
         date={currentDate}
         onTypeChange={() => {
-          // Force a refetch of date types when changed
-          const fetchDateTypes = async () => {
-            const dayJobs = getJobsForDate(currentDate);
-            const jobIds = dayJobs.map(job => job.id);
-            const formattedDate = format(currentDate, 'yyyy-MM-dd');
-
-            if (jobIds.length === 0) {
-              setDateTypes({});
-              return;
-            }
-
-            const { data, error } = await supabase
-              .from("job_date_types")
-              .select("*")
-              .in("job_id", jobIds)
-              .eq("date", formattedDate);
-
-            if (error) {
-              console.error("Error fetching date types:", error);
-              return;
-            }
-
-            const typesMap = data.reduce((acc: Record<string, any>, curr) => ({
-              ...acc,
-              [`${curr.job_id}-${curr.date}`]: curr,
-            }), {});
-            setDateTypes(typesMap);
-          };
-          
-          // Refetch date types immediately
-          fetchDateTypes();
+          // Invalidate and refetch date types query
+          queryClient.invalidateQueries({ 
+            queryKey: ['job_date_types', format(currentDate, 'yyyy-MM-dd')] 
+          });
           // Also call the parent callback
           onDateTypeChange();
         }}
@@ -262,37 +239,10 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
           currentDate={currentDate}
           dateTypes={dateTypes}
           onDateTypeChange={() => {
-            // Force a refetch of date types when changed
-            const fetchDateTypes = async () => {
-              const dayJobs = getJobsForDate(currentDate);
-              const jobIds = dayJobs.map(job => job.id);
-              const formattedDate = format(currentDate, 'yyyy-MM-dd');
-
-              if (jobIds.length === 0) {
-                setDateTypes({});
-                return;
-              }
-
-              const { data, error } = await supabase
-                .from("job_date_types")
-                .select("*")
-                .in("job_id", jobIds)
-                .eq("date", formattedDate);
-
-              if (error) {
-                console.error("Error fetching date types:", error);
-                return;
-              }
-
-              const typesMap = data.reduce((acc: Record<string, any>, curr) => ({
-                ...acc,
-                [`${curr.job_id}-${curr.date}`]: curr,
-              }), {});
-              setDateTypes(typesMap);
-            };
-            
-            // Refetch date types immediately
-            fetchDateTypes();
+            // Invalidate and refetch date types query
+            queryClient.invalidateQueries({ 
+              queryKey: ['job_date_types', format(currentDate, 'yyyy-MM-dd')] 
+            });
             // Also call the parent callback
             onDateTypeChange();
           }}

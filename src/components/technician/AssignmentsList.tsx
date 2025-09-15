@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useAssignmentsListSubscriptions } from "@/hooks/useMobileRealtimeSubscriptions";
 
 interface AssignmentsListProps {
   assignments: any[];
@@ -29,6 +30,9 @@ export const AssignmentsList = ({
   const { toast } = useToast();
   const [expandedDocuments, setExpandedDocuments] = useState<Set<string>>(new Set());
   const [documentLoading, setDocumentLoading] = useState<Set<string>>(new Set());
+  
+  // Set up realtime subscriptions for assignment data updates
+  useAssignmentsListSubscriptions();
 
   const handleViewDocument = async (doc: any) => {
     const docId = doc.id;

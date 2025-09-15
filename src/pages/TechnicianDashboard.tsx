@@ -14,8 +14,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
-import { useTableSubscription } from "@/hooks/useSubscription";
 import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
+import { useTechnicianDashboardSubscriptions } from "@/hooks/useMobileRealtimeSubscriptions";
 
 const TechnicianDashboard = () => {
   const [timeSpan, setTimeSpan] = useState<string>("1week");
@@ -69,8 +69,8 @@ const TechnicianDashboard = () => {
     fetchUserDepartment();
   }, []);
 
-  // Set up real-time subscription for job assignments
-  useTableSubscription('job_assignments', 'assignments');
+  // Set up comprehensive real-time subscriptions for mobile dashboard
+  useTechnicianDashboardSubscriptions();
 
   const getTimeSpanEndDate = () => {
     const today = new Date();
