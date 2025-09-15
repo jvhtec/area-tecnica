@@ -134,7 +134,8 @@ const TechnicianDashboard = () => {
               )
             )
           `)
-          .eq('technician_id', user.id);
+          .eq('technician_id', user.id)
+          .eq('status', 'confirmed');
 
         if (viewMode === 'upcoming') {
           // Show upcoming and ongoing jobs

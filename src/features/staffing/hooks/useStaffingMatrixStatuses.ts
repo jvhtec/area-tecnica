@@ -49,11 +49,11 @@ export function useStaffingMatrixStatuses(
         for (const tb of techBatches) {
           for (const jb of jobBatches) {
             promises.push(
-              supabase
+              Promise.resolve(supabase
                 .from('assignment_matrix_staffing')
                 .select('job_id, profile_id, availability_status, offer_status')
                 .in('job_id', jb)
-                .in('profile_id', tb)
+                .in('profile_id', tb))
             )
           }
         }
@@ -86,11 +86,11 @@ export function useStaffingMatrixStatuses(
         for (const tb of techBatches) {
           for (const jb of jobBatches) {
             promises.push(
-              supabase
+              Promise.resolve(supabase
                 .from('staffing_requests')
                 .select('job_id, profile_id, phase, status, updated_at')
                 .in('profile_id', tb)
-                .in('job_id', jb)
+                .in('job_id', jb))
             )
           }
         }
