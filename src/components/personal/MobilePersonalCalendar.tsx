@@ -9,6 +9,7 @@ import { HouseTechBadge } from "./HouseTechBadge";
 import { TechContextMenu } from "./TechContextMenu";
 import { usePersonalCalendarData } from "./hooks/usePersonalCalendarData";
 import { useTechnicianAvailability } from "./hooks/useTechnicianAvailability";
+import { TechDetailModal } from "./TechDetailModal";
 
 interface MobilePersonalCalendarProps {
   date: Date;
@@ -31,6 +32,14 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
       festival: true,
     },
   });
+
+  // Modal state for showing assignment/job details like desktop
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedTech, setSelectedTech] = useState<any | null>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<any | undefined>(undefined);
+  const [selectedAvailability, setSelectedAvailability] = useState<
+    'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | null
+  >(null);
 
   useEffect(() => {
     setCurrentDate(date);
@@ -103,6 +112,18 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
     }
 
     return true;
+  };
+
+  const openDetail = (tech: any) => {
+    const dayAssignments = getAssignmentsForDate(currentDate);
+    const techAssignment = dayAssignments.find(
+      (assignment) => assignment.technician_id === tech.id
+    );
+    const availabilityStatus = getAvailabilityStatus(tech.id, currentDate);
+    setSelectedTech(tech);
+    setSelectedAssignment(techAssignment);
+    setSelectedAvailability(availabilityStatus || null);
+    setDetailOpen(true);
   };
 
   // Personnel summary for selected date
@@ -402,7 +423,10 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
                      onAvailabilityChange={(techId, status, date) => handleAvailabilityChange(techId, status, date)}
                      onAvailabilityRemove={handleAvailabilityRemove}
                   >
-                    <div className="border rounded-md p-3 flex items-start justify-between gap-3 hover:bg-accent/50 transition-colors cursor-pointer">
+                    <div
+                      className="border rounded-md p-3 flex items-start justify-between gap-3 hover:bg-accent/50 transition-colors cursor-pointer"
+                      onClick={() => openDetail(tech)}
+                    >
                       <div className="min-w-0">
                         <div className="font-medium truncate">{techName}</div>
                         {tech.department && (
@@ -444,6 +468,20 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
         currentMonth={currentDate}
         selectedJobTypes={[]}
       />
+
+      {/* Detail modal on mobile to mirror desktop behavior */}
+      {selectedTech && (
+        <TechDetailModal
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+          technician={selectedTech}
+          assignment={selectedAssignment}
+          date={currentDate}
+          availabilityStatus={selectedAvailability}
+          onAvailabilityChange={(techId, status, d) => handleAvailabilityChange(techId, status, d)}
+          onAvailabilityRemove={(techId, d) => handleAvailabilityRemove(techId, d)}
+        />
+      )}
     </Card>
     </div>
   );
