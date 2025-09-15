@@ -26,6 +26,7 @@ export class Formatters {
       'train': 'Tren',
       'plane': 'Avión',
       'RV': 'Autocaravana',
+      'own_means': 'Medios propios',
       'trailer': 'Trailer',
       '9m': '9m',
       '8m': '8m',
@@ -35,6 +36,20 @@ export class Formatters {
     };
     
     return translations[type] || type;
+  }
+
+  static translateCompany(company: string | undefined): string {
+    if (!company) return '';
+    const map: Record<string, string> = {
+      'pantoja': 'Pantoja',
+      'transluminaria': 'Transluminaria',
+      'transcamarena': 'Transcamarena',
+      'wild tour': 'Wild Tour',
+      'camionaje': 'Camionaje',
+      'sector-pro': 'Sector-Pro',
+      'other': 'Otro'
+    };
+    return map[company] || company;
   }
 
   static formatTime(time: string): string {

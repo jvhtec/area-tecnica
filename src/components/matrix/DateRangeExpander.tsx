@@ -104,14 +104,12 @@ export const DateRangeExpander: React.FC<DateRangeExpanderProps> = ({
           <SelectValue placeholder="Jump" />
         </SelectTrigger>
         <SelectContent>
-          {years.map(year => (
-            <React.Fragment key={year}>
-              {months.map(month => (
-                <SelectItem key={`${year}-${month.value}`} value={`${year}-${month.value}`}>
-                  {month.label} {year}
-                </SelectItem>
-              ))}
-            </React.Fragment>
+          {years.flatMap(year => (
+            months.map(month => (
+              <SelectItem key={`${year}-${month.value}`} value={`${year}-${month.value}`}>
+                {month.label} {year}
+              </SelectItem>
+            ))
           ))}
         </SelectContent>
       </Select>

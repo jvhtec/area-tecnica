@@ -29,6 +29,7 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
       case 'train': return Train;
       case 'sleeper_bus': return Bus;
       case 'RV': return Car;
+      case 'own_means': return Car;
       default: return Car;
     }
   };
@@ -130,34 +131,44 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
                                 Autocaravana
                               </div>
                             </SelectItem>
+                            <SelectItem value="own_means">
+                              <div className="flex items-center gap-2">
+                                <Car className="w-4 h-4" />
+                                Medios propios
+                              </div>
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium flex items-center gap-2">
-                          <MapPin className="w-4 h-4" />
-                          Dirección de Recogida
-                        </Label>
-                        <AddressAutocomplete
-                          value={arrangement.pickup_address || ''}
-                          onChange={(address) => onUpdate(index, 'pickup_address', address)}
-                          placeholder="Buscar dirección de recogida..."
-                        />
-                      </div>
+                      {arrangement.transportation_type !== 'own_means' && (
+                        <>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                              <MapPin className="w-4 h-4" />
+                              Dirección de Recogida
+                            </Label>
+                            <AddressAutocomplete
+                              value={arrangement.pickup_address || ''}
+                              onChange={(address) => onUpdate(index, 'pickup_address', address)}
+                              placeholder="Buscar dirección de recogida..."
+                            />
+                          </div>
 
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium flex items-center gap-2">
-                          <Clock className="w-4 h-4" />
-                          Hora de Recogida
-                        </Label>
-                        <Input
-                          type="time"
-                          value={arrangement.pickup_time || ''}
-                          onChange={(e) => onUpdate(index, 'pickup_time', e.target.value)}
-                          className="border-2 focus:border-cyan-300"
-                        />
-                      </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                              <Clock className="w-4 h-4" />
+                              Hora de Recogida
+                            </Label>
+                            <Input
+                              type="time"
+                              value={arrangement.pickup_time || ''}
+                              onChange={(e) => onUpdate(index, 'pickup_time', e.target.value)}
+                              className="border-2 focus:border-cyan-300"
+                            />
+                          </div>
+                        </>
+                      )}
 
                       {(arrangement.transportation_type === 'plane' || arrangement.transportation_type === 'train') && (
                         <>
@@ -256,6 +267,11 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
                         placeholder="Información adicional sobre el viaje..."
                         className="border-2 focus:border-cyan-300"
                       />
+                      {arrangement.transportation_type === 'own_means' && (
+                        <p className="text-xs text-gray-500">
+                          Con "Medios propios" no es necesario completar direcciones, horarios ni datos de conductor.
+                        </p>
+                      )}
                     </div>
                   </motion.div>
                 );

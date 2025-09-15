@@ -124,6 +124,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
                         <SelectItem value="transcamarena">Transcamarena</SelectItem>
                         <SelectItem value="wild tour">Wild Tour</SelectItem>
                         <SelectItem value="camionaje">Camionaje</SelectItem>
+                        <SelectItem value="sector-pro">Sector-Pro</SelectItem>
                         <SelectItem value="other">Otro</SelectItem>
                       </SelectContent>
                     </Select>

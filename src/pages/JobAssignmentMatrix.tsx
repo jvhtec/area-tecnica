@@ -17,6 +17,12 @@ import { format } from 'date-fns';
 export default function JobAssignmentMatrix() {
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  // Debounce search to reduce filtering churn
+  React.useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm.trim().toLowerCase()), 150);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [allowDirectAssign, setAllowDirectAssign] = useState(false);
 
@@ -66,15 +72,13 @@ export default function JobAssignmentMatrix() {
 
   // Filter technicians based on search term
   const filteredTechnicians = useMemo(() => {
-    if (!searchTerm) return technicians;
-    
-    const searchLower = searchTerm.toLowerCase();
+    if (!debouncedSearch) return technicians;
     return technicians.filter(tech => 
-      `${tech.first_name} ${tech.last_name}`.toLowerCase().includes(searchLower) ||
-      tech.email?.toLowerCase().includes(searchLower) ||
-      tech.department?.toLowerCase().includes(searchLower)
+      `${tech.first_name} ${tech.last_name}`.toLowerCase().includes(debouncedSearch) ||
+      tech.email?.toLowerCase().includes(debouncedSearch) ||
+      tech.department?.toLowerCase().includes(debouncedSearch)
     );
-  }, [technicians, searchTerm]);
+  }, [technicians, debouncedSearch]);
 
   // Optimized jobs query with smart date filtering
   const { data: yearJobs = [], isLoading: isLoadingJobs } = useQuery({

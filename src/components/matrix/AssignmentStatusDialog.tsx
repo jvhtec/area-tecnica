@@ -98,19 +98,27 @@ export const AssignmentStatusDialog = ({
       ];
 
       assignmentQueries.forEach(queryKey => {
-        queryClient.setQueryData(queryKey, (oldData: any) => {
-          if (!oldData) return oldData;
-          
-          if (Array.isArray(oldData)) {
-            return oldData.map((item: any) => {
-              if (item.job_id === assignment.job_id && item.technician_id === technicianId) {
-                return { ...item, status: newStatus, response_time: new Date().toISOString() };
-              }
-              return item;
-            });
+        try {
+          queryClient.setQueryData(queryKey, (oldData: any) => {
+            if (!oldData) return oldData;
+            
+            if (Array.isArray(oldData)) {
+              return oldData.map((item: any) => {
+                if (item.job_id === assignment.job_id && item.technician_id === technicianId) {
+                  return { ...item, status: newStatus, response_time: new Date().toISOString() };
+                }
+                return item;
+              });
+            }
+            return oldData;
+          });
+        } catch (e: any) {
+          if (typeof window !== 'undefined' && e?.name === 'InvalidStateError') {
+            console.warn('Broadcast channel closed; skipping optimistic update broadcast');
+          } else {
+            console.warn('setQueryData error (non-fatal):', e);
           }
-          return oldData;
-        });
+        }
       });
 
       // Invalidate relevant queries to refresh the UI

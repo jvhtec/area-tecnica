@@ -31,6 +31,8 @@ interface OptimizedMatrixCellProps {
   jobId?: string;
   allowDirectAssign?: boolean;
   declinedJobIds?: string[];
+  staffingStatusProvided?: { availability_status: any; offer_status: any } | null;
+  staffingStatusByDateProvided?: { availability_status: any; offer_status: any; availability_job_id?: string | null; offer_job_id?: string | null } | null;
 }
 
 export const OptimizedMatrixCell = memo(({
@@ -48,7 +50,9 @@ export const OptimizedMatrixCell = memo(({
   onRender,
   jobId,
   allowDirectAssign = false,
-  declinedJobIds = []
+  declinedJobIds = [],
+  staffingStatusProvided = null,
+  staffingStatusByDateProvided = null
 }: OptimizedMatrixCellProps) => {
   // Track cell renders for performance monitoring
   React.useEffect(() => {
@@ -62,11 +66,14 @@ export const OptimizedMatrixCell = memo(({
   const isUnavailable = availability?.status === 'unavailable';
 
   // Staffing status hooks
-  const { data: staffingStatusByJob } = useStaffingStatus(
+  // Always call hooks to preserve consistent hook ordering, then prefer provided statuses
+  const { data: hookStatusByJob } = useStaffingStatus(
     jobId || assignment?.job_id || '', 
     technician.id
   );
-  const { data: staffingStatusByDate } = useStaffingStatusByDate(technician.id, date);
+  const { data: hookStatusByDate } = useStaffingStatusByDate(technician.id, date);
+  const staffingStatusByJob = staffingStatusProvided ?? hookStatusByJob;
+  const staffingStatusByDate = staffingStatusByDateProvided ?? hookStatusByDate;
   const { mutate: sendStaffingEmail, isPending: isSendingEmail } = useSendStaffingEmail();
   const [availabilityRetrying, setAvailabilityRetrying] = React.useState(false);
   const [pendingRetry, setPendingRetry] = React.useState<null | { jobId: string }>(null);

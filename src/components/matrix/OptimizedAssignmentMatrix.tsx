@@ -16,6 +16,7 @@ import { useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
 import { useToast } from '@/hooks/use-toast';
 import { OfferDetailsDialog } from './OfferDetailsDialog';
 import { supabase } from '@/lib/supabase';
+import { useStaffingMatrixStatuses } from '@/features/staffing/hooks/useStaffingMatrixStatuses';
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
 interface MatrixJob {
@@ -122,6 +123,29 @@ export const OptimizedAssignmentMatrix = ({
   const matrixWidth = dates.length * CELL_WIDTH;
   const matrixHeight = technicians.length * CELL_HEIGHT;
 
+  // Visible window state for virtualization
+  const [visibleRows, setVisibleRows] = useState({ start: 0, end: Math.min(technicians.length - 1, 20) });
+  const [visibleCols, setVisibleCols] = useState({ start: 0, end: Math.min(dates.length - 1, 14) });
+  const OVERSCAN_ROWS = 4;
+  const OVERSCAN_COLS = 3;
+
+  const updateVisibleWindow = useCallback(() => {
+    const el = mainScrollRef.current;
+    if (!el) return;
+    const scrollTop = el.scrollTop;
+    const scrollLeft = el.scrollLeft;
+    const clientH = el.clientHeight;
+    const clientW = el.clientWidth;
+
+    const rowStart = Math.max(0, Math.floor(scrollTop / CELL_HEIGHT) - OVERSCAN_ROWS);
+    const rowEnd = Math.min(technicians.length - 1, Math.floor((scrollTop + clientH) / CELL_HEIGHT) + OVERSCAN_ROWS);
+    const colStart = Math.max(0, Math.floor(scrollLeft / CELL_WIDTH) - OVERSCAN_COLS);
+    const colEnd = Math.min(dates.length - 1, Math.floor((scrollLeft + clientW) / CELL_WIDTH) + OVERSCAN_COLS);
+
+    setVisibleRows(prev => (prev.start !== rowStart || prev.end !== rowEnd ? { start: rowStart, end: rowEnd } : prev));
+    setVisibleCols(prev => (prev.start !== colStart || prev.end !== colEnd ? { start: colStart, end: colEnd } : prev));
+  }, [technicians.length, dates.length]);
+
   // Build declined job sets per technician for targeted staffing blocking
   const declinedJobsByTech = React.useMemo(() => {
     const map = new Map<string, Set<string>>();
@@ -182,7 +206,9 @@ export const OptimizedAssignmentMatrix = ({
     }
     
     syncScrollPositions(scrollLeft, scrollTop, 'main');
-  }, [syncScrollPositions, canExpandBefore, canExpandAfter, onNearEdgeScroll]);
+    // Update visible window for virtualization
+    updateVisibleWindow();
+  }, [syncScrollPositions, canExpandBefore, canExpandAfter, onNearEdgeScroll, updateVisibleWindow]);
 
   const handleDateHeadersScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (syncInProgressRef.current) return;
@@ -372,6 +398,23 @@ export const OptimizedAssignmentMatrix = ({
     return () => clearTimeout(timeoutId);
   }, [scrollToToday, isLoading, dates.length, scrollAttempts]);
 
+  // Initialize visible window after mount and when sizes change
+  useEffect(() => {
+    updateVisibleWindow();
+  }, [technicians.length, dates.length, updateVisibleWindow]);
+
+  // Batched staffing statuses for visible window
+  const visibleTechIds = technicians.slice(visibleRows.start, visibleRows.end + 1).map(t => t.id);
+  const visibleDates = dates.slice(visibleCols.start, visibleCols.end + 1);
+  // Collect jobs overlapping visible dates
+  const visibleJobsSet = new Set<string>();
+  visibleDates.forEach(d => {
+    const js = getJobsForDate(d);
+    js.forEach(j => visibleJobsSet.add(j.id));
+  });
+  const visibleJobsLite = jobs.filter(j => visibleJobsSet.has(j.id)).map(j => ({ id: j.id, start_time: j.start_time, end_time: j.end_time }));
+  const { data: staffingMaps } = useStaffingMatrixStatuses(visibleTechIds, visibleJobsLite, visibleDates);
+
   const getCurrentTechnician = useCallback(() => {
     if (!cellAction?.technicianId) return null;
     return technicians.find(t => t.id === cellAction.technicianId);
@@ -416,15 +459,19 @@ export const OptimizedAssignmentMatrix = ({
         }}
         onScroll={handleDateHeadersScroll}
       >
-        <div style={{ width: matrixWidth, height: '100%', display: 'flex' }}>
-          {dates.map((date, index) => (
+        <div style={{ width: matrixWidth, height: '100%', display: 'flex', position: 'relative' }}>
+          {/* Leading spacer for virtualized columns */}
+          <div style={{ width: visibleCols.start * CELL_WIDTH }} />
+          {dates.slice(visibleCols.start, visibleCols.end + 1).map((date, idx) => (
             <DateHeader
-              key={index}
+              key={visibleCols.start + idx}
               date={date}
               width={CELL_WIDTH}
               jobs={getJobsForDate(date)}
             />
           ))}
+          {/* Trailing spacer to fill remaining width */}
+          <div style={{ width: Math.max(0, (dates.length - (visibleCols.end + 1)) * CELL_WIDTH) }} />
         </div>
       </div>
 
@@ -442,8 +489,10 @@ export const OptimizedAssignmentMatrix = ({
           className="matrix-technician-scroll"
           onScroll={handleTechnicianScroll}
         >
-          <div style={{ height: matrixHeight }}>
-            {technicians.map((technician) => (
+          <div style={{ height: matrixHeight, position: 'relative' }}>
+            {/* Leading spacer for virtualized rows */}
+            <div style={{ height: visibleRows.start * CELL_HEIGHT }} />
+            {technicians.slice(visibleRows.start, visibleRows.end + 1).map((technician) => (
               <TechnicianRow
                 key={technician.id}
                 technician={technician}
@@ -476,7 +525,9 @@ export const OptimizedAssignmentMatrix = ({
               height: matrixHeight
             }}
           >
-            {technicians.map((technician, techIndex) => (
+            {technicians.slice(visibleRows.start, visibleRows.end + 1).map((technician, idx) => {
+              const techIndex = visibleRows.start + idx;
+              return (
               <div 
                 key={technician.id} 
                 className="matrix-row"
@@ -485,11 +536,17 @@ export const OptimizedAssignmentMatrix = ({
                   height: CELL_HEIGHT
                 }}
               >
-                {dates.map((date, dateIndex) => {
+                {dates.slice(visibleCols.start, visibleCols.end + 1).map((date, jdx) => {
+                  const dateIndex = visibleCols.start + jdx;
                   const assignment = getAssignmentForCell(technician.id, date);
                   const availability = getAvailabilityForCell(technician.id, date);
                   const cellKey = `${technician.id}-${format(date, 'yyyy-MM-dd')}`;
                   const isSelected = selectedCells.has(cellKey);
+                  const jobId = assignment?.job_id;
+                  const byJobKey = jobId ? `${jobId}-${technician.id}` : '';
+                  const byDateKey = `${technician.id}-${format(date, 'yyyy-MM-dd')}`;
+                  const providedByJob = jobId && staffingMaps?.byJob.get(byJobKey) ? staffingMaps?.byJob.get(byJobKey) as any : null;
+                  const providedByDate = staffingMaps?.byDate.get(byDateKey) ? staffingMaps?.byDate.get(byDateKey) as any : null;
                   
                   return (
                     <div
@@ -514,15 +571,17 @@ export const OptimizedAssignmentMatrix = ({
                         onPrefetch={() => handleCellPrefetch(technician.id)}
                         onOptimisticUpdate={(status) => assignment && handleOptimisticUpdate(technician.id, assignment.job_id, status)}
                         onRender={() => incrementCellRender()}
-                        jobId={assignment?.job_id}
+                        jobId={jobId}
                         declinedJobIds={Array.from(declinedJobsByTech.get(technician.id) || [])}
                         allowDirectAssign={allowDirectAssign}
+                        staffingStatusProvided={providedByJob}
+                        staffingStatusByDateProvided={providedByDate}
                       />
                     </div>
                   );
                 })}
               </div>
-            ))}
+            )})}
           </div>
         </div>
       </div>
