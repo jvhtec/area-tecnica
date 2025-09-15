@@ -48,18 +48,21 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         .from('jobs')
         .select(`
           *,
-          locations(*),
+          locations(id, name, address, formatted_address, latitude, longitude),
           job_assignments(
-            *,
+            id, job_id, technician_id, assigned_by, assigned_at,
+            sound_role, lights_role, video_role,
+            external_technician_name,
             profiles(id, first_name, last_name, department, role)
           ),
-          job_documents(*),
-          logistics_events(*)
+          job_documents(id, file_name, file_path, uploaded_at, file_size),
+          logistics_events(id, event_type, transport_type, event_date, event_time, license_plate)
         `)
         .eq('id', job.id)
         .single();
 
       if (error) throw error;
+      console.log('JobDetailsDialog: Full job data loaded:', JSON.stringify(data, null, 2));
       return data;
     },
     enabled: open
@@ -67,22 +70,33 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
   // Fetch nearby restaurants
   const { data: restaurants, isLoading: isRestaurantsLoading } = useQuery({
-    queryKey: ['job-restaurants', job.id, jobDetails?.locations?.formatted_address],
+    queryKey: ['job-restaurants', job.id, jobDetails?.locations?.formatted_address || jobDetails?.locations?.address],
     queryFn: async () => {
-      if (!jobDetails?.locations?.formatted_address) return [];
+      const locationData = jobDetails?.locations;
+      const address = locationData?.formatted_address || locationData?.address;
       
-      const coordinates = jobDetails.locations.latitude && jobDetails.locations.longitude 
-        ? { lat: parseFloat(jobDetails.locations.latitude), lng: parseFloat(jobDetails.locations.longitude) }
+      console.log('Restaurant query - location data:', locationData);
+      console.log('Restaurant query - using address:', address);
+      
+      if (!address) {
+        console.log('Restaurant query - no address found, returning empty array');
+        return [];
+      }
+      
+      const coordinates = locationData?.latitude && locationData?.longitude 
+        ? { lat: parseFloat(locationData.latitude), lng: parseFloat(locationData.longitude) }
         : undefined;
 
+      console.log('Restaurant query - coordinates:', coordinates);
+      
       return await PlacesRestaurantService.searchRestaurantsNearVenue(
-        jobDetails.locations.formatted_address,
+        address,
         2000,
         10,
         coordinates
       );
     },
-    enabled: open && !!jobDetails?.locations?.formatted_address
+    enabled: open && !!(jobDetails?.locations?.formatted_address || jobDetails?.locations?.address)
   });
 
   const handleDownloadDocument = async (doc: any) => {
