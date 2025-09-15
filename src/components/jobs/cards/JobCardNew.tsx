@@ -28,6 +28,7 @@ import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
+import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -68,6 +69,7 @@ export function JobCardNew({
   // Add folder creation loading state
   const [isCreatingFolders, setIsCreatingFolders] = useState(false);
   const [isCreatingLocalFolders, setIsCreatingLocalFolders] = useState(false);
+  const [jobDetailsDialogOpen, setJobDetailsDialogOpen] = useState(false);
   
   const {
     appliedBorderColor,
@@ -469,6 +471,7 @@ export function JobCardNew({
               }
             }}
             handleFileUpload={handleFileUpload}
+            onJobDetailsClick={() => setJobDetailsDialogOpen(true)}
           />
         </div>
 
@@ -542,6 +545,14 @@ export function JobCardNew({
               department={department as Department}
             />
           )}
+          
+          {/* Job Details Dialog */}
+          <JobDetailsDialog
+            open={jobDetailsDialogOpen}
+            onOpenChange={setJobDetailsDialogOpen}
+            job={job}
+            department={department}
+          />
         </>
       )}
     </div>

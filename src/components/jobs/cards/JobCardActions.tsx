@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
-import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock } from "lucide-react";
+import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
 
@@ -28,6 +28,7 @@ interface JobCardActionsProps {
   onFestivalArtistsClick: (e: React.MouseEvent) => void;
   onAssignmentDialogOpen: (e: React.MouseEvent) => void;
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onJobDetailsClick?: () => void;
 }
 
 export const JobCardActions: React.FC<JobCardActionsProps> = ({
@@ -51,7 +52,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   onCreateLocalFolders,
   onFestivalArtistsClick,
   onAssignmentDialogOpen,
-  handleFileUpload
+  handleFileUpload,
+  onJobDetailsClick
 }) => {
   const navigate = useNavigate();
 
@@ -73,6 +75,19 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
 
   return (
     <div className="flex flex-wrap gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+      {/* View Details - for technicians and house techs */}
+      {(userRole === 'technician' || userRole === 'house_tech') && onJobDetailsClick && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onJobDetailsClick}
+          className="gap-2"
+        >
+          <FileText className="h-4 w-4" />
+          View Details
+        </Button>
+      )}
+
       {job.job_type === "festival" && isProjectManagementPage && canManageArtists && (
         <Button
           variant="outline"

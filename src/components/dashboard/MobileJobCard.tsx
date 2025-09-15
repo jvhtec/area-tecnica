@@ -24,7 +24,8 @@ import {
   Star,
   Calendar,
   ExternalLink,
-  Loader2
+  Loader2,
+  FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
@@ -32,6 +33,7 @@ import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
+import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useFlexUuidLazy } from "@/hooks/useFlexUuidLazy";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -72,6 +74,7 @@ export function MobileJobCard({
   const [userRole, setUserRole] = useState<string | null>(null);
   const [dateTypeDialogOpen, setDateTypeDialogOpen] = useState(false);
   const [selectedDateType, setSelectedDateType] = useState<string>('show');
+  const [jobDetailsDialogOpen, setJobDetailsDialogOpen] = useState(false);
   const isMobile = useIsMobile();
   const { uuid: flexUuid, isLoading: isLoadingFlexUuid, error: flexError, hasChecked, fetchFlexUuid } = useFlexUuidLazy();
 
@@ -320,6 +323,19 @@ export function MobileJobCard({
                   
                   <DropdownMenuSeparator />
                   
+                  {/* View Details - for technicians and house techs */}
+                  {(userRole === 'technician' || userRole === 'house_tech') && (
+                    <DropdownMenuItem 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setJobDetailsDialogOpen(true);
+                      }}
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      View Details
+                    </DropdownMenuItem>
+                  )}
+                  
                   <DropdownMenuItem 
                     onClick={(e) => {
                       e.stopPropagation();
@@ -397,6 +413,19 @@ export function MobileJobCard({
                   )}
                   
                   <DropdownMenuSeparator />
+                  
+                  {/* View Details - for technicians and house techs */}
+                  {(userRole === 'technician' || userRole === 'house_tech') && (
+                    <DropdownMenuItem 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setJobDetailsDialogOpen(true);
+                      }}
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      View Details
+                    </DropdownMenuItem>
+                  )}
                   
                   {canEditJobs && (
                     <DropdownMenuItem onClick={handleEditButtonClick}>
@@ -511,6 +540,14 @@ export function MobileJobCard({
         onClose={() => setAssignmentDialogOpen(false)}
         onAssignmentChange={() => {}}
         jobId={job.id}
+      />
+
+      {/* Job Details Dialog */}
+      <JobDetailsDialog
+        open={jobDetailsDialogOpen}
+        onOpenChange={setJobDetailsDialogOpen}
+        job={job}
+        department={department}
       />
     </>
   );
