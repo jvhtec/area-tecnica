@@ -67,22 +67,22 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
   // Fetch nearby restaurants
   const { data: restaurants, isLoading: isRestaurantsLoading } = useQuery({
-    queryKey: ['job-restaurants', job.id, jobDetails?.locations?.address],
+    queryKey: ['job-restaurants', job.id, jobDetails?.locations?.formatted_address],
     queryFn: async () => {
-      if (!jobDetails?.locations?.address) return [];
+      if (!jobDetails?.locations?.formatted_address) return [];
       
       const coordinates = jobDetails.locations.latitude && jobDetails.locations.longitude 
         ? { lat: parseFloat(jobDetails.locations.latitude), lng: parseFloat(jobDetails.locations.longitude) }
         : undefined;
 
       return await PlacesRestaurantService.searchRestaurantsNearVenue(
-        jobDetails.locations.address,
+        jobDetails.locations.formatted_address,
         2000,
         10,
         coordinates
       );
     },
-    enabled: open && !!jobDetails?.locations?.address
+    enabled: open && !!jobDetails?.locations?.formatted_address
   });
 
   const handleDownloadDocument = async (doc: any) => {
@@ -106,7 +106,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
   const openGoogleMaps = () => {
     if (jobDetails?.locations) {
-      const address = encodeURIComponent(jobDetails.locations.address || jobDetails.locations.name || '');
+      const address = encodeURIComponent(jobDetails.locations.formatted_address || jobDetails.locations.address || jobDetails.locations.name || '');
       window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank');
     }
   };
@@ -186,19 +186,19 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                     <Badge variant="outline">{jobDetails?.job_type}</Badge>
                   </div>
 
-                  {jobDetails?.locations && (
-                    <div>
-                      <p className="text-sm font-medium">Venue</p>
-                      <p className="text-sm text-muted-foreground">
-                        {jobDetails.locations.name}
-                      </p>
-                      {jobDetails.locations.address && (
-                        <p className="text-sm text-muted-foreground">
-                          {jobDetails.locations.address}
-                        </p>
+                      {jobDetails?.locations && (
+                        <div>
+                          <p className="text-sm font-medium">Venue</p>
+                          <p className="text-sm text-muted-foreground">
+                            {jobDetails.locations.name}
+                          </p>
+                          {(jobDetails.locations.formatted_address || jobDetails.locations.address) && (
+                            <p className="text-sm text-muted-foreground">
+                              {jobDetails.locations.formatted_address || jobDetails.locations.address}
+                            </p>
+                          )}
+                        </div>
                       )}
-                    </div>
-                  )}
                 </div>
               </Card>
             </TabsContent>
@@ -210,8 +210,8 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                     <div className="flex items-start justify-between">
                       <div>
                         <h3 className="font-semibold">{jobDetails.locations.name}</h3>
-                        {jobDetails.locations.address && (
-                          <p className="text-muted-foreground">{jobDetails.locations.address}</p>
+                        {(jobDetails.locations.formatted_address || jobDetails.locations.address) && (
+                          <p className="text-muted-foreground">{jobDetails.locations.formatted_address || jobDetails.locations.address}</p>
                         )}
                       </div>
                       <Button onClick={openGoogleMaps} size="sm">
