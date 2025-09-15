@@ -48,11 +48,10 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         .from('jobs')
         .select(`
           *,
-          locations(id, name, address, formatted_address, latitude, longitude),
+          locations(id, name, formatted_address, latitude, longitude),
           job_assignments(
-            id, job_id, technician_id, assigned_by, assigned_at,
-            sound_role, lights_role, video_role,
-            external_technician_name,
+            job_id, technician_id, assigned_by, assigned_at,
+            sound_role, lights_role, video_role, status,
             profiles(id, first_name, last_name, department, role)
           ),
           job_documents(id, file_name, file_path, uploaded_at, file_size),
