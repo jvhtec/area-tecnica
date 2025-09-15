@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PersonalCalendar } from '@/components/personal/PersonalCalendar';
 import { MobilePersonalCalendar } from '@/components/personal/MobilePersonalCalendar';
 import { VacationRequestsTabs } from '@/components/personal/VacationRequestsTabs';
@@ -9,6 +9,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const Personal = () => {
   const [date, setDate] = useState<Date>(new Date());
@@ -16,8 +17,17 @@ const Personal = () => {
   const { user, userRole } = useOptimizedAuth();
   const { submitRequest, isSubmitting } = useVacationRequests();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
 
   console.log('Personal page: Rendering with date:', date);
+
+  // Redirect technicians to technician dashboard - they shouldn't access personal calendar
+  useEffect(() => {
+    if (userRole === 'technician') {
+      console.log('Technician trying to access personal calendar, redirecting to technician dashboard');
+      navigate('/technician-dashboard');
+    }
+  }, [userRole, navigate]);
 
   const handleVacationRequestSubmit = async (request: { startDate: string; endDate: string; reason: string }) => {
     if (!user?.id) {
