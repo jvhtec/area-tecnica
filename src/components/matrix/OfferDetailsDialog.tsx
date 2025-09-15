@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Department } from '@/types/department';
+import { getDepartmentRoles } from '@/utils/roles';
 
 interface OfferDetailsDialogProps {
   open: boolean;
@@ -15,19 +16,6 @@ interface OfferDetailsDialogProps {
   onSubmit: (details: { role: string; message: string }) => void;
 }
 
-const getRoleOptions = (department: string): string[] => {
-  switch (department) {
-    case 'sound':
-      return ['FOH Engineer', 'Monitor Engineer', 'PA Tech', 'RF Tech'];
-    case 'lights':
-      return ['Lighting Designer', 'Lighting Tech', 'Follow Spot'];
-    case 'video':
-      return ['Video Director', 'Camera Operator', 'Video Tech'];
-    default:
-      return ['Technician', 'Stagehand', 'Other'];
-  }
-};
-
 export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, onClose, technicianName, jobTitle, technicianDepartment, onSubmit }) => {
   const [role, setRole] = useState('');
   const [message, setMessage] = useState('');
@@ -36,7 +24,7 @@ export const OfferDetailsDialog: React.FC<OfferDetailsDialogProps> = ({ open, on
     onSubmit({ role: role.trim(), message: message.trim() });
   };
 
-  const roleOptions = getRoleOptions(technicianDepartment);
+  const roleOptions = getDepartmentRoles(String(technicianDepartment));
   React.useEffect(() => {
     if (open && roleOptions.length && !role) setRole(roleOptions[0]);
   }, [open, technicianDepartment]);

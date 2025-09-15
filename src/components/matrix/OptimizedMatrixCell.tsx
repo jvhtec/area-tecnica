@@ -3,7 +3,7 @@ import React, { memo, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Calendar, Clock, Check, X, UserX, Mail, CheckCircle } from 'lucide-react';
+import { Calendar, Clock, Check, X, UserX, Mail, CheckCircle, Ban } from 'lucide-react';
 import { format, isToday, isWeekend } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useStaffingStatus, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
@@ -56,6 +56,7 @@ export const OptimizedMatrixCell = memo(({
   const isTodayCell = isToday(date);
   const isWeekendCell = isWeekend(date);
   const hasAssignment = !!assignment;
+  const isDeclinedAssignment = hasAssignment && assignment.status === 'declined';
   const isUnavailable = availability?.status === 'unavailable';
 
   // Staffing status hooks
@@ -324,6 +325,13 @@ export const OptimizedMatrixCell = memo(({
               </Badge>
             </button>
           )}
+        </div>
+      )}
+
+      {/* Declined lock indicator for the job to prevent re-assigning to the same job */}
+      {isDeclinedAssignment && (
+        <div className="absolute top-1 left-1 z-10" title="Declined: cannot reassign to this job">
+          <Ban className="h-3.5 w-3.5 text-rose-600" />
         </div>
       )}
 

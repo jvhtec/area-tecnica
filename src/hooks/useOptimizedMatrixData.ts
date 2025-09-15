@@ -85,7 +85,6 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
             `)
             .in('job_id', jobBatch)
             .in('technician_id', technicianIds)
-            .neq('status', 'declined')
             .limit(500) // Limit per batch
         );
       }

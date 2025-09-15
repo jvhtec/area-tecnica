@@ -4,7 +4,7 @@ import { format, isSameDay, isToday, isWeekend } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar, User, X, Plus, Check, AlertCircle } from 'lucide-react';
+import { Calendar, User, X, Plus, Check, AlertCircle, Ban } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface MatrixCellProps {
@@ -175,6 +175,11 @@ export const MatrixCell = ({
           onMouseLeave={() => setIsHovered(false)}
         >
           <div className="p-1.5 h-full flex flex-col justify-center items-center text-xs relative overflow-hidden">
+            {isAssigned && isDeclined && (
+              <div className="absolute top-1 left-1" title="Declined: cannot reassign to this job">
+                <Ban className="h-3.5 w-3.5 text-red-600" />
+              </div>
+            )}
             {isAssigned && assignment?.jobs && (
               <>
                 <div className="font-medium text-center w-full mb-1 leading-tight">

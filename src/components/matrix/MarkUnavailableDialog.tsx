@@ -23,6 +23,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
+import { format as formatDate } from 'date-fns';
 
 interface MarkUnavailableDialogProps {
   open: boolean;
@@ -102,21 +103,52 @@ export const MarkUnavailableDialog = ({
 
     try {
       const finalReason = reason === 'other' ? customReason : reason;
-      
-      // Create availability schedule entries
-      const { error } = await supabase
+
+      // Determine target dates: selectedDate + any additional selectedCells for this technician
+      const selectedDates = new Set<string>();
+      // Always include the primary selectedDate
+      selectedDates.add(formatDate(selectedDate, 'yyyy-MM-dd'));
+      // Include additional dates from multi-select matching this technician
+      for (const key of selectedCells) {
+        // Keys are formatted as `${technicianId}-yyyy-MM-dd`
+        if (key.startsWith(`${technicianId}-`)) {
+          const parts = key.split('-');
+          const d = parts.slice(1).join('-'); // yyyy-MM-dd
+          if (d && d.length === 10) selectedDates.add(d);
+        }
+      }
+
+      const payload = Array.from(selectedDates).map(d => ({
+        user_id: technicianId,
+        date: d,
+        status: 'unavailable',
+        reason: finalReason,
+        department: technician?.department || 'general'
+      }));
+
+      // Try bulk insert first
+      const { error: bulkError } = await supabase
         .from('availability_schedules')
-        .insert({
-          user_id: technicianId,
-          date: format(selectedDate, 'yyyy-MM-dd'),
-          status: 'unavailable',
-          reason: finalReason,
-          department: technician?.department || 'general'
-        });
+        .insert(payload);
 
-      if (error) throw error;
+      if (bulkError) {
+        // Fallback to per-date insertion, ignoring duplicates
+        const results = await Promise.allSettled(payload.map(async (row) => {
+          const { error } = await supabase.from('availability_schedules').insert(row);
+          // Ignore duplicate key errors if present
+          if (error && (error as any).code !== '23505') {
+            throw error;
+          }
+        }));
 
-      toast.success(`Marked ${technician?.first_name} ${technician?.last_name} as unavailable`);
+        const rejected = results.filter(r => r.status === 'rejected');
+        if (rejected.length > 0) {
+          throw (rejected[0] as PromiseRejectedResult).reason;
+        }
+      }
+
+      const count = selectedDates.size;
+      toast.success(`Marked ${technician?.first_name} ${technician?.last_name} as unavailable for ${count} day${count > 1 ? 's' : ''}`);
       onClose();
     } catch (error) {
       console.error('Error marking unavailable:', error);

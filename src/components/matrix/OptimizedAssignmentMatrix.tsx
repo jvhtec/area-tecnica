@@ -15,7 +15,7 @@ import { useStaffingRealtime } from '@/features/staffing/hooks/useStaffingRealti
 import { useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
 import { useToast } from '@/hooks/use-toast';
 import { OfferDetailsDialog } from './OfferDetailsDialog';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
 interface MatrixJob {

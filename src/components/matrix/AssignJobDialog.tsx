@@ -22,6 +22,7 @@ import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { getDepartmentRoles } from '@/utils/roles';
 
 interface AssignJobDialogProps {
   open: boolean;
@@ -70,21 +71,15 @@ export const AssignJobDialog = ({
     enabled: open && !!technicianId
   });
 
-  // Get department-specific roles
-  const getDepartmentRoles = (department: string) => {
-    switch (department?.toLowerCase()) {
-      case 'sound':
-        return ['FOH Engineer', 'Monitor Engineer', 'RF Technician', 'PA Technician'];
-      case 'lights':
-        return ['Lighting Designer', 'Lighting Technician', 'Follow Spot', 'Rigger'];
-      case 'video':
-        return ['Video Director', 'Video Technician', 'Camera Operator', 'Playback Technician'];
-      default:
-        return ['FOH Engineer', 'Monitor Engineer', 'RF Technician', 'PA Technician'];
+  // If we're reassigning and the existing assignment was declined, block choosing the same job again
+  const filteredJobs = React.useMemo(() => {
+    if (existingAssignment?.status === 'declined') {
+      return availableJobs.filter(j => j.id !== existingAssignment.job_id);
     }
-  };
+    return availableJobs;
+  }, [availableJobs, existingAssignment?.status, existingAssignment?.job_id]);
 
-  const selectedJob = availableJobs.find(job => job.id === selectedJobId);
+  const selectedJob = filteredJobs.find(job => job.id === selectedJobId);
   const roles = technician ? getDepartmentRoles(technician.department) : [];
   const isReassignment = !!existingAssignment;
 
@@ -110,6 +105,12 @@ export const AssignJobDialog = ({
   const handleAssign = async () => {
     if (!selectedJobId || !selectedRole || !technician) {
       toast.error('Please select both a job and role');
+      return;
+    }
+
+    // Prevent re-assigning a declined technician to the same job
+    if (existingAssignment?.status === 'declined' && selectedJobId === existingAssignment.job_id) {
+      toast.error('This technician already declined this job');
       return;
     }
 
@@ -297,12 +298,12 @@ export const AssignJobDialog = ({
                   <SelectValue placeholder="Choose a job..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableJobs.length === 0 ? (
+                  {filteredJobs.length === 0 ? (
                     <div className="p-2 text-sm text-muted-foreground">
                       No jobs available for this date
                     </div>
                   ) : (
-                    availableJobs.map((job) => (
+                    filteredJobs.map((job) => (
                       <SelectItem key={job.id} value={job.id}>
                         <div className="flex items-center gap-2">
                           <div>
