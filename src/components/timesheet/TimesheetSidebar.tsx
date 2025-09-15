@@ -20,13 +20,14 @@ export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => 
   const { userRole, user } = useOptimizedAuth();
   const navigate = useNavigate();
 
-  // Filter jobs and exclude dry hire jobs and jobs with only off/travel date types
+  // Filter jobs and exclude dry hire and tourdate jobs and jobs with only off/travel date types
   const relevantJobs = useMemo(() => {
     return allJobs
       .filter(job => {
-        // Filter out dry hire jobs since they don't have personnel/timesheets
+        // Filter out dry hire and tourdate jobs since they don't have timesheets
         const isDryHire = job.job_type === 'dry_hire' || job.job_type === 'dryhire';
-        if (isDryHire) return false;
+        const isTourDate = job.job_type === 'tourdate';
+        if (isDryHire || isTourDate) return false;
         
         // Check if job has any work date types (not just "off" or "travel")
         if (job.job_date_types && job.job_date_types.length > 0) {

@@ -128,15 +128,17 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       >
         <RefreshCw className="h-4 w-4" />
       </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={handleTimesheetClick}
-        title="Manage Timesheets"
-        className="hover:bg-accent/50"
-      >
-        <Clock className="h-4 w-4" />
-      </Button>
+      {job.job_type !== 'dryhire' && job.job_type !== 'tourdate' && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleTimesheetClick}
+          title="Manage Timesheets"
+          className="hover:bg-accent/50"
+        >
+          <Clock className="h-4 w-4" />
+        </Button>
+      )}
       {userRole === 'technician' && job.job_type !== "dryhire" && (
         <TechnicianIncidentReportDialog 
           job={job} 

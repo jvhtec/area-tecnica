@@ -241,7 +241,7 @@ export const AssignmentsList = ({
                 </Button>
                 
                 {/* Timesheet Button */}
-                {jobData.job_type !== "dryhire" && (
+                {jobData.job_type !== "dryhire" && jobData.job_type !== "tourdate" && (
                   <Button
                     onClick={() => handleTimesheetClick(jobData.id)}
                     variant="outline"

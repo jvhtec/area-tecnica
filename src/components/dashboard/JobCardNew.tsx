@@ -225,6 +225,46 @@ export function JobCardNew({
         .filter(Boolean)
     : [];
 
+  // Fetch timesheet statuses per technician for this job to reflect submission state on badges
+  const { data: jobTimesheets } = useQuery({
+    queryKey: ["job-timesheets-status", job.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select('technician_id, status')
+        .eq('job_id', job.id);
+      if (error) throw error;
+      return data as { technician_id: string; status: string }[];
+    },
+    enabled: job.job_type !== 'dryhire' && job.job_type !== 'tourdate' && !isJobBeingDeleted,
+    staleTime: 60_000
+  });
+
+  const getTechTimesheetState = (techId: string): 'none' | 'draft' | 'partial' | 'submitted' | 'approved' => {
+    const list = (jobTimesheets || []).filter(t => t.technician_id === techId);
+    if (list.length === 0) return 'none';
+    const anyApproved = list.some(t => t.status === 'approved');
+    const anySubmitted = list.some(t => t.status === 'submitted');
+    const allSubmittedOrApproved = list.every(t => t.status === 'submitted' || t.status === 'approved');
+    if (anyApproved && allSubmittedOrApproved) return 'approved';
+    if (allSubmittedOrApproved) return 'submitted';
+    if (anySubmitted || anyApproved) return 'partial';
+    return 'draft';
+  };
+
+  const getBadgeClassesForTimesheet = (techId: string) => {
+    const state = getTechTimesheetState(techId);
+    switch (state) {
+      case 'approved':
+      case 'submitted':
+        return 'bg-green-500/15 text-green-700 border-green-500/30';
+      case 'partial':
+        return 'bg-yellow-500/15 text-yellow-700 border-yellow-500/30';
+      default:
+        return '';
+    }
+  };
+
   const { data: soundTasks } = useQuery({
     queryKey: ["sound-tasks", job.id],
     queryFn: async () => {
@@ -859,18 +899,20 @@ export function JobCardNew({
               </Button>
             </div>
             <div className="flex flex-wrap gap-1 sm:gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-              {/* Timesheet button - available for all users */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleTimesheetClick}
-                className="hover:bg-accent/50 text-xs sm:text-sm px-1 sm:px-2 h-7 sm:h-8"
-                disabled={isJobBeingDeleted}
-              >
-                <ClipboardList className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Times</span>
-                <span className="sm:hidden">Times</span>
-              </Button>
+              {/* Timesheet button - hide for dryhire and tourdate */}
+              {job.job_type !== 'dryhire' && job.job_type !== 'tourdate' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTimesheetClick}
+                  className="hover:bg-accent/50 text-xs sm:text-sm px-1 sm:px-2 h-7 sm:h-8"
+                  disabled={isJobBeingDeleted}
+                >
+                  <ClipboardList className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Times</span>
+                  <span className="sm:hidden">Times</span>
+                </Button>
+              )}
               
               {job.job_type === "festival" && isProjectManagementPage && canManageArtists && (
                 <Button
@@ -1026,11 +1068,14 @@ export function JobCardNew({
                   <div className="flex items-start gap-2">
                     <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0 mt-0.5" />
                     <div className="flex flex-wrap gap-1 min-w-0">
-                      {assignedTechnicians.map((tech) => (
-                        <Badge key={tech.id} variant="secondary" className="text-xs max-w-full">
-                          <span className="truncate">{tech.name} {tech.role && `(${tech.role})`}</span>
-                        </Badge>
-                      ))}
+                      {assignedTechnicians.map((tech) => {
+                        const extraClasses = getBadgeClassesForTimesheet(tech.id);
+                        return (
+                          <Badge key={tech.id} variant="secondary" className={cn("text-xs max-w-full border", extraClasses)}>
+                            <span className="truncate">{tech.name} {tech.role && `(${tech.role})`}</span>
+                          </Badge>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

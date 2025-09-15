@@ -27,6 +27,7 @@ export default function Timesheets() {
   }, [jobIdFromUrl]);
 
   const selectedJob = jobs.find(job => job.id === selectedJobId);
+  const timesheetsDisabled = selectedJob && (selectedJob.job_type === 'dryhire' || selectedJob.job_type === 'tourdate');
   const canManage = userRole === 'admin' || userRole === 'management';
   const canDownloadPDF = userRole === 'admin' || userRole === 'management';
 
@@ -75,7 +76,7 @@ export default function Timesheets() {
           </p>
         </div>
 
-        {selectedJobId && canDownloadPDF && (
+        {selectedJobId && canDownloadPDF && !timesheetsDisabled && (
           <div className="flex items-center gap-3">
             <input
               type="date"
@@ -129,7 +130,26 @@ export default function Timesheets() {
         </Card>
       )}
 
-      {selectedJobId && (
+      {timesheetsDisabled && selectedJob && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Timesheets Disabled
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="p-4 bg-muted rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                Timesheets are not used for jobs of type
+                <span className="font-medium"> {selectedJob.job_type}</span>.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {selectedJobId && !timesheetsDisabled && (
         <TimesheetView
           jobId={selectedJobId}
           jobTitle={selectedJob?.title}
