@@ -313,17 +313,29 @@ const TechnicianDashboard = () => {
         </CardHeader>
         <CardContent>
           {assignments && assignments.length > 0 ? (
-            <div className="hidden md:block">
-              <TodaySchedule 
-                jobs={assignments} 
-                onEditClick={handleEditClick} 
-                onDeleteClick={handleDeleteClick} 
-                onJobClick={handleJobClick} 
-                userRole="technician"
-                isLoading={isLoading}
-                hideTasks={true}
-              />
-            </div>
+            <>
+              {/* Desktop view */}
+              <div className="hidden md:block">
+                <TodaySchedule 
+                  jobs={assignments} 
+                  onEditClick={handleEditClick} 
+                  onDeleteClick={handleDeleteClick} 
+                  onJobClick={handleJobClick} 
+                  userRole="technician"
+                  isLoading={isLoading}
+                  hideTasks={true}
+                />
+              </div>
+              {/* Mobile view */}
+              <div className="block md:hidden">
+                <AssignmentsList 
+                  assignments={assignments} 
+                  loading={isLoading} 
+                  onRefresh={handleRefresh}
+                  techName={userDepartment ? `${userDepartment} Technician` : 'Technician'}
+                />
+              </div>
+            </>
           ) : (
             <AssignmentsList 
               assignments={assignments} 
