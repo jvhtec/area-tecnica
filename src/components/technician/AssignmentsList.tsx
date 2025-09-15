@@ -2,8 +2,9 @@
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { RefreshCw, Clock, Eye, Download, FileText, ChevronDown, ChevronRight } from "lucide-react";
+import { RefreshCw, Clock, Eye, Download, FileText, ChevronDown, ChevronRight, Info } from "lucide-react";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
+import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +31,7 @@ export const AssignmentsList = ({
   const { toast } = useToast();
   const [expandedDocuments, setExpandedDocuments] = useState<Set<string>>(new Set());
   const [documentLoading, setDocumentLoading] = useState<Set<string>>(new Set());
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   
   // Set up realtime subscriptions for assignment data updates
   useAssignmentsListSubscriptions();
@@ -226,6 +228,17 @@ export const AssignmentsList = ({
               </div>
               
               <div className="flex flex-col items-end gap-2">
+                {/* View Details Button */}
+                <Button
+                  onClick={() => setSelectedJobId(jobData.id)}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Info className="h-3 w-3" />
+                  Detalles
+                </Button>
+                
                 {/* Timesheet Button */}
                 {jobData.job_type !== "dryhire" && (
                   <Button
@@ -320,6 +333,12 @@ export const AssignmentsList = ({
           </div>
         );
       })}
+      
+      <JobDetailsDialog 
+        open={selectedJobId !== null}
+        onOpenChange={(open) => !open && setSelectedJobId(null)}
+        job={{ id: selectedJobId }}
+      />
     </div>
   );
 };
