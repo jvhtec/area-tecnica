@@ -111,8 +111,15 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     }
   };
 
-  const formatDateTime = (dateTime: string) => {
-    return format(new Date(dateTime), 'PPp');
+  const formatDateTime = (dateTime: string | null | undefined) => {
+    if (!dateTime) return 'Not set';
+    try {
+      const date = new Date(dateTime);
+      if (isNaN(date.getTime())) return 'Invalid date';
+      return format(date, 'PPp');
+    } catch (error) {
+      return 'Invalid date';
+    }
   };
 
   if (isJobLoading) {
@@ -244,7 +251,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                                 </span>
                               </div>
                               <div className="text-sm text-muted-foreground">
-                                {format(new Date(event.event_date), 'PP')} at {event.event_time}
+                                {event.event_date ? format(new Date(event.event_date), 'PP') : 'No date'} at {event.event_time || 'No time'}
                               </div>
                             </div>
                           ))}
@@ -326,7 +333,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                         <div>
                           <p className="font-medium">{doc.file_name}</p>
                           <p className="text-sm text-muted-foreground">
-                            Uploaded {format(new Date(doc.uploaded_at), 'PP')}
+                            {doc.uploaded_at ? `Uploaded ${format(new Date(doc.uploaded_at), 'PP')}` : 'Upload date unknown'}
                           </p>
                         </div>
                         <Button 
