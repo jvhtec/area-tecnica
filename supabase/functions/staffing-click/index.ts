@@ -309,7 +309,7 @@ ${submessageHtml}
  */
 function redirectResponse(opts: { title: string, status: 'success'|'warning'|'error'|'neutral', heading: string, message: string, submessage?: string }) {
   // Use single parametric URL with query parameters
-  const baseUrl = 'https://sl1nk.com/unexpectederror';
+  const baseUrl = 'https://jvhtec.github.io/area-tecnica/public/temp_error.html';
   const params = new URLSearchParams();
   
   params.set('title', opts.title);
