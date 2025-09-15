@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Filter, Users, RefreshCw } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { OptimizedAssignmentMatrix } from '@/components/matrix/OptimizedAssignmentMatrix';
 import { PerformanceIndicator } from '@/components/matrix/PerformanceIndicator';
 import { DateRangeExpander } from '@/components/matrix/DateRangeExpander';
@@ -17,6 +18,7 @@ export default function JobAssignmentMatrix() {
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [allowDirectAssign, setAllowDirectAssign] = useState(false);
 
   // Use virtualized date range with expandable capabilities
   const {
@@ -180,6 +182,14 @@ export default function JobAssignmentMatrix() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+            <div className="flex items-center gap-2 pr-2 border-r">
+              <span className="text-sm font-medium">Direct assign</span>
+              <Switch
+                checked={allowDirectAssign}
+                onCheckedChange={(v) => setAllowDirectAssign(Boolean(v))}
+                aria-label="Toggle direct assignment"
+              />
+            </div>
             <Users className="h-4 w-4" />
             <Badge variant="secondary" className="text-xs">
               {filteredTechnicians.length} techs
@@ -213,6 +223,7 @@ export default function JobAssignmentMatrix() {
             technicians={filteredTechnicians}
             dates={dateRange}
             jobs={yearJobs}
+            allowDirectAssign={allowDirectAssign}
             onNearEdgeScroll={(direction) => {
               if (direction === 'before' && canExpandBefore) {
                 expandBefore();

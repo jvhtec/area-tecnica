@@ -13,8 +13,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Clock, Mail, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
-import { useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
-import { useToast } from '@/hooks/use-toast';
+// Note: This dialog only collects a choice and delegates handling upstream.
 
 interface StaffingJobSelectionDialogProps {
   open: boolean;
@@ -42,8 +41,7 @@ export const StaffingJobSelectionDialog = ({
 }: StaffingJobSelectionDialogProps) => {
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedAction, setSelectedAction] = useState<'availability' | 'offer'>('availability');
-  const { toast } = useToast();
-  const { mutate: sendStaffingEmail, isPending: isSendingEmail } = useSendStaffingEmail();
+  // No direct email sending here; parent handles the action.
 
   const handleJobSelect = (jobId: string) => {
     setSelectedJobId(jobId);
@@ -58,9 +56,9 @@ export const StaffingJobSelectionDialog = ({
         date: format(date, 'yyyy-MM-dd')
       });
       
-      // Call the callback to let parent handle it
+      // Call the callback to let parent handle it.
+      // Do NOT call onClose() here to avoid racing with parent state transitions (e.g., opening OfferDetails).
       onStaffingActionSelected(selectedJobId, selectedAction);
-      handleClose();
     } else {
       console.log('❌ StaffingJobSelectionDialog: No job selected');
     }

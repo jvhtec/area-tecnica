@@ -53,6 +53,7 @@ interface OptimizedAssignmentMatrixExtendedProps extends OptimizedAssignmentMatr
   onNearEdgeScroll?: (direction: 'before' | 'after') => void;
   canExpandBefore?: boolean;
   canExpandAfter?: boolean;
+  allowDirectAssign?: boolean;
 }
 
 export const OptimizedAssignmentMatrix = ({ 
@@ -61,7 +62,8 @@ export const OptimizedAssignmentMatrix = ({
   jobs, 
   onNearEdgeScroll,
   canExpandBefore = false,
-  canExpandAfter = false
+  canExpandAfter = false,
+  allowDirectAssign = false
 }: OptimizedAssignmentMatrixExtendedProps) => {
   const [cellAction, setCellAction] = useState<CellAction | null>(null);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
@@ -184,8 +186,13 @@ export const OptimizedAssignmentMatrix = ({
     console.log('Matrix handling cell click:', { technicianId, date: format(date, 'yyyy-MM-dd'), action });
     const assignment = getAssignmentForCell(technicianId, date);
     console.log('Assignment data:', assignment);
+    // Gate direct assign-related actions behind allowDirectAssign
+    if (!allowDirectAssign && (action === 'select-job' || action === 'assign')) {
+      console.log('Direct assign disabled by UI toggle; ignoring click');
+      return;
+    }
     setCellAction({ type: action, technicianId, date, assignment, selectedJobId });
-  }, [getAssignmentForCell]);
+  }, [getAssignmentForCell, allowDirectAssign]);
 
   const handleJobSelected = useCallback((jobId: string) => {
     if (cellAction?.type === 'select-job') {
@@ -488,6 +495,7 @@ export const OptimizedAssignmentMatrix = ({
                         onOptimisticUpdate={(status) => assignment && handleOptimisticUpdate(technician.id, assignment.job_id, status)}
                         onRender={() => incrementCellRender()}
                         jobId={assignment?.job_id}
+                        allowDirectAssign={allowDirectAssign}
                       />
                     </div>
                   );

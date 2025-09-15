@@ -2,6 +2,7 @@
 import React, { memo, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Calendar, Clock, Check, X, UserX, Mail, CheckCircle } from 'lucide-react';
 import { format, isToday, isWeekend } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -28,6 +29,7 @@ interface OptimizedMatrixCellProps {
   onOptimisticUpdate?: (status: string) => void;
   onRender?: () => void;
   jobId?: string;
+  allowDirectAssign?: boolean;
 }
 
 export const OptimizedMatrixCell = memo(({
@@ -43,7 +45,8 @@ export const OptimizedMatrixCell = memo(({
   onPrefetch,
   onOptimisticUpdate,
   onRender,
-  jobId
+  jobId,
+  allowDirectAssign = false
 }: OptimizedMatrixCellProps) => {
   // Track cell renders for performance monitoring
   React.useEffect(() => {
@@ -62,6 +65,8 @@ export const OptimizedMatrixCell = memo(({
   );
   const { data: staffingStatusByDate } = useStaffingStatusByDate(technician.id, date);
   const { mutate: sendStaffingEmail, isPending: isSendingEmail } = useSendStaffingEmail();
+  const [availabilityRetrying, setAvailabilityRetrying] = React.useState(false);
+  const [pendingRetry, setPendingRetry] = React.useState<null | { jobId: string }>(null);
   
   // Use job-specific status for assigned cells, date-based status for empty cells
   const staffingStatus = hasAssignment ? staffingStatusByJob : staffingStatusByDate;
@@ -142,15 +147,23 @@ export const OptimizedMatrixCell = memo(({
     
     if (hasAssignment) {
       console.log('Opening assignment edit dialog');
-      onClick('assign'); // Edit existing assignment
+      if (allowDirectAssign) {
+        onClick('assign'); // Edit existing assignment
+      } else {
+        console.log('Direct assign disabled; ignoring assignment edit');
+      }
     } else if (isUnavailable) {
       console.log('Opening unavailability dialog');
       onClick('unavailable'); // Edit unavailability
     } else {
       console.log('Opening job selection dialog');
-      onClick('select-job'); // Create new assignment
+      if (allowDirectAssign) {
+        onClick('select-job'); // Create new assignment
+      } else {
+        console.log('Direct assign disabled; ignoring select-job');
+      }
     }
-  }, [hasAssignment, isUnavailable, onClick, technician, date, assignment]);
+  }, [hasAssignment, isUnavailable, onClick, technician, date, assignment, allowDirectAssign]);
 
   const handleStatusClick = useCallback((e: React.MouseEvent, action: 'confirm' | 'decline') => {
     e.stopPropagation();
@@ -206,6 +219,8 @@ export const OptimizedMatrixCell = memo(({
   // Get staffing button states
   const canAskAvailability = !hasAssignment && !isUnavailable && (!staffingStatus?.availability_status || staffingStatus.availability_status === 'declined' || staffingStatus.availability_status === 'expired');
   const canSendOffer = staffingStatus?.availability_status === 'confirmed' && (!staffingStatus?.offer_status || staffingStatus.offer_status === 'declined' || staffingStatus.offer_status === 'expired');
+  // Manual progression: allow offering even if availability isn't in confirmed state
+  const canOfferFallback = !hasAssignment && !isUnavailable && !canSendOffer;
 
   // Debug logging for staffing button visibility
   React.useEffect(() => {
@@ -251,36 +266,69 @@ export const OptimizedMatrixCell = memo(({
       {(staffingStatus?.availability_status || staffingStatus?.offer_status) && (
         <div className="absolute top-1 left-1 flex gap-1 z-10">
           {staffingStatus.availability_status && (
-            <Badge 
-              variant={
-                staffingStatus.availability_status === 'confirmed' ? 'default' : 
-                staffingStatus.availability_status === 'declined' ? 'destructive' : 
-                'secondary'
-              }
-              className="text-xs px-1 py-0 h-3"
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Prefer concrete job ids; otherwise fall back to by-date job id
+                const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.availability_job_id;
+                if (targetJobId) {
+                  // Ask for confirmation before retrying
+                  setPendingRetry({ jobId: targetJobId });
+                } else {
+                  // Ask user to pick a job for the retry
+                  onClick('select-job-for-staffing');
+                }
+              }}
+              title="Retry availability email"
+              className="focus:outline-none"
             >
-              A:{staffingStatus.availability_status === 'confirmed' ? '✓' : 
-                 staffingStatus.availability_status === 'declined' ? '✗' : '?'}
-            </Badge>
+              <Badge 
+                variant={
+                  staffingStatus.availability_status === 'confirmed' ? 'default' : 
+                  staffingStatus.availability_status === 'declined' ? 'destructive' : 
+                  'secondary'
+                }
+                className={`text-xs px-1 py-0 h-3 ${availabilityRetrying ? 'ring-1 ring-blue-400' : ''}`}
+              >
+                {availabilityRetrying ? 'A:↻' : `A:${staffingStatus.availability_status === 'confirmed' ? '✓' : staffingStatus.availability_status === 'declined' ? '✗' : '?'}`}
+              </Badge>
+            </button>
           )}
           {staffingStatus.offer_status && (
-            <Badge 
-              variant={
-                staffingStatus.offer_status === 'confirmed' ? 'default' : 
-                staffingStatus.offer_status === 'declined' ? 'destructive' : 
-                'secondary'
-              }
-              className="text-xs px-1 py-0 h-3"
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Determine job for offer; then open offer-details to choose role
+                const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.offer_job_id;
+                if (targetJobId) {
+                  onClick('offer-details', targetJobId);
+                } else {
+                  onClick('select-job-for-staffing');
+                }
+              }}
+              title="Retry offer email"
+              className="focus:outline-none"
             >
-              O:{staffingStatus.offer_status === 'confirmed' ? '✓' : 
-                 staffingStatus.offer_status === 'declined' ? '✗' : '?'}
-            </Badge>
+              <Badge 
+                variant={
+                  staffingStatus.offer_status === 'confirmed' ? 'default' : 
+                  staffingStatus.offer_status === 'declined' ? 'destructive' : 
+                  'secondary'
+                }
+                className="text-xs px-1 py-0 h-3"
+              >
+                O:{staffingStatus.offer_status === 'confirmed' ? '✓' : 
+                   staffingStatus.offer_status === 'declined' ? '✗' : '?'}
+              </Badge>
+            </button>
           )}
         </div>
       )}
 
       {/* Staffing Action Buttons */}
-      {(canAskAvailability || canSendOffer) && (
+      {(canAskAvailability || canSendOffer || canOfferFallback) && (
         <div className="absolute top-1 right-1 flex gap-1 z-10">
           {canAskAvailability && (
             <>
@@ -300,21 +348,21 @@ export const OptimizedMatrixCell = memo(({
               </Button>
             </>
           )}
-          {canSendOffer && (
+          {(canSendOffer || canOfferFallback) && (
             <>
               {console.log('🟢 Rendering SEND OFFER button for:', `${technician.first_name} ${technician.last_name}`, format(date, 'yyyy-MM-dd'))}
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-5 w-5 p-0 hover:bg-green-100"
+                className={`h-5 w-5 p-0 ${canSendOffer ? 'hover:bg-green-100' : 'opacity-80 hover:bg-muted'}`}
                 onClick={(e) => {
                   console.log('✅ SEND OFFER CLICKED!');
                   handleStaffingEmail(e, 'offer');
                 }}
                 disabled={isSendingEmail}
-                title="Send offer"
+                title={canSendOffer ? 'Send offer' : 'Send offer (manual progress)'}
               >
-                <CheckCircle className="h-3 w-3 text-green-600" />
+                <CheckCircle className={`h-3 w-3 ${canSendOffer ? 'text-green-600' : 'text-muted-foreground'}`} />
               </Button>
             </>
           )}
@@ -382,7 +430,7 @@ export const OptimizedMatrixCell = memo(({
       )}
 
       {/* Empty Cell */}
-      {!hasAssignment && !isUnavailable && (
+      {!hasAssignment && !isUnavailable && allowDirectAssign && (
         <div className="flex-1 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
           <Calendar className="h-4 w-4 text-muted-foreground" />
         </div>
@@ -391,6 +439,43 @@ export const OptimizedMatrixCell = memo(({
       {/* Date indicator for today */}
       {isTodayCell && (
         <div className="absolute bottom-0 left-0 w-full h-1 bg-orange-400 dark:bg-orange-600" />
+      )}
+
+      {pendingRetry && (
+        <Dialog open={true} onOpenChange={(v) => !v && setPendingRetry(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Resend availability email?</DialogTitle>
+              <DialogDescription>
+                This will resend an availability request to {technician.first_name} {technician.last_name} for {format(date, 'PPP')}.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPendingRetry(null)}>Cancel</Button>
+              <Button onClick={() => {
+                if (!pendingRetry) return;
+                setAvailabilityRetrying(true);
+                sendStaffingEmail(
+                  { job_id: pendingRetry.jobId, profile_id: technician.id, phase: 'availability' },
+                  {
+                    onSuccess: () => {
+                      setAvailabilityRetrying(false);
+                      setPendingRetry(null);
+                      toast.success('Availability email resent');
+                    },
+                    onError: (error) => {
+                      setAvailabilityRetrying(false);
+                      setPendingRetry(null);
+                      toast.error(`Failed to resend availability: ${error.message}`);
+                    }
+                  }
+                );
+              }} disabled={availabilityRetrying}>
+                {availabilityRetrying ? 'Resending…' : 'Resend'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
