@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Users, Plus, Trash2, User, IdCard, Briefcase } from "lucide-react";
 import { EventData } from "@/types/hoja-de-ruta";
 import { ProfileAutocomplete } from "../components/ProfileAutocomplete";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ModernStaffSectionProps {
   eventData: EventData;
@@ -22,34 +23,37 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
   onAddStaff,
   onProfileSelect,
 }) => {
-  const handleProfileSelect = (index: number, profile: any) => {
+  const handleProfileSelect = async (index: number, profile: any) => {
     console.debug('[ModernStaffSection] Profile selected', { index, profile });
-    // Auto-fill the form fields from the selected profile
-    const fullName = (profile.full_name || [profile.first_name, profile.last_name].filter(Boolean).join(' ')).trim();
-    
-    if (fullName) {
-      const parts = fullName.split(/\s+/);
-      const firstName = parts[0] || '';
-      const surnameParts = parts.slice(1);
+    // Auto-fill: use first_name for 'Nombre' and put full last_name in 'Apellidos'
+    const firstName = (profile.first_name || '').toString().trim();
+    const lastName = (profile.last_name || '').toString().trim();
 
-      onStaffChange(index, 'name', firstName);
+    if (firstName) onStaffChange(index, 'name', firstName);
+    if (lastName) {
+      onStaffChange(index, 'surname1', lastName);
+      onStaffChange(index, 'surname2', ''); // keep empty; field is hidden
+    }
 
-      if (surnameParts.length > 0) {
-        onStaffChange(index, 'surname1', surnameParts[0] || '');
-        if (surnameParts.length > 1) {
-          onStaffChange(index, 'surname2', surnameParts.slice(1).join(' ') || '');
+    // Ensure DNI auto-fills when available
+    let dni = (profile.dni || (profile.DNI as string) || '').toString().trim();
+    if (!dni && profile.id) {
+      // Fallback: fetch full profile to ensure DNI is loaded
+      try {
+        const { data: p, error } = await supabase
+          .from('profiles')
+          .select('dni, role, first_name, last_name')
+          .eq('id', profile.id)
+          .maybeSingle();
+        if (!error && p?.dni) {
+          dni = p.dni;
         }
+      } catch (e) {
+        console.warn('ModernStaffSection: could not fetch profile for DNI', e);
       }
-
-      console.debug('[ModernStaffSection] Parsed name fields', { firstName, surname1: surnameParts[0], surname2: surnameParts.slice(1).join(' ') });
     }
-
-    if (profile.dni) {
-      onStaffChange(index, 'dni', profile.dni);
-    }
-    if (profile.role) {
-      onStaffChange(index, 'position', profile.role);
-    }
+    if (dni) onStaffChange(index, 'dni', dni);
+    // Do not auto-fill position from profile.role per request
     
     if (onProfileSelect) {
       onProfileSelect(index, profile);
@@ -107,24 +111,12 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
                     <div className="space-y-2">
                       <Label className="text-sm font-medium flex items-center gap-2">
                         <IdCard className="w-4 h-4" />
-                        Primer Apellido
+                        Apellidos
                       </Label>
                       <Input
                         value={staff.surname1}
                         onChange={(e) => onStaffChange(index, 'surname1', e.target.value)}
-                        placeholder="Primer apellido"
-                        className="border-2 focus:border-orange-300"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">
-                        Segundo Apellido
-                      </Label>
-                      <Input
-                        value={staff.surname2}
-                        onChange={(e) => onStaffChange(index, 'surname2', e.target.value)}
-                        placeholder="Segundo apellido"
+                        placeholder="Apellidos"
                         className="border-2 focus:border-orange-300"
                       />
                     </div>

@@ -48,7 +48,7 @@ export const ProfileAutocomplete: React.FC<ProfileAutocompleteProps> = ({
       const { data, error } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, dni, department, role')
-        .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`)
+        .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,dni.ilike.%${searchTerm}%`)
         .limit(10);
 
       if (error) {
