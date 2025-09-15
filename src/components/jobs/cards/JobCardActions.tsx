@@ -29,6 +29,10 @@ interface JobCardActionsProps {
   onAssignmentDialogOpen: (e: React.MouseEvent) => void;
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onJobDetailsClick?: () => void;
+  // Flex sync + logs
+  canSyncFlex?: boolean;
+  onSyncFlex?: (e: React.MouseEvent) => void;
+  onOpenFlexLogs?: (e: React.MouseEvent) => void;
 }
 
 export const JobCardActions: React.FC<JobCardActionsProps> = ({
@@ -53,7 +57,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   onFestivalArtistsClick,
   onAssignmentDialogOpen,
   handleFileUpload,
-  onJobDetailsClick
+  onJobDetailsClick,
+  canSyncFlex,
+  onSyncFlex,
+  onOpenFlexLogs
 }) => {
   const navigate = useNavigate();
 
@@ -128,6 +135,17 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       >
         <RefreshCw className="h-4 w-4" />
       </Button>
+      {isProjectManagementPage && canSyncFlex && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onSyncFlex}
+          title="Sync status to Flex"
+          className="hover:bg-accent/50"
+        >
+          <RefreshCw className="h-4 w-4" />
+        </Button>
+      )}
       {job.job_type !== 'dryhire' && job.job_type !== 'tourdate' && (
         <Button
           variant="ghost"
@@ -216,6 +234,17 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
             <Upload className="h-4 w-4" />
           </Button>
         </div>
+      )}
+      {isProjectManagementPage && canSyncFlex && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onOpenFlexLogs}
+          className="gap-2"
+        >
+          <FileText className="h-4 w-4" />
+          Sync Logs
+        </Button>
       )}
     </div>
   );

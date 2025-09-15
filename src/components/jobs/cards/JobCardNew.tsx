@@ -29,6 +29,7 @@ import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
+import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -70,6 +71,7 @@ export function JobCardNew({
   const [isCreatingFolders, setIsCreatingFolders] = useState(false);
   const [isCreatingLocalFolders, setIsCreatingLocalFolders] = useState(false);
   const [jobDetailsDialogOpen, setJobDetailsDialogOpen] = useState(false);
+  const [flexLogDialogOpen, setFlexLogDialogOpen] = useState(false);
   
   const {
     appliedBorderColor,
@@ -122,6 +124,54 @@ export function JobCardNew({
   
   // Final decision: only consider folders created if they actually exist
   const foldersAreCreated = actualFoldersExist;
+
+  // Manual Flex sync handler
+  const syncStatusToFlex = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const mapStatus = (s: string | null | undefined): 'tentativa' | 'confirmado' | 'cancelado' | null => {
+        switch (s) {
+          case 'Tentativa':
+            return 'tentativa';
+          case 'Confirmado':
+            return 'confirmado';
+          case 'Cancelado':
+            return 'cancelado';
+          default:
+            return null; // skip 'Completado' and others
+        }
+      };
+      const flexStatus = mapStatus(job.status);
+      if (!flexStatus) {
+        toast({ title: 'Not applicable', description: 'Only Tentativa/Confirmado/Cancelado are synced to Flex.' });
+        return;
+      }
+      const { data: folders, error: fErr } = await supabase
+        .from('flex_folders')
+        .select('id, parent_id, department, folder_type')
+        .eq('job_id', job.id);
+      if (fErr || !folders || folders.length === 0) {
+        toast({ title: 'No Flex folders', description: 'Create Flex folders before syncing status.', variant: 'destructive' });
+        return;
+      }
+      // Prefer the department subfolder's parent as master, using department column
+      const deptLc = (department || '').toLowerCase();
+      const sub = folders.find((f: any) => (f.department || '').toLowerCase() === deptLc)
+                  || folders.find((f: any) => ['sound','lights','video'].includes((f.department || f.folder_type || '').toLowerCase()));
+      const master = sub?.parent_id ? folders.find((f: any) => f.id === sub.parent_id) : null;
+      const targetFolderId = master?.id || sub?.parent_id || sub?.id; // fallback to any available id
+      const { data: res, error } = await supabase.functions.invoke('apply-flex-status', {
+        body: { folder_id: targetFolderId, status: flexStatus, cascade: true }
+      });
+      if (error || !res?.success) {
+        toast({ title: 'Flex sync failed', description: 'See logs for details.' });
+      } else {
+        toast({ title: 'Flex synced', description: 'Status synchronized with Flex.' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message || String(err), variant: 'destructive' });
+    }
+  };
 
   // Optimistic delete handler with instant UI feedback
   const handleDeleteClick = async (e: React.MouseEvent) => {
@@ -472,6 +522,9 @@ export function JobCardNew({
             }}
             handleFileUpload={handleFileUpload}
             onJobDetailsClick={() => setJobDetailsDialogOpen(true)}
+            canSyncFlex={['admin','management','logistics'].includes(userRole || '')}
+            onSyncFlex={syncStatusToFlex}
+            onOpenFlexLogs={(e) => { e.stopPropagation(); setFlexLogDialogOpen(true); }}
           />
         </div>
 
@@ -552,6 +605,12 @@ export function JobCardNew({
             onOpenChange={setJobDetailsDialogOpen}
             job={job}
             department={department}
+          />
+          {/* Flex Sync Logs Dialog */}
+          <FlexSyncLogDialog
+            jobId={job.id}
+            open={flexLogDialogOpen}
+            onOpenChange={setFlexLogDialogOpen}
           />
         </>
       )}

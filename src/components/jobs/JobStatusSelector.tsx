@@ -63,6 +63,63 @@ export const JobStatusSelector = ({
         description: `Job status changed to ${JOB_STATUS_OPTIONS.find(opt => opt.value === newStatus)?.label}`
       });
 
+      // Attempt to sync status with Flex via Edge Function
+      const toFlexStatus = (s: JobStatus): 'tentativa' | 'confirmado' | 'cancelado' | null => {
+        switch (s) {
+          case 'Tentativa':
+            return 'tentativa';
+          case 'Confirmado':
+            return 'confirmado';
+          case 'Cancelado':
+            return 'cancelado';
+          default:
+            return null; // Do not sync 'Completado' to Flex
+        }
+      };
+
+      const flexStatus = toFlexStatus(newStatus);
+      if (flexStatus) {
+        try {
+          // Find master flex folder for this job based on department subfolder's parent
+          const { data: folders, error: foldersError } = await supabase
+            .from('flex_folders')
+            .select('id, parent_id, department, folder_type')
+            .eq('job_id', jobId);
+
+          if (!foldersError && folders && folders.length > 0) {
+            const deptTypes = ['sound','lights','video'];
+            const sub = folders.find((f: any) => deptTypes.includes((f.department || f.folder_type || '').toLowerCase()));
+            const masterId = sub?.parent_id || null;
+            const master = masterId ? folders.find((f: any) => f.id === masterId) : null;
+            if (master) {
+              const { data: syncRes, error: syncErr } = await supabase.functions.invoke('apply-flex-status', {
+                body: { folder_id: master.id, status: flexStatus, cascade: true }
+              });
+              if (syncErr || !syncRes?.success) {
+                console.warn('Flex status sync failed', syncErr || syncRes);
+                toast({
+                  title: 'Flex sync warning',
+                  description: 'Updated locally, but Flex sync did not complete.',
+                });
+              } else {
+                toast({
+                  title: 'Flex synced',
+                  description: 'Status synchronized with Flex.'
+                });
+              }
+            } else {
+              console.log('No master Flex folder found via subfolder parent; skipping Flex sync');
+            }
+          } else {
+            // No folders for this job: nothing to sync
+            console.log('No flex_folders found for job; skipping Flex sync');
+          }
+        } catch (syncError) {
+          console.warn('Error during Flex sync:', syncError);
+          // Non-blocking warning; status already updated locally
+        }
+      }
+
     } catch (error) {
       console.error('Error updating job status:', error);
       
