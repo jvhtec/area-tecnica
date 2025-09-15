@@ -2,8 +2,11 @@
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Clock, Eye, Download, FileText } from "lucide-react";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface AssignmentsListProps {
   assignments: any[];
@@ -19,6 +22,60 @@ export const AssignmentsList = ({
   techName = ''
 }: AssignmentsListProps) => {
   console.log("AssignmentsList rendered with:", { assignments, loading });
+  
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleViewDocument = async (doc: any) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('job-documents')
+        .createSignedUrl(doc.file_path, 3600); // 1 hour expiry
+
+      if (error) throw error;
+
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank');
+      }
+    } catch (err) {
+      console.error("Error in handleViewDocument:", err);
+      toast({
+        title: "Error",
+        description: "No se pudo abrir el documento.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDownload = async (doc: any) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('job-documents')
+        .createSignedUrl(doc.file_path, 3600);
+
+      if (error) throw error;
+
+      if (data?.signedUrl) {
+        const link = document.createElement('a');
+        link.href = data.signedUrl;
+        link.download = doc.file_name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (err) {
+      console.error("Error downloading document:", err);
+      toast({
+        title: "Error",
+        description: "No se pudo descargar el documento.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleTimesheetClick = (jobId: string) => {
+    navigate(`/timesheets?jobId=${jobId}`);
+  };
 
   if (loading) {
     return (
@@ -115,11 +172,58 @@ export const AssignmentsList = ({
               </div>
               
               <div className="flex flex-col items-end gap-2">
-                {jobData.job_documents && jobData.job_documents.length > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    {jobData.job_documents.length} documento{jobData.job_documents.length !== 1 ? 's' : ''}
-                  </span>
+                {/* Timesheet Button */}
+                {jobData.job_type !== "dryhire" && (
+                  <Button
+                    onClick={() => handleTimesheetClick(jobData.id)}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Clock className="h-3 w-3" />
+                    Tiempos
+                  </Button>
                 )}
+                
+                {/* Documents */}
+                {jobData.job_documents && jobData.job_documents.length > 0 && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-muted-foreground text-right">
+                      {jobData.job_documents.length} documento{jobData.job_documents.length !== 1 ? 's' : ''}
+                    </span>
+                    <div className="flex gap-1">
+                      {jobData.job_documents.slice(0, 2).map((doc: any) => (
+                        <div key={doc.id} className="flex gap-1">
+                          <Button
+                            onClick={() => handleViewDocument(doc)}
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            title={`Ver ${doc.file_name}`}
+                          >
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            onClick={() => handleDownload(doc)}
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            title={`Descargar ${doc.file_name}`}
+                          >
+                            <Download className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                      {jobData.job_documents.length > 2 && (
+                        <span className="text-xs text-muted-foreground">
+                          +{jobData.job_documents.length - 2} más
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Incident Report */}
                 {jobData.job_type !== "dryhire" && (
                   <TechnicianIncidentReportDialog 
                     job={jobData} 
