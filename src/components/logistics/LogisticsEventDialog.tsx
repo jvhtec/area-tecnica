@@ -28,6 +28,7 @@ import {
 import { Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { SimplifiedJobColorPicker } from "@/components/jobs/SimplifiedJobColorPicker";
+import { REQUEST_TRANSPORT_OPTIONS } from "@/constants/transportOptions";
 
 // Available departments
 const departments: Department[] = [
@@ -53,6 +54,12 @@ interface LogisticsEventDialogProps {
     color?: string;
     departments: { department: Department }[];
   };
+  // Optional initial values when creating a new event
+  initialJobId?: string | null;
+  initialDepartments?: Department[];
+  initialTransportType?: string;
+  initialEventType?: 'load' | 'unload';
+  onCreated?: (details: { id: string; event_type: 'load' | 'unload'; event_date: string; event_time: string }) => void;
 }
 
 export const LogisticsEventDialog = ({
@@ -60,6 +67,11 @@ export const LogisticsEventDialog = ({
   onOpenChange,
   selectedDate,
   selectedEvent,
+  initialJobId = null,
+  initialDepartments = [],
+  initialTransportType,
+  initialEventType,
+  onCreated,
 }: LogisticsEventDialogProps) => {
   const [eventType, setEventType] = useState<"load" | "unload">("load");
   const [transportType, setTransportType] = useState<string>("trailer");
@@ -93,18 +105,18 @@ export const LogisticsEventDialog = ({
       setSelectedDepartments(selectedEvent.departments.map((d) => d.department));
       setColor(selectedEvent.color || "#7E69AB");
     } else {
-      setEventType("load");
-      setTransportType("trailer");
+      setEventType(initialEventType || "load");
+      setTransportType(initialTransportType || "trailer");
       setTime("09:00");
       setDate(selectedDate ? format(selectedDate, "yyyy-MM-dd") : "");
       setLoadingBay("");
-      setSelectedJob(null);
+      setSelectedJob(initialJobId || null);
       setCustomTitle("");
       setLicensePlate("");
-      setSelectedDepartments([]);
+      setSelectedDepartments(initialDepartments || []);
       setColor("#7E69AB");
     }
-  }, [selectedEvent, selectedDate]);
+  }, [selectedEvent, selectedDate, initialJobId, initialDepartments, initialTransportType, initialEventType]);
 
   // Fetch available Jobs
   const { data: jobs } = useQuery({
@@ -217,6 +229,11 @@ export const LogisticsEventDialog = ({
           .single();
 
         if (error) throw error;
+
+        // notify caller on create
+        try {
+          onCreated?.({ id: newEvent.id, event_type: newEvent.event_type, event_date: newEvent.event_date, event_time: newEvent.event_time });
+        } catch {}
 
         if (selectedDepartments.length > 0) {
           const { error: deptError } = await supabase
@@ -350,17 +367,11 @@ export const LogisticsEventDialog = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="trailer">Trailer</SelectItem>
-                  <SelectItem value="rv">RV</SelectItem>
-                  <SelectItem value="van">Van</SelectItem>
-                  <SelectItem value="sleeper_bus">Sleeper Bus</SelectItem>
-                  <SelectItem value="9m">9m</SelectItem>
-                  <SelectItem value="8m">8m</SelectItem>
-                  <SelectItem value="6m">6m</SelectItem>
-                  <SelectItem value="4m">4m</SelectItem>
-                  <SelectItem value="furgoneta">Furgoneta</SelectItem>
-                  <SelectItem value="train">Train</SelectItem>
-                  <SelectItem value="plane">Plane</SelectItem>
+                  {REQUEST_TRANSPORT_OPTIONS.map((opt) => (
+                    <SelectItem key={opt} value={opt}>
+                      {opt.replace('_', ' ')}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

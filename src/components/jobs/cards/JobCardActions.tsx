@@ -33,6 +33,10 @@ interface JobCardActionsProps {
   canSyncFlex?: boolean;
   onSyncFlex?: (e: React.MouseEvent) => void;
   onOpenFlexLogs?: (e: React.MouseEvent) => void;
+  // Transport / Logistics
+  transportButtonLabel?: string;
+  transportButtonTone?: 'default' | 'outline' | 'secondary' | 'ghost';
+  onTransportClick?: (e: React.MouseEvent) => void;
 }
 
 export const JobCardActions: React.FC<JobCardActionsProps> = ({
@@ -60,7 +64,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   onJobDetailsClick,
   canSyncFlex,
   onSyncFlex,
-  onOpenFlexLogs
+  onOpenFlexLogs,
+  transportButtonLabel,
+  transportButtonTone,
+  onTransportClick,
 }) => {
   const navigate = useNavigate();
 
@@ -82,6 +89,17 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
 
   return (
     <div className="flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
+      {transportButtonLabel && onTransportClick && (
+        <Button
+          variant={transportButtonTone || 'outline'}
+          size="sm"
+          onClick={onTransportClick}
+          className="gap-2"
+          title={transportButtonLabel}
+        >
+          {transportButtonLabel}
+        </Button>
+      )}
       {/* View Details - for technicians and house techs */}
       {(userRole === 'technician' || userRole === 'house_tech') && onJobDetailsClick && (
         <Button

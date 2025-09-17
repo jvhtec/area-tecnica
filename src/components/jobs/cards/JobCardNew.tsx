@@ -31,9 +31,11 @@ import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ModernHojaDeRuta } from "@/components/hoja-de-ruta/ModernHojaDeRuta";
+import { TransportRequestDialog } from "@/components/logistics/TransportRequestDialog";
+import { LogisticsEventDialog } from "@/components/logistics/LogisticsEventDialog";
 
 export interface JobCardNewProps {
   job: any;
@@ -75,6 +77,11 @@ export function JobCardNew({
   const [isCreatingLocalFolders, setIsCreatingLocalFolders] = useState(false);
   const [jobDetailsDialogOpen, setJobDetailsDialogOpen] = useState(false);
   const [flexLogDialogOpen, setFlexLogDialogOpen] = useState(false);
+  const [transportDialogOpen, setTransportDialogOpen] = useState(false);
+  const [logisticsDialogOpen, setLogisticsDialogOpen] = useState(false);
+  const [selectedTransportRequest, setSelectedTransportRequest] = useState<any | null>(null);
+  const [logisticsInitialEventType, setLogisticsInitialEventType] = useState<'load' | 'unload' | undefined>(undefined);
+  const [userDepartment, setUserDepartment] = useState<string | null>(null);
   
   const {
     appliedBorderColor,
@@ -127,6 +134,113 @@ export function JobCardNew({
   
   // Final decision: only consider folders created if they actually exist
   const foldersAreCreated = actualFoldersExist;
+
+  // Load current user's department
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('department')
+          .eq('id', user.id)
+          .single();
+        if (!error) setUserDepartment(data?.department || null);
+      } catch {}
+    })();
+  }, []);
+
+  // Queries for transport requests and logistics events
+  const { data: myTransportRequest } = useQuery({
+    queryKey: ['transport-request', job.id, userDepartment],
+    queryFn: async () => {
+      if (!userDepartment || !['sound','lights','video'].includes(userDepartment)) return null;
+      const { data, error } = await supabase
+        .from('transport_requests')
+        .select('id, department, status, note, created_at, items:transport_request_items(id, transport_type, leftover_space_meters)')
+        .eq('job_id', job.id)
+        .eq('department', userDepartment)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) return null;
+      return data;
+    },
+    enabled: !!job?.id && !!userDepartment,
+  });
+
+  const { data: allRequests = [] } = useQuery({
+    queryKey: ['transport-requests-all', job.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('transport_requests')
+        .select('id, department, status, note, created_at, items:transport_request_items(id, transport_type, leftover_space_meters)')
+        .eq('job_id', job.id)
+        .eq('status', 'requested')
+        .order('created_at', { ascending: false });
+      if (error) return [];
+      return data || [];
+    },
+    enabled: !!job?.id && ['logistics','admin','management'].includes(userRole || ''),
+  });
+
+  const { data: jobEvents = [] } = useQuery({
+    queryKey: ['logistics-events-for-job', job.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('logistics_events')
+        .select('id')
+        .eq('job_id', job.id);
+      if (error) return [];
+      return data || [];
+    },
+    enabled: !!job?.id,
+  });
+
+  const isScheduled = (jobEvents?.length || 0) > 0;
+  const hasRequest = Boolean(myTransportRequest) || (Array.isArray(allRequests) && allRequests.length > 0);
+  const isTechDept = userDepartment && ['sound','lights','video'].includes(userDepartment);
+
+  const transportButtonLabel = (() => {
+    if (isScheduled) return 'Transport Scheduled';
+    if ((userRole === 'logistics') || (userRole === 'admin' && !isTechDept)) {
+      return allRequests.length > 0 ? `Requests (${allRequests.length})` : 'Logistics';
+    }
+    if (isTechDept) {
+      return myTransportRequest ? 'Transport Requested' : 'Request Transport';
+    }
+    return undefined;
+  })();
+
+  const transportButtonTone = isScheduled ? 'default' : hasRequest ? 'secondary' : 'outline';
+
+  const handleTransportClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if ((userRole === 'logistics') || (userRole === 'admin' && !isTechDept)) {
+      setTransportDialogOpen(true); // open requests manager
+    } else if (isTechDept && userDepartment) {
+      setTransportDialogOpen(true); // open request creator
+    }
+  };
+
+  // Auto-fulfill request when both load and unload exist for the request's department
+  const checkAndFulfillRequest = async (requestId: string, departmentForReq: string) => {
+    try {
+      const { data: events } = await supabase
+        .from('logistics_events')
+        .select('id, event_type, logistics_event_departments(department)')
+        .eq('job_id', job.id)
+        .eq('logistics_event_departments.department', departmentForReq);
+      const hasLoad = !!events?.some((e: any) => e.event_type === 'load');
+      const hasUnload = !!events?.some((e: any) => e.event_type === 'unload');
+      if (hasLoad && hasUnload) {
+        await supabase.from('transport_requests').update({ status: 'fulfilled' }).eq('id', requestId);
+        queryClient.invalidateQueries({ queryKey: ['transport-request', job.id, departmentForReq] });
+        queryClient.invalidateQueries({ queryKey: ['transport-requests-all', job.id] });
+      }
+    } catch {}
+  };
 
   // Manual Flex sync handler
   const syncStatusToFlex = async (e: React.MouseEvent) => {
@@ -509,7 +623,7 @@ export function JobCardNew({
             )}
             <div className="flex-1" />
           </div>
-          <JobCardActions 
+          <JobCardActions
             job={job}
             userRole={userRole || null}
             foldersAreCreated={foldersAreCreated || isFoldersLoading}
@@ -540,6 +654,9 @@ export function JobCardNew({
             canSyncFlex={['admin','management','logistics'].includes(userRole || '')}
             onSyncFlex={syncStatusToFlex}
             onOpenFlexLogs={(e) => { e.stopPropagation(); setFlexLogDialogOpen(true); }}
+            transportButtonLabel={transportButtonLabel}
+            transportButtonTone={transportButtonTone as any}
+            onTransportClick={handleTransportClick}
           />
         </div>
 
@@ -637,6 +754,116 @@ export function JobCardNew({
                 </div>
               </DialogContent>
             </Dialog>
+          )}
+
+          {/* Transport Request / Logistics Dialogs */}
+          {transportDialogOpen && isTechDept && userDepartment && (
+            <TransportRequestDialog
+              open={transportDialogOpen}
+              onOpenChange={setTransportDialogOpen}
+              jobId={job.id}
+              department={userDepartment}
+              requestId={myTransportRequest?.id || null}
+              onSubmitted={() => {
+                queryClient.invalidateQueries({ queryKey: ['transport-request', job.id, userDepartment] });
+                queryClient.invalidateQueries({ queryKey: ['transport-requests-all', job.id] });
+              }}
+            />
+          )}
+
+          {transportDialogOpen && (userRole === 'logistics' || (userRole === 'admin' && !isTechDept)) && (
+            <Dialog open={transportDialogOpen} onOpenChange={setTransportDialogOpen}>
+              <DialogContent className="max-w-xl">
+                <div className="space-y-4">
+                  <div className="text-lg font-semibold">Transport Requests</div>
+                  {allRequests.length === 0 ? (
+                    <div className="text-muted-foreground">No pending requests for this job.</div>) : (
+                    <div className="space-y-2">
+                      {allRequests.map((req: any) => (
+                        <div key={req.id} className="border rounded p-2 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-medium capitalize">{req.department}</div>
+                              {req.note && <div className="text-xs text-muted-foreground">{req.note}</div>}
+                            </div>
+                            <button
+                              className="px-3 py-1 text-sm rounded border hover:bg-accent"
+                              onClick={async (ev) => {
+                                ev.stopPropagation();
+                                await supabase.from('transport_requests').update({ status: 'cancelled' }).eq('id', req.id);
+                                queryClient.invalidateQueries({ queryKey: ['transport-requests-all', job.id] });
+                              }}
+                            >
+                              Cancel Request
+                            </button>
+                          </div>
+                          <div className="space-y-1">
+                            {(req.items || []).map((it: any) => (
+                              <div key={it.id} className="flex items-center justify-between pl-2">
+                                <div className="text-sm text-muted-foreground">
+                                  {it.transport_type.replace('_',' ')}
+                                  {typeof it.leftover_space_meters === 'number' && (
+                                    <span className="ml-2">· Leftover: {it.leftover_space_meters} m</span>
+                                  )}
+                                </div>
+                                <button
+                                  className="px-3 py-1 text-sm rounded border hover:bg-accent"
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                setSelectedTransportRequest({ ...req, selectedItem: it });
+                                setLogisticsInitialEventType('load');
+                                setTransportDialogOpen(false);
+                                setLogisticsDialogOpen(true);
+                              }}
+                            >
+                              Create Event
+                            </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {logisticsDialogOpen && selectedTransportRequest && (
+            <LogisticsEventDialog
+              open={logisticsDialogOpen}
+              onOpenChange={(open) => {
+                setLogisticsDialogOpen(open);
+                if (!open) {
+                  // Refresh data when dialog closes
+                  queryClient.invalidateQueries({ queryKey: ['logistics-events-for-job', job.id] });
+                  queryClient.invalidateQueries({ queryKey: ['today-logistics'] });
+                }
+              }}
+              selectedDate={new Date(job.start_time)}
+              initialJobId={job.id}
+              initialDepartments={[selectedTransportRequest.department]}
+              initialTransportType={selectedTransportRequest.selectedItem?.transport_type}
+              initialEventType={logisticsInitialEventType}
+              onCreated={(details) => {
+                // Fire and forget: attempt auto-fulfill
+                if (selectedTransportRequest?.id && selectedTransportRequest?.department) {
+                  void checkAndFulfillRequest(selectedTransportRequest.id, selectedTransportRequest.department);
+                }
+                if (details.event_type === 'load') {
+                  const alsoUnload = window.confirm('Create an unload event as well?');
+                  if (alsoUnload) {
+                    setLogisticsInitialEventType('unload');
+                    setLogisticsDialogOpen(true);
+                  } else {
+                    setLogisticsInitialEventType(undefined);
+                  }
+                } else {
+                  setLogisticsInitialEventType(undefined);
+                }
+              }}
+            />
           )}
 
         </>

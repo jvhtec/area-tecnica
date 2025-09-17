@@ -198,8 +198,8 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
         </div>
       </CardHeader>
       <CardContent className="flex-grow p-4">
-        <div className="border rounded-lg">
-          <div className="grid grid-cols-7 gap-px bg-muted">
+        <div className="border rounded-lg overflow-x-auto">
+          <div className="grid grid-cols-7 gap-px bg-muted" style={{ minWidth: '980px' }}>
             {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
               <div key={day} className="bg-background p-2 text-center text-sm text-muted-foreground font-medium">
                 {day}
@@ -208,13 +208,13 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
             {allDays.map((day, i) => {
               const dayEvents = getDayEvents(day);
               const isCurrentMonth = isSameMonth(day, currentMonth);
-              const maxVisibleEvents = 3;
+              const maxVisibleEvents = 7;
 
               return (
                 <div
                   key={i}
                   className={cn(
-                    "bg-background p-2 min-h-[120px] border-t relative cursor-pointer hover:bg-accent/50 transition-colors",
+                    "bg-background p-2 min-h-[200px] border-t relative cursor-pointer hover:bg-accent/50 transition-colors",
                     !isCurrentMonth && "text-muted-foreground/50"
                   )}
                   onClick={() => handleDayClick(day)}
