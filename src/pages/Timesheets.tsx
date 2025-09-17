@@ -18,7 +18,7 @@ export default function Timesheets() {
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const { user, userRole } = useOptimizedAuth();
   const { data: jobs = [], isLoading: jobsLoading } = useOptimizedJobs();
-  const { timesheets } = useTimesheets(selectedJobId || "");
+  const { timesheets } = useTimesheets(selectedJobId || "", { userRole });
 
   useEffect(() => {
     if (jobIdFromUrl) {

@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { Timesheet } from '@/types/timesheet';
 import { Job } from '@/types/job';
 import { format, parseISO } from 'date-fns';
@@ -222,7 +222,7 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
   });
 
   // Create the table using autoTable with updated headers
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: yPosition,
     head: [['Date', 'Technician', 'Start Time', 'End Time', 'Break', 'Total Hours', 'Overtime', 'Signature']],
     body: tableData,

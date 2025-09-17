@@ -23,9 +23,10 @@ interface TimesheetViewProps {
 }
 
 export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetViewProps) => {
-  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, recalcTimesheet, refetch } = useTimesheets(jobId);
-  const { assignments } = useJobAssignmentsRealtime(jobId);
+  // Ensure userRole is initialized before passing into hooks that depend on it
   const { user, userRole } = useOptimizedAuth();
+  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, recalcTimesheet, refetch } = useTimesheets(jobId, { userRole });
+  const { assignments } = useJobAssignmentsRealtime(jobId);
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [editingTimesheet, setEditingTimesheet] = useState<string | null>(null);
@@ -236,6 +237,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
 
   const isManagementUser = userRole === 'admin' || userRole === 'management';
   const isTechnician = userRole === 'technician' || userRole === 'house_tech';
+  const isHouseTech = userRole === 'house_tech';
 
   console.log('TimesheetView Debug:', { 
     userRole, 
@@ -674,7 +676,17 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                     </div>
                   )}
 
-                  {/* Rate calculation visibility & actions */}
+                  {/* Rate calculation visibility & actions
+                      - Managers: always visible
+                      - Technicians: visible only when amount_breakdown_visible exists
+                      - House tech: never visible
+                  */}
+                  {(() => {
+                    const breakdownVisible = !!timesheet.amount_breakdown_visible;
+                    const isTechnicianRole = userRole === 'technician';
+                    const canShowRates = isManagementUser || (isTechnicianRole && breakdownVisible);
+                    if (!canShowRates) return null;
+                    return (
                   <div className="mt-4 p-3 rounded-md border">
                     <div className="flex items-center justify-between mb-2">
                       <p className="font-medium">Rate Calculation</p>
@@ -695,7 +707,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                       if (!breakdown) {
                         return (
                           <p className="text-sm text-muted-foreground">
-                            {isTechnician ? 'Pending approval' : 'No calculation available yet'}
+                            {userRole === 'technician' ? 'Pending approval' : 'No calculation available yet'}
                           </p>
                         );
                       }
@@ -721,7 +733,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                             <p className="text-muted-foreground">Total</p>
                             <p className="font-semibold">€{breakdown.total_eur.toFixed(2)}</p>
                           </div>
-                          {isTechnician && (
+                          {userRole === 'technician' && (
                             <div className="col-span-2 md:col-span-5 text-xs text-muted-foreground mt-1">
                               Notes: rounding after 30 minutes; some conditions such as 30€ discounts for autónomos may apply depending on contract; house-tech rates to be added later.
                             </div>
@@ -730,6 +742,8 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                       );
                     })()}
                   </div>
+                    );
+                  })()}
 
                   {(timesheet.status === 'draft' || timesheet.status === 'submitted') && (
                     <TimesheetSignature

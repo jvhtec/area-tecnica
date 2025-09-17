@@ -8,4 +8,5 @@ deno task bundle
 allowed_imports = ["https://deno.land/std/*", "https://esm.sh/*", "https://cdn.skypack.dev/*"]
 
 [env]
-SUPABASE_URL = "syldobdcdsgfgjtbuwxm"
+# Must be the full Supabase URL, not just the project ref
+SUPABASE_URL = "https://syldobdcdsgfgjtbuwxm.supabase.co"
