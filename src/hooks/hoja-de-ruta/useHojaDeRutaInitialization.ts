@@ -31,7 +31,7 @@ export const useHojaDeRutaInitialization = (
           location:locations(name, formatted_address, latitude, longitude),
           job_assignments(
             *,
-            profiles:technician_id(first_name, last_name)
+            profiles:technician_id(first_name, last_name, dni)
           )
         `)
         .eq('id', jobId)
@@ -47,7 +47,7 @@ export const useHojaDeRutaInitialization = (
         surname1: assignment.profiles?.last_name || "",
         surname2: "",
         position: assignment.sound_role || assignment.lights_role || assignment.video_role || "Técnico",
-        dni: ""
+        dni: assignment.profiles?.dni || ""
       })) || [];
 
       console.log("✅ INITIALIZATION: Loaded current assignments:", staffFromAssignments);
@@ -175,6 +175,38 @@ export const useHojaDeRutaInitialization = (
         setDataSource('saved');
         
         const savedEventData = hojaDeRuta.eventData;
+        // Merge saved staff with current assignments, preserving saved DNI and manual entries
+        const mergeStaff = (
+          saved: Array<{ name?: string; surname1?: string; surname2?: string; position?: string; dni?: string }> = [],
+          assigned: Array<{ name?: string; surname1?: string; surname2?: string; position?: string; dni?: string }> = []
+        ) => {
+          const norm = (s?: string) => (s || '').trim().toLowerCase();
+          const keyOf = (p: any) => `${norm(p?.name)}|${norm(p?.surname1)}`;
+          const map = new Map<string, any>();
+          // Seed with saved staff
+          for (const p of saved) {
+            map.set(keyOf(p), { ...p });
+          }
+          // Merge in assignments
+          for (const a of assigned) {
+            const k = keyOf(a);
+            if (map.has(k)) {
+              const s = map.get(k);
+              map.set(k, {
+                name: s.name || a.name || '',
+                surname1: s.surname1 || a.surname1 || '',
+                surname2: s.surname2 || a.surname2 || '',
+                position: s.position || a.position || '',
+                dni: s.dni || a.dni || ''
+              });
+            } else {
+              map.set(k, { ...a });
+            }
+          }
+          return Array.from(map.values());
+        };
+
+        const mergedStaff = mergeStaff(savedEventData?.staff || [], staffFromAssignments || []);
         
         setEventData({
           eventName: savedEventData?.eventName || jobData.title || "",
@@ -201,12 +233,10 @@ export const useHojaDeRutaInitialization = (
             unloadingDetails: "",
             equipmentLogistics: "",
           },
-          // Prioritize current assignments over saved staff
-          staff: staffFromAssignments.length > 0
-            ? staffFromAssignments 
-            : savedEventData?.staff?.length > 0
-              ? savedEventData.staff
-              : [{ name: "", surname1: "", surname2: "", position: "", dni: "" }],
+          // Merge saved staff with current assignments to preserve DNIs and manual entries
+          staff: (mergedStaff.length > 0)
+            ? mergedStaff
+            : [{ name: "", surname1: "", surname2: "", position: "", dni: "" }],
           schedule: savedEventData?.schedule || (startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : ""),
           powerRequirements: savedEventData?.powerRequirements || "",
           auxiliaryNeeds: savedEventData?.auxiliaryNeeds || "",
