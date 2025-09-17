@@ -10,4 +10,5 @@ export type Profile = {
   department: Department | null;
   dni: string | null;
   residencia: string | null;
+  assignable_as_tech?: boolean | null;
 };

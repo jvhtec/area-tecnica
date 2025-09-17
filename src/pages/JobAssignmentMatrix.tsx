@@ -58,8 +58,8 @@ export default function JobAssignmentMatrix() {
     queryFn: async () => {
       let query = supabase
         .from('profiles_with_skills')
-        .select('id, first_name, last_name, email, phone, dni, department, role, skills')
-        .in('role', ['technician', 'house_tech']);
+        .select('id, first_name, last_name, email, phone, dni, department, role, assignable_as_tech, skills')
+        .or('role.in.(technician,house_tech),and(role.eq.management,assignable_as_tech.eq.true)');
 
       if (selectedDepartment !== 'all') {
         query = query.eq('department', selectedDepartment);

@@ -74,7 +74,9 @@ const formatAssignmentTechnicianName = (assignment: any) => {
 // Helper function to format available technician name
 const formatAvailableTechnicianName = (technician: { first_name: string; last_name: string; role: string }) => {
   const isHouseTech = technician.role === 'house_tech';
-  return `${technician.first_name} ${technician.last_name}${isHouseTech ? ' (House Tech)' : ''}`;
+  const isManagement = technician.role === 'management';
+  const suffix = isHouseTech ? ' (House Tech)' : isManagement ? ' (Mgmt)' : '';
+  return `${technician.first_name} ${technician.last_name}${suffix}`;
 };
 
 export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId, department }: JobAssignmentDialogProps) => {
@@ -119,9 +121,9 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     enabled: isOpen && !!jobData && !!jobId
   });
 
-  // Filter technicians to only include technician and house_tech roles
+  // Filter technicians: include technicians, house techs, and flagged management
   const filteredTechnicians = availableTechnicians.filter(tech => 
-    tech.role === 'technician' || tech.role === 'house_tech'
+    tech.role === 'technician' || tech.role === 'house_tech' || tech.role === 'management'
   );
 
   // Fetch crew call data for the current job and department

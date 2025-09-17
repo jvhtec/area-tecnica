@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Profile } from "./types";
 import { Department } from "@/types/department";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useEffect, useState } from "react";
 
 interface EditUserDialogProps {
   user: Profile | null;
@@ -15,17 +17,19 @@ interface EditUserDialogProps {
 }
 
 export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogProps) => {
-  if (!user?.id) {
-    console.error("EditUserDialog: No valid user ID provided");
-    return null;
-  }
+  // Keep dialog mounted even if user becomes null to avoid portal teardown race conditions
+  const [assignableAsTech, setAssignableAsTech] = useState<boolean>(!!user?.assignable_as_tech);
+
+  useEffect(() => {
+    setAssignableAsTech(!!user?.assignable_as_tech);
+  }, [user?.id]);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     
     // Ensure we have a valid user ID
-    if (!user.id) {
+    if (!user?.id) {
       console.error("Cannot update user: No valid ID");
       return;
     }
@@ -39,6 +43,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
       dni: formData.get('dni') as string,
       residencia: formData.get('residencia') as string,
       role: formData.get('role') as string,
+      assignable_as_tech: assignableAsTech,
     };
 
     console.log("Submitting user update with data:", updatedData);
@@ -57,15 +62,28 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
             <Input
               id="firstName"
               name="firstName"
-              defaultValue={user.first_name || ''}
+              defaultValue={user?.first_name || ''}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="assignableAsTech">Assignable to jobs as tech</Label>
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="assignableAsTech"
+                checked={assignableAsTech}
+                onCheckedChange={(v) => setAssignableAsTech(!!v)}
+              />
+              <span className="text-sm text-muted-foreground">
+                If enabled, this user (typically management) can be assigned to jobs in technician lists.
+              </span>
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="lastName">Last Name</Label>
             <Input
               id="lastName"
               name="lastName"
-              defaultValue={user.last_name || ''}
+              defaultValue={user?.last_name || ''}
             />
           </div>
           <div className="space-y-2">
@@ -73,12 +91,12 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
             <Input
               id="phone"
               name="phone"
-              defaultValue={user.phone || ''}
+              defaultValue={user?.phone || ''}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="department">Department</Label>
-            <Select name="department" defaultValue={user.department || 'sound'}>
+            <Select name="department" defaultValue={user?.department || 'sound'}>
               <SelectTrigger>
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
@@ -94,7 +112,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
           </div>
           <div className="space-y-2">
             <Label htmlFor="role">Role</Label>
-            <Select name="role" defaultValue={user.role}>
+            <Select name="role" defaultValue={user?.role}>
               <SelectTrigger>
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
@@ -112,7 +130,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
             <Input
               id="dni"
               name="dni"
-              defaultValue={user.dni || ''}
+              defaultValue={user?.dni || ''}
             />
           </div>
           <div className="space-y-2">
@@ -120,7 +138,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
             <Input
               id="residencia"
               name="residencia"
-              defaultValue={user.residencia || ''}
+              defaultValue={user?.residencia || ''}
             />
           </div>
           <div className="flex justify-end gap-2 pt-4">

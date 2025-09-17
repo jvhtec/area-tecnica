@@ -100,8 +100,9 @@ export const TourAssignmentDialog = ({
       
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, department')
+        .select('id, first_name, last_name, email, department, role, assignable_as_tech')
         .eq('department', selectedDepartment)
+        .or('role.in.(technician,house_tech),and(role.eq.management,assignable_as_tech.eq.true)')
         .order('first_name');
 
       if (error) throw error;

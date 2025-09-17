@@ -28,11 +28,13 @@ export async function getAvailableTechnicians(
   jobEndTime: string
 ) {
   try {
-    // First, get all technicians from the specified department
+    // First, get all technicians from the specified department, plus flagged management users
+    // Note: we include management here to avoid an extra query, then filter by assignable_as_tech in code
     const { data: allTechnicians, error: techError } = await supabase
       .from("profiles")
-      .select("id, first_name, last_name, email, department, role")
-      .eq("department", department);
+      .select("id, first_name, last_name, email, department, role, assignable_as_tech")
+      .eq("department", department)
+      .in("role", ["technician", "house_tech", "management"]);
 
     if (techError) {
       throw techError;
@@ -42,8 +44,16 @@ export async function getAvailableTechnicians(
       return [];
     }
 
+    // Filter management to only those explicitly marked as assignable to avoid clutter
+    const eligibleTechnicians = allTechnicians.filter((tech: any) => {
+      if (tech.role === 'management') {
+        return !!tech.assignable_as_tech;
+      }
+      return true;
+    });
+
     // Get all job assignments for these technicians with job date information
-    const technicianIds = allTechnicians.map(tech => tech.id);
+    const technicianIds = eligibleTechnicians.map((tech: any) => tech.id);
     
     const { data: conflictingAssignments, error: assignmentError } = await supabase
       .from("job_assignments")
@@ -80,7 +90,7 @@ export async function getAvailableTechnicians(
     }
 
     // Filter out technicians who have conflicts
-    const availableTechnicians = allTechnicians.filter(technician => {
+    const availableTechnicians = eligibleTechnicians.filter((technician: any) => {
       // Check if technician is already assigned to this specific job
       const assignedToCurrentJob = conflictingAssignments?.some(
         assignment => 
