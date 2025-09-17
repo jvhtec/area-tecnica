@@ -262,7 +262,7 @@ const ProjectManagement = () => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle>Project Management</CardTitle>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />

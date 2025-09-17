@@ -32,6 +32,8 @@ import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ModernHojaDeRuta } from "@/components/hoja-de-ruta/ModernHojaDeRuta";
 
 export interface JobCardNewProps {
   job: any;
@@ -66,6 +68,7 @@ export function JobCardNew({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { addDeletingJob, removeDeletingJob, isDeletingJob } = useDeletionState();
+  const [routeSheetOpen, setRouteSheetOpen] = useState(false);
   
   // Add folder creation loading state
   const [isCreatingFolders, setIsCreatingFolders] = useState(false);
@@ -493,7 +496,19 @@ export function JobCardNew({
         />
 
         <div className="flex items-center justify-between px-6">
-          <div className="flex-1"></div>
+          <div className="flex items-center gap-2">
+            {isProjectManagementPage && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setRouteSheetOpen(true); }}
+                className="text-xs px-3 py-1 border rounded-md hover:bg-secondary"
+                title="Abrir Hoja de Ruta"
+              >
+                Hoja de Ruta
+              </button>
+            )}
+            <div className="flex-1" />
+          </div>
           <JobCardActions 
             job={job}
             userRole={userRole || null}
@@ -612,6 +627,17 @@ export function JobCardNew({
             open={flexLogDialogOpen}
             onOpenChange={setFlexLogDialogOpen}
           />
+
+          {/* Hoja de Ruta Dialog (Project Management only) */}
+          {isProjectManagementPage && (
+            <Dialog open={routeSheetOpen} onOpenChange={setRouteSheetOpen}>
+              <DialogContent className="max-w-[96vw] w-[96vw] h-[96vh] p-0 overflow-hidden">
+                <div className="h-full overflow-auto">
+                  <ModernHojaDeRuta jobId={job.id} />
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
 
         </>
       )}

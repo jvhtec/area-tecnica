@@ -81,7 +81,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   };
 
   return (
-    <div className="flex flex-wrap gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+    <div className="flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
       {/* View Details - for technicians and house techs */}
       {(userRole === 'technician' || userRole === 'house_tech') && onJobDetailsClick && (
         <Button
@@ -91,7 +91,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           className="gap-2"
         >
           <FileText className="h-4 w-4" />
-          View Details
+          <span className="hidden sm:inline">View Details</span>
         </Button>
       )}
 
@@ -101,8 +101,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           size="sm"
           onClick={onFestivalArtistsClick}
           className="hover:bg-accent/50"
+          title={userRole === 'technician' || userRole === 'house_tech' ? 'View Festival' : 'Manage Festival'}
         >
-          {userRole === 'technician' || userRole === 'house_tech' ? 'View Festival' : 'Manage Festival'}
+          <Users className="h-4 w-4 mr-1" />
+          <span className="hidden sm:inline">{userRole === 'technician' || userRole === 'house_tech' ? 'View Festival' : 'Manage Festival'}</span>
         </Button>
       )}
       {job.job_type !== "festival" && job.job_type !== "dryhire" && isProjectManagementPage && canManageArtists && (
@@ -111,8 +113,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           size="sm"
           onClick={handleManageJob}
           className="hover:bg-accent/50"
+          title={userRole === 'technician' || userRole === 'house_tech' ? 'View Job' : 'Manage Job'}
         >
-          {userRole === 'technician' || userRole === 'house_tech' ? 'View Job' : 'Manage Job'}
+          <FileText className="h-4 w-4 mr-1" />
+          <span className="hidden sm:inline">{userRole === 'technician' || userRole === 'house_tech' ? 'View Job' : 'Manage Job'}</span>
         </Button>
       )}
       {!isHouseTech && job.job_type !== "dryhire" && isProjectManagementPage && (
@@ -121,9 +125,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           size="sm"
           onClick={onAssignmentDialogOpen}
           className="hover:bg-accent/50"
+          title="Assign"
         >
-          <Users className="h-4 w-4 mr-2" />
-          Assign
+          <Users className="h-4 w-4 mr-1" />
+          <span className="hidden sm:inline">Assign</span>
         </Button>
       )}
       <Button
@@ -241,9 +246,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           size="sm"
           onClick={onOpenFlexLogs}
           className="gap-2"
+          title="Sync Logs"
         >
           <FileText className="h-4 w-4" />
-          Sync Logs
+          <span className="hidden sm:inline">Sync Logs</span>
         </Button>
       )}
     </div>
