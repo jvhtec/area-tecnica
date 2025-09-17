@@ -704,11 +704,14 @@ export function JobCardNew({
     }
   };
 
+  const resolveBucket = (path: string) =>
+    path.startsWith('hojas-de-ruta/') ? 'job-documents' : 'job_documents';
+
   const handleViewDocument = async (doc: JobDocument) => {
     try {
       console.log("Attempting to view document:", doc);
       const { data, error } = await supabase.storage
-        .from("job_documents")
+        .from(resolveBucket(doc.file_path))
         .createSignedUrl(doc.file_path, 60);
 
       if (error) {
@@ -733,7 +736,7 @@ export function JobCardNew({
     try {
       console.log("Starting document deletion:", doc);
       const { error: storageError } = await supabase.storage
-        .from("job_documents")
+        .from(resolveBucket(doc.file_path))
         .remove([doc.file_path]);
       
       if (storageError) {
@@ -1265,7 +1268,7 @@ const handleDownload = async (doc: JobDocument) => {
     console.log('Starting download for document:', doc.file_name);
     
     const { data, error } = await supabase.storage
-      .from('job_documents')
+      .from(resolveBucket(doc.file_path))
       .createSignedUrl(doc.file_path, 60);
     
     if (error) {

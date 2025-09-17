@@ -301,21 +301,6 @@ const ProjectManagement = () => {
                   )}
                   Auto-Complete Past Jobs
                 </Button>
-                <Button 
-                  onClick={() => navigate("/hoja-de-ruta")} 
-                  className="flex items-center gap-2"
-                  variant="outline"
-                >
-                  <FileText className="h-4 w-4" />
-                  Hoja de Ruta
-                </Button>
-                <Button 
-                  onClick={() => navigate("/labor-po-form")} 
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Create Labor PO
-                </Button>
               </>
             )}
           </div>

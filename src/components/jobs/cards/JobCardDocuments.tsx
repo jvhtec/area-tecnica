@@ -27,11 +27,15 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
     return null;
   }
 
+  const resolveBucket = (path: string) =>
+    path.startsWith('hojas-de-ruta/') ? 'job-documents' : 'job_documents';
+
   const handleViewDocument = async (doc: JobDocument) => {
     try {
       console.log("Attempting to view document:", doc);
+      const bucket = resolveBucket(doc.file_path);
       const { data, error } = await supabase.storage
-        .from("job_documents")
+        .from(bucket)
         .createSignedUrl(doc.file_path, 60);
 
       if (error) {
@@ -51,8 +55,9 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
     try {
       console.log('Starting download for document:', doc.file_name);
       
+      const bucket = resolveBucket(doc.file_path);
       const { data, error } = await supabase.storage
-        .from('job_documents')
+        .from(bucket)
         .createSignedUrl(doc.file_path, 60);
       
       if (error) {

@@ -141,10 +141,14 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     loadStaticMap();
   }, [open, jobDetails]);
 
+  const resolveBucket = (path: string) =>
+    path.startsWith('hojas-de-ruta/') ? 'job-documents' : 'job_documents';
+
   const handleDownloadDocument = async (doc: any) => {
     try {
+      const bucket = resolveBucket(doc.file_path);
       const { data } = await supabase.storage
-        .from('job_documents')
+        .from(bucket)
         .createSignedUrl(doc.file_path, 3600);
 
       if (data?.signedUrl) {

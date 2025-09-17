@@ -32,7 +32,7 @@ export const useOptimizedJobs = (
     'video_job_personnel',
     'flex_folders',
     'locations'
-  ], ['jobs']);
+  ], ['optimized-jobs']);
 
   const fetchOptimizedJobs = async () => {
     const startTime = Date.now();
@@ -109,14 +109,8 @@ export const useOptimizedJobs = (
     // Process the data to match expected format with optimized processing
     const processedJobs = data?.map(job => ({
       ...job,
-      // Filter documents by department if specified with security validation
-      job_documents: department 
-        ? job.job_documents?.filter(doc => 
-            doc.file_path?.startsWith(`${department}/`) && 
-            doc.file_name && // Ensure file name exists
-            doc.file_path.length < 500 // Prevent excessively long paths
-          ) || []
-        : job.job_documents || [],
+      // Include all documents; filtering (if needed) is handled in UI
+      job_documents: job.job_documents || [],
       // Add computed properties
       flex_folders_exist: (job.flex_folders?.length || 0) > 0,
       // Flatten assignments for easier access

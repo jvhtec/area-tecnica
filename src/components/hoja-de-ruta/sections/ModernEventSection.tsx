@@ -19,6 +19,7 @@ interface ModernEventSectionProps {
   isLoadingJobs: boolean;
   jobDetails: any;
   onAutoPopulate: () => void;
+  hideJobSelection?: boolean;
 }
 
 export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
@@ -30,6 +31,7 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
   isLoadingJobs,
   jobDetails,
   onAutoPopulate,
+  hideJobSelection = false,
 }) => {
   const handleVenueSelect = (place: any) => {
     setEventData(prev => ({
@@ -48,76 +50,78 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Job Selection Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
-        <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-primary" />
-              Selección de Trabajo
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="job-select">Trabajo Base</Label>
-                <Select value={selectedJobId} onValueChange={setSelectedJobId}>
-                  <SelectTrigger className="border-2">
-                    <SelectValue placeholder="Seleccionar trabajo..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {jobs?.map((job) => (
-                      <SelectItem key={job.id} value={job.id}>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4" />
-                          {job.title}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="flex items-end">
-                <Button
-                  onClick={onAutoPopulate}
-                  disabled={!selectedJobId || !jobDetails}
-                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-                >
-                  <Zap className="w-4 h-4 mr-2" />
-                  Auto-completar
-                </Button>
-              </div>
-            </div>
-
-            {jobDetails && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200"
-              >
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium text-blue-700">Fechas:</span>
-                    <p className="text-blue-600">
-                      {new Date(jobDetails.start_time).toLocaleDateString()} - 
-                      {new Date(jobDetails.end_time).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-blue-700">Ubicación:</span>
-                    <p className="text-blue-600">{jobDetails.location || "No especificada"}</p>
-                  </div>
+      {/* Job Selection Card (hidden when jobId is forced) */}
+      {!hideJobSelection && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-primary" />
+                Selección de Trabajo
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="job-select">Trabajo Base</Label>
+                  <Select value={selectedJobId} onValueChange={setSelectedJobId}>
+                    <SelectTrigger className="border-2">
+                      <SelectValue placeholder="Seleccionar trabajo..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {jobs?.map((job) => (
+                        <SelectItem key={job.id} value={job.id}>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4" />
+                            {job.title}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </motion.div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
+                
+                <div className="flex items-end">
+                  <Button
+                    onClick={onAutoPopulate}
+                    disabled={!selectedJobId || !jobDetails}
+                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                  >
+                    <Zap className="w-4 h-4 mr-2" />
+                    Auto-completar
+                  </Button>
+                </div>
+              </div>
+
+              {jobDetails && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200"
+                >
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium text-blue-700">Fechas:</span>
+                      <p className="text-blue-600">
+                        {new Date(jobDetails.start_time).toLocaleDateString()} - 
+                        {new Date(jobDetails.end_time).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-blue-700">Ubicación:</span>
+                      <p className="text-blue-600">{jobDetails.location || "No especificada"}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Event Details Card */}
       <motion.div

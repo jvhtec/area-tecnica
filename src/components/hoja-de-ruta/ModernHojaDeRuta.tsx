@@ -58,13 +58,16 @@ import { ModernTravelSection } from "./sections/ModernTravelSection";
 import { ModernAccommodationSection } from "./sections/ModernAccommodationSection";
 import { ModernLogisticsSection } from "./sections/ModernLogisticsSection";
 import { ModernScheduleSection } from "./sections/ModernScheduleSection";
-import { ModernTemplateManager } from "./components/ModernTemplateManager";
 import { ModernStatusIndicator } from "./components/ModernStatusIndicator";
 import { ModernProgressTracker } from "./components/ModernProgressTracker";
 import { ModernWeatherSection } from "./sections/ModernWeatherSection";
 import { ModernRestaurantSection } from "./sections/ModernRestaurantSection";
 
-export const ModernHojaDeRuta = () => {
+type ModernHojaDeRutaProps = {
+  jobId?: string;
+};
+
+export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("event");
   const [completionProgress, setCompletionProgress] = useState(0);
@@ -146,6 +149,13 @@ export const ModernHojaDeRuta = () => {
     addTransport,
     removeTransport
   } = useHojaDeRutaForm(venueImagesForSave);
+
+  // If a jobId is provided from parent, lock selection to that job
+  useEffect(() => {
+    if (jobId && selectedJobId !== jobId) {
+      setSelectedJobId(jobId);
+    }
+  }, [jobId, selectedJobId, setSelectedJobId]);
 
   // Calculate completion progress including weather and restaurants
   useEffect(() => {
@@ -360,7 +370,7 @@ export const ModernHojaDeRuta = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                  Hoja de Ruta Moderna
+                  Hoja de Ruta
                 </h1>
                 <p className="text-sm text-muted-foreground">
                   Sistema integral de gestión de eventos
@@ -470,18 +480,6 @@ export const ModernHojaDeRuta = () => {
           {/* Sidebar with Templates */}
           <div className="col-span-3">
             <div className="sticky top-24 space-y-4">
-              <ModernTemplateManager
-                templates={[]}
-                onApplyTemplate={(templateData) => {
-                  setEventData(prev => ({
-                    ...templateData,
-                    eventName: prev.eventName || templateData.eventName,
-                    eventDates: prev.eventDates || templateData.eventDates,
-                  }));
-                }}
-                isLoading={false}
-              />
-
               {/* Quick Navigation */}
               <Card className="border-2">
                 <CardHeader className="pb-3">
@@ -538,6 +536,7 @@ export const ModernHojaDeRuta = () => {
                         isLoadingJobs={isLoadingJobs}
                         jobDetails={null}
                         onAutoPopulate={handleLoadJobData}
+                        hideJobSelection={!!jobId}
                       />
                     </TabsContent>
 

@@ -67,6 +67,23 @@ export const useOptimizedJobCard = (
           }
         } catch {}
       })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'job_documents',
+        filter: `job_id=eq.${job.id}`,
+      }, async () => {
+        try {
+          const { data, error } = await supabase
+            .from('job_documents')
+            .select('*')
+            .eq('job_id', job.id)
+            .order('uploaded_at', { ascending: false });
+          if (!error) {
+            setDocuments(data || []);
+          }
+        } catch {}
+      })
       .subscribe();
 
     return () => {
@@ -151,7 +168,7 @@ export const useOptimizedJobCard = (
         .upload(filePath, file);
       if (uploadError) throw uploadError;
 
-      const { error: dbError } = await supabase
+      const { data: inserted, error: dbError } = await supabase
         .from('job_documents')
         .insert({
           job_id: job.id,
@@ -159,11 +176,15 @@ export const useOptimizedJobCard = (
           file_path: filePath,
           file_type: file.type,
           file_size: file.size
-        });
+        })
+        .select('*')
+        .single();
       if (dbError) throw dbError;
 
-      // Optimized query invalidation
-      // queryClient.invalidateQueries({ queryKey: createQueryKey.jobs.detail(job.id) });
+      // Update local documents state immediately
+      if (inserted) {
+        setDocuments(prev => Array.isArray(prev) ? [...prev, inserted] : [inserted]);
+      }
     } catch (err: any) {
       console.error('Upload error:', err);
     }
@@ -186,8 +207,8 @@ export const useOptimizedJobCard = (
       
       if (dbError) throw dbError;
 
-      // Optimized query invalidation
-      // queryClient.invalidateQueries({ queryKey: createQueryKey.jobs.detail(job.id) });
+      // Update local documents state immediately
+      setDocuments(prev => Array.isArray(prev) ? prev.filter((d: any) => d.id !== doc.id) : prev);
     } catch (err: any) {
       console.error('Delete error:', err);
     }
@@ -195,7 +216,18 @@ export const useOptimizedJobCard = (
 
   const refreshData = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
-    // Implement optimized refresh logic here
+    try {
+      const { data, error } = await supabase
+        .from('job_documents')
+        .select('*')
+        .eq('job_id', job.id)
+        .order('uploaded_at', { ascending: false });
+      if (!error) {
+        setDocuments(data || []);
+      }
+    } catch (err) {
+      console.error('Refresh documents error:', err);
+    }
   }, [job.id]);
 
   // Memoized deletion state check
