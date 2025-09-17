@@ -291,7 +291,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
       // If time fields or category changed, recompute amount server-side
       try {
         const changedKeys = Object.keys(updates);
-        if (changedKeys.some(k => ['start_time','end_time','break_minutes','category'].includes(k))) {
+        if (changedKeys.some(k => ['start_time','end_time','break_minutes','category','ends_next_day'].includes(k))) {
           await supabase.rpc('compute_timesheet_amount_2025', { _timesheet_id: timesheetId, _persist: true });
         }
       } catch (e) {

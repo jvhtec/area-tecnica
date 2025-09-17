@@ -184,7 +184,10 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
     if (timesheet.start_time && timesheet.end_time) {
       const start = new Date(`2000-01-01T${timesheet.start_time}`);
       const end = new Date(`2000-01-01T${timesheet.end_time}`);
-      const diffMs = end.getTime() - start.getTime();
+      let diffMs = end.getTime() - start.getTime();
+      if (timesheet.ends_next_day || diffMs < 0) {
+        diffMs += 24 * 60 * 60 * 1000;
+      }
       const diffHours = diffMs / (1000 * 60 * 60);
       const breakHours = (timesheet.break_minutes || 0) / 60;
       const workHours = Math.max(0, diffHours - breakHours);

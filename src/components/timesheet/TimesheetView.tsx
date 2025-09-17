@@ -48,6 +48,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     break_minutes: 30,
     overtime_hours: 0,
     notes: "",
+    ends_next_day: false,
     category: undefined
   });
 
@@ -92,6 +93,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
       break_minutes: formData.break_minutes,
       overtime_hours: formData.overtime_hours,
       notes: formData.notes,
+      ends_next_day: formData.ends_next_day,
       category: formData.category
     });
     setEditingTimesheet(null);
@@ -106,16 +108,20 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
       break_minutes: timesheet.break_minutes || 0,
       overtime_hours: timesheet.overtime_hours || 0,
       notes: timesheet.notes || "",
+      ends_next_day: timesheet.ends_next_day || false,
       category: (timesheet.category as any) || undefined
     });
   };
 
-  const calculateHours = (startTime: string, endTime: string, breakMinutes: number) => {
+  const calculateHours = (startTime: string, endTime: string, breakMinutes: number, endsNextDay?: boolean) => {
     if (!startTime || !endTime) return 0;
     
     const start = new Date(`2000-01-01T${startTime}`);
     const end = new Date(`2000-01-01T${endTime}`);
-    const diffMs = end.getTime() - start.getTime();
+    let diffMs = end.getTime() - start.getTime();
+    if (endsNextDay || diffMs < 0) {
+      diffMs += 24 * 60 * 60 * 1000; // add one day for overnight
+    }
     const diffHours = diffMs / (1000 * 60 * 60);
     const workingHours = diffHours - (breakMinutes / 60);
     
@@ -570,7 +576,7 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                   </div>
 
                   {editingTimesheet === timesheet.id ? (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
                         <Label htmlFor="start_time">Start Time</Label>
                         <Input
@@ -597,6 +603,15 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                           value={formData.break_minutes}
                           onChange={(e) => setFormData({ ...formData, break_minutes: parseInt(e.target.value) || 0 })}
                         />
+                      </div>
+                      <div className="flex items-center gap-2 mt-6">
+                        <input
+                          id="ends_next_day"
+                          type="checkbox"
+                          checked={!!formData.ends_next_day}
+                          onChange={(e) => setFormData({ ...formData, ends_next_day: e.target.checked })}
+                        />
+                        <Label htmlFor="ends_next_day">Ends next day</Label>
                       </div>
                       <div>
                         <Label htmlFor="category">Category</Label>
@@ -659,10 +674,17 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                           {calculateHours(
                             timesheet.start_time || '09:00',
                             timesheet.end_time || '17:00',
-                            timesheet.break_minutes || 0
+                            timesheet.break_minutes || 0,
+                            timesheet.ends_next_day
                           ).toFixed(1)}h
                         </p>
                       </div>
+                      {timesheet.ends_next_day && (
+                        <div>
+                          <p className="text-muted-foreground">Spans midnight</p>
+                          <p className="font-medium">Yes</p>
+                        </div>
+                      )}
                       <div>
                         <p className="text-muted-foreground">Category</p>
                         <p className="font-medium">{timesheet.category || 'Not set'}</p>

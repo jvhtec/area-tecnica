@@ -8,6 +8,7 @@ export interface Timesheet {
   break_minutes: number;
   overtime_hours: number;
   notes?: string;
+  ends_next_day?: boolean;
   status: 'draft' | 'submitted' | 'approved';
   signature_data?: string;
   signed_at?: string;
@@ -63,6 +64,7 @@ export interface TimesheetFormData {
   break_minutes: number;
   overtime_hours: number;
   notes: string;
+  ends_next_day?: boolean;
   category?: 'tecnico' | 'especialista' | 'responsable';
 }
 

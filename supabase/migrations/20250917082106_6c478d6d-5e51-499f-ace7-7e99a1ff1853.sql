@@ -66,10 +66,17 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'Rate card not found for %', t.category; END IF;
 
   -- Calculate total worked minutes = (end - start) - break
-  total_mins := GREATEST(0, 
-    CASE 
+  -- Support shifts that extend into the next day
+  total_mins := GREATEST(0,
+    CASE
       WHEN t.start_time IS NOT NULL AND t.end_time IS NOT NULL THEN
-        CAST(EXTRACT(epoch FROM (t.end_time::time - t.start_time::time)) AS int) / 60 - COALESCE(t.break_minutes,0)
+        CAST(EXTRACT(
+          epoch FROM (
+            ((timestamp '2000-01-01' + t.end_time::time)
+              + CASE WHEN COALESCE(t.ends_next_day, false) THEN interval '1 day' ELSE interval '0 day' END)
+            - (timestamp '2000-01-01' + t.start_time::time)
+          )
+        ) AS int) / 60 - COALESCE(t.break_minutes, 0)
       ELSE 0
     END
   );
@@ -143,20 +150,41 @@ SELECT
 FROM timesheets t;
 
 -- 6) RLS policies for new features
-CREATE POLICY "Users can view visible timesheet amounts" ON timesheets
-FOR SELECT USING (
-  -- Allow access to timesheet data based on existing policies
-  auth.uid() = technician_id OR 
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'management'))
-);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' AND tablename = 'timesheets' AND policyname = 'Users can view visible timesheet amounts'
+  ) THEN
+    CREATE POLICY "Users can view visible timesheet amounts" ON timesheets
+    FOR SELECT USING (
+      -- Allow access to timesheet data based on existing policies
+      auth.uid() = technician_id OR 
+      EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'management'))
+    );
+  END IF;
+END $$;
 
 -- Enable RLS on rate cards (read-only for authenticated users)
 ALTER TABLE rate_cards_2025 ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Authenticated users can view rate cards" ON rate_cards_2025
-FOR SELECT TO authenticated USING (true);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' AND tablename = 'rate_cards_2025' AND policyname = 'Authenticated users can view rate cards'
+  ) THEN
+    CREATE POLICY "Authenticated users can view rate cards" ON rate_cards_2025
+    FOR SELECT TO authenticated USING (true);
+  END IF;
+END $$;
 
-CREATE POLICY "Management can manage rate cards" ON rate_cards_2025
-FOR ALL TO authenticated USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'management'))
-);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE schemaname = 'public' AND tablename = 'rate_cards_2025' AND policyname = 'Management can manage rate cards'
+  ) THEN
+    CREATE POLICY "Management can manage rate cards" ON rate_cards_2025
+    FOR ALL TO authenticated USING (
+      EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'management'))
+    );
+  END IF;
+END $$;

@@ -40,10 +40,17 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'Rate card not found for %', t.category; END IF;
 
   -- Calculate total worked minutes = (end - start) - break
-  total_mins := GREATEST(0, 
-    CASE 
+  -- Support shifts that extend into the next day
+  total_mins := GREATEST(0,
+    CASE
       WHEN t.start_time IS NOT NULL AND t.end_time IS NOT NULL THEN
-        CAST(EXTRACT(epoch FROM (t.end_time::time - t.start_time::time)) AS int) / 60 - COALESCE(t.break_minutes,0)
+        CAST(EXTRACT(
+          epoch FROM (
+            ((timestamp '2000-01-01' + t.end_time::time)
+              + CASE WHEN COALESCE(t.ends_next_day, false) THEN interval '1 day' ELSE interval '0 day' END)
+            - (timestamp '2000-01-01' + t.start_time::time)
+          )
+        ) AS int) / 60 - COALESCE(t.break_minutes, 0)
       ELSE 0
     END
   );
