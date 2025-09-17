@@ -3,7 +3,11 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Mail, User, Building, Phone, IdCard } from 'lucide-react';
+import { Mail, User, Building, Phone, IdCard, Award, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ManageSkillsDialog } from '@/components/users/ManageSkillsDialog';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface TechnicianRowProps {
   technician: {
@@ -21,6 +25,18 @@ interface TechnicianRowProps {
 }
 
 export const TechnicianRow = ({ technician, height }: TechnicianRowProps) => {
+  const { userRole } = useOptimizedAuth();
+  const isManagementUser = ['admin', 'management'].includes(userRole || '');
+  const [skillsOpen, setSkillsOpen] = React.useState(false);
+  const qc = useQueryClient();
+
+  const handleSkillsOpenChange = (open: boolean) => {
+    if (!open) {
+      // Invalidate technicians list so skills refresh
+      qc.invalidateQueries({ queryKey: ['optimized-matrix-technicians'] });
+    }
+    setSkillsOpen(open);
+  };
   const getInitials = () => {
     return `${technician.first_name?.[0] || ''}${technician.last_name?.[0] || ''}`.toUpperCase();
   };
@@ -50,6 +66,7 @@ export const TechnicianRow = ({ technician, height }: TechnicianRowProps) => {
   };
 
   return (
+    <>
     <Popover>
       <PopoverTrigger asChild>
         <div 
@@ -102,6 +119,13 @@ export const TechnicianRow = ({ technician, height }: TechnicianRowProps) => {
                 {technician.role === 'house_tech' ? 'House Technician' : 'Technician'}
               </div>
             </div>
+            {isManagementUser && (
+              <div className="ml-auto">
+                <Button size="sm" variant="outline" onClick={() => setSkillsOpen(true)} className="h-8">
+                  <Award className="h-4 w-4 mr-1" /> Skills
+                </Button>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -160,9 +184,27 @@ export const TechnicianRow = ({ technician, height }: TechnicianRowProps) => {
                 </div>
               </div>
             )}
+
+            {isManagementUser && (
+              <div className="pt-2">
+                <Button variant="secondary" size="sm" onClick={() => setSkillsOpen(true)} className="gap-2 h-8">
+                  <Plus className="h-4 w-4" /> Add skill
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </PopoverContent>
     </Popover>
+    {/* Skills dialog (management only) */}
+    {isManagementUser && (
+      <ManageSkillsDialog
+        profileId={technician.id}
+        fullName={`${technician.first_name} ${technician.last_name}`}
+        open={skillsOpen}
+        onOpenChange={handleSkillsOpenChange}
+      />
+    )}
+  </>
   );
 };

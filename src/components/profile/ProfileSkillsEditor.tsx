@@ -22,16 +22,18 @@ export const ProfileSkillsEditor: React.FC<ProfileSkillsEditorProps> = ({ profil
   const [loading, setLoading] = React.useState(true);
   const [addingOpen, setAddingOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
+  const [profileDepartment, setProfileDepartment] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
-    const [sres, psres] = await Promise.all([
+    const [sres, psres, pres] = await Promise.all([
       supabase.from('skills').select('id,name,category').eq('active', true).order('category').order('name'),
       supabase.from('profile_skills')
         .select('id,skill_id,proficiency,is_primary,skills:skill_id(name,category)')
         .eq('profile_id', profileId)
         .order('is_primary', { ascending: false })
-        .order('proficiency', { ascending: false })
+        .order('proficiency', { ascending: false }),
+      supabase.from('profiles').select('department').eq('id', profileId).maybeSingle()
     ]);
     if (!sres.error) setAllSkills(sres.data || []);
     if (!psres.error) {
@@ -45,12 +47,20 @@ export const ProfileSkillsEditor: React.FC<ProfileSkillsEditorProps> = ({ profil
       }));
       setProfileSkills(mapped);
     }
+    if (!pres.error) setProfileDepartment(pres.data?.department ?? null);
     setLoading(false);
   }, [profileId]);
 
   React.useEffect(() => { load(); }, [load]);
 
-  const available = allSkills.filter(s => !profileSkills.some(ps => ps.skill_id === s.id));
+  const availableAll = allSkills.filter(s => !profileSkills.some(ps => ps.skill_id === s.id));
+  const available = React.useMemo(() => {
+    if ((profileDepartment || '').toLowerCase() === 'sound') {
+      // Restrict to sound categories for sound profiles
+      return availableAll.filter(s => (s.category || '').startsWith('sound'));
+    }
+    return availableAll;
+  }, [availableAll, profileDepartment]);
 
   const addSkill = async (skill: Skill) => {
     const { data, error } = await supabase
