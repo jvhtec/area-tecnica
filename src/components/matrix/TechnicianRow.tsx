@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { ManageSkillsDialog } from '@/components/users/ManageSkillsDialog';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
+import { startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 
 interface TechnicianRowProps {
   technician: {
@@ -28,7 +30,47 @@ export const TechnicianRow = ({ technician, height }: TechnicianRowProps) => {
   const { userRole } = useOptimizedAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
   const [skillsOpen, setSkillsOpen] = React.useState(false);
+  const [popoverOpen, setPopoverOpen] = React.useState(false);
   const qc = useQueryClient();
+
+  const [metricsLoading, setMetricsLoading] = React.useState(false);
+  const [metrics, setMetrics] = React.useState<{ monthConfirmed: number; yearConfirmed: number }>({ monthConfirmed: 0, yearConfirmed: 0 });
+
+  const loadMetrics = React.useCallback(async () => {
+    try {
+      setMetricsLoading(true);
+      const now = new Date();
+      const mStart = startOfMonth(now).toISOString();
+      const mEnd = endOfMonth(now).toISOString();
+      const yStart = startOfYear(now).toISOString();
+      const yEnd = endOfYear(now).toISOString();
+
+      // Count confirmed assignments within a date range via inner join to jobs; avoid HEAD to prevent 400s
+      const countInRange = async (fromISO: string, toISO: string) => {
+        const { count, error } = await supabase
+          .from('job_assignments')
+          .select('job_id,jobs!inner(id)', { count: 'exact' })
+          .eq('technician_id', technician.id)
+          .eq('status', 'confirmed')
+          .gte('jobs.start_time', fromISO)
+          .lte('jobs.end_time', toISO)
+          .limit(1);
+        if (error) {
+          console.warn('Metrics count error', error);
+          return 0;
+        }
+        return count || 0;
+      };
+
+      const [m, y] = await Promise.all([
+        countInRange(mStart, mEnd),
+        countInRange(yStart, yEnd)
+      ]);
+      setMetrics({ monthConfirmed: m, yearConfirmed: y });
+    } finally {
+      setMetricsLoading(false);
+    }
+  }, [technician.id]);
 
   const handleSkillsOpenChange = (open: boolean) => {
     if (!open) {
@@ -36,6 +78,13 @@ export const TechnicianRow = ({ technician, height }: TechnicianRowProps) => {
       qc.invalidateQueries({ queryKey: ['optimized-matrix-technicians'] });
     }
     setSkillsOpen(open);
+  };
+
+  const handlePopoverOpenChange = (open: boolean) => {
+    setPopoverOpen(open);
+    if (open) {
+      loadMetrics();
+    }
   };
   const getInitials = () => {
     return `${technician.first_name?.[0] || ''}${technician.last_name?.[0] || ''}`.toUpperCase();
@@ -67,7 +116,7 @@ export const TechnicianRow = ({ technician, height }: TechnicianRowProps) => {
 
   return (
     <>
-    <Popover>
+    <Popover open={popoverOpen} onOpenChange={handlePopoverOpenChange}>
       <PopoverTrigger asChild>
         <div 
           className="border-b p-3 hover:bg-accent/50 cursor-pointer transition-colors"
@@ -184,6 +233,19 @@ export const TechnicianRow = ({ technician, height }: TechnicianRowProps) => {
                 </div>
               </div>
             )}
+
+            {/* Metrics */}
+            <div className="pt-2 border-t">
+              <div className="text-sm font-medium mb-1">Activity</div>
+              {metricsLoading ? (
+                <div className="text-xs text-muted-foreground">Loading…</div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">Gigs/Month: {metrics.monthConfirmed}</Badge>
+                  <Badge variant="outline" className="text-xs">Gigs/Year: {metrics.yearConfirmed}</Badge>
+                </div>
+              )}
+            </div>
 
             {isManagementUser && (
               <div className="pt-2">
