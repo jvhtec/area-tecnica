@@ -4354,6 +4354,92 @@ export type Database = {
         }
         Relationships: []
       }
+      timesheet_amounts_visible: {
+        Row: {
+          amount_breakdown: Json | null
+          amount_breakdown_visible: Json | null
+          amount_eur: number | null
+          amount_eur_visible: number | null
+          approved_at: string | null
+          approved_by: string | null
+          approved_by_manager: boolean | null
+          break_minutes: number | null
+          category: string | null
+          created_at: string | null
+          created_by: string | null
+          date: string | null
+          end_time: string | null
+          id: string | null
+          job_id: string | null
+          notes: string | null
+          overtime_hours: number | null
+          signature_data: string | null
+          signed_at: string | null
+          start_time: string | null
+          status: Database["public"]["Enums"]["timesheet_status"] | null
+          technician_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount_breakdown?: Json | null
+          amount_breakdown_visible?: never
+          amount_eur?: number | null
+          amount_eur_visible?: never
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_by_manager?: boolean | null
+          break_minutes?: number | null
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          date?: string | null
+          end_time?: string | null
+          id?: string | null
+          job_id?: string | null
+          notes?: string | null
+          overtime_hours?: number | null
+          signature_data?: string | null
+          signed_at?: string | null
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["timesheet_status"] | null
+          technician_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount_breakdown?: Json | null
+          amount_breakdown_visible?: never
+          amount_eur?: number | null
+          amount_eur_visible?: never
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_by_manager?: boolean | null
+          break_minutes?: number | null
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          date?: string | null
+          end_time?: string | null
+          id?: string | null
+          job_id?: string | null
+          notes?: string | null
+          overtime_hours?: number | null
+          signature_data?: string | null
+          signed_at?: string | null
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["timesheet_status"] | null
+          technician_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_timesheets_technician_id"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       auto_complete_past_jobs: {
@@ -4379,34 +4465,6 @@ export type Database = {
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
-      }
-      get_timesheet_with_visible_amounts: {
-        Args: { _timesheet_id: string }
-        Returns: {
-          amount_breakdown: Json
-          amount_breakdown_visible: Json
-          amount_eur: number
-          amount_eur_visible: number
-          approved_at: string
-          approved_by: string
-          approved_by_manager: boolean
-          break_minutes: number
-          category: string
-          created_at: string
-          created_by: string
-          date: string
-          end_time: string
-          id: string
-          job_id: string
-          notes: string
-          overtime_hours: number
-          signature_data: string
-          signed_at: string
-          start_time: string
-          status: string
-          technician_id: string
-          updated_at: string
-        }[]
       }
       get_user_job_ids: {
         Args: { user_uuid: string }
