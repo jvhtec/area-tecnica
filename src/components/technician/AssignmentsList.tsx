@@ -1,6 +1,8 @@
 
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
+import { formatInJobTimezone } from "@/utils/timezoneUtils";
+import { formatInTimeZone } from "date-fns-tz";
 import { es } from "date-fns/locale";
 import { RefreshCw, Clock, Eye, Download, FileText, ChevronDown, ChevronRight, Info } from "lucide-react";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
@@ -166,11 +168,12 @@ export const AssignmentsList = ({
           return null;
         }
         
-        // Format date and time
+        // Format date and time in job's timezone
+        const jobTimezone = jobData.timezone || 'Europe/Madrid';
         let formattedDate = "Fecha desconocida";
         try {
           if (jobData.start_time) {
-            formattedDate = format(new Date(jobData.start_time), "PPP", { locale: es });
+            formattedDate = formatInTimeZone(new Date(jobData.start_time), jobTimezone, "PPP", { locale: es });
           } else if (jobData.day && jobData.festival?.start_date) {
             // For festival jobs, calculate the date based on the festival start date and day number
             const festivalStart = new Date(jobData.festival.start_date);
@@ -218,7 +221,7 @@ export const AssignmentsList = ({
                 <p className="text-sm text-muted-foreground">{formattedDate}</p>
                 {jobData.start_time && jobData.end_time && (
                   <p className="text-sm text-muted-foreground">
-                    {format(new Date(jobData.start_time), "HH:mm")} - {format(new Date(jobData.end_time), "HH:mm")}
+                    {formatInJobTimezone(jobData.start_time, "HH:mm", jobTimezone)} - {formatInJobTimezone(jobData.end_time, "HH:mm", jobTimezone)}
                   </p>
                 )}
                 <div className="mt-2">

@@ -121,6 +121,7 @@ const TechnicianDashboard = () => {
               description,
               start_time,
               end_time,
+              timezone,
               location_id,
               job_type,
               color,
