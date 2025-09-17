@@ -40,12 +40,15 @@ export const JobDocuments = ({
     setLocalDocuments(documents);
   }, [documents]);
 
+  const resolveBucket = (path: string) =>
+    path.startsWith('hojas-de-ruta/') ? 'job-documents' : 'job_documents';
+
   const handleDownload = async (jobDocument: JobDocument) => {
     try {
       console.log('Starting download for document:', jobDocument.file_name);
       
       const { data, error } = await supabase.storage
-        .from('job_documents')
+        .from(resolveBucket(jobDocument.file_path))
         .download(jobDocument.file_path);
 
       if (error) {
@@ -78,7 +81,7 @@ export const JobDocuments = ({
       console.log('Starting view for document:', jobDocument.file_name);
       
       const { data: { signedUrl }, error } = await supabase.storage
-        .from('job_documents')
+        .from(resolveBucket(jobDocument.file_path))
         .createSignedUrl(jobDocument.file_path, 60);
 
       if (error) {
