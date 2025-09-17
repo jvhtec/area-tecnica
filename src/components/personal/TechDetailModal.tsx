@@ -35,8 +35,8 @@ interface TechDetailModalProps {
     };
   };
   date: Date;
-  availabilityStatus?: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | null;
-  onAvailabilityChange?: (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', date: Date) => void;
+  availabilityStatus?: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable' | null;
+  onAvailabilityChange?: (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable', date: Date) => void;
   onAvailabilityRemove?: (techId: string, date: Date) => void;
 }
 
@@ -76,6 +76,8 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
         return 'Sick Day';
       case 'day_off':
         return 'Day Off';
+      case 'unavailable':
+        return 'Unavailable';
       case 'warehouse':
         return 'In Warehouse';
       default:
@@ -83,7 +85,7 @@ export const TechDetailModal: React.FC<TechDetailModalProps> = ({
     }
   };
 
-  const handleUnavailableClick = (status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse') => {
+  const handleUnavailableClick = (status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable') => {
     if (onAvailabilityChange) {
       onAvailabilityChange(technician.id, status, date);
       onOpenChange(false);

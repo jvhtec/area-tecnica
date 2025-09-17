@@ -81,7 +81,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
     onDateSelect(today);
   };
 
-  const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', targetDate: Date) => {
+  const handleAvailabilityChange = (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable', targetDate: Date) => {
     updateAvailability(techId, status, targetDate);
   };
 

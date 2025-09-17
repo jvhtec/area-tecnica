@@ -169,7 +169,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
     };
   }, [currentMonth]);
 
-  const updateAvailability = async (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', date: Date) => {
+  const updateAvailability = async (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable', date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const key = `${techId}-${dateStr}`;
 

@@ -21,7 +21,7 @@ interface TechContextMenuProps {
     department: string | null;
   };
   date: Date;
-  onAvailabilityChange: (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse', date: Date) => void;
+  onAvailabilityChange: (techId: string, status: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable', date: Date) => void;
   onAvailabilityRemove?: (techId: string, date: Date) => void;
 }
 
@@ -32,7 +32,7 @@ export const TechContextMenu: React.FC<TechContextMenuProps> = ({
   onAvailabilityChange,
   onAvailabilityRemove,
 }) => {
-  const handleUnavailable = (reason: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse') => {
+  const handleUnavailable = (reason: 'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable') => {
     onAvailabilityChange(technician.id, reason, date);
   };
 

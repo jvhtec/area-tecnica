@@ -1151,6 +1151,7 @@ export type Database = {
       flex_folders: {
         Row: {
           created_at: string
+          current_status: string | null
           department: string | null
           element_id: string
           folder_type: string
@@ -1161,6 +1162,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          current_status?: string | null
           department?: string | null
           element_id: string
           folder_type: string
@@ -1171,6 +1173,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          current_status?: string | null
           department?: string | null
           element_id?: string
           folder_type?: string
@@ -1192,6 +1195,60 @@ export type Database = {
             columns: ["tour_date_id"]
             isOneToOne: false
             referencedRelation: "tour_dates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flex_status_log: {
+        Row: {
+          action_type: string | null
+          error: string | null
+          flex_response: Json | null
+          folder_id: string
+          id: string
+          new_status: string
+          previous_status: string | null
+          processed_at: string
+          processed_by: string | null
+          success: boolean
+        }
+        Insert: {
+          action_type?: string | null
+          error?: string | null
+          flex_response?: Json | null
+          folder_id: string
+          id?: string
+          new_status: string
+          previous_status?: string | null
+          processed_at?: string
+          processed_by?: string | null
+          success?: boolean
+        }
+        Update: {
+          action_type?: string | null
+          error?: string | null
+          flex_response?: Json | null
+          folder_id?: string
+          id?: string
+          new_status?: string
+          previous_status?: string | null
+          processed_at?: string
+          processed_by?: string | null
+          success?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flex_status_log_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "flex_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flex_status_log_processed_by_fkey"
+            columns: ["processed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2967,6 +3024,36 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_cards_2025: {
+        Row: {
+          base_day_eur: number
+          base_day_hours: number
+          category: string
+          id: string
+          mid_tier_hours: number
+          overtime_hour_eur: number
+          plus_10_12_eur: number
+        }
+        Insert: {
+          base_day_eur: number
+          base_day_hours?: number
+          category: string
+          id?: string
+          mid_tier_hours?: number
+          overtime_hour_eur: number
+          plus_10_12_eur: number
+        }
+        Update: {
+          base_day_eur?: number
+          base_day_hours?: number
+          category?: string
+          id?: string
+          mid_tier_hours?: number
+          overtime_hour_eur?: number
+          plus_10_12_eur?: number
+        }
+        Relationships: []
+      }
       secrets: {
         Row: {
           created_at: string
@@ -3378,9 +3465,13 @@ export type Database = {
       }
       timesheets: {
         Row: {
+          amount_breakdown: Json | null
+          amount_eur: number | null
           approved_at: string | null
           approved_by: string | null
+          approved_by_manager: boolean | null
           break_minutes: number | null
+          category: string | null
           created_at: string
           created_by: string | null
           date: string
@@ -3397,9 +3488,13 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          amount_breakdown?: Json | null
+          amount_eur?: number | null
           approved_at?: string | null
           approved_by?: string | null
+          approved_by_manager?: boolean | null
           break_minutes?: number | null
+          category?: string | null
           created_at?: string
           created_by?: string | null
           date: string
@@ -3416,9 +3511,13 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          amount_breakdown?: Json | null
+          amount_eur?: number | null
           approved_at?: string | null
           approved_by?: string | null
+          approved_by_manager?: boolean | null
           break_minutes?: number | null
+          category?: string | null
           created_at?: string
           created_by?: string | null
           date?: string
@@ -4255,6 +4354,92 @@ export type Database = {
         }
         Relationships: []
       }
+      timesheet_amounts_visible: {
+        Row: {
+          amount_breakdown: Json | null
+          amount_breakdown_visible: Json | null
+          amount_eur: number | null
+          amount_eur_visible: number | null
+          approved_at: string | null
+          approved_by: string | null
+          approved_by_manager: boolean | null
+          break_minutes: number | null
+          category: string | null
+          created_at: string | null
+          created_by: string | null
+          date: string | null
+          end_time: string | null
+          id: string | null
+          job_id: string | null
+          notes: string | null
+          overtime_hours: number | null
+          signature_data: string | null
+          signed_at: string | null
+          start_time: string | null
+          status: Database["public"]["Enums"]["timesheet_status"] | null
+          technician_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount_breakdown?: Json | null
+          amount_breakdown_visible?: never
+          amount_eur?: number | null
+          amount_eur_visible?: never
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_by_manager?: boolean | null
+          break_minutes?: number | null
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          date?: string | null
+          end_time?: string | null
+          id?: string | null
+          job_id?: string | null
+          notes?: string | null
+          overtime_hours?: number | null
+          signature_data?: string | null
+          signed_at?: string | null
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["timesheet_status"] | null
+          technician_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount_breakdown?: Json | null
+          amount_breakdown_visible?: never
+          amount_eur?: number | null
+          amount_eur_visible?: never
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_by_manager?: boolean | null
+          break_minutes?: number | null
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          date?: string | null
+          end_time?: string | null
+          id?: string | null
+          job_id?: string | null
+          notes?: string | null
+          overtime_hours?: number | null
+          signature_data?: string | null
+          signed_at?: string | null
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["timesheet_status"] | null
+          technician_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_timesheets_technician_id"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       auto_complete_past_jobs: {
@@ -4264,6 +4449,10 @@ export type Database = {
       can_manage_users: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      compute_timesheet_amount_2025: {
+        Args: { _persist?: boolean; _timesheet_id: string }
+        Returns: Json
       }
       convert_to_timezone: {
         Args: { target_timezone?: string; timestamp_val: string }
@@ -4277,9 +4466,19 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_user_job_ids: {
+        Args: { user_uuid: string }
+        Returns: {
+          job_id: string
+        }[]
+      }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      minutes_to_hours_round_30: {
+        Args: { mins: number }
+        Returns: number
       }
       update_tour_dates: {
         Args: Record<PropertyKey, never>

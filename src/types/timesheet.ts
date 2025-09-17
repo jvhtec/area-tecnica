@@ -16,6 +16,23 @@ export interface Timesheet {
   approved_at?: string;
   created_at: string;
   updated_at: string;
+  // New 2025 rate calculator fields
+  category?: 'tecnico' | 'especialista' | 'responsable';
+  amount_eur?: number;
+  amount_breakdown?: {
+    category: string;
+    worked_minutes: number;
+    worked_hours_rounded: number;
+    base_day_hours: number;
+    mid_tier_hours: number;
+    base_amount_eur: number;
+    overtime_hours: number;
+    overtime_hour_eur: number;
+    overtime_amount_eur: number;
+    total_eur: number;
+    notes: string[];
+  };
+  approved_by_manager?: boolean;
   technician?: {
     first_name: string;
     last_name: string;
@@ -31,4 +48,15 @@ export interface TimesheetFormData {
   break_minutes: number;
   overtime_hours: number;
   notes: string;
+  category?: 'tecnico' | 'especialista' | 'responsable';
+}
+
+export interface RateCard2025 {
+  id: string;
+  category: 'tecnico' | 'especialista' | 'responsable';
+  base_day_eur: number;
+  plus_10_12_eur: number;
+  overtime_hour_eur: number;
+  base_day_hours: number;
+  mid_tier_hours: number;
 }
