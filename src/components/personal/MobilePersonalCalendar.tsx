@@ -38,7 +38,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   const [selectedTech, setSelectedTech] = useState<any | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<any | undefined>(undefined);
   const [selectedAvailability, setSelectedAvailability] = useState<
-    'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | null
+    'vacation' | 'travel' | 'sick' | 'day_off' | 'warehouse' | 'unavailable' | null
   >(null);
 
   useEffect(() => {
