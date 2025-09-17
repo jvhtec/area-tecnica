@@ -43,6 +43,8 @@ export const MemoriaTecnica = () => {
     { id: "power", title: "Informe de Consumos", file: null, landscape: false },
     { id: "rigging", title: "Plano de Rigging", file: null, landscape: true }
   ]);
+  // Preferred bucket names (try in order)
+  const STORAGE_BUCKET_CANDIDATES = ['Memoria Tecnica', 'memoria-tecnica', 'sound-memoria-tecnica'];
 
   const handleLogoUpload = async (file: File) => {
     if (!file.type.includes('image/')) {
@@ -120,19 +122,30 @@ export const MemoriaTecnica = () => {
   };
 
   const uploadToStorage = async (file: File, path: string) => {
-    const { error: uploadError, data } = await supabase.storage
-      .from('Memoria Tecnica')
-      .upload(path, file);
+    const safePath = path.replace(/\s+/g, '_');
+    let lastErr: any = null;
+    for (const bucket of STORAGE_BUCKET_CANDIDATES) {
+      try {
+        const { error: uploadError } = await supabase.storage
+          .from(bucket)
+          .upload(safePath, file, { upsert: true });
+        if (uploadError) throw uploadError;
 
-    if (uploadError) throw uploadError;
-
-    const { data: signedUrlData, error: signUrlError } = await supabase.storage
-      .from('Memoria Tecnica')
-      .createSignedUrl(path, 3600); // 1 hour expiration
-
-    if (signUrlError) throw signUrlError;
-
-    return signedUrlData.signedUrl;
+        const { data: signedUrlData, error: signUrlError } = await supabase.storage
+          .from(bucket)
+          .createSignedUrl(safePath, 3600);
+        if (signUrlError) throw signUrlError;
+        return signedUrlData.signedUrl;
+      } catch (err) {
+        lastErr = err;
+        // Try next candidate on 404 bucket not found; otherwise rethrow
+        const msg = (err && (err.message || err.error || '')) + '';
+        if (!msg.toLowerCase().includes('bucket not found') && !(err?.statusCode === '404')) {
+          throw err;
+        }
+      }
+    }
+    throw lastErr || new Error('Failed to upload: no matching bucket found');
   };
 
   const generateMemoriaTecnica = async () => {

@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { PDFDocument, rgb } from "https://cdn.skypack.dev/pdf-lib@1.17.1?dts";
+import { PDFDocument, rgb, StandardFonts } from "https://cdn.skypack.dev/pdf-lib@1.17.1?dts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -13,10 +13,10 @@ const sanitizeFileName = (name: string) => {
   return name
     .normalize('NFD') // Decompose accented characters
     .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
-    .replace(/[^a-zA-Z0-9-_.]/g, '_') // Replace invalid characters with underscores
-    .replace(/_+/g, '_') // Replace multiple underscores with single
-    .replace(/^_|_$/g, '') // Remove leading/trailing underscores
-    .toLowerCase(); // Convert to lowercase for consistency
+    .replace(/[^a-zA-Z0-9.-]/g, '-') // Replace invalid characters with hyphens
+    .replace(/-+/g, '-') // Collapse multiple hyphens
+    .replace(/^-|-$/g, '') // Trim leading/trailing hyphens
+    .toLowerCase(); // Lowercase for consistency
 };
 
 serve(async (req) => {
@@ -63,27 +63,59 @@ serve(async (req) => {
       color: corporateColor
     });
 
-    // Add title in white on header - centered
+    // Fonts for better measuring and centering
+    const helveticaBold = await mergedPdf.embedFont(StandardFonts.HelveticaBold);
+    const helvetica = await mergedPdf.embedFont(StandardFonts.Helvetica);
+
+    // Add title in white on header - truly centered
     const titleFontSize = 24;
-    coverPage.drawText('Memoria Tecnica - Sonido', {
-      x: 160,
+    const titleText = 'Memoria Tecnica - Sonido';
+    const titleWidth = helveticaBold.widthOfTextAtSize(titleText, titleFontSize);
+    const titleX = Math.max(20, (width - titleWidth) / 2);
+    coverPage.drawText(titleText, {
+      x: titleX,
       y: height - 25,
       size: titleFontSize,
-      color: rgb(1, 1, 1, 1),
-      maxWidth: width - 40,
-      align: 'center'
+      color: rgb(1, 1, 1),
+      font: helveticaBold
     });
 
-    // Add centered project name
+    // Add centered project name with wrapping
     const projectNameSize = 24;
-    coverPage.drawText(projectName.toUpperCase(), {
-      x: width / 2 - 30,
-      y: height / 2 + projectNameSize / 2,
-      size: projectNameSize,
-      color: rgb(0, 0, 0),
-      maxWidth: width - 40,
-      align: 'center'
-    });
+    const maxNameWidth = width - 80;
+    const wrapText = (text: string, maxWidth: number) => {
+      const words = text.split(/\s+/);
+      const lines: string[] = [];
+      let current = '';
+      for (const w of words) {
+        const test = current ? current + ' ' + w : w;
+        const testWidth = helveticaBold.widthOfTextAtSize(test.toUpperCase(), projectNameSize);
+        if (testWidth <= maxWidth) {
+          current = test;
+        } else {
+          if (current) lines.push(current);
+          current = w;
+        }
+      }
+      if (current) lines.push(current);
+      return lines;
+    };
+    const nameLines = wrapText(projectName, maxNameWidth);
+    const totalNameHeight = nameLines.length * (projectNameSize + 4);
+    let nameY = height / 2 + totalNameHeight / 2;
+    for (const line of nameLines) {
+      const lineText = line.toUpperCase();
+      const lineWidth = helveticaBold.widthOfTextAtSize(lineText, projectNameSize);
+      const lineX = Math.max(20, (width - lineWidth) / 2);
+      coverPage.drawText(lineText, {
+        x: lineX,
+        y: nameY,
+        size: projectNameSize,
+        color: rgb(0, 0, 0),
+        font: helveticaBold
+      });
+      nameY -= projectNameSize + 4;
+    }
 
     // Add customer logo if provided
     if (logoUrl) {
@@ -161,21 +193,25 @@ serve(async (req) => {
       }
     }
 
+    // Helper to fetch footer logo from public logos first, then fallback
+    const fetchFooterLogo = async (): Promise<Uint8Array | null> => {
+      const candidates = [
+        `${supabaseUrl}/storage/v1/object/public/public%20logos/sectorpro.png`,
+        `${supabaseUrl}/storage/v1/object/public/company-assets/sector-pro-logo.png`
+      ];
+      for (const url of candidates) {
+        try {
+          const res = await fetch(url, { headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } });
+          if (res.ok) return new Uint8Array(await res.arrayBuffer());
+        } catch (_) { /* continue */ }
+      }
+      return null;
+    };
+
     // Add Sector Pro logo at the bottom
     try {
-      const sectorProLogoUrl = `${supabaseUrl}/storage/v1/object/public/company-assets/sector-pro-logo.png`;
-      console.log('Fetching Sector Pro logo from:', sectorProLogoUrl);
-      
-      const logoResponse = await fetch(sectorProLogoUrl, {
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
-      
-      if (!logoResponse.ok) throw new Error(`Failed to fetch Sector Pro logo: ${logoResponse.statusText}`);
-      
-      const logoBytes = new Uint8Array(await logoResponse.arrayBuffer());
+      const logoBytes = await fetchFooterLogo();
+      if (!logoBytes) throw new Error('Footer logo not found in public logos or company-assets');
       const sectorProLogo = await mergedPdf.embedPng(logoBytes);
       
       const targetLogoHeight = 20;
@@ -203,29 +239,22 @@ serve(async (req) => {
       color: corporateColor
     });
 
-    // Add index title
-    indexPage.drawText('Tabla de Contenidos', {
-      x: 180,
+    // Add index title (centered)
+    const indexTitle = 'Tabla de Contenidos';
+    const indexWidth = helveticaBold.widthOfTextAtSize(indexTitle, titleFontSize);
+    const indexX = Math.max(20, (width - indexWidth) / 2);
+    indexPage.drawText(indexTitle, {
+      x: indexX,
       y: height - 25,
       size: titleFontSize,
-      color: rgb(1, 1, 1, 1),
-      maxWidth: width - 40,
-      align: 'center'
+      color: rgb(1, 1, 1),
+      font: helveticaBold
     });
 
     // Add Sector Pro logo to index page
     try {
-      const sectorProLogoUrl = `${supabaseUrl}/storage/v1/object/public/company-assets/sector-pro-logo.png`;
-      const logoResponse = await fetch(sectorProLogoUrl, {
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
-      
-      if (!logoResponse.ok) throw new Error(`Failed to fetch Sector Pro logo for index: ${logoResponse.statusText}`);
-      
-      const logoBytes = new Uint8Array(await logoResponse.arrayBuffer());
+      const logoBytes = await fetchFooterLogo();
+      if (!logoBytes) throw new Error('Footer logo not found for index');
       const sectorProLogo = await mergedPdf.embedPng(logoBytes);
       
       const targetLogoHeight = 20;
@@ -292,84 +321,112 @@ serve(async (req) => {
       }
     }
 
+    // Do not add footer to merged PDFs; only cover and index include logo.
+
     const pdfBytes = await mergedPdf.save();
-    const timestamp = new Date().toISOString().replace(/[^0-9]/g, '');
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yy = String(now.getFullYear()).slice(-2);
 
-    // Use the sanitizeFileName function for better file naming
+    // Folder-safe project name for storage path
     const sanitizedProjectName = sanitizeFileName(projectName || 'proyecto');
-    const fileName = `memoria_tecnica_sonido_${sanitizedProjectName}_${timestamp}.pdf`;
+    // Display-friendly job name in the file name (allow spaces & parentheses, remove slashes)
+    const displayProjectName = (projectName || 'Proyecto')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[\\/]+/g, '-')
+      .replace(/\s+/g, ' ')
+      .trim();
 
-    // Check if bucket exists and create it if it doesn't (as PRIVATE bucket)
-    const bucketName = 'Memoria Tecnica'; // Using your existing bucket name
-    try {
-      const bucketCheckResponse = await fetch(`${supabaseUrl}/storage/v1/bucket/${encodeURIComponent(bucketName)}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${supabaseKey}`,
-        }
-      });
+    // Requested format: Memoria Tecnica Sonido - Job Name (DDMMYY).pdf
+    const fileName = `Memoria Tecnica Sonido - ${displayProjectName} (${dd}${mm}${yy}).pdf`;
+    const objectPath = `${sanitizedProjectName}/${fileName}`;
 
-      if (bucketCheckResponse.status === 404) {
-        console.log('Bucket does not exist, creating it as private...');
-        const createBucketResponse = await fetch(`${supabaseUrl}/storage/v1/bucket`, {
+    // Choose a bucket and upload using the Supabase client; fall back across candidates
+    const bucketCandidates = ['Memoria Tecnica', 'memoria-tecnica'];
+    let selectedBucket = '';
+    let lastUploadErr: any = null;
+    for (const candidate of bucketCandidates) {
+      try {
+        const encodedBucket = encodeURIComponent(candidate);
+        const encodedPath = encodeURI(objectPath);
+        const uploadResp = await fetch(`${supabaseUrl}/storage/v1/object/${encodedBucket}/${encodedPath}`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/pdf'
           },
-          body: JSON.stringify({
-            id: bucketName,
-            name: bucketName,
-            public: false, // PRIVATE BUCKET
-            file_size_limit: null,
-            allowed_mime_types: null
-          })
+          body: pdfBytes
         });
-
-        if (!createBucketResponse.ok) {
-          const errorText = await createBucketResponse.text();
-          console.error('Failed to create bucket:', errorText);
-          throw new Error(`Failed to create bucket: ${createBucketResponse.status}`);
+        if (uploadResp.ok) { selectedBucket = candidate; break; }
+        // If bucket not found, try to create and retry once
+        if (uploadResp.status === 404) {
+          await fetch(`${supabaseUrl}/storage/v1/bucket`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ id: candidate, name: candidate, public: false })
+          });
+          const retryResp = await fetch(`${supabaseUrl}/storage/v1/object/${encodedBucket}/${encodedPath}`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseKey}`,
+              'Content-Type': 'application/pdf'
+            },
+            body: pdfBytes
+          });
+          if (retryResp.ok) { selectedBucket = candidate; break; }
+          lastUploadErr = new Error(`Upload retry failed: ${retryResp.status} ${retryResp.statusText} ${await retryResp.text()}`);
+        } else {
+          lastUploadErr = new Error(`Upload failed: ${uploadResp.status} ${uploadResp.statusText} ${await uploadResp.text()}`);
         }
-        console.log('Private bucket created successfully');
+      } catch (e) {
+        lastUploadErr = e;
       }
-    } catch (error) {
-      console.error('Error checking/creating bucket:', error);
-      // Continue anyway - the bucket might exist but the check failed
     }
-
-    // Upload to private bucket using raw fetch
-    const encodedBucketName = encodeURIComponent(bucketName);
-    const uploadResponse = await fetch(`${supabaseUrl}/storage/v1/object/${encodedBucketName}/${fileName}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${supabaseKey}`,
-        'Content-Type': 'application/pdf'
-      },
-      body: pdfBytes
-    });
-
-    if (!uploadResponse.ok) {
-      const errorText = await uploadResponse.text();
-      console.error('Upload error details:', errorText);
-      throw new Error(`Failed to upload merged PDF: ${uploadResponse.status} ${uploadResponse.statusText}`);
+    if (!selectedBucket) {
+      console.error('Upload failed for all buckets:', lastUploadErr);
+      throw new Error(`Failed to upload merged PDF: ${lastUploadErr?.message || 'unknown error'}`);
     }
 
     // Generate signed URL for private access (expires based on expiresIn parameter)
     console.log('Generating signed URL...');
-    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-      .from(bucketName)
-      .createSignedUrl(fileName, expiresIn);
-
-    if (signedUrlError) {
-      console.error('Error creating signed URL:', signedUrlError);
-      throw new Error(`Failed to create signed URL: ${signedUrlError.message}`);
+    // Try to create a signed URL using SDK, fall back to REST if bucket name causes issues
+    let signedUrl = '';
+    try {
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from(selectedBucket)
+        .createSignedUrl(objectPath, expiresIn);
+      if (signedUrlError) throw signedUrlError;
+      signedUrl = signedUrlData.signedUrl;
+    } catch (e) {
+      // REST fallback
+      const encodedBucket = encodeURIComponent(selectedBucket);
+      const res = await fetch(`${supabaseUrl}/storage/v1/object/sign/${encodedBucket}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ expiresIn, paths: [objectPath] })
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`Failed to sign URL: ${res.status} ${res.statusText} ${txt}`);
+      }
+      const body = await res.json();
+      // Response is array of objects with signedURL
+      signedUrl = body[0]?.signedURL || body[0]?.signedUrl || '';
+      if (!signedUrl) throw new Error('Signed URL missing in response');
     }
 
     console.log('Signed URL generated successfully');
 
     return new Response(JSON.stringify({
-      url: signedUrlData.signedUrl,
+      url: signedUrl,
       fileName: fileName,
       expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
       expiresIn: expiresIn
