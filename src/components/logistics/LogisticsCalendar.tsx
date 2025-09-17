@@ -178,6 +178,10 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
           <Button variant="ghost" size="icon" onClick={handlePreviousMonth}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
+          <div className="hidden sm:flex items-center gap-2 px-2 text-sm font-medium text-muted-foreground">
+            <CalendarIcon className="h-4 w-4" />
+            <span>{format(currentMonth, 'MMMM yyyy')}</span>
+          </div>
           <Button variant="ghost" size="icon" onClick={handleNextMonth}>
             <ChevronRight className="h-4 w-4" />
           </Button>
