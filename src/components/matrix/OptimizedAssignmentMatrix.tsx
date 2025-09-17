@@ -17,6 +17,11 @@ import { useToast } from '@/hooks/use-toast';
 import { OfferDetailsDialog } from './OfferDetailsDialog';
 import { supabase } from '@/lib/supabase';
 import { useStaffingMatrixStatuses } from '@/features/staffing/hooks/useStaffingMatrixStatuses';
+import { Button } from '@/components/ui/button';
+import { UserPlus } from 'lucide-react';
+import { CreateUserDialog } from '@/components/users/CreateUserDialog';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useQueryClient } from '@tanstack/react-query';
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
 interface MatrixJob {
@@ -78,6 +83,10 @@ export const OptimizedAssignmentMatrix = ({
   const mainScrollRef = useRef<HTMLDivElement>(null);
   const [scrollAttempts, setScrollAttempts] = useState(0);
   const syncInProgressRef = useRef(false);
+  const [createUserOpen, setCreateUserOpen] = useState(false);
+  const { userRole } = useOptimizedAuth();
+  const isManagementUser = ['admin', 'management'].includes(userRole || '');
+  const qc = useQueryClient();
   
   // Performance monitoring
   const { startRenderTimer, endRenderTimer, incrementCellRender } = usePerformanceMonitor('AssignmentMatrix');
@@ -446,8 +455,13 @@ export const OptimizedAssignmentMatrix = ({
           height: HEADER_HEIGHT 
         }}
       >
-        <div className="flex items-center justify-center h-full font-semibold bg-card border-r border-b">
-          Technicians
+        <div className="flex items-center justify-between h-full bg-card border-r border-b px-2">
+          <div className="font-semibold">Technicians</div>
+          {isManagementUser && (
+            <Button size="sm" variant="outline" className="h-8" onClick={() => setCreateUserOpen(true)}>
+              <UserPlus className="h-4 w-4 mr-1" /> Add
+            </Button>
+          )}
         </div>
       </div>
 
@@ -681,6 +695,18 @@ export const OptimizedAssignmentMatrix = ({
           technicianId={cellAction.technicianId}
           selectedDate={cellAction.date}
           selectedCells={Array.from(selectedCells)}
+        />
+      )}
+
+      {isManagementUser && (
+        <CreateUserDialog
+          open={createUserOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              qc.invalidateQueries({ queryKey: ['optimized-matrix-technicians'] });
+            }
+            setCreateUserOpen(open);
+          }}
         />
       )}
     </div>
