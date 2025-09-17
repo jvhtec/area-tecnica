@@ -28,6 +28,7 @@ interface UsersListProps {
   searchQuery?: string;
   roleFilter?: string;
   departmentFilter?: string;
+  isManagementUser?: boolean;
 }
 
 interface QueryResult {
@@ -40,7 +41,8 @@ const PAGE_SIZE = 10;
 export const UsersList = ({ 
   searchQuery = "", 
   roleFilter = "", 
-  departmentFilter = "" 
+  departmentFilter = "",
+  isManagementUser = false,
 }: UsersListProps) => {
   useTabVisibility(['profiles']);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -228,7 +230,7 @@ export const UsersList = ({
         </div>
       </div>
 
-      <UsersListContent users={users.data} groupBy={groupBy} />
+      <UsersListContent users={users.data} groupBy={groupBy} isManagementUser={isManagementUser} />
 
       {totalPages > 1 && (
         <Pagination>

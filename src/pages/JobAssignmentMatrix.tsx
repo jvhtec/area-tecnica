@@ -13,6 +13,7 @@ import { useVirtualizedDateRange } from '@/hooks/useVirtualizedDateRange';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
+import { SkillsFilter } from '@/components/matrix/SkillsFilter';
 
 export default function JobAssignmentMatrix() {
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
@@ -25,6 +26,11 @@ export default function JobAssignmentMatrix() {
   }, [searchTerm]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [allowDirectAssign, setAllowDirectAssign] = useState(false);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const specialtyOptions = ['foh','monitores','sistemas','rf','escenario','PA'] as const;
+  const toggleSpecialty = (name: (typeof specialtyOptions)[number]) => {
+    setSelectedSkills(prev => prev.includes(name) ? prev.filter(s => s !== name) : [...prev, name]);
+  };
 
   // Use virtualized date range with expandable capabilities
   const {
@@ -51,8 +57,8 @@ export default function JobAssignmentMatrix() {
     queryKey: ['optimized-matrix-technicians', selectedDepartment],
     queryFn: async () => {
       let query = supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email, department, role')
+        .from('profiles_with_skills')
+        .select('id, first_name, last_name, email, phone, dni, department, role, skills')
         .in('role', ['technician', 'house_tech']);
 
       if (selectedDepartment !== 'all') {
@@ -72,13 +78,45 @@ export default function JobAssignmentMatrix() {
 
   // Filter technicians based on search term
   const filteredTechnicians = useMemo(() => {
-    if (!debouncedSearch) return technicians;
-    return technicians.filter(tech => 
-      `${tech.first_name} ${tech.last_name}`.toLowerCase().includes(debouncedSearch) ||
-      tech.email?.toLowerCase().includes(debouncedSearch) ||
-      tech.department?.toLowerCase().includes(debouncedSearch)
-    );
-  }, [technicians, debouncedSearch]);
+    const arr = technicians.filter((tech: any) => {
+      const matchesSearch = !debouncedSearch || (
+        `${tech.first_name} ${tech.last_name}`.toLowerCase().includes(debouncedSearch) ||
+        tech.email?.toLowerCase().includes(debouncedSearch) ||
+        tech.department?.toLowerCase().includes(debouncedSearch)
+      );
+      if (!matchesSearch) return false;
+      if (!selectedSkills.length) return true;
+      const skills: Array<{ name: string }> = (tech.skills || []).map((s: any) => ({ name: (s.name || '').toLowerCase() }));
+      // Require all selected skills to be present
+      return selectedSkills.every(sel => skills.some(s => s.name === sel.toLowerCase()));
+    });
+
+    if (!selectedSkills.length) return arr;
+    // Sort by skill match strength
+    const scoreFor = (tech: any) => {
+      const skills = (tech.skills || []) as Array<{ name?: string; proficiency?: number; is_primary?: boolean; category?: string | null }>;
+      let score = 0;
+      for (const sel of selectedSkills) {
+        const m = skills.find(s => (s.name || '').toLowerCase() === sel.toLowerCase());
+        if (!m) continue;
+        const prof = Number(m.proficiency ?? 0);
+        if (m.is_primary) score += 3;
+        if (prof >= 4) score += 2; else if (prof >= 2) score += 1;
+        // small bonus for sound-specialty when filtering foh/mon/rf
+        if ((m.category || '') === 'sound-specialty') score += 1;
+      }
+      return score;
+    };
+    return arr.sort((a: any, b: any) => {
+      const da = scoreFor(a);
+      const db = scoreFor(b);
+      if (db !== da) return db - da;
+      // tie-breakers: department then last name
+      const ad = (a.department || '').localeCompare(b.department || '');
+      if (ad !== 0) return ad;
+      return (a.last_name || '').localeCompare(b.last_name || '');
+    });
+  }, [technicians, debouncedSearch, selectedSkills]);
 
   // Optimized jobs query with smart date filtering
   const { data: yearJobs = [], isLoading: isLoadingJobs } = useQuery({
@@ -183,6 +221,21 @@ export default function JobAssignmentMatrix() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-48 min-w-0 flex-1 sm:flex-none"
             />
+
+            <SkillsFilter selected={selectedSkills} onChange={setSelectedSkills} />
+            {/* Quick specialties for sound */}
+            <div className="flex items-center gap-1">
+              {specialtyOptions.map(opt => (
+                <Badge
+                  key={opt}
+                  variant={selectedSkills.includes(opt) ? 'default' : 'outline'}
+                  className="cursor-pointer capitalize"
+                  onClick={() => toggleSpecialty(opt)}
+                >
+                  {opt}
+                </Badge>
+              ))}
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto">

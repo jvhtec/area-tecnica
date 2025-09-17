@@ -3,16 +3,17 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Profile } from "./types";
-import { AlertTriangle, Pencil, Trash2 } from "lucide-react";
+import { AlertTriangle, Pencil, Trash2, Award } from "lucide-react";
 
 interface UserCardProps {
   user: Profile;
   onEdit: (user: Profile) => void;
   onDelete: (user: Profile) => void;
   showPasswordAlert?: boolean;
+  onManageSkills?: (user: Profile) => void;
 }
 
-export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false }: UserCardProps) => {
+export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false, onManageSkills }: UserCardProps) => {
   const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
 
   return (
@@ -50,6 +51,16 @@ export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false }: 
       </HoverCard>
 
       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        {onManageSkills && (
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => onManageSkills(user)}
+            className="h-8"
+          >
+            <Award className="h-4 w-4 mr-1" /> Skills
+          </Button>
+        )}
         <Button 
           variant="outline" 
           size="icon"

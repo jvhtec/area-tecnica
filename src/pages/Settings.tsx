@@ -62,6 +62,7 @@ const Settings = () => {
                 searchQuery={searchQuery}
                 roleFilter={selectedRole === "all" ? "" : selectedRole}
                 departmentFilter={selectedDepartment === "all" ? "" : selectedDepartment}
+                isManagementUser={isManagementUser}
               />
             </CardContent>
           </Card>

@@ -363,6 +363,7 @@ export const Profile = () => {
               </div>
             </CardContent>
           </Card>
+
         </div>
 
         {/* Right Column - Folder Structure */}

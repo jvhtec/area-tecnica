@@ -35,8 +35,11 @@ interface OptimizedAssignmentMatrixProps {
     first_name: string;
     last_name: string;
     email: string;
+    phone?: string | null;
+    dni?: string | null;
     department: string;
     role: string;
+    skills?: Array<{ name?: string; category?: string | null; proficiency?: number | null; is_primary?: boolean | null }>;
   }>;
   dates: Date[];
   jobs: MatrixJob[];

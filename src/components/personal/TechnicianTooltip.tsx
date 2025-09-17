@@ -14,6 +14,7 @@ interface TechnicianTooltipProps {
     last_name: string | null;
     department: string | null;
     phone: string | null;
+    skills?: Array<{ name?: string; category?: string | null; proficiency?: number | null; is_primary?: boolean | null }>;
   };
   assignment?: {
     sound_role: string | null;
@@ -95,6 +96,15 @@ export const TechnicianTooltip: React.FC<TechnicianTooltipProps> = ({
                   <Briefcase className="h-3 w-3" />
                   {getDepartmentRole()}
                 </p>
+                {!!(technician.skills && technician.skills.length) && (
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {technician.skills.slice(0,6).map((s, i) => (
+                      <Badge key={(s.name || '') + i} variant={s.is_primary ? 'default' : 'secondary'} className="text-[10px]" title={`${s.name}${s.proficiency != null ? ` (lvl ${s.proficiency})` : ''}`}>
+                        {s.name}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
               
               {/* Status indicator */}

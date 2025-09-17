@@ -3,7 +3,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Mail, User, Building } from 'lucide-react';
+import { Mail, User, Building, Phone, IdCard } from 'lucide-react';
 
 interface TechnicianRowProps {
   technician: {
@@ -11,8 +11,11 @@ interface TechnicianRowProps {
     first_name: string;
     last_name: string;
     email: string;
+    phone?: string | null;
+    dni?: string | null;
     department: string;
     role: string;
+    skills?: Array<{ name?: string; category?: string | null; proficiency?: number | null; is_primary?: boolean | null }>;
   };
   height: number;
 }
@@ -64,7 +67,7 @@ export const TechnicianRow = ({ technician, height }: TechnicianRowProps) => {
               <div className="font-medium text-sm truncate">
                 {technician.first_name} {technician.last_name}
               </div>
-              <div className="flex gap-1 mt-1">
+              <div className="flex gap-1 mt-1 flex-wrap">
                 <Badge 
                   variant="secondary" 
                   className={`text-xs ${getDepartmentColor(technician.department)}`}
@@ -117,6 +120,20 @@ export const TechnicianRow = ({ technician, height }: TechnicianRowProps) => {
               </div>
             )}
 
+            {technician.phone && (
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm truncate">{technician.phone}</span>
+              </div>
+            )}
+
+            {technician.dni && (
+              <div className="flex items-center gap-2">
+                <IdCard className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm truncate">{technician.dni}</span>
+              </div>
+            )}
+
             <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">Role:</span>
@@ -124,6 +141,25 @@ export const TechnicianRow = ({ technician, height }: TechnicianRowProps) => {
                 {technician.role === 'house_tech' ? 'House Tech' : 'Technician'}
               </Badge>
             </div>
+
+            {/* Skills */}
+            {!!(technician.skills && technician.skills.length) && (
+              <div className="pt-2">
+                <div className="text-sm font-medium mb-1">Skills</div>
+                <div className="flex flex-wrap gap-1">
+                  {technician.skills
+                    ?.slice(0, 8)
+                    .map((s, i) => (
+                      <Badge key={(s.name || '') + i} variant={s.is_primary ? 'default' : 'secondary'} className="text-xs" title={`${s.name}${s.proficiency != null ? ` (lvl ${s.proficiency})` : ''}`}>
+                        {s.name}
+                      </Badge>
+                    ))}
+                  {technician.skills!.length > 8 && (
+                    <Badge variant="outline" className="text-xs">+{technician.skills!.length - 8} more</Badge>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </PopoverContent>
