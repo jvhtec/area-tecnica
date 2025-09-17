@@ -32,6 +32,21 @@ export interface Timesheet {
     total_eur: number;
     notes: string[];
   };
+  // Visible-only fields (DB visibility rules applied via RPC)
+  amount_eur_visible?: number | null;
+  amount_breakdown_visible?: {
+    category: string;
+    worked_minutes: number;
+    worked_hours_rounded: number;
+    base_day_hours: number;
+    mid_tier_hours: number;
+    base_amount_eur: number;
+    overtime_hours: number;
+    overtime_hour_eur: number;
+    overtime_amount_eur: number;
+    total_eur: number;
+    notes: string[];
+  } | null;
   approved_by_manager?: boolean;
   technician?: {
     first_name: string;

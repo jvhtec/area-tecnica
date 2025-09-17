@@ -23,7 +23,7 @@ interface TimesheetViewProps {
 }
 
 export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetViewProps) => {
-  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, refetch } = useTimesheets(jobId);
+  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, recalcTimesheet, refetch } = useTimesheets(jobId);
   const { assignments } = useJobAssignmentsRealtime(jobId);
   const { user, userRole } = useOptimizedAuth();
   const { toast } = useToast();
@@ -46,7 +46,8 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
     end_time: "17:00",
     break_minutes: 30,
     overtime_hours: 0,
-    notes: ""
+    notes: "",
+    category: undefined
   });
 
   // Filter timesheets based on user role
@@ -89,7 +90,8 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
       end_time: formData.end_time,
       break_minutes: formData.break_minutes,
       overtime_hours: formData.overtime_hours,
-      notes: formData.notes
+      notes: formData.notes,
+      category: formData.category
     });
     setEditingTimesheet(null);
   };
@@ -102,7 +104,8 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
       end_time: timesheet.end_time || "17:00",
       break_minutes: timesheet.break_minutes || 0,
       overtime_hours: timesheet.overtime_hours || 0,
-      notes: timesheet.notes || ""
+      notes: timesheet.notes || "",
+      category: (timesheet.category as any) || undefined
     });
   };
 
@@ -594,6 +597,19 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                         />
                       </div>
                       <div>
+                        <Label htmlFor="category">Category</Label>
+                        <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v as any })}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="tecnico">tecnico</SelectItem>
+                            <SelectItem value="especialista">especialista</SelectItem>
+                            <SelectItem value="responsable">responsable</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
                         <Label htmlFor="overtime_hours">Overtime (hours)</Label>
                         <Input
                           id="overtime_hours"
@@ -645,6 +661,10 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                           ).toFixed(1)}h
                         </p>
                       </div>
+                      <div>
+                        <p className="text-muted-foreground">Category</p>
+                        <p className="font-medium">{timesheet.category || 'Not set'}</p>
+                      </div>
                       {timesheet.notes && (
                         <div className="col-span-2 md:col-span-4">
                           <p className="text-muted-foreground">Notes</p>
@@ -653,6 +673,63 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                       )}
                     </div>
                   )}
+
+                  {/* Rate calculation visibility & actions */}
+                  <div className="mt-4 p-3 rounded-md border">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="font-medium">Rate Calculation</p>
+                      {isManagementUser && (
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => recalcTimesheet(timesheet.id)}>Recalculate</Button>
+                          {!timesheet.category && (
+                            <Badge variant="destructive">Set category to calculate</Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {(() => {
+                      const breakdown = isManagementUser
+                        ? timesheet.amount_breakdown
+                        : timesheet.amount_breakdown_visible;
+                      if (!breakdown) {
+                        return (
+                          <p className="text-sm text-muted-foreground">
+                            {isTechnician ? 'Pending approval' : 'No calculation available yet'}
+                          </p>
+                        );
+                      }
+                      return (
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Rounded Hours</p>
+                            <p className="font-medium">{breakdown.worked_hours_rounded}h</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Base Amount</p>
+                            <p className="font-medium">€{breakdown.base_amount_eur.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Overtime</p>
+                            <p className="font-medium">{breakdown.overtime_hours}h × €{breakdown.overtime_hour_eur}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">OT Amount</p>
+                            <p className="font-medium">€{breakdown.overtime_amount_eur.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Total</p>
+                            <p className="font-semibold">€{breakdown.total_eur.toFixed(2)}</p>
+                          </div>
+                          {isTechnician && (
+                            <div className="col-span-2 md:col-span-5 text-xs text-muted-foreground mt-1">
+                              Notes: rounding after 30 minutes; some conditions such as 30€ discounts for autónomos may apply depending on contract; house-tech rates to be added later.
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
 
                   {(timesheet.status === 'draft' || timesheet.status === 'submitted') && (
                     <TimesheetSignature

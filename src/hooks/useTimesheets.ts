@@ -37,14 +37,40 @@ export const useTimesheets = (jobId: string) => {
           .select("id, first_name, last_name, email, department")
           .in("id", technicianIds);
 
-        // Merge profile data with timesheets
-        const timesheetsWithProfiles = data.map(timesheet => ({
-          ...timesheet,
-          technician: profiles?.find(p => p.id === timesheet.technician_id)
-        }));
+        // For each timesheet, pull visibility-aware amounts via RPC
+        const enriched = await Promise.all(
+          data.map(async (t) => {
+            try {
+              const { data: visRow, error: visErr } = await supabase.rpc(
+                'get_timesheet_with_visible_amounts',
+                { _timesheet_id: t.id }
+              );
+              if (visErr) {
+                console.warn('get_timesheet_with_visible_amounts error for', t.id, visErr);
+              }
+              const visible = Array.isArray(visRow) ? visRow[0] : visRow; // some clients wrap rows
+              return {
+                ...t,
+                amount_eur: visible?.amount_eur ?? t.amount_eur,
+                amount_breakdown: visible?.amount_breakdown ?? t.amount_breakdown,
+                amount_eur_visible: visible?.amount_eur_visible ?? null,
+                amount_breakdown_visible: visible?.amount_breakdown_visible ?? null,
+                technician: profiles?.find(p => p.id === t.technician_id)
+              } as unknown as Timesheet;
+            } catch (e) {
+              console.warn('RPC get_timesheet_with_visible_amounts failed for', t.id, e);
+              return {
+                ...t,
+                amount_eur_visible: null,
+                amount_breakdown_visible: null,
+                technician: profiles?.find(p => p.id === t.technician_id)
+              } as unknown as Timesheet;
+            }
+          })
+        );
 
-        console.log("Setting timesheets:", timesheetsWithProfiles);
-        setTimesheets(timesheetsWithProfiles as unknown as Timesheet[]);
+        console.log("Setting timesheets (with visibility):", enriched);
+        setTimesheets(enriched as unknown as Timesheet[]);
       } else {
         setTimesheets([]);
       }
@@ -243,6 +269,16 @@ export const useTimesheets = (jobId: string) => {
         return null;
       }
 
+      // If time fields or category changed, recompute amount server-side
+      try {
+        const changedKeys = Object.keys(updates);
+        if (changedKeys.some(k => ['start_time','end_time','break_minutes','category'].includes(k))) {
+          await supabase.rpc('compute_timesheet_amount_2025', { _timesheet_id: timesheetId, _persist: true });
+        }
+      } catch (e) {
+        console.warn('Recompute after update failed (non-fatal):', e);
+      }
+
       // Only refetch if not skipping (for bulk operations)
       if (!skipRefetch) {
         await fetchTimesheets();
@@ -263,11 +299,20 @@ export const useTimesheets = (jobId: string) => {
 
   const approveTimesheet = async (timesheetId: string) => {
     const currentUser = (await supabase.auth.getUser()).data.user;
-    return updateTimesheet(timesheetId, { 
+    // Mark as approved (manager) and recompute
+    const updated = await updateTimesheet(timesheetId, { 
       status: 'approved',
+      approved_by_manager: true,
       approved_by: currentUser?.id,
       approved_at: new Date().toISOString()
     });
+    try {
+      await supabase.rpc('compute_timesheet_amount_2025', { _timesheet_id: timesheetId, _persist: true });
+      await fetchTimesheets();
+    } catch (e) {
+      console.warn('Recompute on approve failed (non-fatal):', e);
+    }
+    return updated;
   };
 
   const signTimesheet = async (timesheetId: string, signatureData: string) => {
@@ -321,6 +366,24 @@ export const useTimesheets = (jobId: string) => {
     }
   };
 
+  const recalcTimesheet = async (timesheetId: string) => {
+    try {
+      const { data, error } = await supabase.rpc('compute_timesheet_amount_2025', { _timesheet_id: timesheetId, _persist: true });
+      if (error) {
+        console.error('Error recalculating timesheet:', error);
+        toast.error('Failed to recalculate amount');
+        return null;
+      }
+      await fetchTimesheets();
+      toast.success('Amount recalculated');
+      return data;
+    } catch (e) {
+      console.error('Error in recalcTimesheet:', e);
+      toast.error('Failed to recalculate amount');
+      return null;
+    }
+  };
+
   return {
     timesheets,
     isLoading,
@@ -332,6 +395,7 @@ export const useTimesheets = (jobId: string) => {
     approveTimesheet,
     signTimesheet,
     deleteTimesheet,
-    deleteTimesheets
+    deleteTimesheets,
+    recalcTimesheet
   };
 };
