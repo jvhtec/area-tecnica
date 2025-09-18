@@ -27,8 +27,11 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
     return null;
   }
 
-  const resolveBucket = (path: string) =>
-    path.startsWith('hojas-de-ruta/') ? 'job-documents' : 'job_documents';
+  const resolveBucket = (path: string) => {
+    const first = (path || '').split('/')[0];
+    const dept = new Set(['sound','lights','video','production','logistics','administrative']);
+    return dept.has(first) ? 'job_documents' : 'job-documents';
+  };
 
   const handleViewDocument = async (doc: JobDocument) => {
     try {
@@ -38,9 +41,9 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
         .from(bucket)
         .createSignedUrl(doc.file_path, 60);
 
-      if (error) {
-        console.error("Error creating signed URL:", error);
-        throw error;
+      if (error || !data?.signedUrl) {
+        console.error("Error creating signed URL:", error || 'No signedUrl returned', { bucket, path: doc.file_path });
+        throw error || new Error('Failed to generate signed URL');
       }
 
       console.log("Signed URL created:", data.signedUrl);
@@ -60,13 +63,9 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
         .from(bucket)
         .createSignedUrl(doc.file_path, 60);
       
-      if (error) {
-        console.error('Error creating signed URL for download:', error);
-        throw error;
-      }
-      
-      if (!data?.signedUrl) {
-        throw new Error('Failed to generate download URL');
+      if (error || !data?.signedUrl) {
+        console.error('Error creating signed URL for download:', error || 'No signedUrl returned', { bucket, path: doc.file_path });
+        throw error || new Error('Failed to generate download URL');
       }
       
       console.log('Download URL created:', data.signedUrl);

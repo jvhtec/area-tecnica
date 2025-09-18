@@ -46,8 +46,11 @@ export const AssignmentsList = ({
     try {
       console.log("Viewing document:", doc.file_name, "at path:", doc.file_path);
       
+      const first = (doc.file_path || '').split('/')[0];
+      const dept = new Set(['sound','lights','video','production','logistics','administrative']);
+      const bucket = dept.has(first) ? 'job_documents' : 'job-documents';
       const { data, error } = await supabase.storage
-        .from('job_documents')
+        .from(bucket)
         .createSignedUrl(doc.file_path, 60);
 
       if (error) {
@@ -84,8 +87,11 @@ export const AssignmentsList = ({
     try {
       console.log("Downloading document:", doc.file_name, "from path:", doc.file_path);
       
+      const first = (doc.file_path || '').split('/')[0];
+      const dept = new Set(['sound','lights','video','production','logistics','administrative']);
+      const bucket = dept.has(first) ? 'job_documents' : 'job-documents';
       const { data, error } = await supabase.storage
-        .from('job_documents')
+        .from(bucket)
         .createSignedUrl(doc.file_path, 60);
 
       if (error) {

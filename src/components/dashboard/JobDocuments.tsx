@@ -40,8 +40,11 @@ export const JobDocuments = ({
     setLocalDocuments(documents);
   }, [documents]);
 
-  const resolveBucket = (path: string) =>
-    path.startsWith('hojas-de-ruta/') ? 'job-documents' : 'job_documents';
+  const resolveBucket = (path: string) => {
+    const first = (path || '').split('/')[0];
+    const dept = new Set(['sound','lights','video','production','logistics','administrative']);
+    return dept.has(first) ? 'job_documents' : 'job-documents';
+  };
 
   const handleDownload = async (jobDocument: JobDocument) => {
     try {
