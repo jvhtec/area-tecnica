@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useState, useEffect } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -84,12 +85,16 @@ export const LogisticsEventDialog = ({
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [color, setColor] = useState("#7E69AB");
+  const [alsoCreateUnload, setAlsoCreateUnload] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Initialize form state when dialog opens or when switching to a different event
   useEffect(() => {
-    if (selectedEvent) {
+    if (!open) return;
+
+    if (selectedEvent?.id) {
       setEventType(selectedEvent.event_type);
       setTransportType(selectedEvent.transport_type);
       setTime(selectedEvent.event_time);
@@ -102,7 +107,7 @@ export const LogisticsEventDialog = ({
       setSelectedJob(selectedEvent.job_id || null);
       setCustomTitle(selectedEvent.title || "");
       setLicensePlate(selectedEvent.license_plate || "");
-      setSelectedDepartments(selectedEvent.departments.map((d) => d.department));
+      setSelectedDepartments((selectedEvent.departments || []).map((d) => d.department));
       setColor(selectedEvent.color || "#7E69AB");
     } else {
       setEventType(initialEventType || "load");
@@ -116,9 +121,10 @@ export const LogisticsEventDialog = ({
       setSelectedDepartments(initialDepartments || []);
       setColor("#7E69AB");
     }
-  }, [selectedEvent, selectedDate, initialJobId, initialDepartments, initialTransportType, initialEventType]);
+    // Only re-run when dialog opens or we switch to a different event
+  }, [open, selectedEvent?.id]);
 
-  // Fetch available Jobs
+  // Fetch available Jobs (used for read-only job label and select)
   const { data: jobs } = useQuery({
     queryKey: ["jobs"],
     queryFn: async () => {
@@ -247,6 +253,26 @@ export const LogisticsEventDialog = ({
           if (deptError) throw deptError;
         }
 
+        // Optional: create an unload event right after saving a load event
+        if (alsoCreateUnload && eventType === 'load') {
+          const unloadData = { ...eventData, event_type: 'unload' as const };
+          const { data: unloadEvent, error: unloadErr } = await supabase
+            .from('logistics_events')
+            .insert(unloadData)
+            .select()
+            .single();
+          if (unloadErr) throw unloadErr;
+          if (selectedDepartments.length > 0) {
+            const { error: unloadDeptErr } = await supabase
+              .from('logistics_event_departments')
+              .insert(selectedDepartments.map((dept) => ({ event_id: unloadEvent.id, department: dept })));
+            if (unloadDeptErr) throw unloadDeptErr;
+          }
+          try {
+            onCreated?.({ id: unloadEvent.id, event_type: unloadEvent.event_type, event_date: unloadEvent.event_date, event_time: unloadEvent.event_time });
+          } catch {}
+        }
+
         toast({
           title: "Success",
           description: "Logistics event created successfully.",
@@ -275,28 +301,40 @@ export const LogisticsEventDialog = ({
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Job Selection */}
-            <div className="space-y-2">
-              <Label>Job</Label>
-              <Select
-                value={selectedJob || "no-job"}
-                onValueChange={(value) => {
-                  setSelectedJob(value === "no-job" ? null : value);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a job" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="no-job">No Job</SelectItem>
-                  {jobs?.map((job) => (
-                    <SelectItem key={job.id} value={job.id}>
-                      {job.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Job Selection or locked job display */}
+            {(!selectedEvent && !initialJobId) ? (
+              <div className="space-y-2">
+                <Label>Job</Label>
+                <Select
+                  value={selectedJob || "no-job"}
+                  onValueChange={(value) => {
+                    setSelectedJob(value === "no-job" ? null : value);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a job" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="no-job">No Job</SelectItem>
+                    {jobs?.map((job) => (
+                      <SelectItem key={job.id} value={job.id}>
+                        {job.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Job</Label>
+                <div className="px-3 py-2 border rounded bg-muted text-sm">
+                  {(() => {
+                    const jt = jobs?.find(j => j.id === (selectedEvent?.job_id || initialJobId))?.title;
+                    return jt || 'Selected Job';
+                  })()}
+                </div>
+              </div>
+            )}
 
             {/* Color Picker */}
             <div className="space-y-2">
@@ -430,6 +468,12 @@ export const LogisticsEventDialog = ({
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
                 </Button>
+              )}
+              {!selectedEvent && eventType === 'load' && (
+                <div className="flex items-center gap-2">
+                  <Checkbox id="alsoCreateUnload" checked={alsoCreateUnload} onCheckedChange={(v) => setAlsoCreateUnload(!!v)} />
+                  <Label htmlFor="alsoCreateUnload" className="text-sm">Also create unload event</Label>
+                </div>
               )}
               <Button type="submit">
                 {selectedEvent ? "Update" : "Create"} Event

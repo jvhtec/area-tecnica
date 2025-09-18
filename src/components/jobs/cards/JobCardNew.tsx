@@ -182,7 +182,7 @@ export function JobCardNew({
       if (error) return [];
       return data || [];
     },
-    enabled: !!job?.id && ['logistics','admin','management'].includes(userRole || ''),
+    enabled: !!job?.id && ((userDepartment === 'logistics') || ['admin','management'].includes(userRole || '')),
   });
 
   const { data: jobEvents = [] } = useQuery({
@@ -204,7 +204,7 @@ export function JobCardNew({
 
   const transportButtonLabel = (() => {
     if (isScheduled) return 'Transport Scheduled';
-    if ((userRole === 'logistics') || (userRole === 'admin' && !isTechDept)) {
+    if ((userDepartment === 'logistics') || ((userRole === 'management' || userRole === 'admin') && !isTechDept)) {
       return allRequests.length > 0 ? `Requests (${allRequests.length})` : 'Logistics';
     }
     if (isTechDept) {
@@ -217,7 +217,7 @@ export function JobCardNew({
 
   const handleTransportClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if ((userRole === 'logistics') || (userRole === 'admin' && !isTechDept)) {
+    if ((userDepartment === 'logistics') || ((userRole === 'management' || userRole === 'admin') && !isTechDept)) {
       setTransportDialogOpen(true); // open requests manager
     } else if (isTechDept && userDepartment) {
       setTransportDialogOpen(true); // open request creator
@@ -771,7 +771,7 @@ export function JobCardNew({
             />
           )}
 
-          {transportDialogOpen && (userRole === 'logistics' || (userRole === 'admin' && !isTechDept)) && (
+          {transportDialogOpen && ((userDepartment === 'logistics') || ((userRole === 'management' || userRole === 'admin') && !isTechDept)) && (
             <Dialog open={transportDialogOpen} onOpenChange={setTransportDialogOpen}>
               <DialogContent className="max-w-xl">
                 <div className="space-y-4">
@@ -846,22 +846,12 @@ export function JobCardNew({
               initialDepartments={[selectedTransportRequest.department]}
               initialTransportType={selectedTransportRequest.selectedItem?.transport_type}
               initialEventType={logisticsInitialEventType}
-              onCreated={(details) => {
-                // Fire and forget: attempt auto-fulfill
+              onCreated={(_details) => {
+                // Attempt auto-fulfill; dialog can optionally auto-create unload itself
                 if (selectedTransportRequest?.id && selectedTransportRequest?.department) {
                   void checkAndFulfillRequest(selectedTransportRequest.id, selectedTransportRequest.department);
                 }
-                if (details.event_type === 'load') {
-                  const alsoUnload = window.confirm('Create an unload event as well?');
-                  if (alsoUnload) {
-                    setLogisticsInitialEventType('unload');
-                    setLogisticsDialogOpen(true);
-                  } else {
-                    setLogisticsInitialEventType(undefined);
-                  }
-                } else {
-                  setLogisticsInitialEventType(undefined);
-                }
+                setLogisticsInitialEventType(undefined);
               }}
             />
           )}
