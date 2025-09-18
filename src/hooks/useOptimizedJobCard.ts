@@ -134,11 +134,17 @@ export const useOptimizedJobCard = (
     queryFn: async () => {
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, display_name')
-        .order('display_name');
+        .select('id, first_name, last_name')
+        .order('last_name', { ascending: true })
+        .order('first_name', { ascending: true });
       
       if (error) throw error;
-      return profiles || [];
+      // Add a computed display_name to keep existing consumers working
+      const withDisplay = (profiles || []).map((p: any) => ({
+        ...p,
+        display_name: [p.first_name, p.last_name].filter(Boolean).join(' ').trim()
+      }));
+      return withDisplay;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes for personnel data
   });
