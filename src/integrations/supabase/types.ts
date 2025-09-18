@@ -54,6 +54,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "assignment_notifications_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
+            referencedColumns: ["id"]
+          },
         ]
       }
       availability_conflicts: {
@@ -109,10 +116,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "availability_conflicts_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "availability_conflicts_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "availability_conflicts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
             referencedColumns: ["id"]
           },
         ]
@@ -157,6 +178,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "availability_exceptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
             referencedColumns: ["id"]
           },
         ]
@@ -207,6 +235,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "availability_schedules_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
             referencedColumns: ["id"]
           },
         ]
@@ -310,10 +345,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "direct_messages_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "direct_messages_sender_id_fkey"
             columns: ["sender_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "direct_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
             referencedColumns: ["id"]
           },
         ]
@@ -410,6 +459,13 @@ export type Database = {
             columns: ["uploaded_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "festival_artist_files_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
             referencedColumns: ["id"]
           },
         ]
@@ -1111,6 +1167,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "flex_crew_assignments_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
+            referencedColumns: ["id"]
+          },
         ]
       }
       flex_crew_calls: {
@@ -1249,6 +1312,13 @@ export type Database = {
             columns: ["processed_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flex_status_log_processed_by_fkey"
+            columns: ["processed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
             referencedColumns: ["id"]
           },
         ]
@@ -1411,6 +1481,13 @@ export type Database = {
             columns: ["last_modified_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hoja_de_ruta_last_modified_by_fkey"
+            columns: ["last_modified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
             referencedColumns: ["id"]
           },
         ]
@@ -1784,10 +1861,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "hoja_de_ruta_rooms_staff_member1_id_fkey"
+            columns: ["staff_member1_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "hoja_de_ruta_rooms_staff_member2_id_fkey"
             columns: ["staff_member2_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hoja_de_ruta_rooms_staff_member2_id_fkey"
+            columns: ["staff_member2_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
             referencedColumns: ["id"]
           },
         ]
@@ -2088,6 +2179,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "job_assignments_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
+            referencedColumns: ["id"]
+          },
         ]
       }
       job_date_types: {
@@ -2285,6 +2383,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "job_milestones_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "job_milestones_definition_id_fkey"
             columns: ["definition_id"]
             isOneToOne: false
@@ -2441,6 +2546,13 @@ export type Database = {
             columns: ["assigned_to"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lights_job_tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
             referencedColumns: ["id"]
           },
           {
@@ -2712,6 +2824,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
+            referencedColumns: ["id"]
+          },
         ]
       }
       milestone_definitions: {
@@ -2786,6 +2905,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
+            referencedColumns: ["id"]
+          },
         ]
       }
       notification_subscriptions: {
@@ -2822,6 +2948,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
             referencedColumns: ["id"]
           },
         ]
@@ -2949,8 +3082,61 @@ export type Database = {
         }
         Relationships: []
       }
+      profile_skills: {
+        Row: {
+          created_at: string
+          id: string
+          is_primary: boolean
+          notes: string | null
+          proficiency: number | null
+          profile_id: string
+          skill_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          notes?: string | null
+          proficiency?: number | null
+          profile_id: string
+          skill_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          notes?: string | null
+          proficiency?: number | null
+          profile_id?: string
+          skill_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_skills_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_skills_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_skills_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
+          assignable_as_tech: boolean
           created_at: string
           custom_folder_structure: Json | null
           custom_tour_folder_structure: Json | null
@@ -2975,6 +3161,7 @@ export type Database = {
           tours_expanded: boolean | null
         }
         Insert: {
+          assignable_as_tech?: boolean
           created_at?: string
           custom_folder_structure?: Json | null
           custom_tour_folder_structure?: Json | null
@@ -2999,6 +3186,7 @@ export type Database = {
           tours_expanded?: boolean | null
         }
         Update: {
+          assignable_as_tech?: boolean
           created_at?: string
           custom_folder_structure?: Json | null
           custom_tour_folder_structure?: Json | null
@@ -3075,6 +3263,30 @@ export type Database = {
         }
         Relationships: []
       }
+      skills: {
+        Row: {
+          active: boolean
+          category: string | null
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          active?: boolean
+          category?: string | null
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          active?: boolean
+          category?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       sound_job_personnel: {
         Row: {
           foh_engineers: number | null
@@ -3147,6 +3359,13 @@ export type Database = {
             columns: ["assigned_to"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sound_job_tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
             referencedColumns: ["id"]
           },
           {
@@ -3237,6 +3456,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staffing_requests_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
             referencedColumns: ["id"]
           },
         ]
@@ -3340,6 +3566,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "task_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "task_documents_video_task_id_fkey"
             columns: ["video_task_id"]
             isOneToOne: false
@@ -3394,6 +3627,13 @@ export type Database = {
             columns: ["technician_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_departments_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
             referencedColumns: ["id"]
           },
         ]
@@ -3476,6 +3716,7 @@ export type Database = {
           created_by: string | null
           date: string
           end_time: string | null
+          ends_next_day: boolean | null
           id: string
           job_id: string
           notes: string | null
@@ -3499,6 +3740,7 @@ export type Database = {
           created_by?: string | null
           date: string
           end_time?: string | null
+          ends_next_day?: boolean | null
           id?: string
           job_id: string
           notes?: string | null
@@ -3522,6 +3764,7 @@ export type Database = {
           created_by?: string | null
           date?: string
           end_time?: string | null
+          ends_next_day?: boolean | null
           id?: string
           job_id?: string
           notes?: string | null
@@ -3539,6 +3782,13 @@ export type Database = {
             columns: ["technician_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_timesheets_technician_id"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
             referencedColumns: ["id"]
           },
         ]
@@ -3592,10 +3842,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tour_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tour_assignments_technician_id_fkey"
             columns: ["technician_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_assignments_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
             referencedColumns: ["id"]
           },
           {
@@ -4126,6 +4390,113 @@ export type Database = {
         }
         Relationships: []
       }
+      transport_request_items: {
+        Row: {
+          created_at: string
+          id: string
+          leftover_space_meters: number | null
+          request_id: string
+          transport_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          leftover_space_meters?: number | null
+          request_id: string
+          transport_type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          leftover_space_meters?: number | null
+          request_id?: string
+          transport_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transport_request_items_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "transport_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transport_requests: {
+        Row: {
+          created_at: string
+          created_by: string
+          department: string
+          fulfilled_by: string | null
+          id: string
+          job_id: string
+          note: string | null
+          status: string
+          transport_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          department: string
+          fulfilled_by?: string | null
+          id?: string
+          job_id: string
+          note?: string | null
+          status?: string
+          transport_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          department?: string
+          fulfilled_by?: string | null
+          id?: string
+          job_id?: string
+          note?: string | null
+          status?: string
+          transport_type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transport_requests_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transport_requests_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transport_requests_fulfilled_by_fkey"
+            columns: ["fulfilled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transport_requests_fulfilled_by_fkey"
+            columns: ["fulfilled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transport_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vacation_requests: {
         Row: {
           approved_at: string | null
@@ -4175,10 +4546,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "vacation_requests_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "vacation_requests_technician_id_fkey"
             columns: ["technician_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vacation_requests_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
             referencedColumns: ["id"]
           },
         ]
@@ -4255,6 +4640,13 @@ export type Database = {
             columns: ["assigned_to"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_job_tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
             referencedColumns: ["id"]
           },
           {
@@ -4343,6 +4735,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "staffing_requests_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
+            referencedColumns: ["id"]
+          },
         ]
       }
       current_stock_levels: {
@@ -4353,6 +4752,117 @@ export type Database = {
           equipment_name: string | null
         }
         Relationships: []
+      }
+      profiles_with_skills: {
+        Row: {
+          assignable_as_tech: boolean | null
+          department: string | null
+          dni: string | null
+          email: string | null
+          first_name: string | null
+          id: string | null
+          last_name: string | null
+          phone: string | null
+          role: Database["public"]["Enums"]["user_role"] | null
+          skills: Json | null
+        }
+        Relationships: []
+      }
+      timesheet_amounts_visible: {
+        Row: {
+          amount_breakdown: Json | null
+          amount_breakdown_visible: Json | null
+          amount_eur: number | null
+          amount_eur_visible: number | null
+          approved_at: string | null
+          approved_by: string | null
+          approved_by_manager: boolean | null
+          break_minutes: number | null
+          category: string | null
+          created_at: string | null
+          created_by: string | null
+          date: string | null
+          end_time: string | null
+          ends_next_day: boolean | null
+          id: string | null
+          job_id: string | null
+          notes: string | null
+          overtime_hours: number | null
+          signature_data: string | null
+          signed_at: string | null
+          start_time: string | null
+          status: Database["public"]["Enums"]["timesheet_status"] | null
+          technician_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount_breakdown?: Json | null
+          amount_breakdown_visible?: never
+          amount_eur?: number | null
+          amount_eur_visible?: never
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_by_manager?: boolean | null
+          break_minutes?: number | null
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          date?: string | null
+          end_time?: string | null
+          ends_next_day?: boolean | null
+          id?: string | null
+          job_id?: string | null
+          notes?: string | null
+          overtime_hours?: number | null
+          signature_data?: string | null
+          signed_at?: string | null
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["timesheet_status"] | null
+          technician_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount_breakdown?: Json | null
+          amount_breakdown_visible?: never
+          amount_eur?: number | null
+          amount_eur_visible?: never
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_by_manager?: boolean | null
+          break_minutes?: number | null
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          date?: string | null
+          end_time?: string | null
+          ends_next_day?: boolean | null
+          id?: string | null
+          job_id?: string | null
+          notes?: string | null
+          overtime_hours?: number | null
+          signature_data?: string | null
+          signed_at?: string | null
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["timesheet_status"] | null
+          technician_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_timesheets_technician_id"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_timesheets_technician_id"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_with_skills"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
@@ -4403,7 +4913,7 @@ export type Database = {
           signature_data: string
           signed_at: string
           start_time: string
-          status: string
+          status: Database["public"]["Enums"]["timesheet_status"]
           technician_id: string
           updated_at: string
         }[]
