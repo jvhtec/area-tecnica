@@ -1267,6 +1267,12 @@ export function JobCardNew({
 }
 
 const handleDownload = async (doc: JobDocument) => {
+  const resolveBucket = (path: string) => {
+    const first = (path || '').split('/')[0];
+    const dept = new Set(['sound','lights','video','production','logistics','administrative']);
+    return dept.has(first) ? 'job_documents' : 'job-documents';
+  };
+
   try {
     console.log('Starting download for document:', doc.file_name);
     
