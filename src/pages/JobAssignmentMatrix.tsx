@@ -56,24 +56,31 @@ export default function JobAssignmentMatrix() {
   const { data: technicians = [], isLoading: isLoadingTechnicians } = useQuery({
     queryKey: ['optimized-matrix-technicians', selectedDepartment],
     queryFn: async () => {
-      let query = supabase
-        .from('profiles_with_skills')
-        .select('id, first_name, last_name, email, phone, dni, department, role, assignable_as_tech, skills')
-        .or('role.in.(technician,house_tech),and(role.eq.management,assignable_as_tech.eq.true)');
-
-      if (selectedDepartment !== 'all') {
-        query = query.eq('department', selectedDepartment);
-      }
-
-      const { data, error } = await query
-        .order('department', { ascending: true })
-        .order('last_name', { ascending: true });
+      const { data, error } = await supabase.rpc('get_profiles_with_skills');
 
       if (error) throw error;
-      return data || [];
+
+      const filtered = (data || []).filter((tech: any) => {
+        if (selectedDepartment !== 'all' && tech.department !== selectedDepartment) {
+          return false;
+        }
+        if (tech.role === 'technician' || tech.role === 'house_tech') {
+          return true;
+        }
+        if (tech.role === 'management') {
+          return !!tech.assignable_as_tech;
+        }
+        return false;
+      });
+
+      return filtered.sort((a: any, b: any) => {
+        const deptCompare = (a.department || '').localeCompare(b.department || '');
+        if (deptCompare !== 0) return deptCompare;
+        return (a.last_name || '').localeCompare(b.last_name || '');
+      });
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   // Filter technicians based on search term

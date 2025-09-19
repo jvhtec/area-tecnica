@@ -30,27 +30,29 @@ export async function getAvailableTechnicians(
   try {
     // First, get all technicians from the specified department, plus flagged management users
     // Note: we include management here to avoid an extra query, then filter by assignable_as_tech in code
-    const { data: allTechnicians, error: techError } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name, email, department, role, assignable_as_tech")
-      .eq("department", department)
-      .in("role", ["technician", "house_tech", "management"]);
+    const { data: profileData, error: profileError } = await supabase
+      .rpc('get_profiles_with_skills');
 
-    if (techError) {
-      throw techError;
+    if (profileError) {
+      throw profileError;
     }
 
-    if (!allTechnicians) {
+    const allTechnicians = (profileData || []).filter((tech: any) => tech.department === department);
+
+    if (allTechnicians.length === 0) {
       return [];
     }
 
-    // Filter management to only those explicitly marked as assignable to avoid clutter
     const eligibleTechnicians = allTechnicians.filter((tech: any) => {
       if (tech.role === 'management') {
         return !!tech.assignable_as_tech;
       }
-      return true;
+      return tech.role === 'technician' || tech.role === 'house_tech';
     });
+
+    if (eligibleTechnicians.length === 0) {
+      return [];
+    }
 
     // Get all job assignments for these technicians with job date information
     const technicianIds = eligibleTechnicians.map((tech: any) => tech.id);

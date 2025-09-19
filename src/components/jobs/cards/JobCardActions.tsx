@@ -84,7 +84,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
 
   const handleManageJob = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigate(`/job-management/${job.id}`);
+    const params = new URLSearchParams({ singleJob: 'true' });
+    navigate(`/festival-management/${job.id}?${params.toString()}`);
   };
 
   return (

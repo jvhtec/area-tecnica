@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { TourDateFormFields } from "./TourDateFormFields";
 import { TourDateListItem } from "./TourDateListItem";
-import { useLocationManagement } from "@/hooks/useLocationManagement";
+import { useLocationManagement, LocationDetails } from "@/hooks/useLocationManagement";
 import { useTourDateRealtime } from "@/hooks/useTourDateRealtime";
 import {
   FLEX_FOLDER_IDS,
@@ -38,6 +38,7 @@ import { createFlexFolder } from "@/utils/flex-folders/api";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { deleteJobDateTypes } from "@/services/deleteJobDateTypes";
+import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 
 interface TourDateManagementDialogProps {
   open: boolean;
@@ -360,7 +361,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { getOrCreateLocation } = useLocationManagement();
+  const { getOrCreateLocation, getOrCreateLocationWithDetails } = useLocationManagement();
 
   // Add real-time subscriptions
   const tourDateIds = tourDates.map(d => d.id);
@@ -375,7 +376,6 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   }, [open, tourId, queryClient]);
 
   const [editingTourDate, setEditingTourDate] = useState<any>(null);
-  const [editDateValue, setEditDateValue] = useState<string>("");
   const [editLocationValue, setEditLocationValue] = useState<string>("");
   const [editTourDateType, setEditTourDateType] = useState<'show' | 'rehearsal' | 'travel'>('show');
   const [editStartDate, setEditStartDate] = useState<string>("");
@@ -387,10 +387,12 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   
   // New date form state
   const [newLocation, setNewLocation] = useState<string>("");
+  const [newLocationDetails, setNewLocationDetails] = useState<LocationDetails | null>(null);
   const [newTourDateType, setNewTourDateType] = useState<'show' | 'rehearsal' | 'travel'>('show');
   const [newStartDate, setNewStartDate] = useState<string>("");
   const [newEndDate, setNewEndDate] = useState<string>("");
   const [newTourPackOnly, setNewTourPackOnly] = useState<boolean>(false);
+  const [editLocationDetails, setEditLocationDetails] = useState<LocationDetails | null>(null);
 
   const { data: foldersExistenceMap, refetch: refetchFoldersExistence } = useQuery({
     queryKey: ["flex-folders-existence", tourDateIds],
@@ -509,7 +511,12 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       
       console.log("Adding new tour date:", { startDate, finalEndDate, location, tourId, tourDateType, isTourPackOnly });
       
-      const locationId = await getOrCreateLocation(location);
+      let locationId: string | null = null;
+      if (newLocationDetails && newLocationDetails.name) {
+        locationId = await getOrCreateLocationWithDetails(newLocationDetails);
+      } else {
+        locationId = await getOrCreateLocation(location);
+      }
       console.log("Location ID:", locationId);
       const { data: newTourDate, error: tourDateError } = await supabase
         .from("tour_dates")
@@ -661,7 +668,12 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       const finalEndDate = endDate || startDate;
       const rehearsalDays = Math.ceil((new Date(finalEndDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
       console.log("Editing tour date:", { dateId, startDate, finalEndDate, newLocation, tourDateType, isTourPackOnly });
-      const locationId = await getOrCreateLocation(newLocation);
+      let locationId: string | null = null;
+      if (editLocationDetails && editLocationDetails.name) {
+        locationId = await getOrCreateLocationWithDetails(editLocationDetails);
+      } else {
+        locationId = await getOrCreateLocation(newLocation);
+      }
 
       const { data: tourData, error: tourError } = await supabase
         .from("tours")
@@ -963,22 +975,36 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
   const startEditing = (dateObj: any) => {
     setEditingTourDate(dateObj);
-    setEditDateValue(dateObj.date.split("T")[0]);
+    const baseDate = (dateObj.start_date || dateObj.date || '').split('T')[0] || '';
+    setEditStartDate(baseDate);
+    setEditEndDate((dateObj.end_date || baseDate || '').split('T')[0] || '');
     setEditLocationValue(dateObj.location?.name || "");
     setEditTourDateType(dateObj.tour_date_type || 'show');
-    setEditStartDate(dateObj.start_date || dateObj.date.split("T")[0]);
-    setEditEndDate(dateObj.end_date || dateObj.date.split("T")[0]);
     setEditTourPackOnly(dateObj.is_tour_pack_only || false);
+
+    if (dateObj.location) {
+      setEditLocationDetails({
+        name: dateObj.location.name,
+        address: dateObj.location.formatted_address || dateObj.location.address || '',
+        coordinates:
+          dateObj.location.latitude && dateObj.location.longitude
+            ? { lat: dateObj.location.latitude, lng: dateObj.location.longitude }
+            : undefined,
+        place_id: dateObj.location.google_place_id || dateObj.location.place_id || undefined,
+      });
+    } else {
+      setEditLocationDetails(null);
+    }
   };
 
   const cancelEditing = () => {
     setEditingTourDate(null);
-    setEditDateValue("");
     setEditLocationValue("");
     setEditTourDateType('show');
     setEditStartDate("");
     setEditEndDate("");
     setEditTourPackOnly(false);
+    setEditLocationDetails(null);
   };
 
   const submitEditing = async (dateId: string) => {
@@ -1025,26 +1051,53 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                 return (
                   <div key={dateObj.id} className="p-3 border rounded-lg">
                     {editingTourDate && editingTourDate.id === dateObj.id && !readOnly ? (
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-3">
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4" />
                           <Input
                             type="date"
-                            value={editDateValue}
-                            onChange={(e) => setEditDateValue(e.target.value)}
+                            value={editStartDate}
+                            onChange={(e) => {
+                              const newDate = e.target.value;
+                              setEditStartDate(newDate);
+                              if (editTourDateType !== 'rehearsal') {
+                                setEditEndDate(newDate);
+                              }
+                            }}
                             required
                           />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4" />
-                          <Input
-                            type="text"
-                            value={editLocationValue}
-                            onChange={(e) => setEditLocationValue(e.target.value)}
-                            placeholder="Location"
-                            required
-                          />
-                        </div>
+                        {editTourDateType === 'rehearsal' && (
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4" />
+                            <Input
+                              type="date"
+                              value={editEndDate}
+                              min={editStartDate}
+                              onChange={(e) => setEditEndDate(e.target.value)}
+                              required
+                            />
+                          </div>
+                        )}
+                        <PlaceAutocomplete
+                          value={editLocationValue}
+                          onInputChange={(value) => {
+                            setEditLocationValue(value);
+                            setEditLocationDetails(null);
+                          }}
+                          onSelect={(result) => {
+                            setEditLocationValue(result.name);
+                            setEditLocationDetails({
+                              name: result.name,
+                              address: result.address,
+                              coordinates: result.coordinates,
+                              place_id: result.place_id,
+                            });
+                          }}
+                          placeholder="Location"
+                          label="Location"
+                          className="w-full"
+                        />
                         <div className="flex items-center space-x-2">
                           <Checkbox
                             id="tour-pack-only-edit"
@@ -1145,6 +1198,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                 <TourDateFormFields
                   location={newLocation}
                   setLocation={setNewLocation}
+                  setLocationDetails={setNewLocationDetails}
                   tourDateType={newTourDateType}
                   setTourDateType={setNewTourDateType}
                   startDate={newStartDate}
@@ -1181,6 +1235,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                     );
                     // Reset form
                     setNewLocation("");
+                    setNewLocationDetails(null);
                     setNewTourDateType('show');
                     setNewStartDate("");
                     setNewEndDate("");

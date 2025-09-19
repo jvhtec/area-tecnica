@@ -2,11 +2,14 @@ import React from 'react';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, MapPin, Clock } from "lucide-react";
+import { Calendar, Clock, MapPin } from "lucide-react";
+import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
+import { LocationDetails } from "@/hooks/useLocationManagement";
 
 interface TourDateFormFieldsProps {
   location: string;
   setLocation: (value: string) => void;
+  setLocationDetails?: (value: LocationDetails | null) => void;
   tourDateType: 'show' | 'rehearsal' | 'travel';
   setTourDateType: (value: 'show' | 'rehearsal' | 'travel') => void;
   startDate: string;
@@ -18,6 +21,7 @@ interface TourDateFormFieldsProps {
 export const TourDateFormFields: React.FC<TourDateFormFieldsProps> = ({
   location,
   setLocation,
+  setLocationDetails,
   tourDateType,
   setTourDateType,
   startDate,
@@ -73,13 +77,23 @@ export const TourDateFormFields: React.FC<TourDateFormFieldsProps> = ({
       </div>
 
       <div>
-        <Label htmlFor="location">Location</Label>
-        <Input
-          id="location"
-          type="text"
-          placeholder="Enter location"
+        <PlaceAutocomplete
           value={location}
-          onChange={(e) => setLocation(e.target.value)}
+          onInputChange={(value) => {
+            setLocation(value);
+            setLocationDetails?.(null);
+          }}
+          onSelect={(result) => {
+            setLocation(result.name);
+            setLocationDetails?.({
+              name: result.name,
+              address: result.address,
+              coordinates: result.coordinates,
+              place_id: result.place_id,
+            });
+          }}
+          placeholder="Enter location"
+          label="Location"
         />
       </div>
 

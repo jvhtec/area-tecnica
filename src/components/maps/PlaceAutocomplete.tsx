@@ -20,6 +20,7 @@ interface PlaceAutocompleteProps {
   label?: string;
   className?: string;
   onBusyChange?: (busy: boolean) => void;
+  onInputChange?: (value: string) => void;
 }
 
 interface PredictionItem {
@@ -35,6 +36,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   label = 'Lugar',
   className,
   onBusyChange,
+  onInputChange,
 }) => {
   const [inputValue, setInputValue] = useState(value || '');
   const [suggestions, setSuggestions] = useState<PredictionItem[]>([]);
@@ -246,6 +248,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
     const v = e.target.value;
     console.log('PlacesAutocomplete: Input changed:', v);
     setInputValue(v);
+    onInputChange?.(v);
     // Debounce
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     debounceRef.current = window.setTimeout(() => searchPlaces(v), 400);
