@@ -383,16 +383,15 @@ const LightsConsumosTool: React.FC = () => {
       );
 
       const fileName = `Informe de Potencia - ${jobToUse.title}.pdf`;
-      
+
       if (!isOverrideMode && selectedJobId) {
-        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-        const filePath = `lights/${selectedJobId}/${crypto.randomUUID()}.pdf`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('task_documents')
-          .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
+        const { uploadJobPdfWithCleanup } = await import('@/utils/jobDocumentsUpload');
+        await uploadJobPdfWithCleanup(
+          selectedJobId,
+          pdfBlob,
+          fileName,
+          'calculators/lights-consumos'
+        );
       }
 
       toast({
