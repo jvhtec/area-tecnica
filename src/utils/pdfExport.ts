@@ -3,12 +3,16 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 interface ExportTableRow {
-  quantity: string;
+  quantity?: string;
   componentName?: string;
   weight?: string;
   watts?: string;
   totalWeight?: number;
   totalWatts?: number;
+  // rigging-specific
+  x?: number; // position in meters
+  reactionKg?: number;
+  hoistName?: string;
 }
 
 interface ExportTable {
@@ -18,11 +22,17 @@ interface ExportTable {
   dualMotors?: boolean;
   totalWatts?: number;
   currentPerPhase?: number;
-  toolType?: 'pesos' | 'consumos';
+  toolType?: 'pesos' | 'consumos' | 'rigging';
   pduType?: string;
   customPduType?: string;
   includesHoist?: boolean;
   riggingPoint?: string;
+  // rigging summary fields
+  maxMomentNm?: number;
+  maxDeflectionMm?: number;
+  okMoment?: boolean;
+  okDefl?: boolean;
+  cablePick?: boolean;
 }
 
 export interface SummaryRow {
@@ -34,7 +44,7 @@ export interface SummaryRow {
 export const exportToPDF = (
   projectName: string,
   tables: ExportTable[],
-  type: 'weight' | 'power',
+  type: 'weight' | 'power' | 'rigging',
   jobName: string,
   jobDate: string,
   summaryRows?: SummaryRow[],
@@ -72,7 +82,9 @@ export const exportToPDF = (
     // Store the titleText variable outside the function so it's accessible everywhere
     const titleText = type === 'weight'
       ? "Informe de Distribución de Peso"
-      : "Informe de Distribución de Potencia";
+      : type === 'power'
+        ? "Informe de Distribución de Potencia"
+        : "Informe de Rigging";
 
     // If we have a custom logo, load it for the header
     const loadHeaderContent = (customLogo?: HTMLImageElement) => {
@@ -127,6 +139,90 @@ export const exportToPDF = (
 
       // === MAIN TABLES SECTION ===
       tables.forEach((table, index) => {
+        // Rigging specialized rendering
+        if (table.toolType === 'rigging') {
+          // Header for this truss section
+          doc.setFillColor(245, 245, 250);
+          doc.rect(14, yPosition - 6, pageWidth - 28, 10, 'F');
+          doc.setFontSize(14);
+          doc.setTextColor(125, 1, 1);
+          doc.text(`Truss: ${table.name}`, 14, yPosition);
+          yPosition += 10;
+
+          // Fixtures table
+          const fixtureRows = table.rows
+            .filter(r => r.componentName && (r.weight !== undefined || r.x !== undefined))
+            .map(r => [
+              r.quantity ?? '',
+              r.componentName ?? '',
+              r.weight ?? '',
+              r.x !== undefined ? `${Number(r.x).toFixed(2)} m` : ''
+            ]);
+
+          if (fixtureRows.length > 0) {
+            autoTable(doc, {
+              head: [['Cantidad', 'Componente', 'Peso (kg)', 'Posición (m)']],
+              body: fixtureRows,
+              startY: yPosition,
+              theme: 'grid',
+              styles: { fontSize: 10, cellPadding: 5 },
+              headStyles: { fillColor: [125, 1, 1], textColor: [255, 255, 255] }
+            });
+            yPosition = (doc as any).lastAutoTable.finalY + 10;
+          }
+
+          // Supports table with reactions + hoists
+          const supportRows = table.rows
+            .filter(r => r.reactionKg !== undefined)
+            .map(r => [
+              r.componentName ?? '',
+              r.reactionKg !== undefined ? Number(r.reactionKg).toFixed(0) : '',
+              r.hoistName ?? ''
+            ]);
+
+          if (supportRows.length > 0) {
+            autoTable(doc, {
+              head: [['Punto de Montaje', 'Reacción (kg)', 'Polipasto Sugerido']],
+              body: supportRows,
+              startY: yPosition,
+              theme: 'grid',
+              styles: { fontSize: 10, cellPadding: 5 },
+              headStyles: { fillColor: [125, 1, 1], textColor: [255, 255, 255] }
+            });
+            yPosition = (doc as any).lastAutoTable.finalY + 10;
+          }
+
+          // Engineering checks
+          if (table.maxMomentNm !== undefined || table.maxDeflectionMm !== undefined) {
+            const need = 30;
+            checkPageBreak(need);
+            doc.setFontSize(11);
+            doc.setTextColor(0, 0, 0);
+            if (table.maxMomentNm !== undefined) {
+              doc.text(`Momento Máximo: ${Number(table.maxMomentNm).toFixed(0)} N·m (${table.okMoment ? 'OK' : 'FALLA'})`, 14, yPosition);
+              yPosition += 6;
+            }
+            if (table.maxDeflectionMm !== undefined) {
+              doc.text(`Deflexión Máxima: ${Number(table.maxDeflectionMm).toFixed(1)} mm (${table.okDefl ? 'OK' : 'FALLA'})`, 14, yPosition);
+              yPosition += 10;
+            }
+          }
+
+          if (table.cablePick) {
+            checkPageBreak(10);
+            doc.setFontSize(10);
+            doc.setTextColor(80, 80, 80);
+            doc.text('*Incluye cable pick.', 14, yPosition);
+            yPosition += 10;
+          }
+
+          if (yPosition > pageHeight - 40 && index < tables.length - 1) {
+            doc.addPage();
+            yPosition = 20;
+          }
+
+          return; // skip default rendering for rigging
+        }
         // Calculate approximate table height
         const rowCount = table.rows.length + (type === 'weight' && table.totalWeight !== undefined ? 1 : 0);
         const approxTableHeight = rowCount * 15 + 20;
@@ -265,6 +361,17 @@ export const exportToPDF = (
         }));
       }
 
+      // Generate summary for rigging reports
+      let riggingSummaryRows: SummaryRow[] = [];
+      const riggingTables = tables.filter(t => t.toolType === 'rigging');
+      if (riggingTables.length > 0) {
+        riggingSummaryRows = riggingTables.map((t) => ({
+          clusterName: t.name,
+          riggingPoints: String(t.rows.filter(r => r.reactionKg !== undefined).length),
+          clusterWeight: t.totalWeight || 0
+        }));
+      }
+
       // Generate summary for power reports (consumos)
       if (type === 'power') {
         const totalSystemWatts = tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
@@ -273,14 +380,16 @@ export const exportToPDF = (
       }
 
       // Use provided summaries or generated ones
-      const finalSummaryRows = summaryRows && summaryRows.length > 0 ? summaryRows : generatedSummaryRows;
+      const finalSummaryRows = summaryRows && summaryRows.length > 0 ? summaryRows : (riggingSummaryRows.length > 0 ? riggingSummaryRows : generatedSummaryRows);
       const finalPowerSummary = powerSummary || generatedPowerSummary;
 
       // === SUMMARY PAGE ===
       // Generate summary for weight reports OR power reports with consumos toolType
       const shouldGenerateSummary = 
         (type === 'weight' && finalSummaryRows.length > 0) ||
-        (type === 'power' && tables.length > 0 && tables[0]?.toolType === 'consumos');
+        (type === 'power' && tables.length > 0 && tables[0]?.toolType === 'consumos') ||
+        (type === 'rigging' && riggingSummaryRows.length > 0) ||
+        (riggingSummaryRows.length > 0);
 
       if (shouldGenerateSummary) {
         // Always add a new page for the summary.
@@ -422,11 +531,11 @@ export const exportToPDF = (
             doc.text(`Corriente Total del Sistema: ${finalPowerSummary.totalSystemAmps.toFixed(2)} A`, 14, yPosition);
             yPosition += 7;
           }
-        } else if (type === 'weight' && finalSummaryRows.length > 0) {
+        } else if ((type === 'weight' || type === 'rigging') && finalSummaryRows.length > 0) {
           doc.setFontSize(16);
           doc.setTextColor(125, 1, 1);
           // Translate "Summary" to "Resumen"
-          doc.text("Resumen", 14, yPosition);
+          doc.text(riggingSummaryRows.length > 0 ? "Resumen de Rigging" : "Resumen", 14, yPosition);
           yPosition += 6;
 
           const summaryData = finalSummaryRows.map((row) => [
@@ -436,7 +545,7 @@ export const exportToPDF = (
           ]);
 
           autoTable(doc, {
-            head: [['Nombre del Cluster', 'Puntos de Montaje', 'Peso del Cluster']],
+            head: [['Truss', 'Puntos de Montaje', 'Peso Total (kg)']],
             body: summaryData,
             startY: yPosition,
             theme: 'grid',
