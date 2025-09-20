@@ -4701,6 +4701,17 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_job_total_amounts: {
+        Args: { _job_id: string; _user_role?: string }
+        Returns: {
+          breakdown_by_category: Json
+          individual_amounts: Json
+          job_id: string
+          total_approved_eur: number
+          total_pending_eur: number
+          user_can_see_all: boolean
+        }[]
+      }
       get_profiles_with_skills: {
         Args: Record<PropertyKey, never>
         Returns: {

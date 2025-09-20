@@ -8,7 +8,6 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
   const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
-  const isHouseTech = (opts?.userRole || '') === 'house_tech';
 
   const fetchTimesheets = useCallback(async () => {
     try {
@@ -38,50 +37,37 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
           .select("id, first_name, last_name, email, department")
           .in("id", technicianIds);
 
-        let enriched: Timesheet[];
-        if (isHouseTech) {
-          // House techs never see amounts; skip RPC and scrub amount fields
-          enriched = data.map((t) => ({
-            ...(t as any),
-            amount_eur: undefined,
-            amount_breakdown: undefined,
-            amount_eur_visible: null,
-            amount_breakdown_visible: null,
-            technician: profiles?.find(p => p.id === t.technician_id)
-          })) as unknown as Timesheet[];
-        } else {
-          // For each timesheet, pull visibility-aware amounts via RPC
-          enriched = await Promise.all(
-            data.map(async (t) => {
-              try {
-                const { data: visRow, error: visErr } = await supabase.rpc(
-                  'get_timesheet_with_visible_amounts',
-                  { _timesheet_id: t.id }
-                );
-                if (visErr) {
-                  console.warn('get_timesheet_with_visible_amounts error for', t.id, visErr);
-                }
-                const visible = Array.isArray(visRow) ? visRow[0] : visRow; // some clients wrap rows
-                return {
-                  ...t,
-                  amount_eur: visible?.amount_eur ?? undefined,
-                  amount_breakdown: visible?.amount_breakdown ?? undefined,
-                  amount_eur_visible: visible?.amount_eur_visible ?? null,
-                  amount_breakdown_visible: visible?.amount_breakdown_visible ?? null,
-                  technician: profiles?.find(p => p.id === t.technician_id)
-                } as unknown as Timesheet;
-              } catch (e) {
-                console.warn('RPC get_timesheet_with_visible_amounts failed for', t.id, e);
-                return {
-                  ...t,
-                  amount_eur_visible: null,
-                  amount_breakdown_visible: null,
-                  technician: profiles?.find(p => p.id === t.technician_id)
-                } as unknown as Timesheet;
+        // For all users (including house techs), use the RPC to get visibility-aware amounts
+        const enriched = await Promise.all(
+          data.map(async (t) => {
+            try {
+              const { data: visRow, error: visErr } = await supabase.rpc(
+                'get_timesheet_with_visible_amounts',
+                { _timesheet_id: t.id }
+              );
+              if (visErr) {
+                console.warn('get_timesheet_with_visible_amounts error for', t.id, visErr);
               }
-            })
-          );
-        }
+              const visible = Array.isArray(visRow) ? visRow[0] : visRow; // some clients wrap rows
+              return {
+                ...t,
+                amount_eur: visible?.amount_eur ?? undefined,
+                amount_breakdown: visible?.amount_breakdown ?? undefined,
+                amount_eur_visible: visible?.amount_eur_visible ?? null,
+                amount_breakdown_visible: visible?.amount_breakdown_visible ?? null,
+                technician: profiles?.find(p => p.id === t.technician_id)
+              } as unknown as Timesheet;
+            } catch (e) {
+              console.warn('RPC get_timesheet_with_visible_amounts failed for', t.id, e);
+              return {
+                ...t,
+                amount_eur_visible: null,
+                amount_breakdown_visible: null,
+                technician: profiles?.find(p => p.id === t.technician_id)
+              } as unknown as Timesheet;
+            }
+          })
+        );
 
         console.log("Setting timesheets (with visibility):", enriched);
         setTimesheets(enriched as unknown as Timesheet[]);
@@ -96,7 +82,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
       console.log("fetchTimesheets completed, setting loading to false");
       setIsLoading(false);
     }
-  }, [jobId, isHouseTech]);
+  }, [jobId]);
 
   const autoCreateTimesheets = useCallback(async () => {
     try {

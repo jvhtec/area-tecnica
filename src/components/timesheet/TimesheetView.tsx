@@ -13,6 +13,7 @@ import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { Timesheet, TimesheetFormData } from "@/types/timesheet";
 import { TimesheetSignature } from "./TimesheetSignature";
+import { JobTotalAmounts } from "./JobTotalAmounts";
 import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -261,6 +262,9 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
 
   return (
     <div className="space-y-6">
+      {/* Job cost summary */}
+      <JobTotalAmounts jobId={jobId} jobTitle={jobTitle} />
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
@@ -703,11 +707,12 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                       - Technicians: visible only when amount_breakdown_visible exists
                       - House tech: never visible
                   */}
-                  {(() => {
-                    const breakdownVisible = !!timesheet.amount_breakdown_visible;
-                    const isTechnicianRole = userRole === 'technician';
-                    const canShowRates = isManagementUser || (isTechnicianRole && breakdownVisible);
-                    if (!canShowRates) return null;
+                   {(() => {
+                     const breakdownVisible = !!timesheet.amount_breakdown_visible;
+                     const isTechnicianRole = userRole === 'technician';
+                     const isHouseTechRole = userRole === 'house_tech';
+                     const canShowRates = isManagementUser || (isTechnicianRole && breakdownVisible) || (isHouseTechRole && breakdownVisible);
+                     if (!canShowRates) return null;
                     return (
                   <div className="mt-4 p-3 rounded-md border">
                     <div className="flex items-center justify-between mb-2">
@@ -719,10 +724,10 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                             <Badge variant="destructive">Set category to calculate</Badge>
                           )}
                         </div>
-                      )}
-                    </div>
+                       )}
+                     </div>
 
-                    {(() => {
+                     {(() => {
                       const breakdown = isManagementUser
                         ? timesheet.amount_breakdown
                         : timesheet.amount_breakdown_visible;
@@ -751,15 +756,15 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
                             <p className="text-muted-foreground">OT Amount</p>
                             <p className="font-medium">€{breakdown.overtime_amount_eur.toFixed(2)}</p>
                           </div>
-                          <div>
-                            <p className="text-muted-foreground">Total</p>
-                            <p className="font-semibold">€{breakdown.total_eur.toFixed(2)}</p>
-                          </div>
-                          {userRole === 'technician' && (
-                            <div className="col-span-2 md:col-span-5 text-xs text-muted-foreground mt-1">
-                              Notes: rounding after 30 minutes; some conditions such as 30€ discounts for autónomos may apply depending on contract; house-tech rates to be added later.
-                            </div>
-                          )}
+                           <div>
+                             <p className="text-muted-foreground">Total</p>
+                             <p className="font-semibold">€{breakdown.total_eur.toFixed(2)}</p>
+                           </div>
+                           {(userRole === 'technician' || userRole === 'house_tech') && (
+                             <div className="col-span-2 md:col-span-5 text-xs text-muted-foreground mt-1">
+                               Notes: rounding after 30 minutes; some conditions such as 30€ discounts for autónomos may apply depending on contract.
+                             </div>
+                           )}
                         </div>
                       );
                     })()}
