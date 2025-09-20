@@ -1,11 +1,12 @@
 
 import { useState } from "react";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { SignUpFormFields } from "./signup/SignUpFormFields";
-import { SignUpFormActions } from "./signup/SignUpFormActions";
-import { supabase } from "@/lib/supabase";
-import { useToast } from "@/hooks/use-toast";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 interface SignUpFormProps {
   onBack?: () => void;
@@ -15,74 +16,197 @@ interface SignUpFormProps {
 export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps) => {
   const { signUp, isLoading, error: authError } = useOptimizedAuth();
   const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+    confirmPassword: "",
+    firstName: "",
+    lastName: "",
+    phone: "",
+    department: "",
+    dni: "",
+    residencia: "",
+  });
 
-  const handleSubmit = async (formData: any) => {
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError(null);
 
-    try {
-      console.log("Starting user creation process");
-      
-      if (preventAutoLogin) {
-        // Create user via Edge Function with default password, without logging in
-        const payload = {
-          email: formData.email,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          phone: formData.phone,
-          department: formData.department,
-          dni: formData.dni,
-          residencia: formData.residencia,
-        };
-
-        const { data, error: fnError } = await supabase.functions.invoke("create-user", {
-          body: payload,
-        });
-
-        if (fnError) {
-          throw fnError;
-        }
-
-        toast({
-          title: "User created",
-          description: `Account created for ${payload.email} with default password`,
-        });
-        if (onBack) onBack();
-        return;
-      }
-      
-      await signUp({
-        email: formData.email,
-        password: formData.password,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        phone: formData.phone,
-        department: formData.department,
-        dni: formData.dni,
-        residencia: formData.residencia,
-      });
-    } catch (err: any) {
-      console.error("Error in signup form:", err);
-      setError(err.message || "An unexpected error occurred");
+    // Validation
+    if (!formData.email || !formData.firstName || !formData.lastName) {
+      setError("Please fill in all required fields");
+      return;
     }
+
+    if (!preventAutoLogin && !formData.password) {
+      setError("Password is required");
+      return;
+    }
+
+    if (!preventAutoLogin && formData.password.length < 6) {
+      setError("Password must be at least 6 characters long");
+      return;
+    }
+
+    if (!preventAutoLogin && formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    await signUp({
+      email: formData.email,
+      password: formData.password,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      phone: formData.phone,
+      department: formData.department,
+      dni: formData.dni,
+      residencia: formData.residencia,
+    });
   };
 
   return (
-    <div className="space-y-6">
+    <form onSubmit={handleSignUp} className="space-y-4">
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold">Create Account</h2>
+        <p className="text-muted-foreground mt-2">
+          Fill in your details to get started
+        </p>
+      </div>
+
       {(error || authError) && (
         <Alert variant="destructive">
           <AlertDescription>{error || authError}</AlertDescription>
         </Alert>
       )}
-      
-      <SignUpFormFields 
-        onSubmit={handleSubmit}
-        error={error || authError}
-        isLoading={isLoading}
-        hidePassword={preventAutoLogin}
-        submitLabel={preventAutoLogin ? 'Create User' : 'Sign Up'}
-      />
-      {onBack && <SignUpFormActions onBack={onBack} loading={isLoading} />}
-    </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="firstName">First Name *</Label>
+          <Input
+            id="firstName"
+            type="text"
+            value={formData.firstName}
+            onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="lastName">Last Name *</Label>
+          <Input
+            id="lastName"
+            type="text"
+            value={formData.lastName}
+            onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+            required
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="signup-email">Email *</Label>
+        <Input
+          id="signup-email"
+          type="email"
+          value={formData.email}
+          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          required
+        />
+      </div>
+
+      {!preventAutoLogin && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="signup-password">Password *</Label>
+            <Input
+              id="signup-password"
+              type="password"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              required
+              minLength={6}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">Confirm Password *</Label>
+            <Input
+              id="confirmPassword"
+              type="password"
+              value={formData.confirmPassword}
+              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              required
+              minLength={6}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <Label htmlFor="phone">Phone</Label>
+        <Input
+          id="phone"
+          type="tel"
+          value={formData.phone}
+          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="department">Department</Label>
+        <Select value={formData.department} onValueChange={(value) => setFormData({ ...formData, department: value })}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select department" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="sound">Sound</SelectItem>
+            <SelectItem value="lights">Lights</SelectItem>
+            <SelectItem value="video">Video</SelectItem>
+            <SelectItem value="logistics">Logistics</SelectItem>
+            <SelectItem value="management">Management</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="dni">DNI</Label>
+          <Input
+            id="dni"
+            type="text"
+            value={formData.dni}
+            onChange={(e) => setFormData({ ...formData, dni: e.target.value })}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="residencia">Residencia</Label>
+          <Input
+            id="residencia"
+            type="text"
+            value={formData.residencia}
+            onChange={(e) => setFormData({ ...formData, residencia: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-col space-y-4">
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Creating Account...
+            </>
+          ) : (
+            preventAutoLogin ? 'Create User' : 'Create Account'
+          )}
+        </Button>
+
+        {onBack && (
+          <Button type="button" variant="ghost" onClick={onBack}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Login
+          </Button>
+        )}
+      </div>
+    </form>
   );
 };

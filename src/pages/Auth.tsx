@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { SignUpForm } from "@/components/auth/SignUpForm";
+import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
+import { ResetPasswordForm } from "@/components/auth/ResetPasswordForm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
@@ -10,7 +12,21 @@ import { UserRole } from "@/types/user";
 
 const Auth = () => {
   const { session, userRole, isLoading, error } = useOptimizedAuth();
+  const [searchParams] = useSearchParams();
   const [showSignUp, setShowSignUp] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetToken, setResetToken] = useState<string | null>(null);
+
+  // Check for password reset parameters
+  useEffect(() => {
+    const type = searchParams.get('type');
+    const access_token = searchParams.get('access_token');
+    const refresh_token = searchParams.get('refresh_token');
+    
+    if (type === 'recovery' && access_token && refresh_token) {
+      setResetToken(access_token);
+    }
+  }, [searchParams]);
   
   useEffect(() => {
     // Remove dark mode for better authentication UI visibility
@@ -54,10 +70,23 @@ const Auth = () => {
         )}
 
         <Card className="p-6 w-full shadow-lg">
-          {showSignUp ? (
+          {resetToken ? (
+            <ResetPasswordForm 
+              token={resetToken} 
+              onSuccess={() => {
+                setResetToken(null);
+                // User will be automatically redirected after successful reset
+              }} 
+            />
+          ) : showForgotPassword ? (
+            <ForgotPasswordForm onBack={() => setShowForgotPassword(false)} />
+          ) : showSignUp ? (
             <SignUpForm onBack={() => setShowSignUp(false)} />
           ) : (
-            <LoginForm onShowSignUp={() => setShowSignUp(true)} />
+            <LoginForm 
+              onShowSignUp={() => setShowSignUp(true)}
+              onShowForgotPassword={() => setShowForgotPassword(true)}
+            />
           )}
         </Card>
 

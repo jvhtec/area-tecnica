@@ -6,6 +6,7 @@ import { Session } from "@supabase/supabase-js";
 import { TokenManager } from "@/lib/token-manager";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
+import { UserRole } from "@/types/user";
 
 interface AuthContextType {
   session: Session | null;
@@ -22,6 +23,8 @@ interface AuthContextType {
   refreshSession: () => Promise<Session | null>;
   setUserRole: (role: string | null) => void;
   setUserDepartment: (department: string | null) => void;
+  requestPasswordReset: (email: string) => Promise<void>;
+  resetPassword: (token: string, newPassword: string) => Promise<void>;
   clearCache: () => void;
   getCacheStatus: () => { hasCache: boolean; cacheAge: number; isValid: boolean };
 }
@@ -432,6 +435,76 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     }
   };
 
+  const requestPasswordReset = async (email: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const { data, error } = await supabase.functions.invoke('send-password-reset', {
+        body: { email: email.toLowerCase() }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to send password reset email');
+      }
+
+      toast({
+        title: "Password Reset Email Sent",
+        description: "If an account with that email exists, a password reset link has been sent.",
+      });
+    } catch (error: any) {
+      const errorMessage = error.message || "Failed to send password reset email";
+      setError(errorMessage);
+      toast({
+        title: "Password Reset Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetPassword = async (token: string, newPassword: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Password Updated",
+        description: "Your password has been successfully updated.",
+      });
+
+      // Navigate to dashboard after successful password reset
+      const dashboardPath = getDashboardPath(userRole as UserRole);
+      navigate(dashboardPath);
+    } catch (error: any) {
+      const errorMessage = error.message || "Failed to update password";
+      setError(errorMessage);
+      toast({
+        title: "Password Update Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!session) return;
     
@@ -488,6 +561,8 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     refreshSession,
     setUserRole,
     setUserDepartment,
+    requestPasswordReset,
+    resetPassword,
     clearCache: () => {
       tokenManager.clearCache();
       clearProfileCache();

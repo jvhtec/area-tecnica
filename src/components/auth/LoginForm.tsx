@@ -9,9 +9,10 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 interface LoginFormProps {
   onShowSignUp: () => void;
+  onShowForgotPassword: () => void;
 }
 
-export const LoginForm = ({ onShowSignUp }: LoginFormProps) => {
+export const LoginForm = ({ onShowSignUp, onShowForgotPassword }: LoginFormProps) => {
   const { login, isLoading, error: authError } = useOptimizedAuth();
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -74,6 +75,16 @@ export const LoginForm = ({ onShowSignUp }: LoginFormProps) => {
             'Log In'
           )}
         </Button>
+        
+        <Button 
+          type="button" 
+          variant="link" 
+          onClick={onShowForgotPassword}
+          className="text-sm"
+        >
+          Forgot your password?
+        </Button>
+        
         <Button type="button" variant="ghost" onClick={onShowSignUp}>
           Don't have an account? Sign Up
         </Button>
