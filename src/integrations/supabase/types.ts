@@ -3270,6 +3270,21 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_cards_tour_2025: {
+        Row: {
+          base_day_eur: number
+          category: string
+        }
+        Insert: {
+          base_day_eur: number
+          category: string
+        }
+        Update: {
+          base_day_eur?: number
+          category?: string
+        }
+        Relationships: []
+      }
       secrets: {
         Row: {
           created_at: string
@@ -4241,6 +4256,24 @@ export type Database = {
           },
         ]
       }
+      tour_week_multipliers_2025: {
+        Row: {
+          max_dates: number
+          min_dates: number
+          multiplier: number
+        }
+        Insert: {
+          max_dates: number
+          min_dates: number
+          multiplier: number
+        }
+        Update: {
+          max_dates?: number
+          min_dates?: number
+          multiplier?: number
+        }
+        Relationships: []
+      }
       tour_weight_defaults: {
         Row: {
           category: string | null
@@ -4663,6 +4696,42 @@ export type Database = {
         }
         Relationships: []
       }
+      v_tour_job_rate_quotes_2025: {
+        Row: {
+          base_day_eur: number | null
+          breakdown: Json | null
+          category: string | null
+          end_time: string | null
+          is_house_tech: boolean | null
+          iso_week: number | null
+          iso_year: number | null
+          job_id: string | null
+          job_type: Database["public"]["Enums"]["job_type"] | null
+          multiplier: number | null
+          start_time: string | null
+          technician_id: string | null
+          title: string | null
+          total_eur: number | null
+          tour_id: string | null
+          week_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_assignments_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       auto_complete_past_jobs: {
@@ -4675,6 +4744,10 @@ export type Database = {
       }
       compute_timesheet_amount_2025: {
         Args: { _persist?: boolean; _timesheet_id: string }
+        Returns: Json
+      }
+      compute_tour_job_rate_quote_2025: {
+        Args: { _job_id: string; _tech_id: string }
         Returns: Json
       }
       convert_to_timezone: {
@@ -4807,6 +4880,17 @@ export type Database = {
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      is_house_tech: {
+        Args: { _profile_id: string }
+        Returns: boolean
+      }
+      iso_year_week_madrid: {
+        Args: { ts: string }
+        Returns: {
+          iso_week: number
+          iso_year: number
+        }[]
       }
       json_diff_public: {
         Args: { _new: Json; _old: Json; allowed: string[] }
