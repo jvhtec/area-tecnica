@@ -14,6 +14,133 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_catalog: {
+        Row: {
+          code: string
+          created_at: string
+          default_visibility: Database["public"]["Enums"]["activity_visibility"]
+          label: string
+          severity: string
+          template: string | null
+          toast_enabled: boolean
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          default_visibility: Database["public"]["Enums"]["activity_visibility"]
+          label: string
+          severity?: string
+          template?: string | null
+          toast_enabled?: boolean
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          default_visibility?: Database["public"]["Enums"]["activity_visibility"]
+          label?: string
+          severity?: string
+          template?: string | null
+          toast_enabled?: boolean
+        }
+        Relationships: []
+      }
+      activity_log: {
+        Row: {
+          actor_id: string
+          actor_name: string | null
+          code: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          job_id: string | null
+          payload: Json | null
+          visibility: Database["public"]["Enums"]["activity_visibility"]
+        }
+        Insert: {
+          actor_id: string
+          actor_name?: string | null
+          code: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          job_id?: string | null
+          payload?: Json | null
+          visibility: Database["public"]["Enums"]["activity_visibility"]
+        }
+        Update: {
+          actor_id?: string
+          actor_name?: string | null
+          code?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          job_id?: string | null
+          payload?: Json | null
+          visibility?: Database["public"]["Enums"]["activity_visibility"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_log_code_fkey"
+            columns: ["code"]
+            isOneToOne: false
+            referencedRelation: "activity_catalog"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      activity_prefs: {
+        Row: {
+          created_at: string
+          mute_toasts: boolean | null
+          muted_codes: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          mute_toasts?: boolean | null
+          muted_codes?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          mute_toasts?: boolean | null
+          muted_codes?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      activity_reads: {
+        Row: {
+          activity_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_reads_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activity_log"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assignment_notifications: {
         Row: {
           created_at: string | null
@@ -2032,6 +2159,44 @@ export type Database = {
             columns: ["hoja_de_ruta_id"]
             isOneToOne: false
             referencedRelation: "hoja_de_ruta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      house_tech_rates: {
+        Row: {
+          base_day_eur: number
+          currency: string
+          overtime_hour_eur: number | null
+          plus_10_12_eur: number | null
+          profile_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          base_day_eur: number
+          currency?: string
+          overtime_hour_eur?: number | null
+          plus_10_12_eur?: number | null
+          profile_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          base_day_eur?: number
+          currency?: string
+          overtime_hour_eur?: number | null
+          plus_10_12_eur?: number | null
+          profile_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "house_tech_rates_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -4495,6 +4660,28 @@ export type Database = {
         }
         Relationships: []
       }
+      v_timesheet_effective_rate: {
+        Row: {
+          base_day_default: number | null
+          base_day_override: number | null
+          category: string | null
+          overtime_default: number | null
+          overtime_override: number | null
+          plus_10_12_default: number | null
+          plus_10_12_override: number | null
+          technician_id: string | null
+          timesheet_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_timesheets_technician_id"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       auto_complete_past_jobs: {
@@ -4615,9 +4802,40 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      json_diff_public: {
+        Args: { _new: Json; _old: Json; allowed: string[] }
+        Returns: Json
+      }
+      log_activity: {
+        Args: {
+          _code: string
+          _entity_id: string
+          _entity_type: string
+          _job_id: string
+          _payload?: Json
+          _visibility?: Database["public"]["Enums"]["activity_visibility"]
+        }
+        Returns: string
+      }
+      log_activity_as: {
+        Args: {
+          _actor_id: string
+          _code: string
+          _entity_id: string
+          _entity_type: string
+          _job_id: string
+          _payload?: Json
+          _visibility?: Database["public"]["Enums"]["activity_visibility"]
+        }
+        Returns: string
+      }
       minutes_to_hours_round_30: {
         Args: { mins: number }
         Returns: number
+      }
+      resolve_visibility: {
+        Args: { _actor_id: string; _code: string; _job_id: string }
+        Returns: Database["public"]["Enums"]["activity_visibility"]
       }
       update_tour_dates: {
         Args: Record<PropertyKey, never>
@@ -4625,6 +4843,11 @@ export type Database = {
       }
     }
     Enums: {
+      activity_visibility:
+        | "management"
+        | "house_plus_job"
+        | "job_participants"
+        | "actor_only"
       assignment_status: "invited" | "confirmed" | "declined"
       department:
         | "sound"
@@ -4810,6 +5033,12 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      activity_visibility: [
+        "management",
+        "house_plus_job",
+        "job_participants",
+        "actor_only",
+      ],
       assignment_status: ["invited", "confirmed", "declined"],
       department: [
         "sound",
