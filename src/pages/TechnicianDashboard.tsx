@@ -16,6 +16,8 @@ import { toast } from "sonner";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
 import { useTechnicianDashboardSubscriptions } from "@/hooks/useMobileRealtimeSubscriptions";
+import { TechnicianTourRates } from "@/components/dashboard/TechnicianTourRates";
+import { useTourRateSubscriptions } from "@/hooks/useTourRateSubscriptions";
 
 const TechnicianDashboard = () => {
   const [timeSpan, setTimeSpan] = useState<string>("1week");
@@ -71,6 +73,9 @@ const TechnicianDashboard = () => {
 
   // Set up comprehensive real-time subscriptions for mobile dashboard
   useTechnicianDashboardSubscriptions();
+  
+  // Set up tour rates subscriptions
+  useTourRateSubscriptions();
 
   const getTimeSpanEndDate = () => {
     const today = new Date();
@@ -304,6 +309,9 @@ const TechnicianDashboard = () => {
 
       {/* My Tours Section */}
       <MyToursSection />
+
+      {/* Tour Rates Section */}
+      <TechnicianTourRates />
 
       <Card>
         <CardHeader>

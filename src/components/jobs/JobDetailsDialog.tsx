@@ -25,6 +25,8 @@ import { supabase } from "@/lib/supabase";
 import { PlacesRestaurantService } from "@/utils/hoja-de-ruta/services/places-restaurant-service";
 import type { Restaurant } from "@/types/hoja-de-ruta";
 import { labelForCode } from '@/utils/roles';
+import { TourRatesPanel } from '@/components/tours/TourRatesPanel';
+import { useTourRateSubscriptions } from "@/hooks/useTourRateSubscriptions";
 
 interface JobDetailsDialogProps {
   open: boolean;
@@ -98,6 +100,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     },
     enabled: open && !!(jobDetails?.locations?.formatted_address || jobDetails?.locations?.address)
   });
+
+  // Set up tour rates subscriptions for real-time updates
+  useTourRateSubscriptions();
 
   // Static map preview via Edge Function (technician-safe)
   const [mapPreviewUrl, setMapPreviewUrl] = useState<string | null>(null);
@@ -208,12 +213,15 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         </DialogHeader>
 
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className={`grid w-full ${jobDetails?.job_type === 'tourdate' ? 'grid-cols-6' : 'grid-cols-5'}`}>
             <TabsTrigger value="info">Info</TabsTrigger>
             <TabsTrigger value="location">Location</TabsTrigger>
             <TabsTrigger value="personnel">Personnel</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="restaurants">Restaurants</TabsTrigger>
+            {jobDetails?.job_type === 'tourdate' && (
+              <TabsTrigger value="tour-rates">Tour Rates</TabsTrigger>
+            )}
           </TabsList>
 
           <ScrollArea className="h-[500px] mt-4">
@@ -508,6 +516,12 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 )}
               </Card>
             </TabsContent>
+
+            {jobDetails?.job_type === 'tourdate' && (
+              <TabsContent value="tour-rates" className="space-y-4">
+                <TourRatesPanel jobId={jobDetails.id} />
+              </TabsContent>
+            )}
           </ScrollArea>
         </Tabs>
       </DialogContent>
