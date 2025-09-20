@@ -17,7 +17,10 @@ export function useTourJobRateQuotes(jobId?: string) {
       const { data, error } = await query;
       
       if (error) throw error;
-      return data || [];
+      return (data || []).map(item => ({
+        ...item,
+        breakdown: item.breakdown as unknown as TourJobRateQuote['breakdown'],
+      }));
     },
     enabled: !!jobId,
     staleTime: 30 * 1000, // 30 seconds
@@ -34,7 +37,10 @@ export function useTechnicianTourRateQuotes() {
         .order('start_time', { ascending: true });
       
       if (error) throw error;
-      return data || [];
+      return (data || []).map(item => ({
+        ...item,
+        breakdown: item.breakdown as unknown as TourJobRateQuote['breakdown'],
+      }));
     },
     staleTime: 30 * 1000, // 30 seconds
   });
