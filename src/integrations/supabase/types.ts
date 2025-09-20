@@ -175,6 +175,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "assignment_notifications_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
+          {
             foreignKeyName: "assignment_notifications_technician_id_fkey"
             columns: ["technician_id"]
             isOneToOne: false
@@ -227,6 +234,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "availability_conflicts_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
           },
           {
             foreignKeyName: "availability_conflicts_resolved_by_fkey"
@@ -825,6 +839,13 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "festival_artists_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
         ]
       }
       festival_gear_setups: {
@@ -908,6 +929,13 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "festival_gear_setups_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
         ]
       }
       festival_logos: {
@@ -949,6 +977,13 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "festival_logos_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
         ]
       }
       festival_settings: {
@@ -980,6 +1015,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "festival_settings_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -1065,6 +1107,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "festival_shifts_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -1199,6 +1248,13 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "festival_stages_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
         ]
       }
       flex_crew_assignments: {
@@ -1273,6 +1329,13 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "flex_crew_calls_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
         ]
       }
       flex_folders: {
@@ -1316,6 +1379,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flex_folders_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
           },
           {
             foreignKeyName: "flex_folders_tour_date_id_fkey"
@@ -1532,6 +1602,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hoja_de_ruta_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
           },
           {
             foreignKeyName: "hoja_de_ruta_last_modified_by_fkey"
@@ -2247,6 +2324,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "job_assignments_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
+          {
             foreignKeyName: "job_assignments_technician_id_fkey"
             columns: ["technician_id"]
             isOneToOne: false
@@ -2288,6 +2372,13 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "job_date_types_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
         ]
       }
       job_departments: {
@@ -2310,6 +2401,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_departments_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -2351,6 +2449,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_documents_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -2395,6 +2500,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_milestone_definitions_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -2461,6 +2573,65 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_milestones_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
+        ]
+      }
+      job_rate_extras: {
+        Row: {
+          amount_override_eur: number | null
+          extra_type: Database["public"]["Enums"]["job_extra_type"]
+          job_id: string
+          quantity: number
+          technician_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          amount_override_eur?: number | null
+          extra_type: Database["public"]["Enums"]["job_extra_type"]
+          job_id: string
+          quantity?: number
+          technician_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          amount_override_eur?: number | null
+          extra_type?: Database["public"]["Enums"]["job_extra_type"]
+          job_id?: string
+          quantity?: number
+          technician_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_rate_extras_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_rate_extras_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "job_rate_extras_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2567,6 +2738,13 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "lights_job_personnel_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
         ]
       }
       lights_job_tasks: {
@@ -2614,6 +2792,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lights_job_tasks_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -2670,6 +2855,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lights_memoria_tecnica_documents_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -2786,6 +2978,13 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "logistics_events_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
         ]
       }
       memoria_tecnica_documents: {
@@ -2841,6 +3040,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memoria_tecnica_documents_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -3035,6 +3241,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "power_requirement_tables_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -3285,6 +3498,21 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_extras_2025: {
+        Row: {
+          amount_eur: number
+          extra_type: Database["public"]["Enums"]["job_extra_type"]
+        }
+        Insert: {
+          amount_eur: number
+          extra_type: Database["public"]["Enums"]["job_extra_type"]
+        }
+        Update: {
+          amount_eur?: number
+          extra_type?: Database["public"]["Enums"]["job_extra_type"]
+        }
+        Relationships: []
+      }
       secrets: {
         Row: {
           created_at: string
@@ -3363,6 +3591,13 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "sound_job_personnel_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
         ]
       }
       sound_job_tasks: {
@@ -3410,6 +3645,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sound_job_tasks_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -3486,6 +3728,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staffing_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
           },
           {
             foreignKeyName: "staffing_requests_profile_id_fkey"
@@ -3715,6 +3964,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_work_records_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -4493,6 +4749,13 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "transport_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
         ]
       }
       vacation_requests: {
@@ -4585,6 +4848,13 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "video_job_personnel_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
         ]
       }
       video_job_tasks: {
@@ -4632,6 +4902,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_job_tasks_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
           },
         ]
       }
@@ -4683,6 +4960,13 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "video_memoria_tecnica_documents_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
         ]
       }
     }
@@ -4695,6 +4979,27 @@ export type Database = {
           equipment_name: string | null
         }
         Relationships: []
+      }
+      v_job_tech_payout_2025: {
+        Row: {
+          extras_breakdown: Json | null
+          extras_total_eur: number | null
+          job_id: string | null
+          technician_id: string | null
+          timesheets_total_eur: number | null
+          total_eur: number | null
+          vehicle_disclaimer: boolean | null
+          vehicle_disclaimer_text: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_assignments_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       v_tour_job_rate_quotes_2025: {
         Row: {
@@ -4722,6 +5027,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
           },
           {
             foreignKeyName: "job_assignments_technician_id_fkey"
@@ -4757,6 +5069,10 @@ export type Database = {
       create_default_logistics_events_for_job: {
         Args: { job_id: string }
         Returns: undefined
+      }
+      extras_total_for_job_tech: {
+        Args: { _job_id: string; _tech_id: string }
+        Returns: Json
       }
       get_assignment_matrix_staffing: {
         Args: Record<PropertyKey, never>
@@ -4923,6 +5239,10 @@ export type Database = {
         Args: { mins: number }
         Returns: number
       }
+      needs_vehicle_disclaimer: {
+        Args: { _profile_id: string }
+        Returns: boolean
+      }
       resolve_category_for_timesheet: {
         Args: { _job_id: string; _tech_id: string }
         Returns: string
@@ -4965,6 +5285,7 @@ export type Database = {
       form_status: "pending" | "submitted" | "expired"
       global_preset_status: "available" | "unavailable" | "tentative"
       job_date_type: "travel" | "setup" | "show" | "off" | "rehearsal"
+      job_extra_type: "travel_half" | "travel_full" | "day_off"
       job_status: "Tentativa" | "Confirmado" | "Completado" | "Cancelado"
       job_type: "single" | "tour" | "festival" | "dryhire" | "tourdate"
       logistics_event_type: "load" | "unload"
@@ -5158,6 +5479,7 @@ export const Constants = {
       form_status: ["pending", "submitted", "expired"],
       global_preset_status: ["available", "unavailable", "tentative"],
       job_date_type: ["travel", "setup", "show", "off", "rehearsal"],
+      job_extra_type: ["travel_half", "travel_full", "day_off"],
       job_status: ["Tentativa", "Confirmado", "Completado", "Cancelado"],
       job_type: ["single", "tour", "festival", "dryhire", "tourdate"],
       logistics_event_type: ["load", "unload"],
