@@ -8,7 +8,10 @@ import { Profile } from "./types";
 import { Department } from "@/types/department";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 import { useEffect, useState } from "react";
+import { HouseTechRateEditor } from "@/components/settings/HouseTechRateEditor";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 interface EditUserDialogProps {
   user: Profile | null;
@@ -19,6 +22,8 @@ interface EditUserDialogProps {
 export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogProps) => {
   // Keep dialog mounted even if user becomes null to avoid portal teardown race conditions
   const [assignableAsTech, setAssignableAsTech] = useState<boolean>(!!user?.assignable_as_tech);
+  const { userRole } = useOptimizedAuth();
+  const isManagementUser = ['admin', 'management'].includes(userRole || '');
 
   useEffect(() => {
     setAssignableAsTech(!!user?.assignable_as_tech);
@@ -52,104 +57,118 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
 
   return (
     <Dialog open={!!user} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit User Profile</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="firstName">First Name</Label>
-            <Input
-              id="firstName"
-              name="firstName"
-              defaultValue={user?.first_name || ''}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="assignableAsTech">Assignable to jobs as tech</Label>
-            <div className="flex items-center gap-3">
-              <Checkbox
-                id="assignableAsTech"
-                checked={assignableAsTech}
-                onCheckedChange={(v) => setAssignableAsTech(!!v)}
+        <div className="space-y-6 py-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">First Name</Label>
+              <Input
+                id="firstName"
+                name="firstName"
+                defaultValue={user?.first_name || ''}
               />
-              <span className="text-sm text-muted-foreground">
-                If enabled, this user (typically management) can be assigned to jobs in technician lists.
-              </span>
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="lastName">Last Name</Label>
-            <Input
-              id="lastName"
-              name="lastName"
-              defaultValue={user?.last_name || ''}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number</Label>
-            <Input
-              id="phone"
-              name="phone"
-              defaultValue={user?.phone || ''}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="department">Department</Label>
-            <Select name="department" defaultValue={user?.department || 'sound'}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sound">Sound</SelectItem>
-                <SelectItem value="lights">Lights</SelectItem>
-                <SelectItem value="video">Video</SelectItem>
-                <SelectItem value="production">Production</SelectItem>
-                <SelectItem value="logistics">Logistics</SelectItem>
-                <SelectItem value="administrative">Administrative</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="role">Role</Label>
-            <Select name="role" defaultValue={user?.role}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="management">Management</SelectItem>
-                <SelectItem value="logistics">Logistics</SelectItem>
-                <SelectItem value="technician">Technician</SelectItem>
-                <SelectItem value="house_tech">House Tech</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="dni">DNI/NIE</Label>
-            <Input
-              id="dni"
-              name="dni"
-              defaultValue={user?.dni || ''}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="residencia">Residencia</Label>
-            <Input
-              id="residencia"
-              name="residencia"
-              defaultValue={user?.residencia || ''}
-            />
-          </div>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit">
-              Save Changes
-            </Button>
-          </div>
-        </form>
+            <div className="space-y-2">
+              <Label htmlFor="assignableAsTech">Assignable to jobs as tech</Label>
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="assignableAsTech"
+                  checked={assignableAsTech}
+                  onCheckedChange={(v) => setAssignableAsTech(!!v)}
+                />
+                <span className="text-sm text-muted-foreground">
+                  If enabled, this user (typically management) can be assigned to jobs in technician lists.
+                </span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last Name</Label>
+              <Input
+                id="lastName"
+                name="lastName"
+                defaultValue={user?.last_name || ''}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number</Label>
+              <Input
+                id="phone"
+                name="phone"
+                defaultValue={user?.phone || ''}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="department">Department</Label>
+              <Select name="department" defaultValue={user?.department || 'sound'}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sound">Sound</SelectItem>
+                  <SelectItem value="lights">Lights</SelectItem>
+                  <SelectItem value="video">Video</SelectItem>
+                  <SelectItem value="production">Production</SelectItem>
+                  <SelectItem value="logistics">Logistics</SelectItem>
+                  <SelectItem value="administrative">Administrative</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="role">Role</Label>
+              <Select name="role" defaultValue={user?.role}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="management">Management</SelectItem>
+                  <SelectItem value="logistics">Logistics</SelectItem>
+                  <SelectItem value="technician">Technician</SelectItem>
+                  <SelectItem value="house_tech">House Tech</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dni">DNI/NIE</Label>
+              <Input
+                id="dni"
+                name="dni"
+                defaultValue={user?.dni || ''}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="residencia">Residencia</Label>
+              <Input
+                id="residencia"
+                name="residencia"
+                defaultValue={user?.residencia || ''}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                Save Changes
+              </Button>
+            </div>
+          </form>
+
+          {/* House Tech Rate Editor - Management Only */}
+          {isManagementUser && user?.id && (
+            <>
+              <Separator />
+              <HouseTechRateEditor
+                profileId={user.id}
+                profileName={`${user.first_name} ${user.last_name}`}
+                category={user.role === 'house_tech' ? 'tecnico' : 'tecnico'}
+              />
+            </>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

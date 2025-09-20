@@ -4660,28 +4660,6 @@ export type Database = {
         }
         Relationships: []
       }
-      v_timesheet_effective_rate: {
-        Row: {
-          base_day_default: number | null
-          base_day_override: number | null
-          category: string | null
-          overtime_default: number | null
-          overtime_override: number | null
-          plus_10_12_default: number | null
-          plus_10_12_override: number | null
-          technician_id: string | null
-          timesheet_id: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_timesheets_technician_id"
-            columns: ["technician_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Functions: {
       auto_complete_past_jobs: {
@@ -4762,6 +4740,20 @@ export type Database = {
           status: Database["public"]["Enums"]["timesheet_status"]
           technician_id: string
           updated_at: string
+        }[]
+      }
+      get_timesheet_effective_rate: {
+        Args: { _timesheet_id: string }
+        Returns: {
+          base_day_default: number
+          base_day_override: number
+          category: string
+          overtime_default: number
+          overtime_override: number
+          plus_10_12_default: number
+          plus_10_12_override: number
+          technician_id: string
+          timesheet_id: string
         }[]
       }
       get_timesheet_with_visible_amounts: {
