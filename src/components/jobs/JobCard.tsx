@@ -1,10 +1,12 @@
 
-import { Music, CalendarDays } from "lucide-react";
+import { Music, CalendarDays, DollarSign } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Job } from "@/types/job";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { JobExtrasDialog } from "./JobExtrasDialog";
 
 interface JobCardProps {
   job: Job;
@@ -30,6 +32,7 @@ export const JobCard = ({
   hideFestivalControls = false 
 }: JobCardProps) => {
   const navigate = useNavigate();
+  const [showExtrasDialog, setShowExtrasDialog] = useState(false);
 
   const handleFestivalManage = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -58,6 +61,20 @@ export const JobCard = ({
             )}
           </CardTitle>
           <div className="flex items-center gap-2">
+            {canEditJobs && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  setShowExtrasDialog(true);
+                }}
+                className="flex items-center gap-1"
+              >
+                <DollarSign className="h-3 w-3" />
+                Extras
+              </Button>
+            )}
             {job.job_type === 'festival' && canManageFestival && (
               <Button 
                 variant="outline" 
@@ -111,6 +128,14 @@ export const JobCard = ({
           </span>
         </div>
       </div>
+
+      <JobExtrasDialog
+        open={showExtrasDialog}
+        onOpenChange={setShowExtrasDialog}
+        jobId={job.id}
+        jobTitle={job.title}
+        isManager={canEditJobs}
+      />
     </Card>
   );
 };

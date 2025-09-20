@@ -12,6 +12,7 @@ import { FestivalScheduling } from "@/components/festival/scheduling/FestivalSch
 import { FestivalWeatherSection } from "@/components/festival/FestivalWeatherSection";
 import { PrintOptionsDialog } from "@/components/festival/pdf/PrintOptionsDialog";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
+import { JobExtrasManagement } from "@/components/jobs/JobExtrasManagement";
 
 interface UnifiedJobManagementProps {
   mode: 'job' | 'festival';
@@ -397,6 +398,9 @@ export const UnifiedJobManagement = ({ mode }: UnifiedJobManagementProps) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Job Extras Management Section */}
+      <JobExtrasManagement jobId={jobId || ''} isManager={true} />
 
       {venue && venue.address && venue.lat && venue.lng && (
         <FestivalWeatherSection
