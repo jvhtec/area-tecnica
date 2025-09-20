@@ -11,8 +11,8 @@ export interface TourJobRateQuote {
   base_day_eur: number;
   week_count: number;
   multiplier: number;
-  iso_year: number;
-  iso_week: number;
+  iso_year: number | null;
+  iso_week: number | null;
   total_eur: number;
   breakdown: {
     error?: string;

@@ -69,7 +69,10 @@ export const TechnicianTourRates: React.FC = () => {
       groups[tourKey] = {};
     }
     
-    const weekKey = `${quote.iso_year}-W${quote.iso_week.toString().padStart(2, '0')}`;
+    // Handle null values for iso_year and iso_week
+    const year = quote.iso_year || new Date().getFullYear();
+    const week = quote.iso_week || 1;  
+    const weekKey = `${year}-W${week.toString().padStart(2, '0')}`;
     if (!groups[tourKey][weekKey]) {
       groups[tourKey][weekKey] = [];
     }
