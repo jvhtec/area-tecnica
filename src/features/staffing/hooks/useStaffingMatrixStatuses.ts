@@ -50,8 +50,7 @@ export function useStaffingMatrixStatuses(
           for (const jb of jobBatches) {
             promises.push(
               Promise.resolve(supabase
-                .from('assignment_matrix_staffing')
-                .select('job_id, profile_id, availability_status, offer_status')
+                .rpc('get_assignment_matrix_staffing')
                 .in('job_id', jb)
                 .in('profile_id', tb))
             )

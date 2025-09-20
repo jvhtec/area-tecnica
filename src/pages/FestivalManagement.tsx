@@ -323,7 +323,7 @@ const FestivalManagement = () => {
         throw riderError;
       }
 
-      setArtistRiderFiles((riderData || []) as ArtistRiderFile[]);
+      setArtistRiderFiles((riderData || []) as unknown as ArtistRiderFile[]);
     } catch (error: any) {
       console.error('Error fetching documents:', error);
       toast({

@@ -7,10 +7,9 @@ export function useStaffingStatus(jobId: string, profileId: string) {
     queryFn: async () => {
       console.log('🔍 Fetching staffing status (view) for:', { jobId, profileId })
 
-      // Prefer the aggregated view which reflects the latest statuses
+      // Use the RPC function which reflects the latest statuses
       const { data, error } = await supabase
-        .from('assignment_matrix_staffing')
-        .select('availability_status, offer_status')
+        .rpc('get_assignment_matrix_staffing')
         .eq('job_id', jobId)
         .eq('profile_id', profileId)
         .maybeSingle()
