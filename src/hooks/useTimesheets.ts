@@ -175,6 +175,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         for (const date of dates) {
           const combo = `${assignment.technician_id}-${date}`;
           if (!existingCombos.has(combo)) {
+            // Let DB trigger resolve category - don't set it here to keep creation simple
             timesheetsToCreate.push({
               job_id: jobId,
               technician_id: assignment.technician_id,
@@ -228,16 +229,23 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
     }
   }, [jobId, fetchTimesheets, opts?.userRole]);
 
-  const createTimesheet = async (technicianId: string, date: string) => {
+  const createTimesheet = async (technicianId: string, date: string, category?: 'tecnico' | 'especialista' | 'responsable') => {
     try {
+      const insertData: any = {
+        job_id: jobId,
+        technician_id: technicianId,
+        date: date,
+        created_by: (await supabase.auth.getUser()).data.user?.id,
+      };
+      
+      // Include category if provided, otherwise let DB trigger resolve it
+      if (category) {
+        insertData.category = category;
+      }
+
       const { data, error } = await supabase
         .from("timesheets")
-        .insert({
-          job_id: jobId,
-          technician_id: technicianId,
-          date: date,
-          created_by: (await supabase.auth.getUser()).data.user?.id,
-        })
+        .insert(insertData)
         .select(`
           *,
           profiles (

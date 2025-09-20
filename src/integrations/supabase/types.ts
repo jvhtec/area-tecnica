@@ -3166,6 +3166,7 @@ export type Database = {
           custom_folder_structure: Json | null
           custom_tour_folder_structure: Json | null
           dark_mode: boolean | null
+          default_timesheet_category: string | null
           department: string | null
           dni: string | null
           email: string
@@ -3191,6 +3192,7 @@ export type Database = {
           custom_folder_structure?: Json | null
           custom_tour_folder_structure?: Json | null
           dark_mode?: boolean | null
+          default_timesheet_category?: string | null
           department?: string | null
           dni?: string | null
           email: string
@@ -3216,6 +3218,7 @@ export type Database = {
           custom_folder_structure?: Json | null
           custom_tour_folder_structure?: Json | null
           dark_mode?: boolean | null
+          default_timesheet_category?: string | null
           department?: string | null
           dni?: string | null
           email?: string
@@ -4824,6 +4827,10 @@ export type Database = {
       minutes_to_hours_round_30: {
         Args: { mins: number }
         Returns: number
+      }
+      resolve_category_for_timesheet: {
+        Args: { _job_id: string; _tech_id: string }
+        Returns: string
       }
       resolve_visibility: {
         Args: { _actor_id: string; _code: string; _job_id: string }
