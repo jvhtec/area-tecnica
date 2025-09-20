@@ -1,3 +1,5 @@
+import { JobExtrasBreakdown } from '@/types/jobExtras';
+
 export interface TourJobRateQuote {
   job_id: string;
   technician_id: string;
@@ -14,6 +16,12 @@ export interface TourJobRateQuote {
   iso_year: number | null;
   iso_week: number | null;
   total_eur: number;
+  // Extras fields (optional for backward compatibility)
+  extras?: JobExtrasBreakdown;
+  extras_total_eur?: number;
+  total_with_extras_eur?: number;
+  vehicle_disclaimer?: boolean;
+  vehicle_disclaimer_text?: string;
   breakdown: {
     error?: string;
     [key: string]: any;

@@ -72,11 +72,35 @@ export const useTourRateSubscriptions = () => {
       )
       .subscribe();
 
+    // Subscribe to job rate extras changes
+    const extrasChannel = supabase
+      .channel('job-rate-extras-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'job_rate_extras'
+        },
+        (payload) => {
+          console.log('Job rate extras change detected:', payload);
+          
+          // Invalidate tour rate and payout queries
+          queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes'] });
+          queryClient.invalidateQueries({ queryKey: ['technician-tour-rate-quotes'] });
+          queryClient.invalidateQueries({ queryKey: ['job-extras'] });
+          queryClient.invalidateQueries({ queryKey: ['job-tech-payout'] });
+          queryClient.invalidateQueries({ queryKey: ['my-job-payout-totals'] });
+        }
+      )
+      .subscribe();
+
     return () => {
       console.log('Cleaning up tour rates subscriptions');
       supabase.removeChannel(jobsChannel);
       supabase.removeChannel(assignmentsChannel);
       supabase.removeChannel(houseRatesChannel);
+      supabase.removeChannel(extrasChannel);
     };
   }, [queryClient]);
 };
