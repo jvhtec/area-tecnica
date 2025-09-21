@@ -149,14 +149,13 @@ const TechnicianDashboard = () => {
             .lte('jobs.start_time', endDate.toISOString())
             .gte('jobs.end_time', new Date().toISOString());
         } else {
-          // Show past jobs
+          // Show past jobs - jobs that have already ended
           query = query
-            .gte('jobs.start_time', endDate.toISOString())
             .lte('jobs.end_time', new Date().toISOString());
         }
 
         const { data: jobAssignments, error: jobAssignmentsError } = await query
-          .order('jobs(start_time)');
+          .order('start_time', { referencedTable: 'jobs' });
 
         if (jobAssignmentsError) {
           console.error("Error fetching job assignments:", jobAssignmentsError);
