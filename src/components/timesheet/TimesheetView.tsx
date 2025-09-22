@@ -14,6 +14,7 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { Timesheet, TimesheetFormData } from "@/types/timesheet";
 import { TimesheetSignature } from "./TimesheetSignature";
 import { JobTotalAmounts } from "./JobTotalAmounts";
+import { MyJobTotal } from "./MyJobTotal";
 import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -262,8 +263,11 @@ export const TimesheetView = ({ jobId, jobTitle, canManage = false }: TimesheetV
 
   return (
     <div className="space-y-6">
-      {/* Job cost summary */}
+      {/* Job cost summary (overall) */}
       <JobTotalAmounts jobId={jobId} jobTitle={jobTitle} />
+
+      {/* Technician’s total for this job */}
+      <MyJobTotal jobId={jobId} />
 
       <div className="flex items-center justify-between">
         <div>
