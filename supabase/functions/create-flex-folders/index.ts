@@ -21,6 +21,28 @@ interface FlexFolderResponse {
   parent_id?: string;
 }
 
+async function resolveActorId(supabase: ReturnType<typeof createClient>, req: Request): Promise<string | null> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+
+  const token = authHeader.replace('Bearer ', '').trim();
+  if (!token) return null;
+
+  try {
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error) {
+      console.warn('[create-flex-folders] Unable to resolve actor id:', error);
+      return null;
+    }
+    return data.user?.id ?? null;
+  } catch (err) {
+    console.warn('[create-flex-folders] Error resolving actor id', err);
+    return null;
+  }
+}
+
 async function createFlexFolder(payload: FlexFolderPayload, authToken: string): Promise<FlexFolderResponse> {
   console.log("Creating Flex folder with payload:", payload);
   
@@ -112,6 +134,8 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey)
+    const actorId = await resolveActorId(supabase, req)
+    const activityEvents: Array<{ payload: Record<string, unknown>; visibility?: 'management' | 'job_participants' | 'house_plus_job' | 'actor_only' }> = []
 
     // Get tour information
     const { data: tour, error: tourError } = await supabase
@@ -179,6 +203,16 @@ serve(async (req) => {
       if (updateError) throw updateError
 
       result.data = { ...tour, ...folderIds, flex_folders_created: true }
+
+      activityEvents.push({
+        payload: {
+          folder: tour.name,
+          scope: 'root',
+          tour_id: tourId,
+          departments: Object.keys(folderIds).filter((key) => key !== 'main'),
+        },
+        visibility: 'management',
+      })
     }
 
     // Create date folders if requested
@@ -208,6 +242,7 @@ serve(async (req) => {
       console.log("Selected departments for date folder creation:", selectedDepartments);
 
       // Create folders for each tour date
+      let createdDateCount = 0
       for (const tourDate of tourDates) {
         const dateStr = new Date(tourDate.date).toISOString().split('T')[0]
         const dateFolderName = `${dateStr} - ${tour.name}`
@@ -245,6 +280,38 @@ serve(async (req) => {
             folder_type: 'tour_date',
             department: null
           })
+
+        createdDateCount += 1
+      }
+
+      activityEvents.push({
+        payload: {
+          folder: tour.name,
+          scope: 'dates',
+          tour_id: tourId,
+          dates_created: createdDateCount,
+        },
+        visibility: 'management',
+      })
+    }
+
+    if (activityEvents.length) {
+      try {
+        await Promise.all(
+          activityEvents.map((event) =>
+            supabase.rpc('log_activity_as', {
+              _actor_id: actorId,
+              _code: 'flex.folders.created',
+              _job_id: null,
+              _entity_type: 'flex',
+              _entity_id: tourId,
+              _payload: event.payload,
+              _visibility: event.visibility ?? 'management',
+            })
+          )
+        )
+      } catch (activityError) {
+        console.warn('[create-flex-folders] Failed to log activity event', activityError)
       }
     }
 

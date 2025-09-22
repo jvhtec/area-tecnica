@@ -25,6 +25,7 @@ import { WolfensteinDialog } from "@/components/doom/WolfensteinDialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { HeaderStatus } from "@/components/ui/header-status";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useActivityRealtime } from "@/features/activity/hooks/useActivityRealtime";
 import { HelpButton } from "@/components/layout/HelpButton";
 
 const Layout = () => {
@@ -43,6 +44,10 @@ const Layout = () => {
     isLoading,
     logout
   } = useOptimizedAuth();
+
+  useActivityRealtime({
+    userId: session?.user?.id,
+  });
 
   // Redirect technicians and house techs to technician dashboard if they somehow get to the regular dashboard
   useEffect(() => {

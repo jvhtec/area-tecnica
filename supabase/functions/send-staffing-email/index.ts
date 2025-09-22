@@ -26,6 +26,28 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+async function resolveActorId(supabase: ReturnType<typeof createClient>, req: Request): Promise<string | null> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+
+  const token = authHeader.replace('Bearer ', '').trim();
+  if (!token) return null;
+
+  try {
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error) {
+      console.warn('[send-staffing-email] Unable to resolve actor id:', error);
+      return null;
+    }
+    return data.user?.id ?? null;
+  } catch (err) {
+    console.warn('[send-staffing-email] Error resolving actor id', err);
+    return null;
+  }
+}
+
 function b64url(u8: Uint8Array) {
   return btoa(String.fromCharCode(...u8)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
@@ -40,6 +62,7 @@ serve(async (req) => {
   
   try {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
+    const actorId = await resolveActorId(supabase, req);
     const body = await req.json();
     console.log('📥 RECEIVED PAYLOAD:', JSON.stringify(body, null, 2));
     
@@ -457,6 +480,27 @@ serve(async (req) => {
       // Step 8: Return result
       if (sendRes.ok) {
         console.log('✅ EMAIL SENT SUCCESSFULLY');
+
+        try {
+          const activityCode = phase === 'availability' ? 'staffing.availability.sent' : 'staffing.offer.sent';
+          await supabase.rpc('log_activity_as', {
+            _actor_id: actorId,
+            _code: activityCode,
+            _job_id: job_id,
+            _entity_type: 'staffing',
+            _entity_id: insertedId,
+            _payload: {
+              staffing_request_id: insertedId,
+              phase,
+              profile_id,
+              tech_name: fullName || tech.email,
+            },
+            _visibility: null,
+          });
+        } catch (activityError) {
+          console.warn('[send-staffing-email] Failed to log activity', activityError);
+        }
+
         return new Response(JSON.stringify({ success: true }), { 
           status: 200, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }

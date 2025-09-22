@@ -14,6 +14,28 @@ interface RequestBody {
   action: 'add' | 'remove';
 }
 
+async function resolveActorId(supabase: ReturnType<typeof createClient>, req: Request): Promise<string | null> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+
+  const token = authHeader.replace('Bearer ', '').trim();
+  if (!token) return null;
+
+  try {
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error) {
+      console.warn('[manage-flex-crew-assignments] Unable to resolve actor id:', error);
+      return null;
+    }
+    return data.user?.id ?? null;
+  } catch (err) {
+    console.warn('[manage-flex-crew-assignments] Error resolving actor id', err);
+    return null;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -27,6 +49,7 @@ serve(async (req) => {
     );
 
     const { job_id, technician_id, department, action } = await req.json() as RequestBody;
+    const actorId = await resolveActorId(supabase, req);
 
     console.log(`Managing Flex crew assignment: ${action} technician ${technician_id} for job ${job_id} in department ${department}`);
 
@@ -137,6 +160,24 @@ serve(async (req) => {
         );
       }
 
+      try {
+        await supabase.rpc('log_activity_as', {
+          _actor_id: actorId,
+          _code: 'flex.crew.updated',
+          _job_id: job_id,
+          _entity_type: 'flex',
+          _entity_id: crewCall.id,
+          _payload: {
+            action: 'add',
+            department,
+            technician_id,
+          },
+          _visibility: null,
+        });
+      } catch (activityError) {
+        console.warn('[manage-flex-crew-assignments] Failed to log add activity', activityError);
+      }
+
       return new Response(
         JSON.stringify({ success: true, message: 'Resource added to crew call', flex_line_item_id: addResult.id }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -194,6 +235,24 @@ serve(async (req) => {
           JSON.stringify({ error: 'Failed to remove assignment from database' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+
+      try {
+        await supabase.rpc('log_activity_as', {
+          _actor_id: actorId,
+          _code: 'flex.crew.updated',
+          _job_id: job_id,
+          _entity_type: 'flex',
+          _entity_id: crewCall.id,
+          _payload: {
+            action: 'remove',
+            department,
+            technician_id,
+          },
+          _visibility: null,
+        });
+      } catch (activityError) {
+        console.warn('[manage-flex-crew-assignments] Failed to log remove activity', activityError);
       }
 
       return new Response(
