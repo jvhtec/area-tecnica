@@ -117,15 +117,61 @@ export const useOptimizedJobs = (
       assignments: job.job_assignments || []
     })) || [];
 
+    // Load tour metadata so cancelled tours can be hidden from calendars and lists
+    const tourIds = Array.from(
+      new Set(
+        processedJobs
+          .map(job => job.tour_id)
+          .filter((id): id is string => Boolean(id))
+      )
+    );
+
+    const tourMetaMap: Record<string, { id: string; status: string | null; deleted: boolean | null }> = {};
+
+    if (tourIds.length > 0) {
+      const { data: toursData, error: toursError } = await supabase
+        .from('tours')
+        .select('id, status, deleted')
+        .in('id', tourIds);
+
+      if (toursError) {
+        console.warn('useOptimizedJobs: Failed to load tour metadata', sanitizeLogData(toursError));
+      } else {
+        (toursData || []).forEach(tour => {
+          if (tour?.id) {
+            tourMetaMap[tour.id] = {
+              id: tour.id,
+              status: tour.status ?? null,
+              deleted: tour.deleted ?? null,
+            };
+          }
+        });
+      }
+    }
+
+    const filteredJobs = processedJobs
+      .map(job => ({
+        ...job,
+        tour_meta: job.tour_id ? tourMetaMap[job.tour_id] ?? null : null,
+      }))
+      .filter(job => {
+        const meta = job.tour_meta;
+        if (meta && (meta.status === 'cancelled' || meta.deleted === true)) {
+          // Hide jobs tied to cancelled tours from operational views
+          return false;
+        }
+        return true;
+      });
+
     const duration = Date.now() - startTime;
-    console.log(`useOptimizedJobs: Successfully fetched ${processedJobs.length} jobs in ${duration}ms`);
-    
+    console.log(`useOptimizedJobs: Successfully fetched ${filteredJobs.length} jobs in ${duration}ms`);
+
     // Log performance warning if query is slow
     if (duration > 2000) {
-      console.warn(`useOptimizedJobs: Slow query detected - ${duration}ms for ${processedJobs.length} jobs`);
+      console.warn(`useOptimizedJobs: Slow query detected - ${duration}ms for ${filteredJobs.length} jobs`);
     }
-    
-    return processedJobs;
+
+    return filteredJobs;
   };
 
   return useQuery({
