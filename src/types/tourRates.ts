@@ -9,6 +9,7 @@ export interface TourJobRateQuote {
   tour_id: string;
   title: string;
   is_house_tech: boolean;
+  is_tour_team_member?: boolean;
   category: string;
   base_day_eur: number;
   week_count: number;
