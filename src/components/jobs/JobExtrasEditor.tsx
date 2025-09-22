@@ -14,6 +14,7 @@ import {
   JobExtra 
 } from '@/types/jobExtras';
 import { formatCurrency } from '@/lib/utils';
+import { useRateExtrasCatalog } from '@/hooks/useRateExtrasCatalog';
 
 interface JobExtrasEditorProps {
   jobId: string;
@@ -33,6 +34,7 @@ export function JobExtrasEditor({
   vehicleDisclaimerText,
 }: JobExtrasEditorProps) {
   const { data: jobExtras = [], isLoading } = useJobExtras(jobId, technicianId);
+  const { data: catalog = [], isLoading: catalogLoading } = useRateExtrasCatalog();
   const upsertJobExtra = useUpsertJobExtra();
   const deleteJobExtra = useDeleteJobExtra();
   
@@ -89,12 +91,13 @@ export function JobExtrasEditor({
 
   // Get unit amount for extra type (from rate catalog - hardcoded for now)
   function getUnitAmount(extraType: JobExtraType): number {
-    const rates = {
+    const defaults = {
       travel_half: 50,
       travel_full: 100,
       day_off: 100,
     } as const;
-    return rates[extraType];
+    const row = catalog?.find(r => r.extra_type === extraType);
+    return row?.amount_eur ?? defaults[extraType];
   }
 
   // Calculate total extras amount
@@ -105,7 +108,7 @@ export function JobExtrasEditor({
       return total + (quantity * unitAmount);
     }, 0);
 
-  if (isLoading) {
+  if (isLoading || catalogLoading) {
     return (
       <Card>
         <CardHeader>
