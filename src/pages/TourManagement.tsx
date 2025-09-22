@@ -19,8 +19,10 @@ import {
   ArrowLeft,
   Info,
   Printer,
-  Loader2
+  Loader2,
+  Euro
 } from "lucide-react";
+import { TourRatesManagerDialog } from "@/components/tours/TourRatesManagerDialog";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { TourManagementDialog } from "@/components/tours/TourManagementDialog";
@@ -55,6 +57,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
   const [isDefaultsManagerOpen, setIsDefaultsManagerOpen] = useState(false);
   const [isAssignmentsOpen, setIsAssignmentsOpen] = useState(false);
   const [isDocumentsOpen, setIsDocumentsOpen] = useState(false);
+  const [isRatesManagerOpen, setIsRatesManagerOpen] = useState(false);
   const [tourLogoUrl, setTourLogoUrl] = useState<string | undefined>();
   const [isPrintingSchedule, setIsPrintingSchedule] = useState(false);
 
@@ -156,6 +159,14 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
       onClick: () => setIsDocumentsOpen(true),
       badge: "Available",
       viewOnly: false
+    },
+    {
+      title: "Rates & Extras Manager",
+      description: "Set extras and resolve rate issues",
+      icon: Euro,
+      onClick: () => setIsRatesManagerOpen(true),
+      badge: "Management",
+      showForTechnician: false
     },
     {
       title: "Tour Configuration",
@@ -459,6 +470,15 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
           open={isSettingsOpen}
           onOpenChange={setIsSettingsOpen}
           tour={tour}
+        />
+      )}
+
+      {/* Rates & Extras Manager */}
+      {!isTechnicianView && (
+        <TourRatesManagerDialog 
+          open={isRatesManagerOpen}
+          onOpenChange={setIsRatesManagerOpen}
+          tourId={tour.id}
         />
       )}
 

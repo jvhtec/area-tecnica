@@ -87,6 +87,16 @@ export function JobExtrasEditor({
   // Check if there are unsaved changes
   const hasChanges = Object.keys(pendingChanges).length > 0;
 
+  // Get unit amount for extra type (from rate catalog - hardcoded for now)
+  function getUnitAmount(extraType: JobExtraType): number {
+    const rates = {
+      travel_half: 50,
+      travel_full: 100,
+      day_off: 100,
+    } as const;
+    return rates[extraType];
+  }
+
   // Calculate total extras amount
   const totalExtrasAmount = (Object.keys(EXTRA_TYPE_LABELS) as JobExtraType[])
     .reduce((total, extraType) => {
@@ -94,16 +104,6 @@ export function JobExtrasEditor({
       const unitAmount = getUnitAmount(extraType);
       return total + (quantity * unitAmount);
     }, 0);
-
-  // Get unit amount for extra type (from rate catalog - hardcoded for now)
-  const getUnitAmount = (extraType: JobExtraType): number => {
-    const rates = {
-      travel_half: 50,
-      travel_full: 100,
-      day_off: 100,
-    };
-    return rates[extraType];
-  };
 
   if (isLoading) {
     return (

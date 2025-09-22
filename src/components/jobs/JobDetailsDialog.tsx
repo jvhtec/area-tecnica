@@ -26,6 +26,8 @@ import { PlacesRestaurantService } from "@/utils/hoja-de-ruta/services/places-re
 import type { Restaurant } from "@/types/hoja-de-ruta";
 import { labelForCode } from '@/utils/roles';
 import { TourRatesPanel } from '@/components/tours/TourRatesPanel';
+import { JobExtrasManagement } from '@/components/jobs/JobExtrasManagement';
+import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useTourRateSubscriptions } from "@/hooks/useTourRateSubscriptions";
 
 interface JobDetailsDialogProps {
@@ -42,6 +44,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   department = 'sound'
 }) => {
   const [selectedTab, setSelectedTab] = useState('info');
+  const { userRole } = useOptimizedAuth();
 
   // Fetch comprehensive job data
   const { data: jobDetails, isLoading: isJobLoading } = useQuery({
@@ -213,7 +216,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         </DialogHeader>
 
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-          <TabsList className={`grid w-full ${jobDetails?.job_type === 'tourdate' ? 'grid-cols-6' : 'grid-cols-5'}`}>
+          <TabsList className={`grid w-full ${jobDetails?.job_type === 'tourdate' ? 'grid-cols-7' : 'grid-cols-6'}`}>
             <TabsTrigger value="info">Info</TabsTrigger>
             <TabsTrigger value="location">Location</TabsTrigger>
             <TabsTrigger value="personnel">Personnel</TabsTrigger>
@@ -222,6 +225,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
             {jobDetails?.job_type === 'tourdate' && (
               <TabsTrigger value="tour-rates">Tour Rates</TabsTrigger>
             )}
+            <TabsTrigger value="extras">Extras</TabsTrigger>
           </TabsList>
 
           <ScrollArea className="h-[500px] mt-4">
@@ -522,6 +526,13 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                 <TourRatesPanel jobId={jobDetails.id} />
               </TabsContent>
             )}
+
+            <TabsContent value="extras" className="space-y-4">
+              <JobExtrasManagement 
+                jobId={(jobDetails?.id as string) || job.id}
+                isManager={['admin','management'].includes(userRole || '')}
+              />
+            </TabsContent>
           </ScrollArea>
         </Tabs>
       </DialogContent>

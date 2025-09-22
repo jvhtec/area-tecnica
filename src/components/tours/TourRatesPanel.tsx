@@ -114,7 +114,7 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
 
       <Alert>
         <AlertDescription>
-          Tour dates use fixed rates without timesheet logging. House technicians receive their profile-specific rate, while other technicians receive category-based rates with weekly multipliers.
+          Tour dates use fixed rates without timesheet logging. Weekly multipliers apply only to technicians on the tour team for this routing (including house technicians when they are on the tour team).
         </AlertDescription>
       </Alert>
 
