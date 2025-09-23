@@ -52,6 +52,7 @@ const LightsRiggingPlanner: React.FC = () => {
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
   const [searchParams] = useSearchParams();
+  const jobIdFromUrl = searchParams.get("jobId");
 
   const tourId = searchParams.get("tourId");
   const mode = searchParams.get("mode");
@@ -61,6 +62,13 @@ const LightsRiggingPlanner: React.FC = () => {
   const selectedJob = useMemo(() => jobs?.find(j => j.id === selectedJobId), [jobs, selectedJobId]);
 
   const [trusses, setTrusses] = useState<UITruss[]>([]);
+
+  // Preselect job from query param
+  React.useEffect(() => {
+    if (jobIdFromUrl) {
+      setSelectedJobId(jobIdFromUrl);
+    }
+  }, [jobIdFromUrl]);
 
   const addTruss = () => {
     const nextName = autoName(trusses.length + 1);
@@ -277,7 +285,7 @@ const LightsRiggingPlanner: React.FC = () => {
           </div>
         </div>
 
-        {!isTourDefaults && (
+        {!isTourDefaults && !jobIdFromUrl && (
           <div className="grid gap-2 max-w-sm">
             <Label>Select Job</Label>
             <Select value={selectedJobId} onValueChange={setSelectedJobId}>
@@ -468,4 +476,3 @@ const LightsRiggingPlanner: React.FC = () => {
 export default LightsRiggingPlanner;
 
 function clamp(v: number, a: number, b: number) { return Math.max(a, Math.min(b, v)); }
-

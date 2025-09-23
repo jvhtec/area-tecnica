@@ -506,7 +506,7 @@ const LightsConsumosTool: React.FC = () => {
             </Select>
           </div>
 
-          {!isOverrideMode && (
+          {!isOverrideMode && !jobIdFromUrl && (
             <div className="space-y-2">
               <Label htmlFor="jobSelect">Seleccionar Trabajo</Label>
               <Select value={selectedJobId} onValueChange={handleJobSelect}>

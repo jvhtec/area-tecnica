@@ -1,9 +1,12 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
-import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock, FileText } from "lucide-react";
+import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock, FileText, Scale, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
+import { Department } from "@/types/department";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 
 interface JobCardActionsProps {
   job: any;
@@ -16,6 +19,7 @@ interface JobCardActionsProps {
   canCreateFlexFolders: boolean;
   canUploadDocuments: boolean;
   canManageArtists: boolean;
+  department?: Department;
   isCreatingFolders?: boolean;
   isCreatingLocalFolders?: boolean;
   currentFolderStep?: string;
@@ -50,6 +54,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   canCreateFlexFolders,
   canUploadDocuments,
   canManageArtists,
+  department,
   isCreatingFolders = false,
   isCreatingLocalFolders = false,
   techName,
@@ -75,6 +80,56 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     e.stopPropagation();
     navigate(`/timesheets?jobId=${job.id}`);
   };
+
+  const canViewCalculators = isProjectManagementPage && (userRole === 'management');
+
+  const allowedJobType = ['single', 'festival', 'tourdate'].includes(job?.job_type);
+
+  const navigateToCalculator = (e: React.MouseEvent, type: 'pesos' | 'consumos') => {
+    e.stopPropagation();
+    const params = new URLSearchParams({ jobId: job.id });
+    let path = '';
+    switch (department) {
+      case 'sound':
+        path = type === 'pesos' ? '/sound/pesos' : '/sound/consumos';
+        break;
+      case 'lights':
+        path = type === 'pesos' ? '/lights-pesos-tool' : '/lights-consumos-tool';
+        break;
+      case 'video':
+        path = type === 'pesos' ? '/video-pesos-tool' : '/video-consumos-tool';
+        break;
+      default:
+        // Fallback to sound if department is undefined/other
+        path = type === 'pesos' ? '/sound/pesos' : '/sound/consumos';
+    }
+    navigate(`${path}?${params.toString()}`);
+  };
+
+  // Show tour defaults indicator on buttons if defaults exist for this tour and department
+  const tourId: string | undefined = job?.tour_id || job?.tour?.id || undefined;
+  const { data: defaultsInfo } = useQuery<{ weight: boolean; power: boolean }>({
+    queryKey: ['tour-default-exists', tourId, department],
+    enabled: Boolean(tourId && department && canViewCalculators && allowedJobType),
+    queryFn: async () => {
+      const { data: sets, error: err1 } = await supabase
+        .from('tour_default_sets')
+        .select('id')
+        .eq('tour_id', tourId!)
+        .eq('department', department!);
+      if (err1) throw err1;
+      if (!sets || sets.length === 0) return { weight: false, power: false };
+      const setIds = sets.map(s => s.id);
+      const { data: tables, error: err2 } = await supabase
+        .from('tour_default_tables')
+        .select('id, table_type')
+        .in('set_id', setIds);
+      if (err2) throw err2;
+      const weight = (tables || []).some(t => t.table_type === 'weight');
+      const power = (tables || []).some(t => t.table_type === 'power');
+      return { weight, power };
+    }
+  });
   const getFlexButtonTitle = () => {
     if (isCreatingFolders) {
       return "Creating folders...";
@@ -87,6 +142,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     const params = new URLSearchParams({ singleJob: 'true' });
     navigate(`/festival-management/${job.id}?${params.toString()}`);
   };
+
+  const showFlexButtons = false; // Temporarily hide Flex sync and logs buttons
 
   return (
     <div className="flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
@@ -159,7 +216,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       >
         <RefreshCw className="h-4 w-4" />
       </Button>
-      {isProjectManagementPage && canSyncFlex && (
+      {isProjectManagementPage && canSyncFlex && showFlexButtons && (
         <Button
           variant="ghost"
           size="icon"
@@ -180,6 +237,33 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         >
           <Clock className="h-4 w-4" />
         </Button>
+      )}
+
+      {canViewCalculators && allowedJobType && (
+        <>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            title="Weights (Pesos) Calculator"
+            onClick={(e) => navigateToCalculator(e, 'pesos')}
+          >
+            <Scale className="h-4 w-4" />
+            <span className="hidden sm:inline">Pesos</span>
+            {defaultsInfo?.weight && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-green-500" title="Tour defaults exist" />}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            title="Power (Consumos) Calculator"
+            onClick={(e) => navigateToCalculator(e, 'consumos')}
+          >
+            <Zap className="h-4 w-4" />
+            <span className="hidden sm:inline">Consumos</span>
+            {defaultsInfo?.power && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-green-500" title="Tour defaults exist" />}
+          </Button>
+        </>
       )}
       {userRole === 'technician' && job.job_type !== "dryhire" && (
         <TechnicianIncidentReportDialog 
@@ -259,7 +343,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           </Button>
         </div>
       )}
-      {isProjectManagementPage && canSyncFlex && (
+      {isProjectManagementPage && canSyncFlex && showFlexButtons && (
         <Button
           variant="outline"
           size="sm"

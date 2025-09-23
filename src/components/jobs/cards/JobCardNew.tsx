@@ -634,6 +634,7 @@ export function JobCardNew({
             canCreateFlexFolders={canCreateFlexFolders}
             canUploadDocuments={canUploadDocuments}
             canManageArtists={canManageArtists}
+            department={department}
             isCreatingFolders={isCreatingFolders}
             isCreatingLocalFolders={isCreatingLocalFolders}
             techName={personnel?.find(p => p.id === assignments.find(a => a.technician_id)?.technician_id)?.display_name || ''}

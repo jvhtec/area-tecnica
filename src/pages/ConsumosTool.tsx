@@ -60,6 +60,7 @@ const ConsumosTool: React.FC = () => {
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
   const [searchParams] = useSearchParams();
+  const jobIdFromUrl = searchParams.get('jobId');
 
   // NEW: Add tour defaults mode detection
   const tourId = searchParams.get('tourId');
@@ -102,6 +103,28 @@ const ConsumosTool: React.FC = () => {
     name: '',
     rows: [{ quantity: '', componentId: '', watts: '' }],
   });
+
+  // Preselect job from query param and fetch details if not in the list
+  useEffect(() => {
+    const applyJobFromUrl = async () => {
+      if (!jobIdFromUrl) return;
+      try {
+        setSelectedJobId(jobIdFromUrl);
+        const found = (jobs || []).find((j: any) => j.id === jobIdFromUrl) || null;
+        if (found) {
+          setSelectedJob(found);
+          return;
+        }
+        const { data } = await supabase
+          .from('jobs')
+          .select('id, title, start_time, end_time, tour_date_id')
+          .eq('id', jobIdFromUrl)
+          .single();
+        if (data) setSelectedJob(data);
+      } catch {}
+    };
+    applyJobFromUrl();
+  }, [jobIdFromUrl, jobs]);
 
   // Helper function to get or create the set ID for sound department
   const getOrCreateSoundSetId = async (): Promise<string> => {
@@ -764,7 +787,7 @@ const ConsumosTool: React.FC = () => {
             </Select>
           </div>
 
-          {!isJobOverrideMode && !isTourDefaults && (
+          {!isJobOverrideMode && !isTourDefaults && !jobIdFromUrl && (
             <div className="space-y-2">
               <Label htmlFor="jobSelect">Select Job</Label>
               <Select value={selectedJobId} onValueChange={handleJobSelect}>
@@ -782,7 +805,7 @@ const ConsumosTool: React.FC = () => {
             </div>
           )}
 
-          {isJobOverrideMode && (
+          {isJobOverrideMode && !jobIdFromUrl && (
             <div className="space-y-2">
               <Label htmlFor="jobSelect">Select Job</Label>
               <Select value={selectedJobId} onValueChange={handleJobSelect}>

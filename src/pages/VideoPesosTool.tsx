@@ -11,6 +11,7 @@ import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
 import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
 import { Badge } from '@/components/ui/badge';
@@ -49,6 +50,7 @@ const VideoPesosTool: React.FC = () => {
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
   const [searchParams] = useSearchParams();
+  const jobIdFromUrl = searchParams.get('jobId');
   
   // Tour override mode detection
   const tourId = searchParams.get('tourId');
@@ -73,6 +75,28 @@ const VideoPesosTool: React.FC = () => {
     name: '',
     rows: [{ quantity: '', componentId: '', weight: '' }],
   });
+
+  // Preselect job from query param and fetch details if not in the list
+  useEffect(() => {
+    const applyJobFromUrl = async () => {
+      if (!jobIdFromUrl) return;
+      try {
+        setSelectedJobId(jobIdFromUrl);
+        const found = (jobs || []).find((j: any) => j.id === jobIdFromUrl) || null;
+        if (found) {
+          setSelectedJob(found);
+          return;
+        }
+        const { data } = await supabase
+          .from('jobs')
+          .select('id, title, start_time')
+          .eq('id', jobIdFromUrl)
+          .single();
+        if (data) setSelectedJob(data);
+      } catch {}
+    };
+    applyJobFromUrl();
+  }, [jobIdFromUrl, jobs]);
 
   // Helper to generate a VX suffix for video department
   // Returns a string such as "VX01" or "VX01, VX02" depending on useDualMotors
@@ -396,21 +420,23 @@ const VideoPesosTool: React.FC = () => {
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="jobSelect">Select Job</Label>
-            <Select value={selectedJobId} onValueChange={handleJobSelect}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a job" />
-              </SelectTrigger>
-              <SelectContent>
-                {jobs?.map((job) => (
-                  <SelectItem key={job.id} value={job.id}>
-                    {job.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!jobIdFromUrl && (
+            <div className="space-y-2">
+              <Label htmlFor="jobSelect">Select Job</Label>
+              <Select value={selectedJobId} onValueChange={handleJobSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a job" />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobs?.map((job) => (
+                    <SelectItem key={job.id} value={job.id}>
+                      {job.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="tableName">Table Name</Label>

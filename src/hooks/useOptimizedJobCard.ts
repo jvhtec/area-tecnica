@@ -2,7 +2,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { createQueryKey } from '@/lib/optimized-react-query';
 
@@ -15,6 +15,7 @@ export const useOptimizedJobCard = (
   onJobClick: (jobId: string) => void
 ) => {
   const { theme } = useTheme();
+  const queryClient = useQueryClient();
   
   // Memoized styling calculations
   const { appliedBorderColor, appliedBgColor } = useMemo(() => {
@@ -223,6 +224,7 @@ export const useOptimizedJobCard = (
   const refreshData = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
+      // Refresh job documents directly for instant UI
       const { data, error } = await supabase
         .from('job_documents')
         .select('*')
@@ -231,10 +233,14 @@ export const useOptimizedJobCard = (
       if (!error) {
         setDocuments(data || []);
       }
+
+      // Invalidate broader queries so the card and list re-fetch
+      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['personnel', job.id, department] });
     } catch (err) {
-      console.error('Refresh documents error:', err);
+      console.error('Refresh error:', err);
     }
-  }, [job.id]);
+  }, [job.id, department, queryClient]);
 
   // Memoized deletion state check
   const isJobBeingDeleted = useMemo(() => {
