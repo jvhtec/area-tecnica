@@ -613,6 +613,7 @@ export const OptimizedAssignmentMatrix = ({
           open={true}
           onClose={closeDialogs}
           onStaffingActionSelected={handleStaffingActionSelected}
+          technicianId={cellAction.technicianId}
           technicianName={`${currentTechnician.first_name} ${currentTechnician.last_name}`}
           date={cellAction.date}
           availableJobs={getJobsForDate(cellAction.date)}

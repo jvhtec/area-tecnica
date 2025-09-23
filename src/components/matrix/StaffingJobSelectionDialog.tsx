@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { useCancelStaffingRequest } from '@/features/staffing/hooks/useStaffing';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -19,6 +20,7 @@ interface StaffingJobSelectionDialogProps {
   open: boolean;
   onClose: () => void;
   onStaffingActionSelected: (jobId: string, action: 'availability' | 'offer', options?: { singleDay?: boolean }) => void;
+  technicianId: string;
   technicianName: string;
   date: Date;
   availableJobs: Array<{
@@ -38,6 +40,7 @@ export const StaffingJobSelectionDialog = ({
   open, 
   onClose, 
   onStaffingActionSelected,
+  technicianId,
   technicianName,
   date,
   availableJobs,
@@ -47,6 +50,7 @@ export const StaffingJobSelectionDialog = ({
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedAction, setSelectedAction] = useState<'availability' | 'offer'>('availability');
   const [singleDay, setSingleDay] = useState<boolean>(false);
+  const { mutate: cancelStaffing, isPending: isCancelling } = useCancelStaffingRequest();
   // No direct email sending here; parent handles the action.
 
   const handleJobSelect = (jobId: string) => {
@@ -173,6 +177,19 @@ export const StaffingJobSelectionDialog = ({
               <div className="flex items-center gap-2">
                 <input id="scope-single-day" type="checkbox" checked={singleDay} onChange={(e) => setSingleDay(e.target.checked)} />
                 <Label htmlFor="scope-single-day">Substitute only for this day</Label>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <Button 
+                  variant="outline"
+                  disabled={!selectedJobId}
+                  onClick={() => {
+                    if (!selectedJobId) return;
+                    cancelStaffing({ job_id: selectedJobId, profile_id: technicianId, phase: selectedAction });
+                  }}
+                >
+                  {isCancelling ? 'Cancelling…' : `Cancel ${selectedAction}`}
+                </Button>
               </div>
             </div>
           )}

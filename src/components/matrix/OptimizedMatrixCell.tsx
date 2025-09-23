@@ -6,7 +6,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Calendar, Clock, Check, X, UserX, Mail, CheckCircle, Ban } from 'lucide-react';
 import { format, isToday, isWeekend } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
+import { useCancelStaffingRequest, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { labelForCode } from '@/utils/roles';
 import { pickTextColor, rgbaFromHex } from '@/utils/color';
@@ -73,8 +74,11 @@ export const OptimizedMatrixCell = memo(({
   const staffingStatusByJob = staffingStatusProvided;
   const staffingStatusByDate = staffingStatusByDateProvided;
   const { mutate: sendStaffingEmail, isPending: isSendingEmail } = useSendStaffingEmail();
+  const { mutate: cancelStaffing, isPending: isCancelling } = useCancelStaffingRequest();
   const [availabilityRetrying, setAvailabilityRetrying] = React.useState(false);
   const [pendingRetry, setPendingRetry] = React.useState<null | { jobId: string }>(null);
+  const [pendingCancel, setPendingCancel] = React.useState<null | { phase: 'availability' | 'offer', jobId: string | null }>(null);
+  const [pendingRemoveAssignment, setPendingRemoveAssignment] = React.useState(false);
   
   // Use job-specific status for assigned cells, date-based status for empty cells
   const staffingStatus = hasAssignment ? staffingStatusByJob : staffingStatusByDate;
@@ -217,65 +221,90 @@ export const OptimizedMatrixCell = memo(({
     >
       {/* Staffing Status Badges */}
       {(staffingStatus?.availability_status || staffingStatus?.offer_status) && (
-        <div className="absolute top-1 left-1 flex gap-1 z-10">
+        <div className="absolute bottom-1 left-1 flex gap-1 z-10">
           {staffingStatus.availability_status && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                // Prefer concrete job ids; otherwise fall back to by-date job id
-                const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.availability_job_id;
-                if (targetJobId) {
-                  // Ask for confirmation before retrying
-                  setPendingRetry({ jobId: targetJobId });
-                } else {
-                  // Ask user to pick a job for the retry
-                  onClick('select-job-for-staffing');
-                }
-              }}
-              title="Retry availability email"
-              className="focus:outline-none"
-            >
-      <Badge 
-        variant={
-          staffingStatus.availability_status === 'confirmed' ? 'default' : 
-          staffingStatus.availability_status === 'declined' ? 'destructive' : 
-          'secondary'
-        }
-                className={`text-xs px-1 py-0 h-3 ${availabilityRetrying ? 'ring-1 ring-blue-400' : ''}`}
+            <>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.availability_job_id;
+                  if (targetJobId) {
+                    setPendingRetry({ jobId: targetJobId });
+                  } else {
+                    onClick('select-job-for-staffing');
+                  }
+                }}
+                title="Retry availability email"
+                className="focus:outline-none"
               >
-                {availabilityRetrying ? 'A:↻' : `A:${staffingStatus.availability_status === 'confirmed' ? '✓' : staffingStatus.availability_status === 'declined' ? '✗' : '?'}`}
-              </Badge>
-            </button>
+                <Badge 
+                  variant={
+                    staffingStatus.availability_status === 'confirmed' ? 'default' : 
+                    staffingStatus.availability_status === 'declined' ? 'destructive' : 
+                    'secondary'
+                  }
+                  className={`text-xs px-1 py-0 h-3 ${availabilityRetrying ? 'ring-1 ring-blue-400' : ''}`}
+                >
+                  {availabilityRetrying ? 'A:↻' : 'A:' + (staffingStatus.availability_status === 'confirmed' ? '✓' : (staffingStatus.availability_status === 'declined' ? '✗' : '?'))}
+                </Badge>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.availability_job_id || null;
+                  setPendingCancel({ phase: 'availability', jobId: targetJobId });
+                }}
+                title="Cancel availability request"
+                className="focus:outline-none"
+              >
+                <Badge variant="outline" className="text-[10px] px-1 py-0 h-3">×</Badge>
+              </button>
+            </>
           )}
           {staffingStatus.offer_status && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                // Determine job for offer; then open offer-details to choose role
-                const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.offer_job_id;
-                if (targetJobId) {
-                  onClick('offer-details', targetJobId);
-                } else {
-                  onClick('select-job-for-staffing');
-                }
-              }}
-              title="Retry offer email"
-              className="focus:outline-none"
-            >
-              <Badge 
-                variant={
-                  staffingStatus.offer_status === 'confirmed' ? 'default' : 
-                  staffingStatus.offer_status === 'declined' ? 'destructive' : 
-                  'secondary'
-                }
-                className="text-xs px-1 py-0 h-3"
+            <>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Determine job for offer; then open offer-details to choose role
+                  const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.offer_job_id;
+                  if (targetJobId) {
+                    onClick('offer-details', targetJobId);
+                  } else {
+                    onClick('select-job-for-staffing');
+                  }
+                }}
+                title="Retry offer email"
+                className="focus:outline-none"
               >
-                O:{staffingStatus.offer_status === 'confirmed' ? '✓' : 
-                   staffingStatus.offer_status === 'declined' ? '✗' : '?'}
-              </Badge>
-            </button>
+                <Badge 
+                  variant={
+                    staffingStatus.offer_status === 'confirmed' ? 'default' : 
+                    staffingStatus.offer_status === 'declined' ? 'destructive' : 
+                    'secondary'
+                  }
+                  className="text-xs px-1 py-0 h-3"
+                >
+                  O:{staffingStatus.offer_status === 'confirmed' ? '✓' : 
+                     staffingStatus.offer_status === 'declined' ? '✗' : '?'}
+                </Badge>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.offer_job_id || null;
+                  setPendingCancel({ phase: 'offer', jobId: targetJobId });
+                }}
+                title="Cancel offer"
+                className="focus:outline-none"
+              >
+                <Badge variant="outline" className="text-[10px] px-1 py-0 h-3">×</Badge>
+              </button>
+            </>
           )}
         </div>
       )}
@@ -372,6 +401,17 @@ export const OptimizedMatrixCell = memo(({
               </Badge>
             </div>
           )}
+          <div className="absolute top-1 right-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 hover:bg-red-100"
+              title="Remove assignment"
+              onClick={(e) => { e.stopPropagation(); setPendingRemoveAssignment(true); }}
+            >
+              <X className="h-3 w-3 text-red-600" />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -430,6 +470,71 @@ export const OptimizedMatrixCell = memo(({
                 );
               }} disabled={availabilityRetrying}>
                 {availabilityRetrying ? 'Resending…' : 'Resend'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {pendingCancel && (
+        <Dialog open={true} onOpenChange={(v) => !v && setPendingCancel(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{pendingCancel.phase === 'availability' ? 'Cancel availability request?' : 'Cancel offer?'}</DialogTitle>
+              <DialogDescription>
+                This will mark the {pendingCancel.phase} as cancelled (expired) for {technician.first_name} {technician.last_name}.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPendingCancel(null)}>Keep</Button>
+              <Button onClick={() => {
+                if (!pendingCancel.jobId) { setPendingCancel(null); return; }
+                cancelStaffing(
+                  { job_id: pendingCancel.jobId, profile_id: technician.id, phase: pendingCancel.phase },
+                  {
+                    onSuccess: () => {
+                      setPendingCancel(null);
+                      toast.success(`${pendingCancel.phase === 'availability' ? 'Availability' : 'Offer'} cancelled`)
+                    },
+                    onError: (e: any) => {
+                      toast.error(e?.message || 'Failed to cancel')
+                    }
+                  }
+                )
+              }} disabled={isCancelling}>
+                {isCancelling ? 'Cancelling…' : 'Cancel'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {pendingRemoveAssignment && (
+        <Dialog open={true} onOpenChange={(v) => !v && setPendingRemoveAssignment(false)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Remove assignment?</DialogTitle>
+              <DialogDescription>
+                This will remove the assignment of {technician.first_name} {technician.last_name} from this job.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPendingRemoveAssignment(false)}>Keep</Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  try {
+                    if (!assignment?.job_id) { setPendingRemoveAssignment(false); return; }
+                    await supabase.from('job_assignments').delete().eq('job_id', assignment.job_id).eq('technician_id', technician.id)
+                    setPendingRemoveAssignment(false)
+                    toast.success('Assignment removed')
+                    window.dispatchEvent(new CustomEvent('assignment-updated'))
+                  } catch (e: any) {
+                    toast.error(e?.message || 'Failed to remove assignment')
+                  }
+                }}
+              >
+                Remove
               </Button>
             </DialogFooter>
           </DialogContent>

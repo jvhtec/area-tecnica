@@ -85,3 +85,26 @@ export function useSendStaffingEmail() {
     }
   })
 }
+
+export function useCancelStaffingRequest() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: { job_id: string, profile_id: string, phase: 'availability'|'offer' }) => {
+      const { error } = await supabase
+        .from('staffing_requests')
+        .update({ status: 'expired' })
+        .eq('job_id', payload.job_id)
+        .eq('profile_id', payload.profile_id)
+        .eq('phase', payload.phase)
+        .eq('status', 'pending') // only cancel pending
+      if (error) throw error
+      return true
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['staffing', vars.job_id, vars.profile_id] })
+      qc.invalidateQueries({ queryKey: ['staffing-by-date', vars.profile_id] })
+      qc.invalidateQueries({ queryKey: ['staffing-matrix'] })
+      qc.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] })
+    }
+  })
+}

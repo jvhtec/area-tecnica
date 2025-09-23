@@ -54,6 +54,7 @@ export const AssignJobDialog = ({
   const [selectedRole, setSelectedRole] = useState<string>('');
   const [assignAsConfirmed, setAssignAsConfirmed] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
 
   // Get technician details
   const { data: technician } = useQuery({
@@ -260,6 +261,27 @@ export const AssignJobDialog = ({
     }
   };
 
+  const handleRemoveAssignment = async () => {
+    if (!existingAssignment) return;
+    if (isRemoving) return;
+    setIsRemoving(true);
+    try {
+      const { error } = await supabase
+        .from('job_assignments')
+        .delete()
+        .eq('job_id', existingAssignment.job_id)
+        .eq('technician_id', technicianId);
+      if (error) throw error;
+      toast.success('Assignment removed');
+      window.dispatchEvent(new CustomEvent('assignment-updated', { detail: { technicianId, jobId: existingAssignment.job_id } }));
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to remove assignment');
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
   const handleCheckboxChange = (checked: boolean | "indeterminate") => {
     // Convert CheckedState to boolean, treating "indeterminate" as false
     setAssignAsConfirmed(checked === true);
@@ -390,7 +412,25 @@ export const AssignJobDialog = ({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex items-center justify-between gap-2">
+          <div className="mr-auto">
+            {isReassignment && (
+              <Button 
+                variant="destructive" 
+                onClick={handleRemoveAssignment}
+                disabled={isRemoving}
+              >
+                {isRemoving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Removing...
+                  </>
+                ) : (
+                  'Remove Assignment'
+                )}
+              </Button>
+            )}
+          </div>
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
