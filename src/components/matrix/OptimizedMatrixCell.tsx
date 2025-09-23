@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
 import { toast } from 'sonner';
 import { labelForCode } from '@/utils/roles';
+import { pickTextColor, rgbaFromHex } from '@/utils/color';
 
 interface OptimizedMatrixCellProps {
   technician: {
@@ -64,6 +65,9 @@ export const OptimizedMatrixCell = memo(({
   const hasAssignment = !!assignment;
   const isDeclinedAssignment = hasAssignment && assignment.status === 'declined';
   const isUnavailable = availability?.status === 'unavailable';
+  const confirmedBg = hasAssignment && assignment.status === 'confirmed' ? (assignment?.job?.color || null) : null;
+  const confirmedTextColor = confirmedBg ? pickTextColor(confirmedBg) : undefined;
+  const confirmedSubTextColor = confirmedTextColor ? (rgbaFromHex(confirmedTextColor, 0.9) || confirmedTextColor) : undefined;
 
   // Staffing status: use provided batched data exclusively for performance
   const staffingStatusByJob = staffingStatusProvided;
@@ -319,10 +323,16 @@ export const OptimizedMatrixCell = memo(({
       {/* Assignment Content */}
       {hasAssignment && (
         <div className="flex-1 overflow-hidden">
-          <div className={cn('font-medium truncate text-xs', assignment.status === 'confirmed' ? 'text-white' : '')}>
+          <div 
+            className={cn('font-medium truncate text-xs', assignment.status !== 'confirmed' ? '' : '')}
+            style={{ color: assignment.status === 'confirmed' ? confirmedTextColor : undefined }}
+          >
             {assignment.job?.title || 'Assignment'}
           </div>
-          <div className={cn('text-xs truncate', assignment.status === 'confirmed' ? 'text-white/90' : 'text-muted-foreground')}>
+          <div 
+            className={cn('text-xs truncate', assignment.status === 'confirmed' ? '' : 'text-muted-foreground')}
+            style={{ color: assignment.status === 'confirmed' ? confirmedSubTextColor : undefined }}
+          >
             {labelForCode(assignment.sound_role || assignment.lights_role || assignment.video_role)}
           </div>
           
