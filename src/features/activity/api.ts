@@ -38,7 +38,7 @@ export async function markActivityRead(ids: string[], userId: string): Promise<v
 
   const { error } = await supabase
     .from('activity_reads')
-    .insert(rows, { ignoreDuplicates: true });
+    .upsert(rows, { onConflict: 'user_id,activity_id' });
 
   if (error) {
     throw error;

@@ -117,7 +117,7 @@ export function useActivityRealtime(options: UseActivityRealtimeOptions = {}): v
 
     const channel = supabase
       .channel(`activity${jobId ? `-${jobId}` : ''}`)
-      .on('postgres_changes', filter, async (payload) => {
+      .on('postgres_changes' as any, filter, async (payload) => {
         if (cancelled) return;
 
         const row = payload.new as ActivityLogEntry | null;

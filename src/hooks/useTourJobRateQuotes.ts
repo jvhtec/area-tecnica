@@ -19,9 +19,9 @@ export function useTourJobRateQuotes(jobId?: string) {
       if (error) throw error;
       return (data || []).map(item => ({
         ...item,
-        is_tour_team_member: item.is_tour_team_member ?? false,
-        extras_total_eur: item.extras_total_eur ?? undefined,
-        total_with_extras_eur: item.total_with_extras_eur ?? undefined,
+        is_tour_team_member: (item as any).is_tour_team_member ?? false,
+        extras_total_eur: (item as any).extras_total_eur ?? undefined,
+        total_with_extras_eur: (item as any).total_with_extras_eur ?? undefined,
         breakdown: item.breakdown as unknown as TourJobRateQuote['breakdown'],
       }));
     },
@@ -42,9 +42,9 @@ export function useTechnicianTourRateQuotes() {
       if (error) throw error;
       return (data || []).map(item => ({
         ...item,
-        is_tour_team_member: item.is_tour_team_member ?? false,
-        extras_total_eur: item.extras_total_eur ?? undefined,
-        total_with_extras_eur: item.total_with_extras_eur ?? undefined,
+        is_tour_team_member: (item as any).is_tour_team_member ?? false,
+        extras_total_eur: (item as any).extras_total_eur ?? undefined,
+        total_with_extras_eur: (item as any).total_with_extras_eur ?? undefined,
         breakdown: item.breakdown as unknown as TourJobRateQuote['breakdown'],
       }));
     },

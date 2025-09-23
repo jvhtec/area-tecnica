@@ -10,7 +10,6 @@ import { useJobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';

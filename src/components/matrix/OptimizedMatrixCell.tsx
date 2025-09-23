@@ -3,6 +3,7 @@ import React, { memo, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Calendar, Clock, Check, X, UserX, Mail, CheckCircle, Ban } from 'lucide-react';
 import { format, isToday, isWeekend } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -199,26 +200,28 @@ export const OptimizedMatrixCell = memo(({
   // Skip noisy debug logs in production
 
   return (
-    <div
-      className={cn(
-        'border-r border-b cursor-pointer transition-colors duration-150',
-        'flex flex-col justify-between p-1 text-xs relative',
-        getCellBackground(),
-        getBorderColor()
-      )}
-      style={{ 
-        width: `${width}px`, 
-        height: `${height}px`,
-        borderLeftColor: assignment?.job?.color,
-        borderLeftWidth: hasAssignment && assignment?.job?.color ? '3px' : '1px',
-        // If assignment is confirmed, paint background with the job color
-        background: hasAssignment && assignment.status === 'confirmed' && assignment?.job?.color
-          ? assignment.job.color
-          : undefined
-      }}
-      onClick={handleCellClick}
-      onMouseEnter={handleMouseEnter}
-    >
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          className={cn(
+            'border-r border-b cursor-pointer transition-colors duration-150',
+            'flex flex-col justify-between p-1 text-xs relative',
+            getCellBackground(),
+            getBorderColor()
+          )}
+          style={{ 
+            width: `${width}px`, 
+            height: `${height}px`,
+            borderLeftColor: assignment?.job?.color,
+            borderLeftWidth: hasAssignment && assignment?.job?.color ? '3px' : '1px',
+            // If assignment is confirmed, paint background with the job color
+            background: hasAssignment && assignment.status === 'confirmed' && assignment?.job?.color
+              ? assignment.job.color
+              : undefined
+          }}
+          onClick={handleCellClick}
+          onMouseEnter={handleMouseEnter}
+        >
       {/* Staffing Status Badges */}
       {(staffingStatus?.availability_status || staffingStatus?.offer_status) && (
         <div className="absolute bottom-1 left-1 flex gap-1 z-10">
@@ -540,7 +543,38 @@ export const OptimizedMatrixCell = memo(({
           </DialogContent>
         </Dialog>
       )}
-    </div>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent 
+        side="top" 
+        className="max-w-xs p-2"
+      >
+        <div className="space-y-1 text-sm">
+          <div className="font-semibold">
+            {technician.first_name} {technician.last_name}
+          </div>
+          <div className="text-muted-foreground">
+            {technician.department}
+          </div>
+          {hasAssignment && (
+            <div className="text-xs">
+              <div>{assignment.job?.title}</div>
+              <div className="text-muted-foreground">
+                {labelForCode(assignment.sound_role || assignment.lights_role || assignment.video_role)}
+              </div>
+              <div className={`capitalize ${assignment.status === 'confirmed' ? 'text-green-600' : assignment.status === 'declined' ? 'text-red-600' : 'text-yellow-600'}`}>
+                {assignment.status}
+              </div>
+            </div>
+          )}
+          {isUnavailable && !hasAssignment && (
+            <div className="text-xs text-muted-foreground">
+              Unavailable{availability.notes ? `: ${availability.notes}` : ''}
+            </div>
+          )}
+        </div>
+      </TooltipContent>
+    </Tooltip>
   );
 });
 

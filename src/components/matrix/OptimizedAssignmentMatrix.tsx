@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { format, isSameDay } from 'date-fns';
 import { TechnicianRow } from './TechnicianRow';
 import { OptimizedMatrixCell } from './OptimizedMatrixCell';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { DateHeader } from './DateHeader';
 import { SelectJobDialog } from './SelectJobDialog';
 import { StaffingJobSelectionDialog } from './StaffingJobSelectionDialog';
@@ -523,6 +524,7 @@ export const OptimizedAssignmentMatrix = ({
           height: `calc(100% - ${HEADER_HEIGHT}px)`
         }}
       >
+        <TooltipProvider>
         <div 
           ref={mainScrollRef}
           className="matrix-main-scroll"
@@ -594,6 +596,7 @@ export const OptimizedAssignmentMatrix = ({
             )})}
           </div>
         </div>
+        </TooltipProvider>
       </div>
 
       {/* Dialogs */}
