@@ -26,7 +26,7 @@ interface TechnicianRowProps {
   height: number;
 }
 
-export const TechnicianRow = ({ technician, height }: TechnicianRowProps) => {
+const TechnicianRowComp = ({ technician, height }: TechnicianRowProps) => {
   const { userRole } = useOptimizedAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
   const [skillsOpen, setSkillsOpen] = React.useState(false);
@@ -302,3 +302,5 @@ export const TechnicianRow = ({ technician, height }: TechnicianRowProps) => {
   </>
   );
 };
+
+export const TechnicianRow = React.memo(TechnicianRowComp);

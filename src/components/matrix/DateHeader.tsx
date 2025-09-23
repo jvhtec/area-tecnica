@@ -20,7 +20,7 @@ interface DateHeaderProps {
   }>;
 }
 
-export const DateHeader = ({ date, width, jobs = [] }: DateHeaderProps) => {
+const DateHeaderComp = ({ date, width, jobs = [] }: DateHeaderProps) => {
   const isTodayHeader = isToday(date);
   const isWeekendHeader = isWeekend(date);
   const hasJobs = jobs.length > 0;
@@ -148,3 +148,5 @@ export const DateHeader = ({ date, width, jobs = [] }: DateHeaderProps) => {
     </Popover>
   );
 };
+
+export const DateHeader = React.memo(DateHeaderComp);

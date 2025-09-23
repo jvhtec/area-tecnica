@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { TechnicianRow } from './TechnicianRow';
 import { OptimizedMatrixCell } from './OptimizedMatrixCell';
@@ -117,7 +117,6 @@ export const OptimizedAssignmentMatrix = ({
   // Listen for assignment updates and refresh data
   useEffect(() => {
     const handleAssignmentUpdate = () => {
-      console.log('Assignment update event received, refreshing data...');
       invalidateAssignmentQueries();
     };
 
@@ -138,8 +137,8 @@ export const OptimizedAssignmentMatrix = ({
   // Visible window state for virtualization
   const [visibleRows, setVisibleRows] = useState({ start: 0, end: Math.min(technicians.length - 1, 20) });
   const [visibleCols, setVisibleCols] = useState({ start: 0, end: Math.min(dates.length - 1, 14) });
-  const OVERSCAN_ROWS = 4;
-  const OVERSCAN_COLS = 3;
+  const OVERSCAN_ROWS = 2;
+  const OVERSCAN_COLS = 2;
 
   const updateVisibleWindow = useCallback(() => {
     const el = mainScrollRef.current;
@@ -157,6 +156,17 @@ export const OptimizedAssignmentMatrix = ({
     setVisibleRows(prev => (prev.start !== rowStart || prev.end !== rowEnd ? { start: rowStart, end: rowEnd } : prev));
     setVisibleCols(prev => (prev.start !== colStart || prev.end !== colEnd ? { start: colStart, end: colEnd } : prev));
   }, [technicians.length, dates.length]);
+
+  // Throttle visible window updates with rAF
+  const updateScheduledRef = useRef(false);
+  const scheduleVisibleWindowUpdate = useCallback(() => {
+    if (updateScheduledRef.current) return;
+    updateScheduledRef.current = true;
+    requestAnimationFrame(() => {
+      updateScheduledRef.current = false;
+      updateVisibleWindow();
+    });
+  }, [updateVisibleWindow]);
 
   // Build declined job sets per technician for targeted staffing blocking
   const declinedJobsByTech = React.useMemo(() => {
@@ -211,16 +221,23 @@ export const OptimizedAssignmentMatrix = ({
     const nearRightEdge = scrollLeft > maxScrollLeft - 200; // Within 200px of right edge
     
     // Trigger expansion if we're near an edge and can expand
-    if (nearLeftEdge && canExpandBefore && onNearEdgeScroll) {
-      onNearEdgeScroll('before');
-    } else if (nearRightEdge && canExpandAfter && onNearEdgeScroll) {
-      onNearEdgeScroll('after');
+    // Edge expansion throttled to avoid repeated triggers
+    const now = performance.now();
+    const lastEdgeRef = (handleMainScroll as any)._lastEdgeRef || ((handleMainScroll as any)._lastEdgeRef = { t: 0 });
+    if (now - lastEdgeRef.t > 300) {
+      if (nearLeftEdge && canExpandBefore && onNearEdgeScroll) {
+        onNearEdgeScroll('before');
+        lastEdgeRef.t = now;
+      } else if (nearRightEdge && canExpandAfter && onNearEdgeScroll) {
+        onNearEdgeScroll('after');
+        lastEdgeRef.t = now;
+      }
     }
     
     syncScrollPositions(scrollLeft, scrollTop, 'main');
     // Update visible window for virtualization
-    updateVisibleWindow();
-  }, [syncScrollPositions, canExpandBefore, canExpandAfter, onNearEdgeScroll, updateVisibleWindow]);
+    scheduleVisibleWindowUpdate();
+  }, [syncScrollPositions, canExpandBefore, canExpandAfter, onNearEdgeScroll, scheduleVisibleWindowUpdate]);
 
   const handleDateHeadersScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (syncInProgressRef.current) return;
@@ -307,17 +324,14 @@ export const OptimizedAssignmentMatrix = ({
           });
           return;
         }
-        console.log('🚀 ABOUT TO SEND STAFFING EMAIL:', { jobId, action, technicianId: cellAction.technicianId });
         sendStaffingEmail(
           ({ job_id: jobId, profile_id: cellAction.technicianId, phase: action, target_date: cellAction.date.toISOString(), single_day: !!options?.singleDay } as any),
           {
-            onSuccess: (data) => {
-              console.log('✅ STAFFING EMAIL SUCCESS:', data);
+            onSuccess: (_data) => {
               toast({ title: "Email sent!", description: `Availability request sent successfully.` });
               closeDialogs();
             },
             onError: (error) => {
-              console.error('❌ STAFFING EMAIL ERROR:', error);
               toast({ title: "Email failed", description: `Failed to send availability email: ${error.message}`, variant: "destructive" });
               closeDialogs();
             }
@@ -325,7 +339,7 @@ export const OptimizedAssignmentMatrix = ({
         );
       })();
     } else {
-      console.log('❌ cellAction is not select-job-for-staffing:', cellAction);
+      // no-op
     }
   }, [cellAction, sendStaffingEmail, toast, closeDialogs]);
 
@@ -340,27 +354,20 @@ export const OptimizedAssignmentMatrix = ({
   // Improved auto-scroll to today with retry mechanism
   const scrollToToday = useCallback(() => {
     if (!mainScrollRef.current || dates.length === 0) {
-      console.log('Auto-scroll: Container not ready or no dates');
       return false;
     }
 
     const today = new Date();
     const todayIndex = dates.findIndex(date => isSameDay(date, today));
     
-    console.log('Auto-scroll: Today index:', todayIndex, 'Total dates:', dates.length);
-    
     if (todayIndex === -1) {
-      console.log('Auto-scroll: Today not found in dates array');
       return false;
     }
 
     const container = mainScrollRef.current;
     const containerWidth = container.clientWidth;
     
-    console.log('Auto-scroll: Container width:', containerWidth);
-    
     if (containerWidth === 0) {
-      console.log('Auto-scroll: Container not properly sized yet');
       return false;
     }
     
@@ -368,19 +375,11 @@ export const OptimizedAssignmentMatrix = ({
     const maxScroll = matrixWidth - containerWidth;
     scrollPosition = Math.max(0, Math.min(scrollPosition, maxScroll));
     
-    console.log('Auto-scroll: Calculated position:', scrollPosition, 'Max scroll:', maxScroll);
     
     container.scrollLeft = scrollPosition;
     
     // Verify the scroll actually happened
-    requestAnimationFrame(() => {
-      const actualScrollLeft = container.scrollLeft;
-      console.log('Auto-scroll: Actual scroll position:', actualScrollLeft);
-      if (Math.abs(actualScrollLeft - scrollPosition) < 5) {
-        console.log('Auto-scroll: Successfully scrolled to today');
-        return true;
-      }
-    });
+    requestAnimationFrame(() => { /* verify next frame (no-op) */ });
     
     return true;
   }, [dates, CELL_WIDTH, matrixWidth]);
@@ -391,40 +390,37 @@ export const OptimizedAssignmentMatrix = ({
 
     const attemptScroll = () => {
       const success = scrollToToday();
-      
       if (!success && scrollAttempts < 5) {
-        console.log(`Auto-scroll attempt ${scrollAttempts + 1} failed, retrying...`);
         setScrollAttempts(prev => prev + 1);
         setTimeout(attemptScroll, 100 * (scrollAttempts + 1)); // Increasing delay
       } else if (success) {
-        console.log('Auto-scroll: Successfully completed');
         setScrollAttempts(0);
       } else {
-        console.log('Auto-scroll: Max attempts reached, giving up');
+        // give up
       }
     };
 
-    // Initial attempt with a small delay to ensure DOM is ready
     const timeoutId = setTimeout(attemptScroll, 50);
-    
     return () => clearTimeout(timeoutId);
   }, [scrollToToday, isLoading, dates.length, scrollAttempts]);
 
   // Initialize visible window after mount and when sizes change
   useEffect(() => {
     updateVisibleWindow();
-  }, [technicians.length, dates.length, updateVisibleWindow]);
+  }, [technicians.length, dates.length, scheduleVisibleWindowUpdate]);
 
   // Batched staffing statuses for visible window
-  const visibleTechIds = technicians.slice(visibleRows.start, visibleRows.end + 1).map(t => t.id);
-  const visibleDates = dates.slice(visibleCols.start, visibleCols.end + 1);
+  const visibleTechIds = useMemo(() => technicians.slice(visibleRows.start, visibleRows.end + 1).map(t => t.id), [technicians, visibleRows.start, visibleRows.end]);
+  const visibleDates = useMemo(() => dates.slice(visibleCols.start, visibleCols.end + 1), [dates, visibleCols.start, visibleCols.end]);
   // Collect jobs overlapping visible dates
-  const visibleJobsSet = new Set<string>();
-  visibleDates.forEach(d => {
-    const js = getJobsForDate(d);
-    js.forEach(j => visibleJobsSet.add(j.id));
-  });
-  const visibleJobsLite = jobs.filter(j => visibleJobsSet.has(j.id)).map(j => ({ id: j.id, start_time: j.start_time, end_time: j.end_time }));
+  const visibleJobsLite = useMemo(() => {
+    const s = new Set<string>();
+    visibleDates.forEach(d => {
+      const js = getJobsForDate(d);
+      js.forEach(j => s.add(j.id));
+    });
+    return jobs.filter(j => s.has(j.id)).map(j => ({ id: j.id, start_time: j.start_time, end_time: j.end_time }));
+  }, [visibleDates, jobs, getJobsForDate]);
   const { data: staffingMaps } = useStaffingMatrixStatuses(visibleTechIds, visibleJobsLite, visibleDates);
 
   const getCurrentTechnician = useCallback(() => {
@@ -549,7 +545,7 @@ export const OptimizedAssignmentMatrix = ({
                 key={technician.id} 
                 className="matrix-row"
                 style={{ 
-                  top: techIndex * CELL_HEIGHT,
+                  transform: `translate3d(0, ${techIndex * CELL_HEIGHT}px, 0)`,
                   height: CELL_HEIGHT
                 }}
               >
@@ -562,15 +558,15 @@ export const OptimizedAssignmentMatrix = ({
                   const jobId = assignment?.job_id;
                   const byJobKey = jobId ? `${jobId}-${technician.id}` : '';
                   const byDateKey = `${technician.id}-${format(date, 'yyyy-MM-dd')}`;
-                  const providedByJob = jobId && staffingMaps?.byJob.get(byJobKey) ? staffingMaps?.byJob.get(byJobKey) as any : null;
-                  const providedByDate = staffingMaps?.byDate.get(byDateKey) ? staffingMaps?.byDate.get(byDateKey) as any : null;
+                  const providedByJob = jobId && staffingMaps?.byJob.get(byJobKey) ? (staffingMaps?.byJob.get(byJobKey) as any) : null;
+                  const providedByDate = staffingMaps?.byDate.get(byDateKey) ? (staffingMaps?.byDate.get(byDateKey) as any) : null;
                   
                   return (
                     <div
                       key={dateIndex}
                       className="matrix-cell-wrapper"
                       style={{
-                        left: dateIndex * CELL_WIDTH,
+                        transform: `translate3d(${dateIndex * CELL_WIDTH}px, 0, 0)`,
                         width: CELL_WIDTH,
                         height: CELL_HEIGHT
                       }}
@@ -589,7 +585,7 @@ export const OptimizedAssignmentMatrix = ({
                         onOptimisticUpdate={(status) => assignment && handleOptimisticUpdate(technician.id, assignment.job_id, status)}
                         onRender={() => incrementCellRender()}
                         jobId={jobId}
-                        declinedJobIds={Array.from(declinedJobsByTech.get(technician.id) || [])}
+                        declinedJobIdsSet={declinedJobsByTech.get(technician.id) || new Set<string>()}
                         allowDirectAssign={allowDirectAssign}
                         staffingStatusProvided={providedByJob}
                         staffingStatusByDateProvided={providedByDate}

@@ -6,8 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Calendar, Clock, Check, X, UserX, Mail, CheckCircle, Ban } from 'lucide-react';
 import { format, isToday, isWeekend } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useStaffingStatus, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
-import { useStaffingStatusByDate } from '@/features/staffing/hooks/useStaffingStatusByDate';
+import { useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
 import { toast } from 'sonner';
 import { labelForCode } from '@/utils/roles';
 
@@ -31,7 +30,7 @@ interface OptimizedMatrixCellProps {
   onRender?: () => void;
   jobId?: string;
   allowDirectAssign?: boolean;
-  declinedJobIds?: string[];
+  declinedJobIdsSet?: Set<string>;
   staffingStatusProvided?: { availability_status: any; offer_status: any } | null;
   staffingStatusByDateProvided?: { availability_status: any; offer_status: any; availability_job_id?: string | null; offer_job_id?: string | null } | null;
 }
@@ -51,7 +50,7 @@ export const OptimizedMatrixCell = memo(({
   onRender,
   jobId,
   allowDirectAssign = false,
-  declinedJobIds = [],
+  declinedJobIdsSet = new Set<string>(),
   staffingStatusProvided = null,
   staffingStatusByDateProvided = null
 }: OptimizedMatrixCellProps) => {
@@ -66,15 +65,9 @@ export const OptimizedMatrixCell = memo(({
   const isDeclinedAssignment = hasAssignment && assignment.status === 'declined';
   const isUnavailable = availability?.status === 'unavailable';
 
-  // Staffing status hooks
-  // Always call hooks to preserve consistent hook ordering, then prefer provided statuses
-  const { data: hookStatusByJob } = useStaffingStatus(
-    jobId || assignment?.job_id || '', 
-    technician.id
-  );
-  const { data: hookStatusByDate } = useStaffingStatusByDate(technician.id, date);
-  const staffingStatusByJob = staffingStatusProvided ?? hookStatusByJob;
-  const staffingStatusByDate = staffingStatusByDateProvided ?? hookStatusByDate;
+  // Staffing status: use provided batched data exclusively for performance
+  const staffingStatusByJob = staffingStatusProvided;
+  const staffingStatusByDate = staffingStatusByDateProvided;
   const { mutate: sendStaffingEmail, isPending: isSendingEmail } = useSendStaffingEmail();
   const [availabilityRetrying, setAvailabilityRetrying] = React.useState(false);
   const [pendingRetry, setPendingRetry] = React.useState<null | { jobId: string }>(null);
@@ -86,20 +79,8 @@ export const OptimizedMatrixCell = memo(({
   const handleStaffingEmail = useCallback((e: React.MouseEvent, phase: 'availability' | 'offer') => {
     e.stopPropagation();
     
-    console.log('🔥 MAIL ICON CLICKED! handleStaffingEmail called', {
-      phase,
-      technician: `${technician.first_name} ${technician.last_name}`,
-      technicianId: technician.id,
-      date: format(date, 'yyyy-MM-dd'),
-      jobId: jobId || assignment?.job_id,
-      hasAssignment,
-      assignment,
-      clickEvent: 'MAIL_ICON_CLICKED'
-    });
-    
     // For requests on empty cells, we need to select a job first
     if (phase === 'availability' && !hasAssignment && !jobId) {
-      console.log('📋 No job selected for request, calling onClick with select-job-for-staffing');
       onClick('select-job-for-staffing');
       return;
     }
@@ -113,7 +94,7 @@ export const OptimizedMatrixCell = memo(({
         return;
       }
       // Block staffing for jobs previously declined by this technician
-      if (declinedJobIds.includes(targetJobId)) {
+      if (declinedJobIdsSet.has(targetJobId)) {
         toast.error('This job was already declined; choose a different job.');
         return;
       }
@@ -135,30 +116,17 @@ export const OptimizedMatrixCell = memo(({
   const handleCellClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     
-    console.log('Cell clicked:', {
-      technician: `${technician.first_name} ${technician.last_name}`,
-      date: format(date, 'yyyy-MM-dd'),
-      hasAssignment,
-      isUnavailable,
-      assignment
-    });
-    
     if (hasAssignment) {
-      console.log('Opening assignment edit dialog');
       if (allowDirectAssign) {
         onClick('assign'); // Edit existing assignment
       } else {
-        console.log('Direct assign disabled; ignoring assignment edit');
       }
     } else if (isUnavailable) {
-      console.log('Opening unavailability dialog');
       onClick('unavailable'); // Edit unavailability
     } else {
-      console.log('Opening job selection dialog');
       if (allowDirectAssign) {
         onClick('select-job'); // Create new assignment
       } else {
-        console.log('Direct assign disabled; ignoring select-job');
       }
     }
   }, [hasAssignment, isUnavailable, onClick, technician, date, assignment, allowDirectAssign]);
@@ -220,24 +188,7 @@ export const OptimizedMatrixCell = memo(({
   // Manual progression: allow offering even if availability isn't in confirmed state
   const canOfferFallback = !hasAssignment && !isUnavailable && !canSendOffer;
 
-  // Debug logging for staffing button visibility
-  React.useEffect(() => {
-    console.log('🔍 STAFFING BUTTON DEBUG:', {
-      technician: `${technician.first_name} ${technician.last_name}`,
-      date: format(date, 'yyyy-MM-dd'),
-      hasAssignment,
-      isUnavailable,
-      staffingStatus,
-      jobId: jobId || assignment?.job_id || '',
-      canAskAvailability,
-      canSendOffer,
-      conditions: {
-        noAssignment: !hasAssignment,
-        notUnavailable: !isUnavailable,
-        staffingStatusCheck: (!staffingStatus?.availability_status || staffingStatus.availability_status === 'declined' || staffingStatus.availability_status === 'expired')
-      }
-    });
-  }, [canAskAvailability, canSendOffer, technician, date, hasAssignment, isUnavailable, staffingStatus, jobId, assignment]);
+  // Skip noisy debug logs in production
 
   return (
     <div
@@ -337,15 +288,11 @@ export const OptimizedMatrixCell = memo(({
         <div className="absolute top-1 right-1 flex gap-1 z-10">
           {canAskAvailability && (
             <>
-              {console.log('🔵 Rendering ASK AVAILABILITY button for:', `${technician.first_name} ${technician.last_name}`, format(date, 'yyyy-MM-dd'))}
               <Button
                 variant="ghost"
                 size="sm"
                 className="h-5 w-5 p-0 hover:bg-blue-100"
-                onClick={(e) => {
-                  console.log('📧 ASK AVAILABILITY CLICKED!');
-                  handleStaffingEmail(e, 'availability');
-                }}
+                onClick={(e) => handleStaffingEmail(e, 'availability')}
                 disabled={isSendingEmail}
                 title="Ask availability"
               >
@@ -355,15 +302,11 @@ export const OptimizedMatrixCell = memo(({
           )}
           {(canSendOffer || canOfferFallback) && (
             <>
-              {console.log('🟢 Rendering SEND OFFER button for:', `${technician.first_name} ${technician.last_name}`, format(date, 'yyyy-MM-dd'))}
               <Button
                 variant="ghost"
                 size="sm"
                 className={`h-5 w-5 p-0 ${canSendOffer ? 'hover:bg-green-100' : 'opacity-80 hover:bg-muted'}`}
-                onClick={(e) => {
-                  console.log('✅ SEND OFFER CLICKED!');
-                  handleStaffingEmail(e, 'offer');
-                }}
+                onClick={(e) => handleStaffingEmail(e, 'offer')}
                 disabled={isSendingEmail}
                 title={canSendOffer ? 'Send offer' : 'Send offer (manual progress)'}
               >

@@ -243,19 +243,20 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
 
   // Optimistic update functions
   const updateAssignmentOptimistically = (technicianId: string, jobId: string, newStatus: string) => {
-    const queryKey = ['optimized-matrix-assignments', jobIds];
-    const oldData = queryClient.getQueryData(queryKey);
-    
-    if (oldData) {
-      const updatedData = (oldData as any[]).map(assignment => {
-        if (assignment.technician_id === technicianId && assignment.job_id === jobId) {
-          return { ...assignment, status: newStatus, response_time: new Date().toISOString() };
-        }
-        return assignment;
-      });
-      
-      queryClient.setQueryData(queryKey, updatedData);
-    }
+    // Update all cached assignment queries to reflect the new status immediately
+    queryClient.setQueriesData({ queryKey: ['optimized-matrix-assignments'] }, (old: any) => {
+      if (!old) return old;
+      try {
+        return (old as any[]).map((assignment: any) => {
+          if (assignment.technician_id === technicianId && assignment.job_id === jobId) {
+            return { ...assignment, status: newStatus, response_time: new Date().toISOString() };
+          }
+          return assignment;
+        });
+      } catch {
+        return old;
+      }
+    });
   };
 
   // Invalidate specific queries for real-time updates

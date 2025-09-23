@@ -177,6 +177,8 @@
   overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  will-change: scroll-position;
+  -webkit-overflow-scrolling: touch;
 }
 
 .matrix-main-scroll::-webkit-scrollbar {
@@ -202,12 +204,15 @@
   position: relative;
   background: hsl(var(--background));
   contain: layout style paint;
+  will-change: transform;
 }
 
 .matrix-row {
   position: absolute;
   width: 100%;
   contain: layout style;
+  content-visibility: auto;
+  contain-intrinsic-size: 60px;
 }
 
 .matrix-cell-wrapper {
@@ -215,6 +220,8 @@
   border-right: 1px solid hsl(var(--border));
   border-bottom: 1px solid hsl(var(--border));
   contain: layout style paint;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 /* Responsive adjustments */
