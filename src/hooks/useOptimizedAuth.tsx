@@ -19,6 +19,7 @@ interface AuthContextType {
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
   signUp: (userData: SignUpData) => Promise<void>;
+  createUserAsAdmin: (userData: Omit<SignUpData, 'password'> & { role?: string }) => Promise<{ id: string; email: string } | null>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<Session | null>;
   setUserRole: (role: string | null) => void;
@@ -364,10 +365,13 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       });
 
       if (error) {
-        setError(error.message);
+        const msg = /signups not allowed/i.test(error.message)
+          ? 'Signups are disabled. Please ask an admin to create your account.'
+          : error.message;
+        setError(msg);
         toast({
           title: "Signup failed",
-          description: error.message,
+          description: msg,
           variant: "destructive",
         });
         return;
@@ -399,6 +403,41 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Admin/management-only create user via Edge Function (service role)
+  const createUserAsAdmin = async (userData: Omit<SignUpData, 'password'> & { role?: string }) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: userData.email.toLowerCase(),
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          phone: userData.phone,
+          department: userData.department,
+          dni: userData.dni,
+          residencia: userData.residencia,
+          role: (userData as any).role,
+        }
+      });
+      if (error) {
+        const msg = error.message || 'Failed to create user';
+        setError(msg);
+        toast({ title: 'Create user failed', description: msg, variant: 'destructive' });
+        return null;
+      }
+      toast({ title: 'User created', description: `${data?.email || userData.email} has been created.` });
+      return data as { id: string; email: string };
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to create user';
+      setError(msg);
+      toast({ title: 'Create user failed', description: msg, variant: 'destructive' });
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -557,6 +596,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     error,
     login,
     signUp,
+    createUserAsAdmin,
     logout,
     refreshSession,
     setUserRole,

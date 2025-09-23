@@ -14,7 +14,7 @@ interface SignUpFormProps {
 }
 
 export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps) => {
-  const { signUp, isLoading, error: authError } = useOptimizedAuth();
+  const { signUp, createUserAsAdmin, isLoading, error: authError } = useOptimizedAuth();
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: "",
@@ -53,16 +53,30 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
       return;
     }
 
-    await signUp({
-      email: formData.email,
-      password: formData.password,
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      phone: formData.phone,
-      department: formData.department,
-      dni: formData.dni,
-      residencia: formData.residencia,
-    });
+    if (preventAutoLogin) {
+      // Management creates user via Edge Function; no password needed here
+      await createUserAsAdmin({
+        email: formData.email,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone,
+        department: formData.department,
+        dni: formData.dni,
+        residencia: formData.residencia,
+      });
+      return;
+    } else {
+      await signUp({
+        email: formData.email,
+        password: formData.password,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone,
+        department: formData.department,
+        dni: formData.dni,
+        residencia: formData.residencia,
+      });
+    }
   };
 
   return (

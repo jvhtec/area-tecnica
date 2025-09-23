@@ -410,18 +410,15 @@ export const OptimizedAssignmentMatrix = ({
   }, [technicians.length, dates.length, scheduleVisibleWindowUpdate]);
 
   // Batched staffing statuses for visible window
-  const visibleTechIds = useMemo(() => technicians.slice(visibleRows.start, visibleRows.end + 1).map(t => t.id), [technicians, visibleRows.start, visibleRows.end]);
-  const visibleDates = useMemo(() => dates.slice(visibleCols.start, visibleCols.end + 1), [dates, visibleCols.start, visibleCols.end]);
-  // Collect jobs overlapping visible dates
-  const visibleJobsLite = useMemo(() => {
-    const s = new Set<string>();
-    visibleDates.forEach(d => {
-      const js = getJobsForDate(d);
-      js.forEach(j => s.add(j.id));
-    });
-    return jobs.filter(j => s.has(j.id)).map(j => ({ id: j.id, start_time: j.start_time, end_time: j.end_time }));
-  }, [visibleDates, jobs, getJobsForDate]);
-  const { data: staffingMaps } = useStaffingMatrixStatuses(visibleTechIds, visibleJobsLite, visibleDates);
+  const visibleTechIds = useMemo(() => {
+    const start = Math.max(0, visibleRows.start - 10);
+    const end = Math.min(technicians.length - 1, visibleRows.end + 10);
+    return technicians.slice(start, end + 1).map(t => t.id);
+  }, [technicians, visibleRows.start, visibleRows.end]);
+  // Fetch staffing statuses for ALL currently loaded dates and jobs for the visible technicians
+  // This avoids re-fetching when scrolling horizontally, making badges render immediately.
+  const allJobsLite = useMemo(() => jobs.map(j => ({ id: j.id, start_time: j.start_time, end_time: j.end_time })), [jobs]);
+  const { data: staffingMaps } = useStaffingMatrixStatuses(visibleTechIds, allJobsLite, dates);
 
   const getCurrentTechnician = useCallback(() => {
     if (!cellAction?.technicianId) return null;

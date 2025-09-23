@@ -167,7 +167,9 @@ export function useStaffingMatrixStatuses(
 
       return { byJob: mapByJob, byDate: mapByDate }
     },
-    staleTime: 1000,
-    refetchOnWindowFocus: false
+    staleTime: 1500,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    placeholderData: (prev) => prev as any,
   })
 }
