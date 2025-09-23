@@ -16,6 +16,7 @@ interface DateHeaderProps {
     end_time: string;
     color?: string;
     status: string;
+    _assigned_count?: number;
   }>;
 }
 
@@ -129,9 +130,14 @@ export const DateHeader = ({ date, width, jobs = [] }: DateHeaderProps) => {
                         {format(new Date(job.start_time), 'HH:mm')} - {format(new Date(job.end_time), 'HH:mm')}
                       </div>
                     </div>
-                    <Badge variant="outline" className="text-xs">
-                      {job.status}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {job.status === 'Cancelado' && (
+                        <Badge variant="destructive" className="text-[10px]">Call these people to cancel</Badge>
+                      )}
+                      <Badge variant="outline" className="text-xs">
+                        {job.status}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
               ))}

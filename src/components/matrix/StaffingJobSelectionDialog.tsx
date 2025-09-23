@@ -28,6 +28,7 @@ interface StaffingJobSelectionDialogProps {
     end_time: string;
     color?: string;
     status: string;
+    _assigned_count?: number;
   }>;
   declinedJobIds?: string[];
   preselectedJobId?: string | null;
@@ -130,6 +131,9 @@ export const StaffingJobSelectionDialog = ({
                       </div>
                       <div className="flex items-center gap-2">
                         {isDeclined && <Badge variant="destructive">Declined</Badge>}
+                        {job.status === 'Cancelado' && (
+                          <Badge variant="destructive" className="text-[10px]">Call these people to cancel</Badge>
+                        )}
                         <Badge variant="secondary">{job.status}</Badge>
                       </div>
                     </div>

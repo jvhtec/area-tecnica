@@ -26,6 +26,7 @@ import { TourRatesManagerDialog } from "@/components/tours/TourRatesManagerDialo
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { TourManagementDialog } from "@/components/tours/TourManagementDialog";
+import { TourLogisticsDialog } from "@/components/tours/TourLogisticsDialog";
 import { TourDateManagementDialog } from "@/components/tours/TourDateManagementDialog";
 import { TourDefaultsManager } from "@/components/tours/TourDefaultsManager";
 import { TourAssignmentDialog } from "@/components/tours/TourAssignmentDialog";
@@ -58,6 +59,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
   const [isAssignmentsOpen, setIsAssignmentsOpen] = useState(false);
   const [isDocumentsOpen, setIsDocumentsOpen] = useState(false);
   const [isRatesManagerOpen, setIsRatesManagerOpen] = useState(false);
+  const [isLogisticsOpen, setIsLogisticsOpen] = useState(false);
   const [tourLogoUrl, setTourLogoUrl] = useState<string | undefined>();
   const [isPrintingSchedule, setIsPrintingSchedule] = useState(false);
 
@@ -201,11 +203,11 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
       viewOnly: true
     },
     {
-      title: "Logistics Integration",
-      description: "Transport, accommodation, and logistics",
+      title: "Logistics",
+      description: "Tour‑wide transport with per‑date overrides",
       icon: Truck,
-      onClick: () => {},
-      badge: "Coming Soon",
+      onClick: () => setIsLogisticsOpen(true),
+      badge: "Available",
       showForTechnician: false
     }
   ].filter(action => {
@@ -511,6 +513,15 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
         tourId={tour.id}
         tourName={tour.name}
       />
+
+      {/* Logistics – tour‑wide with per‑date overrides */}
+      {!isTechnicianView && (
+        <TourLogisticsDialog
+          open={isLogisticsOpen}
+          onOpenChange={setIsLogisticsOpen}
+          tourId={tour.id}
+        />
+      )}
     </div>
   );
 };

@@ -13,7 +13,7 @@ import { Euro, Wrench, AlertTriangle, Calendar, Users } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
-import { useTourJobRateQuotes } from '@/hooks/useTourJobRateQuotes';
+import { useTourJobRateQuotesForManager } from '@/hooks/useTourJobRateQuotesForManager';
 import { useRateExtrasCatalog, useSaveRateExtra } from '@/hooks/useRateExtrasCatalog';
 import { useTourBaseRates, useSaveTourBaseRate } from '@/hooks/useTourBaseRates';
 import { useSaveHouseTechRate } from '@/hooks/useHouseTechRates';
@@ -51,7 +51,8 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
     }
   }, [open, tourJobs, selectedJobId]);
 
-  const { data: quotes = [], isLoading: quotesLoading } = useTourJobRateQuotes(selectedJobId);
+  // Manager view: compute quotes for all tour assignments regardless of auth.uid()
+  const { data: quotes = [], isLoading: quotesLoading } = useTourJobRateQuotesForManager(selectedJobId, tourId);
 
   // Fetch profiles for names
   const { data: profiles = [] } = useQuery({

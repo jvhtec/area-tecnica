@@ -18,6 +18,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FestivalShift, ShiftWithAssignments } from "@/types/festival-scheduling";
 import { Department } from "@/types/department";
+import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
 import { Switch } from "@/components/ui/switch";
 
 interface ManageAssignmentsDialogProps {
@@ -61,9 +62,9 @@ export const ManageAssignmentsDialog = ({
   // Set a default role when dialog opens based on department
   useEffect(() => {
     if (open && shift.department) {
-      const roleOptions = getRoleOptions(shift.department as Department);
-      if (roleOptions.length > 0) {
-        setRole(roleOptions[0]);
+      const opts = roleOptionsForDiscipline(String(shift.department));
+      if (opts.length > 0) {
+        setRole(opts[0].code);
       }
     }
   }, [open, shift.department]);
@@ -108,17 +109,9 @@ export const ManageAssignmentsDialog = ({
   });
 
   // Function to get department-specific role options
-  const getRoleOptions = (department: Department) => {
-    switch (department) {
-      case "sound":
-        return ["FOH Engineer", "Monitor Engineer", "PA Tech", "RF Tech"];
-      case "lights":
-        return ["Lighting Designer", "Lighting Tech", "Follow Spot"];
-      case "video":
-        return ["Video Director", "Camera Operator", "Video Tech"];
-      default:
-        return ["Technician", "Stagehand", "Other"];
-    }
+  const getRoleOptions = (department: Department): string[] => {
+    const opts = roleOptionsForDiscipline(String(department));
+    return opts.map(o => o.code);
   };
 
   // Function to sort technicians - house techs first
@@ -319,9 +312,9 @@ export const ManageAssignmentsDialog = ({
                       <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
                     <SelectContent>
-                      {getRoleOptions(shift.department as Department || "sound").map((roleOption) => (
-                        <SelectItem key={roleOption} value={roleOption}>
-                          {roleOption}
+                      {getRoleOptions(shift.department as Department || "sound").map((code) => (
+                        <SelectItem key={code} value={code}>
+                          {labelForCode(code)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -342,7 +335,7 @@ export const ManageAssignmentsDialog = ({
                       <div>
                         {assignment.external_technician_name || 
                           `${assignment.profiles?.first_name} ${assignment.profiles?.last_name}`} 
-                        - {assignment.role}
+                        - {labelForCode(assignment.role) || assignment.role}
                       </div>
                       {!isViewOnly && (
                         <Button 

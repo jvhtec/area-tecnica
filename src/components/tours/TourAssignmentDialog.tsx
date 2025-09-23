@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
 
 interface TourAssignment {
   id: string;
@@ -45,10 +46,9 @@ const DEPARTMENTS = [
   { value: 'production', label: 'Production' }
 ];
 
-const ROLES_BY_DEPARTMENT = {
-  sound: ['FOH Engineer', 'Monitor Engineer', 'RF Technician', 'PA Technician', 'System Technician'],
-  lights: ['Lighting Designer', 'Lighting Technician', 'Rigger', 'Spot Operator'],
-  video: ['Video Director', 'Video Technician', 'Camera Operator', 'Playback Technician'],
+// Centralized technical roles (sound/lights/video) come from the roles registry and are stored as codes.
+// For non-technical departments we keep simple label lists.
+const NON_TECH_ROLE_LABELS: Record<string, string[]> = {
   logistics: ['Logistics Coordinator', 'Transport Manager', 'Load Manager'],
   production: ['Tour Manager', 'Production Manager', 'Stage Manager', 'Backline Technician']
 };
@@ -196,8 +196,14 @@ export const TourAssignmentDialog = ({
   };
 
   const getAvailableRoles = () => {
-    if (!selectedDepartment) return [];
-    return ROLES_BY_DEPARTMENT[selectedDepartment as keyof typeof ROLES_BY_DEPARTMENT] || [];
+    if (!selectedDepartment) return [] as Array<{ value: string; label: string }>;
+    // Technical departments: use role codes registry
+    if (['sound','lights','video'].includes(selectedDepartment)) {
+      return roleOptionsForDiscipline(selectedDepartment).map(opt => ({ value: opt.code, label: opt.label }));
+    }
+    // Non-technical: use static labels
+    const labels = NON_TECH_ROLE_LABELS[selectedDepartment] || [];
+    return labels.map(l => ({ value: l, label: l }));
   };
 
   const groupedAssignments = assignments.reduce((acc, assignment) => {
@@ -271,7 +277,7 @@ export const TourAssignmentDialog = ({
                                   }
                                 </span>
                                 <Badge variant="outline" className="text-xs">
-                                  {assignment.role}
+                                  {labelForCode(assignment.role) || assignment.role}
                                 </Badge>
                                 {assignment.external_technician_name && (
                                   <Badge variant="secondary" className="text-xs">
@@ -338,9 +344,9 @@ export const TourAssignmentDialog = ({
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
-                      {getAvailableRoles().map(role => (
-                        <SelectItem key={role} value={role}>
-                          {role}
+                      {getAvailableRoles().map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
                         </SelectItem>
                       ))}
                     </SelectContent>

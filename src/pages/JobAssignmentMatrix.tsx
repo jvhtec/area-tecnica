@@ -136,7 +136,8 @@ export default function JobAssignmentMatrix() {
         .from('jobs')
         .select(`
           id, title, start_time, end_time, color, status, job_type,
-          job_departments!inner(department)
+          job_departments!inner(department),
+          job_assignments!job_id(technician_id)
         `)
         .gte('start_time', startDate.toISOString())
         .lte('end_time', endDate.toISOString())
@@ -151,7 +152,24 @@ export default function JobAssignmentMatrix() {
       const { data, error } = await query.order('start_time', { ascending: true });
 
       if (error) throw error;
-      return data || [];
+
+      // Filter out cancelled jobs unless they have assigned technicians
+      const filtered = (data || []).map((j: any) => {
+        const assigns = Array.isArray(j.job_assignments) ? j.job_assignments : [];
+        return {
+          id: j.id,
+          title: j.title,
+          start_time: j.start_time,
+          end_time: j.end_time,
+          color: j.color,
+          status: j.status,
+          job_type: j.job_type,
+          // keep for downstream UI warnings
+          _assigned_count: assigns.length as number,
+        };
+      }).filter((j: any) => j.status !== 'Cancelado' || j._assigned_count > 0);
+
+      return filtered;
     },
     enabled: dateRange.length > 0,
     staleTime: 5 * 60 * 1000, // 5 minutes

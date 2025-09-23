@@ -46,7 +46,7 @@ export const useOptimizedJobs = (
       .from('jobs')
       .select(`
         *,
-        location:locations!inner(
+        location:locations(
           id,
           name,
           formatted_address
@@ -156,11 +156,12 @@ export const useOptimizedJobs = (
       }))
       .filter(job => {
         const meta = job.tour_meta;
+        // Hide anything tied to a cancelled/deleted tour
         if (meta && (meta.status === 'cancelled' || meta.deleted === true)) {
-          // Hide jobs tied to cancelled tours from operational views
           return false;
         }
-        return true;
+        // Also hide jobs explicitly cancelled
+        return job.status !== 'Cancelado';
       });
 
     const duration = Date.now() - startTime;

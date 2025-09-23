@@ -3,7 +3,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Mail, User, Building, Phone, IdCard, Award, Plus } from 'lucide-react';
+import { Mail, User, Building, Phone, IdCard, Award, Plus, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ManageSkillsDialog } from '@/components/users/ManageSkillsDialog';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
@@ -35,6 +35,8 @@ export const TechnicianRow = ({ technician, height }: TechnicianRowProps) => {
 
   const [metricsLoading, setMetricsLoading] = React.useState(false);
   const [metrics, setMetrics] = React.useState<{ monthConfirmed: number; yearConfirmed: number }>({ monthConfirmed: 0, yearConfirmed: 0 });
+  const [residencia, setResidencia] = React.useState<string | null>(null);
+  const [residenciaLoading, setResidenciaLoading] = React.useState(false);
 
   const loadMetrics = React.useCallback(async () => {
     try {
@@ -72,6 +74,22 @@ export const TechnicianRow = ({ technician, height }: TechnicianRowProps) => {
     }
   }, [technician.id]);
 
+  const loadProfileResidencia = React.useCallback(async () => {
+    try {
+      setResidenciaLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('residencia')
+        .eq('id', technician.id)
+        .single();
+      if (!error) {
+        setResidencia((data as any)?.residencia ?? null);
+      }
+    } finally {
+      setResidenciaLoading(false);
+    }
+  }, [technician.id]);
+
   const handleSkillsOpenChange = (open: boolean) => {
     if (!open) {
       // Invalidate technicians list so skills refresh
@@ -84,6 +102,10 @@ export const TechnicianRow = ({ technician, height }: TechnicianRowProps) => {
     setPopoverOpen(open);
     if (open) {
       loadMetrics();
+      // Fetch residencia lazily when opening
+      if (residencia === null) {
+        loadProfileResidencia();
+      }
     }
   };
   const getInitials = () => {
@@ -192,6 +214,16 @@ export const TechnicianRow = ({ technician, height }: TechnicianRowProps) => {
                 <span className="text-sm truncate">{technician.email}</span>
               </div>
             )}
+
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm">Residencia:</span>
+              {residenciaLoading ? (
+                <span className="text-sm text-muted-foreground">Loading…</span>
+              ) : (
+                <span className="text-sm truncate">{residencia || '—'}</span>
+              )}
+            </div>
 
             {technician.phone && (
               <div className="flex items-center gap-2">

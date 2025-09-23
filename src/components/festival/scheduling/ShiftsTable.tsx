@@ -17,6 +17,7 @@ import { supabase } from "@/lib/supabase";
 import { EditShiftDialog } from "./EditShiftDialog";
 import { ManageAssignmentsDialog } from "./ManageAssignmentsDialog";
 import { CopyShiftsDialog } from "./CopyShiftsDialog";
+import { labelForCode } from '@/utils/roles';
 
 interface ShiftsTableProps {
   shifts: ShiftWithAssignments[];
@@ -245,7 +246,7 @@ export const ShiftsTable = ({
                       <li key={assignment.id} className="text-sm">
                         {assignment.external_technician_name || 
                           (assignment.profiles && 
-                            `${assignment.profiles.first_name} ${assignment.profiles.last_name}`)} ({assignment.role})
+                            `${assignment.profiles.first_name} ${assignment.profiles.last_name}`)} ({labelForCode(assignment.role) || assignment.role})
                       </li>
                     ))}
                   </ul>
