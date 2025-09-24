@@ -20,8 +20,8 @@ import {
   Calendar
 } from "lucide-react";
 import { format } from "date-fns";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { PlacesRestaurantService } from "@/utils/hoja-de-ruta/services/places-restaurant-service";
 import type { Restaurant } from "@/types/hoja-de-ruta";
 import { labelForCode } from '@/utils/roles';
@@ -45,6 +45,8 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 }) => {
   const [selectedTab, setSelectedTab] = useState('info');
   const { userRole } = useOptimizedAuth();
+  const isManager = ['admin','management'].includes(userRole || '');
+  const queryClient = useQueryClient();
 
   // Fetch comprehensive job data
   const { data: jobDetails, isLoading: isJobLoading } = useQuery({
@@ -260,6 +262,48 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                     <p className="text-sm font-medium mb-2">Job Type</p>
                     <Badge variant="outline">{jobDetails?.job_type}</Badge>
                   </div>
+
+                  {isManager && (
+                    <div className="flex items-center justify-between p-3 border rounded-md bg-muted/30">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={jobDetails?.rates_approved ? 'default' : 'secondary'}>
+                          {jobDetails?.rates_approved ? 'Rates Approved' : 'Approval Required'}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">Controls technician visibility of per-job payouts</span>
+                      </div>
+                      <div>
+                        {jobDetails?.rates_approved ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              await supabase
+                                .from('jobs')
+                                .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null } as any)
+                                .eq('id', job.id);
+                              queryClient.invalidateQueries({ queryKey: ['job-details', job.id] });
+                            }}
+                          >
+                            Revoke
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              const { data: u } = await supabase.auth.getUser();
+                              await supabase
+                                .from('jobs')
+                                .update({ rates_approved: true, rates_approved_at: new Date().toISOString(), rates_approved_by: u?.user?.id || null } as any)
+                                .eq('id', job.id);
+                              queryClient.invalidateQueries({ queryKey: ['job-details', job.id] });
+                            }}
+                          >
+                            Approve
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                       {jobDetails?.locations && (
                         <div>

@@ -23,6 +23,8 @@ import {
   Euro
 } from "lucide-react";
 import { TourRatesManagerDialog } from "@/components/tours/TourRatesManagerDialog";
+import { useTourRatesApproval } from "@/hooks/useTourRatesApproval";
+import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { TourManagementDialog } from "@/components/tours/TourManagementDialog";
@@ -64,6 +66,8 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
   const [isPrintingSchedule, setIsPrintingSchedule] = useState(false);
 
   const { assignments } = useTourAssignments(tour?.id);
+  const { data: approvalRow, refetch: refetchApproval } = useTourRatesApproval(tour?.id);
+  const tourRatesApproved = !!approvalRow?.rates_approved;
   // Use tour.id directly - the service now handles tours properly
   const { flexUuid, isLoading: isFlexLoading, error: flexError, folderExists } = useFlexUuid(tour?.id || '');
 
@@ -167,7 +171,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
       description: "Set extras and resolve rate issues",
       icon: Euro,
       onClick: () => setIsRatesManagerOpen(true),
-      badge: "Management",
+      badge: tourRatesApproved ? "Rates Approved" : "Needs Approval",
       showForTechnician: false
     },
     {
@@ -414,9 +418,45 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
                       </Badge>
                     )}
                   </div>
-                  <Badge variant={action.badge === "Coming Soon" ? "secondary" : "outline"}>
-                    {action.badge}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={action.badge === "Coming Soon" ? "secondary" : tourRatesApproved && action.title === 'Rates & Extras Manager' ? 'default' : 'outline'}>
+                      {action.badge}
+                    </Badge>
+                    {!isTechnicianView && action.title === 'Rates & Extras Manager' && (
+                      tourRatesApproved ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await supabase
+                              .from('tours')
+                              .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null } as any)
+                              .eq('id', tour.id);
+                            refetchApproval();
+                          }}
+                        >
+                          Revoke
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const { data: u } = await supabase.auth.getUser();
+                            await supabase
+                              .from('tours')
+                              .update({ rates_approved: true, rates_approved_at: new Date().toISOString(), rates_approved_by: u?.user?.id || null } as any)
+                              .eq('id', tour.id);
+                            refetchApproval();
+                          }}
+                        >
+                          Approve
+                        </Button>
+                      )
+                    )}
+                  </div>
                 </div>
                 <CardTitle className="text-sm">{action.title}</CardTitle>
               </CardHeader>

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { Euro, Wrench, AlertTriangle, Calendar, Users } from 'lucide-react';
+import { Euro, Wrench, AlertTriangle, Calendar, Users, ShieldCheck, ShieldX } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -19,6 +19,7 @@ import { useTourBaseRates, useSaveTourBaseRate } from '@/hooks/useTourBaseRates'
 import { useSaveHouseTechRate } from '@/hooks/useHouseTechRates';
 import { JobExtrasEditor } from '@/components/jobs/JobExtrasEditor';
 import { formatCurrency } from '@/lib/utils';
+import { useTourRatesApproval } from '@/hooks/useTourRatesApproval';
 
 type TourRatesManagerDialogProps = {
   open: boolean;
@@ -111,15 +112,61 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
   });
 
   const [activeTab, setActiveTab] = useState('by-date');
+  const { data: approvalRow, refetch: refetchApproval } = useTourRatesApproval(tourId);
+  const approved = !!approvalRow?.rates_approved;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Euro className="h-5 w-5" />
-            Rates & Extras Manager
-          </DialogTitle>
+          <div className="flex items-center justify-between gap-2">
+            <DialogTitle className="flex items-center gap-2">
+              <Euro className="h-5 w-5" />
+              Rates & Extras Manager
+            </DialogTitle>
+            <div className="flex items-center gap-2">
+              <Badge variant={approved ? 'default' : 'secondary'} className="hidden sm:inline-flex">
+                {approved ? 'Rates Approved' : 'Approval Required'}
+              </Badge>
+              {approved ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    const { error } = await supabase
+                      .from('tours')
+                      .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null } as any)
+                      .eq('id', tourId);
+                    if (!error) {
+                      refetchApproval();
+                    }
+                  }}
+                  className="flex items-center gap-1"
+                >
+                  <ShieldX className="h-4 w-4" /> Revoke Approval
+                </Button>
+              ) : (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={async () => {
+                    const { data: user } = await supabase.auth.getUser();
+                    const approver = user?.user?.id || null;
+                    const { error } = await supabase
+                      .from('tours')
+                      .update({ rates_approved: true, rates_approved_at: new Date().toISOString(), rates_approved_by: approver } as any)
+                      .eq('id', tourId);
+                    if (!error) {
+                      refetchApproval();
+                    }
+                  }}
+                  className="flex items-center gap-1"
+                >
+                  <ShieldCheck className="h-4 w-4" /> Approve Rates
+                </Button>
+              )}
+            </div>
+          </div>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">

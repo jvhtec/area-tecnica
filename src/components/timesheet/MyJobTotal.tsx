@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Euro, Plus, User } from 'lucide-react';
+import { Euro, Plus, User, ShieldAlert } from 'lucide-react';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { formatCurrency } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
 
 interface MyJobTotalProps {
   jobId: string;
@@ -18,6 +19,7 @@ export function MyJobTotal({ jobId }: MyJobTotalProps) {
   const isTech = userRole === 'technician' || userRole === 'house_tech';
   // Techs: filter by current user. Management: fetch all rows for job.
   const { data: rows = [], isLoading, error } = useJobPayoutTotals(jobId, isTech ? user?.id : undefined);
+  const { data: approvalRow } = useJobRatesApproval(jobId);
 
   // For management, fetch names to display in selector
   const { data: assignments = [] } = useQuery({
@@ -65,7 +67,9 @@ export function MyJobTotal({ jobId }: MyJobTotalProps) {
     );
   }
 
-  if (error || rows.length === 0) {
+  const isApproved = approvalRow?.rates_approved ?? false;
+
+  if ((isTech && !isApproved) || error || rows.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -74,7 +78,14 @@ export function MyJobTotal({ jobId }: MyJobTotalProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-sm text-muted-foreground">No approved amounts yet.</div>
+          {isTech && !isApproved ? (
+            <div className="text-sm text-muted-foreground flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4" />
+              Rates for this job are pending approval by management.
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">No approved amounts yet.</div>
+          )}
         </CardContent>
       </Card>
     );

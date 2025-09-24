@@ -6,9 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Euro, Info, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { format, getISOWeek, getISOWeekYear, startOfWeek, endOfWeek } from "date-fns";
 import { useTechnicianTourRateQuotes } from "@/hooks/useTourJobRateQuotes";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useTourRatesApprovalMap } from "@/hooks/useTourRatesApproval";
 
 export const TechnicianTourRates: React.FC = () => {
   const { data: quotes, isLoading, error } = useTechnicianTourRateQuotes();
+  const { userRole } = useOptimizedAuth();
 
   if (isLoading) {
     return (
@@ -38,6 +41,9 @@ export const TechnicianTourRates: React.FC = () => {
       </Alert>
     );
   }
+
+  const tourIds = Array.from(new Set((quotes || []).map(q => q.tour_id).filter(Boolean))) as string[];
+  const { data: approvalMap } = useTourRatesApprovalMap(tourIds);
 
   if (!quotes?.length) {
     return (
@@ -115,6 +121,8 @@ export const TechnicianTourRates: React.FC = () => {
 
   const activeWeekIndex = activeWeekKey ? allowedWeekKeys.indexOf(activeWeekKey) : -1;
   const selectedQuotes = activeWeekKey ? weekGroups[activeWeekKey] ?? [] : [];
+  const approvedQuotes = selectedQuotes.filter(q => !q.tour_id || (approvalMap?.get(q.tour_id) ?? false));
+  const pendingQuotes = selectedQuotes.filter(q => q.tour_id && !(approvalMap?.get(q.tour_id) ?? false));
   const isHouseTech = quotes[0]?.is_house_tech;
 
   return (
@@ -186,8 +194,8 @@ export const TechnicianTourRates: React.FC = () => {
           )}
 
           <div className="space-y-3">
-            {selectedQuotes.length > 0 ? (
-              selectedQuotes.map((quote) => (
+            {approvedQuotes.length > 0 ? (
+              approvedQuotes.map((quote) => (
                 <div key={quote.job_id} className="flex flex-col gap-3 rounded-lg border border-muted bg-muted/40 p-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -228,7 +236,7 @@ export const TechnicianTourRates: React.FC = () => {
               ))
             ) : (
               <div className="text-sm text-muted-foreground">
-                No tour rate entries for this week.
+                {pendingQuotes.length > 0 ? 'Rates for this week are pending approval.' : 'No tour rate entries for this week.'}
               </div>
             )}
           </div>
