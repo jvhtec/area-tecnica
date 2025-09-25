@@ -108,6 +108,14 @@ export default function JobAssignmentMatrix() {
     return s;
   }, [fridgeRows]);
 
+  // Count of technicians marked in fridge among current technician list
+  const fridgeCount = React.useMemo(() => {
+    if (!technicians?.length || !fridgeSet?.size) return 0;
+    let c = 0;
+    for (const t of technicians as any[]) if (fridgeSet.has(t.id)) c++;
+    return c;
+  }, [technicians, fridgeSet]);
+
   // Realtime invalidation for fridge state
   React.useEffect(() => {
     const ch = (supabase as any)
@@ -309,6 +317,7 @@ export default function JobAssignmentMatrix() {
                 onCheckedChange={(v) => setHideFridge(Boolean(v))}
                 aria-label={hideFridge ? 'Abrir la nevera' : 'Cerrar la nevera'}
               />
+              <Badge variant="secondary" className="text-[10px] h-5 px-1.5">{fridgeCount}</Badge>
             </div>
             <div className="flex items-center gap-2 pr-2 border-r">
               <span className="text-sm font-medium">Direct assign</span>
