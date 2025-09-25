@@ -273,7 +273,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false }: TechnicianR
               <div className="pt-2">
                 <Button variant={isFridge ? 'secondary' : 'destructive'} size="sm" onClick={toggleFridge} className="gap-2 h-8" disabled={togglingFridge}>
                   <Refrigerator className="h-4 w-4" />
-                  {isFridge ? 'Return from fridge' : 'Send to fridge'}
+                  {isFridge ? 'Descongelar' : 'A la nevera'}
                 </Button>
               </div>
             )}

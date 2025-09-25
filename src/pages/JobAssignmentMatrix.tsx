@@ -303,11 +303,11 @@ export default function JobAssignmentMatrix() {
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
             <div className="flex items-center gap-2 pr-2 border-r">
               <Refrigerator className="h-4 w-4" />
-              <span className="text-sm font-medium">Hide in fridge</span>
+              <span className="text-sm font-medium">{hideFridge ? 'Abrir la nevera' : 'Cerrar la nevera'}</span>
               <Switch
                 checked={hideFridge}
                 onCheckedChange={(v) => setHideFridge(Boolean(v))}
-                aria-label="Hide technicians marked en la nevera"
+                aria-label={hideFridge ? 'Abrir la nevera' : 'Cerrar la nevera'}
               />
             </div>
             <div className="flex items-center gap-2 pr-2 border-r">
