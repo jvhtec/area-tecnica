@@ -65,6 +65,7 @@ interface OptimizedAssignmentMatrixExtendedProps extends OptimizedAssignmentMatr
   canExpandBefore?: boolean;
   canExpandAfter?: boolean;
   allowDirectAssign?: boolean;
+  fridgeSet?: Set<string>;
 }
 
 export const OptimizedAssignmentMatrix = ({ 
@@ -74,7 +75,8 @@ export const OptimizedAssignmentMatrix = ({
   onNearEdgeScroll,
   canExpandBefore = false,
   canExpandAfter = false,
-  allowDirectAssign = false
+  allowDirectAssign = false,
+  fridgeSet
 }: OptimizedAssignmentMatrixExtendedProps) => {
   const [cellAction, setCellAction] = useState<CellAction | null>(null);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
@@ -256,13 +258,19 @@ export const OptimizedAssignmentMatrix = ({
     console.log('Matrix handling cell click:', { technicianId, date: format(date, 'yyyy-MM-dd'), action });
     const assignment = getAssignmentForCell(technicianId, date);
     console.log('Assignment data:', assignment);
+    // Block assignment/staffing interactions if technician is in fridge
+    const isFridge = fridgeSet?.has(technicianId);
+    if (isFridge && (action === 'select-job' || action === 'assign' || action === 'select-job-for-staffing' || action === 'confirm' || action === 'offer-details')) {
+      toast({ title: 'En la nevera', description: 'Este técnico está en la nevera y no puede ser asignado.', variant: 'destructive' });
+      return;
+    }
     // Gate direct assign-related actions behind allowDirectAssign
     if (!allowDirectAssign && (action === 'select-job' || action === 'assign')) {
       console.log('Direct assign disabled by UI toggle; ignoring click');
       return;
     }
     setCellAction({ type: action, technicianId, date, assignment, selectedJobId });
-  }, [getAssignmentForCell, allowDirectAssign]);
+  }, [getAssignmentForCell, allowDirectAssign, fridgeSet]);
 
   const handleJobSelected = useCallback((jobId: string) => {
     if (cellAction?.type === 'select-job') {
@@ -508,6 +516,7 @@ export const OptimizedAssignmentMatrix = ({
                 key={technician.id}
                 technician={technician}
                 height={CELL_HEIGHT}
+                isFridge={fridgeSet?.has(technician.id) || false}
               />
             ))}
           </div>
@@ -588,6 +597,7 @@ export const OptimizedAssignmentMatrix = ({
                         allowDirectAssign={allowDirectAssign}
                         staffingStatusProvided={providedByJob}
                         staffingStatusByDateProvided={providedByDate}
+                        isFridge={fridgeSet?.has(technician.id) || false}
                       />
                     </div>
                   );

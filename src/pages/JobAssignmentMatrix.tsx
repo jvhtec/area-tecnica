@@ -4,18 +4,19 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Filter, Users, RefreshCw } from 'lucide-react';
+import { Calendar, Filter, Users, RefreshCw, Refrigerator } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { OptimizedAssignmentMatrix } from '@/components/matrix/OptimizedAssignmentMatrix';
 import { PerformanceIndicator } from '@/components/matrix/PerformanceIndicator';
 import { DateRangeExpander } from '@/components/matrix/DateRangeExpander';
 import { useVirtualizedDateRange } from '@/hooks/useVirtualizedDateRange';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { SkillsFilter } from '@/components/matrix/SkillsFilter';
 
 export default function JobAssignmentMatrix() {
+  const qc = useQueryClient();
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -27,6 +28,7 @@ export default function JobAssignmentMatrix() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [allowDirectAssign, setAllowDirectAssign] = useState(false);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [hideFridge, setHideFridge] = useState<boolean>(false);
   const specialtyOptions = ['foh','monitores','sistemas','rf','escenario','PA'] as const;
   const toggleSpecialty = (name: (typeof specialtyOptions)[number]) => {
     setSelectedSkills(prev => prev.includes(name) ? prev.filter(s => s !== name) : [...prev, name]);
@@ -83,6 +85,40 @@ export default function JobAssignmentMatrix() {
     gcTime: 10 * 60 * 1000,
   });
 
+  // Fridge state for technicians currently in view
+  const technicianIds = React.useMemo(() => technicians.map((t: any) => t.id), [technicians]);
+  const { data: fridgeRows = [] } = useQuery({
+    queryKey: ['technician-fridge-status', technicianIds],
+    queryFn: async () => {
+      if (!technicianIds.length) return [] as Array<{ technician_id: string; in_fridge: boolean }>;
+      const { data, error } = await supabase
+        .from('technician_fridge')
+        .select('technician_id, in_fridge')
+        .in('technician_id', technicianIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: technicianIds.length > 0,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+  });
+  const fridgeSet = React.useMemo(() => {
+    const s = new Set<string>();
+    (fridgeRows as Array<{ technician_id: string; in_fridge: boolean }>).forEach(r => { if (r.in_fridge) s.add(r.technician_id); });
+    return s;
+  }, [fridgeRows]);
+
+  // Realtime invalidation for fridge state
+  React.useEffect(() => {
+    const ch = (supabase as any)
+      .channel('rt-technician-fridge')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'technician_fridge' }, () => {
+        qc.invalidateQueries({ queryKey: ['technician-fridge-status'] });
+      })
+      .subscribe();
+    return () => { try { (supabase as any).removeChannel(ch); } catch {} };
+  }, [qc]);
+
   // Filter technicians based on search term
   const filteredTechnicians = useMemo(() => {
     const arr = technicians.filter((tech: any) => {
@@ -92,6 +128,7 @@ export default function JobAssignmentMatrix() {
         tech.department?.toLowerCase().includes(debouncedSearch)
       );
       if (!matchesSearch) return false;
+      if (hideFridge && fridgeSet.has(tech.id)) return false;
       if (!selectedSkills.length) return true;
       const skills: Array<{ name: string }> = (tech.skills || []).map((s: any) => ({ name: (s.name || '').toLowerCase() }));
       // Require all selected skills to be present
@@ -123,7 +160,7 @@ export default function JobAssignmentMatrix() {
       if (ad !== 0) return ad;
       return (a.last_name || '').localeCompare(b.last_name || '');
     });
-  }, [technicians, debouncedSearch, selectedSkills]);
+  }, [technicians, debouncedSearch, selectedSkills, hideFridge, fridgeSet]);
 
   // Optimized jobs query with smart date filtering
   const { data: yearJobs = [], isLoading: isLoadingJobs } = useQuery({
@@ -265,6 +302,15 @@ export default function JobAssignmentMatrix() {
 
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
             <div className="flex items-center gap-2 pr-2 border-r">
+              <Refrigerator className="h-4 w-4" />
+              <span className="text-sm font-medium">Hide in fridge</span>
+              <Switch
+                checked={hideFridge}
+                onCheckedChange={(v) => setHideFridge(Boolean(v))}
+                aria-label="Hide technicians marked en la nevera"
+              />
+            </div>
+            <div className="flex items-center gap-2 pr-2 border-r">
               <span className="text-sm font-medium">Direct assign</span>
               <Switch
                 checked={allowDirectAssign}
@@ -305,6 +351,7 @@ export default function JobAssignmentMatrix() {
             technicians={filteredTechnicians}
             dates={dateRange}
             jobs={yearJobs}
+            fridgeSet={fridgeSet}
             allowDirectAssign={allowDirectAssign}
             onNearEdgeScroll={(direction) => {
               if (direction === 'before' && canExpandBefore) {

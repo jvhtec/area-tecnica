@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { Calendar, Clock, Check, X, UserX, Mail, CheckCircle, Ban } from 'lucide-react';
+import { Calendar, Clock, Check, X, UserX, Mail, CheckCircle, Ban, Refrigerator } from 'lucide-react';
 import { format, isToday, isWeekend } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCancelStaffingRequest, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
@@ -36,6 +36,7 @@ interface OptimizedMatrixCellProps {
   declinedJobIdsSet?: Set<string>;
   staffingStatusProvided?: { availability_status: any; offer_status: any } | null;
   staffingStatusByDateProvided?: { availability_status: any; offer_status: any; availability_job_id?: string | null; offer_job_id?: string | null } | null;
+  isFridge?: boolean;
 }
 
 export const OptimizedMatrixCell = memo(({
@@ -55,7 +56,8 @@ export const OptimizedMatrixCell = memo(({
   allowDirectAssign = false,
   declinedJobIdsSet = new Set<string>(),
   staffingStatusProvided = null,
-  staffingStatusByDateProvided = null
+  staffingStatusByDateProvided = null,
+  isFridge = false
 }: OptimizedMatrixCellProps) => {
   // Track cell renders for performance monitoring
   React.useEffect(() => {
@@ -222,6 +224,12 @@ export const OptimizedMatrixCell = memo(({
           onClick={handleCellClick}
           onMouseEnter={handleMouseEnter}
         >
+      {/* Fridge indicator */}
+      {isFridge && (
+        <div className="absolute top-1 left-1 z-10" title="En la nevera: no asignable">
+          <Refrigerator className="h-3.5 w-3.5 text-sky-600" />
+        </div>
+      )}
       {/* Staffing Status Badges */}
       {(staffingStatus?.availability_status || staffingStatus?.offer_status) && (
         <div className="absolute bottom-1 left-1 flex gap-1 z-10">

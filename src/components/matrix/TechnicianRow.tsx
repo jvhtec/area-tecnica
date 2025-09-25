@@ -3,7 +3,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Mail, User, Building, Phone, IdCard, Award, Plus, MapPin } from 'lucide-react';
+import { Mail, User, Building, Phone, IdCard, Award, Plus, MapPin, Refrigerator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ManageSkillsDialog } from '@/components/users/ManageSkillsDialog';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
@@ -24,14 +24,16 @@ interface TechnicianRowProps {
     skills?: Array<{ name?: string; category?: string | null; proficiency?: number | null; is_primary?: boolean | null }>;
   };
   height: number;
+  isFridge?: boolean;
 }
 
-const TechnicianRowComp = ({ technician, height }: TechnicianRowProps) => {
+const TechnicianRowComp = ({ technician, height, isFridge = false }: TechnicianRowProps) => {
   const { userRole } = useOptimizedAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
   const [skillsOpen, setSkillsOpen] = React.useState(false);
   const [popoverOpen, setPopoverOpen] = React.useState(false);
   const qc = useQueryClient();
+  const [togglingFridge, setTogglingFridge] = React.useState(false);
 
   const [metricsLoading, setMetricsLoading] = React.useState(false);
   const [metrics, setMetrics] = React.useState<{ monthConfirmed: number; yearConfirmed: number }>({ monthConfirmed: 0, yearConfirmed: 0 });
@@ -108,6 +110,23 @@ const TechnicianRowComp = ({ technician, height }: TechnicianRowProps) => {
       }
     }
   };
+
+  const toggleFridge = async () => {
+    try {
+      setTogglingFridge(true);
+      const next = !isFridge;
+      const { error } = await supabase
+        .from('technician_fridge')
+        .upsert({ technician_id: technician.id, in_fridge: next }, { onConflict: 'technician_id' });
+      if (error) throw error;
+      // Invalidate fridge queries so UI updates across matrix
+      await qc.invalidateQueries({ queryKey: ['technician-fridge-status'] });
+    } catch (e: any) {
+      console.warn('Fridge toggle error', e);
+    } finally {
+      setTogglingFridge(false);
+    }
+  };
   const getInitials = () => {
     return `${technician.first_name?.[0] || ''}${technician.last_name?.[0] || ''}`.toUpperCase();
   };
@@ -154,6 +173,9 @@ const TechnicianRowComp = ({ technician, height }: TechnicianRowProps) => {
             <div className="flex-1 min-w-0">
               <div className="font-medium text-sm truncate">
                 {technician.first_name} {technician.last_name}
+                {isFridge && (
+                  <Refrigerator className="inline-block h-3.5 w-3.5 ml-1 text-sky-600" title="En la nevera" />
+                )}
               </div>
               <div className="flex gap-1 mt-1 flex-wrap">
                 <Badge 
@@ -246,6 +268,15 @@ const TechnicianRowComp = ({ technician, height }: TechnicianRowProps) => {
                 {technician.role === 'house_tech' ? 'House Tech' : 'Technician'}
               </Badge>
             </div>
+
+            {isManagementUser && (
+              <div className="pt-2">
+                <Button variant={isFridge ? 'secondary' : 'destructive'} size="sm" onClick={toggleFridge} className="gap-2 h-8" disabled={togglingFridge}>
+                  <Refrigerator className="h-4 w-4" />
+                  {isFridge ? 'Return from fridge' : 'Send to fridge'}
+                </Button>
+              </div>
+            )}
 
             {/* Skills */}
             {!!(technician.skills && technician.skills.length) && (
