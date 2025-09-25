@@ -8,15 +8,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+// Reason selection removed per request
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+// import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
@@ -40,8 +34,7 @@ export const MarkUnavailableDialog = ({
   selectedDate,
   selectedCells 
 }: MarkUnavailableDialogProps) => {
-  const [reason, setReason] = useState<string>('');
-  const [customReason, setCustomReason] = useState('');
+  // Reason removed; default to day_off
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Get technician details
@@ -60,30 +53,15 @@ export const MarkUnavailableDialog = ({
     enabled: open && !!technicianId
   });
 
-  const availabilityReasons = [
-    'vacation',
-    'travel',
-    'sick',
-    'day_off'
-  ];
-
-  const getReasonLabel = (r: string) => {
-    switch (r) {
-      case 'vacation': return 'Vacation';
-      case 'travel': return 'Travel';
-      case 'sick': return 'Sick';
-      case 'day_off': return 'Day off';
-      default: return r;
-    }
-  };
+  // No reason list
 
   const handleSubmit = async () => {
-    // reason is optional; default handled below
+    // Reasonless flow; default handled below
 
     setIsSubmitting(true);
 
     try {
-      const finalStatus = reason || 'day_off';
+      const finalStatus = 'day_off';
 
       // Determine target dates: selectedDate + any additional selectedCells for this technician
       const selectedDates = new Set<string>();
@@ -160,21 +138,7 @@ export const MarkUnavailableDialog = ({
             )}
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Reason for Unavailability</label>
-            <Select value={reason} onValueChange={setReason}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a reason..." />
-              </SelectTrigger>
-              <SelectContent>
-                {availabilityReasons.map((reasonOption) => (
-                  <SelectItem key={reasonOption} value={reasonOption}>
-                    {getReasonLabel(reasonOption)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Reason removed; defaulting to day_off */}
         </div>
 
         <DialogFooter>
@@ -183,7 +147,7 @@ export const MarkUnavailableDialog = ({
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={!reason || isSubmitting || (reason === 'other' && !customReason.trim())}
+            disabled={isSubmitting}
           >
             {isSubmitting ? (
               <>

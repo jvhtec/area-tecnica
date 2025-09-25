@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { format, isWithinInterval, isSameDay } from 'date-fns';
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
@@ -151,7 +151,8 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
 
       // Map statuses to a unified unavailable signal used by cells
       const rows = all.flat() as Array<{ technician_id: string; date: string; status: string }>;
-      return rows.map(r => ({ user_id: r.technician_id, date: r.date, status: 'unavailable', notes: r.status, reason: r.status }));
+      // Mark cells as unavailable, without exposing restricted reasons
+      return rows.map(r => ({ user_id: r.technician_id, date: r.date, status: 'unavailable' }));
     },
     enabled: technicianIds.length > 0 && !!dateRange.start && !!dateRange.end,
     staleTime: 2 * 60 * 1000,
@@ -159,7 +160,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   });
 
   // Realtime invalidation for availability changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (!technicianIds.length) return;
     const channel = (supabase as any)
       .channel('rt-technician-availability')

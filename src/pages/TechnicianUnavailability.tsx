@@ -16,7 +16,7 @@ export default function TechnicianUnavailability() {
   const [allDay, setAllDay] = React.useState(true);
   const [start, setStart] = React.useState<string>('');
   const [end, setEnd] = React.useState<string>('');
-  const [reason, setReason] = React.useState<string>('');
+  // Reasonless flow; defaults to day_off in DB
 
   const { data: blocks = [], isLoading } = useQuery({
     queryKey: ['my-unavailability', user?.id],
@@ -53,7 +53,6 @@ export default function TechnicianUnavailability() {
       toast.success('Unavailability created');
       qc.invalidateQueries({ queryKey: ['my-unavailability'] });
       setOpen(false);
-      setReason('');
       setStart('');
       setEnd('');
     },
@@ -118,22 +117,22 @@ export default function TechnicianUnavailability() {
                 <Input type={allDay ? 'date' : 'datetime-local'} value={end} onChange={(e) => setEnd(e.target.value)} />
               </div>
             </div>
-            <div>
-              <Label>Reason (optional)</Label>
-              <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="vacation, travel, sick, day_off" />
-            </div>
+            {/* Reason removed; defaults to day_off */}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button onClick={() => {
               try {
                 if (!start || !end) { toast.error('Start and end required'); return; }
-                if (!['vacation','travel','sick','day_off'].includes(reason)) { toast.error('Pick a valid reason'); return; }
-                createMutation.mutate({ startDate: start, endDate: end, status: reason as any });
+                const normalize = (v: string) => (v.includes('T') ? v.slice(0,10) : v);
+                const s = normalize(start);
+                const e = normalize(end);
+                if (s.length !== 10 || e.length !== 10) { toast.error('Invalid date'); return; }
+                createMutation.mutate({ startDate: s, endDate: e, status: 'day_off' });
               } catch (e) {
                 toast.error('Invalid date');
               }
-            }} disabled={createMutation.isPending}>Create</Button>
+            }} disabled={createMutation.isPending || !start || !end}>Create</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
