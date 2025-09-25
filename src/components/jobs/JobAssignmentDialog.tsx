@@ -34,7 +34,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Job } from "@/types/job";
 import { User } from "@/types/user";
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
@@ -87,6 +87,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   const [lightsRole, setLightsRole] = useState<string>("none");
   const [isAdding, setIsAdding] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const { assignments, addAssignment, removeAssignment, isRemoving } = useJobAssignmentsRealtime(jobId);
   const { manageFlexCrewAssignment, useCrewCallData } = useFlexCrewAssignments();
 
@@ -222,8 +223,49 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
   const handleViewCrewCall = () => {
     if (crewCallData?.flex_element_id) {
-      const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#contact-list/${crewCallData.flex_element_id}/detail`;
+      // Crew Call view requires explicit view id to render the correct detail form
+      const CREW_CALL_VIEW_ID = '139e2f60-8d20-11e2-b07f-00e08175e43e';
+      const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#contact-list/${crewCallData.flex_element_id}/view/${CREW_CALL_VIEW_ID}/detail`;
       window.open(flexUrl, '_blank');
+    }
+  };
+
+  const handleSyncFlex = async () => {
+    const dept = (currentDepartment || '').toLowerCase();
+    if (!['sound','lights','video'].includes(dept)) {
+      toast({ title: 'Not supported', description: 'Sync is available for Sound, Lights, or Video' });
+      return;
+    }
+    try {
+      setIsSyncing(true);
+      toast({ title: 'Syncing', description: 'Syncing crew to Flex…' });
+      const { data, error } = await supabase.functions.invoke('sync-flex-crew-for-job', {
+        body: { job_id: jobId }
+      });
+      if (error) {
+        console.error('Flex sync error:', error);
+        toast({ title: 'Flex sync failed', description: error.message, variant: 'destructive' });
+        return;
+      }
+      if (data?.ok) {
+        const s = data.summary?.[dept] || {};
+        if (s.errors?.length) {
+          toast({ title: 'Flex sync errors', description: s.errors.join('; '), variant: 'destructive' });
+        } else if (s.note) {
+          toast({ title: 'Flex sync', description: String(s.note) });
+        } else {
+          toast({ title: 'Flex synced', description: `+${s.added ?? 0}  −${s.removed ?? 0}  =${s.kept ?? 0}` });
+        }
+      } else if (data?.error) {
+        toast({ title: 'Flex sync failed', description: data.error, variant: 'destructive' });
+      } else {
+        toast({ title: 'Flex sync completed' });
+      }
+    } catch (e: any) {
+      console.error('Flex sync exception:', e);
+      toast({ title: 'Flex sync failed', description: e?.message || 'Unknown error', variant: 'destructive' });
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -235,17 +277,31 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Manage {currentDepartment} Assignments</span>
-            {crewCallData?.flex_element_id && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleViewCrewCall}
-                className="gap-2"
-              >
-                <ExternalLink className="h-4 w-4" />
-                View Crew Call in Flex
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {crewCallData?.flex_element_id && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleViewCrewCall}
+                  className="gap-2"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  View Crew Call in Flex
+                </Button>
+              )}
+              {['sound','lights','video'].includes((currentDepartment || '').toLowerCase()) && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleSyncFlex}
+                  disabled={isSyncing}
+                  className="gap-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                  {isSyncing ? 'Syncing…' : 'Sync Flex'}
+                </Button>
+              )}
+            </div>
           </DialogTitle>
           <DialogDescription>
             Assign available {currentDepartment} technicians to this job.

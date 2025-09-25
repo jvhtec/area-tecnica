@@ -8,7 +8,7 @@ import { Button } from "../ui/button";
 import { toast } from "sonner";
 import { SubscriptionIndicator } from "../ui/subscription-indicator";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { labelForCode } from '@/utils/roles';
 
 interface JobAssignmentsProps {
@@ -20,6 +20,7 @@ interface JobAssignmentsProps {
 export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsProps) => {
   const queryClient = useQueryClient();
   const { assignments, isLoading, isRefreshing, refetch } = useJobAssignmentsRealtime(jobId);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Set up additional real-time subscription to invalidate available technicians
   useEffect(() => {
@@ -79,6 +80,45 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
     }
   };
 
+  const handleSyncFlex = async () => {
+    if (!department) {
+      toast.message('Select a department first to sync');
+      return;
+    }
+    try {
+      setIsSyncing(true);
+      toast.info('Syncing crew to Flex…');
+      const { data, error } = await supabase.functions.invoke('sync-flex-crew-for-job', {
+        body: { job_id: jobId }
+      });
+      if (error) {
+        console.error('Flex sync error:', error);
+        toast.error(`Flex sync failed: ${error.message}`);
+        return;
+      }
+      if (data?.ok) {
+        // Prefer current department summary if present, else show a compact aggregate
+        const s = data.summary?.[department] || {};
+        if (s.errors?.length) {
+          toast.error(`Flex sync errors: ${s.errors.join('; ')}`);
+        } else if (s.note) {
+          toast.info(String(s.note));
+        } else {
+          toast.success(`Flex synced: +${s.added ?? 0}  −${s.removed ?? 0}  =${s.kept ?? 0}`);
+        }
+      } else if (data?.error) {
+        toast.error(`Flex sync failed: ${data.error}`);
+      } else {
+        toast.success('Flex sync completed');
+      }
+    } catch (e: any) {
+      console.error('Flex sync exception:', e);
+      toast.error(`Flex sync failed: ${e?.message || 'Unknown error'}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-2">
@@ -120,6 +160,18 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
         </span>
         <div className="flex items-center gap-1">
           <SubscriptionIndicator tables={["job_assignments"]} variant="compact" showRefreshButton onRefresh={refetch} />
+          {department && ['sound','lights','video'].includes(department) && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-6 px-2"
+              disabled={isSyncing}
+              onClick={handleSyncFlex}
+              title="Sync crew to Flex"
+            >
+              {isSyncing ? 'Syncing…' : 'Sync Flex'}
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"

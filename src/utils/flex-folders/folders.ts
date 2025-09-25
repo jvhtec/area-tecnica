@@ -12,6 +12,39 @@ import {
   DEPARTMENT_SUFFIXES
 } from "./constants";
 
+// Created ledger types
+type Dept = "sound" | "lights" | "video" | "production" | "personnel" | "comercial";
+type Kind =
+  | "job_root_folder"
+  | "job_department_folder"
+  | "tour_date_folder"
+  | "crew_call"
+  | "pull_sheet"
+  | "doc_tecnica"
+  | "hoja_gastos"
+  | "hoja_info_sx"
+  | "hoja_info_lx"
+  | "hoja_info_vx";
+
+type CreatedItem = {
+  kind: Kind;
+  elementId: string;
+  jobId?: string;
+  tourId?: string;
+  tourDateId?: string;
+  department?: Dept;
+  parentElementId?: string;
+};
+
+async function persistCreatedSafe(created: CreatedItem[]) {
+  try {
+    if (!created.length) return;
+    await supabase.functions.invoke('persist-flex-elements', { body: { created } });
+  } catch (err) {
+    console.warn('[folders] persist-flex-elements failed (non-blocking):', err);
+  }
+}
+
 /**
  * Helper function to fetch selected departments for a job
  */
@@ -83,6 +116,7 @@ export async function createAllFoldersForJob(
   formattedEndDate: string,
   documentNumber: string
 ) {
+  const created: CreatedItem[] = [];
   if (job.job_type === "dryhire") {
     console.log("Dryhire job type detected. Creating dryhire folder...");
 
@@ -125,8 +159,8 @@ export async function createAllFoldersForJob(
         department: department,
         folder_type: "dryhire",
       });
-
-    return;
+    await persistCreatedSafe(created);
+    return created;
   }
 
   if (job.job_type === "tourdate") {
@@ -246,6 +280,17 @@ export async function createAllFoldersForJob(
         continue;
       }
 
+      // Record the tour date folder
+      created.push({
+        kind: "tour_date_folder",
+        elementId: tourDateFolder.elementId,
+        jobId: job.id,
+        tourId: job.tour_id,
+        tourDateId: job.tour_date_id,
+        department: dept as Dept,
+        parentElementId: parentRow.element_id,
+      });
+
       // Create department-specific hojaInfo elements for sound, lights, and video
       if (["sound", "lights", "video"].includes(dept)) {
         const hojaInfoType = dept === "sound" 
@@ -271,7 +316,16 @@ export async function createAllFoldersForJob(
         };
         
         console.log(`Creating hojaInfo element for ${dept}:`, hojaInfoPayload);
-        await createFlexFolder(hojaInfoPayload);
+        const hojaInfo = await createFlexFolder(hojaInfoPayload);
+        created.push({
+          kind: dept === "sound" ? "hoja_info_sx" : dept === "lights" ? "hoja_info_lx" : "hoja_info_vx",
+          elementId: hojaInfo.elementId,
+          jobId: job.id,
+          tourId: job.tour_id,
+          tourDateId: job.tour_date_id,
+          department: dept as Dept,
+          parentElementId: childRow.element_id,
+        });
       }
 
       if (dept !== "personnel" && dept !== "comercial") {
@@ -307,8 +361,18 @@ export async function createAllFoldersForJob(
             documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${sf.suffix}`,
             personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
           };
-
-          await createFlexFolder(subPayload);
+          const sfResp = await createFlexFolder(subPayload);
+          if (sf.suffix === "DT" || sf.suffix === "HG") {
+            created.push({
+              kind: sf.suffix === "DT" ? "doc_tecnica" : "hoja_gastos",
+              elementId: sfResp.elementId,
+              jobId: job.id,
+              tourId: job.tour_id,
+              tourDateId: job.tour_date_id,
+              department: dept as Dept,
+              parentElementId: childRow.element_id,
+            });
+          }
         }
       }
       if (dept === "sound") {
@@ -339,8 +403,16 @@ export async function createAllFoldersForJob(
             departmentId: DEPARTMENT_IDS[dept as Department],
             personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
           };
-          
-          await createFlexFolder(subPayload);
+          const ps = await createFlexFolder(subPayload);
+          created.push({
+            kind: "pull_sheet",
+            elementId: ps.elementId,
+            jobId: job.id,
+            tourId: job.tour_id,
+            tourDateId: job.tour_date_id,
+            department: dept as Dept,
+            parentElementId: childRow.element_id,
+          });
         }
       }
       if (dept === "personnel") {
@@ -362,8 +434,16 @@ export async function createAllFoldersForJob(
             departmentId: DEPARTMENT_IDS[dept as Department],
             personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
           };
-
-          await createFlexFolder(subPayload);
+          const hg = await createFlexFolder(subPayload);
+          created.push({
+            kind: "hoja_gastos",
+            elementId: hg.elementId,
+            jobId: job.id,
+            tourId: job.tour_id,
+            tourDateId: job.tour_date_id,
+            department: dept as Dept,
+            parentElementId: childRow.element_id,
+          });
         }
 
         const personnelcrewCall = [
@@ -385,12 +465,24 @@ export async function createAllFoldersForJob(
             departmentId: DEPARTMENT_IDS[dept as Department],
             personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
           };
-
-          await createFlexFolder(subPayload);
+          const cc = await createFlexFolder(subPayload);
+          const d: Dept | undefined = sf.name.includes('Sonido') ? 'sound' : sf.name.includes('Luces') ? 'lights' : undefined;
+          if (d) {
+            created.push({
+              kind: "crew_call",
+              elementId: cc.elementId,
+              jobId: job.id,
+              tourId: job.tour_id,
+              tourDateId: job.tour_date_id,
+              department: d,
+              parentElementId: childRow.element_id,
+            });
+          }
         }
       }
     }
-    return;
+    await persistCreatedSafe(created);
+    return created;
   }
 
   console.log("Default job type detected. Creating full folder structure.");
@@ -421,6 +513,7 @@ export async function createAllFoldersForJob(
       element_id: topFolderId,
       folder_type: "main_event",
     });
+  created.push({ kind: "job_root_folder", elementId: topFolderId, jobId: job.id });
 
   const allDepartments = ["sound", "lights", "video", "production", "personnel", "comercial"];
   for (const dept of allDepartments) {
@@ -464,6 +557,13 @@ export async function createAllFoldersForJob(
     }
 
     const deptFolderId = childRow.element_id;
+    created.push({
+      kind: "job_department_folder",
+      elementId: deptFolder.elementId,
+      jobId: job.id,
+      department: dept as Dept,
+      parentElementId: topFolderId,
+    });
 
     // Create department-specific hojaInfo elements for sound, lights, and video
     if (["sound", "lights", "video"].includes(dept)) {
@@ -490,7 +590,14 @@ export async function createAllFoldersForJob(
       };
       
       console.log(`Creating hojaInfo element for ${dept}:`, hojaInfoPayload);
-      await createFlexFolder(hojaInfoPayload);
+      const hoja = await createFlexFolder(hojaInfoPayload);
+      created.push({
+        kind: dept === "sound" ? "hoja_info_sx" : dept === "lights" ? "hoja_info_lx" : "hoja_info_vx",
+        elementId: hoja.elementId,
+        jobId: job.id,
+        department: dept as Dept,
+        parentElementId: deptFolderId,
+      });
     }
 
     if (dept !== "personnel" && dept !== "comercial") {
@@ -526,8 +633,16 @@ export async function createAllFoldersForJob(
           documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${sf.suffix}`,
           personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
         };
-
-        await createFlexFolder(subPayload);
+        const sfResp = await createFlexFolder(subPayload);
+        if (sf.suffix === 'DT' || sf.suffix === 'HG') {
+          created.push({
+            kind: sf.suffix === 'DT' ? 'doc_tecnica' : 'hoja_gastos',
+            elementId: sfResp.elementId,
+            jobId: job.id,
+            department: dept as Dept,
+            parentElementId: deptFolderId,
+          });
+        }
       }
     } else if (dept === "personnel") {
       const personnelSubfolders = [
@@ -550,9 +665,27 @@ export async function createAllFoldersForJob(
           departmentId: DEPARTMENT_IDS[dept as Department],
           personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
         };
-
-        await createFlexFolder(subPayload);
+        const resp = await createFlexFolder(subPayload);
+        if (sf.suffix === 'GP') {
+          created.push({
+            kind: "hoja_gastos",
+            elementId: resp.elementId,
+            jobId: job.id,
+            department: dept as Dept,
+            parentElementId: deptFolderId,
+          });
+        } else if (sf.suffix === 'CCS' || sf.suffix === 'CCL') {
+          created.push({
+            kind: "crew_call",
+            elementId: resp.elementId,
+            jobId: job.id,
+            department: sf.suffix === 'CCS' ? 'sound' : 'lights',
+            parentElementId: deptFolderId,
+          });
+        }
       }
-    }
   }
+  await persistCreatedSafe(created);
+  return created;
+}
 }
