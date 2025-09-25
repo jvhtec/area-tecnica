@@ -16,12 +16,14 @@ interface JobCardDocumentsProps {
   documents: JobDocument[];
   userRole: string | null;
   onDeleteDocument: (doc: JobDocument) => void;
+  showTitle?: boolean;
 }
 
 export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
   documents,
   userRole,
-  onDeleteDocument
+  onDeleteDocument,
+  showTitle = true,
 }) => {
   if (documents.length === 0) {
     return null;
@@ -84,8 +86,8 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
   };
 
   return (
-    <div className="mt-4 space-y-2">
-      <div className="text-sm font-medium">Documents</div>
+    <div className="mt-2 space-y-2">
+      {showTitle && <div className="text-sm font-medium">Documents</div>}
       <div className="space-y-2">
         {documents.map((doc) => (
           <div

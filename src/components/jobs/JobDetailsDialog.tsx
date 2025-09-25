@@ -16,6 +16,7 @@ import {
   Phone,
   Globe,
   Download,
+  Eye,
   ExternalLink,
   Calendar
 } from "lucide-react";
@@ -75,6 +76,67 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
     enabled: open
   });
 
+  // Artist list for job (to avoid join issues under RLS)
+  const { data: jobArtists = [] } = useQuery({
+    queryKey: ['job-artists', job.id],
+    enabled: open && !!job?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('festival_artists')
+        .select('id, name')
+        .eq('job_id', job.id);
+      if (error) throw error;
+      return (data || []) as Array<{ id: string; name: string }>;
+    }
+  });
+
+  const artistIdList = React.useMemo(() => jobArtists.map(a => a.id), [jobArtists]);
+  const artistNameMap = React.useMemo(() => new Map(jobArtists.map(a => [a.id, a.name])), [jobArtists]);
+
+  // Rider files for the artists of this job (2-step to be RLS-friendly)
+  const { data: riderFiles = [], isLoading: isRidersLoading } = useQuery({
+    queryKey: ['job-rider-files', job.id, artistIdList],
+    enabled: open && !!job?.id && artistIdList.length > 0,
+    queryFn: async () => {
+      let query = supabase
+        .from('festival_artist_files')
+        .select('id, file_name, file_path, uploaded_at, artist_id')
+        .order('uploaded_at', { ascending: false });
+      if (artistIdList.length === 1) {
+        query = query.eq('artist_id', artistIdList[0]);
+      } else {
+        const orExpr = artistIdList.map((id) => `artist_id.eq.${id}`).join(',');
+        query = query.or(orExpr);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []) as Array<{ id: string; file_name: string; file_path: string; uploaded_at: string; artist_id: string }>;
+    }
+  });
+
+  const viewRider = async (file: { file_path: string }) => {
+    const { data, error } = await supabase.storage
+      .from('festival_artist_files')
+      .createSignedUrl(file.file_path, 3600);
+    if (error) throw error;
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
+  };
+
+  const downloadRider = async (file: { file_path: string; file_name: string }) => {
+    const { data, error } = await supabase.storage
+      .from('festival_artist_files')
+      .download(file.file_path);
+    if (error) throw error;
+    const url = window.URL.createObjectURL(data);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.file_name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
   // Fetch nearby restaurants
   const { data: restaurants, isLoading: isRestaurantsLoading } = useQuery({
     queryKey: ['job-restaurants', job.id, jobDetails?.locations?.formatted_address || jobDetails?.locations?.address],
@@ -109,7 +171,8 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   // Set up tour rates subscriptions for real-time updates
   useTourRateSubscriptions();
 
-  // Static map preview via Edge Function (technician-safe)
+  // Static map preview via Google Static Maps (key fetched via Edge Function secret)
+  const [googleStaticKey, setGoogleStaticKey] = useState<string | null>(null);
   const [mapPreviewUrl, setMapPreviewUrl] = useState<string | null>(null);
   const [isMapLoading, setIsMapLoading] = useState<boolean>(false);
   useEffect(() => {
@@ -123,26 +186,40 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         }
         const lat = typeof loc.latitude === 'number' ? loc.latitude : (typeof loc.latitude === 'string' ? parseFloat(loc.latitude) : undefined);
         const lng = typeof loc.longitude === 'number' ? loc.longitude : (typeof loc.longitude === 'string' ? parseFloat(loc.longitude) : undefined);
-        const address = loc.formatted_address || (loc as any).address || loc.name;
+        const address = loc.formatted_address || (loc as any).address || loc.name || '';
+
         setIsMapLoading(true);
-        const { data, error } = await supabase.functions.invoke('static-map', {
-          body: {
-            lat: Number.isFinite(lat) ? lat : undefined,
-            lng: Number.isFinite(lng) ? lng : undefined,
-            address: (!Number.isFinite(lat) || !Number.isFinite(lng)) ? address : undefined,
-            width: 600,
-            height: 300,
-            zoom: 15,
-            scale: 2,
+
+        // Ensure we have an API key (fetch from secrets if needed)
+        let apiKey = googleStaticKey;
+        if (!apiKey) {
+          const { data, error } = await supabase.functions.invoke('get-secret', {
+            body: { secretName: 'GOOGLE_MAPS_API_KEY' }
+          });
+          if (error || !data?.GOOGLE_MAPS_API_KEY) {
+            setMapPreviewUrl(null);
+            setIsMapLoading(false);
+            return;
           }
-        });
-        if (!error && data?.dataUrl) {
-          setMapPreviewUrl(data.dataUrl);
-        } else {
-          setMapPreviewUrl(null);
+          apiKey = data.GOOGLE_MAPS_API_KEY as string;
+          setGoogleStaticKey(apiKey);
         }
-      } catch (e) {
-        console.warn('Failed to load static map preview:', e);
+
+        const zoom = 15;
+        const width = 600;
+        const height = 300;
+        const scale = 2;
+        const center = Number.isFinite(lat) && Number.isFinite(lng)
+          ? `${lat},${lng}`
+          : encodeURIComponent(address);
+        const markers = Number.isFinite(lat) && Number.isFinite(lng)
+          ? `&markers=color:red|label:A|${lat},${lng}`
+          : (address ? `&markers=color:red|label:A|${encodeURIComponent(address)}` : '');
+        const url = `https://maps.googleapis.com/maps/api/staticmap?center=${center}&zoom=${zoom}&size=${width}x${height}&scale=${scale}${markers}&key=${encodeURIComponent(apiKey)}`;
+
+        setMapPreviewUrl(url);
+      } catch (e: any) {
+        console.warn('Failed to load static map preview:', e?.message || e);
         setMapPreviewUrl(null);
       } finally {
         setIsMapLoading(false);
@@ -174,6 +251,23 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
       }
     } catch (error) {
       console.error('Error downloading document:', error);
+    }
+  };
+
+  const handleViewDocument = async (doc: any) => {
+    try {
+      const bucket = resolveBucket(doc.file_path);
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(doc.file_path, 3600);
+
+      if (error) throw error;
+
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank', 'noopener');
+      }
+    } catch (error) {
+      console.error('Error viewing document:', error);
     }
   };
 
@@ -471,14 +565,24 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                             {doc.uploaded_at ? `Uploaded ${format(new Date(doc.uploaded_at), 'PP')}` : 'Upload date unknown'}
                           </p>
                         </div>
-                        <Button 
-                          onClick={() => handleDownloadDocument(doc)}
-                          size="sm"
-                          variant="outline"
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Download
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button 
+                            onClick={() => handleViewDocument(doc)}
+                            size="sm"
+                            variant="outline"
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View
+                          </Button>
+                          <Button 
+                            onClick={() => handleDownloadDocument(doc)}
+                            size="sm"
+                            variant="outline"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -486,6 +590,40 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   <div className="text-center py-8">
                     <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                     <p className="text-muted-foreground">No documents uploaded yet</p>
+                  </div>
+                )}
+              </Card>
+
+              <Card className="p-4">
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Artist Riders
+                </h3>
+                {isRidersLoading ? (
+                  <div className="text-center py-4 text-muted-foreground">Loading riders…</div>
+                ) : riderFiles.length > 0 ? (
+                  <div className="space-y-2">
+                    {riderFiles.map((file) => (
+                      <div key={file.id} className="flex items-center justify-between p-3 bg-muted rounded">
+                        <div>
+                          <p className="font-medium">{file.file_name}</p>
+                          <p className="text-sm text-muted-foreground">Artist: {artistNameMap.get(file.artist_id) || 'Unknown'}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => viewRider(file)}>
+                            <Eye className="h-4 w-4 mr-1" /> View
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => downloadRider(file)}>
+                            <Download className="h-4 w-4 mr-1" /> Download
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-muted-foreground">No artist riders uploaded yet</p>
                   </div>
                 )}
               </Card>

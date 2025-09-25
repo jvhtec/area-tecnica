@@ -16,6 +16,7 @@ import { useDeletionState } from '@/hooks/useDeletionState';
 import { supabase } from "@/lib/supabase";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
+import { Eye, Download, ChevronRight, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { createSafeFolderName, sanitizeFolderName } from "@/utils/folderNameSanitizer";
 import { JobCardHeader } from './JobCardHeader';
@@ -75,6 +76,65 @@ export function JobCardNew({
   // Add folder creation loading state
   const [isCreatingFolders, setIsCreatingFolders] = useState(false);
   const [isCreatingLocalFolders, setIsCreatingLocalFolders] = useState(false);
+  // Collapsible sections (collapsed by default)
+  const [docsCollapsed, setDocsCollapsed] = useState(true);
+  const [ridersCollapsed, setRidersCollapsed] = useState(true);
+  // Load artists then rider files (2-step RLS-friendly)
+  const { data: cardArtists = [] } = useQuery({
+    queryKey: ['jobcard-artists', job.id],
+    enabled: !!job?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('festival_artists')
+        .select('id, name')
+        .eq('job_id', job.id);
+      if (error) throw error;
+      return (data || []) as Array<{ id: string; name: string }>;
+    }
+  });
+  const cardArtistIds = React.useMemo(() => cardArtists.map(a => a.id), [cardArtists]);
+  const cardArtistNameMap = React.useMemo(() => new Map(cardArtists.map(a => [a.id, a.name])), [cardArtists]);
+  const { data: riderFiles = [] } = useQuery({
+    queryKey: ['jobcard-rider-files', job.id, cardArtistIds],
+    enabled: !!job?.id && cardArtistIds.length > 0,
+    queryFn: async () => {
+      let query = supabase
+        .from('festival_artist_files')
+        .select('id, file_name, file_path, uploaded_at, artist_id')
+        .order('uploaded_at', { ascending: false });
+      if (cardArtistIds.length === 1) {
+        query = query.eq('artist_id', cardArtistIds[0]);
+      } else {
+        const orExpr = cardArtistIds.map((id) => `artist_id.eq.${id}`).join(',');
+        query = query.or(orExpr);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []) as Array<{ id: string; file_name: string; file_path: string; uploaded_at: string; artist_id: string }>;
+    }
+  });
+
+  const viewRider = async (file: { file_path: string }) => {
+    const { data } = await supabase.storage
+      .from('festival_artist_files')
+      .createSignedUrl(file.file_path, 3600);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
+  };
+
+  const downloadRider = async (file: { file_path: string; file_name: string }) => {
+    const { data } = await supabase.storage
+      .from('festival_artist_files')
+      .download(file.file_path);
+    if (!data) return;
+    const url = window.URL.createObjectURL(data);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.file_name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
   const [jobDetailsDialogOpen, setJobDetailsDialogOpen] = useState(false);
   const [flexLogDialogOpen, setFlexLogDialogOpen] = useState(false);
   const [transportDialogOpen, setTransportDialogOpen] = useState(false);
@@ -673,11 +733,59 @@ export function JobCardNew({
                 )}
                 
                 {documents.length > 0 && (
-                  <JobCardDocuments 
-                    documents={documents} 
-                    userRole={userRole}
-                    onDeleteDocument={handleDeleteDocument}
-                  />
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-between text-left px-2 py-1 rounded hover:bg-accent/40"
+                      onClick={(e) => { e.stopPropagation(); setDocsCollapsed(prev => !prev); }}
+                    >
+                      <span className="text-sm font-medium">Documents ({documents.length})</span>
+                      {docsCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </button>
+                    {!docsCollapsed && (
+                      <div className="mt-1">
+                        <JobCardDocuments 
+                          documents={documents} 
+                          userRole={userRole}
+                          onDeleteDocument={handleDeleteDocument}
+                          showTitle={false}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {riderFiles.length > 0 && (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-between text-left px-2 py-1 rounded hover:bg-accent/40"
+                      onClick={(e) => { e.stopPropagation(); setRidersCollapsed(prev => !prev); }}
+                    >
+                      <span className="text-sm font-medium">Artist Riders ({riderFiles.length})</span>
+                      {ridersCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </button>
+                    {!ridersCollapsed && (
+                      <div className="mt-1 space-y-2">
+                        {riderFiles.map((file) => (
+                          <div key={file.id} className="flex items-center justify-between p-2 rounded-md bg-accent/20 hover:bg-accent/30 transition-colors" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium">{file.file_name}</span>
+                              <span className="text-xs text-muted-foreground">Artist: {cardArtistNameMap.get(file.artist_id) || 'Unknown'}</span>
+                            </div>
+                            <div className="flex gap-2">
+                              <button className="p-1 hover:bg-accent rounded" title="View" onClick={() => viewRider(file)}>
+                                <Eye className="h-4 w-4" />
+                              </button>
+                              <button className="p-1 hover:bg-accent rounded" title="Download" onClick={() => downloadRider(file)}>
+                                <Download className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </>
             )}

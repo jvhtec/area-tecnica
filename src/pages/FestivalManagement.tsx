@@ -302,25 +302,31 @@ const FestivalManagement = () => {
 
       setJobDocuments((jobDocs || []) as JobDocumentEntry[]);
 
-      const { data: riderData, error: riderError } = await supabase
-        .from('festival_artist_files')
-        .select(`
-          id,
-          file_name,
-          file_path,
-          created_at,
-          artist_id,
-          festival_artists!inner (
-            id,
-            name,
-            job_id
-          )
-        `)
-        .eq('festival_artists.job_id', jobId)
-        .order('created_at', { ascending: false });
-
-      if (riderError) {
-        throw riderError;
+      // Two-step: get artists, then rider files for those artists
+      const { data: artistsForJob, error: artistsErr } = await supabase
+        .from('festival_artists')
+        .select('id, name')
+        .eq('job_id', jobId);
+      if (artistsErr) throw artistsErr;
+      const artistIds = (artistsForJob || []).map(a => a.id);
+      let riderData: any[] = [];
+      if (artistIds.length > 0) {
+        let query = supabase
+          .from('festival_artist_files')
+          .select('id, file_name, file_path, uploaded_at, artist_id')
+          .order('uploaded_at', { ascending: false });
+        if (artistIds.length === 1) {
+          query = query.eq('artist_id', artistIds[0]);
+        } else {
+          const orExpr = artistIds.map((id) => `artist_id.eq.${id}`).join(',');
+          query = query.or(orExpr);
+        }
+        const { data, error } = await query;
+        if (error) throw error;
+        riderData = data || [];
+        // re-attach artist names for grouping
+        const nameMap = new Map((artistsForJob || []).map(a => [a.id, (a as any).name]));
+        riderData = riderData.map((f: any) => ({ ...f, festival_artists: { id: f.artist_id, name: nameMap.get(f.artist_id) || 'Unknown' } }));
       }
 
       setArtistRiderFiles((riderData || []) as unknown as ArtistRiderFile[]);
@@ -1073,7 +1079,7 @@ const FestivalManagement = () => {
                                   <div>
                                     <div className="text-sm font-medium text-foreground">{file.file_name}</div>
                                     <div className="text-xs text-muted-foreground">
-                                      Uploaded {formatDateLabel(file.created_at)}
+                                      Uploaded {formatDateLabel(file.uploaded_at)}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-1">
