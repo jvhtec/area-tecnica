@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
+import { Toaster as SonnerToaster } from 'sonner';
 import { queryClient } from '@/lib/react-query';
 import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
 import Layout from '@/components/layout/Layout';
@@ -16,6 +17,7 @@ import Profile from '@/pages/Profile';
 import Settings from '@/pages/Settings';
 import ProjectManagement from '@/pages/ProjectManagement';
 import TechnicianDashboard from '@/pages/TechnicianDashboard';
+import TechnicianUnavailability from '@/pages/TechnicianUnavailability';
 import Personal from '@/pages/Personal';
 import Tours from '@/pages/Tours';
 import PesosTool from '@/pages/PesosTool';
@@ -34,6 +36,7 @@ import LightsDisponibilidad from '@/pages/LightsDisponibilidad';
 import LightsMemoriaTecnica from '@/pages/LightsMemoriaTecnica';
 import VideoMemoriaTecnica from '@/pages/VideoMemoriaTecnica';
 import JobAssignmentMatrix from '@/pages/JobAssignmentMatrix';
+import ActivityCenter from '@/pages/ActivityCenter';
 import { EquipmentManagement } from '@/pages/EquipmentManagement';
 import { ArtistRequirementsForm } from '@/components/festival/ArtistRequirementsForm';
 import { FormSubmitted } from '@/components/festival/FormSubmitted';
@@ -81,6 +84,7 @@ export default function App() {
                   <Route element={<RequireAuth><Layout /></RequireAuth>}>
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/technician-dashboard" element={<TechnicianDashboard />} />
+                    <Route path="/dashboard/unavailability" element={<TechnicianUnavailability />} />
                     <Route path="/personal" element={<Personal />} />
                     <Route path="/sound" element={<Sound />} />
                     <Route path="/lights" element={<Lights />} />
@@ -91,6 +95,7 @@ export default function App() {
                     <Route path="/project-management" element={<ProjectManagement />} />
                     <Route path="/equipment-management" element={<EquipmentManagement />} />
                     <Route path="/job-assignment-matrix" element={<JobAssignmentMatrix />} />
+                    <Route path="/activity" element={<ActivityCenter />} />
                     <Route path="/timesheets" element={<Timesheets />} />
                     <Route path="/tours" element={<Tours />} />
                     <Route path="/festivals" element={<Festivals />} />
@@ -147,7 +152,9 @@ export default function App() {
                     <Route path="/job-management/:jobId/scheduling" element={<JobManagement />} />
                   </Route>
                 </Routes>
+                {/* Radix-based toaster (legacy) and Sonner toaster for activity + app toasts */}
                 <Toaster />
+                <SonnerToaster richColors position="top-right" />
               </div>
             </OptimizedAuthProvider>
           </Router>

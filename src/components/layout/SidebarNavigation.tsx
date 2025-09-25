@@ -93,6 +93,21 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
           </Link>
         )}
 
+        {/* Technician Unavailability - only for technicians/house techs */}
+        {isTechnicianOrHouseTech && (
+          <Link to="/dashboard/unavailability">
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-2 ${
+                location.pathname === "/dashboard/unavailability" ? "bg-accent" : ""
+              }`}
+            >
+              <Clock className="h-4 w-4" />
+              <span>My Unavailability</span>
+            </Button>
+          </Link>
+        )}
+
         {/* Personal Calendar - Available to all authenticated users except technicians */}
         {userRole !== 'technician' && (
           <Link to="/personal">

@@ -312,6 +312,24 @@ const TechnicianDashboard = () => {
       {/* Tour Rates Section */}
       <TechnicianTourRates />
 
+      {/* My Availability / Unavailability */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            My Availability
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between gap-3">
+          <div className="text-sm text-muted-foreground">
+            Manage your unavailability blocks so managers don’t assign overlapping jobs.
+          </div>
+          <Button onClick={() => navigate('/dashboard/unavailability')}>
+            Manage Unavailability
+          </Button>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

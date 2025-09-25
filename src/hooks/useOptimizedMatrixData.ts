@@ -125,40 +125,50 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     refetchOnWindowFocus: false, // Disable automatic refetch on focus
   });
 
-  // Optimized availability query with batch processing
+  // Availability query using existing per-day table technician_availability
   const { data: availabilityData = [], isLoading: availabilityLoading } = useQuery({
     queryKey: ['optimized-matrix-availability', technicianIds, format(dateRange.start, 'yyyy-MM-dd'), format(dateRange.end, 'yyyy-MM-dd')],
     queryFn: async () => {
-      if (technicianIds.length === 0 || !dateRange.start || !dateRange.end) return [];
-      
-      // Batch technicians to avoid URL length limits
+      if (technicianIds.length === 0 || !dateRange.start || !dateRange.end) return [] as Array<{ user_id: string; date: string; status: string; notes?: string | null }>;
+
       const batchSize = 100;
-      const techBatches = [];
-      for (let i = 0; i < technicianIds.length; i += batchSize) {
-        techBatches.push(technicianIds.slice(i, i + batchSize));
-      }
-      
-      const allResults = await Promise.all(
+      const techBatches: string[][] = [];
+      for (let i = 0; i < technicianIds.length; i += batchSize) techBatches.push(technicianIds.slice(i, i + batchSize));
+
+      const all = await Promise.all(
         techBatches.map(async (batch) => {
           const { data, error } = await supabase
-            .from('availability_schedules')
-            .select('user_id, date, status, notes')
-            .in('user_id', batch)
+            .from('technician_availability')
+            .select('technician_id, date, status')
+            .in('technician_id', batch)
             .gte('date', format(dateRange.start, 'yyyy-MM-dd'))
             .lte('date', format(dateRange.end, 'yyyy-MM-dd'))
             .order('date', { ascending: true });
-
           if (error) throw error;
           return data || [];
         })
       );
-      
-      return allResults.flat();
+
+      // Map statuses to a unified unavailable signal used by cells
+      const rows = all.flat() as Array<{ technician_id: string; date: string; status: string }>;
+      return rows.map(r => ({ user_id: r.technician_id, date: r.date, status: 'unavailable', notes: r.status, reason: r.status }));
     },
     enabled: technicianIds.length > 0 && !!dateRange.start && !!dateRange.end,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes cache
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
+
+  // Realtime invalidation for availability changes
+  React.useEffect(() => {
+    if (!technicianIds.length) return;
+    const channel = (supabase as any)
+      .channel('rt-technician-availability')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'technician_availability' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['optimized-matrix-availability'] });
+      })
+      .subscribe();
+    return () => { try { (supabase as any).removeChannel(channel); } catch {} };
+  }, [queryClient, technicianIds.length]);
 
   // Preload technician data for dialogs
   const prefetchTechnicianData = async (technicianId: string) => {

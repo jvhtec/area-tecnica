@@ -12,54 +12,11 @@ import { useTourRatesApprovalMap } from "@/hooks/useTourRatesApproval";
 export const TechnicianTourRates: React.FC = () => {
   const { data: quotes, isLoading, error } = useTechnicianTourRateQuotes();
   const { userRole } = useOptimizedAuth();
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Euro className="h-5 w-5" />
-            Your Tour Rates
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-muted rounded w-3/4"></div>
-            <div className="h-4 bg-muted rounded w-1/2"></div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>
-          Failed to load your tour rates: {error.message}
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
+  // Always compute tourIds and call the hook (it self-disables when empty)
   const tourIds = Array.from(new Set((quotes || []).map(q => q.tour_id).filter(Boolean))) as string[];
   const { data: approvalMap } = useTourRatesApprovalMap(tourIds);
-
-  if (!quotes?.length) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Euro className="h-5 w-5" />
-            Your Tour Rates
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">You have no upcoming tour date assignments.</p>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Local state/hooks must not be behind conditional returns
+  const [expanded, setExpanded] = useState(true);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-ES', {
@@ -69,10 +26,9 @@ export const TechnicianTourRates: React.FC = () => {
     }).format(amount);
   };
 
-  const [expanded, setExpanded] = useState(true);
-
   const weekGroups = useMemo(() => {
-    return quotes.reduce((groups, quote) => {
+    const list = quotes || [];
+    return list.reduce((groups, quote) => {
       const weekKey = quote.iso_year && quote.iso_week
         ? `${quote.iso_year}-W${quote.iso_week.toString().padStart(2, '0')}`
         : `${getISOWeekYear(new Date(quote.start_time))}-W${getISOWeek(new Date(quote.start_time)).toString().padStart(2, '0')}`;
@@ -123,7 +79,7 @@ export const TechnicianTourRates: React.FC = () => {
   const selectedQuotes = activeWeekKey ? weekGroups[activeWeekKey] ?? [] : [];
   const approvedQuotes = selectedQuotes.filter(q => !q.tour_id || (approvalMap?.get(q.tour_id) ?? false));
   const pendingQuotes = selectedQuotes.filter(q => q.tour_id && !(approvalMap?.get(q.tour_id) ?? false));
-  const isHouseTech = quotes[0]?.is_house_tech;
+  const isHouseTech = (quotes && quotes[0]) ? quotes[0].is_house_tech : false;
 
   return (
     <Card>
@@ -146,15 +102,31 @@ export const TechnicianTourRates: React.FC = () => {
       </CardHeader>
       {expanded && (
         <CardContent className="space-y-4">
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              {isHouseTech
-                ? "As a house technician, you receive your profile-specific base rate. Weekly multipliers apply when you're assigned to the tour team."
-                : "Tour rates use your category base. Weekly multipliers only apply if you're on the tour team for that routing."
-              }
-            </AlertDescription>
-          </Alert>
+          {isLoading ? (
+            <div className="animate-pulse space-y-4">
+              <div className="h-4 bg-muted rounded w-3/4"></div>
+              <div className="h-4 bg-muted rounded w-1/2"></div>
+            </div>
+          ) : error ? (
+            <Alert variant="destructive">
+              <AlertDescription>
+                Failed to load your tour rates: {(error as any).message}
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <>
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  {isHouseTech
+                    ? "As a house technician, you receive your profile-specific base rate. Weekly multipliers apply when you're assigned to the tour team."
+                    : "Tour rates use your category base. Weekly multipliers only apply if you're on the tour team for that routing."}
+                </AlertDescription>
+              </Alert>
+
+              {(!quotes || quotes.length === 0) && (
+                <div className="text-muted-foreground">You have no upcoming tour date assignments.</div>
+              )}
 
           {allowedWeekKeys.length > 0 && activeWeekKey && (
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -244,6 +216,8 @@ export const TechnicianTourRates: React.FC = () => {
           <div className="border-t pt-3 text-xs text-muted-foreground">
             Amounts shown are per tour date. Use pagination to review past or upcoming routings.
           </div>
+            </>
+          )}
         </CardContent>
       )}
     </Card>

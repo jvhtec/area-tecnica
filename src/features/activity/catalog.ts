@@ -185,6 +185,30 @@ export const activityCatalogDefaults: Record<string, ActivityCatalogEntry> = {
     toast_enabled: false,
     template: 'Calendar export generated',
   },
+  'availability.unavailable.created': {
+    code: 'availability.unavailable.created',
+    label: 'Marked unavailable',
+    default_visibility: 'management',
+    severity: 'info',
+    toast_enabled: true,
+    template: '{actor_name} marked unavailable',
+  },
+  'availability.unavailable.updated': {
+    code: 'availability.unavailable.updated',
+    label: 'Updated unavailable',
+    default_visibility: 'management',
+    severity: 'info',
+    toast_enabled: false,
+    template: '{actor_name} updated unavailability',
+  },
+  'availability.unavailable.deleted': {
+    code: 'availability.unavailable.deleted',
+    label: 'Removed unavailable',
+    default_visibility: 'management',
+    severity: 'warn',
+    toast_enabled: true,
+    template: '{actor_name} removed unavailability',
+  },
 };
 
 export function getActivityMeta(code: string): ActivityCatalogEntry | undefined {

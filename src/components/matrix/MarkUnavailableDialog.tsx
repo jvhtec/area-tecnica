@@ -62,47 +62,28 @@ export const MarkUnavailableDialog = ({
 
   const availabilityReasons = [
     'vacation',
-    'sick_leave',
-    'personal_leave',
-    'training',
     'travel',
-    'other'
+    'sick',
+    'day_off'
   ];
 
-  const getReasonLabel = (reason: string) => {
-    switch (reason) {
-      case 'vacation':
-        return 'Vacation';
-      case 'sick_leave':
-        return 'Sick Leave';
-      case 'personal_leave':
-        return 'Personal Leave';
-      case 'training':
-        return 'Training';
-      case 'travel':
-        return 'Travel';
-      case 'other':
-        return 'Other (specify below)';
-      default:
-        return reason;
+  const getReasonLabel = (r: string) => {
+    switch (r) {
+      case 'vacation': return 'Vacation';
+      case 'travel': return 'Travel';
+      case 'sick': return 'Sick';
+      case 'day_off': return 'Day off';
+      default: return r;
     }
   };
 
   const handleSubmit = async () => {
-    if (!reason) {
-      toast.error('Please select a reason');
-      return;
-    }
-
-    if (reason === 'other' && !customReason.trim()) {
-      toast.error('Please specify the reason');
-      return;
-    }
+    // reason is optional; default handled below
 
     setIsSubmitting(true);
 
     try {
-      const finalReason = reason === 'other' ? customReason : reason;
+      const finalStatus = reason || 'day_off';
 
       // Determine target dates: selectedDate + any additional selectedCells for this technician
       const selectedDates = new Set<string>();
@@ -118,37 +99,23 @@ export const MarkUnavailableDialog = ({
         }
       }
 
-      const payload = Array.from(selectedDates).map(d => ({
-        user_id: technicianId,
+      // Upsert rows into existing per-day table
+      const rows = Array.from(selectedDates).map(d => ({
+        technician_id: technicianId,
         date: d,
-        status: 'unavailable',
-        reason: finalReason,
-        department: technician?.department || 'general'
+        status: finalStatus,
       }));
 
-      // Try bulk insert first
-      const { error: bulkError } = await supabase
-        .from('availability_schedules')
-        .insert(payload);
+      const { error: upsertError } = await supabase
+        .from('technician_availability')
+        .upsert(rows, { onConflict: 'technician_id,date' });
 
-      if (bulkError) {
-        // Fallback to per-date insertion, ignoring duplicates
-        const results = await Promise.allSettled(payload.map(async (row) => {
-          const { error } = await supabase.from('availability_schedules').insert(row);
-          // Ignore duplicate key errors if present
-          if (error && (error as any).code !== '23505') {
-            throw error;
-          }
-        }));
-
-        const rejected = results.filter(r => r.status === 'rejected');
-        if (rejected.length > 0) {
-          throw (rejected[0] as PromiseRejectedResult).reason;
-        }
-      }
+      if (upsertError) throw upsertError;
 
       const count = selectedDates.size;
       toast.success(`Marked ${technician?.first_name} ${technician?.last_name} as unavailable for ${count} day${count > 1 ? 's' : ''}`);
+      // Hint consumers to refresh matrix
+      window.dispatchEvent(new CustomEvent('assignment-updated'));
       onClose();
     } catch (error) {
       console.error('Error marking unavailable:', error);
@@ -208,18 +175,6 @@ export const MarkUnavailableDialog = ({
               </SelectContent>
             </Select>
           </div>
-
-          {reason === 'other' && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Specify Reason</label>
-              <Textarea
-                placeholder="Enter the specific reason..."
-                value={customReason}
-                onChange={(e) => setCustomReason(e.target.value)}
-                rows={3}
-              />
-            </div>
-          )}
         </div>
 
         <DialogFooter>
