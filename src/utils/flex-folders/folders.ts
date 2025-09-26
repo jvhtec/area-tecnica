@@ -49,6 +49,31 @@ async function getTourJobDepartments(tourId: string): Promise<string[]> {
   return data[0].job_departments?.map((jd: any) => jd.department) || [];
 }
 
+// Save or update the Flex crew call element id for a job/department
+async function upsertCrewCall(jobId: string, dept: 'sound' | 'lights', elementId: string) {
+  try {
+    const { data: existing } = await supabase
+      .from('flex_crew_calls')
+      .select('id')
+      .eq('job_id', jobId)
+      .eq('department', dept)
+      .maybeSingle();
+
+    if (existing?.id) {
+      await supabase
+        .from('flex_crew_calls')
+        .update({ flex_element_id: elementId })
+        .eq('id', existing.id);
+    } else {
+      await supabase
+        .from('flex_crew_calls')
+        .insert({ job_id: jobId, department: dept, flex_element_id: elementId });
+    }
+  } catch (err) {
+    console.error('Failed to upsert flex_crew_calls:', { jobId, dept, elementId, err });
+  }
+}
+
 /**
  * Determines which departments should have folders created
  */
@@ -385,7 +410,9 @@ export async function createAllFoldersForJob(
             personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
           };
 
-          await createFlexFolder(subPayload);
+          const cc = await createFlexFolder(subPayload);
+          const mappedDept = sf.suffix === 'CCS' ? 'sound' : 'lights';
+          await upsertCrewCall(job.id, mappedDept, cc.elementId);
         }
       }
     }
@@ -550,9 +577,12 @@ export async function createAllFoldersForJob(
           personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
         };
 
-        await createFlexFolder(subPayload);
+        const created = await createFlexFolder(subPayload);
+        if (sf.suffix === 'CCS' || sf.suffix === 'CCL') {
+          const mappedDept = sf.suffix === 'CCS' ? 'sound' : 'lights';
+          await upsertCrewCall(job.id, mappedDept, created.elementId);
+        }
       }
     }
   }
 }
-
