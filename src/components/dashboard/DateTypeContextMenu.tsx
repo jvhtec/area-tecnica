@@ -36,7 +36,7 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         originalDate: date
       });
 
-      // Optimistically update the UI
+      // Optimistically update a local cache key (kept minimal)
       queryClient.setQueryData(['job-date-types', jobId], (old: any) => {
         const key = `${jobId}-${formattedDate}`;
         return { ...old, [key]: { type, job_id: jobId, date: formattedDate } };
@@ -54,6 +54,11 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
 
       if (error) throw error;
 
+      // Invalidate all date-types queries so CalendarSection refreshes icons
+      queryClient.invalidateQueries({
+        predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === 'date-types'
+      });
+
       toast({
         title: "Success",
         description: `Date type set to ${type}`,
@@ -67,6 +72,9 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         variant: "destructive",
       });
       queryClient.invalidateQueries({ queryKey: ['job-date-types', jobId] });
+      queryClient.invalidateQueries({
+        predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === 'date-types'
+      });
     }
   };
 

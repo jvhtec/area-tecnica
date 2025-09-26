@@ -90,10 +90,8 @@ const Dashboard = () => {
   }, []);
 
   // Event handlers
-  const handleJobClick = (jobId: string) => {
-    if (userRole === "logistics") return;
-    setSelectedJobId(jobId);
-    setIsAssignmentDialogOpen(true);
+  const handleJobClick = (_jobId: string) => {
+    // Parity: disable assignment dialog on card click in dashboard
   };
 
   const handleEditClick = (job: any) => {
@@ -213,19 +211,12 @@ const Dashboard = () => {
             onJobClick={handleJobClick}
             userRole={userRole}
             selectedDate={date}
+            hideTasks
           />
         </div>
       </div>
 
-      {selectedJobId && (
-        <JobAssignmentDialog
-          isOpen={isAssignmentDialogOpen}
-          onClose={() => setIsAssignmentDialogOpen(false)}
-          onAssignmentChange={() => {}}
-          jobId={selectedJobId}
-          department={selectedDepartment}
-        />
-      )}
+      {/* Assignment dialog intentionally disabled for dashboard parity */}
 
       {selectedJob && (
         <EditJobDialog

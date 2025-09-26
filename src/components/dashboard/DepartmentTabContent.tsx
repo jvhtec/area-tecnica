@@ -4,9 +4,7 @@ import { useState } from "react";
 import { JobCardNew } from "../jobs/cards/JobCardNew";
 import { Department } from "@/types/department";
 import { JobDocument } from "@/components/jobs/cards/JobCardDocuments";
-import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
-import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
-import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
+// Task dialogs intentionally not used for parity — tasks hidden on these cards
 
 interface DepartmentTabContentProps {
   department: Department;
@@ -23,7 +21,7 @@ export const DepartmentTabContent = ({
   onDeleteDocument,
   userRole
 }: DepartmentTabContentProps) => {
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  // Parity: no task dialogs in department tabs
 
   if (isLoading) {
     return (
@@ -41,42 +39,9 @@ export const DepartmentTabContent = ({
     );
   }
 
-  const handleJobClick = (jobId: string) => {
-    setSelectedJobId(jobId);
-  };
+  const handleJobClick = (_jobId: string) => {};
 
-  const getTaskDialog = () => {
-    if (!selectedJobId) return null;
-
-    switch (department) {
-      case 'sound':
-        return (
-          <SoundTaskDialog
-            jobId={selectedJobId}
-            open={!!selectedJobId}
-            onOpenChange={(open) => !open && setSelectedJobId(null)}
-          />
-        );
-      case 'lights':
-        return (
-          <LightsTaskDialog
-            jobId={selectedJobId}
-            open={!!selectedJobId}
-            onOpenChange={(open) => !open && setSelectedJobId(null)}
-          />
-        );
-      case 'video':
-        return (
-          <VideoTaskDialog
-            jobId={selectedJobId}
-            open={!!selectedJobId}
-            onOpenChange={(open) => !open && setSelectedJobId(null)}
-          />
-        );
-      default:
-        return null;
-    }
-  };
+  const getTaskDialog = () => null;
 
   return (
     <div className="space-y-4">
@@ -91,6 +56,7 @@ export const DepartmentTabContent = ({
           onDeleteDocument={onDeleteDocument}
           showUpload={true}
           userRole={userRole}
+          hideTasks
         />
       ))}
       

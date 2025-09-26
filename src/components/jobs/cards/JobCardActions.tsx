@@ -158,8 +158,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           {transportButtonLabel}
         </Button>
       )}
-      {/* View Details - for technicians and house techs */}
-      {(userRole === 'technician' || userRole === 'house_tech') && onJobDetailsClick && (
+      {/* View Details - available in dashboard/department contexts for all roles */}
+      {onJobDetailsClick && (
         <Button
           variant="outline"
           size="sm"

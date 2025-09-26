@@ -205,6 +205,12 @@ export function MobileJobCard({
         description: `Set to ${DATE_TYPE_OPTIONS.find(opt => opt.value === newType)?.label}`
       });
 
+      // Ensure both mobile and desktop calendars refresh their caches
+      queryClient.invalidateQueries({ queryKey: ['job_date_types', dateStr] });
+      queryClient.invalidateQueries({
+        predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === 'date-types'
+      });
+
       if (onDateTypeChange) {
         onDateTypeChange();
       }
