@@ -122,26 +122,68 @@ serve(async (req) => {
       const addUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${crewCall.flex_element_id}/add-resource/${technician.flex_resource_id}`;
       
       console.log(`Adding resource to Flex crew call: ${addUrl}`);
-      
-      const addResponse = await fetch(addUrl, {
-        method: 'POST',
-        headers: {
-          'X-Auth-Token': flexAuthToken,
-          'Content-Type': 'application/json',
-        },
-      });
 
-      if (!addResponse.ok) {
-        const errorText = await addResponse.text();
-        console.error(`Failed to add resource to Flex crew call: ${addResponse.status} - ${errorText}`);
-        return new Response(
-          JSON.stringify({ error: `Failed to add resource to Flex: ${addResponse.status}` }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      const flexHeaders: Record<string,string> = {
+        'X-Auth-Token': flexAuthToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-API-Client': 'flex5-desktop',
+        'Accept': '*/*',
+      };
+
+      // Attempt 1: simple POST
+      let addOk = false;
+      let addResult: any = {};
+      try {
+        const addResponse = await fetch(addUrl, { method: 'POST', headers: flexHeaders });
+        addOk = addResponse.ok;
+        addResult = addOk ? await addResponse.json().catch(() => ({} as any)) : {};
+      } catch (_) {}
+
+      // Attempt 2: form-encoded POST
+      if (!addOk) {
+        try {
+          const params = new URLSearchParams();
+          params.set('resourceParentId', '');
+          params.set('managedResourceLineItemType', 'contact');
+          params.set('quantity', '1');
+          params.set('parentLineItemId', '');
+          params.set('nextSiblingId', '');
+          const addResponse2 = await fetch(addUrl, { method: 'POST', headers: { ...flexHeaders, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: params.toString() });
+          addOk = addResponse2.ok;
+          addResult = addOk ? await addResponse2.json().catch(() => ({} as any)) : {};
+        } catch (_) {}
       }
 
-      const addResult = await addResponse.json();
-      console.log('Successfully added resource to Flex crew call:', addResult);
+      if (!addOk) {
+        console.error('Failed to add resource to Flex crew call via both attempts');
+      }
+
+      // Extract lineItemId from various response shapes observed
+      const extractedLineItemId: string | null = (addResult && (
+        addResult.id || addResult.lineItemId || (addResult.data && (addResult.data.id || addResult.data.lineItemId)) || (Array.isArray(addResult.addedResourceLineIds) && addResult.addedResourceLineIds[0])
+      )) || null;
+      console.log('Add response parsed line item id:', extractedLineItemId, 'raw:', addResult);
+
+      // Discover lineItemId if missing by scanning row-data for this resourceId
+      let effectiveLineItemId = extractedLineItemId as string | null;
+      if (!effectiveLineItemId) {
+        try {
+          const qs3 = new URLSearchParams();
+          qs3.set('_dc', String(Date.now()));
+          for (const c of ['contact','business-role','pickup-date','return-date','notes','quantity','status']) qs3.append('codeList', c);
+          qs3.set('node', 'root');
+          const rdUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${encodeURIComponent(crewCall.flex_element_id)}/row-data/?${qs3.toString()}`;
+          const rdRes = await fetch(rdUrl, { headers: flexHeaders });
+          if (rdRes.ok) {
+            const arr = await rdRes.json().catch(() => null) as any;
+            if (Array.isArray(arr)) {
+              const resId = technician.flex_resource_id as string;
+              const hit = arr.find((r: any) => (r?.resourceId || r?.resource?.id) === resId);
+              if (hit?.id) effectiveLineItemId = hit.id as string;
+            }
+          }
+        } catch (_) { /* ignore */ }
+      }
 
       // Store the assignment with the line item ID
       const { error: insertError } = await supabase
@@ -149,7 +191,7 @@ serve(async (req) => {
         .insert({
           crew_call_id: crewCall.id,
           technician_id: technician_id,
-          flex_line_item_id: addResult.id
+          flex_line_item_id: effectiveLineItemId
         });
 
       if (insertError) {
@@ -158,6 +200,39 @@ serve(async (req) => {
           JSON.stringify({ error: 'Failed to store assignment in database' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+
+      // Attempt to set business-role for SOUND department after adding
+      try {
+        if (department === 'sound' && (effectiveLineItemId)) {
+          const FLEX_SOUND_BUSINESS_ROLES: Record<'responsable'|'especialista'|'tecnico', string> = {
+            responsable: '2916b300-c515-11ea-a087-2a0a4490a7fb',
+            especialista: 'b18a5bcc-59fa-4956-917f-0d1816d7d9b3',
+            tecnico: '2f6cf050-c5c1-11ea-a087-2a0a4490a7fb',
+          };
+          const { data: ja } = await supabase
+            .from('job_assignments')
+            .select('sound_role')
+            .eq('job_id', job_id)
+            .eq('technician_id', technician_id)
+            .maybeSingle();
+          const role = ja?.sound_role ?? null;
+          const tier = role ? (role.includes('-R') ? 'responsable' : role.includes('-E') ? 'especialista' : role.includes('-T') ? 'tecnico' : null) : null;
+          const roleId = tier ? FLEX_SOUND_BUSINESS_ROLES[tier] : null;
+          if (roleId) {
+            const rowDataUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${encodeURIComponent(crewCall.flex_element_id)}/row-data/`;
+            const setRes = await fetch(rowDataUrl, {
+              method: 'POST',
+              headers: { ...flexHeaders, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ lineItemId: effectiveLineItemId, fieldType: 'business-role', payloadValue: roleId })
+            });
+            if (!setRes.ok) {
+              console.warn('[manage-flex-crew-assignments] Failed to set business-role', setRes.status);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[manage-flex-crew-assignments] Error attempting to set business-role', err);
       }
 
       try {
@@ -179,7 +254,7 @@ serve(async (req) => {
       }
 
       return new Response(
-        JSON.stringify({ success: true, message: 'Resource added to crew call', flex_line_item_id: addResult.id }),
+        JSON.stringify({ success: true, message: 'Resource added to crew call', flex_line_item_id: effectiveLineItemId }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 

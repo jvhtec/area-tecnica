@@ -118,19 +118,45 @@ serve(async (req: Request) => {
       const desiredIds = new Set(desired.map((d) => d.technician_id));
       const desiredResourceIds = new Set(desired.map((d) => d.flex_resource_id));
 
-      // Current DB assignments
+      // Current DB assignments (DB view)
       const { data: currentRows } = await supabase
         .from("flex_crew_assignments")
         .select("id, technician_id, flex_line_item_id")
         .eq("crew_call_id", crew_call_id);
 
-      const currentIds = new Set((currentRows ?? []).map((r: any) => r.technician_id));
+      // Discover present contact line items in Flex to prune stale DB rows
+      const presentLineItemIds: Set<string> = new Set();
+      try {
+        const qs = new URLSearchParams();
+        qs.set("_dc", String(Date.now()));
+        qs.append("codeList", "contact");
+        qs.set("node", "root");
+        const rdUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${encodeURIComponent(flex_crew_call_id)}/row-data/?${qs.toString()}`;
+        const rdRes = await fetch(rdUrl, { headers: flexHeaders });
+        if (rdRes.ok) {
+          const arr = await rdRes.json().catch(() => null) as any;
+          if (Array.isArray(arr)) {
+            for (const r of arr) { if (r?.id) presentLineItemIds.add(r.id as string); }
+          }
+        }
+      } catch (_) { /* ignore */ }
+
+      const freshCurrentRows = (currentRows ?? []).filter((r: any) => !r.flex_line_item_id || presentLineItemIds.has(r.flex_line_item_id));
+      const staleRows = (currentRows ?? []).filter((r: any) => r.flex_line_item_id && !presentLineItemIds.has(r.flex_line_item_id));
+      if (staleRows.length) {
+        // Drop stale DB rows so they can be re-added
+        await supabase.from("flex_crew_assignments").delete().in("id", staleRows.map((s: any) => s.id));
+      }
+
+      const currentIds = new Set(freshCurrentRows.map((r: any) => r.technician_id));
       const toAdd = desired.filter((d) => !currentIds.has(d.technician_id));
-      const toRemove = (currentRows ?? []).filter((r: any) => !desiredIds.has(r.technician_id));
+      const toRemove = freshCurrentRows.filter((r: any) => !desiredIds.has(r.technician_id));
 
       let added = 0;
       let removed = 0;
       let kept = 0;
+      let failedAdds = 0;
+      let rolesSet = 0;
       const errors: string[] = [];
 
       // Adds
@@ -139,7 +165,7 @@ serve(async (req: Request) => {
 
         const liUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${encodeURIComponent(flex_crew_call_id)}/add-resource/${encodeURIComponent(add.flex_resource_id)}`;
         try {
-          const liRes = await fetch(liUrl, { method: "POST", headers: { "X-Auth-Token": flexAuthToken } });
+          const liRes = await fetch(liUrl, { method: "POST", headers: { ...flexHeaders } });
           if (liRes.ok) {
             const j = await liRes.json().catch(() => null) as any;
             lineItemId = (j && (j.id || j.lineItemId || (j.data && (j.data.id || j.data.lineItemId)) || (j.addedResourceLineIds && j.addedResourceLineIds[0]))) || null;
@@ -156,7 +182,7 @@ serve(async (req: Request) => {
           try {
             const liRes2 = await fetch(liUrl, {
               method: "POST",
-              headers: { "X-Auth-Token": flexAuthToken, "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+              headers: { ...flexHeaders, "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
               body: params.toString()
             });
             if (liRes2.ok) {
@@ -167,11 +193,18 @@ serve(async (req: Request) => {
         }
 
         if (!lineItemId) {
-          kept += 1;
+          failedAdds += 1;
+          errors.push(`Add failed for tech ${add.technician_id}`);
           continue;
         }
         await supabase.from("flex_crew_assignments").insert({ crew_call_id, technician_id: add.technician_id, flex_line_item_id: lineItemId });
         added += 1;
+
+        // Apply business-role for SOUND if mappable
+        try {
+          const ok = await setBusinessRoleIfNeeded({ dept, crew_call_flex_id: flex_crew_call_id, lineItemId, role: (add as any).role ?? null });
+          if (ok) rolesSet += 1;
+        } catch (_) { /* ignore */ }
       }
 
       // Known removals (DB rows)
@@ -341,13 +374,17 @@ serve(async (req: Request) => {
         // ignore
       }
 
-      kept = desired.length - added;
+      // kept = technicians already present on Flex before this run
+      const alreadyThere = desired.filter((d) => currentIds.has(d.technician_id)).length;
+      kept = alreadyThere;
       summary[dept] = {
         added,
         removed,
         kept,
+        rolesSet,
+        failedAdds,
         desired_count: desired.length,
-        current_count: currentRows?.length ?? 0,
+        current_count: freshCurrentRows.length,
         scanned_items,
         planned_delete_count,
         errors: errors.length ? errors : undefined
