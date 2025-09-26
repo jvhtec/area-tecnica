@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plane, Wrench, Star, Moon, Mic, Loader2 } from "lucide-react";
+import { Plane, Wrench, Star, Moon, Mic, Loader2, FileText } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import {
   Clock,
@@ -44,6 +44,7 @@ import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
+import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 
 import { useFolderExistence } from "@/hooks/useFolderExistence";
 
@@ -115,6 +116,7 @@ export function JobCardNew({
   const [videoTaskDialogOpen, setVideoTaskDialogOpen] = useState(false);
   const [editJobDialogOpen, setEditJobDialogOpen] = useState(false);
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
+  const [jobDetailsDialogOpen, setJobDetailsDialogOpen] = useState(false);
 
   // Check if this job is being deleted
   const isJobBeingDeleted = isDeletingJob(job.id);
@@ -923,7 +925,19 @@ export function JobCardNew({
                 )}
               </Button>
             </div>
-            <div className="flex flex-wrap gap-1 sm:gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+          <div className="flex flex-wrap gap-1 sm:gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+              {(userRole === 'technician' || userRole === 'house_tech') && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setJobDetailsDialogOpen(true)}
+                  className="text-xs sm:text-sm px-2 sm:px-3 h-7 sm:h-8 gap-2"
+                  disabled={isJobBeingDeleted}
+                >
+                  <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">View Details</span>
+                </Button>
+              )}
               {/* Timesheet button - hide for dryhire and tourdate */}
               {job.job_type !== 'dryhire' && job.job_type !== 'tourdate' && (
                 <Button
@@ -1249,6 +1263,15 @@ export function JobCardNew({
               open={editJobDialogOpen}
               onOpenChange={setEditJobDialogOpen}
               job={job}
+            />
+          )}
+          {/* Job Details Dialog for technicians/house techs */}
+          {jobDetailsDialogOpen && (
+            <JobDetailsDialog
+              open={jobDetailsDialogOpen}
+              onOpenChange={setJobDetailsDialogOpen}
+              job={job}
+              department={department}
             />
           )}
           {assignmentDialogOpen && job.job_type !== "dryhire" && (
