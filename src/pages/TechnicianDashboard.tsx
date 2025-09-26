@@ -7,13 +7,14 @@ import { addWeeks, addMonths } from "date-fns";
 import { TimeSpanSelector } from "@/components/technician/TimeSpanSelector";
 import { MessageManagementDialog } from "@/components/technician/MessageManagementDialog";
 import { AssignmentsList } from "@/components/technician/AssignmentsList";
+import { AssignmentsGrid } from "@/components/technician/AssignmentsGrid";
 import { MyToursSection } from "@/components/technician/MyToursSection";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
+// Standardize on the mobile-style assignment cards for all breakpoints
 import { useRealtimeQuery } from "@/hooks/useRealtimeQuery";
 import { useTechnicianDashboardSubscriptions } from "@/hooks/useMobileRealtimeSubscriptions";
 import { TechnicianTourRates } from "@/components/dashboard/TechnicianTourRates";
@@ -228,36 +229,7 @@ const TechnicianDashboard = () => {
     console.log("Assignment count:", assignments?.length);
   }, [assignments, userDepartment, isLoading]);
 
-  const handleJobClick = (jobId: string) => {
-    console.log("Job clicked:", jobId);
-    
-    const job = assignments.find(a => a.job_id === jobId);
-    
-    if (!job) {
-      console.log("Job not found in assignments", jobId);
-      return;
-    }
-    
-    console.log("Found job:", job);
-    
-    const isFestivalJob = job.jobs && 
-      (typeof job.jobs === 'object' && 'job_type' in job.jobs) && 
-      job.jobs.job_type === 'festival';
-    
-    console.log("Is festival job:", isFestivalJob);
-    
-    if (isFestivalJob) {
-      navigate(`/festival-management/${jobId}`);
-    }
-  };
-
-  const handleEditClick = (job: any) => {
-    console.log("Edit job clicked:", job);
-  };
-
-  const handleDeleteClick = (jobId: string) => {
-    console.log("Delete job clicked:", jobId);
-  };
+  // Editing and deletion are not available on technician dashboard
 
   return (
     <div className="w-full max-w-full space-y-4 md:space-y-6">
@@ -342,14 +314,11 @@ const TechnicianDashboard = () => {
             <>
               {/* Desktop view */}
               <div className="hidden md:block">
-                <TodaySchedule 
-                  jobs={assignments} 
-                  onEditClick={handleEditClick} 
-                  onDeleteClick={handleDeleteClick} 
-                  onJobClick={handleJobClick} 
-                  userRole="technician"
-                  isLoading={isLoading}
-                  hideTasks={true}
+                <AssignmentsGrid 
+                  assignments={assignments}
+                  loading={isLoading}
+                  onRefresh={handleRefresh}
+                  techName={userDepartment ? `${userDepartment} Technician` : 'Technician'}
                 />
               </div>
               {/* Mobile view */}

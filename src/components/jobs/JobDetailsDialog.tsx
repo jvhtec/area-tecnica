@@ -30,6 +30,7 @@ import { TourRatesPanel } from '@/components/tours/TourRatesPanel';
 import { JobExtrasManagement } from '@/components/jobs/JobExtrasManagement';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useTourRateSubscriptions } from "@/hooks/useTourRateSubscriptions";
+import { useJobExtras } from '@/hooks/useJobExtras';
 
 interface JobDetailsDialogProps {
   open: boolean;
@@ -45,7 +46,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   department = 'sound'
 }) => {
   const [selectedTab, setSelectedTab] = useState('info');
-  const { userRole } = useOptimizedAuth();
+  const { userRole, user } = useOptimizedAuth();
   const isManager = ['admin','management'].includes(userRole || '');
   const queryClient = useQueryClient();
 
@@ -92,6 +93,11 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
   const artistIdList = React.useMemo(() => jobArtists.map(a => a.id), [jobArtists]);
   const artistNameMap = React.useMemo(() => new Map(jobArtists.map(a => [a.id, a.name])), [jobArtists]);
+
+  // Extras setup and visibility
+  const jobIdForExtras = (jobDetails?.id as string) || job.id;
+  const { data: jobExtras = [] } = useJobExtras(jobIdForExtras);
+  const showExtrasTab = !!(jobDetails?.rates_approved) && (jobExtras.length > 0);
 
   // Rider files for the artists of this job (2-step to be RLS-friendly)
   const { data: riderFiles = [], isLoading: isRidersLoading } = useQuery({
@@ -312,7 +318,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         </DialogHeader>
 
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-          <TabsList className={`grid w-full ${jobDetails?.job_type === 'tourdate' ? 'grid-cols-7' : 'grid-cols-6'}`}>
+          <TabsList className={`grid w-full ${jobDetails?.job_type === 'tourdate' ? (showExtrasTab ? 'grid-cols-7' : 'grid-cols-6') : (showExtrasTab ? 'grid-cols-6' : 'grid-cols-5')}`}>
             <TabsTrigger value="info">Info</TabsTrigger>
             <TabsTrigger value="location">Location</TabsTrigger>
             <TabsTrigger value="personnel">Personnel</TabsTrigger>
@@ -321,7 +327,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
             {jobDetails?.job_type === 'tourdate' && (
               <TabsTrigger value="tour-rates">Tour Rates</TabsTrigger>
             )}
-            <TabsTrigger value="extras">Extras</TabsTrigger>
+            {showExtrasTab && <TabsTrigger value="extras">Extras</TabsTrigger>}
           </TabsList>
 
           <ScrollArea className="h-[500px] mt-4">
@@ -709,12 +715,15 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
               </TabsContent>
             )}
 
-            <TabsContent value="extras" className="space-y-4">
-              <JobExtrasManagement 
-                jobId={(jobDetails?.id as string) || job.id}
-                isManager={['admin','management'].includes(userRole || '')}
-              />
-            </TabsContent>
+            {showExtrasTab && (
+              <TabsContent value="extras" className="space-y-4">
+                <JobExtrasManagement 
+                  jobId={jobIdForExtras}
+                  isManager={isManager}
+                  technicianId={isManager ? undefined : (user?.id || undefined)}
+                />
+              </TabsContent>
+            )}
           </ScrollArea>
         </Tabs>
       </DialogContent>

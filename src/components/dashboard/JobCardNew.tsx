@@ -19,6 +19,8 @@ import {
 import { 
   Card 
 } from "@/components/ui/card";
+import { canCreateFolders, canDeleteDocuments, canEditJobs as canEditJobsPerm, canManageFestivalArtists as canManageFestivalArtistsPerm, canUploadDocuments as canUploadDocumentsPerm } from "@/utils/permissions";
+import { createSignedUrl, resolveJobDocBucket } from "@/utils/jobDocuments";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plane, Wrench, Star, Moon, Mic, Loader2, FileText } from "lucide-react";
@@ -706,26 +708,11 @@ export function JobCardNew({
     }
   };
 
-  const resolveBucket = (path: string) => {
-    const first = (path || '').split('/')[0];
-    const dept = new Set(['sound','lights','video','production','logistics','administrative']);
-    return dept.has(first) ? 'job_documents' : 'job-documents';
-  };
-
   const handleViewDocument = async (doc: JobDocument) => {
     try {
       console.log("Attempting to view document:", doc);
-      const { data, error } = await supabase.storage
-        .from(resolveBucket(doc.file_path))
-        .createSignedUrl(doc.file_path, 60);
-
-      if (error) {
-        console.error("Error creating signed URL:", error);
-        throw error;
-      }
-
-      console.log("Signed URL created:", data.signedUrl);
-      window.open(data.signedUrl, "_blank");
+      const url = await createSignedUrl(supabase, doc.file_path, 60);
+      window.open(url, "_blank");
     } catch (err: any) {
       console.error("Error in handleViewDocument:", err);
       toast({
@@ -741,7 +728,7 @@ export function JobCardNew({
     try {
       console.log("Starting document deletion:", doc);
       const { error: storageError } = await supabase.storage
-        .from(resolveBucket(doc.file_path))
+        .from(resolveJobDocBucket(doc.file_path))
         .remove([doc.file_path]);
       
       if (storageError) {
@@ -842,11 +829,11 @@ export function JobCardNew({
   };
 
   const isHouseTech = userRole === 'house_tech';
-  const canEditJobs = ['admin', 'management', 'logistics'].includes(userRole || '');
-  const canManageArtists = ['admin', 'management', 'logistics', 'technician', 'house_tech'].includes(userRole || '');
-  const canUploadDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
-  const canCreateFlexFolders = ['admin', 'management', 'logistics'].includes(userRole || '');
-  const canCreateLocalFolders = ['admin', 'management', 'logistics'].includes(userRole || '');
+  const canEditJobs = canEditJobsPerm(userRole);
+  const canManageArtists = canManageFestivalArtistsPerm(userRole);
+  const canUploadDocuments = canUploadDocumentsPerm(userRole);
+  const canCreateFlexFolders = canCreateFolders(userRole);
+  const canCreateLocalFolders = canCreateFolders(userRole);
 
   // Show loading state if job is being deleted
   const cardOpacity = isJobBeingDeleted ? "opacity-50" : "";
@@ -1158,7 +1145,7 @@ export function JobCardNew({
                             >
                               <Download className="h-3 w-3 sm:h-4 sm:w-4" />
                             </Button>
-                            {['admin', 'management'].includes(userRole || '') && (
+                            {canDeleteDocuments(userRole) && (
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -1290,37 +1277,15 @@ export function JobCardNew({
 }
 
 const handleDownload = async (doc: JobDocument) => {
-  const resolveBucket = (path: string) => {
-    const first = (path || '').split('/')[0];
-    const dept = new Set(['sound','lights','video','production','logistics','administrative']);
-    return dept.has(first) ? 'job_documents' : 'job-documents';
-  };
-
   try {
     console.log('Starting download for document:', doc.file_name);
-    
-    const { data, error } = await supabase.storage
-      .from(resolveBucket(doc.file_path))
-      .createSignedUrl(doc.file_path, 60);
-    
-    if (error) {
-      console.error('Error creating signed URL for download:', error);
-      throw error;
-    }
-    
-    if (!data?.signedUrl) {
-      throw new Error('Failed to generate download URL');
-    }
-    
-    console.log('Download URL created:', data.signedUrl);
-    
+    const url = await createSignedUrl(supabase, doc.file_path, 60);
     const link = document.createElement('a');
-    link.href = data.signedUrl;
+    link.href = url;
     link.download = doc.file_name;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
   } catch (err: any) {
     console.error('Error in handleDownload:', err);
     alert(`Error downloading document: ${err.message}`);

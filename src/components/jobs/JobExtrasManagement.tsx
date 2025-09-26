@@ -11,21 +11,22 @@ import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 interface JobExtrasManagementProps {
   jobId: string;
   isManager?: boolean;
+  technicianId?: string; // when provided (non-manager), restrict view to this tech
 }
 
 interface JobAssignment {
   technician_id: string;
   profiles: {
-    first_name: string;
-    last_name: string;
-  };
+    first_name?: string | null;
+    last_name?: string | null;
+  } | null;
 }
 
-export const JobExtrasManagement = ({ jobId, isManager = false }: JobExtrasManagementProps) => {
+export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: JobExtrasManagementProps) => {
   const { data: assignments, isLoading: assignmentsLoading } = useQuery({
     queryKey: ['job-assignments', jobId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('job_assignments')
         .select(`
           technician_id,
@@ -35,6 +36,10 @@ export const JobExtrasManagement = ({ jobId, isManager = false }: JobExtrasManag
           )
         `)
         .eq('job_id', jobId);
+      if (technicianId && !isManager) {
+        query = query.eq('technician_id', technicianId);
+      }
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as JobAssignment[];
@@ -42,7 +47,8 @@ export const JobExtrasManagement = ({ jobId, isManager = false }: JobExtrasManag
     enabled: !!jobId,
   });
 
-  const { data: payoutTotals, isLoading: payoutLoading } = useJobPayoutTotals(jobId);
+  // If technicianId is provided (non-manager), restrict payouts to that technician
+  const { data: payoutTotals, isLoading: payoutLoading } = useJobPayoutTotals(jobId, technicianId);
 
   if (assignmentsLoading || payoutLoading) {
     return (
@@ -62,7 +68,14 @@ export const JobExtrasManagement = ({ jobId, isManager = false }: JobExtrasManag
     );
   }
 
-  if (!assignments?.length) {
+  // When not manager and technicianId provided, filter assignments to that technician only
+  const visibleAssignments = assignments?.filter(a => !technicianId || a.technician_id === technicianId) || [];
+
+  if (assignmentsLoading || payoutLoading) {
+    // covered above, but keep logic order consistent
+  }
+
+  if (!visibleAssignments.length) {
     return (
       <Card>
         <CardHeader>
@@ -73,16 +86,14 @@ export const JobExtrasManagement = ({ jobId, isManager = false }: JobExtrasManag
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <div className="text-sm text-muted-foreground">No technicians assigned to this job</div>
+            <div className="text-sm text-muted-foreground">No extras available</div>
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  const totalExtrasAmount = payoutTotals?.reduce((sum, payout) => 
-    sum + (payout.extras_total_eur || 0), 0
-  ) || 0;
+  const totalExtrasAmount = (isManager ? (payoutTotals?.reduce((sum, payout) => sum + (payout.extras_total_eur || 0), 0) || 0) : (payoutTotals?.[0]?.extras_total_eur || 0));
 
   return (
     <Card>
@@ -91,21 +102,25 @@ export const JobExtrasManagement = ({ jobId, isManager = false }: JobExtrasManag
           <DollarSign className="h-5 w-5" />
           Job Extras & Rates
         </CardTitle>
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Users className="h-4 w-4" />
-            {assignments.length} technician{assignments.length !== 1 ? 's' : ''}
+        {isManager && (
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Users className="h-4 w-4" />
+              {visibleAssignments.length} technician{visibleAssignments.length !== 1 ? 's' : ''}
+            </div>
+            {totalExtrasAmount > 0 && (
+              <Badge variant="secondary">
+                Total Extras: {formatCurrency(totalExtrasAmount)}
+              </Badge>
+            )}
           </div>
-          {totalExtrasAmount > 0 && (
-            <Badge variant="secondary">
-              Total Extras: {formatCurrency(totalExtrasAmount)}
-            </Badge>
-          )}
-        </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-6">
-        {assignments.map((assignment, index) => {
-          const technicianName = `${assignment.profiles.first_name} ${assignment.profiles.last_name}`;
+        {visibleAssignments.map((assignment, index) => {
+          const technicianName = (
+            `${assignment.profiles?.first_name ?? ''} ${assignment.profiles?.last_name ?? ''}`
+          ).trim() || 'Unnamed Technician';
           const technicianPayout = payoutTotals?.find(p => p.technician_id === assignment.technician_id);
           
           return (

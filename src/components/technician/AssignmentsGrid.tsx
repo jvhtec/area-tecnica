@@ -1,18 +1,15 @@
 import { Button } from "@/components/ui/button";
-import { useAssignmentsListSubscriptions } from "@/hooks/useMobileRealtimeSubscriptions";
-import { AssignmentCard } from './AssignmentCard';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw } from "lucide-react";
+import { AssignmentCard } from "./AssignmentCard";
 
-interface AssignmentsListProps {
+interface AssignmentsGridProps {
   assignments: any[];
   loading: boolean;
   onRefresh: () => void;
   techName?: string;
 }
 
-export const AssignmentsList = ({ assignments = [], loading = false, onRefresh, techName = '' }: AssignmentsListProps) => {
-  useAssignmentsListSubscriptions();
-
+export const AssignmentsGrid = ({ assignments = [], loading = false, onRefresh, techName = '' }: AssignmentsGridProps) => {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center p-8 space-y-4">
@@ -35,7 +32,7 @@ export const AssignmentsList = ({ assignments = [], loading = false, onRefresh, 
   }
 
   return (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {assignments.map((assignment) => (
         <AssignmentCard key={assignment.id || `${assignment.job_id}-${assignment.technician_id}`} assignment={assignment} techName={techName} />
       ))}

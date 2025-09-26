@@ -14,6 +14,7 @@ interface TechnicianIncidentReportDialogProps {
   job: any;
   techName?: string;
   className?: string;
+  labeled?: boolean; // when true, show a labeled button instead of icon-only
 }
 
 interface IncidentReportData {
@@ -27,7 +28,8 @@ interface IncidentReportData {
 export const TechnicianIncidentReportDialog = ({ 
   job, 
   techName = "",
-  className = ""
+  className = "",
+  labeled = false
 }: TechnicianIncidentReportDialogProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState<IncidentReportData>({
@@ -143,14 +145,26 @@ export const TechnicianIncidentReportDialog = ({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          title="Create Incident Report"
-          className={`hover:bg-accent/50 ${className}`}
-        >
-          <ClipboardList className="h-4 w-4" />
-        </Button>
+        {labeled ? (
+          <Button
+            variant="outline"
+            size="sm"
+            title="Crear reporte de incidencia"
+            className={`gap-2 ${className}`}
+          >
+            <ClipboardList className="h-3 w-3" />
+            Incidencia
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Crear reporte de incidencia"
+            className={`hover:bg-accent/50 ${className}`}
+          >
+            <ClipboardList className="h-4 w-4" />
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
