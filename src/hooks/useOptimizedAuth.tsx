@@ -409,7 +409,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   };
 
   // Admin/management-only create user via Edge Function (service role)
-  const createUserAsAdmin = async (userData: Omit<SignUpData, 'password'> & { role?: string }) => {
+  const createUserAsAdmin = async (userData: Omit<SignUpData, 'password'> & { role?: string } & { flex_resource_id?: string }) => {
     try {
       setIsLoading(true);
       setError(null);
@@ -423,6 +423,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
           dni: userData.dni,
           residencia: userData.residencia,
           role: (userData as any).role,
+          flex_resource_id: (userData as any).flex_resource_id,
         }
       });
       if (error) {

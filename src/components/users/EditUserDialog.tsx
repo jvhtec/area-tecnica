@@ -9,7 +9,7 @@ import { Department } from "@/types/department";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { HouseTechRateEditor } from "@/components/settings/HouseTechRateEditor";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
@@ -24,10 +24,30 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
   const [assignableAsTech, setAssignableAsTech] = useState<boolean>(!!user?.assignable_as_tech);
   const { userRole } = useOptimizedAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
+  const [flexUrl, setFlexUrl] = useState<string>("");
+  const [flexResourceId, setFlexResourceId] = useState<string>(user?.flex_resource_id || "");
 
   useEffect(() => {
     setAssignableAsTech(!!user?.assignable_as_tech);
+    setFlexResourceId(user?.flex_resource_id || "");
+    setFlexUrl("");
   }, [user?.id]);
+
+  const extractFlexIdFromUrl = (url: string): string | null => {
+    try {
+      // Accept raw UUID directly
+      const raw = url.trim();
+      const uuidRe = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/;
+      const direct = raw.match(uuidRe)?.[0];
+      if (direct) return direct;
+      // Typical Flex URL: ...#contact/<uuid>/...
+      const hash = raw.split('#')[1] || '';
+      const m = hash.match(uuidRe);
+      return m?.[0] || null;
+    } catch {
+      return null;
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -49,6 +69,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
       residencia: formData.get('residencia') as string,
       role: formData.get('role') as string,
       assignable_as_tech: assignableAsTech,
+      flex_resource_id: (formData.get('flex_resource_id') as string || flexResourceId || '').trim() || null,
     };
 
     console.log("Submitting user update with data:", updatedData);
@@ -92,14 +113,70 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
                 defaultValue={user?.last_name || ''}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input
-                id="phone"
-                name="phone"
-                defaultValue={user?.phone || ''}
-              />
-            </div>
+        <div className="space-y-2">
+          <Label htmlFor="phone">Phone Number</Label>
+          <Input
+            id="phone"
+            name="phone"
+            defaultValue={user?.phone || ''}
+          />
+        </div>
+
+            {/* Flex Resource ID helpers (management only) */}
+            {isManagementUser && (
+              <div className="space-y-2">
+                <Label htmlFor="flex_resource_id">Flex Resource ID</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="flex_resource_id"
+                    name="flex_resource_id"
+                    placeholder="4b0d98e0-e700-11ea-97d0-2a0a4490a7fb"
+                    value={flexResourceId}
+                    onChange={(e) => setFlexResourceId(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="flex_url">Flex Contact URL (paste then Extract)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="flex_url"
+                      placeholder="https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#contact/UUID/phone"
+                      value={flexUrl}
+                      onChange={(e) => setFlexUrl(e.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        const id = extractFlexIdFromUrl(flexUrl);
+                        if (id) setFlexResourceId(id);
+                      }}
+                    >
+                      Extract
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          const clip = await navigator.clipboard.readText();
+                          setFlexUrl(clip);
+                          const id = extractFlexIdFromUrl(clip);
+                          if (id) setFlexResourceId(id);
+                        } catch (_) {
+                          // Clipboard not available; no-op
+                        }
+                      }}
+                    >
+                      Paste URL
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Example URL: https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#contact/4b0d98e0-e700-11ea-97d0-2a0a4490a7fb/phone
+                  </p>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="department">Department</Label>
               <Select name="department" defaultValue={user?.department || 'sound'}>

@@ -15,6 +15,7 @@ interface CreateUserBody {
   dni?: string;
   residencia?: string;
   role?: string; // optional; defaults handled by DB
+  flex_resource_id?: string; // optional Flex contact id
 }
 
 serve(async (req) => {
@@ -84,13 +85,16 @@ serve(async (req) => {
 
     if (authError) throw authError;
 
-    // Optionally set role explicitly if provided
-    if (body.role) {
-      const { error: roleUpdateError } = await supabaseAdmin
+    // Optionally set role and flex_resource_id if provided
+    const updates: Record<string, any> = {};
+    if (body.role) updates.role = body.role;
+    if (body.flex_resource_id) updates.flex_resource_id = body.flex_resource_id;
+    if (Object.keys(updates).length > 0) {
+      const { error: updErr } = await supabaseAdmin
         .from('profiles')
-        .update({ role: body.role })
+        .update(updates)
         .eq('id', authData.user.id);
-      if (roleUpdateError) throw roleUpdateError;
+      if (updErr) throw updErr;
     }
 
     return new Response(
@@ -105,4 +109,3 @@ serve(async (req) => {
     });
   }
 });
-

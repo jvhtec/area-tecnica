@@ -26,6 +26,8 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
     department: "",
     dni: "",
     residencia: "",
+    flexResourceId: "",
+    flexUrl: "",
   });
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -63,6 +65,9 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
         department: formData.department,
         dni: formData.dni,
         residencia: formData.residencia,
+        // Pass Flex Resource ID if provided
+        // @ts-ignore - allowed as extra prop for the function body
+        flex_resource_id: formData.flexResourceId || undefined,
       });
       return;
     } else {
@@ -201,6 +206,63 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
           />
         </div>
       </div>
+
+      {preventAutoLogin && (
+        <div className="space-y-3 border rounded-md p-3">
+          <div className="space-y-2">
+            <Label htmlFor="flexResourceId">Flex Resource ID (optional)</Label>
+            <Input
+              id="flexResourceId"
+              type="text"
+              placeholder="4b0d98e0-e700-11ea-97d0-2a0a4490a7fb"
+              value={formData.flexResourceId}
+              onChange={(e) => setFormData({ ...formData, flexResourceId: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="flexUrl">Flex Contact URL (paste then Extract)</Label>
+            <div className="flex gap-2">
+              <Input
+                id="flexUrl"
+                type="text"
+                placeholder="https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#contact/UUID/phone"
+                value={formData.flexUrl}
+                onChange={(e) => setFormData({ ...formData, flexUrl: e.target.value })}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  const uuidRe = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/;
+                  const m = (formData.flexUrl || '').match(uuidRe)?.[0];
+                  if (m) setFormData({ ...formData, flexResourceId: m });
+                }}
+              >
+                Extract
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    const clip = await navigator.clipboard.readText();
+                    const uuidRe = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/;
+                    const m = (clip || '').match(uuidRe)?.[0];
+                    setFormData({ ...formData, flexUrl: clip, flexResourceId: m || formData.flexResourceId });
+                  } catch (_) {
+                    // ignore
+                  }
+                }}
+              >
+                Paste URL
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Example: https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#contact/4b0d98e0-e700-11ea-97d0-2a0a4490a7fb/phone
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col space-y-4">
         <Button type="submit" disabled={isLoading}>

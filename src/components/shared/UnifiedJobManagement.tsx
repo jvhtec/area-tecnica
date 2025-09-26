@@ -13,6 +13,7 @@ import { FestivalWeatherSection } from "@/components/festival/FestivalWeatherSec
 import { PrintOptionsDialog } from "@/components/festival/pdf/PrintOptionsDialog";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { JobExtrasManagement } from "@/components/jobs/JobExtrasManagement";
+import { CrewCallLinkerDialog } from "@/components/jobs/CrewCallLinker";
 
 interface UnifiedJobManagementProps {
   mode: 'job' | 'festival';
@@ -398,6 +399,13 @@ export const UnifiedJobManagement = ({ mode }: UnifiedJobManagementProps) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Flex Crew Call linking (dialog trigger) */}
+      {mode === 'festival' ? null : (
+        <div className="flex justify-end">
+          {jobId && <CrewCallLinkerDialog jobId={jobId} />}
+        </div>
+      )}
 
       {/* Job Extras Management Section */}
       <JobExtrasManagement jobId={jobId || ''} isManager={true} />

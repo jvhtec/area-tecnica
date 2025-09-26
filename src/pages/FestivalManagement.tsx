@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Music2, Layout, Calendar, Printer, Loader2, FileText, Download, Eye, Clock, FolderPlus, RefreshCw, MapPin } from "lucide-react";
+import { Users, Music2, Layout, Calendar, Printer, Loader2, FileText, Download, Eye, Clock, FolderPlus, RefreshCw, MapPin, Link as LinkIcon } from "lucide-react";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +23,7 @@ import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { ModernHojaDeRuta } from "@/components/hoja-de-ruta/ModernHojaDeRuta";
 import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { CrewCallLinkerDialog } from "@/components/jobs/CrewCallLinker";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
 
 interface FestivalJob {
@@ -890,6 +891,19 @@ const FestivalManagement = () => {
                     >
                       Open
                     </Button>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <LinkIcon className="h-4 w-4" />
+                    Flex Crew Calls
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Link Sound/Lights crew call element IDs.
+                  </p>
+                  <div className="flex">
+                    {jobId && <CrewCallLinkerDialog jobId={jobId} />}
                   </div>
                 </div>
 
