@@ -27,6 +27,7 @@ import { JobCardProgress } from './JobCardProgress';
 import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
 import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
+import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
@@ -72,6 +73,7 @@ export function JobCardNew({
   const queryClient = useQueryClient();
   const { addDeletingJob, removeDeletingJob, isDeletingJob } = useDeletionState();
   const [routeSheetOpen, setRouteSheetOpen] = useState(false);
+  const [taskManagerOpen, setTaskManagerOpen] = useState(false);
   
   // Add folder creation loading state
   const [isCreatingFolders, setIsCreatingFolders] = useState(false);
@@ -607,16 +609,8 @@ export function JobCardNew({
     if (isHouseTech || isJobBeingDeleted) {
       return;
     }
-    
-    if (isProjectManagementPage) {
-      if (department === "sound") {
-        setSoundTaskDialogOpen(true);
-      } else if (department === "lights") {
-        setLightsTaskDialogOpen(true);
-      } else if (department === "video") {
-        setVideoTaskDialogOpen(true);
-      }
-    } else {
+    // On project management pages, do not open tasks on card click
+    if (!isProjectManagementPage) {
       if (userRole !== "logistics" && onJobClick) {
         onJobClick(job.id);
       }
@@ -712,6 +706,7 @@ export function JobCardNew({
             }}
             handleFileUpload={handleFileUpload}
             onJobDetailsClick={() => setJobDetailsDialogOpen(true)}
+            onOpenTasks={(e) => { e.stopPropagation(); setTaskManagerOpen(true); }}
             canSyncFlex={['admin','management','logistics'].includes(userRole || '')}
             onSyncFlex={syncStatusToFlex}
             onOpenFlexLogs={(e) => { e.stopPropagation(); setFlexLogDialogOpen(true); }}
@@ -802,6 +797,14 @@ export function JobCardNew({
 
       {!isHouseTech && !isJobBeingDeleted && (
         <>
+          {taskManagerOpen && (
+            <TaskManagerDialog
+              open={taskManagerOpen}
+              onOpenChange={setTaskManagerOpen}
+              userRole={userRole}
+              jobId={job.id}
+            />
+          )}
           {soundTaskDialogOpen && (
             <SoundTaskDialog
               open={soundTaskDialogOpen}

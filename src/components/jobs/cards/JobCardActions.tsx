@@ -33,6 +33,8 @@ interface JobCardActionsProps {
   onAssignmentDialogOpen: (e: React.MouseEvent) => void;
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onJobDetailsClick?: () => void;
+  // Tasks
+  onOpenTasks?: (e: React.MouseEvent) => void;
   // Flex sync + logs
   canSyncFlex?: boolean;
   onSyncFlex?: (e: React.MouseEvent) => void;
@@ -67,6 +69,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   onAssignmentDialogOpen,
   handleFileUpload,
   onJobDetailsClick,
+  onOpenTasks,
   canSyncFlex,
   onSyncFlex,
   onOpenFlexLogs,
@@ -147,6 +150,18 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
 
   return (
     <div className="flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
+      {isProjectManagementPage && job.job_type !== 'dryhire' && onOpenTasks && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onOpenTasks}
+          className="gap-2"
+          title="Tasks"
+        >
+          <FileText className="h-4 w-4" />
+          <span className="hidden sm:inline">Tasks</span>
+        </Button>
+      )}
       {transportButtonLabel && onTransportClick && (
         <Button
           variant={transportButtonTone || 'outline'}

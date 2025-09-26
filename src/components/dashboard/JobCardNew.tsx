@@ -44,6 +44,7 @@ import {
 import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
 import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
+import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
@@ -116,6 +117,7 @@ export function JobCardNew({
   const [soundTaskDialogOpen, setSoundTaskDialogOpen] = useState(false);
   const [lightsTaskDialogOpen, setLightsTaskDialogOpen] = useState(false);
   const [videoTaskDialogOpen, setVideoTaskDialogOpen] = useState(false);
+  const [taskManagerOpen, setTaskManagerOpen] = useState(false);
   const [editJobDialogOpen, setEditJobDialogOpen] = useState(false);
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
   const [jobDetailsDialogOpen, setJobDetailsDialogOpen] = useState(false);
@@ -799,16 +801,8 @@ export function JobCardNew({
     if (isHouseTech || isJobBeingDeleted) {
       return; // Block job card clicks for house techs or jobs being deleted
     }
-    
-    if (isProjectManagementPage) {
-      if (department === "sound") {
-        setSoundTaskDialogOpen(true);
-      } else if (department === "lights") {
-        setLightsTaskDialogOpen(true);
-      } else if (department === "video") {
-        setVideoTaskDialogOpen(true);
-      }
-    } else {
+    // On project management pages, do not open tasks on card click
+    if (!isProjectManagementPage) {
       if (userRole !== "logistics") {
         onJobClick(job.id);
       }
@@ -896,15 +890,15 @@ export function JobCardNew({
           {/* Buttons section */}
           <div className="flex items-center justify-between gap-2 sm:gap-4">
             <div className="flex-1" /> {/* Spacer */}
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleCollapse}
-                title="Toggle Details"
-                className="hover:bg-accent/50 shrink-0 h-8 w-8 sm:h-10 sm:w-10"
-                disabled={isJobBeingDeleted}
-              >
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleCollapse}
+              title="Toggle Details"
+              className="hover:bg-accent/50 shrink-0 h-8 w-8 sm:h-10 sm:w-10"
+              disabled={isJobBeingDeleted}
+            >
                 {collapsed ? (
                   <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
                 ) : (
@@ -952,6 +946,19 @@ export function JobCardNew({
                     {userRole === 'technician' || userRole === 'house_tech' ? 'View Festival' : 'Manage Festival'}
                   </span>
                   <span className="sm:hidden">Festival</span>
+                </Button>
+              )}
+              {isProjectManagementPage && job.job_type !== 'dryhire' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => { e.stopPropagation(); setTaskManagerOpen(true); }}
+                  className="hover:bg-accent/50 text-xs sm:text-sm px-2 sm:px-3 h-7 sm:h-8"
+                  disabled={isJobBeingDeleted}
+                >
+                  <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Tasks</span>
+                  <span className="sm:hidden">Tasks</span>
                 </Button>
               )}
               {!isHouseTech && job.job_type !== "dryhire" && isProjectManagementPage && (
@@ -1224,6 +1231,14 @@ export function JobCardNew({
 
       {!isHouseTech && !isJobBeingDeleted && (
         <>
+          {taskManagerOpen && (
+            <TaskManagerDialog
+              open={taskManagerOpen}
+              onOpenChange={setTaskManagerOpen}
+              userRole={userRole}
+              jobId={job.id}
+            />
+          )}
           {soundTaskDialogOpen && (
             <SoundTaskDialog
               open={soundTaskDialogOpen}
