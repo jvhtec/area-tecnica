@@ -114,9 +114,23 @@ export const TourManagementDialog = ({
 
       if (error) throw error;
 
+      // When cancelling a tour, mark all its tourdate jobs as Cancelado
+      if (newStatus === 'cancelled') {
+        const { error: jobsErr } = await supabase
+          .from('jobs')
+          .update({ status: 'Cancelado' })
+          .eq('tour_id', tour.id)
+          .eq('job_type', 'tourdate');
+        if (jobsErr) {
+          console.warn('Failed to mark tour jobs as Cancelado:', jobsErr);
+        }
+      }
+
       // Refresh tour data
       await queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
       await queryClient.invalidateQueries({ queryKey: ["tours"] });
+      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
 
       toast({
         title: "Success",

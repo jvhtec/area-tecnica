@@ -51,10 +51,34 @@ export const useJobs = () => {
           }
 
           console.log("Jobs fetched successfully:", jobs);
-          
-          // Return all jobs without tour filtering
-          const filteredJobs = jobs || [];
-          
+
+          const allJobs = jobs || [];
+
+          // Load tour metadata to hide cancelled/deleted tours
+          const tourIds = Array.from(new Set(allJobs.map(j => j.tour_id).filter(Boolean)));
+          let tourMeta: Record<string, { status: string | null; deleted: boolean | null }> = {};
+          if (tourIds.length > 0) {
+            const { data: toursData, error: toursError } = await supabase
+              .from('tours')
+              .select('id, status, deleted')
+              .in('id', tourIds as string[]);
+            if (!toursError) {
+              for (const t of (toursData || [])) {
+                tourMeta[t.id] = { status: t.status ?? null, deleted: (t.deleted as any) ?? null };
+              }
+            } else {
+              console.warn('useJobs: Failed to load tour metadata', toursError);
+            }
+          }
+
+          // Filter out jobs from cancelled/deleted tours and explicitly cancelled jobs
+          const filteredJobs = allJobs.filter(j => {
+            if (j.status === 'Cancelado') return false;
+            const meta = j.tour_id ? tourMeta[j.tour_id] : null;
+            if (meta && (meta.status === 'cancelled' || meta.deleted === true)) return false;
+            return true;
+          });
+
           return filteredJobs;
         } catch (error) {
           if (retries > 0) {
