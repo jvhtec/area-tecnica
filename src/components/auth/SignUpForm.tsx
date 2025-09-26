@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, ArrowLeft } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
 interface SignUpFormProps {
   onBack?: () => void;
@@ -15,6 +17,7 @@ interface SignUpFormProps {
 
 export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps) => {
   const { signUp, createUserAsAdmin, isLoading, error: authError } = useOptimizedAuth();
+  const { toast } = useToast();
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: "",
@@ -29,6 +32,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
     flexResourceId: "",
     flexUrl: "",
   });
+  const [isFetchingFlex, setIsFetchingFlex] = useState(false);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -255,6 +259,49 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
                 }}
               >
                 Paste URL
+              </Button>
+              <Button
+                type="button"
+                variant="default"
+                disabled={isFetchingFlex || !(formData.flexResourceId || formData.flexUrl)}
+                onClick={async () => {
+                  try {
+                    setIsFetchingFlex(true);
+                    const { data, error } = await supabase.functions.invoke('fetch-flex-contact-info', {
+                      body: formData.flexResourceId
+                        ? { contact_id: formData.flexResourceId }
+                        : { url: formData.flexUrl }
+                    });
+                    if (error) throw error;
+                    if (data?.error) throw new Error(data.error);
+                    const m = data?.mapped || {};
+                    setFormData((prev) => ({
+                      ...prev,
+                      firstName: m.firstName || prev.firstName,
+                      lastName: m.lastName || prev.lastName,
+                      email: m.email || prev.email,
+                      phone: m.phone || prev.phone,
+                      residencia: m.residencia || prev.residencia,
+                      dni: m.dni || prev.dni,
+                      department: m.department || prev.department,
+                      flexResourceId: data?.contact_id || prev.flexResourceId,
+                    }));
+                    toast({ title: 'Fetched from Flex', description: 'Fields have been autofilled.' });
+                  } catch (e: any) {
+                    toast({ title: 'Flex fetch failed', description: e?.message || 'Unknown error', variant: 'destructive' });
+                  } finally {
+                    setIsFetchingFlex(false);
+                  }
+                }}
+              >
+                {isFetchingFlex ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Fetching…
+                  </>
+                ) : (
+                  'Fetch from Flex'
+                )}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
