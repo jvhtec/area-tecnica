@@ -52,6 +52,7 @@ import Timesheets from '@/pages/Timesheets';
 import JobManagement from '@/pages/JobManagement';
 import { UserManual } from '@/components/UserManual';
 import IncidentReports from '@/pages/IncidentReports';
+import Wallboard from '@/pages/Wallboard';
 
 export default function App() {
   // Initialize multi-tab coordinator
@@ -74,6 +75,8 @@ export default function App() {
                 <Routes>
                   <Route path="/" element={<Auth />} />
                   <Route path="/auth" element={<Auth />} />
+                  {/* Wallboard: protected, full-screen (no Layout) */}
+                  <Route path="/wallboard" element={<RequireAuth><Wallboard /></RequireAuth>} />
                   {/* Public Routes */}
                   <Route path="festival">
                     <Route path="artist-form/:token" element={<ArtistRequirementsForm />} />

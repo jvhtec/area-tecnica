@@ -10,11 +10,11 @@ export const shouldAutoComplete = (job: any): boolean => {
     return false;
   }
   
-  const jobEndDate = new Date(job.end_time);
+  const end = new Date(job.end_time);
   const now = new Date();
-  
-  // Job should be completed if end date has passed
-  return jobEndDate < now;
+  // Only auto-complete starting the day AFTER the job ends (D+1 at 00:00 local time)
+  const nextDayStart = new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1, 0, 0, 0, 0);
+  return now >= nextDayStart;
 };
 
 /**
