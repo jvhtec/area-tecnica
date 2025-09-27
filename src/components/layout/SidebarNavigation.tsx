@@ -14,7 +14,8 @@ import {
   MapPin,
   Grid3X3,
   Clock,
-  FileText
+  FileText,
+  Megaphone
 } from "lucide-react";
 import { TimesheetSidebarTrigger } from "@/components/timesheet/TimesheetSidebarTrigger";
 import { SidebarNavigationSkeleton } from './SidebarNavigationSkeleton';
@@ -278,6 +279,18 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
         {/* Settings Access - Available to admin and management */}
         {(['admin', 'management'].includes(userRole)) && (
           <>
+            <Link to="/announcements">
+              <Button
+                variant="ghost"
+                className={`w-full justify-start gap-2 ${
+                  location.pathname === "/announcements" ? "bg-accent" : ""
+                }`}
+              >
+                <Megaphone className="h-4 w-4" />
+                <span>Announcements</span>
+              </Button>
+            </Link>
+
             <Link to="/incident-reports">
               <Button
                 variant="ghost"

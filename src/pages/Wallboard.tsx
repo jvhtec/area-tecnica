@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRoleGuard } from '@/hooks/useRoleGuard';
 
@@ -8,6 +8,7 @@ interface JobsOverviewFeed { jobs: Array<{ id:string; title:string; start_time:s
 interface CrewAssignmentsFeed { jobs: Array<{ id:string; title:string; crew: Array<{ name:string; role:string; dept:Dept|null; timesheetStatus:'submitted'|'draft'|'missing'|'approved'; }> }>; }
 interface DocProgressFeed { jobs: Array<{ id:string; title:string; departments: Array<{ dept:Dept; have:number; need:number; missing:string[] }> }> }
 interface PendingActionsFeed { items: Array<{ severity:'red'|'yellow'; text:string }> }
+interface LogisticsItem { id:string; date:string; time:string; title:string; transport_type:string|null; plate:string|null; job_title?: string|null }
 
 const PanelContainer: React.FC<{ children: React.ReactNode }>=({ children })=> (
   <div className="w-full h-full p-6 flex flex-col gap-4 bg-black text-white">
@@ -131,22 +132,56 @@ const PendingActionsPanel: React.FC<{ data: PendingActionsFeed | null }>=({ data
 );
 
 const Ticker: React.FC<{ messages: string[]; bottomOffset?: number }>=({ messages, bottomOffset = 0 })=> {
-  const [offset, setOffset] = useState(0);
-  const text = messages.join('   •   ');
+  const [posX, setPosX] = useState(0);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const textRef = useRef<HTMLSpanElement | null>(null);
+  const gap = 64; // px spacing between repeats
+  const text = (messages || []).join('   •   ');
+
+  // Start from the right edge whenever content changes
   useEffect(() => {
-    const id = setInterval(() => setOffset(o => (o+1)%10000), 30);
-    return () => clearInterval(id);
-  }, []);
+    const cw = containerRef.current?.offsetWidth || 0;
+    setPosX(cw);
+  }, [text]);
+
+  // Smooth, endless loop: track translateX decreases; wrap by one copy width
+  useEffect(() => {
+    if (!text) return;
+    let raf = 0;
+    let last = performance.now();
+    const speed = 50; // px/sec
+    const tick = (now: number) => {
+      const dt = (now - last) / 1000;
+      last = now;
+      setPosX(prev => {
+        const w = (textRef.current?.offsetWidth || 0) + gap; // width of one copy
+        if (w <= 0) return prev;
+        let next = prev - speed * dt;
+        // If we've fully scrolled one copy past the left, wrap forward by that width
+        while (next <= -w) next += w;
+        return next;
+      });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [text]);
+
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-zinc-900/95 border-t border-zinc-800 py-2 text-xl overflow-hidden" style={{ bottom: bottomOffset }}>
-      <div className="whitespace-nowrap will-change-transform" style={{ transform: `translateX(-${offset}px)` }}>
-        {text || '—'}
-      </div>
+    <div ref={containerRef} className="fixed bottom-0 left-0 right-0 bg-zinc-900/95 border-t border-zinc-800 py-2 text-xl overflow-hidden" style={{ bottom: bottomOffset }}>
+      {text ? (
+        <div className="whitespace-nowrap will-change-transform" style={{ transform: `translateX(${posX}px)` }}>
+          <span ref={textRef} className="inline-block">{text}</span>
+          <span className="inline-block" style={{ paddingLeft: gap }}>{text}</span>
+        </div>
+      ) : (
+        <div>—</div>
+      )}
     </div>
   );
 };
 
-const FooterLogo: React.FC = () => {
+const FooterLogo: React.FC<{ onToggle?: () => void }> = ({ onToggle }) => {
   // Use Supabase public bucket: "public logos"/sectorlogow.png, with local fallbacks
   const { data } = supabase.storage.from('public logos').getPublicUrl('sectorlogow.png');
   const primary = data?.publicUrl;
@@ -162,20 +197,22 @@ const FooterLogo: React.FC = () => {
       <img
         src={src}
         alt="Company Logo"
-        className="h-12 w-auto opacity-90"
+        className="h-12 w-auto opacity-90 cursor-pointer select-none"
         onError={() => setIdx(i => i + 1)}
+        onClick={() => onToggle && onToggle()}
       />
     </div>
   );
 };
 
-type PanelKey = 'overview'|'crew'|'docs'|'pending';
+type PanelKey = 'overview'|'crew'|'docs'|'pending'|'logistics';
 
 export default function Wallboard() {
   useRoleGuard(['admin','management','wallboard']);
+  const [isAlien, setIsAlien] = useState(false);
 
   // Rotate panels every 12s (overview, crew, docs, pending)
-  const panels: PanelKey[] = ['overview','crew','docs','pending'];
+  const panels: PanelKey[] = ['overview','crew','docs','logistics','pending'];
   const [idx, setIdx] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setIdx(i => (i+1)%panels.length), 12000);
@@ -187,6 +224,7 @@ export default function Wallboard() {
   const [crew, setCrew] = useState<CrewAssignmentsFeed|null>(null);
   const [docs, setDocs] = useState<DocProgressFeed|null>(null);
   const [pending, setPending] = useState<PendingActionsFeed|null>(null);
+  const [logistics, setLogistics] = useState<LogisticsItem[]|null>(null);
   const [tickerMsgs, setTickerMsgs] = useState<string[]>([]);
 
   useEffect(() => {
@@ -381,6 +419,37 @@ export default function Wallboard() {
         setDocs(docPayload);
         setPending({ items });
       }
+
+      // 5) Logistics calendar (today + tomorrow)
+      const startDate = startISO.slice(0,10);
+      const endDate = endISO.slice(0,10);
+      const { data: le, error: leErr } = await supabase
+        .from('logistics_events')
+        .select('id,event_date,event_time,title,transport_type,license_plate,job_id')
+        .gte('event_date', startDate)
+        .lte('event_date', endDate)
+        .order('event_date', { ascending: true })
+        .order('event_time', { ascending: true });
+      if (leErr) {
+        console.error('Wallboard logistics_events error:', leErr);
+      }
+      const evts = le || [];
+      const evtJobIds = Array.from(new Set(evts.map((e:any)=>e.job_id).filter(Boolean)));
+      let titlesByJob = new Map<string,string>();
+      if (evtJobIds.length) {
+        const { data: trows } = await supabase.from('jobs').select('id,title').in('id', evtJobIds);
+        (trows||[]).forEach((r:any)=> titlesByJob.set(r.id, r.title));
+      }
+      const logisticsItems: LogisticsItem[] = evts.map((e:any)=>({
+        id: e.id,
+        date: e.event_date,
+        time: e.event_time,
+        title: e.title || titlesByJob.get(e.job_id) || 'Logistics',
+        transport_type: e.transport_type ?? null,
+        plate: e.license_plate ?? null,
+        job_title: titlesByJob.get(e.job_id) || null,
+      }));
+      if (!cancelled) setLogistics(logisticsItems);
     };
     fetchAll();
     const id = setInterval(fetchAll, 60000); // 60s polling
@@ -405,15 +474,166 @@ export default function Wallboard() {
 
   const current = panels[idx];
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className={`min-h-screen ${isAlien ? 'bg-black text-[var(--alien-amber)] alien-scanlines alien-vignette' : 'bg-black text-white'}`}>
       <div className="pb-28">{/* space for ticker + footer */}
-        {current==='overview' && <JobsOverviewPanel data={overview} />}
-        {current==='crew' && <CrewAssignmentsPanel data={crew} />}
-        {current==='docs' && <DocProgressPanel data={docs} />}
-        {current==='pending' && <PendingActionsPanel data={pending} />}
+        {current==='overview' && (isAlien ? <AlienJobsPanel data={overview} /> : <JobsOverviewPanel data={overview} />)}
+        {current==='crew' && (isAlien ? <AlienCrewPanel data={crew} /> : <CrewAssignmentsPanel data={crew} />)}
+        {current==='docs' && (isAlien ? <AlienDocsPanel data={docs} /> : <DocProgressPanel data={docs} />)}
+        {current==='logistics' && (isAlien ? <AlienLogisticsPanel data={logistics} /> : <LogisticsPanel data={logistics} />)}
+        {current==='pending' && (isAlien ? <AlienPendingPanel data={pending} /> : <PendingActionsPanel data={pending} />)}
       </div>
       <Ticker messages={tickerMsgs} bottomOffset={56} />
-      <FooterLogo />
+      <FooterLogo onToggle={() => setIsAlien(v => !v)} />
     </div>
   );
 }
+
+// Alien-styled panels
+const AlienShell: React.FC<{ title: string; kind?: 'standard'|'critical'|'env'|'tracker'; children: React.ReactNode }>=({ title, kind='standard', children })=> {
+  const headerCls = kind==='critical' ? 'bg-red-400' : kind==='env' ? 'bg-blue-400' : kind==='tracker' ? 'bg-green-400' : 'bg-amber-400';
+  return (
+    <div className="bg-black border border-amber-400 h-full overflow-hidden font-mono">
+      <div className={`${headerCls} text-black px-3 py-1 text-sm font-bold tracking-wider uppercase`}>{title}</div>
+      <div className="p-3 text-amber-300 text-xs overflow-auto">
+        {children}
+      </div>
+    </div>
+  );
+};
+
+const AlienJobsPanel: React.FC<{ data: JobsOverviewFeed | null }>=({ data })=> (
+  <div className="p-2 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 min-h-[calc(100vh-120px)]">
+    {(data?.jobs ?? []).map(j => (
+      <AlienShell key={j.id} title="JOBS OVERVIEW - OPERATIONS">
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <div className="text-amber-100 text-sm font-bold uppercase tracking-wider">{j.title}</div>
+            <div className={`w-2 h-2 ${j.status==='green'?'bg-green-400 animate-pulse': j.status==='yellow'?'bg-yellow-400':'bg-red-400'}`} />
+          </div>
+          <div className="text-amber-300 text-xs">{j.location?.name ?? '—'}</div>
+          <div className="text-amber-200 text-xs tabular-nums">{new Date(j.start_time).toLocaleString()} → {new Date(j.end_time).toLocaleTimeString()}</div>
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            {j.departments.map(d => (
+              <div key={d} className="border border-[var(--alien-border-dim)] p-2">
+                <div className="uppercase text-amber-300 text-[10px]">{d}</div>
+                <div className="text-amber-100 text-xs tabular-nums">{j.crewAssigned[d] || 0} crew</div>
+                <div className="text-amber-200 text-[10px]">docs {j.docs[d]?.have ?? 0}/{j.docs[d]?.need ?? 0}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </AlienShell>
+    ))}
+    {(!data || data.jobs.length===0) && (
+      <AlienShell title="JOBS OVERVIEW - OPERATIONS"><div className="text-amber-300">NO JOBS IN WINDOW</div></AlienShell>
+    )}
+  </div>
+);
+
+const AlienCrewPanel: React.FC<{ data: CrewAssignmentsFeed | null }>=({ data })=> (
+  <AlienShell title="CREW STATUS - BIOSIGN MONITOR" kind="tracker">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+      {(data?.jobs ?? []).map(job => (
+        <div key={job.id} className="border border-[var(--alien-border-dim)] p-2">
+          <div className="uppercase text-amber-100 text-xs font-bold tracking-wider mb-1">{job.title}</div>
+          <div className="space-y-1">
+            {job.crew.map((c, i) => (
+              <div key={i} className="flex items-center justify-between text-amber-200 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 ${c.timesheetStatus==='approved'?'bg-green-400 animate-pulse': c.timesheetStatus==='submitted'?'bg-blue-400': c.timesheetStatus==='draft'?'bg-yellow-400':'bg-red-400'}`} />
+                  <span className="truncate">{c.name || '—'} ({c.dept || '—'})</span>
+                </div>
+                <div className="uppercase text-amber-300 text-[10px]">{c.role}</div>
+              </div>
+            ))}
+            {job.crew.length===0 && <div className="text-amber-300 text-xs">NO CREW ASSIGNED</div>}
+          </div>
+        </div>
+      ))}
+      {(!data || data.jobs.length===0) && (
+        <div className="text-amber-300">NO JOBS</div>
+      )}
+    </div>
+  </AlienShell>
+);
+
+const AlienDocsPanel: React.FC<{ data: DocProgressFeed | null }>=({ data })=> (
+  <AlienShell title="DOCUMENTATION - ENV CONTROL" kind="env">
+    <div className="space-y-2">
+      {(data?.jobs ?? []).map(job => (
+        <div key={job.id} className="border border-[var(--alien-border-dim)] p-2">
+          <div className="uppercase text-amber-100 text-xs font-bold tracking-wider mb-1">{job.title}</div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            {job.departments.map(dep => {
+              const pct = dep.need>0 ? Math.round((dep.have/dep.need)*100) : 0;
+              return (
+                <div key={dep.dept}>
+                  <div className="flex justify-between items-center text-amber-300 text-[10px] uppercase mb-1">
+                    <span>{dep.dept}</span>
+                    <span>{dep.have}/{dep.need}</span>
+                  </div>
+                  <div className="w-full h-2 bg-black border border-blue-400/50">
+                    <div className={`${pct<100?'bg-blue-400':'bg-green-400'} h-full`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      {(!data || data.jobs.length===0) && (
+        <div className="text-amber-300">NO DOCUMENT PROGRESS AVAILABLE</div>
+      )}
+    </div>
+  </AlienShell>
+);
+
+const AlienPendingPanel: React.FC<{ data: PendingActionsFeed | null }>=({ data })=> (
+  <AlienShell title="SYSTEM ALERTS - EMERGENCY PROTOCOL" kind="critical">
+    <div className="space-y-2">
+      {(data?.items ?? []).map((it, i) => (
+        <div key={i} className={`px-2 py-1 text-xs font-mono ${it.severity==='red'?'bg-red-600 text-white':'bg-yellow-600 text-black'}`}>{it.text}</div>
+      ))}
+      {(data?.items.length ?? 0)===0 && <div className="text-amber-300">ALL SYSTEMS NOMINAL</div>}
+    </div>
+  </AlienShell>
+);
+
+// Logistics Panels
+const LogisticsPanel: React.FC<{ data: LogisticsItem[] | null }>=({ data })=> (
+  <PanelContainer>
+    <h1 className="text-5xl font-semibold">Logistics – Today & Tomorrow</h1>
+    <div className="flex flex-col gap-3">
+      {(data ?? []).map(ev => (
+        <div key={ev.id} className="bg-zinc-900 border border-zinc-800 rounded p-3 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="text-xl tabular-nums text-zinc-200">{ev.date} {ev.time?.slice(0,5)}</div>
+            <div className="text-2xl">🚚</div>
+            <div>
+              <div className="text-2xl font-medium text-white">{ev.title}</div>
+              <div className="text-zinc-400 text-sm">{ev.transport_type || 'transport'} {ev.plate ? `• ${ev.plate}` : ''}</div>
+            </div>
+          </div>
+        </div>
+      ))}
+      {(!data || data.length===0) && <div className="text-zinc-400 text-2xl">No logistics scheduled</div>}
+    </div>
+  </PanelContainer>
+);
+
+const AlienLogisticsPanel: React.FC<{ data: LogisticsItem[] | null }>=({ data })=> (
+  <AlienShell title="LOGISTICS - PROXIMITY SCAN" kind="tracker">
+    <div className="space-y-2">
+      {(data ?? []).map(ev => (
+        <div key={ev.id} className="border border-[var(--alien-border-dim)] p-2 flex items-center justify-between text-amber-200 text-xs">
+          <div className="flex items-center gap-3">
+            <div className="font-mono tabular-nums">{ev.date} {ev.time?.slice(0,5)}</div>
+            <div className="uppercase text-amber-100">{ev.title}</div>
+          </div>
+          <div className="text-amber-300">{ev.transport_type || 'transport'} {ev.plate ? `• ${ev.plate}` : ''}</div>
+        </div>
+      ))}
+      {(!data || data.length===0) && <div className="text-amber-300">NO LOGISTICS IN WINDOW</div>}
+    </div>
+  </AlienShell>
+);

@@ -3,6 +3,59 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ALIEN Movie Terminal Style Guide - Weyland-Yutani */
+:root {
+  --alien-amber: #fbbf24;
+  --alien-amber-dim: #d97706;
+  --alien-amber-bg: #451a03;
+  --alien-black: #000000;
+  --alien-green: #22c55e;
+  --alien-green-dim: #16a34a;
+  --alien-red: #ef4444;
+  --alien-blue: #3b82f6;
+  --alien-yellow: #eab308;
+  --alien-border: #fbbf24;
+  --alien-border-dim: rgba(251, 191, 36, 0.3);
+}
+
+.alien-scanlines::after {
+  content: '';
+  position: fixed;
+  pointer-events: none;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 1px,
+    rgba(255, 191, 0, 0.1) 1px,
+    rgba(255, 191, 0, 0.1) 2px
+  );
+  opacity: 0.15;
+  z-index: 50;
+}
+
+.alien-vignette::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    transparent 85%,
+    rgba(0,0,0,0.9) 100%
+  );
+  z-index: 40;
+}
+
+.alien-flicker { animation: alien-flicker 4s ease-in-out infinite; }
+@keyframes alien-flicker {
+  0%, 100% { opacity: 0.95; }
+  50% { opacity: 1; }
+  92% { opacity: 0.98; }
+}
+
+
 @layer base {
   :root {
     --background: 0 0% 100%;

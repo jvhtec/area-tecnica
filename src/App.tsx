@@ -53,6 +53,7 @@ import JobManagement from '@/pages/JobManagement';
 import { UserManual } from '@/components/UserManual';
 import IncidentReports from '@/pages/IncidentReports';
 import Wallboard from '@/pages/Wallboard';
+import Announcements from '@/pages/Announcements';
 
 export default function App() {
   // Initialize multi-tab coordinator
@@ -103,6 +104,7 @@ export default function App() {
                     <Route path="/tours" element={<Tours />} />
                     <Route path="/festivals" element={<Festivals />} />
                     <Route path="/incident-reports" element={<IncidentReports />} />
+                    <Route path="/announcements" element={<Announcements />} />
                     <Route path="/manual" element={<UserManual />} />
                     
                     {/* Tour Management Route */}
