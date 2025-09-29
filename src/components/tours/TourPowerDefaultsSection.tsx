@@ -189,13 +189,14 @@ export const TourPowerDefaultsSection: React.FC<TourPowerDefaultsSectionProps> =
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CEE 16A">CEE 16A</SelectItem>
-                    <SelectItem value="CEE 32A">CEE 32A</SelectItem>
-                    <SelectItem value="CEE 63A">CEE 63A</SelectItem>
-                    <SelectItem value="Schuko">Schuko</SelectItem>
-                    <SelectItem value="Custom">Custom</SelectItem>
-                  </SelectContent>
+                <SelectContent>
+                  <SelectItem value="CEE 16A">CEE 16A</SelectItem>
+                  <SelectItem value="CEE 32A">CEE 32A</SelectItem>
+                  <SelectItem value="CEE 63A">CEE 63A</SelectItem>
+                  <SelectItem value="CEE 125A">CEE 125A</SelectItem>
+                  <SelectItem value="Schuko">Schuko</SelectItem>
+                  <SelectItem value="Custom">Custom</SelectItem>
+                </SelectContent>
                 </Select>
               </div>
               {formData.pdu_type === "Custom" && (

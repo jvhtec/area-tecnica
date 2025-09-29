@@ -181,7 +181,7 @@ const Ticker: React.FC<{ messages: string[]; bottomOffset?: number }>=({ message
   );
 };
 
-const FooterLogo: React.FC<{ onToggle?: () => void }> = ({ onToggle }) => {
+const FooterLogo: React.FC<{ onToggle?: () => void; onMeasure?: (h: number) => void }> = ({ onToggle, onMeasure }) => {
   // Use Supabase public bucket: "public logos"/sectorlogow.png, with local fallbacks
   const { data } = supabase.storage.from('public logos').getPublicUrl('sectorlogow.png');
   const primary = data?.publicUrl;
@@ -192,8 +192,19 @@ const FooterLogo: React.FC<{ onToggle?: () => void }> = ({ onToggle }) => {
   const [idx, setIdx] = useState(0);
   const sources = primary ? [primary, ...fallbacks] : fallbacks;
   const src = sources[Math.min(idx, sources.length - 1)];
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const report = () => onMeasure && onMeasure(el.offsetHeight);
+    report();
+    const ro = new ResizeObserver(report);
+    ro.observe(el);
+    window.addEventListener('resize', report);
+    return () => { ro.disconnect(); window.removeEventListener('resize', report); };
+  }, [onMeasure]);
   return (
-    <div className="fixed bottom-0 left-0 right-0 py-3 bg-black/70 border-t border-zinc-800 flex items-center justify-center z-50">
+    <div ref={containerRef} className="fixed bottom-0 left-0 right-0 py-3 bg-black/70 border-t border-zinc-800 flex items-center justify-center z-50">
       <img
         src={src}
         alt="Company Logo"
@@ -226,6 +237,7 @@ export default function Wallboard() {
   const [pending, setPending] = useState<PendingActionsFeed|null>(null);
   const [logistics, setLogistics] = useState<LogisticsItem[]|null>(null);
   const [tickerMsgs, setTickerMsgs] = useState<string[]>([]);
+  const [footerH, setFooterH] = useState<number>(72);
 
   useEffect(() => {
     let cancelled = false;
@@ -482,8 +494,8 @@ export default function Wallboard() {
         {current==='logistics' && (isAlien ? <AlienLogisticsPanel data={logistics} /> : <LogisticsPanel data={logistics} />)}
         {current==='pending' && (isAlien ? <AlienPendingPanel data={pending} /> : <PendingActionsPanel data={pending} />)}
       </div>
-      <Ticker messages={tickerMsgs} bottomOffset={56} />
-      <FooterLogo onToggle={() => setIsAlien(v => !v)} />
+      <Ticker messages={tickerMsgs} bottomOffset={footerH} />
+      <FooterLogo onToggle={() => setIsAlien(v => !v)} onMeasure={setFooterH} />
     </div>
   );
 }

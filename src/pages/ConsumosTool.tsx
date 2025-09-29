@@ -278,7 +278,7 @@ const ConsumosTool: React.FC = () => {
       toast({ title: "Success", description: "Tour default saved successfully" });
     } catch (error: any) {
       console.error('Error saving tour default:', error);
-      toast({ title: "Error", description: "Failed to save tour default", variant: "destructive" });
+      toast({ title: "Error", description: `Failed to save tour default: ${error?.message || 'unknown error'}` , variant: "destructive" });
     }
   };
 
@@ -414,7 +414,7 @@ const ConsumosTool: React.FC = () => {
       toast({ title: "Success", description: `${unsavedTables.length} default table(s) saved successfully` });
     } catch (error: any) {
       console.error('Error saving default tables:', error);
-      toast({ title: "Error", description: "Failed to save some default tables", variant: "destructive" });
+      toast({ title: "Error", description: `Failed to save some default tables: ${error?.message || 'unknown error'}`, variant: "destructive" });
     }
   };
 
