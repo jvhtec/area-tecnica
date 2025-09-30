@@ -286,6 +286,87 @@ export function JobCardNew({
     }
   };
 
+  // WhatsApp group existence for this job + department (for management only)
+  const { data: waGroup, refetch: refetchWaGroup } = useQuery({
+    queryKey: ['job-whatsapp-group', job.id, department],
+    enabled: !!job?.id && !!department && (userRole === 'management' || userRole === 'admin'),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('job_whatsapp_groups')
+        .select('id, wa_group_id')
+        .eq('job_id', job.id)
+        .eq('department', department)
+        .maybeSingle();
+      if (error) return null;
+      return data;
+    }
+  });
+
+  const { data: waRequest, refetch: refetchWaRequest } = useQuery({
+    queryKey: ['job-whatsapp-group-request', job.id, department],
+    enabled: !!job?.id && !!department && (userRole === 'management' || userRole === 'admin'),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('job_whatsapp_group_requests')
+        .select('id, created_at')
+        .eq('job_id', job.id)
+        .eq('department', department)
+        .maybeSingle();
+      if (error) return null;
+      return data;
+    }
+  });
+
+  const handleCreateWhatsappGroup = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!(userRole === 'management' || userRole === 'admin')) return;
+    try {
+      // Pre-check: warn for missing phones
+      const { data: rows } = await supabase
+        .from('job_assignments')
+        .select('sound_role, lights_role, video_role, profiles!job_assignments_technician_id_fkey(first_name,last_name,phone)')
+        .eq('job_id', job.id);
+      const deptKey = department === 'sound' ? 'sound_role' : department === 'lights' ? 'lights_role' : 'video_role';
+      const crew = (rows || []).filter((r: any) => !!r[deptKey]);
+      const missing: string[] = [];
+      let validPhones = 0;
+      for (const r of crew) {
+        const full = `${r.profiles?.first_name ?? ''} ${r.profiles?.last_name ?? ''}`.trim() || 'Técnico';
+        const ph = (r.profiles?.phone || '').trim();
+        if (!ph) missing.push(full); else validPhones += 1;
+      }
+      if (validPhones === 0) {
+        toast({ title: 'Sin teléfonos', description: 'No hay teléfonos válidos para el equipo asignado.', variant: 'destructive' });
+        return;
+      }
+      if (missing.length > 0) {
+        const proceed = window.confirm(`Faltan teléfonos para ${missing.length} técnico(s):\n- ${missing.slice(0,5).join('\n- ')}${missing.length>5 ? '\n...' : ''}\n\n¿Crear el grupo igualmente?`);
+        if (!proceed) return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-whatsapp-group', {
+        body: { job_id: job.id as string, department: department as any }
+      });
+      if (error) {
+        // Even on error, lock may have been recorded. We’ll refetch lock and inform user.
+        toast({ title: 'Grupo solicitado', description: 'Se ha solicitado la creación del grupo. El botón quedará bloqueado.', });
+      } else {
+        const warnings = (data as any)?.warnings;
+        toast({
+          title: (data as any)?.wa_group_id ? 'Grupo creado' : 'Grupo solicitado',
+          description: warnings && (warnings.missing?.length || warnings.invalid?.length)
+            ? `Avisos: sin teléfono ${warnings.missing?.length || 0}, inválidos ${warnings.invalid?.length || 0}`
+            : ((data as any)?.note || 'Operación realizada.' )
+        });
+      }
+      await Promise.all([refetchWaGroup(), refetchWaRequest()]);
+    } catch (err: any) {
+      // Still lock; refetch
+      await Promise.all([refetchWaGroup(), refetchWaRequest()]);
+      toast({ title: 'Grupo solicitado', description: 'Se ha solicitado la creación del grupo. El botón quedará bloqueado.' });
+    }
+  };
+
   // Auto-fulfill request when both load and unload exist for the request's department
   const checkAndFulfillRequest = async (requestId: string, departmentForReq: string) => {
     try {
@@ -713,6 +794,8 @@ export function JobCardNew({
             transportButtonLabel={transportButtonLabel}
             transportButtonTone={transportButtonTone as any}
             onTransportClick={handleTransportClick}
+            onCreateWhatsappGroup={handleCreateWhatsappGroup}
+            whatsappDisabled={!!waGroup || !!waRequest}
           />
         </div>
 

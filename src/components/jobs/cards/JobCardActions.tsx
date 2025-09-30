@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
-import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock, FileText, Scale, Zap } from "lucide-react";
+import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock, FileText, Scale, Zap, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
 import { Department } from "@/types/department";
@@ -43,6 +43,9 @@ interface JobCardActionsProps {
   transportButtonLabel?: string;
   transportButtonTone?: 'default' | 'outline' | 'secondary' | 'ghost';
   onTransportClick?: (e: React.MouseEvent) => void;
+  // WhatsApp group
+  onCreateWhatsappGroup?: (e: React.MouseEvent) => void;
+  whatsappDisabled?: boolean;
 }
 
 export const JobCardActions: React.FC<JobCardActionsProps> = ({
@@ -76,6 +79,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   transportButtonLabel,
   transportButtonTone,
   onTransportClick,
+  onCreateWhatsappGroup,
+  whatsappDisabled,
 }) => {
   const navigate = useNavigate();
 
@@ -171,6 +176,19 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           title={transportButtonLabel}
         >
           {transportButtonLabel}
+        </Button>
+      )}
+      {isProjectManagementPage && (userRole === 'management' || userRole === 'admin') && onCreateWhatsappGroup && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onCreateWhatsappGroup}
+          disabled={!!whatsappDisabled}
+          className="gap-2"
+          title={whatsappDisabled ? 'Grupo ya creado' : 'Crear grupo WhatsApp'}
+        >
+          <MessageCircle className="h-4 w-4" />
+          <span className="hidden sm:inline">WhatsApp</span>
         </Button>
       )}
       {/* View Details - available in dashboard/department contexts for all roles */}
