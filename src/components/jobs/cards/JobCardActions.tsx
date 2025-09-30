@@ -1,8 +1,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
-import whatsappIcon from "@/assets/whatsapp-icon.png";
-import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock, FileText, Scale, Zap } from "lucide-react";
+import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock, FileText, Scale, Zap, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
 import { Department } from "@/types/department";
@@ -181,14 +180,15 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       )}
       {isProjectManagementPage && (userRole === 'management' || userRole === 'admin') && onCreateWhatsappGroup && (
         <Button
-          variant="ghost"
-          size="icon"
+          variant="outline"
+          size="sm"
           onClick={onCreateWhatsappGroup}
           disabled={!!whatsappDisabled}
+          className="gap-2"
           title={whatsappDisabled ? 'Grupo ya creado' : 'Crear grupo WhatsApp'}
-          className="hover:bg-accent/50"
         >
-          <img src={whatsappIcon} alt="WhatsApp" className="h-5 w-5" />
+          <MessageCircle className="h-4 w-4" />
+          <span className="hidden sm:inline">WhatsApp</span>
         </Button>
       )}
       {/* View Details - available in dashboard/department contexts for all roles */}

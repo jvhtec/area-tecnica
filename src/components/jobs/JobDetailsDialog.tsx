@@ -97,7 +97,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
   // Extras setup and visibility
   const jobIdForExtras = (jobDetails?.id as string) || job.id;
   const { data: jobExtras = [] } = useJobExtras(jobIdForExtras);
-  const showExtrasTab = jobExtras.length > 0;
+  const showExtrasTab = !!(jobDetails?.rates_approved) && (jobExtras.length > 0);
 
   // Rider files for the artists of this job (2-step to be RLS-friendly)
   const { data: riderFiles = [], isLoading: isRidersLoading } = useQuery({
@@ -145,10 +145,10 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
   // Fetch nearby restaurants
   const { data: restaurants, isLoading: isRestaurantsLoading } = useQuery({
-    queryKey: ['job-restaurants', job.id, jobDetails?.locations?.formatted_address],
+    queryKey: ['job-restaurants', job.id, jobDetails?.locations?.formatted_address || jobDetails?.locations?.address],
     queryFn: async () => {
       const locationData = jobDetails?.locations;
-      const address = locationData?.formatted_address;
+      const address = locationData?.formatted_address || locationData?.address;
       
       console.log('Restaurant query - location data:', locationData);
       console.log('Restaurant query - using address:', address);
@@ -159,7 +159,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
       }
       
       const coordinates = locationData?.latitude && locationData?.longitude 
-        ? { lat: Number(locationData.latitude), lng: Number(locationData.longitude) }
+        ? { lat: parseFloat(locationData.latitude), lng: parseFloat(locationData.longitude) }
         : undefined;
 
       console.log('Restaurant query - coordinates:', coordinates);
@@ -171,7 +171,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         coordinates
       );
     },
-    enabled: open && !!jobDetails?.locations?.formatted_address
+    enabled: open && !!(jobDetails?.locations?.formatted_address || jobDetails?.locations?.address)
   });
 
   // Set up tour rates subscriptions for real-time updates
@@ -279,7 +279,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
   const openGoogleMaps = () => {
     if (jobDetails?.locations) {
-      const address = encodeURIComponent(jobDetails.locations.formatted_address || jobDetails.locations.name || '');
+      const address = encodeURIComponent(jobDetails.locations.formatted_address || jobDetails.locations.address || jobDetails.locations.name || '');
       window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank');
     }
   };
@@ -363,18 +363,47 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                     <Badge variant="outline">{jobDetails?.job_type}</Badge>
                   </div>
 
-                  {/* Rates approval section - temporarily disabled as rates_approved column doesn't exist
                   {isManager && (
                     <div className="flex items-center justify-between p-3 border rounded-md bg-muted/30">
                       <div className="flex items-center gap-2">
-                        <Badge variant="secondary">
-                          Rates approval feature coming soon
+                        <Badge variant={jobDetails?.rates_approved ? 'default' : 'secondary'}>
+                          {jobDetails?.rates_approved ? 'Rates Approved' : 'Approval Required'}
                         </Badge>
                         <span className="text-xs text-muted-foreground">Controls technician visibility of per-job payouts</span>
                       </div>
+                      <div>
+                        {jobDetails?.rates_approved ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              await supabase
+                                .from('jobs')
+                                .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null } as any)
+                                .eq('id', job.id);
+                              queryClient.invalidateQueries({ queryKey: ['job-details', job.id] });
+                            }}
+                          >
+                            Revoke
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              const { data: u } = await supabase.auth.getUser();
+                              await supabase
+                                .from('jobs')
+                                .update({ rates_approved: true, rates_approved_at: new Date().toISOString(), rates_approved_by: u?.user?.id || null } as any)
+                                .eq('id', job.id);
+                              queryClient.invalidateQueries({ queryKey: ['job-details', job.id] });
+                            }}
+                          >
+                            Approve
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   )}
-                  */}
 
                       {jobDetails?.locations && (
                         <div>
@@ -382,9 +411,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                           <p className="text-sm text-muted-foreground">
                             {jobDetails.locations.name}
                           </p>
-                          {jobDetails.locations.formatted_address && (
+                          {(jobDetails.locations.formatted_address || jobDetails.locations.address) && (
                             <p className="text-sm text-muted-foreground">
-                              {jobDetails.locations.formatted_address}
+                              {jobDetails.locations.formatted_address || jobDetails.locations.address}
                             </p>
                           )}
                         </div>
@@ -400,8 +429,8 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                     <div className="flex items-start justify-between">
                       <div>
                         <h3 className="font-semibold">{jobDetails.locations.name}</h3>
-                        {jobDetails.locations.formatted_address && (
-                          <p className="text-muted-foreground">{jobDetails.locations.formatted_address}</p>
+                        {(jobDetails.locations.formatted_address || jobDetails.locations.address) && (
+                          <p className="text-muted-foreground">{jobDetails.locations.formatted_address || jobDetails.locations.address}</p>
                         )}
                       </div>
                       <Button onClick={openGoogleMaps} size="sm">
@@ -670,7 +699,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   <div className="text-center py-8">
                     <UtensilsCrossed className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                     <p className="text-muted-foreground">
-                      {jobDetails?.locations?.formatted_address 
+                      {jobDetails?.locations?.address 
                         ? "No restaurants found nearby" 
                         : "No venue address available to search for restaurants"
                       }
