@@ -170,13 +170,15 @@ const TechnicianRowComp = ({ technician, height, isFridge = false }: TechnicianR
               </AvatarFallback>
             </Avatar>
             
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-sm truncate">
-                {technician.first_name} {technician.last_name}
-                {isFridge && (
-                  <Refrigerator className="inline-block h-3.5 w-3.5 ml-1 text-sky-600" title="En la nevera" />
-                )}
-              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm truncate flex items-center gap-1">
+                  {technician.first_name} {technician.last_name}
+                  {isFridge && (
+                    <span title="En la nevera">
+                      <Refrigerator className="inline-block h-3.5 w-3.5 text-sky-600" />
+                    </span>
+                  )}
+                </div>
               <div className="flex gap-1 mt-1 flex-wrap">
                 <Badge 
                   variant="secondary" 
