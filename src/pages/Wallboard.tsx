@@ -22,7 +22,7 @@ const StatusDot: React.FC<{ color: 'green'|'yellow'|'red' }>=({ color }) => (
 
 const JobsOverviewPanel: React.FC<{ data: JobsOverviewFeed | null }>=({ data })=> (
   <PanelContainer>
-    <h1 className="text-5xl font-semibold">Jobs – Today & Tomorrow</h1>
+    <h1 className="text-5xl font-semibold">Jobs – Next 7 Days</h1>
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       {(data?.jobs ?? []).map(j => (
         <div key={j.id} className="rounded-lg bg-zinc-900 p-4 border border-zinc-800">
@@ -44,9 +44,9 @@ const JobsOverviewPanel: React.FC<{ data: JobsOverviewFeed | null }>=({ data })=
         </div>
       ))}
       {(!data || data.jobs.length===0) && (
-        <div className="text-zinc-400 text-2xl">No jobs in the next 2 days</div>
+        <div className="text-zinc-400 text-2xl">No jobs in the next 7 days</div>
       )}
-    </div>
+  </div>
   </PanelContainer>
 );
 
@@ -244,21 +244,39 @@ export default function Wallboard() {
     const fetchAll = async () => {
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const tomorrowEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 23,59,59,999);
+      // Look-ahead window: next 7 days (including today)
+      const weekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate()+6, 23,59,59,999);
       const startISO = todayStart.toISOString();
-      const endISO = tomorrowEnd.toISOString();
+      const endISO = weekEnd.toISOString();
 
       // 1) Fetch jobs (base fields only)
       const { data: jobs, error: jobsError } = await supabase
         .from('jobs')
-        .select('id,title,start_time,end_time,status,location_id,job_type')
+        .select('id,title,start_time,end_time,status,location_id,job_type,tour_id')
         .in('job_type', ['single','festival','tourdate','dryhire'])
         .in('status', ['Confirmado','Tentativa'])
         .lte('start_time', endISO)
         .gte('end_time', startISO)
         .order('start_time', { ascending: true });
       if (jobsError) console.error('Wallboard jobs query error:', jobsError?.message || jobsError, { startISO, endISO });
-      const jobArr = jobs || [];
+      let jobArr = jobs || [];
+
+      // Exclude jobs whose parent tour is cancelled (some entries may still be Confirmado)
+      const tourIds = Array.from(new Set(jobArr.map((j:any)=>j.tour_id).filter(Boolean)));
+      if (tourIds.length) {
+        const { data: toursMeta, error: toursErr } = await supabase
+          .from('tours')
+          .select('id,status')
+          .in('id', tourIds);
+        if (toursErr) {
+          console.warn('Wallboard tours meta error:', toursErr);
+        } else if (toursMeta && toursMeta.length) {
+          const cancelledTours = new Set((toursMeta as any[]).filter(t=>t.status==='cancelled').map(t=>t.id));
+          if (cancelledTours.size) {
+            jobArr = jobArr.filter((j:any)=> !j.tour_id || !cancelledTours.has(j.tour_id));
+          }
+        }
+      }
       const jobIds = jobArr.map(j=>j.id);
       const dryhireIds = new Set<string>(jobArr.filter((j:any)=>j.job_type==='dryhire').map((j:any)=>j.id));
       const locationIds = Array.from(new Set(jobArr.map((j:any)=>j.location_id).filter(Boolean)));
@@ -321,8 +339,13 @@ export default function Wallboard() {
 
       // Build overview
       const overviewPayload: JobsOverviewFeed = {
-        jobs: jobArr.map((j:any)=>{
-          const depts: Dept[] = (deptsByJob.get(j.id) ?? []) as Dept[];
+        jobs: jobArr
+          // Hide dryhire from overview to avoid one-off items only visible here
+          .filter((j:any)=> !dryhireIds.has(j.id))
+          .map((j:any)=>{
+          // Hide Video in crew context
+          const deptsAll: Dept[] = (deptsByJob.get(j.id) ?? []) as Dept[];
+          const depts: Dept[] = deptsAll.filter(d => d !== 'video');
           const crewAssigned: any = { sound:0, lights:0, video:0 };
           (assignsByJob.get(j.id) ?? []).forEach((a:any)=>{
             if (a.sound_role) crewAssigned.sound++;
@@ -358,9 +381,12 @@ export default function Wallboard() {
       const assignedTechsByJob = new Map<string, string[]>();
       const crewPayload: CrewAssignmentsFeed = {
         jobs: jobArr.filter((j:any)=>!dryhireIds.has(j.id)).map((j:any)=>{
-          const crew = (assignsByJob.get(j.id) ?? []).map((a:any)=>{
-            const dept: Dept | null = a.sound_role ? 'sound' : a.lights_role ? 'lights' : a.video_role ? 'video' : null;
-            const role = a.sound_role || a.lights_role || a.video_role || 'assigned';
+          const crew = (assignsByJob.get(j.id) ?? [])
+            // Hide video crew
+            .filter((a:any)=> a.video_role == null)
+            .map((a:any)=>{
+            const dept: Dept | null = a.sound_role ? 'sound' : a.lights_role ? 'lights' : null;
+            const role = a.sound_role || a.lights_role || 'assigned';
             // collect tech ids per job
             const list = assignedTechsByJob.get(j.id) ?? [];
             list.push(a.technician_id);
@@ -393,23 +419,29 @@ export default function Wallboard() {
 
       // Doc progress
       const docPayload: DocProgressFeed = {
-        jobs: overviewPayload.jobs.filter(j => !dryhireIds.has(j.id)).map(j => ({
-          id: j.id,
-          title: j.title,
-          departments: j.departments.map((d:Dept)=>({
-            dept: d,
-            have: j.docs[d]?.have ?? 0,
-            need: j.docs[d]?.need ?? 0,
-            missing: []
-          }))
-        }))
+        jobs: jobArr
+          .filter((j:any)=> !dryhireIds.has(j.id))
+          .map((j:any)=>{
+            const deptsAll: Dept[] = (deptsByJob.get(j.id) ?? []) as Dept[];
+            return {
+              id: j.id,
+              title: j.title,
+              departments: deptsAll.map((d:Dept)=>({
+                dept: d,
+                have: haveByJobDept.get(`${j.id}:${d}`) ?? 0,
+                need: needByDept.get(d) ?? 0,
+                missing: []
+              }))
+            };
+          })
       };
 
       // Pending actions
       const items: PendingActionsFeed['items'] = [];
       overviewPayload.jobs.forEach(j=>{
         if (dryhireIds.has(j.id)) return; // skip dryhire for pending
-        j.departments.forEach((d:Dept)=>{
+        // Only consider sound/lights for crew checks
+        j.departments.filter((d)=> d!=='video').forEach((d:Dept)=>{
           if ((j.crewAssigned as any)[d] === 0) items.push({ severity: 'yellow', text: `${j.title} – missing crew (${d})`});
         });
         const ended24h = new Date(j.end_time).getTime() < Date.now() - 24*3600*1000;
@@ -432,7 +464,7 @@ export default function Wallboard() {
         setPending({ items });
       }
 
-      // 5) Logistics calendar (today + tomorrow)
+      // 5) Logistics calendar (next 7 days)
       const startDate = startISO.slice(0,10);
       const endDate = endISO.slice(0,10);
       const { data: le, error: leErr } = await supabase
@@ -614,7 +646,7 @@ const AlienPendingPanel: React.FC<{ data: PendingActionsFeed | null }>=({ data }
 // Logistics Panels
 const LogisticsPanel: React.FC<{ data: LogisticsItem[] | null }>=({ data })=> (
   <PanelContainer>
-    <h1 className="text-5xl font-semibold">Logistics – Today & Tomorrow</h1>
+    <h1 className="text-5xl font-semibold">Logistics – Next 7 Days</h1>
     <div className="flex flex-col gap-3">
       {(data ?? []).map(ev => (
         <div key={ev.id} className="bg-zinc-900 border border-zinc-800 rounded p-3 flex items-center justify-between">
@@ -628,7 +660,7 @@ const LogisticsPanel: React.FC<{ data: LogisticsItem[] | null }>=({ data })=> (
           </div>
         </div>
       ))}
-      {(!data || data.length===0) && <div className="text-zinc-400 text-2xl">No logistics scheduled</div>}
+      {(!data || data.length===0) && <div className="text-zinc-400 text-2xl">No logistics in the next 7 days</div>}
     </div>
   </PanelContainer>
 );
