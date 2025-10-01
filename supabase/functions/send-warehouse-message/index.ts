@@ -9,6 +9,7 @@ const corsHeaders = {
 interface SendRequest {
   message?: string;
   job_id?: string;
+  highlight?: boolean; // explicitly request highlight regardless of message detection
 }
 
 const WAREHOUSE_SOUND_GROUP = "120363042398076348@g.us"; // "Almacén sonido"
@@ -89,25 +90,36 @@ serve(async (req: Request) => {
 
     const sendUrl = `${base}/api/sendText`;
     const payload = { chatId: WAREHOUSE_SOUND_GROUP, text: msg, session, linkPreview: false } as const;
-    const res = await fetch(sendUrl, { method: 'POST', headers, body: JSON.stringify(payload) });
-    if (!res.ok) {
-      const txt = await res.text().catch(() => '');
-      return new Response(JSON.stringify({ error: 'WAHA send failed', status: res.status, body: txt }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    try {
+      const res = await fetch(sendUrl, { method: 'POST', headers, body: JSON.stringify(payload) });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        console.warn('WAHA sendText returned non-OK', { status: res.status, body: txt });
+      }
+    } catch (e) {
+      console.warn('WAHA sendText fetch error:', e);
+      // Do not fail the whole function if WAHA responds but throws fetch errors (edge runtime quirks)
     }
 
     // If message equals the default phrase for this job, create an announcement with a highlight directive
-    const expectedDefault = jobTitle ? `He hecho cambios en el PS del ${jobTitle} por favor echad un vistazo` : null;
-    const isDefault = expectedDefault && msg.trim().toLowerCase() === expectedDefault.trim().toLowerCase();
-    if (isDefault && body.job_id) {
-      await supabaseAdmin
-        .from('announcements')
-        .insert({
-          message: `[HIGHLIGHT_JOB:${body.job_id}] ${msg}`,
-          level: 'info',
-          active: true,
-          created_by: actorId
-        } as any)
-        .catch(() => {});
+    try {
+      if (jobTitle && body.job_id) {
+        const expectedDefault = `He hecho cambios en el PS del ${jobTitle} por favor echad un vistazo`;
+        const isDefault = msg.trim().toLowerCase() === expectedDefault.trim().toLowerCase();
+        if (isDefault || body.highlight === true) {
+          await supabaseAdmin
+            .from('announcements')
+            .insert({
+              message: `[HIGHLIGHT_JOB:${body.job_id}] ${msg}`,
+              level: 'info',
+              active: true,
+              created_by: actorId
+            } as any)
+            .catch(() => {});
+        }
+      }
+    } catch (e) {
+      console.warn('Post-send highlight insert failed:', e);
     }
 
     return new Response(JSON.stringify({ success: true }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

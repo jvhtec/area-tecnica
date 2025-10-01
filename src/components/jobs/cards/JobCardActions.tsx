@@ -434,9 +434,12 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
               <Button onClick={async () => {
                 try {
                   setIsSendingWa(true);
-                  const finalMsg = (waMessage || '').trim() || `He hecho cambios en el PS del ${job?.title || 'trabajo'} por favor echad un vistazo`;
+                  const defaultMsg = `He hecho cambios en el PS del ${job?.title || 'trabajo'} por favor echad un vistazo`;
+                  const trimmed = (waMessage || '').trim();
+                  const finalMsg = trimmed || defaultMsg;
+                  const isDefault = finalMsg.trim().toLowerCase() === defaultMsg.trim().toLowerCase();
                   const { error } = await supabase
-                    .functions.invoke('send-warehouse-message', { body: { message: finalMsg, job_id: job?.id } });
+                    .functions.invoke('send-warehouse-message', { body: { message: finalMsg, job_id: job?.id, highlight: isDefault } });
                   if (error) {
                     toast({ title: 'Error al enviar', description: error.message, variant: 'destructive' });
                   } else {
