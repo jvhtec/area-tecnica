@@ -145,10 +145,10 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
   // Fetch nearby restaurants
   const { data: restaurants, isLoading: isRestaurantsLoading } = useQuery({
-    queryKey: ['job-restaurants', job.id, jobDetails?.locations?.formatted_address || jobDetails?.locations?.address],
+    queryKey: ['job-restaurants', job.id, jobDetails?.locations?.formatted_address],
     queryFn: async () => {
       const locationData = jobDetails?.locations;
-      const address = locationData?.formatted_address || locationData?.address;
+      const address = locationData?.formatted_address;
       
       console.log('Restaurant query - location data:', locationData);
       console.log('Restaurant query - using address:', address);
@@ -159,7 +159,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
       }
       
       const coordinates = locationData?.latitude && locationData?.longitude 
-        ? { lat: parseFloat(locationData.latitude), lng: parseFloat(locationData.longitude) }
+        ? { lat: Number(locationData.latitude), lng: Number(locationData.longitude) }
         : undefined;
 
       console.log('Restaurant query - coordinates:', coordinates);
@@ -171,7 +171,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
         coordinates
       );
     },
-    enabled: open && !!(jobDetails?.locations?.formatted_address || jobDetails?.locations?.address)
+    enabled: open && !!jobDetails?.locations?.formatted_address
   });
 
   // Set up tour rates subscriptions for real-time updates
@@ -279,7 +279,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
 
   const openGoogleMaps = () => {
     if (jobDetails?.locations) {
-      const address = encodeURIComponent(jobDetails.locations.formatted_address || jobDetails.locations.address || jobDetails.locations.name || '');
+      const address = encodeURIComponent(jobDetails.locations.formatted_address || jobDetails.locations.name || '');
       window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank');
     }
   };
@@ -411,9 +411,9 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                           <p className="text-sm text-muted-foreground">
                             {jobDetails.locations.name}
                           </p>
-                          {(jobDetails.locations.formatted_address || jobDetails.locations.address) && (
+                          {jobDetails.locations.formatted_address && (
                             <p className="text-sm text-muted-foreground">
-                              {jobDetails.locations.formatted_address || jobDetails.locations.address}
+                              {jobDetails.locations.formatted_address}
                             </p>
                           )}
                         </div>
@@ -429,8 +429,8 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                     <div className="flex items-start justify-between">
                       <div>
                         <h3 className="font-semibold">{jobDetails.locations.name}</h3>
-                        {(jobDetails.locations.formatted_address || jobDetails.locations.address) && (
-                          <p className="text-muted-foreground">{jobDetails.locations.formatted_address || jobDetails.locations.address}</p>
+                        {jobDetails.locations.formatted_address && (
+                          <p className="text-muted-foreground">{jobDetails.locations.formatted_address}</p>
                         )}
                       </div>
                       <Button onClick={openGoogleMaps} size="sm">
@@ -699,7 +699,7 @@ export const JobDetailsDialog: React.FC<JobDetailsDialogProps> = ({
                   <div className="text-center py-8">
                     <UtensilsCrossed className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                     <p className="text-muted-foreground">
-                      {jobDetails?.locations?.address 
+                      {jobDetails?.locations?.formatted_address 
                         ? "No restaurants found nearby" 
                         : "No venue address available to search for restaurants"
                       }

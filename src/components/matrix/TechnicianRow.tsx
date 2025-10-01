@@ -174,7 +174,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false }: TechnicianR
               <div className="font-medium text-sm truncate">
                 {technician.first_name} {technician.last_name}
                 {isFridge && (
-                  <Refrigerator className="inline-block h-3.5 w-3.5 ml-1 text-sky-600" title="En la nevera" />
+                  <Refrigerator className="inline-block h-3.5 w-3.5 ml-1 text-sky-600" />
                 )}
               </div>
               <div className="flex gap-1 mt-1 flex-wrap">

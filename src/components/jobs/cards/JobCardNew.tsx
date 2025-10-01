@@ -331,8 +331,9 @@ export function JobCardNew({
       const missing: string[] = [];
       let validPhones = 0;
       for (const r of crew) {
-        const full = `${r.profiles?.first_name ?? ''} ${r.profiles?.last_name ?? ''}`.trim() || 'Técnico';
-        const ph = (r.profiles?.phone || '').trim();
+        const profile = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
+        const full = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || 'Técnico';
+        const ph = (profile?.phone || '').trim();
         if (!ph) missing.push(full); else validPhones += 1;
       }
       if (validPhones === 0) {

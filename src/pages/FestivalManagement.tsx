@@ -1093,7 +1093,7 @@ const FestivalManagement = () => {
                                   <div>
                                     <div className="text-sm font-medium text-foreground">{file.file_name}</div>
                                     <div className="text-xs text-muted-foreground">
-                                      Uploaded {formatDateLabel(file.uploaded_at)}
+                                      Uploaded {formatDateLabel(file.created_at)}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-1">

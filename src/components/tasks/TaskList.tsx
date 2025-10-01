@@ -122,7 +122,7 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, department, canEdit, 
                 <TableCell className="font-medium">{task.task_type}</TableCell>
                 <TableCell>
                   {canAssign ? (
-                    <Select value={task.assigned_to?.id || task.assigned_to || ''} onValueChange={(v) => assignUser(task.id, v || null).then(refetch)}>
+                    <Select value={task.assigned_to?.id || task.assigned_to || ''} onValueChange={(v) => assignUser(task.id, v || null).then(() => refetch())}>
                       <SelectTrigger className="w-[180px]"><SelectValue placeholder="Assign" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="">Unassigned</SelectItem>
@@ -139,7 +139,7 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, department, canEdit, 
                   {(() => {
                     const canUpdate = canEdit || (!!currentUserId && (task.assigned_to?.id === currentUserId || task.assigned_to === currentUserId));
                     return (
-                      <Select value={task.status} onValueChange={(v) => setStatus(task.id, v as any).then(refetch)}>
+                      <Select value={task.status} onValueChange={(v) => setStatus(task.id, v as any).then(() => refetch())}>
                         <SelectTrigger className="w-[140px]" disabled={!canUpdate}><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="not_started">Not Started</SelectItem>
@@ -163,7 +163,7 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, department, canEdit, 
                       <Input
                         type="date"
                         value={task.due_at ? new Date(task.due_at).toISOString().slice(0,10) : ''}
-                        onChange={(e) => setDueDate(task.id, e.target.value ? new Date(e.target.value).toISOString() : null).then(refetch)}
+                        onChange={(e) => setDueDate(task.id, e.target.value ? new Date(e.target.value).toISOString() : null).then(() => refetch())}
                         className="w-[160px]"
                         disabled={!canUpdate}
                       />
@@ -189,7 +189,7 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, department, canEdit, 
                     <Button size="sm" variant="outline"><Upload className="h-3 w-3 mr-1"/>Upload</Button>
                   </div>
                   {canEdit && (
-                    <Button size="sm" variant="ghost" onClick={() => deleteTask(task.id).then(refetch)}>
+                    <Button size="sm" variant="ghost" onClick={() => deleteTask(task.id).then(() => refetch())}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   )}

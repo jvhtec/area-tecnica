@@ -102,6 +102,35 @@ serve(async (req) => {
     await supabase.from("staffing_requests").update({ status: newStatus }).eq("id", rid);
     await supabase.from("staffing_events").insert({ staffing_request_id: rid, event: `clicked_${action}` });
 
+    // Get technician name for activity log
+    const { data: techProfile } = await supabase
+      .from('profiles')
+      .select('first_name, last_name')
+      .eq('id', row.profile_id)
+      .maybeSingle();
+    
+    const techName = techProfile 
+      ? `${techProfile.first_name || ''} ${techProfile.last_name || ''}`.trim() || 'Technician'
+      : 'Technician';
+
+    // Log activity with correct actor and payload
+    const activityCode = row.phase === 'availability' 
+      ? (newStatus === 'confirmed' ? 'staffing.availability.confirmed' : 'staffing.availability.declined')
+      : (newStatus === 'confirmed' ? 'staffing.offer.confirmed' : 'staffing.offer.declined');
+
+    await supabase.rpc('log_activity_as', {
+      _actor_id: row.profile_id,
+      _code: activityCode,
+      _job_id: row.job_id,
+      _entity_type: 'staffing',
+      _entity_id: rid,
+      _payload: {
+        technician_name: techName,
+        action: newStatus,
+        phase: row.phase
+      }
+    });
+
     // If an offer was confirmed, auto-create/update a job assignment with role
     if (newStatus === 'confirmed' && row.phase === 'offer') {
       try {
