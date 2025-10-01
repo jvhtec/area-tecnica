@@ -15,18 +15,7 @@ const Auth = () => {
   const [searchParams] = useSearchParams();
   const [showSignUp, setShowSignUp] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [resetToken, setResetToken] = useState<string | null>(null);
-
-  // Check for password reset parameters
-  useEffect(() => {
-    const type = searchParams.get('type');
-    const access_token = searchParams.get('access_token');
-    const refresh_token = searchParams.get('refresh_token');
-    
-    if (type === 'recovery' && access_token && refresh_token) {
-      setResetToken(access_token);
-    }
-  }, [searchParams]);
+  const isRecovery = searchParams.get('type') === 'recovery';
   
   useEffect(() => {
     // Remove dark mode for better authentication UI visibility
@@ -48,7 +37,7 @@ const Auth = () => {
     );
   }
 
-  if (session) {
+  if (session && !isRecovery) {
     const dashboardPath = getDashboardPath(userRole as UserRole);
     return <Navigate to={dashboardPath} replace />;
   }
@@ -70,11 +59,9 @@ const Auth = () => {
         )}
 
         <Card className="p-6 w-full shadow-lg">
-          {resetToken ? (
+          {isRecovery ? (
             <ResetPasswordForm 
-              token={resetToken} 
               onSuccess={() => {
-                setResetToken(null);
                 // User will be automatically redirected after successful reset
               }} 
             />

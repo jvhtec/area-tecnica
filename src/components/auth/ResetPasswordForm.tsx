@@ -7,11 +7,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 interface ResetPasswordFormProps {
-  token: string;
   onSuccess: () => void;
 }
 
-export const ResetPasswordForm = ({ token, onSuccess }: ResetPasswordFormProps) => {
+export const ResetPasswordForm = ({ onSuccess }: ResetPasswordFormProps) => {
   const { resetPassword, isLoading } = useOptimizedAuth();
   const [formData, setFormData] = useState({
     password: "",
@@ -39,7 +38,7 @@ export const ResetPasswordForm = ({ token, onSuccess }: ResetPasswordFormProps) 
     }
 
     try {
-      await resetPassword(token, formData.password);
+      await resetPassword(formData.password);
       onSuccess();
     } catch (err: any) {
       setError(err.message || "Failed to reset password");

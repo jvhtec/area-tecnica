@@ -25,7 +25,7 @@ interface AuthContextType {
   setUserRole: (role: string | null) => void;
   setUserDepartment: (department: string | null) => void;
   requestPasswordReset: (email: string) => Promise<void>;
-  resetPassword: (token: string, newPassword: string) => Promise<void>;
+  resetPassword: (newPassword: string) => Promise<void>;
   clearCache: () => void;
   getCacheStatus: () => { hasCache: boolean; cacheAge: number; isValid: boolean };
 }
@@ -510,7 +510,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     }
   };
 
-  const resetPassword = async (token: string, newPassword: string) => {
+  const resetPassword = async (newPassword: string) => {
     try {
       setIsLoading(true);
       setError(null);
