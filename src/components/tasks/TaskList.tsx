@@ -122,10 +122,13 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, department, canEdit, 
                 <TableCell className="font-medium">{task.task_type}</TableCell>
                 <TableCell>
                   {canAssign ? (
-                    <Select value={task.assigned_to?.id || task.assigned_to || ''} onValueChange={(v) => assignUser(task.id, v || null).then(() => refetch())}>
+                    <Select 
+                      value={task.assigned_to?.id || task.assigned_to || 'unassigned'} 
+                      onValueChange={(v) => assignUser(task.id, v === 'unassigned' ? null : v).then(() => refetch())}
+                    >
                       <SelectTrigger className="w-[180px]"><SelectValue placeholder="Assign" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Unassigned</SelectItem>
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
                         {managementUsers?.map((u: any) => (
                           <SelectItem key={u.id} value={u.id}>{u.first_name} {u.last_name}</SelectItem>
                         ))}
