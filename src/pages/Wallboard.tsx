@@ -20,12 +20,15 @@ const StatusDot: React.FC<{ color: 'green'|'yellow'|'red' }>=({ color }) => (
   <span className={`inline-block w-3 h-3 rounded-full mr-2 ${color==='green'?'bg-green-500':color==='yellow'?'bg-yellow-400':'bg-red-500'}`} />
 );
 
-const JobsOverviewPanel: React.FC<{ data: JobsOverviewFeed | null }>=({ data })=> (
+const JobsOverviewPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: Set<string> }>=({ data, highlightIds })=> (
   <PanelContainer>
     <h1 className="text-5xl font-semibold">Jobs – Next 7 Days</h1>
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       {(data?.jobs ?? []).map(j => (
-        <div key={j.id} className="rounded-lg bg-zinc-900 p-4 border border-zinc-800">
+        <div
+          key={j.id}
+          className={`rounded-lg bg-zinc-900 p-4 border ${highlightIds?.has(j.id) ? 'border-amber-400 ring-4 ring-amber-400/40 animate-pulse' : 'border-zinc-800'}`}
+        >
           <div className="flex items-center justify-between">
             <div className="text-2xl font-medium truncate pr-2">{j.title}</div>
             <div className="flex items-center"><StatusDot color={j.status} /></div>
@@ -221,6 +224,7 @@ type PanelKey = 'overview'|'crew'|'docs'|'pending'|'logistics';
 export default function Wallboard() {
   useRoleGuard(['admin','management','wallboard']);
   const [isAlien, setIsAlien] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   // Rotate panels every 12s (overview, crew, docs, pending)
   const panels: PanelKey[] = ['overview','crew','docs','logistics','pending'];
@@ -237,6 +241,7 @@ export default function Wallboard() {
   const [pending, setPending] = useState<PendingActionsFeed|null>(null);
   const [logistics, setLogistics] = useState<LogisticsItem[]|null>(null);
   const [tickerMsgs, setTickerMsgs] = useState<string[]>([]);
+  const [highlightJobs, setHighlightJobs] = useState<Map<string, number>>(new Map());
   const [footerH, setFooterH] = useState<number>(72);
 
   useEffect(() => {
@@ -500,27 +505,108 @@ export default function Wallboard() {
     return () => { cancelled = true; clearInterval(id); };
   }, []);
 
+  // Load current user's role for cleanup permissions
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle();
+        setUserRole(prof?.role ?? null);
+      } catch {}
+    })();
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     const fetchAnns = async () => {
       const { data } = await supabase
         .from('announcements')
-        .select('message, active')
+        .select('id, message, active, created_at')
         .eq('active', true)
         .order('created_at', { ascending: false })
         .limit(20);
-      if (!cancelled) setTickerMsgs((data||[]).map(a=>a.message));
+      if (!cancelled) {
+        const regex = /^\s*\[HIGHLIGHT_JOB:([a-f0-9\-]+)\]\s*/i;
+        const messages: string[] = [];
+        const now = Date.now();
+        const updated = new Map(highlightJobs);
+        const HIGHLIGHT_TTL_MS = 2 * 60 * 1000; // 2 minutes
+        const staleIds: string[] = [];
+        (data||[]).forEach((a:any) => {
+          let m = a.message || '';
+          const match = m.match(regex);
+          if (match) {
+            const jobId = match[1];
+            const created = a.created_at ? new Date(a.created_at).getTime() : now;
+            const expireAt = created + HIGHLIGHT_TTL_MS;
+            if (expireAt > now) {
+              updated.set(jobId, expireAt);
+            } else if (a.id) {
+              staleIds.push(a.id);
+            }
+            m = m.replace(regex, '');
+          }
+          // Include ticker message only if not a highlight directive or still within TTL
+          if (m.trim()) {
+            const created = a.created_at ? new Date(a.created_at).getTime() : now;
+            const expireAt = created + HIGHLIGHT_TTL_MS;
+            const isHighlight = !!match;
+            if (!isHighlight || expireAt > now) {
+              messages.push(m.trim());
+            }
+          }
+        });
+        // Drop expired
+        for (const [jid, exp] of updated) {
+          if (exp < now) updated.delete(jid);
+        }
+        setHighlightJobs(updated);
+        setTickerMsgs(messages);
+
+        // Best-effort cleanup of stale highlight announcements (DB flip to inactive)
+        if (staleIds.length && (userRole === 'admin' || userRole === 'management')) {
+          try {
+            await supabase
+              .from('announcements')
+              .update({ active: false })
+              .in('id', staleIds);
+          } catch (e) {
+            // ignore cleanup errors to avoid UI disruption
+          }
+        }
+      }
     };
     fetchAnns();
     const id = setInterval(fetchAnns, 20000); // 20s ticker polling
     return () => { cancelled = true; clearInterval(id); };
   }, []);
 
+  // Periodic cleanup of expired highlights
+  useEffect(() => {
+    const id = setInterval(() => {
+      setHighlightJobs(prev => {
+        const now = Date.now();
+        const next = new Map(prev);
+        let changed = false;
+        for (const [jid, exp] of next) {
+          if (exp < now) { next.delete(jid); changed = true; }
+        }
+        return changed ? next : prev;
+      });
+    }, 5000);
+    return () => clearInterval(id);
+  }, []);
+
   const current = panels[idx];
   return (
     <div className={`min-h-screen ${isAlien ? 'bg-black text-[var(--alien-amber)] alien-scanlines alien-vignette' : 'bg-black text-white'}`}>
       <div className="pb-28">{/* space for ticker + footer */}
-        {current==='overview' && (isAlien ? <AlienJobsPanel data={overview} /> : <JobsOverviewPanel data={overview} />)}
+        {current==='overview' && (isAlien ? <AlienJobsPanel data={overview} highlightIds={new Set(highlightJobs.keys())} /> : <JobsOverviewPanel data={overview} highlightIds={new Set(highlightJobs.keys())} />)}
         {current==='crew' && (isAlien ? <AlienCrewPanel data={crew} /> : <CrewAssignmentsPanel data={crew} />)}
         {current==='docs' && (isAlien ? <AlienDocsPanel data={docs} /> : <DocProgressPanel data={docs} />)}
         {current==='logistics' && (isAlien ? <AlienLogisticsPanel data={logistics} /> : <LogisticsPanel data={logistics} />)}
@@ -545,13 +631,13 @@ const AlienShell: React.FC<{ title: string; kind?: 'standard'|'critical'|'env'|'
   );
 };
 
-const AlienJobsPanel: React.FC<{ data: JobsOverviewFeed | null }>=({ data })=> (
+const AlienJobsPanel: React.FC<{ data: JobsOverviewFeed | null; highlightIds?: Set<string> }>=({ data, highlightIds })=> (
   <div className="p-2 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 min-h-[calc(100vh-120px)]">
     {(data?.jobs ?? []).map(j => (
       <AlienShell key={j.id} title="JOBS OVERVIEW - OPERATIONS">
         <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <div className="text-amber-100 text-sm font-bold uppercase tracking-wider">{j.title}</div>
+          <div className={`flex justify-between items-center ${highlightIds?.has(j.id) ? 'animate-pulse' : ''}`}>
+            <div className={`text-amber-100 text-sm font-bold uppercase tracking-wider ${highlightIds?.has(j.id) ? 'bg-amber-400 text-black px-1' : ''}`}>{j.title}</div>
             <div className={`w-2 h-2 ${j.status==='green'?'bg-green-400 animate-pulse': j.status==='yellow'?'bg-yellow-400':'bg-red-400'}`} />
           </div>
           <div className="text-amber-300 text-xs">{j.location?.name ?? '—'}</div>

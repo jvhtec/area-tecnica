@@ -203,8 +203,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           variant="outline"
           size="sm"
           onClick={() => {
-            // Leave empty by default; if unchanged on send, we use the default phrase with job title
-            setWaMessage("");
+            const title = job?.title || 'trabajo';
+            setWaMessage(`He hecho cambios en el PS del ${title} por favor echad un vistazo`);
             setWaAlmacenOpen(true);
           }}
           className="gap-2"

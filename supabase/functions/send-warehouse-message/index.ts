@@ -57,19 +57,21 @@ serve(async (req: Request) => {
     const body = (await req.json().catch(() => ({}))) as SendRequest;
     let msg = (body.message || '').toString().trim();
 
+    // Fetch job title early if available (to detect default message and build fallback)
+    let jobTitle: string | null = null;
+    if (body.job_id) {
+      const { data: j } = await supabaseAdmin
+        .from('jobs')
+        .select('title')
+        .eq('id', body.job_id)
+        .maybeSingle();
+      jobTitle = j?.title ?? null;
+    }
+
     // Fallback: build a lightweight message from job context if provided
     if (!msg) {
-      if (body.job_id) {
-        const { data: job } = await supabaseAdmin
-          .from('jobs')
-          .select('title')
-          .eq('id', body.job_id)
-          .maybeSingle();
-        const title = job?.title || 'trabajo';
-        msg = `He hecho cambios en el PS del ${title} por favor echad un vistazo`;
-      } else {
-        msg = 'He hecho cambios en el PS, por favor echad un vistazo';
-      }
+      const title = jobTitle || 'trabajo';
+      msg = `He hecho cambios en el PS del ${title} por favor echad un vistazo`;
     }
 
     const normalizeBase = (s: string) => {
@@ -91,6 +93,21 @@ serve(async (req: Request) => {
     if (!res.ok) {
       const txt = await res.text().catch(() => '');
       return new Response(JSON.stringify({ error: 'WAHA send failed', status: res.status, body: txt }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // If message equals the default phrase for this job, create an announcement with a highlight directive
+    const expectedDefault = jobTitle ? `He hecho cambios en el PS del ${jobTitle} por favor echad un vistazo` : null;
+    const isDefault = expectedDefault && msg.trim().toLowerCase() === expectedDefault.trim().toLowerCase();
+    if (isDefault && body.job_id) {
+      await supabaseAdmin
+        .from('announcements')
+        .insert({
+          message: `[HIGHLIGHT_JOB:${body.job_id}] ${msg}`,
+          level: 'info',
+          active: true,
+          created_by: actorId
+        } as any)
+        .catch(() => {});
     }
 
     return new Response(JSON.stringify({ success: true }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
