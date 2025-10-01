@@ -15,7 +15,8 @@ import {
   Grid3X3,
   Clock,
   FileText,
-  Megaphone
+  Megaphone,
+  Activity
 } from "lucide-react";
 import { TimesheetSidebarTrigger } from "@/components/timesheet/TimesheetSidebarTrigger";
 import { SidebarNavigationSkeleton } from './SidebarNavigationSkeleton';
@@ -300,6 +301,18 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
               >
                 <FileText className="h-4 w-4" />
                 <span>Incident Reports</span>
+              </Button>
+            </Link>
+
+            <Link to="/activity">
+              <Button
+                variant="ghost"
+                className={`w-full justify-start gap-2 ${
+                  location.pathname === "/activity" ? "bg-accent" : ""
+                }`}
+              >
+                <Activity className="h-4 w-4" />
+                <span>Activity</span>
               </Button>
             </Link>
             
