@@ -116,7 +116,7 @@ serve(async (req: Request) => {
     // Fetch job details
     const { data: job, error: jobErr } = await supabaseAdmin
       .from('jobs')
-      .select('id, title, start_time, timezone')
+      .select('id, title, start_time, timezone, tour_id')
       .eq('id', job_id)
       .maybeSingle();
     if (!job || jobErr) return new Response(JSON.stringify({ error: 'Job not found', details: jobErr?.message }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -263,6 +263,110 @@ serve(async (req: Request) => {
     if (insErr) {
       // Best effort to not leave group untracked, still respond with success but include warning
       console.warn('Failed to persist job_whatsapp_groups:', insErr);
+    }
+
+    // Turn OFF "admins-only" so all members can send (best effort)
+    try {
+      const sessionPath = encodeURIComponent(session);
+      const settingsUrl = `${base}/api/${sessionPath}/groups/${encodeURIComponent(wa_group_id)}/settings/security/messages-admin-only`;
+      const settingsRes = await fetch(settingsUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ adminsOnly: false })
+      });
+      if (!settingsRes.ok) {
+        const txt = await settingsRes.text().catch(() => '');
+        console.warn('⚠️ Failed to update group send settings', {
+          status: settingsRes.status,
+          url: settingsUrl,
+          body: txt
+        });
+      } else {
+        console.log(`✅ Group ${wa_group_id} send-permissions updated (all members can send)`);
+      }
+    } catch (err) {
+      console.warn('⚠️ Error toggling group send permissions:', err);
+    }
+
+    // If fallback creation used with only 1 participant, add the rest now (best effort)
+    if (usedFallback && participantObjects.length > 1) {
+      try {
+        const first = actorJidCandidate ? { id: actorJidCandidate } : participantObjects[0];
+        const toAdd = participantObjects.filter((p) => p.id !== first.id);
+        if (toAdd.length) {
+          const addUrl = `${base}/api/${encodeURIComponent(session)}/groups/${encodeURIComponent(wa_group_id)}/participants/add`;
+          const addRes = await fetch(addUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ participants: toAdd })
+          });
+          if (!addRes.ok) {
+            const addTxt = await addRes.text().catch(() => '');
+            console.warn('⚠️ Could not add remaining participants after fallback', { status: addRes.status, addTxt });
+          }
+        }
+      } catch (e) {
+        console.warn('⚠️ Error adding remaining participants:', e);
+      }
+    }
+
+    // Try to set group picture from job or tour logo (best effort)
+    try {
+      // 1) Festival logo by job
+      let logoUrl: string | null = null;
+      try {
+        const { data: festLogo } = await supabaseAdmin
+          .from('festival_logos')
+          .select('file_path')
+          .eq('job_id', job_id)
+          .maybeSingle();
+        if (festLogo?.file_path) {
+          const { data: pub } = supabaseAdmin.storage
+            .from('festival-logos')
+            .getPublicUrl(festLogo.file_path);
+          if (pub?.publicUrl) logoUrl = pub.publicUrl;
+        }
+      } catch { /* ignore */ }
+
+      // 2) Fallback to tour logo
+      if (!logoUrl && job?.tour_id) {
+        try {
+          const { data: tourLogo } = await supabaseAdmin
+            .from('tour_logos')
+            .select('file_path')
+            .eq('tour_id', job.tour_id)
+            .maybeSingle();
+          if (tourLogo?.file_path) {
+            const { data: pub } = supabaseAdmin.storage
+              .from('tour-logos')
+              .getPublicUrl(tourLogo.file_path);
+            if (pub?.publicUrl) logoUrl = pub.publicUrl;
+          }
+        } catch { /* ignore */ }
+      }
+
+      if (logoUrl) {
+        // Infer mimetype/filename from URL
+        const lower = logoUrl.toLowerCase();
+        const mimetype = lower.endsWith('.png') ? 'image/png' : 'image/jpeg';
+        const filename = (() => {
+          try { return new URL(logoUrl).pathname.split('/').pop() || 'logo'; } catch { return 'logo'; }
+        })();
+
+        const picUrl = `${base}/api/${encodeURIComponent(session)}/groups/${encodeURIComponent(wa_group_id)}/picture`;
+        const body = { file: { mimetype, filename, url: logoUrl } } as const;
+        const picRes = await fetch(picUrl, { method: 'PUT', headers, body: JSON.stringify(body) });
+        if (!picRes.ok) {
+          const txt = await picRes.text().catch(() => '');
+          console.warn('⚠️ Failed to set group picture', { status: picRes.status, url: picUrl, body: txt });
+        } else {
+          console.log(`🖼️ Group ${wa_group_id} picture set from ${filename}`);
+        }
+      } else {
+        console.log('No festival/tour logo found for group picture');
+      }
+    } catch (e) {
+      console.warn('⚠️ Error setting group picture:', e);
     }
 
     // Send welcome message (best effort) using WAHA /api/sendText
