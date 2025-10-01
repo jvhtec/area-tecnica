@@ -156,7 +156,7 @@ serve(async (req) => {
 
       // Step 2: Fetch job and profile data
       console.log('🔍 FETCHING JOB AND PROFILE DATA...');
-      const [jobResult, techResult] = await Promise.all([
+      const [jobResult, techResult, actorResult] = await Promise.all([
         supabase.from("jobs")
           .select(`
             id,
@@ -167,7 +167,8 @@ serve(async (req) => {
           `)
           .eq("id", job_id)
           .maybeSingle(),
-        supabase.from("profiles").select("id,first_name,last_name,email,phone").eq("id", profile_id).maybeSingle()
+        supabase.from("profiles").select("id,first_name,last_name,email,phone").eq("id", profile_id).maybeSingle(),
+        actorId ? supabase.from("profiles").select("waha_endpoint").eq("id", actorId).maybeSingle() : Promise.resolve({ data: null, error: null })
       ]);
       
       console.log('📋 JOB RESULT:', { data: jobResult.data, error: jobResult.error });
@@ -231,6 +232,18 @@ serve(async (req) => {
           details: { profile_id, has_phone: !!tech?.phone }
         }), { 
           status: 404, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      // Only users with waha_endpoint can send WhatsApp
+      if (desiredChannel === 'whatsapp' && !actorResult.data?.waha_endpoint) {
+        console.error('❌ ACTOR NOT AUTHORIZED FOR WHATSAPP:', { actorId });
+        return new Response(JSON.stringify({ 
+          error: "User not authorized for WhatsApp operations", 
+          details: { actor_id: actorId }
+        }), { 
+          status: 403, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
@@ -477,13 +490,13 @@ serve(async (req) => {
         lines.push(`No estoy disponible: ${declineUrl}`);
         const text = lines.join('\n');
 
-        // WAHA config
+        // WAHA config - use actor's endpoint
         const normalizeBase = (s: string) => {
           let b = (s || '').trim();
           if (!/^https?:\/\//i.test(b)) b = 'https://' + b;
           return b.replace(/\/+$/, '');
         };
-        const base = normalizeBase(Deno.env.get('WAHA_BASE_URL') || 'https://waha.sector-pro.work');
+        const base = normalizeBase(actorResult.data?.waha_endpoint || 'https://waha.sector-pro.work');
         const apiKey = Deno.env.get('WAHA_API_KEY') || '';
         const session = Deno.env.get('WAHA_SESSION') || 'default';
         const defaultCC = Deno.env.get('WA_DEFAULT_COUNTRY_CODE') || '+34';

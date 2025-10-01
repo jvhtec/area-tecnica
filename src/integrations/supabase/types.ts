@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       activity_catalog: {
@@ -3717,6 +3692,7 @@ export type Database = {
           time_span: string | null
           timezone: string | null
           tours_expanded: boolean | null
+          waha_endpoint: string | null
         }
         Insert: {
           assignable_as_tech?: boolean
@@ -3743,6 +3719,7 @@ export type Database = {
           time_span?: string | null
           timezone?: string | null
           tours_expanded?: boolean | null
+          waha_endpoint?: string | null
         }
         Update: {
           assignable_as_tech?: boolean
@@ -3769,6 +3746,7 @@ export type Database = {
           time_span?: string | null
           timezone?: string | null
           tours_expanded?: boolean | null
+          waha_endpoint?: string | null
         }
         Relationships: []
       }
@@ -6032,9 +6010,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       activity_visibility: [

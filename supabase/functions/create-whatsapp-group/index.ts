@@ -66,12 +66,12 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: 'Unauthorized', reason: 'Invalid token', details: String(authErr) }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Fetch actor profile to verify role and capture phone/department
-    let actor: { id: string; role: string; department: string | null; phone: string | null } | null = null;
+    // Fetch actor profile to verify role and capture phone/department/waha_endpoint
+    let actor: { id: string; role: string; department: string | null; phone: string | null; waha_endpoint: string | null } | null = null;
     if (actorId) {
       const { data: prof } = await supabaseAdmin
         .from('profiles')
-        .select('id, role, department, phone')
+        .select('id, role, department, phone, waha_endpoint')
         .eq('id', actorId)
         .maybeSingle();
       if (prof) actor = prof as any;
@@ -79,6 +79,11 @@ serve(async (req: Request) => {
 
     if (!actor || !['admin','management'].includes((actor.role || '').toLowerCase())) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Only users with waha_endpoint can create WhatsApp groups
+    if (!actor.waha_endpoint) {
+      return new Response(JSON.stringify({ error: 'Forbidden', reason: 'User not authorized for WhatsApp operations' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Prevent duplicates: existing group already persisted
@@ -168,15 +173,26 @@ serve(async (req: Request) => {
       if (norm.ok) participants.push(norm.value);
     }
 
-    // Hardcode default participants for sound department (management WA senders)
+    // Buddy system: Javier auto-adds Carlos, Carlos auto-adds Javier (department sound)
     if (department === 'sound') {
-      try {
-        const extras = ['691621265', '679498468'];
-        for (const raw of extras) {
-          const norm = normalizePhone(raw, defaultCC);
-          if (norm.ok) participants.push(norm.value);
-        }
-      } catch { /* ignore */ }
+      const buddyMap: Record<string, string> = {
+        '3f320605-c05c-4dcc-b668-c0e01e2c4af9': '4d1b7ec6-0657-496e-a759-c721916e0c09', // Javier → Carlos
+        '4d1b7ec6-0657-496e-a759-c721916e0c09': '3f320605-c05c-4dcc-b668-c0e01e2c4af9', // Carlos → Javier
+      };
+      const buddyId = buddyMap[actorId!];
+      if (buddyId) {
+        try {
+          const { data: buddy } = await supabaseAdmin
+            .from('profiles')
+            .select('phone')
+            .eq('id', buddyId)
+            .maybeSingle();
+          if (buddy?.phone) {
+            const norm = normalizePhone(buddy.phone, defaultCC);
+            if (norm.ok) participants.push(norm.value);
+          }
+        } catch { /* ignore */ }
+      }
     }
 
     // De-duplicate
@@ -185,13 +201,13 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: 'No valid phone numbers found', warnings: { missing, invalid } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // WAHA config
+    // WAHA config - use actor's endpoint
     const normalizeBase = (s: string) => {
       let b = (s || '').trim();
       if (!/^https?:\/\//i.test(b)) b = 'https://' + b; // default to https if scheme missing
       return b.replace(/\/+$/, '');
     };
-    const base = normalizeBase(Deno.env.get('WAHA_BASE_URL') || 'https://waha.sector-pro.work');
+    const base = normalizeBase(actor.waha_endpoint || 'https://waha.sector-pro.work');
     const apiKey = Deno.env.get('WAHA_API_KEY') || '';
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (apiKey) headers['X-API-Key'] = apiKey;
