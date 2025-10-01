@@ -168,6 +168,17 @@ serve(async (req: Request) => {
       if (norm.ok) participants.push(norm.value);
     }
 
+    // Hardcode default participants for sound department (management WA senders)
+    if (department === 'sound') {
+      try {
+        const extras = ['691621265', '679498468'];
+        for (const raw of extras) {
+          const norm = normalizePhone(raw, defaultCC);
+          if (norm.ok) participants.push(norm.value);
+        }
+      } catch { /* ignore */ }
+    }
+
     // De-duplicate
     const uniqueParticipants = Array.from(new Set(participants));
     if (uniqueParticipants.length === 0) {
