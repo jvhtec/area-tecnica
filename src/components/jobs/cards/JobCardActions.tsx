@@ -2,6 +2,9 @@ import React from 'react';
 import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock, FileText, Scale, Zap, MessageCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
 import { Department } from "@/types/department";
@@ -83,6 +86,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   whatsappDisabled,
 }) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [waAlmacenOpen, setWaAlmacenOpen] = React.useState(false);
+  const [waMessage, setWaMessage] = React.useState<string>("");
+  const [isSendingWa, setIsSendingWa] = React.useState(false);
 
   const handleTimesheetClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -178,7 +185,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           {transportButtonLabel}
         </Button>
       )}
-      {isProjectManagementPage && (userRole === 'management' || userRole === 'admin') && onCreateWhatsappGroup && (
+      {isProjectManagementPage && (userRole === 'management' || userRole === 'admin') && onCreateWhatsappGroup && job.job_type !== 'tourdate' && (
         <Button
           variant="outline"
           size="sm"
@@ -189,6 +196,22 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         >
           <MessageCircle className="h-4 w-4" />
           <span className="hidden sm:inline">WhatsApp</span>
+        </Button>
+      )}
+      {isProjectManagementPage && (userRole === 'management' || userRole === 'admin') && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            // Leave empty by default; if unchanged on send, we use the default phrase with job title
+            setWaMessage("");
+            setWaAlmacenOpen(true);
+          }}
+          className="gap-2"
+          title="Enviar mensaje a Almacén sonido"
+        >
+          <MessageCircle className="h-4 w-4" />
+          <span className="hidden sm:inline">Almacén</span>
         </Button>
       )}
       {/* View Details - available in dashboard/department contexts for all roles */}
@@ -387,6 +410,50 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           <FileText className="h-4 w-4" />
           <span className="hidden sm:inline">Sync Logs</span>
         </Button>
+      )}
+
+      {/* Send to Almacén sonido dialog */}
+      {waAlmacenOpen && (
+        <Dialog open={waAlmacenOpen} onOpenChange={setWaAlmacenOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Enviar a Almacén sonido</DialogTitle>
+              <DialogDescription>Este mensaje se enviará al grupo de WhatsApp "Almacén sonido" desde tu endpoint WAHA.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Mensaje</label>
+              <Textarea
+                value={waMessage}
+                onChange={(e) => setWaMessage(e.target.value)}
+                placeholder="Escribe tu mensaje…"
+                className="min-h-[100px]"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setWaAlmacenOpen(false)} disabled={isSendingWa}>Cancelar</Button>
+              <Button onClick={async () => {
+                try {
+                  setIsSendingWa(true);
+                  const finalMsg = (waMessage || '').trim() || `He hecho cambios en el PS del ${job?.title || 'trabajo'} por favor echad un vistazo`;
+                  const { error } = await supabase
+                    .functions.invoke('send-warehouse-message', { body: { message: finalMsg, job_id: job?.id } });
+                  if (error) {
+                    toast({ title: 'Error al enviar', description: error.message, variant: 'destructive' });
+                  } else {
+                    toast({ title: 'Enviado', description: 'Mensaje enviado a Almacén sonido.' });
+                    setWaAlmacenOpen(false);
+                  }
+                } catch (e: any) {
+                  toast({ title: 'Error', description: e?.message || String(e), variant: 'destructive' });
+                } finally {
+                  setIsSendingWa(false);
+                }
+              }} disabled={isSendingWa}>
+                {isSendingWa ? 'Enviando…' : 'Enviar'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

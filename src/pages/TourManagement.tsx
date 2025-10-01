@@ -20,7 +20,8 @@ import {
   Info,
   Printer,
   Loader2,
-  Euro
+  Euro,
+  MessageCircle
 } from "lucide-react";
 import { TourRatesManagerDialog } from "@/components/tours/TourRatesManagerDialog";
 import { useTourRatesApproval } from "@/hooks/useTourRatesApproval";
@@ -42,6 +43,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useFlexUuid } from "@/hooks/useFlexUuid";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { TourDateFlexButton } from "@/components/tours/TourDateFlexButton";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface TourManagementProps {
   tour: any;
@@ -64,6 +66,10 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
   const [isLogisticsOpen, setIsLogisticsOpen] = useState(false);
   const [tourLogoUrl, setTourLogoUrl] = useState<string | undefined>();
   const [isPrintingSchedule, setIsPrintingSchedule] = useState(false);
+  const [isWaDialogOpen, setIsWaDialogOpen] = useState(false);
+  const [waSelectedDateId, setWaSelectedDateId] = useState<string | null>(null);
+  const [waDepartment, setWaDepartment] = useState<'sound'|'lights'|'video'>('sound');
+  const [isCreatingWaGroup, setIsCreatingWaGroup] = useState(false);
 
   const { assignments } = useTourAssignments(tour?.id);
   const { data: approvalRow, refetch: refetchApproval } = useTourRatesApproval(tour?.id);
@@ -104,6 +110,73 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
     return [...tour.tour_dates].sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
+  };
+
+  const openWaDialog = () => {
+    const sorted = getSortedTourDates();
+    const upcoming = sorted.find(d => new Date(d.date) >= new Date()) || sorted[0];
+    setWaSelectedDateId(upcoming?.id || null);
+    setIsWaDialogOpen(true);
+  };
+
+  const handleCreateWaGroup = async () => {
+    try {
+      if (!waSelectedDateId) {
+        toast({ title: 'Select a date', description: 'Please choose a tour date to target.' , variant: 'destructive'});
+        return;
+      }
+      setIsCreatingWaGroup(true);
+      // Resolve job for this tour date
+      const { data: jobRow, error: jobErr } = await supabase
+        .from('jobs')
+        .select('id, title, start_time, end_time')
+        .eq('tour_date_id', waSelectedDateId)
+        .maybeSingle();
+      if (jobErr || !jobRow) {
+        toast({ title: 'No job found', description: 'No job linked to the selected tour date.' , variant: 'destructive'});
+        setIsCreatingWaGroup(false);
+        return;
+      }
+
+      // Optional pre-check: warn about missing phones for selected department
+      const { data: rows } = await supabase
+        .from('job_assignments')
+        .select('sound_role, lights_role, video_role, profiles!job_assignments_technician_id_fkey(first_name,last_name,phone)')
+        .eq('job_id', jobRow.id);
+      const deptKey = waDepartment === 'sound' ? 'sound_role' : waDepartment === 'lights' ? 'lights_role' : 'video_role';
+      const crew = (rows || []).filter((r: any) => !!r[deptKey]);
+      const missing: string[] = [];
+      let validPhones = 0;
+      for (const r of crew) {
+        const profile = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
+        const full = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || 'Técnico';
+        const ph = (profile?.phone || '').trim();
+        if (!ph) missing.push(full); else validPhones += 1;
+      }
+      if (validPhones === 0) {
+        toast({ title: 'No phones', description: 'No valid phone numbers found for the selected department on this date.', variant: 'destructive' });
+        setIsCreatingWaGroup(false);
+        return;
+      }
+      if (missing.length > 0) {
+        toast({ title: 'Some missing phones', description: `Members without phone: ${missing.slice(0,3).join(', ')}${missing.length>3?'…':''}` });
+      }
+
+      // Invoke the existing edge function
+      const { data: fnRes, error: fnErr } = await supabase.functions.invoke('create-whatsapp-group', {
+        body: { job_id: jobRow.id, department: waDepartment }
+      });
+      if (fnErr) {
+        toast({ title: 'Failed to create group', description: fnErr.message, variant: 'destructive' });
+      } else {
+        toast({ title: 'Requested', description: 'WhatsApp group creation requested. It will finalize shortly.' });
+        setIsWaDialogOpen(false);
+      }
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message || String(e), variant: 'destructive' });
+    } finally {
+      setIsCreatingWaGroup(false);
+    }
   };
 
   const handlePowerDefaults = () => {
@@ -336,6 +409,12 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
                 {isFlexLoading ? 'Loading...' : 'Flex'}
               </Button>
             )}
+            {(userRole === 'management' || userRole === 'admin') && (
+              <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={openWaDialog}>
+                <MessageCircle className="h-4 w-4" />
+                WhatsApp Group
+              </Button>
+            )}
             <Button onClick={() => setIsSettingsOpen(true)}>
               <Settings className="h-4 w-4 mr-2" />
               Tour Settings
@@ -562,6 +641,57 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
           tourId={tour.id}
         />
       )}
+
+      {/* Create WhatsApp Group Dialog */}
+      <Dialog open={isWaDialogOpen} onOpenChange={setIsWaDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create WhatsApp Group</DialogTitle>
+            <DialogDescription>
+              Choose a tour date and department. The group will include the assigned crew for that date.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="block text-sm font-medium mb-1">Tour Date</label>
+              <select
+                className="w-full border rounded px-2 py-1"
+                value={waSelectedDateId || ''}
+                onChange={(e) => setWaSelectedDateId(e.target.value || null)}
+              >
+                {getSortedTourDates().map((d: any) => (
+                  <option key={d.id} value={d.id}>
+                    {format(new Date(d.date), 'PPPP')}{d.location?.name ? ` · ${d.location.name}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Department</label>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <input type="radio" name="wa-dept" checked={waDepartment==='sound'} onChange={() => setWaDepartment('sound')} />
+                  <span>Sound</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <input type="radio" name="wa-dept" checked={waDepartment==='lights'} onChange={() => setWaDepartment('lights')} />
+                  <span>Lights</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <input type="radio" name="wa-dept" checked={waDepartment==='video'} onChange={() => setWaDepartment('video')} />
+                  <span>Video</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsWaDialogOpen(false)} disabled={isCreatingWaGroup}>Cancel</Button>
+            <Button onClick={handleCreateWaGroup} disabled={isCreatingWaGroup}>
+              {isCreatingWaGroup ? 'Creating…' : 'Create Group'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
