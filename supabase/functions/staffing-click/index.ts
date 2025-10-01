@@ -21,6 +21,7 @@ serve(async (req) => {
     const action = url.searchParams.get("a"); // 'confirm' | 'decline'
     const exp = url.searchParams.get("exp");
     const t = url.searchParams.get("t");
+    const c = (url.searchParams.get('c') || '').toLowerCase(); // optional channel hint: 'email'|'wa'|'whatsapp'
     
     if (!rid || !action || !exp || !t) {
       return redirectResponse({
@@ -84,6 +85,17 @@ serve(async (req) => {
         message: `Ya has ${statusText} ${phase}.`,
         submessage: 'Puedes cerrar esta pestaña.'
       });
+    }
+
+    // If this is a GET for a WhatsApp (or unknown) channel, render a confirmation page requiring a POST
+    const isWaChannel = c === 'wa' || c === 'whatsapp';
+    if (req.method !== 'POST' && isWaChannel) {
+      return new Response(renderChoicePage({
+        heading: row.phase === 'offer' ? 'Responder a la oferta' : 'Confirmar disponibilidad',
+        message: 'Por favor, confirma tu respuesta.',
+        postUrlConfirm: `${url.origin}${url.pathname}?rid=${encodeURIComponent(rid)}&a=confirm&exp=${encodeURIComponent(exp)}&t=${encodeURIComponent(t)}&c=${encodeURIComponent(c)}`,
+        postUrlDecline: `${url.origin}${url.pathname}?rid=${encodeURIComponent(rid)}&a=decline&exp=${encodeURIComponent(exp)}&t=${encodeURIComponent(t)}&c=${encodeURIComponent(c)}`,
+      }), { headers: { 'Content-Type': 'text/html; charset=UTF-8' } });
     }
 
     const newStatus = action === "confirm" ? "confirmed" : "declined";
@@ -302,6 +314,56 @@ ${submessageHtml}
 </div>
 </body>
 </html>`;
+}
+
+// Render a confirmation choice page that posts back to this function
+function renderChoicePage(opts: { heading: string, message: string, postUrlConfirm: string, postUrlDecline: string }) {
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${opts.heading}</title>
+  <style>
+    body { margin:0; padding:0; background:#f5f7fb; font-family: Arial, Helvetica, sans-serif; color:#111827; }
+    .card { background:#ffffff; border-radius:10px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,0.06); max-width:640px; margin:24px auto; }
+    .header { padding:16px 20px; background:#0b0b0b; }
+    .logos { display:flex; align-items:center; justify-content:space-between; }
+    .logos img { display:block; border:0; max-height:36px; }
+    .content { padding:24px; text-align:center; }
+    .actions { display:flex; justify-content:center; gap:12px; margin-top:16px; }
+    .btn { background:#111827; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; font-weight:600; }
+    .btn.green { background:#10b981; }
+    .btn.red { background:#ef4444; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="logos">
+        <a href="https://www.sector-pro.com" target="_blank" rel="noopener noreferrer">
+          <img src="${COMPANY_LOGO_URL}" alt="Sector Pro" height="36" />
+        </a>
+        <a href="https://area-tecnica.lovable.app" target="_blank" rel="noopener noreferrer">
+          <img src="${AT_LOGO_URL}" alt="Área Técnica" height="36" />
+        </a>
+      </div>
+    </div>
+    <div class="content">
+      <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">${opts.heading}</h2>
+      <p style="margin:0;color:#374151;line-height:1.55;">${opts.message}</p>
+      <div class="actions">
+        <form method="POST" action="${opts.postUrlConfirm}">
+          <button class="btn green" type="submit">Confirmar</button>
+        </form>
+        <form method="POST" action="${opts.postUrlDecline}">
+          <button class="btn red" type="submit">No estoy disponible</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`
 }
 
 /**

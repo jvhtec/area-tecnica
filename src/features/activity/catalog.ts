@@ -75,11 +75,11 @@ export const activityCatalogDefaults: Record<string, ActivityCatalogEntry> = {
   },
   'staffing.availability.sent': {
     code: 'staffing.availability.sent',
-    label: 'Availability email sent',
+    label: 'Availability request sent',
     default_visibility: 'management',
     severity: 'info',
     toast_enabled: false,
-    template: 'Sent availability email to {tech_name}',
+    template: 'Sent availability request to {tech_name}',
   },
   'staffing.availability.confirmed': {
     code: 'staffing.availability.confirmed',

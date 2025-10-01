@@ -23,6 +23,7 @@ import { UserPlus } from 'lucide-react';
 import { CreateUserDialog } from '@/components/users/CreateUserDialog';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useQueryClient } from '@tanstack/react-query';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
 interface MatrixJob {
@@ -322,7 +323,7 @@ export const OptimizedAssignmentMatrix = ({
         setCellAction({ ...cellAction, type: 'offer-details', selectedJobId: jobId, singleDay: options?.singleDay });
         return;
       }
-      // Availability: pre-check conflicts, then send
+      // Availability: pre-check conflicts, then choose channel
       (async () => {
         const conflict = await checkTimeConflict(cellAction.technicianId, jobId);
         if (conflict) {
@@ -333,19 +334,7 @@ export const OptimizedAssignmentMatrix = ({
           });
           return;
         }
-        sendStaffingEmail(
-          ({ job_id: jobId, profile_id: cellAction.technicianId, phase: action, target_date: cellAction.date.toISOString(), single_day: !!options?.singleDay } as any),
-          {
-            onSuccess: (_data) => {
-              toast({ title: "Email sent!", description: `Availability request sent successfully.` });
-              closeDialogs();
-            },
-            onError: (error) => {
-              toast({ title: "Email failed", description: `Failed to send availability email: ${error.message}`, variant: "destructive" });
-              closeDialogs();
-            }
-          }
-        );
+        setAvailabilityDialog({ open: true, jobId, profileId: cellAction.technicianId, dateIso: cellAction.date.toISOString(), singleDay: !!options?.singleDay });
       })();
     } else {
       // no-op
@@ -435,6 +424,11 @@ export const OptimizedAssignmentMatrix = ({
   }, [cellAction?.technicianId, technicians]);
 
   const currentTechnician = getCurrentTechnician();
+
+  // Availability channel dialog state
+  const [availabilityDialog, setAvailabilityDialog] = useState<null | { open: boolean; jobId: string; profileId: string; dateIso: string; singleDay: boolean }>(null);
+  const [availabilityChannel, setAvailabilityChannel] = useState<'email' | 'whatsapp'>('email');
+  const [availabilitySending, setAvailabilitySending] = useState(false);
 
   if (isLoading) {
     return (
@@ -693,6 +687,72 @@ export const OptimizedAssignmentMatrix = ({
             })();
           }}
         />
+      )}
+
+      {availabilityDialog?.open && (
+        <Dialog open={true} onOpenChange={(v) => { if (!v) setAvailabilityDialog(null) }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Send availability request</DialogTitle>
+              <DialogDescription>
+                Choose how to contact {currentTechnician?.first_name} {currentTechnician?.last_name}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-2">
+              <div className="space-y-3">
+                <label className="font-medium text-sm text-foreground">Channel</label>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="availability-channel"
+                      checked={availabilityChannel === 'email'}
+                      onChange={() => setAvailabilityChannel('email')}
+                    />
+                    <span>Email</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="availability-channel"
+                      checked={availabilityChannel === 'whatsapp'}
+                      onChange={() => setAvailabilityChannel('whatsapp')}
+                    />
+                    <span>WhatsApp</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAvailabilityDialog(null)}>Cancel</Button>
+              <Button
+                onClick={() => {
+                  if (!availabilityDialog) return;
+                  setAvailabilitySending(true);
+                  sendStaffingEmail(
+                    ({ job_id: availabilityDialog.jobId, profile_id: availabilityDialog.profileId, phase: 'availability', channel: availabilityChannel, target_date: availabilityDialog.dateIso, single_day: availabilityDialog.singleDay } as any),
+                    {
+                      onSuccess: (data: any) => {
+                        setAvailabilitySending(false);
+                        setAvailabilityDialog(null);
+                        const via = data?.channel || availabilityChannel;
+                        toast({ title: 'Request sent', description: `Availability request sent via ${via}.` });
+                        closeDialogs();
+                      },
+                      onError: (error: any) => {
+                        setAvailabilitySending(false);
+                        toast({ title: 'Send failed', description: error.message, variant: 'destructive' });
+                      }
+                    }
+                  );
+                }}
+                disabled={availabilitySending}
+              >
+                {availabilitySending ? 'Sending…' : 'Send'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
 
       {cellAction?.type === 'unavailable' && (

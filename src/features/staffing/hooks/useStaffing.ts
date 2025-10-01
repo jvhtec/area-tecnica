@@ -50,7 +50,7 @@ export function useStaffingStatus(jobId: string, profileId: string) {
 export function useSendStaffingEmail() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (payload: { job_id: string, profile_id: string, phase: 'availability'|'offer', role?: string | null, message?: string | null }) => {
+    mutationFn: async (payload: { job_id: string, profile_id: string, phase: 'availability'|'offer', role?: string | null, message?: string | null, channel?: 'email' | 'whatsapp' }) => {
       console.log('🚀 SENDING STAFFING EMAIL:', {
         payload,
         job_id_type: typeof payload.job_id,
@@ -74,7 +74,7 @@ export function useSendStaffingEmail() {
         throw new Error(data.error || 'Email API returned an error')
       }
       
-      console.log('✅ EMAIL SENT SUCCESSFULLY');
+      console.log('✅ STAFFING REQUEST SENT SUCCESSFULLY');
       return data
     },
     onSuccess: (_data, vars) => {

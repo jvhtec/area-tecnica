@@ -43,6 +43,8 @@ serve(async (req: Request) => {
   );
 
   try {
+    const url = new URL(req.url);
+    const finalizeOnly = url.searchParams.get('finalize') === '1';
     const { job_id, department } = await req.json() as CreateRequest;
     if (!job_id || !department || !['sound','lights','video'].includes(department)) {
       return new Response(JSON.stringify({ error: 'Missing or invalid parameters' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -89,7 +91,7 @@ serve(async (req: Request) => {
     if (existingErr && existingErr.message) {
       console.warn('job_whatsapp_groups lookup error', existingErr);
     }
-    if (existing) {
+    if (existing && !finalizeOnly) {
       return new Response(JSON.stringify({ success: true, wa_group_id: existing.wa_group_id, note: 'Group already exists' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -100,17 +102,19 @@ serve(async (req: Request) => {
       .eq('job_id', job_id)
       .eq('department', department)
       .maybeSingle();
-    if (priorReq) {
+    if (priorReq && !finalizeOnly) {
       return new Response(JSON.stringify({ success: true, wa_group_id: null, note: 'Group request already recorded (locked)' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Record request to lock further attempts
-    const { error: lockErr } = await supabaseAdmin
-      .from('job_whatsapp_group_requests')
-      .insert({ job_id, department });
-    if (lockErr && !(lockErr as any)?.code?.includes?.('23505')) {
-      // Not a unique violation; fail explicitly
-      return new Response(JSON.stringify({ error: 'Failed to record group request', details: lockErr.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    if (!priorReq) {
+      const { error: lockErr } = await supabaseAdmin
+        .from('job_whatsapp_group_requests')
+        .insert({ job_id, department });
+      if (lockErr && !(lockErr as any)?.code?.includes?.('23505')) {
+        // Not a unique violation; fail explicitly
+        return new Response(JSON.stringify({ error: 'Failed to record group request', details: lockErr.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
     }
 
     // Fetch job details
@@ -198,62 +202,119 @@ serve(async (req: Request) => {
       return null;
     })();
 
-    // Create the group per WAHA API: POST /api/{session}/groups { name, participants: [{id}] }
-    const groupUrl = `${base}/api/${encodeURIComponent(session)}/groups`;
     let usedFallback = false;
-    let groupRes: Response;
-    try {
-      groupRes = await fetch(groupUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ name: subject, participants: participantObjects })
-      });
-    } catch (fe) {
-      return new Response(JSON.stringify({ error: 'WAHA request failed', step: 'create-group', url: groupUrl, message: (fe as Error)?.message || String(fe) }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-    if (!groupRes.ok) {
-      const txt = await groupRes.text().catch(() => '');
-      if (groupRes.status === 500 && participantObjects.length > 1) {
-        // Fallback: try create group with a single participant (WAHA bug workaround)
-        const first = actorJidCandidate ? { id: actorJidCandidate } : participantObjects[0];
-        try {
-          const fallbackRes = await fetch(groupUrl, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ name: subject, participants: [first] })
-          });
-          if (!fallbackRes.ok) {
-            const fbTxt = await fallbackRes.text().catch(() => '');
-            return new Response(JSON.stringify({ error: 'WAHA group creation failed', status: fallbackRes.status, url: groupUrl, response: fbTxt, firstAttempt: { status: groupRes.status, body: txt } }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    let wa_group_id = '';
+    let groupText = '';
+    if (!finalizeOnly) {
+      // Create the group per WAHA API: POST /api/{session}/groups { name, participants: [{id}] }
+      const groupUrl = `${base}/api/${encodeURIComponent(session)}/groups`;
+      let groupRes: Response;
+      try {
+        groupRes = await fetch(groupUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ name: subject, participants: participantObjects })
+        });
+      } catch (fe) {
+        return new Response(JSON.stringify({ error: 'WAHA request failed', step: 'create-group', url: groupUrl, message: (fe as Error)?.message || String(fe) }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      if (!groupRes.ok) {
+        const txt = await groupRes.text().catch(() => '');
+        if (groupRes.status === 500 && participantObjects.length > 1) {
+          // Fallback: try create group with a single participant (WAHA bug workaround)
+          const first = actorJidCandidate ? { id: actorJidCandidate } : participantObjects[0];
+          try {
+            const fallbackRes = await fetch(groupUrl, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ name: subject, participants: [first] })
+            });
+            if (!fallbackRes.ok) {
+              const fbTxt = await fallbackRes.text().catch(() => '');
+              return new Response(JSON.stringify({ error: 'WAHA group creation failed', status: fallbackRes.status, url: groupUrl, response: fbTxt, firstAttempt: { status: groupRes.status, body: txt } }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+            usedFallback = true;
+            groupRes = fallbackRes;
+          } catch (fe2) {
+            return new Response(JSON.stringify({ error: 'WAHA request failed', step: 'create-group-fallback', url: groupUrl, message: (fe2 as Error)?.message || String(fe2), firstAttempt: { status: groupRes.status, body: txt } }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
           }
-          usedFallback = true;
-          groupRes = fallbackRes;
-        } catch (fe2) {
-          return new Response(JSON.stringify({ error: 'WAHA request failed', step: 'create-group-fallback', url: groupUrl, message: (fe2 as Error)?.message || String(fe2), firstAttempt: { status: groupRes.status, body: txt } }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        } else {
+          return new Response(JSON.stringify({ error: 'WAHA group creation failed', status: groupRes.status, url: groupUrl, response: txt }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
-      } else {
-        return new Response(JSON.stringify({ error: 'WAHA group creation failed', status: groupRes.status, url: groupUrl, response: txt }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      // Read body as text first to parse and also return on failure
+      groupText = await groupRes.text().catch(() => '');
+      let groupJson: any = {};
+      try { groupJson = groupText ? JSON.parse(groupText) : {}; } catch (_) { groupJson = {}; }
+      // Extract group id from common shapes, or via regex fallback
+      // Try headers first if WAHA provides them
+      try {
+        const headerId = groupRes.headers?.get?.('location') || groupRes.headers?.get?.('Location') || groupRes.headers?.get?.('x-group-id') || groupRes.headers?.get?.('X-Group-Id');
+        if (headerId && /@g\.us$/.test(headerId)) wa_group_id = headerId;
+      } catch { /* ignore */ }
+      if (groupJson?.gid?._serialized) wa_group_id = String(groupJson.gid._serialized);
+      else if (groupJson?.gid?.user) wa_group_id = `${groupJson.gid.user}@g.us`;
+      else if (groupJson?.gid && typeof groupJson.gid === 'string' && /@g\.us$/.test(groupJson.gid)) wa_group_id = groupJson.gid;
+      else if (groupJson?.id && /@g\.us$/.test(groupJson.id)) wa_group_id = groupJson.id;
+      else if (groupJson?.groupId && /@g\.us$/.test(groupJson.groupId)) wa_group_id = groupJson.groupId;
+      else if (groupJson?.data?.id && /@g\.us$/.test(groupJson.data.id)) wa_group_id = groupJson.data.id;
+      else {
+        const m = groupText.match(/\b(\d{12,})@g\.us\b/);
+        if (m) wa_group_id = m[0];
       }
     }
-    // Read body as text first to parse and also return on failure
-    const groupText = await groupRes.text().catch(() => '');
-    let groupJson: any = {};
-    try { groupJson = groupText ? JSON.parse(groupText) : {}; } catch (_) { groupJson = {}; }
-    // Extract group id from common shapes, or via regex fallback
-    let wa_group_id = '';
-    if (groupJson?.gid?._serialized) wa_group_id = String(groupJson.gid._serialized);
-    else if (groupJson?.gid?.user) wa_group_id = `${groupJson.gid.user}@g.us`;
-    else if (groupJson?.gid && typeof groupJson.gid === 'string' && /@g\.us$/.test(groupJson.gid)) wa_group_id = groupJson.gid;
-    else if (groupJson?.id && /@g\.us$/.test(groupJson.id)) wa_group_id = groupJson.id;
-    else if (groupJson?.groupId && /@g\.us$/.test(groupJson.groupId)) wa_group_id = groupJson.groupId;
-    else if (groupJson?.data?.id && /@g\.us$/.test(groupJson.data.id)) wa_group_id = groupJson.data.id;
-    else {
-      const m = groupText.match(/\b(\d{12,})@g\.us\b/);
-      if (m) wa_group_id = m[0];
-    }
     if (!wa_group_id) {
-      // Treat as success but pending; we already locked via requests table
-      return new Response(JSON.stringify({ success: true, wa_group_id: null, pending: true, note: 'Group likely created but id not captured; locked to prevent duplicates', raw: groupText || groupJson }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      // Attempt to resolve the newly created group by subject/name via WAHA listing with retries
+      const norm = (s: string) => (s || '')
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+      const target = norm(subject);
+      for (let attempt = 0; attempt < 6 && !wa_group_id; attempt++) {
+        try {
+          if (attempt > 0) await new Promise((r) => setTimeout(r, 1000));
+          const listUrl = `${base}/api/${encodeURIComponent(session)}/groups`;
+          const listRes = await fetch(listUrl, { method: 'GET', headers });
+          if (!listRes.ok) {
+            const ltxt = await listRes.text().catch(() => '');
+            console.warn('WAHA list groups failed', { status: listRes.status, body: ltxt });
+            continue;
+          }
+          const listTxt = await listRes.text().catch(() => '');
+          let listJson: any = [];
+          try { listJson = listTxt ? JSON.parse(listTxt) : []; } catch { listJson = []; }
+          const candidates = Array.isArray(listJson) ? listJson : (Array.isArray(listJson?.data) ? listJson.data : []);
+          if (!Array.isArray(candidates) || !candidates.length) continue;
+          const ranked = (candidates || []).map((g: any) => {
+            const rawName = g?.name || g?.subject || g?.title || '';
+            const n = typeof rawName === 'string' ? norm(rawName) : '';
+            const exact = n === target;
+            const partial = !exact && !!n && (n.includes(target) || target.includes(n));
+            return { g, score: exact ? 2 : partial ? 1 : 0 };
+          }).filter((r: any) => r.score > 0)
+            .sort((a: any, b: any) => b.score - a.score);
+          const picked = ranked.length ? ranked[0].g : null;
+          if (picked) {
+            if (picked?.gid?._serialized) wa_group_id = String(picked.gid._serialized);
+            else if (picked?.gid?.user) wa_group_id = `${picked.gid.user}@g.us`;
+            else if (picked?.id && /@g\.us$/.test(picked.id)) wa_group_id = picked.id;
+            else if (picked?.groupId && /@g\.us$/.test(picked.groupId)) wa_group_id = picked.groupId;
+            else if (picked?.data?.id && /@g\.us$/.test(picked.data.id)) wa_group_id = picked.data.id;
+          }
+        } catch (e) {
+          console.warn('Error attempting to resolve group id via listing:', e);
+        }
+      }
+
+      if (!wa_group_id) {
+        // Treat as success but pending; we already locked via requests table
+        return new Response(
+          JSON.stringify({ success: true, wa_group_id: null, pending: true, note: 'Group likely created but id not captured; locked to prevent duplicates', raw: groupText || null }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Persist
@@ -269,11 +330,12 @@ serve(async (req: Request) => {
     try {
       const sessionPath = encodeURIComponent(session);
       const settingsUrl = `${base}/api/${sessionPath}/groups/${encodeURIComponent(wa_group_id)}/settings/security/messages-admin-only`;
-      const settingsRes = await fetch(settingsUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ adminsOnly: false })
-      });
+      const body = JSON.stringify({ adminsOnly: false });
+      let settingsRes = await fetch(settingsUrl, { method: 'POST', headers, body });
+      if (!settingsRes.ok && (settingsRes.status === 404 || settingsRes.status === 405)) {
+        // Some WAHA versions may require PUT
+        settingsRes = await fetch(settingsUrl, { method: 'PUT', headers, body });
+      }
       if (!settingsRes.ok) {
         const txt = await settingsRes.text().catch(() => '');
         console.warn('⚠️ Failed to update group send settings', {
@@ -289,20 +351,33 @@ serve(async (req: Request) => {
     }
 
     // If fallback creation used with only 1 participant, add the rest now (best effort)
-    if (usedFallback && participantObjects.length > 1) {
+    if (participantObjects.length > 1) {
       try {
         const first = actorJidCandidate ? { id: actorJidCandidate } : participantObjects[0];
         const toAdd = participantObjects.filter((p) => p.id !== first.id);
         if (toAdd.length) {
           const addUrl = `${base}/api/${encodeURIComponent(session)}/groups/${encodeURIComponent(wa_group_id)}/participants/add`;
-          const addRes = await fetch(addUrl, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ participants: toAdd })
-          });
-          if (!addRes.ok) {
-            const addTxt = await addRes.text().catch(() => '');
-            console.warn('⚠️ Could not add remaining participants after fallback', { status: addRes.status, addTxt });
+          const tryAdd = async () => {
+            const res = await fetch(addUrl, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ participants: toAdd })
+            });
+            if (!res.ok) {
+              const addTxt = await res.text().catch(() => '');
+              throw new Error(`add participants failed ${res.status}: ${addTxt}`);
+            }
+          };
+          try {
+            await tryAdd();
+          } catch (e1) {
+            // small wait then retry once
+            await new Promise((r) => setTimeout(r, 1000));
+            try {
+              await tryAdd();
+            } catch (e2) {
+              console.warn('⚠️ Could not add remaining participants after fallback', { error: String(e2) });
+            }
           }
         }
       } catch (e) {

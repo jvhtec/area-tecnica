@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { labelForCode as labelForRoleCode } from "../_shared/roles.ts";
+import { labelForCode as labelForRoleCode } from "./roles.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -66,7 +66,8 @@ serve(async (req) => {
     const body = await req.json();
     console.log('📥 RECEIVED PAYLOAD:', JSON.stringify(body, null, 2));
     
-    const { job_id, profile_id, phase, role, message } = body;
+    const { job_id, profile_id, phase, role, message, channel } = body;
+    const desiredChannel = (typeof channel === 'string' && channel.toLowerCase() === 'whatsapp' && phase === 'availability') ? 'whatsapp' : 'email';
     
     // Enhanced validation logging
     console.log('🔍 VALIDATING FIELDS:', {
@@ -98,16 +99,18 @@ serve(async (req) => {
       DAILY_CAP: { value: DAILY_CAP, exists: !!DAILY_CAP },
       TOKEN_SECRET: { exists: !!TOKEN_SECRET, length: TOKEN_SECRET?.length },
       CONFIRM_BASE: { exists: !!CONFIRM_BASE, value: CONFIRM_BASE },
-      BREVO_KEY: { exists: !!BREVO_KEY, length: BREVO_KEY?.length },
-      BREVO_FROM: { exists: !!BREVO_FROM, value: BREVO_FROM }
+      BREVO_KEY: desiredChannel === 'email' ? { exists: !!BREVO_KEY, length: BREVO_KEY?.length } : { skipped: true },
+      BREVO_FROM: desiredChannel === 'email' ? { exists: !!BREVO_FROM, value: BREVO_FROM } : { skipped: true }
     });
 
-    if (!TOKEN_SECRET || !CONFIRM_BASE || !BREVO_KEY || !BREVO_FROM) {
+    if (!TOKEN_SECRET || !CONFIRM_BASE || (desiredChannel === 'email' && (!BREVO_KEY || !BREVO_FROM))) {
       const missingEnvs = [];
       if (!TOKEN_SECRET) missingEnvs.push('STAFFING_TOKEN_SECRET');
       if (!CONFIRM_BASE) missingEnvs.push('PUBLIC_CONFIRM_BASE');
-      if (!BREVO_KEY) missingEnvs.push('BREVO_API_KEY');
-      if (!BREVO_FROM) missingEnvs.push('BREVO_FROM');
+      if (desiredChannel === 'email') {
+        if (!BREVO_KEY) missingEnvs.push('BREVO_API_KEY');
+        if (!BREVO_FROM) missingEnvs.push('BREVO_FROM');
+      }
       
       console.error('❌ MISSING ENV VARIABLES:', missingEnvs);
       return new Response(JSON.stringify({ 
@@ -126,7 +129,7 @@ serve(async (req) => {
       const { count, error: capError } = await supabase.from("staffing_events")
         .select("id", { count: "exact", head: true })
         .gte("created_at", since)
-        .eq("event", "email_sent");
+        .in("event", ["email_sent", "whatsapp_sent"]);
       
       if (capError) {
         console.error('❌ DAILY CAP CHECK ERROR:', capError);
@@ -164,7 +167,7 @@ serve(async (req) => {
           `)
           .eq("id", job_id)
           .maybeSingle(),
-        supabase.from("profiles").select("id,first_name,last_name,email").eq("id", profile_id).maybeSingle()
+        supabase.from("profiles").select("id,first_name,last_name,email,phone").eq("id", profile_id).maybeSingle()
       ]);
       
       console.log('📋 JOB RESULT:', { data: jobResult.data, error: jobResult.error });
@@ -209,11 +212,23 @@ serve(async (req) => {
         });
       }
 
-      if (!tech?.email) {
+      // Channel resolution
+      // desiredChannel already computed above
+      if (desiredChannel === 'email' && !tech?.email) {
         console.error('❌ PROFILE NOT FOUND OR NO EMAIL:', { profile_id, has_email: !!tech?.email });
         return new Response(JSON.stringify({ 
           error: "Profile not found or no email address", 
           details: { profile_id, has_profile: !!tech, has_email: !!tech?.email }
+        }), { 
+          status: 404, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      if (desiredChannel === 'whatsapp' && !tech?.phone) {
+        console.error('❌ PROFILE HAS NO PHONE FOR WHATSAPP:', { profile_id });
+        return new Response(JSON.stringify({ 
+          error: "Profile has no phone number for WhatsApp", 
+          details: { profile_id, has_phone: !!tech?.phone }
         }), { 
           status: 404, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -324,10 +339,10 @@ serve(async (req) => {
         });
       }
 
-      // Step 5: Build email content
+      // Step 5: Build content (email or whatsapp)
       console.log('📧 BUILDING EMAIL CONTENT...');
-      const confirmUrl = `${CONFIRM_BASE}?rid=${encodeURIComponent(insertedId)}&a=confirm&exp=${encodeURIComponent(exp)}&t=${token}`;
-      const declineUrl = `${CONFIRM_BASE}?rid=${encodeURIComponent(insertedId)}&a=decline&exp=${encodeURIComponent(exp)}&t=${token}`;
+      const confirmUrl = `${CONFIRM_BASE}?rid=${encodeURIComponent(insertedId)}&a=confirm&exp=${encodeURIComponent(exp)}&t=${token}&c=${encodeURIComponent(desiredChannel)}`;
+      const declineUrl = `${CONFIRM_BASE}?rid=${encodeURIComponent(insertedId)}&a=decline&exp=${encodeURIComponent(exp)}&t=${token}&c=${encodeURIComponent(desiredChannel)}`;
 
       const roleLabel = labelForRoleCode(role) || null;
       const subject = phase === "availability"
@@ -439,82 +454,126 @@ serve(async (req) => {
       </body>
       </html>`;
 
-      // Step 6: Send email via Brevo
+      // Step 6: Deliver via chosen channel
       console.log('🔗 CONFIRM LINKS:', { confirmUrl, declineUrl });
-      console.log('📤 SENDING EMAIL VIA BREVO...');
-      const emailPayload = {
-        sender: { email: BREVO_FROM },
-        to: [{ email: tech.email }],
-        subject,
-        htmlContent: html
-      };
-      
-      console.log('📤 EMAIL PAYLOAD:', { 
-        sender: emailPayload.sender, 
-        to: [{ email: '***@***.***' }], 
-        subject: emailPayload.subject 
-      });
+      if (desiredChannel === 'whatsapp') {
+        // Build WhatsApp text (plain)
+        const lines: string[] = [];
+        lines.push(`Hola ${fullName || ''},`);
+        lines.push(phase === 'availability' ? `¿Puedes confirmar tu disponibilidad para ${job.title}?` : `Tienes una oferta para ${job.title}.`);
+        if (phase === 'offer' && roleLabel) lines.push(`Puesto: ${roleLabel}`);
+        lines.push('');
+        lines.push('Detalles del trabajo:');
+        lines.push(`- Fechas: ${startDate}${job.end_time ? ` — ${endDate}` : ''}`);
+        lines.push(`- Horario: ${callTime}`);
+        lines.push(`- Ubicación: ${loc}`);
+        if (roleLabel) lines.push(`- Rol: ${roleLabel}`);
+        lines.push('');
+        lines.push(`Confirmar: ${confirmUrl}`);
+        lines.push(`No estoy disponible: ${declineUrl}`);
+        const text = lines.join('\n');
 
-      const sendRes = await fetch("https://api.brevo.com/v3/smtp/email", {
-        method: "POST",
-        headers: { "api-key": BREVO_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify(emailPayload)
-      });
+        // WAHA config
+        const normalizeBase = (s: string) => {
+          let b = (s || '').trim();
+          if (!/^https?:\/\//i.test(b)) b = 'https://' + b;
+          return b.replace(/\/+$/, '');
+        };
+        const base = normalizeBase(Deno.env.get('WAHA_BASE_URL') || 'https://waha.sector-pro.work');
+        const apiKey = Deno.env.get('WAHA_API_KEY') || '';
+        const session = Deno.env.get('WAHA_SESSION') || 'default';
+        const defaultCC = Deno.env.get('WA_DEFAULT_COUNTRY_CODE') || '+34';
+        const headersWA: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (apiKey) headersWA['X-API-Key'] = apiKey;
 
-      console.log('📤 BREVO RESPONSE:', { 
-        status: sendRes.status, 
-        statusText: sendRes.statusText,
-        ok: sendRes.ok 
-      });
-
-      // Step 7: Log the email event
-      console.log('📊 LOGGING EMAIL EVENT...');
-      const eventRes = await supabase.from("staffing_events").insert({
-        staffing_request_id: insertedId, 
-        event: "email_sent", 
-        meta: { phase, status: sendRes.status, role: role ?? null, message: message ?? null }
-      });
-      
-      console.log('📊 EVENT LOG RESULT:', { error: eventRes.error });
-
-      // Step 8: Return result
-      if (sendRes.ok) {
-        console.log('✅ EMAIL SENT SUCCESSFULLY');
-
-        try {
-          const activityCode = phase === 'availability' ? 'staffing.availability.sent' : 'staffing.offer.sent';
-          await supabase.rpc('log_activity_as', {
-            _actor_id: actorId,
-            _code: activityCode,
-            _job_id: job_id,
-            _entity_type: 'staffing',
-            _entity_id: insertedId,
-            _payload: {
-              staffing_request_id: insertedId,
-              phase,
-              profile_id,
-              tech_name: fullName || tech.email,
-            },
-            _visibility: null,
-          });
-        } catch (activityError) {
-          console.warn('[send-staffing-email] Failed to log activity', activityError);
+        // Normalize phone → JID
+        function normalizePhone(raw: string, defaultCountry: string): { ok: true; value: string } | { ok: false; reason: string } {
+          if (!raw) return { ok: false, reason: 'empty' } as const;
+          const trimmed = raw.trim();
+          if (!trimmed) return { ok: false, reason: 'empty' } as const;
+          let digits = trimmed.replace(/[\s\-()]/g, '');
+          if (digits.startsWith('00')) digits = '+' + digits.slice(2);
+          if (!digits.startsWith('+')) {
+            if (/^[67]\d{8}$/.test(digits)) {
+              digits = '+34' + digits;
+            } else {
+              const cc = defaultCountry.startsWith('+') ? defaultCountry : `+${defaultCountry}`;
+              digits = cc + digits;
+            }
+          }
+          if (!/^\+\d{7,15}$/.test(digits)) return { ok: false, reason: 'invalid_format' } as const;
+          return { ok: true, value: digits } as const;
         }
 
-        return new Response(JSON.stringify({ success: true }), { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+        const norm = normalizePhone(tech.phone || '', defaultCC);
+        if (!norm.ok) {
+          return new Response(JSON.stringify({ error: 'Invalid phone format for WhatsApp' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const chatId = norm.value.replace(/^\+/, '').replace(/\D/g, '') + '@c.us';
+        const sendUrl = `${base}/api/sendText`;
+        const msgBody = { chatId, text, session, linkPreview: false } as const;
+        console.log('📤 SENDING WHATSAPP VIA WAHA...', { chatId: '***@c.us', sendUrl });
+        const waRes = await fetch(sendUrl, { method: 'POST', headers: headersWA, body: JSON.stringify(msgBody) });
+        console.log('📤 WAHA RESPONSE:', { status: waRes.status, ok: waRes.ok });
+        await supabase.from('staffing_events').insert({ staffing_request_id: insertedId, event: 'whatsapp_sent', meta: { phase, status: waRes.status, role: role ?? null } });
+        if (waRes.ok) {
+          try {
+            const activityCode = phase === 'availability' ? 'staffing.availability.sent' : 'staffing.offer.sent';
+            await supabase.rpc('log_activity_as', {
+              _actor_id: actorId,
+              _code: activityCode,
+              _job_id: job_id,
+              _entity_type: 'staffing',
+              _entity_id: insertedId,
+              _payload: {
+                staffing_request_id: insertedId,
+                phase,
+                profile_id,
+                tech_name: fullName || tech.email || tech.phone,
+              },
+              _visibility: null,
+            });
+          } catch (activityError) {
+            console.warn('[send-staffing-email] Failed to log activity (whatsapp)', activityError);
+          }
+          return new Response(JSON.stringify({ success: true, channel: 'whatsapp' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        } else {
+          const errTxt = await waRes.text().catch(() => '');
+          return new Response(JSON.stringify({ error: 'WhatsApp delivery failed', details: { status: waRes.status, body: errTxt } }), { status: waRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
       } else {
-        const errorText = await sendRes.text();
-        console.error('❌ BREVO EMAIL ERROR:', errorText);
-        return new Response(JSON.stringify({ 
-          error: "Email delivery failed", 
-          details: { status: sendRes.status, message: errorText }
-        }), { 
-          status: sendRes.status, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+        // Email channel via Brevo
+        console.log('📤 SENDING EMAIL VIA BREVO...');
+        const emailPayload = {
+          sender: { email: BREVO_FROM },
+          to: [{ email: tech.email }],
+          subject,
+          htmlContent: html
+        };
+        console.log('📤 EMAIL PAYLOAD:', { sender: emailPayload.sender, to: [{ email: '***@***.***' }], subject: emailPayload.subject });
+        const sendRes = await fetch("https://api.brevo.com/v3/smtp/email", { method: "POST", headers: { "api-key": BREVO_KEY, "Content-Type": "application/json" }, body: JSON.stringify(emailPayload) });
+        console.log('📤 BREVO RESPONSE:', { status: sendRes.status, statusText: sendRes.statusText, ok: sendRes.ok });
+        await supabase.from("staffing_events").insert({ staffing_request_id: insertedId, event: "email_sent", meta: { phase, status: sendRes.status, role: role ?? null, message: message ?? null } });
+        if (sendRes.ok) {
+          try {
+            const activityCode = phase === 'availability' ? 'staffing.availability.sent' : 'staffing.offer.sent';
+            await supabase.rpc('log_activity_as', {
+              _actor_id: actorId,
+              _code: activityCode,
+              _job_id: job_id,
+              _entity_type: 'staffing',
+              _entity_id: insertedId,
+              _payload: { staffing_request_id: insertedId, phase, profile_id, tech_name: fullName || tech.email },
+              _visibility: null,
+            });
+          } catch (activityError) {
+            console.warn('[send-staffing-email] Failed to log activity', activityError);
+          }
+          return new Response(JSON.stringify({ success: true, channel: 'email' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        } else {
+          const errorText = await sendRes.text();
+          return new Response(JSON.stringify({ error: "Email delivery failed", details: { status: sendRes.status, message: errorText } }), { status: sendRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
       }
 
     } catch (operationError) {

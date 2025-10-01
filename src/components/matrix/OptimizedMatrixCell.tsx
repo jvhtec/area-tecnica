@@ -82,6 +82,7 @@ export const OptimizedMatrixCell = memo(({
   const [pendingRetry, setPendingRetry] = React.useState<null | { jobId: string }>(null);
   const [pendingCancel, setPendingCancel] = React.useState<null | { phase: 'availability' | 'offer', jobId: string | null }>(null);
   const [pendingRemoveAssignment, setPendingRemoveAssignment] = React.useState(false);
+  const [retryChannel, setRetryChannel] = React.useState<'email' | 'whatsapp'>('email');
   
   // Use job-specific status for assigned cells, date-based status for empty cells
   const staffingStatus = hasAssignment ? staffingStatusByJob : staffingStatusByDate;
@@ -246,7 +247,7 @@ export const OptimizedMatrixCell = memo(({
                     onClick('select-job-for-staffing');
                   }
                 }}
-                title="Retry availability email"
+                title="Retry availability request"
                 className="focus:outline-none"
               >
                 <Badge 
@@ -454,28 +455,51 @@ export const OptimizedMatrixCell = memo(({
         <Dialog open={true} onOpenChange={(v) => !v && setPendingRetry(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Resend availability email?</DialogTitle>
-              <DialogDescription>
-                This will resend an availability request to {technician.first_name} {technician.last_name} for {format(date, 'PPP')}.
-              </DialogDescription>
+              <DialogTitle>Resend availability request</DialogTitle>
+              <DialogDescription>Choose channel and resend the availability request.</DialogDescription>
             </DialogHeader>
+            <div className="py-2">
+              <div className="space-y-3">
+                <label className="font-medium text-sm text-foreground">Channel</label>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="availability-retry-channel"
+                      checked={retryChannel === 'email'}
+                      onChange={() => setRetryChannel('email')}
+                    />
+                    <span>Email</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="availability-retry-channel"
+                      checked={retryChannel === 'whatsapp'}
+                      onChange={() => setRetryChannel('whatsapp')}
+                    />
+                    <span>WhatsApp</span>
+                  </label>
+                </div>
+              </div>
+            </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setPendingRetry(null)}>Cancel</Button>
               <Button onClick={() => {
                 if (!pendingRetry) return;
                 setAvailabilityRetrying(true);
                 sendStaffingEmail(
-                  ({ job_id: pendingRetry.jobId, profile_id: technician.id, phase: 'availability', target_date: date.toISOString(), single_day: true } as any),
+                  ({ job_id: pendingRetry.jobId, profile_id: technician.id, phase: 'availability', channel: retryChannel, target_date: date.toISOString(), single_day: true } as any),
                   {
                     onSuccess: () => {
                       setAvailabilityRetrying(false);
                       setPendingRetry(null);
-                      toast.success('Availability email resent');
+                      toast.success('Availability request resent');
                     },
                     onError: (error) => {
                       setAvailabilityRetrying(false);
                       setPendingRetry(null);
-                      toast.error(`Failed to resend availability: ${error.message}`);
+                      toast.error(`Failed to resend availability request: ${error.message}`);
                     }
                   }
                 );
