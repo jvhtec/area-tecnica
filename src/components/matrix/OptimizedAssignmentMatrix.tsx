@@ -255,13 +255,24 @@ export const OptimizedAssignmentMatrix = ({
     syncScrollPositions(mainScrollRef.current?.scrollLeft || 0, scrollTop, 'technician');
   }, [syncScrollPositions]);
 
-  const handleCellClick = useCallback((technicianId: string, date: Date, action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details', selectedJobId?: string) => {
+  const closeDialogs = useCallback(() => {
+    setCellAction(null);
+    setSelectedCells(new Set());
+    // Invalidate queries when closing dialogs to refresh data
+    invalidateAssignmentQueries();
+  }, [invalidateAssignmentQueries]);
+
+  const [availabilityPreferredChannel, setAvailabilityPreferredChannel] = useState<null | 'email' | 'whatsapp'>(null);
+  const [offerChannel, setOfferChannel] = useState<'email' | 'whatsapp'>('email');
+  const [offerPreferredChannel, setOfferPreferredChannel] = useState<null | 'email' | 'whatsapp'>(null);
+
+  const handleCellClick = useCallback((technicianId: string, date: Date, action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details' | 'offer-details-wa' | 'availability-wa', selectedJobId?: string) => {
     console.log('Matrix handling cell click:', { technicianId, date: format(date, 'yyyy-MM-dd'), action });
     const assignment = getAssignmentForCell(technicianId, date);
     console.log('Assignment data:', assignment);
     // Block assignment/staffing interactions if technician is in fridge
     const isFridge = fridgeSet?.has(technicianId);
-    if (isFridge && (action === 'select-job' || action === 'assign' || action === 'select-job-for-staffing' || action === 'confirm' || action === 'offer-details')) {
+    if (isFridge && (action === 'select-job' || action === 'assign' || action === 'select-job-for-staffing' || action === 'confirm' || action === 'offer-details' || action === 'offer-details-wa' || action === 'availability-wa')) {
       toast({ title: 'En la nevera', description: 'Este técnico está en la nevera y no puede ser asignado.', variant: 'destructive' });
       return;
     }
@@ -270,8 +281,57 @@ export const OptimizedAssignmentMatrix = ({
       console.log('Direct assign disabled by UI toggle; ignoring click');
       return;
     }
+
+    // Special flows
+    if (action === 'availability-wa') {
+      // Prefer WhatsApp for availability
+      const targetJobId = selectedJobId || assignment?.job_id || undefined;
+      (async () => {
+        const conflict = targetJobId ? await checkTimeConflict(technicianId, targetJobId) : null;
+        if (conflict) {
+          toast({
+            title: 'Conflicto de horarios',
+            description: `Ya tiene confirmado: ${conflict.title} (${new Date(conflict.start_time).toLocaleString()} - ${new Date(conflict.end_time).toLocaleString()})`,
+            variant: 'destructive'
+          });
+          return;
+        }
+        if (targetJobId) {
+          sendStaffingEmail(
+            ({ job_id: targetJobId, profile_id: technicianId, phase: 'availability', channel: 'whatsapp' } as any),
+            {
+              onSuccess: () => {
+                toast({ title: 'Request sent', description: 'Availability request sent via WhatsApp.' });
+                closeDialogs();
+              },
+              onError: (error: any) => {
+                toast({ title: 'Send failed', description: error.message, variant: 'destructive' });
+              }
+            }
+          );
+        } else {
+          setAvailabilityPreferredChannel('whatsapp');
+          setCellAction({ type: 'select-job-for-staffing', technicianId, date, assignment });
+        }
+      })();
+      return;
+    }
+
+    if (action === 'offer-details-wa') {
+      const targetJobId = selectedJobId || assignment?.job_id || undefined;
+      if (targetJobId) {
+        setOfferChannel('whatsapp');
+        setCellAction({ type: 'offer-details', technicianId, date, assignment, selectedJobId: targetJobId });
+      } else {
+        setOfferPreferredChannel('whatsapp');
+        setCellAction({ type: 'select-job-for-staffing', technicianId, date, assignment });
+      }
+      return;
+    }
+
+    // Default behavior
     setCellAction({ type: action, technicianId, date, assignment, selectedJobId });
-  }, [getAssignmentForCell, allowDirectAssign, fridgeSet]);
+  }, [getAssignmentForCell, allowDirectAssign, fridgeSet, sendStaffingEmail, closeDialogs, toast]);
 
   const handleJobSelected = useCallback((jobId: string) => {
     if (cellAction?.type === 'select-job') {
@@ -283,12 +343,7 @@ export const OptimizedAssignmentMatrix = ({
     }
   }, [cellAction]);
 
-  const closeDialogs = useCallback(() => {
-    setCellAction(null);
-    setSelectedCells(new Set());
-    // Invalidate queries when closing dialogs to refresh data
-    invalidateAssignmentQueries();
-  }, [invalidateAssignmentQueries]);
+  
 
   const handleCellSelect = useCallback((technicianId: string, date: Date, selected: boolean) => {
     const cellKey = `${technicianId}-${format(date, 'yyyy-MM-dd')}`;
@@ -319,11 +374,14 @@ export const OptimizedAssignmentMatrix = ({
         return;
       }
       if (action === 'offer') {
+        // Decide channel (respect WA preference if set)
+        setOfferChannel(offerPreferredChannel ?? 'email');
+        setOfferPreferredChannel(null);
         // Open offer details dialog; do not send immediately
         setCellAction({ ...cellAction, type: 'offer-details', selectedJobId: jobId, singleDay: options?.singleDay });
         return;
       }
-      // Availability: pre-check conflicts, then choose channel
+      // Availability: pre-check conflicts, then either direct-send via WA (if preferred) or choose channel
       (async () => {
         const conflict = await checkTimeConflict(cellAction.technicianId, jobId);
         if (conflict) {
@@ -334,12 +392,28 @@ export const OptimizedAssignmentMatrix = ({
           });
           return;
         }
-        setAvailabilityDialog({ open: true, jobId, profileId: cellAction.technicianId, dateIso: cellAction.date.toISOString(), singleDay: !!options?.singleDay });
+        if (availabilityPreferredChannel === 'whatsapp') {
+          setAvailabilityPreferredChannel(null);
+          sendStaffingEmail(
+            ({ job_id: jobId, profile_id: cellAction.technicianId, phase: 'availability', channel: 'whatsapp', target_date: cellAction.date.toISOString(), single_day: !!options?.singleDay } as any),
+            {
+              onSuccess: () => {
+                toast({ title: 'Request sent', description: 'Availability request sent via WhatsApp.' });
+                closeDialogs();
+              },
+              onError: (error: any) => {
+                toast({ title: 'Send failed', description: error.message, variant: 'destructive' });
+              }
+            }
+          );
+        } else {
+          setAvailabilityDialog({ open: true, jobId, profileId: cellAction.technicianId, dateIso: cellAction.date.toISOString(), singleDay: !!options?.singleDay });
+        }
       })();
     } else {
       // no-op
     }
-  }, [cellAction, sendStaffingEmail, toast, closeDialogs]);
+  }, [cellAction, sendStaffingEmail, toast, closeDialogs, availabilityPreferredChannel, offerPreferredChannel]);
 
   const handleCellPrefetch = useCallback((technicianId: string) => {
     prefetchTechnicianData(technicianId);
@@ -673,10 +747,11 @@ export const OptimizedAssignmentMatrix = ({
                 return;
               }
               sendStaffingEmail(
-                ({ job_id: cellAction.selectedJobId, profile_id: currentTechnician.id, phase: 'offer', role, message, target_date: cellAction.date.toISOString(), single_day: !!singleDay } as any),
+                ({ job_id: cellAction.selectedJobId, profile_id: currentTechnician.id, phase: 'offer', role, message, channel: offerChannel, target_date: cellAction.date.toISOString(), single_day: !!singleDay } as any),
                 {
-                  onSuccess: () => {
-                    toast({ title: 'Offer email sent', description: `${role} offer sent to ${currentTechnician.first_name}` });
+                  onSuccess: (data: any) => {
+                    const via = data?.channel || offerChannel;
+                    toast({ title: 'Offer sent', description: `${role} offer sent via ${via}.` });
                     closeDialogs();
                   },
                   onError: (error: any) => {

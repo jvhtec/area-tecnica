@@ -108,9 +108,9 @@ serve(async (req) => {
         // 1) Resolve chosen role from last email_sent event for this request (offer phase)
         const { data: lastEmail, error: lastEmailErr } = await supabase
           .from('staffing_events')
-          .select('meta')
+          .select('meta, created_at')
           .eq('staffing_request_id', rid)
-          .eq('event', 'email_sent')
+          .in('event', ['email_sent', 'whatsapp_sent'])
           .contains('meta', { phase: 'offer' })
           .order('created_at', { ascending: false })
           .limit(1)

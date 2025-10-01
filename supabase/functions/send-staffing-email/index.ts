@@ -67,7 +67,7 @@ serve(async (req) => {
     console.log('📥 RECEIVED PAYLOAD:', JSON.stringify(body, null, 2));
     
     const { job_id, profile_id, phase, role, message, channel } = body;
-    const desiredChannel = (typeof channel === 'string' && channel.toLowerCase() === 'whatsapp' && phase === 'availability') ? 'whatsapp' : 'email';
+    const desiredChannel = (typeof channel === 'string' && channel.toLowerCase() === 'whatsapp') ? 'whatsapp' : 'email';
     
     // Enhanced validation logging
     console.log('🔍 VALIDATING FIELDS:', {
@@ -468,6 +468,10 @@ serve(async (req) => {
         lines.push(`- Horario: ${callTime}`);
         lines.push(`- Ubicación: ${loc}`);
         if (roleLabel) lines.push(`- Rol: ${roleLabel}`);
+        if (phase === 'offer' && (message ?? '').trim()) {
+          lines.push('');
+          lines.push((message as string).trim());
+        }
         lines.push('');
         lines.push(`Confirmar: ${confirmUrl}`);
         lines.push(`No estoy disponible: ${declineUrl}`);

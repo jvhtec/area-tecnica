@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { Calendar, Clock, Check, X, UserX, Mail, CheckCircle, Ban, Refrigerator } from 'lucide-react';
+import { Calendar, Clock, Check, X, UserX, Mail, CheckCircle, Ban, Refrigerator, MessageCircle } from 'lucide-react';
 import { format, isToday, isWeekend } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useCancelStaffingRequest, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
@@ -27,7 +27,7 @@ interface OptimizedMatrixCellProps {
   height: number;
   isSelected: boolean;
   onSelect: (selected: boolean) => void;
-  onClick: (action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details', selectedJobId?: string) => void;
+  onClick: (action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details' | 'offer-details-wa' | 'availability-wa', selectedJobId?: string) => void;
   onPrefetch?: () => void;
   onOptimisticUpdate?: (status: string) => void;
   onRender?: () => void;
@@ -98,8 +98,8 @@ export const OptimizedMatrixCell = memo(({
     }
     
     if (phase === 'offer') {
-      // Determine target job id: assignment > prop > availability job from date hook
-      const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.availability_job_id;
+      // Determine target job id: assignment > prop (do not auto-pick by status)
+      const targetJobId = jobId || assignment?.job_id;
       if (!targetJobId) {
         console.log('📋 No resolvable job for offer; opening job selection');
         onClick('select-job-for-staffing');
@@ -115,8 +115,8 @@ export const OptimizedMatrixCell = memo(({
       return;
     }
 
-    // Availability path: open job selection and scope dialog; preselect target job when resolvable
-    const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.availability_job_id;
+    // Availability path: open job selection; preselect only if assignment provides it
+    const targetJobId = jobId || assignment?.job_id || undefined;
     onClick('select-job-for-staffing', targetJobId);
   }, [jobId, assignment?.job_id, technician.id, technician.first_name, technician.last_name, hasAssignment, assignment, date, onClick, staffingStatusByDate]);
 
@@ -343,6 +343,19 @@ export const OptimizedMatrixCell = memo(({
               >
                 <Mail className="h-3 w-3 text-blue-600" />
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0 hover:bg-emerald-100"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClick('availability-wa');
+                }}
+                disabled={isSendingEmail}
+                title="Ask availability via WhatsApp"
+              >
+                <MessageCircle className="h-3 w-3 text-emerald-600" />
+              </Button>
             </>
           )}
           {(canSendOffer || canOfferFallback) && (
@@ -356,6 +369,19 @@ export const OptimizedMatrixCell = memo(({
                 title={canSendOffer ? 'Send offer' : 'Send offer (manual progress)'}
               >
                 <CheckCircle className={`h-3 w-3 ${canSendOffer ? 'text-green-600' : 'text-muted-foreground'}`} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`h-5 w-5 p-0 ${canSendOffer ? 'hover:bg-emerald-100' : 'opacity-80 hover:bg-muted'}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClick('offer-details-wa', jobId || assignment?.job_id || undefined);
+                }}
+                disabled={isSendingEmail}
+                title={canSendOffer ? 'Send offer via WhatsApp' : 'Send offer via WhatsApp (manual progress)'}
+              >
+                <MessageCircle className={`h-3 w-3 ${canSendOffer ? 'text-emerald-600' : 'text-muted-foreground'}`} />
               </Button>
             </>
           )}
