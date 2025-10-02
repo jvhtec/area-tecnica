@@ -30,6 +30,28 @@ export function useStaffingRealtime() {
       })
       .subscribe()
 
+    // Also listen to activity_log for staffing.* events (secondary source of truth)
+    const activityChannel = supabase.channel('activity-log-staffing')
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'activity_log'
+      }, (payload) => {
+        try {
+          const rec: any = payload.new || payload.old
+          const code = rec?.code || ''
+          if (typeof code === 'string' && code.startsWith('staffing.')) {
+            console.log('Activity staffing event:', code, rec)
+            // We don't know job/profile here, but invalidate broad keys
+            qc.invalidateQueries({ queryKey: ['staffing'] })
+            qc.invalidateQueries({ queryKey: ['staffing-by-date'] })
+            qc.invalidateQueries({ queryKey: ['staffing-matrix'] })
+            qc.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] })
+          }
+        } catch (e) {
+          console.warn('Activity staffing event handling error', e)
+        }
+      })
+      .subscribe()
+
     async function handleStaffingUpdate(payload: any) {
       console.log('🔄 Realtime update received:', {
         table: payload.table,
@@ -87,6 +109,7 @@ export function useStaffingRealtime() {
     return () => { 
       supabase.removeChannel(staffingRequestsChannel)
       supabase.removeChannel(staffingEventsChannel)
+      supabase.removeChannel(activityChannel)
     }
   }, [qc])
 }

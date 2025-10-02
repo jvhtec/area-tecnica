@@ -23,6 +23,11 @@ serve(async (req) => {
     const t = url.searchParams.get("t");
     const c = (url.searchParams.get('c') || '').toLowerCase(); // optional channel hint: 'email'|'wa'|'whatsapp'
     
+    // For link preview HEAD requests, avoid rendering/html to reduce plaintext in previews
+    if (req.method === 'HEAD') {
+      return new Response(null, { status: 204 });
+    }
+
     if (!rid || !action || !exp || !t) {
       return redirectResponse({
         title: 'Enlace inválido',
@@ -90,17 +95,38 @@ serve(async (req) => {
     // If this is a GET for a WhatsApp (or unknown) channel, render a confirmation page requiring a POST
     const isWaChannel = c === 'wa' || c === 'whatsapp';
     if (req.method !== 'POST' && isWaChannel) {
+      const postUrlConfirm = `${url.origin}${url.pathname}?rid=${encodeURIComponent(rid)}&a=confirm&exp=${encodeURIComponent(exp)}&t=${encodeURIComponent(t)}&c=${encodeURIComponent(c)}`;
+      const postUrlDecline = `${url.origin}${url.pathname}?rid=${encodeURIComponent(rid)}&a=decline&exp=${encodeURIComponent(exp)}&t=${encodeURIComponent(t)}&c=${encodeURIComponent(c)}`;
+      const choicePage = Deno.env.get('PUBLIC_CHOICE_PAGE_URL');
+      if (choicePage) {
+        const qp = new URLSearchParams();
+        qp.set('heading', row.phase === 'offer' ? 'Responder a la oferta' : 'Confirmar disponibilidad');
+        qp.set('message', 'Por favor, confirma tu respuesta.');
+        qp.set('postConfirm', postUrlConfirm);
+        qp.set('postDecline', postUrlDecline);
+        return Response.redirect(`${choicePage}?${qp.toString()}`, 302);
+      }
       return new Response(renderChoicePage({
         heading: row.phase === 'offer' ? 'Responder a la oferta' : 'Confirmar disponibilidad',
         message: 'Por favor, confirma tu respuesta.',
-        postUrlConfirm: `${url.origin}${url.pathname}?rid=${encodeURIComponent(rid)}&a=confirm&exp=${encodeURIComponent(exp)}&t=${encodeURIComponent(t)}&c=${encodeURIComponent(c)}`,
-        postUrlDecline: `${url.origin}${url.pathname}?rid=${encodeURIComponent(rid)}&a=decline&exp=${encodeURIComponent(exp)}&t=${encodeURIComponent(t)}&c=${encodeURIComponent(c)}`,
+        postUrlConfirm,
+        postUrlDecline,
       }), { headers: { 'Content-Type': 'text/html; charset=UTF-8' } });
     }
 
     const newStatus = action === "confirm" ? "confirmed" : "declined";
-    await supabase.from("staffing_requests").update({ status: newStatus }).eq("id", rid);
-    await supabase.from("staffing_events").insert({ staffing_request_id: rid, event: `clicked_${action}` });
+    // Update and verify row was affected
+    const { data: updRow, error: updErr } = await supabase
+      .from("staffing_requests")
+      .update({ status: newStatus })
+      .eq("id", rid)
+      .select('id,status')
+      .maybeSingle();
+    if (updErr || !updRow) {
+      console.error('Staffing status update error or no row updated', { updErr, rid });
+    }
+    const { error: insEvtErr } = await supabase.from("staffing_events").insert({ staffing_request_id: rid, event: `clicked_${action}` });
+    if (insEvtErr) console.error('Insert staffing_events failed', insEvtErr);
 
     // Get technician name for activity log
     const { data: techProfile } = await supabase
@@ -399,8 +425,9 @@ function renderChoicePage(opts: { heading: string, message: string, postUrlConfi
  * Creates a redirect response to the parametric HTML page with URL parameters
  */
 function redirectResponse(opts: { title: string, status: 'success'|'warning'|'error'|'neutral', heading: string, message: string, submessage?: string }) {
-  // Use single parametric URL with query parameters
-  const baseUrl = 'https://jvhtec.github.io/area-tecnica/public/temp_error.html';
+  // Use a parametric static page hosted on GitHub Pages (configurable)
+  const baseFromEnv = Deno.env.get('PUBLIC_RESULT_PAGE_URL');
+  const baseUrl = baseFromEnv || 'https://jvhtec.github.io/area-tecnica/result.html';
   const params = new URLSearchParams();
   
   params.set('title', opts.title);

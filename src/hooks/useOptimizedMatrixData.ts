@@ -125,37 +125,53 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     refetchOnWindowFocus: false, // Disable automatic refetch on focus
   });
 
-  // Availability query using existing per-day table technician_availability
+  // Availability (unavailability) from technician_unavailability intervals
   const { data: availabilityData = [], isLoading: availabilityLoading } = useQuery({
     queryKey: ['optimized-matrix-availability', technicianIds, format(dateRange.start, 'yyyy-MM-dd'), format(dateRange.end, 'yyyy-MM-dd')],
     queryFn: async () => {
-      if (technicianIds.length === 0 || !dateRange.start || !dateRange.end) return [] as Array<{ user_id: string; date: string; status: string; notes?: string | null }>;
+      if (technicianIds.length === 0 || !dateRange.start || !dateRange.end) return [] as Array<{ user_id: string; date: string; status: string }>;
 
       const batchSize = 100;
       const techBatches: string[][] = [];
       for (let i = 0; i < technicianIds.length; i += batchSize) techBatches.push(technicianIds.slice(i, i + batchSize));
 
-      const all = await Promise.all(
-        techBatches.map(async (batch) => {
-          const { data, error } = await supabase
-            .from('technician_availability')
-            .select('technician_id, date, status')
-            .in('technician_id', batch)
-            .gte('date', format(dateRange.start, 'yyyy-MM-dd'))
-            .lte('date', format(dateRange.end, 'yyyy-MM-dd'))
-            .order('date', { ascending: true });
-          if (error) throw error;
-          return data || [];
-        })
-      );
+      const endIso = dateRange.end.toISOString();
+      const startIso = dateRange.start.toISOString();
 
-      // Map statuses to a unified unavailable signal used by cells
-      const rows = all.flat() as Array<{ technician_id: string; date: string; status: string }>;
-      // Mark cells as unavailable, without exposing restricted reasons
-      return rows.map(r => ({ user_id: r.technician_id, date: r.date, status: 'unavailable' }));
+      const intervalRows: Array<{ technician_id: string; starts_at: string; ends_at: string }> = [];
+      for (const batch of techBatches) {
+        const { data, error } = await supabase
+          .from('technician_unavailability')
+          .select('technician_id, starts_at, ends_at')
+          .in('technician_id', batch)
+          // overlap check: starts_at <= range.end AND ends_at >= range.start
+          .lte('starts_at', endIso)
+          .gte('ends_at', startIso);
+        if (error) throw error;
+        (data || []).forEach((row: any) => intervalRows.push(row));
+      }
+
+      // Expand intervals to per-day unavailable marks in the visible range
+      const out: Array<{ user_id: string; date: string; status: string }> = [];
+      const startDay = new Date(dateRange.start);
+      startDay.setHours(0,0,0,0);
+      const endDay = new Date(dateRange.end);
+      endDay.setHours(0,0,0,0);
+
+      for (const r of intervalRows) {
+        const s = new Date(r.starts_at);
+        const e = new Date(r.ends_at);
+        // clamp to range
+        const clampStart = new Date(Math.max(startDay.getTime(), new Date(s.getFullYear(), s.getMonth(), s.getDate()).getTime()));
+        const clampEnd = new Date(Math.min(endDay.getTime(), new Date(e.getFullYear(), e.getMonth(), e.getDate()).getTime()));
+        for (let d = new Date(clampStart); d.getTime() <= clampEnd.getTime(); d.setDate(d.getDate() + 1)) {
+          out.push({ user_id: r.technician_id, date: format(d, 'yyyy-MM-dd'), status: 'unavailable' });
+        }
+      }
+      return out;
     },
     enabled: technicianIds.length > 0 && !!dateRange.start && !!dateRange.end,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
 
@@ -163,8 +179,8 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   useEffect(() => {
     if (!technicianIds.length) return;
     const channel = (supabase as any)
-      .channel('rt-technician-availability')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'technician_availability' }, () => {
+      .channel('rt-technician-unavailability')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'technician_unavailability' }, () => {
         queryClient.invalidateQueries({ queryKey: ['optimized-matrix-availability'] });
       })
       .subscribe();
