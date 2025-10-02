@@ -158,10 +158,13 @@ const Layout = () => {
           </main>
         </div>
       </div>
-      <WolfensteinDialog 
-        open={doomTriggered} 
-        onOpenChange={(open) => !open && resetDoom()} 
-      />
+      {/* Feature gate with env var; defaults to enabled unless explicitly set to false */}
+      {((import.meta as any).env?.VITE_ENABLE_WOLFENSTEIN === undefined || String((import.meta as any).env?.VITE_ENABLE_WOLFENSTEIN).toLowerCase() !== 'false') && (
+        <WolfensteinDialog 
+          open={doomTriggered} 
+          onOpenChange={(open) => !open && resetDoom()} 
+        />
+      )}
     </SidebarProvider>
   );
 };

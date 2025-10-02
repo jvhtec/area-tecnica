@@ -6,7 +6,12 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
-import type { DosPlayer } from "js-dos";
+// Avoid static import of js-dos types to prevent Vite pre-bundling issues
+type DosPlayer = {
+  mount?: (path: string) => Promise<void>;
+  run: (executableOrBundle: string, args?: string[]) => Promise<void>;
+  exit: () => void;
+};
 
 interface WolfensteinDialogProps {
   open: boolean;
@@ -20,7 +25,7 @@ export const WolfensteinDialog = ({ open, onOpenChange }: WolfensteinDialogProps
   const dosRef = useRef<DosPlayer | null>(null);
 
   useEffect(() => {
-    if (!open || !canvasRef.current) return;
+    if (!open) return;
 
     const initDos = async () => {
       setIsLoading(true);
@@ -29,23 +34,73 @@ export const WolfensteinDialog = ({ open, onOpenChange }: WolfensteinDialogProps
       try {
         console.log('Initializing DOS emulator...');
         // Dynamically import js-dos
-        const jsdos = await import("js-dos/dist/js-dos");
-        const Dos = jsdos.default;
+        // Prefer module root to get proper named export in v8
+        // Load v7 UMD-compatible build; if the installed package is v8, this import will not expose Dos factory
+        const jsdos: any = await import("js-dos/dist/js-dos");
+        const Dos = (jsdos as any).Dos || (jsdos as any).default || (globalThis as any).Dos || (window as any).Dos;
+        if (typeof Dos !== 'function') {
+          throw new TypeError('Incompatible js-dos version detected. Please use js-dos v7.x for Dos() API.');
+        }
         
         // Create a new DOS instance with local path
         console.log('Creating DOS instance with local wdosbox...');
-        const ci = await Dos(canvasRef.current, {
+        const canvas = canvasRef.current;
+        if (!canvas) {
+          // Canvas not yet mounted; try again on next tick
+          console.warn('DOS init attempted before canvas mounted. Retrying...');
+          setTimeout(initDos, 0);
+          return;
+        }
+        const ci = await Dos(canvas, {
           wdosboxUrl: "/js-dos/wdosbox.js"
         });
         
         dosRef.current = ci;
 
         // Mount and run Wolfenstein 3D using local bundle
-        console.log('Mounting Wolfenstein 3D bundle...');
-        await ci.mount("/WOLF3D.jsdos");
-        
-        console.log('Running WOLF3D.EXE...');
-        await ci.run("WOLF3D.EXE");
+        let started = false;
+        if (typeof (ci as any).mount === 'function') {
+          console.log('Mounting Wolfenstein 3D bundle...');
+          let mounted = false;
+          try {
+            await (ci as any).mount("/WOLF3D.jsdos");
+            mounted = true;
+          } catch (e) {
+            console.warn('Mount "/WOLF3D.jsdos" failed, trying lowercase variant...', e);
+            try {
+              await (ci as any).mount("/wolf3d.jsdos");
+              mounted = true;
+            } catch (e2) {
+              console.warn('Mount fallback failed; will try direct run with .jsdos');
+            }
+          }
+          if (mounted) {
+            console.log('Running WOLF3D.EXE...');
+            // Start the game without awaiting so "loading" clears once mounted
+            (ci as any).run("WOLF3D.EXE").catch((runErr: unknown) => {
+              console.error('Error while running WOLF3D.EXE:', runErr);
+              if (runErr instanceof Error) {
+                setError(`Runtime error: ${runErr.message}`);
+              } else {
+                setError('Unknown runtime error while starting the game.');
+              }
+            });
+            started = true;
+          }
+        }
+
+        // Fallback to direct run of .jsdos bundle (v8 style)
+        if (!started) {
+          console.log('Attempting direct run of .jsdos bundle...');
+          try {
+            await (ci as any).run("/WOLF3D.jsdos");
+            started = true;
+          } catch (e) {
+            console.warn('Direct run "/WOLF3D.jsdos" failed, trying lowercase...', e);
+            await (ci as any).run("/wolf3d.jsdos");
+            started = true;
+          }
+        }
 
         console.log('Wolfenstein 3D initialized successfully');
         setIsLoading(false);
@@ -78,6 +133,7 @@ export const WolfensteinDialog = ({ open, onOpenChange }: WolfensteinDialogProps
         try {
           console.log('Cleaning up DOS instance...');
           dosRef.current.exit();
+          dosRef.current = null;
         } catch (err) {
           console.error('Error cleaning up DOS:', err);
         }
@@ -101,29 +157,39 @@ export const WolfensteinDialog = ({ open, onOpenChange }: WolfensteinDialogProps
             </Button>
           </div>
           
-          <div className="flex-1 flex items-center justify-center bg-black">
-            {isLoading ? (
-              <div className="text-center space-y-2 animate-pulse">
-                <div className="text-xl">Loading Wolfenstein 3D...</div>
-                <div className="text-sm">Please wait...</div>
+          <div className="flex-1 relative bg-black">
+            {/* Canvas must always be present for js-dos to init */}
+            <canvas 
+              ref={canvasRef}
+              className="w-full h-full block"
+              tabIndex={0}
+              onContextMenu={(e) => e.preventDefault()}
+            />
+
+            {/* Loading overlay */}
+            {isLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+                <div className="text-center space-y-2 animate-pulse">
+                  <div className="text-xl">Loading Wolfenstein 3D...</div>
+                  <div className="text-sm">Please wait...</div>
+                </div>
               </div>
-            ) : error ? (
-              <div className="text-center text-blue-500 space-y-2">
-                <div className="text-xl">{error}</div>
-                <Button 
-                  variant="outline" 
-                  onClick={() => onOpenChange(false)}
-                  className="text-blue-500 border-blue-500 hover:bg-blue-950"
-                >
-                  Close
-                </Button>
+            )}
+
+            {/* Error overlay */}
+            {error && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+                <div className="text-center text-blue-500 space-y-3">
+                  <div className="text-xl max-w-[80vw] mx-auto px-4 break-words">{error}</div>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => onOpenChange(false)}
+                    className="text-blue-500 border-blue-500 hover:bg-blue-950"
+                  >
+                    Close
+                  </Button>
+                </div>
               </div>
-            ) : (
-              <canvas 
-                ref={canvasRef}
-                className="w-full h-full"
-                onContextMenu={(e) => e.preventDefault()}
-              />
             )}
           </div>
           
