@@ -102,24 +102,25 @@ serve(async (req: Request) => {
     }
 
     // If message equals the default phrase for this job, create an announcement with a highlight directive
-    try {
-      if (jobTitle && body.job_id) {
-        const expectedDefault = `He hecho cambios en el PS del ${jobTitle} por favor echad un vistazo`;
-        const isDefault = msg.trim().toLowerCase() === expectedDefault.trim().toLowerCase();
-        if (isDefault || body.highlight === true) {
-          await supabaseAdmin
-            .from('announcements')
-            .insert({
-              message: `[HIGHLIGHT_JOB:${body.job_id}] ${msg}`,
-              level: 'info',
-              active: true,
-              created_by: actorId
-            } as any)
-            .catch(() => {});
+    if (jobTitle && body.job_id) {
+      const expectedDefault = `He hecho cambios en el PS del ${jobTitle} por favor echad un vistazo`;
+      const isDefault = msg.trim().toLowerCase() === expectedDefault.trim().toLowerCase();
+      if (isDefault || body.highlight === true) {
+        const { error: annError } = await supabaseAdmin
+          .from('announcements')
+          .insert({
+            message: `[HIGHLIGHT_JOB:${body.job_id}] ${msg}`,
+            level: 'info',
+            active: true,
+            created_by: actorId
+          });
+        
+        if (annError) {
+          console.error('Failed to create announcement:', annError);
+        } else {
+          console.log('Announcement created successfully for job:', body.job_id);
         }
       }
-    } catch (e) {
-      console.warn('Post-send highlight insert failed:', e);
     }
 
     return new Response(JSON.stringify({ success: true }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
