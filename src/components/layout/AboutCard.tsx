@@ -6,7 +6,9 @@ import {
 } from "@/components/ui/hover-card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Info, Edit3, Save, X, Clock } from "lucide-react"
+import { Info, Edit3, Save, X, Clock, Plus, Trash2 } from "lucide-react"
+import { supabase } from "@/lib/supabase"
+import { useToast } from "@/hooks/use-toast"
 
 // Get the version from Vite's env variables
 const version = import.meta.env.VITE_APP_VERSION || "dev"
@@ -45,33 +47,22 @@ interface ChangelogEntry {
 // Define an interface that includes the userRole prop.
 interface AboutCardProps {
   userRole?: string
+  userEmail?: string
 }
 
-export const AboutCard = ({ userRole }: AboutCardProps) => {
+export const AboutCard = ({ userRole, userEmail }: AboutCardProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const [currentImage, setCurrentImage] = useState(images[0])
-  const [changelog, setChangelog] = useState<ChangelogEntry[]>([
-    {
-      id: "1",
-      version: "1.2.0",
-      date: "2024-12-01",
-      content: "Added changelog functionality with editing capabilities for authorized users",
-      lastUpdated: new Date().toISOString()
-    },
-    {
-      id: "2", 
-      version: "1.1.0",
-      date: "2024-11-15",
-      content: "Improved UI with random image selection and better hover interactions",
-      lastUpdated: "2024-11-15T10:00:00Z"
-    }
-  ])
+  const [changelog, setChangelog] = useState<ChangelogEntry[]>([])
   const [editingEntry, setEditingEntry] = useState<string | null>(null)
   const [editContent, setEditContent] = useState("")
+  const [editVersion, setEditVersion] = useState("")
+  const [editDate, setEditDate] = useState("")
   const [hasRecentUpdate, setHasRecentUpdate] = useState(false)
+  const { toast } = useToast()
 
-  // Allow editing for management users
-  const canEditChangelog = userRole === "management"
+  // Allow editing for management/admin or Javier by email
+  const canEditChangelog = (userRole === "management" || userRole === "admin") || (userEmail?.toLowerCase() === 'sonido@sector-pro.com')
 
   // REMOVED: The early return that was hiding the component for management users
   // if (userRole === "management") {
@@ -89,6 +80,31 @@ export const AboutCard = ({ userRole }: AboutCardProps) => {
     setHasRecentUpdate(hasRecent)
   }, [changelog])
 
+  // Fetch changelog entries when the card opens
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('app_changelog')
+          .select('id, version, entry_date, content, last_updated')
+          .order('entry_date', { ascending: false })
+          .order('last_updated', { ascending: false })
+        if (error) throw error
+        const mapped: ChangelogEntry[] = (data || []).map((row: any) => ({
+          id: row.id,
+          version: row.version,
+          date: row.entry_date, // yyyy-mm-dd
+          content: row.content,
+          lastUpdated: row.last_updated
+        }))
+        setChangelog(mapped)
+      } catch (e: any) {
+        console.warn('Failed to load changelog', e?.message || e)
+      }
+    }
+    if (isOpen) void load()
+  }, [isOpen])
+
   // Selects a random image from the images array.
   const selectRandomImage = () => {
     const randomIndex = Math.floor(Math.random() * images.length)
@@ -104,21 +120,94 @@ export const AboutCard = ({ userRole }: AboutCardProps) => {
   }
 
   // Start editing a changelog entry
-  const startEditing = (entryId: string, currentContent: string) => {
+  const startEditing = (entryId: string, currentContent: string, currentVersion: string, currentDate: string) => {
     setEditingEntry(entryId)
     setEditContent(currentContent)
+    setEditVersion(currentVersion)
+    const isoDate = /\d{4}-\d{2}-\d{2}/.test(currentDate) ? currentDate : new Date(currentDate).toISOString().slice(0,10)
+    setEditDate(isoDate)
   }
 
-  // Save changelog entry
-  const saveEntry = () => {
-    if (editingEntry) {
-      setChangelog(prev => prev.map(entry => 
-        entry.id === editingEntry 
-          ? { ...entry, content: editContent, lastUpdated: new Date().toISOString() }
-          : entry
-      ))
+  // Save changelog entry (persist)
+  const saveEntry = async () => {
+    if (!editingEntry) return
+    try {
+      const dateStr = (editDate || '').trim()
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        toast({ title: 'Invalid date', description: 'Use format YYYY-MM-DD', variant: 'destructive' })
+        return
+      }
+      const { data, error } = await supabase
+        .from('app_changelog')
+        .update({ content: editContent, version: editVersion || version, entry_date: dateStr })
+        .eq('id', editingEntry)
+        .select('id, version, entry_date, content, last_updated')
+        .maybeSingle()
+      if (error) throw error
+      if (data) {
+        setChangelog(prev => prev.map(entry =>
+          entry.id === editingEntry
+            ? { id: data.id, version: data.version, date: data.entry_date, content: data.content, lastUpdated: data.last_updated }
+            : entry
+        ))
+      }
       setEditingEntry(null)
       setEditContent("")
+      setEditVersion("")
+      setEditDate("")
+      toast({ title: 'Changelog updated' })
+    } catch (e: any) {
+      toast({ title: 'Failed to save', description: e?.message || String(e), variant: 'destructive' })
+    }
+  }
+
+  const deleteEntry = async (id: string) => {
+    if (!id) return
+    const proceed = window.confirm('Delete this changelog entry?')
+    if (!proceed) return
+    try {
+      const { error } = await supabase
+        .from('app_changelog')
+        .delete()
+        .eq('id', id)
+      if (error) throw error
+      setChangelog(prev => prev.filter(e => e.id !== id))
+      if (editingEntry === id) {
+        setEditingEntry(null)
+        setEditContent('')
+        setEditVersion('')
+        setEditDate('')
+      }
+      toast({ title: 'Entry deleted' })
+    } catch (e: any) {
+      toast({ title: 'Failed to delete', description: e?.message || String(e), variant: 'destructive' })
+    }
+  }
+
+  const addEntry = async () => {
+    try {
+      const today = new Date()
+      const yyyy_mm_dd = today.toISOString().slice(0,10)
+      const ver = String(version)
+      const { data, error } = await supabase
+        .from('app_changelog')
+        .insert({ version: ver, entry_date: yyyy_mm_dd, content: '' })
+        .select('id, version, entry_date, content, last_updated')
+        .maybeSingle()
+      if (error) throw error
+      if (data) {
+        const newEntry: ChangelogEntry = {
+          id: data.id, version: data.version, date: data.entry_date, content: data.content, lastUpdated: data.last_updated
+        }
+        setChangelog(prev => [newEntry, ...prev])
+        setEditingEntry(newEntry.id)
+        setEditContent('')
+        setEditVersion(newEntry.version)
+        setEditDate(newEntry.date)
+        toast({ title: 'Entry created' })
+      }
+    } catch (e: any) {
+      toast({ title: 'Failed to add entry', description: e?.message || String(e), variant: 'destructive' })
     }
   }
 
@@ -174,6 +263,11 @@ export const AboutCard = ({ userRole }: AboutCardProps) => {
           <div className="border-t pt-4">
             <div className="flex items-center gap-2 mb-3">
               <h3 className="text-sm font-semibold">Changelog</h3>
+              {canEditChangelog && (
+                <Button variant="outline" size="sm" className="h-6 px-2 ml-auto" onClick={addEntry}>
+                  <Plus className="h-3 w-3 mr-1" /> Add
+                </Button>
+              )}
               {hasRecentUpdate && (
                 <Badge variant="outline" className="text-xs">
                   Updated
@@ -191,20 +285,53 @@ export const AboutCard = ({ userRole }: AboutCardProps) => {
                         {formatDate(entry.date)}
                       </span>
                     </div>
-                    {canEditChangelog && editingEntry !== entry.id && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0"
-                        onClick={() => startEditing(entry.id, entry.content)}
-                      >
-                        <Edit3 className="h-3 w-3" />
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {canEditChangelog && editingEntry !== entry.id && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => startEditing(entry.id, entry.content, entry.version, entry.date)}
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      )}
+                      {userRole === 'admin' && editingEntry !== entry.id && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-red-600"
+                          onClick={() => deleteEntry(entry.id)}
+                          title="Delete entry"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   
                   {editingEntry === entry.id ? (
                     <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] text-muted-foreground mb-1">Version</label>
+                          <input
+                            value={editVersion}
+                            onChange={(e) => setEditVersion(e.target.value)}
+                            className="w-full text-xs p-2 border rounded"
+                            placeholder="e.g., 1.2.3"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-muted-foreground mb-1">Date</label>
+                          <input
+                            type="date"
+                            value={editDate}
+                            onChange={(e) => setEditDate(e.target.value)}
+                            className="w-full text-xs p-2 border rounded"
+                          />
+                        </div>
+                      </div>
                       <textarea
                         value={editContent}
                         onChange={(e) => setEditContent(e.target.value)}
@@ -231,6 +358,17 @@ export const AboutCard = ({ userRole }: AboutCardProps) => {
                           <X className="h-3 w-3 mr-1" />
                           Cancel
                         </Button>
+                        {userRole === 'admin' && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="h-6 px-2 ml-auto"
+                            onClick={() => deleteEntry(entry.id)}
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Delete
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ) : (

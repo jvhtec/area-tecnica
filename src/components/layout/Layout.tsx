@@ -121,7 +121,7 @@ const Layout = () => {
               <LogOut className="h-4 w-4" />
               <span>{isLoggingOut ? 'Signing out...' : 'Sign Out'}</span>
             </Button>
-            <AboutCard />
+            <AboutCard userRole={userRole} userEmail={session?.user?.email || undefined} />
             <SidebarSeparator />
             <div 
               className="px-2 py-4 cursor-pointer transition-opacity"
