@@ -64,8 +64,18 @@ export function useStaffingMatrixStatuses(
           }
           (res.data || []).forEach((r: any) => {
             const key = `${r.job_id}-${r.profile_id}`
-            const mapAvailability = (s: string | null): Status => (s === 'pending' ? 'requested' : (s as any))
-            const mapOffer = (s: string | null): Status => (s === 'pending' ? 'sent' : (s as any))
+            const mapAvailability = (s: string | null): Status => {
+              if (!s) return null
+              if (s === 'pending') return 'requested'
+              if (s === 'expired') return null // treat cancelled/expired as cleared
+              return s as any
+            }
+            const mapOffer = (s: string | null): Status => {
+              if (!s) return null
+              if (s === 'pending') return 'sent'
+              if (s === 'expired') return null // treat cancelled/expired as cleared
+              return s as any
+            }
             mapByJob.set(key, {
               availability_status: mapAvailability(r.availability_status),
               offer_status: mapOffer(r.offer_status)
@@ -141,14 +151,16 @@ export function useStaffingMatrixStatuses(
             if (r.phase === 'availability') {
               const accT = acc.availability_updated_at || 0
               if (t > accT) {
-                acc.availability_status = r.status === 'pending' ? 'requested' : r.status
+                const mapped = r.status === 'pending' ? 'requested' : (r.status === 'expired' ? null : r.status)
+                acc.availability_status = mapped
                 acc.availability_updated_at = t
                 acc.availability_job_id = r.job_id
               }
             } else if (r.phase === 'offer') {
               const accT = acc.offer_updated_at || 0
               if (t > accT) {
-                acc.offer_status = r.status === 'pending' ? 'sent' : r.status
+                const mapped = r.status === 'pending' ? 'sent' : (r.status === 'expired' ? null : r.status)
+                acc.offer_status = mapped
                 acc.offer_updated_at = t
                 acc.offer_job_id = r.job_id
               }
@@ -156,12 +168,15 @@ export function useStaffingMatrixStatuses(
             return acc
           }, { availability_status: null, offer_status: null, availability_updated_at: 0, offer_updated_at: 0, availability_job_id: null, offer_job_id: null })
 
-          mapByDate.set(`${tid}-${dStr}`, {
-            availability_status: latest.availability_status as Status,
-            offer_status: latest.offer_status as Status,
-            availability_job_id: latest.availability_job_id,
-            offer_job_id: latest.offer_job_id
-          })
+          // Only set an entry if there's a non-null status for either phase
+          if (latest.availability_status || latest.offer_status) {
+            mapByDate.set(`${tid}-${dStr}`, {
+              availability_status: latest.availability_status as Status,
+              offer_status: latest.offer_status as Status,
+              availability_job_id: latest.availability_job_id,
+              offer_job_id: latest.offer_job_id
+            })
+          }
         })
       })
 
