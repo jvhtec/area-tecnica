@@ -34,12 +34,16 @@ serve(async (req) => {
     const t = url.searchParams.get("t");
     const c = (url.searchParams.get('c') || '').toLowerCase(); // optional channel hint: 'email'|'wa'|'whatsapp'
     
+    console.log('✅ STEP 1: Parameters parsed', { rid, action, exp: exp?.substring(0, 20), t: t?.substring(0, 20), channel: c });
+    
     // For link preview HEAD requests, avoid rendering/html to reduce plaintext in previews
     if (req.method === 'HEAD') {
+      console.log('⚠️ HEAD request, returning 204');
       return new Response(null, { status: 204 });
     }
 
     if (!rid || !action || !exp || !t) {
+      console.log('❌ STEP 2 FAILED: Missing parameters');
       return redirectResponse({
         title: 'Enlace inválido',
         status: 'error',
@@ -47,8 +51,12 @@ serve(async (req) => {
         message: 'Este enlace está incompleto o le faltan parámetros.'
       });
     }
+    console.log('✅ STEP 2: All required parameters present');
     
-    if (new Date(exp).getTime() < Date.now()) {
+    const expTime = new Date(exp).getTime();
+    const nowTime = Date.now();
+    if (expTime < nowTime) {
+      console.log('❌ STEP 3 FAILED: Link expired', { expTime, nowTime, diff: nowTime - expTime });
       return redirectResponse({
         title: 'Enlace caducado',
         status: 'warning',
@@ -56,11 +64,24 @@ serve(async (req) => {
         message: 'Este enlace ha caducado. Contacta con tu responsable para solicitar uno nuevo.'
       });
     }
+    console.log('✅ STEP 3: Link not expired', { expTime, nowTime });
 
+    console.log('🔍 STEP 4: Querying database for staffing request', { rid });
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
-    const { data: row } = await supabase.from("staffing_requests").select("*").eq("id", rid).maybeSingle();
+    const { data: row, error: dbError } = await supabase.from("staffing_requests").select("*").eq("id", rid).maybeSingle();
+    
+    if (dbError) {
+      console.error('❌ STEP 4 FAILED: Database error', dbError);
+      return redirectResponse({
+        title: 'Error de base de datos',
+        status: 'error',
+        heading: 'Error de base de datos',
+        message: 'No se pudo verificar la solicitud. Inténtalo de nuevo.'
+      });
+    }
     
     if (!row) {
+      console.log('❌ STEP 4 FAILED: Request not found in database', { rid });
       return redirectResponse({
         title: 'No encontrado',
         status: 'error',
@@ -68,32 +89,54 @@ serve(async (req) => {
         message: 'No hemos podido localizar esta solicitud.'
       });
     }
+    console.log('✅ STEP 4: Request found', { rid, phase: row.phase, status: row.status });
 
     // Recompute expected token hash (HMAC over rid:phase:exp)
-    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(TOKEN_SECRET),
-      { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-    const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key,
-      new TextEncoder().encode(`${rid}:${row.phase}:${exp}`)));
-    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", sig));
-    const token_hash_expected = Array.from(digest).map(x=>x.toString(16).padStart(2,'0')).join('');
+    console.log('🔐 STEP 5: Starting token validation');
+    try {
+      const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(TOKEN_SECRET),
+        { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+      const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key,
+        new TextEncoder().encode(`${rid}:${row.phase}:${exp}`)));
+      const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", sig));
+      const token_hash_expected = Array.from(digest).map(x=>x.toString(16).padStart(2,'0')).join('');
 
-    // Compare provided token too (defense-in-depth)
-    const providedHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", b64uToU8(t))))
-      .map(x=>x.toString(16).padStart(2,'0')).join('');
+      // Compare provided token too (defense-in-depth)
+      const providedHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", b64uToU8(t))))
+        .map(x=>x.toString(16).padStart(2,'0')).join('');
 
-    if (token_hash_expected !== row.token_hash && providedHash !== row.token_hash) {
+      console.log('🔐 Token hashes computed', { 
+        expected: token_hash_expected.substring(0, 16), 
+        provided: providedHash.substring(0, 16),
+        stored: row.token_hash?.substring(0, 16)
+      });
+
+      if (token_hash_expected !== row.token_hash && providedHash !== row.token_hash) {
+        console.log('❌ STEP 5 FAILED: Token validation failed');
+        return redirectResponse({
+          title: 'Token inválido',
+          status: 'error',
+          heading: 'Token inválido',
+          message: 'Este enlace no es válido. Utiliza el enlace original de tu correo.'
+        });
+      }
+      console.log('✅ STEP 5: Token validated successfully');
+    } catch (cryptoError) {
+      console.error('❌ STEP 5 FAILED: Crypto error', cryptoError);
       return redirectResponse({
-        title: 'Token inválido',
+        title: 'Error de validación',
         status: 'error',
-        heading: 'Token inválido',
-        message: 'Este enlace no es válido. Utiliza el enlace original de tu correo.'
+        heading: 'Error de validación',
+        message: 'No se pudo validar el enlace. Inténtalo de nuevo.'
       });
     }
 
     // Check if already responded
+    console.log('🔍 STEP 6: Checking current status', { currentStatus: row.status });
     if (row.status !== 'pending') {
       const statusText = row.status === 'confirmed' ? 'confirmado' : 'rechazado';
       const phase = row.phase === 'offer' ? 'la oferta' : 'la disponibilidad';
+      console.log('⚠️ STEP 6: Already responded', { status: row.status, phase: row.phase });
       return redirectResponse({
         title: 'Respuesta registrada',
         status: 'warning',
@@ -102,10 +145,11 @@ serve(async (req) => {
         submessage: 'Puedes cerrar esta pestaña.'
       });
     }
+    console.log('✅ STEP 6: Status is pending, proceeding to update');
 
     // Process the action directly - no need for intermediate confirmation page
     // The action is already in the URL (a=confirm or a=decline)
-    console.log('💾 PROCESSING ACTION:', { rid, action, channel: c, phase: row.phase });
+    console.log('💾 STEP 7: PROCESSING ACTION', { rid, action, channel: c, phase: row.phase });
     
     const newStatus = action === "confirm" ? "confirmed" : "declined";
     
