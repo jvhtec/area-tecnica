@@ -258,6 +258,8 @@ export const OptimizedAssignmentMatrix = ({
   const closeDialogs = useCallback(() => {
     setCellAction(null);
     setSelectedCells(new Set());
+    setAvailabilityPreferredChannel(null);
+    setOfferPreferredChannel(null);
     // Invalidate queries when closing dialogs to refresh data
     invalidateAssignmentQueries();
   }, [invalidateAssignmentQueries]);
@@ -310,6 +312,7 @@ export const OptimizedAssignmentMatrix = ({
             }
           );
         } else {
+          console.log('Setting availabilityPreferredChannel to whatsapp');
           setAvailabilityPreferredChannel('whatsapp');
           setCellAction({ type: 'select-job-for-staffing', technicianId, date, assignment });
         }
@@ -392,17 +395,20 @@ export const OptimizedAssignmentMatrix = ({
           });
           return;
         }
+        console.log('Checking availabilityPreferredChannel:', availabilityPreferredChannel);
         if (availabilityPreferredChannel === 'whatsapp') {
-          setAvailabilityPreferredChannel(null);
+          console.log('Sending via WhatsApp as preferred channel');
           sendStaffingEmail(
             ({ job_id: jobId, profile_id: cellAction.technicianId, phase: 'availability', channel: 'whatsapp', target_date: cellAction.date.toISOString(), single_day: !!options?.singleDay } as any),
             {
               onSuccess: () => {
                 toast({ title: 'Request sent', description: 'Availability request sent via WhatsApp.' });
+                setAvailabilityPreferredChannel(null);
                 closeDialogs();
               },
               onError: (error: any) => {
                 toast({ title: 'Send failed', description: error.message, variant: 'destructive' });
+                setAvailabilityPreferredChannel(null);
               }
             }
           );
