@@ -379,7 +379,7 @@ serve(async (req) => {
 function redirectResponse(opts: { title: string, status: 'success'|'warning'|'error'|'neutral', heading: string, message: string, submessage?: string }) {
   console.log('📄 REDIRECTING TO RESULT PAGE:', { status: opts.status, heading: opts.heading });
   
-  const baseUrl = 'https://jvhtec.github.io/area-tecnica/temp_error.html';
+  const baseUrl = 'https://jvhtec.github.io/area-tecnica/public/temp_error.html';
   const params = new URLSearchParams({
     status: opts.status,
     heading: opts.heading,
