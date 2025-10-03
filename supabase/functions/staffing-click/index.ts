@@ -103,28 +103,10 @@ serve(async (req) => {
       });
     }
 
-    // If this is a GET for a WhatsApp (or unknown) channel, render a confirmation page requiring a POST
-    const isWaChannel = c === 'wa' || c === 'whatsapp';
-    if (req.method !== 'POST' && isWaChannel) {
-      const postUrlConfirm = `${url.origin}${url.pathname}?rid=${encodeURIComponent(rid)}&a=confirm&exp=${encodeURIComponent(exp)}&t=${encodeURIComponent(t)}&c=${encodeURIComponent(c)}`;
-      const postUrlDecline = `${url.origin}${url.pathname}?rid=${encodeURIComponent(rid)}&a=decline&exp=${encodeURIComponent(exp)}&t=${encodeURIComponent(t)}&c=${encodeURIComponent(c)}`;
-      const choicePage = Deno.env.get('PUBLIC_CHOICE_PAGE_URL');
-      if (choicePage) {
-        const qp = new URLSearchParams();
-        qp.set('heading', row.phase === 'offer' ? 'Responder a la oferta' : 'Confirmar disponibilidad');
-        qp.set('message', 'Por favor, confirma tu respuesta.');
-        qp.set('postConfirm', postUrlConfirm);
-        qp.set('postDecline', postUrlDecline);
-        return Response.redirect(`${choicePage}?${qp.toString()}`, 302);
-      }
-      return new Response(renderChoicePage({
-        heading: row.phase === 'offer' ? 'Responder a la oferta' : 'Confirmar disponibilidad',
-        message: 'Por favor, confirma tu respuesta.',
-        postUrlConfirm,
-        postUrlDecline,
-      }), { headers: { 'Content-Type': 'text/html; charset=UTF-8' } });
-    }
-
+    // Process the action directly - no need for intermediate confirmation page
+    // The action is already in the URL (a=confirm or a=decline)
+    console.log('💾 PROCESSING ACTION:', { rid, action, channel: c, phase: row.phase });
+    
     const newStatus = action === "confirm" ? "confirmed" : "declined";
     
     // Update and verify row was affected
