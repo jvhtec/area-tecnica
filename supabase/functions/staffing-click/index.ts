@@ -15,8 +15,19 @@ function b64uToU8(b64u: string) {
 }
 
 serve(async (req) => {
+  // 🔍 EARLY REQUEST LOGGING - Log all incoming requests for debugging
+  console.log('📥 INCOMING REQUEST:', {
+    method: req.method,
+    url: req.url,
+    headers: Object.fromEntries(req.headers.entries())
+  });
+
   try {
     const url = new URL(req.url);
+    console.log('🔗 PARSED URL:', {
+      pathname: url.pathname,
+      searchParams: Object.fromEntries(url.searchParams.entries())
+    });
     const rid = url.searchParams.get("rid");
     const action = url.searchParams.get("a"); // 'confirm' | 'decline'
     const exp = url.searchParams.get("exp");
@@ -115,15 +126,39 @@ serve(async (req) => {
     }
 
     const newStatus = action === "confirm" ? "confirmed" : "declined";
+    
     // Update and verify row was affected
+    console.log('💾 ATTEMPTING DB UPDATE:', { rid, newStatus, action });
     const { data: updRow, error: updErr } = await supabase
       .from("staffing_requests")
       .update({ status: newStatus })
       .eq("id", rid)
       .select('id,status')
       .maybeSingle();
+    
     if (updErr || !updRow) {
-      console.error('Staffing status update error or no row updated', { updErr, rid });
+      console.error('❌ STAFFING STATUS UPDATE FAILED:', { updErr, rid, newStatus });
+      return new Response(renderPage({
+        title: 'Error de actualización',
+        status: 'error',
+        heading: 'Error al guardar respuesta',
+        message: 'No se pudo guardar tu respuesta. Por favor, inténtalo de nuevo o contacta con tu responsable.',
+        submessage: updErr?.message || 'No se encontró el registro para actualizar.'
+      }), { headers: { 'Content-Type': 'text/html; charset=UTF-8' } });
+    }
+    
+    console.log('✅ DB UPDATE SUCCESS:', { rid, updatedStatus: updRow.status });
+    
+    // Trigger explicit realtime notification to ensure frontend receives update
+    try {
+      await supabase
+        .from('staffing_requests')
+        .select('*')
+        .eq('id', rid)
+        .single();
+      console.log('🔔 Realtime notification triggered for staffing_requests update');
+    } catch (realtimeErr) {
+      console.warn('⚠️ Realtime trigger failed (non-blocking):', realtimeErr);
     }
     const { error: insEvtErr } = await supabase.from("staffing_events").insert({ staffing_request_id: rid, event: `clicked_${action}` });
     if (insEvtErr) console.error('Insert staffing_events failed', insEvtErr);
@@ -300,13 +335,15 @@ serve(async (req) => {
       submessage: 'Puedes cerrar esta pestaña.'
     });
   } catch (error) {
-    console.error("Server error:", error);
-    return redirectResponse({
+    console.error("❌ UNEXPECTED SERVER ERROR:", error);
+    console.error("Error stack:", (error as Error)?.stack);
+    return new Response(renderPage({
       title: 'Error del servidor',
       status: 'error',
       heading: 'Error del servidor',
-      message: 'Ha ocurrido un error inesperado. Inténtalo de nuevo más tarde.'
-    });
+      message: 'Ha ocurrido un error inesperado. Inténtalo de nuevo más tarde.',
+      submessage: (error as Error)?.message || 'Error desconocido'
+    }), { headers: { 'Content-Type': 'text/html; charset=UTF-8' } });
   }
 });
 
@@ -422,23 +459,12 @@ function renderChoicePage(opts: { heading: string, message: string, postUrlConfi
 }
 
 /**
- * Creates a redirect response to the parametric HTML page with URL parameters
+ * Renders an inline HTML response page (no external dependencies)
  */
 function redirectResponse(opts: { title: string, status: 'success'|'warning'|'error'|'neutral', heading: string, message: string, submessage?: string }) {
-  // Use a parametric static page hosted on GitHub Pages (configurable)
-  const baseFromEnv = Deno.env.get('PUBLIC_RESULT_PAGE_URL');
-  const baseUrl = baseFromEnv || 'https://jvhtec.github.io/area-tecnica/result.html';
-  const params = new URLSearchParams();
-  
-  params.set('title', opts.title);
-  params.set('heading', opts.heading);
-  params.set('message', opts.message);
-  params.set('status', opts.status);
-  
-  if (opts.submessage) {
-    params.set('submessage', opts.submessage);
-  }
-
-  const redirectUrl = `${baseUrl}?${params.toString()}`;
-  return Response.redirect(redirectUrl, 302);
+  console.log('📄 RENDERING RESPONSE PAGE:', { status: opts.status, heading: opts.heading });
+  return new Response(renderPage(opts), { 
+    headers: { 'Content-Type': 'text/html; charset=UTF-8' },
+    status: 200
+  });
 }
