@@ -5989,6 +5989,8 @@ export type Database = {
         | "strobo"
         | "canones"
         | "estructuras"
+        | "speakers"
+        | "monitors"
       form_status: "pending" | "submitted" | "expired"
       global_preset_status: "available" | "unavailable" | "tentative"
       job_date_type: "travel" | "setup" | "show" | "off" | "rehearsal"
@@ -6183,6 +6185,8 @@ export const Constants = {
         "strobo",
         "canones",
         "estructuras",
+        "speakers",
+        "monitors",
       ],
       form_status: ["pending", "submitted", "expired"],
       global_preset_status: ["available", "unavailable", "tentative"],
