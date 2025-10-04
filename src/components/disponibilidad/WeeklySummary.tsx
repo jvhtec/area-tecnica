@@ -14,7 +14,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { exportWeeklySummaryPDF } from '@/lib/weeklySummaryPdfExport';
 import { ReloadButton } from '@/components/ui/reload-button';
-import { EquipmentCategory, EQUIPMENT_CATEGORIES, categoryLabels } from '@/types/equipment';
+import { EquipmentCategory, getCategoriesForDepartment, allCategoryLabels } from '@/types/equipment';
+import { useDepartment } from '@/contexts/DepartmentContext';
 
 interface WeeklySummaryProps {
   selectedDate: Date;
@@ -31,6 +32,7 @@ interface Equipment {
 }
 
 export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps) {
+  const { department } = useDepartment();
   const { session } = useOptimizedAuth();
   const { toast } = useToast();
   const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(selectedDate));
@@ -38,7 +40,9 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     const stored = localStorage.getItem('weeklySummaryOpen');
     return stored ? JSON.parse(stored) : true;
   });
-  const [selectedCategories, setSelectedCategories] = useState<EquipmentCategory[]>([...EQUIPMENT_CATEGORIES]);
+  
+  const departmentCategories = getCategoriesForDepartment(department);
+  const [selectedCategories, setSelectedCategories] = useState<EquipmentCategory[]>([...departmentCategories]);
 
   useEffect(() => {
     localStorage.setItem('weeklySummaryOpen', JSON.stringify(isOpen));
@@ -51,12 +55,13 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
 
   // Fetch stock with sub-rentals included
   const { data: stockWithEquipment = [], refetch: refetchStock } = useQuery({
-    queryKey: ['equipment-with-stock'],
+    queryKey: ['equipment-with-stock', department],
     queryFn: async () => {
       // Query from the new view that includes sub-rentals
       const { data, error } = await supabase
         .from('equipment_availability_with_rentals')
         .select('*')
+        .in('category', departmentCategories)
         .order('category')
         .order('equipment_name');
 
@@ -78,7 +83,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
 
   // Fetch all assignments for the week (removed user_id filter for department-wide view)
   const { data: weekAssignments, refetch: refetchAssignments } = useQuery({
-    queryKey: ['week-preset-assignments', currentWeekStart],
+    queryKey: ['week-preset-assignments', department, currentWeekStart],
     queryFn: async () => {
       const assignments = [];
       
@@ -87,7 +92,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
           .from('day_preset_assignments')
           .select(`
             *,
-            preset:presets (
+            preset:presets!inner (
               *,
               items:preset_items (
                 *,
@@ -95,6 +100,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
               )
             )
           `)
+          .eq('preset.department', department)
           .eq('date', format(date, 'yyyy-MM-dd'))
           .order('order', { ascending: true });
 
@@ -218,14 +224,14 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
         <h2 className="text-lg font-semibold">Resumen Semanal</h2>
         <div className="flex items-center gap-2">
           <div className="flex gap-2">
-            {EQUIPMENT_CATEGORIES.map((category) => (
+            {departmentCategories.map((category) => (
               <Button
                 key={category}
                 variant={selectedCategories.includes(category) ? "default" : "outline"}
                 size="sm"
                 onClick={() => toggleCategory(category)}
               >
-                {categoryLabels[category]}
+                {allCategoryLabels[category]}
               </Button>
             ))}
           </div>
@@ -282,7 +288,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
                   return (
                     <TableRow key={item.id}>
                       <TableCell>{item.name}</TableCell>
-                      <TableCell>{categoryLabels[item.category]}</TableCell>
+                      <TableCell>{allCategoryLabels[item.category]}</TableCell>
                       <TableCell>{item.current_quantity}</TableCell>
                       {weekDates.map((date) => {
                         const used = getUsedQuantity(item.id, date);

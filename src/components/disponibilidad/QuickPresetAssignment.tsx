@@ -9,6 +9,7 @@ import { PresetWithItems } from "@/types/equipment";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, isValid } from "date-fns";
 import { Calendar, Loader2, Trash2 } from "lucide-react";
+import { useDepartment } from '@/contexts/DepartmentContext';
 
 interface QuickPresetAssignmentProps {
   selectedDate: Date;
@@ -16,6 +17,7 @@ interface QuickPresetAssignmentProps {
 }
 
 export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAssignmentProps) {
+  const { department } = useDepartment();
   const { session } = useOptimizedAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -25,7 +27,7 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
 
   // Fetch presets with their items
   const { data: presets = [] } = useQuery({
-    queryKey: ['presets'],
+    queryKey: ['presets', department],
     queryFn: async () => {
       if (!session?.user?.id) return [];
       
@@ -38,6 +40,7 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
             equipment:equipment (*)
           )
         `)
+        .eq('department', department)
         .order('name');
       
       if (error) throw error;
@@ -48,13 +51,14 @@ export function QuickPresetAssignment({ selectedDate, onAssign }: QuickPresetAss
 
   // Fetch current assignments
   const { data: currentAssignments = [] } = useQuery({
-    queryKey: ['preset-assignments', selectedDate],
+    queryKey: ['preset-assignments', department, selectedDate],
     queryFn: async () => {
       if (!isValidDate) return [];
 
       const { data, error } = await supabase
         .from('day_preset_assignments')
-        .select('*, preset:presets(name)')
+        .select('*, preset:presets!inner(name, department)')
+        .eq('preset.department', department)
         .eq('date', format(selectedDate, 'yyyy-MM-dd'))
         .order('order', { ascending: true });
 
