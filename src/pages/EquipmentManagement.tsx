@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 export function EquipmentManagement() {
   const auth = useOptimizedAuth();
   const { session } = auth;
-  const userDepartment = (auth as any).department as string | undefined;
+  const userDepartment = auth.userDepartment;
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const navigate = useNavigate();
