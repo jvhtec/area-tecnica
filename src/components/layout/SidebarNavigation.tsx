@@ -16,7 +16,8 @@ import {
   Clock,
   FileText,
   Megaphone,
-  Activity
+  Activity,
+  CalendarCheck
 } from "lucide-react";
 import { TimesheetSidebarTrigger } from "@/components/timesheet/TimesheetSidebarTrigger";
 import { SidebarNavigationSkeleton } from './SidebarNavigationSkeleton';
@@ -42,6 +43,10 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
 
   // Check if user is house tech from sound department
   const isSoundHouseTech = userRole === 'house_tech' && isSoundDepartment;
+  
+  // Check if user is in lights department
+  const isLightsDepartment = userDepartment?.toLowerCase() === 'lights';
+  const isLightsHouseTech = userRole === 'house_tech' && isLightsDepartment;
 
   // Show skeleton instead of nothing while role loads
   if (!userRole) {
@@ -213,6 +218,36 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
                 >
                   <Tent className="h-4 w-4" />
                   <span>Festivals</span>
+                </Button>
+              </Link>
+            )}
+            
+            {/* Lights Disponibilidad - for management and lights house techs */}
+            {(isManagementUser || isLightsHouseTech) && (
+              <Link to="/lights-disponibilidad">
+                <Button
+                  variant="ghost"
+                  className={`w-full justify-start gap-2 ${
+                    location.pathname === "/lights-disponibilidad" ? "bg-accent" : ""
+                  }`}
+                >
+                  <CalendarCheck className="h-4 w-4" />
+                  <span>Lights Disponibilidad</span>
+                </Button>
+              </Link>
+            )}
+            
+            {/* Sound Disponibilidad - for management and sound house techs */}
+            {(isManagementUser || isSoundHouseTech) && (
+              <Link to="/sound-disponibilidad">
+                <Button
+                  variant="ghost"
+                  className={`w-full justify-start gap-2 ${
+                    location.pathname === "/sound-disponibilidad" ? "bg-accent" : ""
+                  }`}
+                >
+                  <CalendarCheck className="h-4 w-4" />
+                  <span>Sound Disponibilidad</span>
                 </Button>
               </Link>
             )}
