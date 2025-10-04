@@ -131,7 +131,8 @@ export function EquipmentCreationManager({ onEquipmentChange, department: propDe
         .select('*');
       
       if (department) {
-        query = query.eq('department', department);
+        const deptCategories = getCategoriesForDepartment(department);
+        query = query.in('category', deptCategories);
       }
       
       query = query.order('name');
@@ -152,8 +153,7 @@ export function EquipmentCreationManager({ onEquipmentChange, department: propDe
         .from('equipment')
         .insert({
           name: equipmentName,
-          category: category,
-          department: department || 'sound' // Default to 'sound' if no department context
+          category: category
         })
         .select()
         .single();
