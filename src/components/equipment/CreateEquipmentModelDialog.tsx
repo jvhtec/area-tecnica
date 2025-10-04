@@ -1,19 +1,13 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEquipmentModels } from "@/hooks/useEquipmentModels";
-
-const categories = [
-  { value: 'foh_console', label: 'FOH Console' },
-  { value: 'mon_console', label: 'Monitor Console' },
-  { value: 'wireless', label: 'Wireless System' },
-  { value: 'iem', label: 'IEM System' },
-  { value: 'wired_mics', label: 'Wired Microphone' }
-];
+import { useDepartment } from "@/contexts/DepartmentContext";
+import { getModelCategoriesForDepartment } from "@/types/equipment";
 
 interface CreateEquipmentModelDialogProps {
   open: boolean;
@@ -24,11 +18,21 @@ interface CreateEquipmentModelDialogProps {
 export const CreateEquipmentModelDialog = ({
   open,
   onOpenChange,
-  defaultCategory = 'foh_console'
+  defaultCategory
 }: CreateEquipmentModelDialogProps) => {
+  const { department } = useDepartment();
+  const categories = getModelCategoriesForDepartment(department);
   const [name, setName] = useState("");
-  const [category, setCategory] = useState(defaultCategory);
+  const [category, setCategory] = useState(defaultCategory || categories[0]?.value || '');
   const { createModel, isCreating } = useEquipmentModels();
+
+  useEffect(() => {
+    if (defaultCategory) {
+      setCategory(defaultCategory);
+    } else if (categories[0]) {
+      setCategory(categories[0].value);
+    }
+  }, [defaultCategory, categories]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,14 +40,14 @@ export const CreateEquipmentModelDialog = ({
 
     createModel({ name: name.trim(), category });
     setName("");
-    setCategory(defaultCategory);
+    setCategory(defaultCategory || categories[0]?.value || '');
     onOpenChange(false);
   };
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
       setName("");
-      setCategory(defaultCategory);
+      setCategory(defaultCategory || categories[0]?.value || '');
     }
     onOpenChange(newOpen);
   };

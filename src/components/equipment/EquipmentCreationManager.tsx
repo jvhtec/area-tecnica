@@ -8,12 +8,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Equipment, EquipmentCategory } from '@/types/equipment';
-import { EQUIPMENT_CATEGORIES, categoryLabels } from '@/types/equipment';
+import { categoryLabels, getCategoriesForDepartment } from '@/types/equipment';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useDepartment } from '@/contexts/DepartmentContext';
 
 interface EditEquipmentDialogProps {
   equipment: Equipment | null;
@@ -23,15 +24,17 @@ interface EditEquipmentDialogProps {
 }
 
 function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEquipmentDialogProps) {
+  const { department } = useDepartment();
+  const categories = getCategoriesForDepartment(department);
   const [name, setName] = useState(equipment?.name || '');
-  const [category, setCategory] = useState<EquipmentCategory>((equipment?.category as EquipmentCategory) || 'convencional');
+  const [category, setCategory] = useState<EquipmentCategory>((equipment?.category as EquipmentCategory) || categories[0]);
 
   useEffect(() => {
     if (equipment) {
       setName(equipment.name);
-      setCategory((equipment.category as EquipmentCategory) || 'convencional');
+      setCategory((equipment.category as EquipmentCategory) || categories[0]);
     }
-  }, [equipment]);
+  }, [equipment, categories]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +69,7 @@ function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEqui
                 <SelectValue placeholder="Seleccione categoría" />
               </SelectTrigger>
               <SelectContent>
-                {EQUIPMENT_CATEGORIES.map((cat) => (
+                {categories.map((cat) => (
                   <SelectItem key={cat} value={cat}>
                     {categoryLabels[cat]}
                   </SelectItem>
@@ -89,19 +92,22 @@ interface EquipmentCreationManagerProps {
 
 export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreationManagerProps) {
   const { session } = useOptimizedAuth();
+  const { department } = useDepartment();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const categories = getCategoriesForDepartment(department);
   const [equipmentName, setEquipmentName] = useState('');
-  const [category, setCategory] = useState<EquipmentCategory>('convencional');
+  const [category, setCategory] = useState<EquipmentCategory>(categories[0] || 'convencional');
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [equipmentToDelete, setEquipmentToDelete] = useState<Equipment | null>(null);
 
   const { data: equipmentList } = useQuery({
-    queryKey: ['equipment'],
+    queryKey: ['equipment', department],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('equipment')
         .select('*')
+        .eq('department', department)
         .order('name');
       
       if (error) throw error;
@@ -118,7 +124,8 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
         .from('equipment')
         .insert({
           name: equipmentName,
-          category: category
+          category: category,
+          department: department
         })
         .select()
         .single();
@@ -127,9 +134,9 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
       return equipment;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      queryClient.invalidateQueries({ queryKey: ['equipment', department] });
       setEquipmentName('');
-      setCategory('convencional');
+      setCategory(categories[0] || 'convencional');
       toast({
         title: "Éxito",
         description: "Equipo creado correctamente"
@@ -160,7 +167,7 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      queryClient.invalidateQueries({ queryKey: ['equipment', department] });
       toast({
         title: "Éxito",
         description: "Equipo actualizado correctamente"
@@ -186,7 +193,7 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      queryClient.invalidateQueries({ queryKey: ['equipment', department] });
       toast({
         title: "Éxito",
         description: "Equipo eliminado correctamente"
@@ -222,7 +229,7 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
               <SelectValue placeholder="Seleccione categoría" />
             </SelectTrigger>
             <SelectContent>
-              {EQUIPMENT_CATEGORIES.map((cat) => (
+              {categories.map((cat) => (
                 <SelectItem key={cat} value={cat}>
                   {categoryLabels[cat]}
                 </SelectItem>

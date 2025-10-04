@@ -58,3 +58,56 @@ export const departmentLabels: Record<Department, string> = {
   sound: 'Sonido',
   video: 'Video'
 };
+
+// Categories by department
+export const LIGHTS_CATEGORIES = [
+  'convencional', 'robotica', 'fx', 'rigging', 'controles', 'cuadros', 'led', 'strobo', 'canones', 'estructuras'
+] as const;
+
+export const SOUND_CATEGORIES = [
+  'foh_console', 'mon_console', 'wireless', 'iem', 'wired_mics', 'speakers', 'monitors'
+] as const;
+
+export type LightsCategory = typeof LIGHTS_CATEGORIES[number];
+export type SoundCategory = typeof SOUND_CATEGORIES[number];
+
+export const getCategoriesForDepartment = (department: Department): readonly EquipmentCategory[] => {
+  switch (department) {
+    case 'lights':
+      return LIGHTS_CATEGORIES as readonly EquipmentCategory[];
+    case 'sound':
+      return SOUND_CATEGORIES as readonly EquipmentCategory[];
+    case 'video':
+      return []; // Video categories can be added later
+    default:
+      return EQUIPMENT_CATEGORIES;
+  }
+};
+
+// Equipment model categories (for the equipment_models table - text field)
+export const SOUND_MODEL_CATEGORIES = [
+  { value: 'foh_console', label: 'FOH Consoles' },
+  { value: 'mon_console', label: 'Monitor Consoles' },
+  { value: 'wireless', label: 'Wireless Systems' },
+  { value: 'iem', label: 'IEM Systems' },
+  { value: 'wired_mics', label: 'Wired Microphones' }
+] as const;
+
+export const LIGHTS_MODEL_CATEGORIES = [
+  { value: 'convencional', label: 'Convencional' },
+  { value: 'robotica', label: 'Robótica' },
+  { value: 'fx', label: 'FX' },
+  { value: 'rigging', label: 'Rigging' },
+  { value: 'controles', label: 'Controles' }
+] as const;
+
+export const getModelCategoriesForDepartment = (department: Department) => {
+  switch (department) {
+    case 'sound':
+      return SOUND_MODEL_CATEGORIES;
+    case 'lights':
+      return LIGHTS_MODEL_CATEGORIES;
+    default:
+      return [];
+  }
+};

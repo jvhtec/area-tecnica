@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Copy, Pencil, Trash2 } from 'lucide-react';
 import { PresetWithItems, PresetItem } from '@/types/equipment';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useDepartment } from '@/contexts/DepartmentContext';
 
 interface PresetCreationManagerProps {
   onClose?: () => void;
@@ -18,6 +19,7 @@ interface PresetCreationManagerProps {
 
 export function PresetCreationManager({ onClose, selectedDate }: PresetCreationManagerProps) {
   const { session } = useOptimizedAuth();
+  const { department } = useDepartment();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [editingPreset, setEditingPreset] = useState<PresetWithItems | null>(null);
@@ -27,7 +29,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
 
   // Fetch all presets for the department (shared access)
   const { data: presets } = useQuery({
-    queryKey: ['presets'],
+    queryKey: ['presets', department],
     queryFn: async () => {
       if (!session?.user?.id) return [];
       
@@ -40,6 +42,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
             equipment:equipment (*)
           )
         `)
+        .eq('department', department)
         .order('is_template', { ascending: false })
         .order('name');
       
@@ -68,7 +71,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
       if (presetError) throw presetError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['presets'] });
+      queryClient.invalidateQueries({ queryKey: ['presets', department] });
       toast({
         title: "Success",
         description: "Preset deleted successfully"
@@ -126,7 +129,8 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
             name,
             created_by: session.user.id,
             user_id: session.user.id, // Keep for backwards compatibility
-            is_template: false
+            is_template: false,
+            department: department
           })
           .select()
           .single();
@@ -148,7 +152,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ['presets'] });
+      queryClient.invalidateQueries({ queryKey: ['presets', department] });
       setEditingPreset(null);
       setCopyingPreset(null);
       setIsCreating(false);

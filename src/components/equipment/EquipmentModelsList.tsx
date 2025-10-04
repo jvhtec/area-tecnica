@@ -7,20 +7,16 @@ import { Plus, Edit, Trash2 } from "lucide-react";
 import { useEquipmentModels, EquipmentModel } from "@/hooks/useEquipmentModels";
 import { CreateEquipmentModelDialog } from "./CreateEquipmentModelDialog";
 import { EditEquipmentModelDialog } from "./EditEquipmentModelDialog";
-
-const categories = [
-  { value: 'foh_console', label: 'FOH Consoles' },
-  { value: 'mon_console', label: 'Monitor Consoles' },
-  { value: 'wireless', label: 'Wireless Systems' },
-  { value: 'iem', label: 'IEM Systems' },
-  { value: 'wired_mics', label: 'Wired Microphones' }
-];
+import { useDepartment } from "@/contexts/DepartmentContext";
+import { getModelCategoriesForDepartment } from "@/types/equipment";
 
 export const EquipmentModelsList = () => {
+  const { department } = useDepartment();
+  const categories = getModelCategoriesForDepartment(department);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState<EquipmentModel | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState('foh_console');
+  const [selectedCategory, setSelectedCategory] = useState(categories[0]?.value || '');
 
   const { models, isLoading, deleteModel, isDeleting } = useEquipmentModels();
 
@@ -41,6 +37,10 @@ export const EquipmentModelsList = () => {
     return <div className="text-center py-4">Loading equipment models...</div>;
   }
 
+  if (categories.length === 0) {
+    return <div className="text-center py-4">No categories available for this department</div>;
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -55,7 +55,7 @@ export const EquipmentModelsList = () => {
       </div>
 
       <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className={`grid w-full grid-cols-${categories.length}`}>
           {categories.map((category) => (
             <TabsTrigger key={category.value} value={category.value}>
               {category.label}

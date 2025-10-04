@@ -6,14 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEquipmentModels, EquipmentModel } from "@/hooks/useEquipmentModels";
-
-const categories = [
-  { value: 'foh_console', label: 'FOH Console' },
-  { value: 'mon_console', label: 'Monitor Console' },
-  { value: 'wireless', label: 'Wireless System' },
-  { value: 'iem', label: 'IEM System' },
-  { value: 'wired_mics', label: 'Wired Microphone' }
-];
+import { useDepartment } from "@/contexts/DepartmentContext";
+import { getModelCategoriesForDepartment } from "@/types/equipment";
 
 interface EditEquipmentModelDialogProps {
   open: boolean;
@@ -26,6 +20,8 @@ export const EditEquipmentModelDialog = ({
   onOpenChange,
   model
 }: EditEquipmentModelDialogProps) => {
+  const { department } = useDepartment();
+  const categories = getModelCategoriesForDepartment(department);
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const { updateModel, isUpdating } = useEquipmentModels();
