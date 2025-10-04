@@ -89,16 +89,16 @@ export const allCategoryLabels: Record<AllCategories, string> = {
   ...soundCategoryLabels
 };
 
-export const getCategoriesForDepartment = (department: Department): readonly EquipmentCategory[] => {
+export const getCategoriesForDepartment = (department: Department): readonly AllCategories[] => {
   switch (department) {
     case 'lights':
-      return LIGHTS_CATEGORIES as readonly EquipmentCategory[];
+      return LIGHTS_CATEGORIES as readonly AllCategories[];
     case 'sound':
-      return SOUND_CATEGORIES as readonly EquipmentCategory[];
+      return SOUND_CATEGORIES as readonly AllCategories[];
     case 'video':
       return []; // Video categories can be added later
     default:
-      return EQUIPMENT_CATEGORIES;
+      return EQUIPMENT_CATEGORIES as readonly AllCategories[];
   }
 };
 

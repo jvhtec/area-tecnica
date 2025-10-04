@@ -14,7 +14,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { exportWeeklySummaryPDF } from '@/lib/weeklySummaryPdfExport';
 import { ReloadButton } from '@/components/ui/reload-button';
-import { EquipmentCategory, getCategoriesForDepartment, allCategoryLabels } from '@/types/equipment';
+import { EquipmentCategory, AllCategories, getCategoriesForDepartment, allCategoryLabels } from '@/types/equipment';
 import { useDepartment } from '@/contexts/DepartmentContext';
 
 interface WeeklySummaryProps {
@@ -42,7 +42,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
   });
   
   const departmentCategories = getCategoriesForDepartment(department);
-  const [selectedCategories, setSelectedCategories] = useState<EquipmentCategory[]>([...departmentCategories]);
+  const [selectedCategories, setSelectedCategories] = useState<AllCategories[]>([...departmentCategories]);
 
   useEffect(() => {
     localStorage.setItem('weeklySummaryOpen', JSON.stringify(isOpen));
@@ -151,7 +151,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     onDateChange(newDate);
   };
 
-  const toggleCategory = (category: EquipmentCategory) => {
+  const toggleCategory = (category: AllCategories) => {
     setSelectedCategories(prev => 
       prev.includes(category)
         ? prev.filter(c => c !== category)
@@ -160,7 +160,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
   };
 
   const filteredEquipment = stockWithEquipment?.filter(item => 
-    selectedCategories.includes(item.category as EquipmentCategory)
+    selectedCategories.includes(item.category as AllCategories)
   );
 
   const handleExportPDF = async () => {
