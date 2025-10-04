@@ -10,6 +10,7 @@ import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Plus, Trash2 } from 'lucide-react';
+import { useDepartment } from '@/contexts/DepartmentContext';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon } from 'lucide-react';
@@ -39,6 +40,7 @@ export function SubRentalManager() {
   const { session } = useOptimizedAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { department } = useDepartment();
   const [isAdding, setIsAdding] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
@@ -46,13 +48,13 @@ export function SubRentalManager() {
   const [endDate, setEndDate] = useState<Date>();
   const [notes, setNotes] = useState('');
 
-  // Fetch equipment list
   const { data: equipmentList } = useQuery({
-    queryKey: ['equipment'],
+    queryKey: ['equipment', department],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('equipment')
         .select('*')
+        .eq('department', department)
         .order('name');
       
       if (error) throw error;
@@ -60,19 +62,20 @@ export function SubRentalManager() {
     }
   });
 
-  // Fetch active sub-rentals
   const { data: subRentals } = useQuery({
-    queryKey: ['sub-rentals'],
+    queryKey: ['sub-rentals', department],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('sub_rentals')
         .select(`
           *,
-          equipment:equipment (
+          equipment:equipment!inner (
             name,
-            category
+            category,
+            department
           )
         `)
+        .eq('equipment.department', department)
         .order('start_date', { ascending: false });
       
       if (error) throw error;

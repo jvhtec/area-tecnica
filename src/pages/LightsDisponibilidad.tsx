@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { WeeklySummary } from '@/components/disponibilidad/WeeklySummary';
 import { QuickPresetAssignment } from '@/components/disponibilidad/QuickPresetAssignment';
 import { SubRentalManager } from '@/components/equipment/SubRentalManager';
+import { DepartmentProvider } from '@/contexts/DepartmentContext';
 
 export default function LightsDisponibilidad() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -20,9 +21,8 @@ export default function LightsDisponibilidad() {
   const { session } = useOptimizedAuth();
   const { toast } = useToast();
 
-  // Fetch all preset assignments for selected date (department-wide)
   const { data: assignedPresets } = useQuery({
-    queryKey: ['preset-assignments', selectedDate],
+    queryKey: ['preset-assignments', 'lights', selectedDate],
     queryFn: async () => {
       if (!selectedDate) return null;
       
@@ -30,11 +30,13 @@ export default function LightsDisponibilidad() {
         .from('day_preset_assignments')
         .select(`
           *,
-          preset:presets (
+          preset:presets!inner (
             name,
-            created_by
+            created_by,
+            department
           )
         `)
+        .eq('preset.department', 'lights')
         .eq('date', format(selectedDate, 'yyyy-MM-dd'))
         .order('order', { ascending: true });
 
@@ -53,7 +55,8 @@ export default function LightsDisponibilidad() {
   });
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <DepartmentProvider department="lights">
+      <div className="container mx-auto py-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Presets de Equipamiento</h1>
         <div className="flex gap-2">
@@ -115,6 +118,7 @@ export default function LightsDisponibilidad() {
         onOpenChange={setShowPresetDialog}
         selectedDate={selectedDate}
       />
-    </div>
+      </div>
+    </DepartmentProvider>
   );
 }

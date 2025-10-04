@@ -35,6 +35,7 @@ import FestivalArtistManagement from '@/pages/FestivalArtistManagement';
 import LightsDisponibilidad from '@/pages/LightsDisponibilidad';
 import LightsMemoriaTecnica from '@/pages/LightsMemoriaTecnica';
 import VideoMemoriaTecnica from '@/pages/VideoMemoriaTecnica';
+import SoundDisponibilidad from '@/pages/SoundDisponibilidad';
 import JobAssignmentMatrix from '@/pages/JobAssignmentMatrix';
 import ActivityCenter from '@/pages/ActivityCenter';
 import { EquipmentManagement } from '@/pages/EquipmentManagement';
@@ -143,6 +144,7 @@ export default function App() {
                     
                     {/* Disponibilidad Routes */}
                     <Route path="/lights-disponibilidad" element={<LightsDisponibilidad />} />
+                    <Route path="/sound-disponibilidad" element={<SoundDisponibilidad />} />
                     
                     {/* Festival Management Routes */}
                     <Route path="/festival-management/:jobId" element={<FestivalManagement />} />

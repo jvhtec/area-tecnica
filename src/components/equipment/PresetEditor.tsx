@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Save, X } from 'lucide-react';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { useDepartment } from '@/contexts/DepartmentContext';
 
 interface PresetEditorProps {
   preset?: PresetWithItems;
@@ -19,6 +20,7 @@ interface PresetEditorProps {
 
 export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel }: PresetEditorProps) => {
   const { session } = useOptimizedAuth();
+  const { department } = useDepartment();
   const [name, setName] = useState(preset?.name || '');
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
     if (!preset?.items) return {};
@@ -28,13 +30,13 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel }: Prese
     }, {} as Record<string, number>);
   });
 
-  // Fetch equipment list
   const { data: equipmentList } = useQuery({
-    queryKey: ['equipment'],
+    queryKey: ['equipment', department],
     queryFn: async () => {
       const { data: equipment, error } = await supabase
         .from('equipment')
         .select('*')
+        .eq('department', department)
         .order('name');
       
       if (error) throw error;
