@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { WeeklySummary } from '@/components/disponibilidad/WeeklySummary';
 import { QuickPresetAssignment } from '@/components/disponibilidad/QuickPresetAssignment';
+import { SubRentalManager } from '@/components/equipment/SubRentalManager';
 
 export default function LightsDisponibilidad() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -19,18 +20,19 @@ export default function LightsDisponibilidad() {
   const { session } = useOptimizedAuth();
   const { toast } = useToast();
 
-  // Fetch preset assignments (removed user_id filter)
+  // Fetch all preset assignments for selected date (department-wide)
   const { data: assignedPresets } = useQuery({
     queryKey: ['preset-assignments', selectedDate],
     queryFn: async () => {
-      if (!session?.user?.id || !selectedDate) return null;
+      if (!selectedDate) return null;
       
       const { data, error } = await supabase
         .from('day_preset_assignments')
         .select(`
           *,
           preset:presets (
-            name
+            name,
+            created_by
           )
         `)
         .eq('date', format(selectedDate, 'yyyy-MM-dd'))
@@ -47,7 +49,7 @@ export default function LightsDisponibilidad() {
 
       return data;
     },
-    enabled: !!session?.user?.id && !!selectedDate
+    enabled: !!selectedDate
   });
 
   return (
@@ -106,7 +108,9 @@ export default function LightsDisponibilidad() {
         onDateChange={setSelectedDate} 
       />
 
-      <PresetManagementDialog 
+      <SubRentalManager />
+
+      <PresetManagementDialog
         open={showPresetDialog} 
         onOpenChange={setShowPresetDialog}
         selectedDate={selectedDate}

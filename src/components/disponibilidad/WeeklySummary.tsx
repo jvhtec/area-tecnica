@@ -26,6 +26,8 @@ interface Equipment {
   name: string;
   category: EquipmentCategory;
   current_quantity: number;
+  base_quantity?: number;
+  rental_boost?: number;
 }
 
 export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps) {
@@ -47,14 +49,13 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     end: endOfWeek(currentWeekStart)
   });
 
+  // Fetch stock with sub-rentals included
   const { data: stockWithEquipment = [], refetch: refetchStock } = useQuery({
-    queryKey: ['equipment-with-stock', session?.user?.id],
+    queryKey: ['equipment-with-stock'],
     queryFn: async () => {
-      if (!session?.user?.id) return [];
-
-      // Query directly from current_stock_levels view
+      // Query from the new view that includes sub-rentals
       const { data, error } = await supabase
-        .from('current_stock_levels')
+        .from('equipment_availability_with_rentals')
         .select('*')
         .order('category')
         .order('equipment_name');
@@ -68,17 +69,17 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
         id: item.equipment_id,
         name: item.equipment_name,
         category: item.category,
-        current_quantity: item.current_quantity || 0
+        current_quantity: item.total_available || 0,
+        base_quantity: item.base_quantity || 0,
+        rental_boost: item.rental_boost || 0
       })) as Equipment[];
-    },
-    enabled: !!session?.user?.id
+    }
   });
 
+  // Fetch all assignments for the week (removed user_id filter for department-wide view)
   const { data: weekAssignments, refetch: refetchAssignments } = useQuery({
-    queryKey: ['week-preset-assignments', session?.user?.id, currentWeekStart],
+    queryKey: ['week-preset-assignments', currentWeekStart],
     queryFn: async () => {
-      if (!session?.user?.id) return [];
-
       const assignments = [];
       
       for (const date of weekDates) {
@@ -94,7 +95,6 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
               )
             )
           `)
-          .eq('user_id', session.user.id)
           .eq('date', format(date, 'yyyy-MM-dd'))
           .order('order', { ascending: true });
 
@@ -109,8 +109,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
       }
 
       return assignments;
-    },
-    enabled: !!session?.user?.id
+    }
   });
 
   const handleReload = async () => {
@@ -289,16 +288,17 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
                         const used = getUsedQuantity(item.id, date);
                         const remaining = item.current_quantity - used;
                         const remainingText = remaining >= 0 ? `(+${remaining})` : `(${remaining})`;
-                        const remainingClass = remaining >= 0 ? 'text-green-500' : 'text-red-500';
+                        const remainingClass = remaining >= 0 ? 'text-green-600' : 'text-red-600 font-bold';
+                        const cellBgClass = remaining < 0 ? 'bg-destructive/20' : '';
 
                         return (
                           <TableCell 
                             key={date.toISOString()} 
-                            className="text-center"
+                            className={`text-center ${cellBgClass}`}
                           >
                             {used > 0 ? (
                               <span className="flex justify-center items-center gap-1">
-                                <span className="text-white">{used}</span>
+                                <span>{used}</span>
                                 <span className={remainingClass}>{remainingText}</span>
                               </span>
                             ) : (

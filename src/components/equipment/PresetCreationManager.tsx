@@ -25,7 +25,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
   const [presetToDelete, setPresetToDelete] = useState<PresetWithItems | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
-  // Fetch all presets (removed user_id filter)
+  // Fetch all presets for the department (shared access)
   const { data: presets } = useQuery({
     queryKey: ['presets'],
     queryFn: async () => {
@@ -40,6 +40,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
             equipment:equipment (*)
           )
         `)
+        .order('is_template', { ascending: false })
         .order('name');
       
       if (error) throw error;
@@ -118,12 +119,14 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
           if (itemsError) throw itemsError;
         }
       } else {
-        // Create new preset
+        // Create new preset (now using created_by, user_id is nullable for shared presets)
         const { data: preset, error: presetError } = await supabase
           .from('presets')
           .insert({
             name,
-            user_id: session.user.id  // We still need to set the creator
+            created_by: session.user.id,
+            user_id: session.user.id, // Keep for backwards compatibility
+            is_template: false
           })
           .select()
           .single();

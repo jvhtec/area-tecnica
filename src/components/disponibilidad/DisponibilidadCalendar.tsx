@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import type { AvailabilitySchedule } from '@/types/availability';
+
 import { format } from 'date-fns';
 import type { PresetWithItems } from '@/types/equipment';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -29,37 +29,23 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
 
-  const { data: availabilityData, isLoading: isLoadingAvailability } = useQuery({
-    queryKey: ['availability', session?.user?.id, userDepartment],
+  // Fetch current stock levels to check for conflicts
+  const { data: stockData } = useQuery({
+    queryKey: ['equipment-stock'],
     queryFn: async () => {
-      if (!session?.user?.id || !userDepartment) return null;
-      
       const { data, error } = await supabase
-        .from('availability_schedules')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .eq('department', userDepartment);
+        .from('current_stock_levels')
+        .select('*');
 
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Could not load availability data"
-        });
-        throw error;
-      }
-
-      return data as AvailabilitySchedule[];
-    },
-    enabled: !!session?.user?.id && !!userDepartment
+      if (error) throw error;
+      return data;
+    }
   });
 
-  // Fetch preset assignments
+  // Fetch all preset assignments for the department (removed user_id filter)
   const { data: presetAssignments, isLoading: isLoadingAssignments } = useQuery({
-    queryKey: ['preset-assignments', session?.user?.id],
+    queryKey: ['preset-assignments'],
     queryFn: async () => {
-      if (!session?.user?.id) return null;
-      
       const { data, error } = await supabase
         .from('day_preset_assignments')
         .select(`
@@ -72,7 +58,7 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
             )
           )
         `)
-        .eq('user_id', session.user.id);
+        .order('date');
 
       if (error) {
         toast({
@@ -84,23 +70,21 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
       }
 
       return data;
-    },
-    enabled: !!session?.user?.id
+    }
   });
 
-  // Mutation to assign preset to date
+  // Mutation to assign preset to date (removed user_id, added assigned_by)
   const assignPresetMutation = useMutation({
     mutationFn: async ({ date, presetId }: { date: Date; presetId: string }) => {
       if (!session?.user?.id) throw new Error('Must be logged in');
 
       const { error } = await supabase
         .from('day_preset_assignments')
-        .upsert({
+        .insert({
           date: format(date, 'yyyy-MM-dd'),
           preset_id: presetId,
-          user_id: session.user.id
-        }, {
-          onConflict: 'date,user_id'
+          user_id: session.user.id, // Keep for compatibility
+          assigned_by: session.user.id
         });
 
       if (error) throw error;
@@ -121,43 +105,43 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
     }
   });
 
+  // Check if a date has equipment conflicts
+  const hasConflict = (date: Date): boolean => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const dayAssignments = presetAssignments?.filter(a => a.date === dateStr);
+    
+    if (!dayAssignments?.length || !stockData) return false;
+
+    // Calculate total equipment needed for this date
+    const equipmentNeeded: Record<string, number> = {};
+    dayAssignments.forEach(assignment => {
+      assignment.preset.items.forEach(item => {
+        equipmentNeeded[item.equipment_id] = (equipmentNeeded[item.equipment_id] || 0) + item.quantity;
+      });
+    });
+
+    // Check if any equipment exceeds available stock
+    return Object.entries(equipmentNeeded).some(([equipmentId, needed]) => {
+      const stock = stockData.find(s => s.equipment_id === equipmentId);
+      return needed > (stock?.current_quantity || 0);
+    });
+  };
+
   const modifiers = {
-    available: (date: Date) => {
-      return availabilityData?.some(
-        schedule => 
-          schedule.date === format(date, 'yyyy-MM-dd') && 
-          schedule.status === 'available'
-      ) ?? false;
-    },
-    unavailable: (date: Date) => {
-      return availabilityData?.some(
-        schedule => 
-          schedule.date === format(date, 'yyyy-MM-dd') && 
-          schedule.status === 'unavailable'
-      ) ?? false;
-    },
-    tentative: (date: Date) => {
-      return availabilityData?.some(
-        schedule => 
-          schedule.date === format(date, 'yyyy-MM-dd') && 
-          schedule.status === 'tentative'
-      ) ?? false;
-    },
     hasPreset: (date: Date) => {
       return presetAssignments?.some(
         assignment => assignment.date === format(date, 'yyyy-MM-dd')
       ) ?? false;
-    }
+    },
+    hasConflict: (date: Date) => hasConflict(date)
   };
 
   const modifiersStyles = {
-    available: { backgroundColor: '#4ade80' },
-    unavailable: { backgroundColor: '#f87171' },
-    tentative: { backgroundColor: '#fbbf24' },
-    hasPreset: { border: '2px solid #6366f1' }  // Indigo border for dates with presets
+    hasPreset: { border: '2px solid hsl(var(--primary))' },
+    hasConflict: { backgroundColor: 'hsl(var(--destructive) / 0.2)', border: '2px solid hsl(var(--destructive))' }
   };
 
-  const isLoading = isLoadingAvailability || isLoadingAssignments;
+  const isLoading = isLoadingAssignments;
 
   const navigateToToday = () => {
     const today = new Date();

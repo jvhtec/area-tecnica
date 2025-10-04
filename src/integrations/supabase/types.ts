@@ -183,6 +183,51 @@ export type Database = {
           },
         ]
       }
+      app_changelog: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string | null
+          entry_date: string
+          id: string
+          last_updated: string
+          version: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          id?: string
+          last_updated?: string
+          version: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          id?: string
+          last_updated?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_changelog_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "app_changelog_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assignment_notifications: {
         Row: {
           created_at: string | null
@@ -458,6 +503,7 @@ export type Database = {
       }
       day_preset_assignments: {
         Row: {
+          assigned_by: string | null
           created_at: string | null
           date: string
           id: string
@@ -467,6 +513,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          assigned_by?: string | null
           created_at?: string | null
           date: string
           id?: string
@@ -476,6 +523,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          assigned_by?: string | null
           created_at?: string | null
           date?: string
           id?: string
@@ -1631,6 +1679,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "equipment"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "global_stock_entries_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment_availability_with_rentals"
+            referencedColumns: ["equipment_id"]
           },
         ]
       }
@@ -3582,6 +3637,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "preset_items_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment_availability_with_rentals"
+            referencedColumns: ["equipment_id"]
+          },
+          {
             foreignKeyName: "preset_items_preset_id_fkey"
             columns: ["preset_id"]
             isOneToOne: false
@@ -3593,24 +3655,30 @@ export type Database = {
       presets: {
         Row: {
           created_at: string | null
+          created_by: string | null
           id: string
+          is_template: boolean | null
           name: string
           updated_at: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
+          created_by?: string | null
           id?: string
+          is_template?: boolean | null
           name: string
           updated_at?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
+          created_by?: string | null
           id?: string
+          is_template?: boolean | null
           name?: string
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -4122,6 +4190,71 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "equipment"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment_availability_with_rentals"
+            referencedColumns: ["equipment_id"]
+          },
+        ]
+      }
+      sub_rentals: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          end_date: string
+          equipment_id: string
+          id: string
+          notes: string | null
+          quantity: number
+          start_date: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          end_date: string
+          equipment_id: string
+          id?: string
+          notes?: string | null
+          quantity: number
+          start_date: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          end_date?: string
+          equipment_id?: string
+          id?: string
+          notes?: string | null
+          quantity?: number
+          start_date?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sub_rentals_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "current_stock_levels"
+            referencedColumns: ["equipment_id"]
+          },
+          {
+            foreignKeyName: "sub_rentals_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_rentals_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment_availability_with_rentals"
+            referencedColumns: ["equipment_id"]
           },
         ]
       }
@@ -5448,6 +5581,17 @@ export type Database = {
           current_quantity: number | null
           equipment_id: string | null
           equipment_name: string | null
+        }
+        Relationships: []
+      }
+      equipment_availability_with_rentals: {
+        Row: {
+          base_quantity: number | null
+          category: Database["public"]["Enums"]["equipment_category"] | null
+          equipment_id: string | null
+          equipment_name: string | null
+          rental_boost: number | null
+          total_available: number | null
         }
         Relationships: []
       }

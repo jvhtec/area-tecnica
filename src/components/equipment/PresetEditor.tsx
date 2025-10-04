@@ -53,7 +53,7 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel }: Prese
   };
 
   const handleSave = () => {
-    if (!name.trim() || !session?.user?.id) return;
+    if (!name.trim()) return;
 
     const now = new Date().toISOString();
     const items = Object.entries(quantities)
@@ -114,7 +114,7 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel }: Prese
               <X className="mr-2 h-4 w-4" />
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={!name.trim() || !session?.user?.id}>
+            <Button onClick={handleSave} disabled={!name.trim()}>
               <Save className="mr-2 h-4 w-4" />
               Save Preset
             </Button>
