@@ -11,20 +11,23 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
 export function EquipmentManagement() {
-  const { session } = useOptimizedAuth();
+  const auth = useOptimizedAuth();
+  const { session } = auth;
+  const userDepartment = (auth as any).department as string | undefined;
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Fetch current stock entries using the correct table name
+  // Fetch current stock entries filtered by user department
   const { data: stockEntries = [], error: stockError } = useQuery({
-    queryKey: ['stock-entries'],
+    queryKey: ['stock-entries', userDepartment],
     queryFn: async () => {
-      if (!session?.user?.id) return [];
+      if (!session?.user?.id || !userDepartment) return [];
       
       const { data, error } = await supabase
         .from('global_stock_entries')
-        .select('*');
+        .select('*, equipment!inner(department)')
+        .eq('equipment.department', userDepartment);
 
       if (error) {
         console.error('Error fetching stock entries:', error);
@@ -32,7 +35,7 @@ export function EquipmentManagement() {
       }
       return data as StockEntry[];
     },
-    enabled: !!session?.user?.id
+    enabled: !!session?.user?.id && !!userDepartment
   });
 
   // Update stock entries mutation with correct table name
@@ -78,6 +81,30 @@ export function EquipmentManagement() {
     updateStockMutation.mutate(updatedStock);
   };
 
+  if (!userDepartment) {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="flex items-center gap-4 mb-6">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => navigate(-1)}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-2xl font-bold">Gestionar Inventario</h1>
+        </div>
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Departamento no asignado</AlertTitle>
+          <AlertDescription>
+            No tienes un departamento asignado. Contacta con administración.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto py-6">
       <div className="flex items-center gap-4 mb-6">
@@ -103,6 +130,7 @@ export function EquipmentManagement() {
         <StockCreationManager 
           stock={stockEntries}
           onStockUpdate={handleStockUpdate}
+          department={userDepartment}
         />
       )}
     </div>

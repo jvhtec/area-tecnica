@@ -98,20 +98,23 @@ function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEqui
 
 interface EquipmentCreationManagerProps {
   onEquipmentChange?: () => void;
+  department?: string;
 }
 
-export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreationManagerProps) {
+export function EquipmentCreationManager({ onEquipmentChange, department: propDepartment }: EquipmentCreationManagerProps) {
   const { session } = useOptimizedAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  // Optionally use department context - works with or without DepartmentProvider
-  let department: Department | undefined;
-  try {
-    const context = useDepartment();
-    department = context.department;
-  } catch {
-    department = undefined;
+  // Use prop department if provided, otherwise try context
+  let department: Department | undefined = propDepartment as Department | undefined;
+  if (!department) {
+    try {
+      const context = useDepartment();
+      department = context.department;
+    } catch {
+      department = undefined;
+    }
   }
   
   const categories = department ? getCategoriesForDepartment(department) : [...SOUND_CATEGORIES, ...LIGHTS_CATEGORIES];

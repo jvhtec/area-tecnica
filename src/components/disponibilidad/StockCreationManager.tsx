@@ -15,6 +15,7 @@ import { StockMovementDialog } from '@/components/equipment/StockMovementDialog'
 interface StockManagerProps {
   stock: StockEntry[];
   onStockUpdate: (stock: StockEntry[]) => void;
+  department: string;
 }
 
 type GroupedEquipment = {
@@ -27,20 +28,21 @@ type GroupedEquipment = {
   }>;
 };
 
-export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps) => {
+export const StockCreationManager = ({ stock, onStockUpdate, department }: StockManagerProps) => {
   const { toast } = useToast();
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [selectedCurrentStock, setSelectedCurrentStock] = useState<number>(0);
   const [isAdditionDialog, setIsAdditionDialog] = useState(true);
   const [showMovementDialog, setShowMovementDialog] = useState(false);
 
-  // Fetch equipment list with proper typing
+  // Fetch equipment list filtered by department
   const { data: equipmentList = [], refetch: refetchEquipment } = useQuery<Equipment[]>({
-    queryKey: ['equipment'],
+    queryKey: ['equipment', department],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('equipment')
         .select('*')
+        .eq('department', department)
         .order('category')
         .order('name');
       
@@ -49,13 +51,14 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
     }
   });
 
-  // Fetch current stock levels using the new view
+  // Fetch current stock levels filtered by department
   const { data: currentStockLevels = [] } = useQuery({
-    queryKey: ['current-stock-levels'],
+    queryKey: ['current-stock-levels', department],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('current_stock_levels')
-        .select('*');
+        .select('*')
+        .eq('department', department);
       
       if (error) throw error;
       return data;
@@ -151,7 +154,7 @@ export const StockCreationManager = ({ stock, onStockUpdate }: StockManagerProps
     <div className="space-y-8">
       <div className="space-y-4">
         <h2 className="text-2xl font-bold">Gestionar Equipamiento</h2>
-        <EquipmentCreationManager onEquipmentChange={handleEquipmentChange} />
+        <EquipmentCreationManager onEquipmentChange={handleEquipmentChange} department={department} />
       </div>
 
       <div className="space-y-4">
