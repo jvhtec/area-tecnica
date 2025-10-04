@@ -32,7 +32,7 @@ export interface PresetWithItems extends Preset {
 
 export const EQUIPMENT_CATEGORIES = [
   'convencional', 'robotica', 'fx', 'rigging', 'controles', 'cuadros', 'led', 'strobo', 'canones', 'estructuras',
-  'monitores', 'inalambricos'
+  'speakers', 'monitors'
 ] as const;
 export type EquipmentCategory = typeof EQUIPMENT_CATEGORIES[number];
 
@@ -47,8 +47,8 @@ export const categoryLabels: Record<EquipmentCategory, string> = {
   strobo: 'Strobo',
   canones: 'Cañones',
   estructuras: 'Estructuras',
-  monitores: 'Monitores',
-  inalambricos: 'Inalámbricos'
+  speakers: 'Speakers',
+  monitors: 'Monitors'
 };
 
 export type Department = 'lights' | 'sound' | 'video';
