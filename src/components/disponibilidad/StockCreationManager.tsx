@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { StockEntry, Equipment } from '@/types/equipment';
+import { StockEntry, Equipment, getCategoriesForDepartment } from '@/types/equipment';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -35,14 +35,16 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
   const [isAdditionDialog, setIsAdditionDialog] = useState(true);
   const [showMovementDialog, setShowMovementDialog] = useState(false);
 
-  // Fetch equipment list filtered by department
+  // Fetch equipment list filtered by department categories
   const { data: equipmentList = [], refetch: refetchEquipment } = useQuery<Equipment[]>({
     queryKey: ['equipment', department],
     queryFn: async () => {
+      const categories = getCategoriesForDepartment(department as any);
+      
       const { data, error } = await supabase
         .from('equipment')
         .select('*')
-        .eq('department', department)
+        .in('category', categories)
         .order('category')
         .order('name');
       
@@ -51,14 +53,16 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
     }
   });
 
-  // Fetch current stock levels filtered by department
+  // Fetch current stock levels filtered by department categories
   const { data: currentStockLevels = [] } = useQuery({
     queryKey: ['current-stock-levels', department],
     queryFn: async () => {
+      const categories = getCategoriesForDepartment(department as any);
+      
       const { data, error } = await supabase
         .from('current_stock_levels')
         .select('*')
-        .eq('department', department);
+        .in('category', categories);
       
       if (error) throw error;
       return data;

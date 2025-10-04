@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StockEntry } from '@/types/equipment';
+import { StockEntry, getCategoriesForDepartment } from '@/types/equipment';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
@@ -18,16 +18,18 @@ export function EquipmentManagement() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Fetch current stock entries filtered by user department
+  // Fetch current stock entries filtered by user department categories
   const { data: stockEntries = [], error: stockError } = useQuery({
     queryKey: ['stock-entries', userDepartment],
     queryFn: async () => {
       if (!session?.user?.id || !userDepartment) return [];
       
+      const categories = getCategoriesForDepartment(userDepartment as any);
+      
       const { data, error } = await supabase
         .from('global_stock_entries')
-        .select('*, equipment!inner(department)')
-        .eq('equipment.department', userDepartment);
+        .select('*, equipment!inner(category)')
+        .in('equipment.category', categories);
 
       if (error) {
         console.error('Error fetching stock entries:', error);
