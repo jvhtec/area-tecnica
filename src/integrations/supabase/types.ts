@@ -5991,6 +5991,11 @@ export type Database = {
         | "estructuras"
         | "speakers"
         | "monitors"
+        | "foh_console"
+        | "mon_console"
+        | "wireless"
+        | "iem"
+        | "wired_mics"
       form_status: "pending" | "submitted" | "expired"
       global_preset_status: "available" | "unavailable" | "tentative"
       job_date_type: "travel" | "setup" | "show" | "off" | "rehearsal"
@@ -6187,6 +6192,11 @@ export const Constants = {
         "estructuras",
         "speakers",
         "monitors",
+        "foh_console",
+        "mon_console",
+        "wireless",
+        "iem",
+        "wired_mics",
       ],
       form_status: ["pending", "submitted", "expired"],
       global_preset_status: ["available", "unavailable", "tentative"],
