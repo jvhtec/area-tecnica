@@ -70,6 +70,24 @@ export const SOUND_CATEGORIES = [
 
 export type LightsCategory = typeof LIGHTS_CATEGORIES[number];
 export type SoundCategory = typeof SOUND_CATEGORIES[number];
+export type AllCategories = LightsCategory | SoundCategory;
+
+// Add label mappings for sound categories
+export const soundCategoryLabels: Record<SoundCategory, string> = {
+  foh_console: 'FOH Console',
+  mon_console: 'Monitor Console',
+  wireless: 'Wireless',
+  iem: 'IEM',
+  wired_mics: 'Wired Mics',
+  speakers: 'Speakers',
+  monitors: 'Monitors'
+};
+
+// Combined category labels
+export const allCategoryLabels: Record<AllCategories, string> = {
+  ...categoryLabels,
+  ...soundCategoryLabels
+};
 
 export const getCategoriesForDepartment = (department: Department): readonly EquipmentCategory[] => {
   switch (department) {

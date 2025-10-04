@@ -7,14 +7,16 @@ import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Equipment, EquipmentCategory } from '@/types/equipment';
-import { categoryLabels, getCategoriesForDepartment } from '@/types/equipment';
+import type { Equipment, EquipmentCategory, AllCategories } from '@/types/equipment';
+import { allCategoryLabels, getCategoriesForDepartment, SOUND_CATEGORIES, LIGHTS_CATEGORIES } from '@/types/equipment';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useDepartment } from '@/contexts/DepartmentContext';
+import { useContext } from 'react';
+import { Department } from '@/types/equipment';
 
 interface EditEquipmentDialogProps {
   equipment: Equipment | null;
@@ -24,15 +26,23 @@ interface EditEquipmentDialogProps {
 }
 
 function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEquipmentDialogProps) {
-  const { department } = useDepartment();
-  const categories = getCategoriesForDepartment(department);
+  // Optionally use department context
+  let department: Department | undefined;
+  try {
+    const context = useDepartment();
+    department = context.department;
+  } catch {
+    department = undefined;
+  }
+  
+  const categories = department ? getCategoriesForDepartment(department) : [...SOUND_CATEGORIES, ...LIGHTS_CATEGORIES];
   const [name, setName] = useState(equipment?.name || '');
-  const [category, setCategory] = useState<EquipmentCategory>((equipment?.category as EquipmentCategory) || categories[0]);
+  const [category, setCategory] = useState<string>((equipment?.category as string) || categories[0]);
 
   useEffect(() => {
     if (equipment) {
       setName(equipment.name);
-      setCategory((equipment.category as EquipmentCategory) || categories[0]);
+      setCategory((equipment.category as string) || categories[0]);
     }
   }, [equipment, categories]);
 
@@ -41,7 +51,7 @@ function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEqui
     onSave({
       id: equipment?.id,
       name,
-      category
+      category: category as any // Type cast for flexibility
     });
     onOpenChange(false);
   };
@@ -64,14 +74,14 @@ function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEqui
           </div>
           <div className="space-y-2">
             <Label htmlFor="category">Categoría</Label>
-            <Select value={category} onValueChange={(value) => setCategory(value as EquipmentCategory)}>
+            <Select value={category} onValueChange={(value) => setCategory(value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Seleccione categoría" />
               </SelectTrigger>
               <SelectContent>
                 {categories.map((cat) => (
                   <SelectItem key={cat} value={cat}>
-                    {categoryLabels[cat]}
+                    {allCategoryLabels[cat as AllCategories] || cat}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -92,23 +102,38 @@ interface EquipmentCreationManagerProps {
 
 export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreationManagerProps) {
   const { session } = useOptimizedAuth();
-  const { department } = useDepartment();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const categories = getCategoriesForDepartment(department);
+  
+  // Optionally use department context - works with or without DepartmentProvider
+  let department: Department | undefined;
+  try {
+    const context = useDepartment();
+    department = context.department;
+  } catch {
+    department = undefined;
+  }
+  
+  const categories = department ? getCategoriesForDepartment(department) : [...SOUND_CATEGORIES, ...LIGHTS_CATEGORIES];
   const [equipmentName, setEquipmentName] = useState('');
-  const [category, setCategory] = useState<EquipmentCategory>(categories[0] || 'convencional');
+  const [category, setCategory] = useState<string>(categories[0] || 'convencional');
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [equipmentToDelete, setEquipmentToDelete] = useState<Equipment | null>(null);
 
   const { data: equipmentList } = useQuery({
-    queryKey: ['equipment', department],
+    queryKey: department ? ['equipment', department] : ['equipment'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('equipment')
-        .select('*')
-        .eq('department', department)
-        .order('name');
+        .select('*');
+      
+      if (department) {
+        query = query.eq('department', department);
+      }
+      
+      query = query.order('name');
+      
+      const { data, error } = await query;
       
       if (error) throw error;
       return data as Equipment[];
@@ -125,7 +150,7 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
         .insert({
           name: equipmentName,
           category: category,
-          department: department
+          department: department || 'sound' // Default to 'sound' if no department context
         })
         .select()
         .single();
@@ -134,7 +159,7 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
       return equipment;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment', department] });
+      queryClient.invalidateQueries({ queryKey: department ? ['equipment', department] : ['equipment'] });
       setEquipmentName('');
       setCategory(categories[0] || 'convencional');
       toast({
@@ -167,7 +192,7 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment', department] });
+      queryClient.invalidateQueries({ queryKey: department ? ['equipment', department] : ['equipment'] });
       toast({
         title: "Éxito",
         description: "Equipo actualizado correctamente"
@@ -193,7 +218,7 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment', department] });
+      queryClient.invalidateQueries({ queryKey: department ? ['equipment', department] : ['equipment'] });
       toast({
         title: "Éxito",
         description: "Equipo eliminado correctamente"
@@ -224,14 +249,14 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
 
         <div className="space-y-2">
           <Label htmlFor="category">Categoría</Label>
-          <Select value={category} onValueChange={(value) => setCategory(value as EquipmentCategory)}>
+          <Select value={category} onValueChange={(value) => setCategory(value)}>
             <SelectTrigger>
               <SelectValue placeholder="Seleccione categoría" />
             </SelectTrigger>
             <SelectContent>
               {categories.map((cat) => (
                 <SelectItem key={cat} value={cat}>
-                  {categoryLabels[cat]}
+                  {allCategoryLabels[cat as AllCategories] || cat}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -256,7 +281,7 @@ export function EquipmentCreationManager({ onEquipmentChange }: EquipmentCreatio
               <div key={item.id} className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">{item.name}</p>
-                  <p className="text-sm text-muted-foreground capitalize">{categoryLabels[item.category as EquipmentCategory]}</p>
+                  <p className="text-sm text-muted-foreground capitalize">{allCategoryLabels[item.category as AllCategories] || item.category}</p>
                 </div>
                 <div className="flex gap-2">
                   <Button
