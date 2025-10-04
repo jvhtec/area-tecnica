@@ -37,7 +37,7 @@ export function StockMovementDialog({
       
       // Get current stock entry
       const { data: stockEntry } = await supabase
-        .from('stock_entries')
+        .from('global_stock_entries')
         .select('*')
         .eq('equipment_id', equipment.id)
         .maybeSingle();
@@ -68,14 +68,14 @@ export function StockMovementDialog({
       // Update or insert stock entry
       if (stockEntry) {
         const { error: updateError } = await supabase
-          .from('stock_entries')
+          .from('global_stock_entries')
           .update({ base_quantity: newBaseQty })
           .eq('id', stockEntry.id);
 
         if (updateError) throw updateError;
       } else {
         const { error: insertError } = await supabase
-          .from('stock_entries')
+          .from('global_stock_entries')
           .insert({
             equipment_id: equipment.id,
             base_quantity: newBaseQty
