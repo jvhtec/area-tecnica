@@ -65,7 +65,7 @@ export const LIGHTS_CATEGORIES = [
 ] as const;
 
 export const SOUND_CATEGORIES = [
-  'foh_console', 'mon_console', 'wireless', 'iem', 'wired_mics', 'speakers', 'monitors'
+  'foh_console', 'mon_console', 'wireless', 'iem', 'wired_mics', 'speakers', 'monitors', 'amplificacion'
 ] as const;
 
 export type LightsCategory = typeof LIGHTS_CATEGORIES[number];
@@ -80,7 +80,8 @@ export const soundCategoryLabels: Record<SoundCategory, string> = {
   iem: 'IEM',
   wired_mics: 'Wired Mics',
   speakers: 'Speakers',
-  monitors: 'Monitors'
+  monitors: 'Monitors',
+  amplificacion: 'Amplificación'
 };
 
 // Combined category labels
@@ -108,7 +109,8 @@ export const SOUND_MODEL_CATEGORIES = [
   { value: 'mon_console', label: 'Monitor Consoles' },
   { value: 'wireless', label: 'Wireless Systems' },
   { value: 'iem', label: 'IEM Systems' },
-  { value: 'wired_mics', label: 'Wired Microphones' }
+  { value: 'wired_mics', label: 'Wired Microphones' },
+  { value: 'amplificacion', label: 'Amplificación' }
 ] as const;
 
 export const LIGHTS_MODEL_CATEGORIES = [
