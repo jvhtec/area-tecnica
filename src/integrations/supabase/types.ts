@@ -602,6 +602,7 @@ export type Database = {
         Row: {
           category: Database["public"]["Enums"]["equipment_category"]
           created_at: string | null
+          department: string
           id: string
           name: string
           updated_at: string | null
@@ -609,6 +610,7 @@ export type Database = {
         Insert: {
           category?: Database["public"]["Enums"]["equipment_category"]
           created_at?: string | null
+          department?: string
           id?: string
           name: string
           updated_at?: string | null
@@ -616,6 +618,7 @@ export type Database = {
         Update: {
           category?: Database["public"]["Enums"]["equipment_category"]
           created_at?: string | null
+          department?: string
           id?: string
           name?: string
           updated_at?: string | null
@@ -3656,6 +3659,7 @@ export type Database = {
         Row: {
           created_at: string | null
           created_by: string | null
+          department: string
           id: string
           is_template: boolean | null
           name: string
@@ -3665,6 +3669,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           created_by?: string | null
+          department?: string
           id?: string
           is_template?: boolean | null
           name: string
@@ -3674,6 +3679,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           created_by?: string | null
+          department?: string
           id?: string
           is_template?: boolean | null
           name?: string
@@ -4204,6 +4210,7 @@ export type Database = {
         Row: {
           created_at: string | null
           created_by: string | null
+          department: string
           end_date: string
           equipment_id: string
           id: string
@@ -4215,6 +4222,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           created_by?: string | null
+          department?: string
           end_date: string
           equipment_id: string
           id?: string
@@ -4226,6 +4234,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           created_by?: string | null
+          department?: string
           end_date?: string
           equipment_id?: string
           id?: string
@@ -5996,6 +6005,7 @@ export type Database = {
         | "wireless"
         | "iem"
         | "wired_mics"
+        | "amplificacion"
       form_status: "pending" | "submitted" | "expired"
       global_preset_status: "available" | "unavailable" | "tentative"
       job_date_type: "travel" | "setup" | "show" | "off" | "rehearsal"
@@ -6197,6 +6207,7 @@ export const Constants = {
         "wireless",
         "iem",
         "wired_mics",
+        "amplificacion",
       ],
       form_status: ["pending", "submitted", "expired"],
       global_preset_status: ["available", "unavailable", "tentative"],
