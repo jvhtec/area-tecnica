@@ -1,5 +1,5 @@
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,9 +16,12 @@ import { supabase } from '@/lib/supabase';
 
 import { format } from 'date-fns';
 import type { PresetWithItems } from '@/types/equipment';
+import { getCategoriesForDepartment, type Department } from '@/types/equipment';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { DayProps } from 'react-day-picker';
+import { useRef } from 'react';
+import { useDayRender } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 
 interface DisponibilidadCalendarProps {
@@ -32,13 +35,19 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
 
-  // Fetch current stock levels to check for conflicts
+  const department = (userDepartment || 'sound') as Department;
+  const departmentCategories = getCategoriesForDepartment(department);
+
+  // Fetch equipment base stock (base_quantity) for this department's categories
   const { data: stockData } = useQuery({
-    queryKey: ['equipment-stock'],
+    queryKey: ['equipment-base-stock', department],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('current_stock_levels')
-        .select('*');
+        .from('equipment_availability_with_rentals')
+        .select('equipment_id, equipment_name, category, base_quantity')
+        .in('category', departmentCategories as string[])
+        .order('category')
+        .order('equipment_name');
 
       if (error) throw error;
       return data;
@@ -109,75 +118,148 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
     }
   });
 
-  // Check if a date has equipment conflicts
-  const hasConflict = (date: Date): boolean => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const dayAssignments = presetAssignments?.filter(a => a.date === dateStr);
-    
-    if (!dayAssignments?.length || !stockData) return false;
+  // Determine date range from assignments to scope sub-rentals query
+  const [assignmentsRange, setAssignmentsRange] = useState<{ start?: string; end?: string }>({});
+  useEffect(() => {
+    if (!presetAssignments || presetAssignments.length === 0) {
+      setAssignmentsRange({});
+      return;
+    }
+    const dates = presetAssignments.map((a: any) => new Date(a.date));
+    const min = new Date(Math.min(...dates.map(d => d.getTime())));
+    const max = new Date(Math.max(...dates.map(d => d.getTime())));
+    const start = format(min, 'yyyy-MM-dd');
+    const end = format(max, 'yyyy-MM-dd');
+    setAssignmentsRange({ start, end });
+  }, [presetAssignments]);
 
-    // Calculate total equipment needed for this date
+  // Fetch sub-rentals overlapping the assignments range for this department
+  const { data: subRentals = [] } = useQuery({
+    queryKey: ['sub-rentals-range', userDepartment, assignmentsRange.start, assignmentsRange.end],
+    queryFn: async () => {
+      if (!assignmentsRange.start || !assignmentsRange.end) return [] as any[];
+      const { data, error } = await supabase
+        .from('sub_rentals')
+        .select('equipment_id, quantity, start_date, end_date, department')
+        .eq('department', (userDepartment || '').toString())
+        .lte('start_date', assignmentsRange.end)
+        .gte('end_date', assignmentsRange.start);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: Boolean(assignmentsRange.start && assignmentsRange.end && userDepartment)
+  });
+
+  // Precompute rental boost per date
+  const rentalBoostByDay: Record<string, Record<string, number>> = useMemo(() => {
+    const map: Record<string, Record<string, number>> = {};
+    if (!subRentals?.length || !assignmentsRange.start || !assignmentsRange.end) return map;
+    const start = new Date(assignmentsRange.start);
+    const end = new Date(assignmentsRange.end);
+    // Iterate by day across range
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      map[format(d, 'yyyy-MM-dd')] = {};
+    }
+    subRentals.forEach((sr: any) => {
+      const srStart = new Date(sr.start_date);
+      const srEnd = new Date(sr.end_date);
+      for (let d = new Date(srStart); d <= srEnd; d.setDate(d.getDate() + 1)) {
+        const key = format(d, 'yyyy-MM-dd');
+        if (!(key in map)) continue;
+        map[key][sr.equipment_id] = (map[key][sr.equipment_id] || 0) + (sr.quantity || 0);
+      }
+    });
+    return map;
+  }, [subRentals, assignmentsRange.start, assignmentsRange.end]);
+
+  // Compute day-level classification accounting for sub-rentals
+  type DayStatus = 'none' | 'stock_ok' | 'rentals_ok' | 'conflict';
+  const getDayStatus = (date: Date): DayStatus => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const dayAssignments = presetAssignments?.filter((a: any) => a.date === dateStr);
+    if (!dayAssignments?.length || !stockData) return 'none';
+
     const equipmentNeeded: Record<string, number> = {};
-    dayAssignments.forEach(assignment => {
-      assignment.preset.items.forEach(item => {
-        equipmentNeeded[item.equipment_id] = (equipmentNeeded[item.equipment_id] || 0) + item.quantity;
+    dayAssignments.forEach((assignment: any) => {
+      assignment.preset.items.forEach((item: any) => {
+        equipmentNeeded[item.equipment_id] = (equipmentNeeded[item.equipment_id] || 0) + (item.quantity || 0);
       });
     });
 
-    // Check if any equipment exceeds available stock
-    return Object.entries(equipmentNeeded).some(([equipmentId, needed]) => {
-      const stock = stockData.find(s => s.equipment_id === equipmentId);
-      return needed > (stock?.current_quantity || 0);
-    });
+    let anyUsesRentals = false;
+    for (const [equipmentId, needed] of Object.entries(equipmentNeeded)) {
+      const stockRow = stockData.find((s: any) => s.equipment_id === equipmentId);
+      const base = stockRow?.base_quantity ?? 0;
+      const boost = rentalBoostByDay[dateStr]?.[equipmentId] ?? 0;
+      if (needed > base + boost) return 'conflict';
+      if (needed > base) anyUsesRentals = true;
+    }
+    return anyUsesRentals ? 'rentals_ok' : 'stock_ok';
   };
 
   const modifiers = {
     hasPreset: (date: Date) => {
       return presetAssignments?.some(
-        assignment => assignment.date === format(date, 'yyyy-MM-dd')
+        (assignment: any) => assignment.date === format(date, 'yyyy-MM-dd')
       ) ?? false;
     },
-    hasConflict: (date: Date) => hasConflict(date)
+    conflict: (date: Date) => getDayStatus(date) === 'conflict',
+    rentals_ok: (date: Date) => getDayStatus(date) === 'rentals_ok',
+    stock_ok: (date: Date) => getDayStatus(date) === 'stock_ok',
   };
 
   const modifiersStyles = {
-    hasPreset: { border: '2px solid hsl(var(--primary))' },
-    hasConflict: { backgroundColor: 'hsl(var(--destructive) / 0.2)', border: '2px solid hsl(var(--destructive))' }
-  };
+    hasPreset: { boxShadow: 'inset 0 0 0 2px hsl(var(--primary))' },
+    conflict: { backgroundColor: 'hsl(var(--destructive) / 0.22)', border: '2px solid hsl(var(--destructive))' },
+    rentals_ok: { backgroundColor: 'hsl(var(--warning, 45 93% 47%) / 0.18)', border: '2px solid hsl(var(--warning, 45 93% 47%))' },
+    stock_ok: { backgroundColor: 'hsl(var(--success, 142 71% 45%) / 0.18)', border: '2px solid hsl(var(--success, 142 71% 45%))' },
+  } as const;
 
-  const isLoading = isLoadingAssignments;
+  // Keep calendar interactive even during loading to avoid blocking selection
+  // const isLoading = isLoadingAssignments;
 
   // Build quick info for tooltips (preset names + conflict status)
   const infoByDate = useMemo(() => {
-    const map: Record<string, { names: string[]; count: number; conflict: boolean } > = {};
+    const map: Record<string, { names: string[]; count: number; status: DayStatus } > = {};
     (presetAssignments || []).forEach((a: any) => {
       const key = a.date;
-      if (!map[key]) map[key] = { names: [], count: 0, conflict: false };
+      if (!map[key]) map[key] = { names: [], count: 0, status: 'none' };
       map[key].count += 1;
       if (a?.preset?.name) map[key].names.push(a.preset.name);
     });
-    Object.keys(map).forEach(d => { map[d].conflict = hasConflict(new Date(d)); });
+    Object.keys(map).forEach(d => { map[d].status = getDayStatus(new Date(d)); });
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [presetAssignments, stockData]);
+  }, [presetAssignments, stockData, rentalBoostByDay]);
 
   // Custom Day with hover details
   function DayWithHover(props: DayProps) {
-    const { date, displayMonth, buttonProps } = props as any;
-    if (!date || (displayMonth && date.getMonth() !== displayMonth.getMonth())) {
-      return <button {...buttonProps} />;
+    const { date, displayMonth } = props;
+    const buttonRef = useRef<HTMLButtonElement>(null);
+    const dayRender = useDayRender(date, displayMonth, buttonRef);
+
+    if (dayRender.isHidden) {
+      return <div role="gridcell" />;
     }
+
     const key = format(date, 'yyyy-MM-dd');
     const info = infoByDate[key];
     const hasData = !!info;
-    const btnClass = cn(buttonProps?.className);
+
+    if (!dayRender.isButton) {
+      return <div {...dayRender.divProps} />;
+    }
+
     return (
       <TooltipProvider>
         <Tooltip delayDuration={150}>
           <TooltipTrigger asChild>
-            <button {...buttonProps} className={btnClass} title={undefined}>
-              {date.getDate()}
-            </button>
+            <button
+              ref={buttonRef}
+              {...dayRender.buttonProps}
+              className={cn(dayRender.buttonProps.className)}
+              title={undefined}
+            />
           </TooltipTrigger>
           {hasData && (
             <TooltipContent side="top" align="center" className="w-64">
@@ -189,8 +271,14 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
                     {info.names.map((n, i) => (<div key={i}>• {n}</div>))}
                   </div>
                 )}
-                {info.conflict && (
+                {info.status === 'conflict' && (
                   <div className="text-xs text-red-600 font-medium">Conflicts detected</div>
+                )}
+                {info.status === 'rentals_ok' && (
+                  <div className="text-xs text-amber-600 font-medium">Covered via sub‑rentals</div>
+                )}
+                {info.status === 'stock_ok' && (
+                  <div className="text-xs text-green-600 font-medium">Covered by stock</div>
                 )}
               </div>
             </TooltipContent>
@@ -248,7 +336,6 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
         components={{ Day: DayWithHover }}
         modifiers={modifiers}
         modifiersStyles={modifiersStyles}
-        disabled={isLoading}
       />
     </Card>
   );
