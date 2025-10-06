@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Music2, Layout, Calendar, Printer, Loader2, FileText, Download, Eye, Clock, FolderPlus, RefreshCw, MapPin, Link as LinkIcon } from "lucide-react";
+import { Users, Music2, Layout, Calendar, Printer, Loader2, FileText, Download, Eye, Clock, FolderPlus, RefreshCw, MapPin, Link as LinkIcon, Box } from "lucide-react";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -25,6 +25,7 @@ import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { CrewCallLinkerDialog } from "@/components/jobs/CrewCallLinker";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
+import { JobPresetManagerDialog } from "@/components/jobs/JobPresetManagerDialog";
 
 interface FestivalJob {
   id: string;
@@ -104,6 +105,7 @@ const FestivalManagement = () => {
   const [isJobDetailsOpen, setIsJobDetailsOpen] = useState(false);
   const [isFlexLogOpen, setIsFlexLogOpen] = useState(false);
   const [isCreatingFlexFolders, setIsCreatingFlexFolders] = useState(false);
+  const [isJobPresetsOpen, setIsJobPresetsOpen] = useState(false);
 
   const resolveJobDocumentBucket = useCallback((path: string) => {
     const firstSegment = (path || '').split('/')[0];
@@ -770,6 +772,17 @@ const FestivalManagement = () => {
                 </Button>
               )}
               {canEdit && <FestivalLogoManager jobId={jobId} />}
+              {canEdit && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                  onClick={() => setIsJobPresetsOpen(true)}
+                >
+                  <Box className="h-4 w-4" />
+                  Presets
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -1208,6 +1221,15 @@ const FestivalManagement = () => {
           onConfirm={handlePrintAllDocumentation}
           maxStages={maxStages}
           jobTitle={job?.title || ''}
+          jobId={jobId}
+        />
+      )}
+
+      {/* Job Presets Manager */}
+      {jobId && (
+        <JobPresetManagerDialog
+          open={isJobPresetsOpen}
+          onOpenChange={setIsJobPresetsOpen}
           jobId={jobId}
         />
       )}

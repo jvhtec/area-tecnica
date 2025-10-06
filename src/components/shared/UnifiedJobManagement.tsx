@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, Calendar, MapPin, FileText, Settings, UserCheck, RefreshCw, LogOut, FileImage, Cloud } from "lucide-react";
+import { Loader2, ArrowLeft, Calendar, MapPin, FileText, Settings, UserCheck, RefreshCw, LogOut, FileImage, Cloud, Box } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,7 @@ import { PrintOptionsDialog } from "@/components/festival/pdf/PrintOptionsDialog
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { JobExtrasManagement } from "@/components/jobs/JobExtrasManagement";
 import { CrewCallLinkerDialog } from "@/components/jobs/CrewCallLinker";
+import { JobPresetManagerDialog } from "@/components/jobs/JobPresetManagerDialog";
 
 interface UnifiedJobManagementProps {
   mode: 'job' | 'festival';
@@ -57,6 +58,7 @@ export const UnifiedJobManagement = ({ mode }: UnifiedJobManagementProps) => {
   const [isPrinting, setIsPrinting] = useState(false);
   const [maxStages, setMaxStages] = useState(1);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [showJobPresets, setShowJobPresets] = useState(false);
 
   const { data: logoUrl } = useQuery({
     queryKey: ['festival-logo', jobId],
@@ -296,7 +298,7 @@ export const UnifiedJobManagement = ({ mode }: UnifiedJobManagementProps) => {
         </div>
         
         <div className="flex items-center gap-2">
-          {mode === 'festival' && (
+          {mode === 'festival' ? (
             <>
               <Button 
                 onClick={() => setShowPrintDialog(true)}
@@ -325,12 +327,39 @@ export const UnifiedJobManagement = ({ mode }: UnifiedJobManagementProps) => {
                 Flex
               </Button>
               <Button 
+                onClick={() => setShowJobPresets(true)}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <Box className="h-4 w-4" />
+                Job Presets
+              </Button>
+              <Button 
                 onClick={() => navigate(`/festival-management/${jobId}/gear`)}
                 variant="outline"
                 className="flex items-center gap-2"
               >
                 <FileImage className="h-4 w-4" />
                 Logo Manager
+              </Button>
+              <Button 
+                onClick={() => setShowJobPresets(true)}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <Box className="h-4 w-4" />
+                Presets
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button 
+                onClick={() => setShowJobPresets(true)}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <Box className="h-4 w-4" />
+                Presets
               </Button>
             </>
           )}
@@ -379,6 +408,23 @@ export const UnifiedJobManagement = ({ mode }: UnifiedJobManagementProps) => {
             </CardContent>
           </Card>
         )}
+
+        {/* Presets quick action (visible in both modes) */}
+        <Card 
+          className="hover:shadow-md transition-shadow cursor-pointer"
+          onClick={() => setShowJobPresets(true)}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Presets</CardTitle>
+            <Box className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm text-muted-foreground">
+              Create/assign equipment presets to all job dates.
+            </div>
+            <Button className="w-full mt-4" variant="outline">Open Presets</Button>
+          </CardContent>
+        </Card>
 
         <Card className="hover:shadow-md transition-shadow cursor-pointer">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -439,6 +485,15 @@ export const UnifiedJobManagement = ({ mode }: UnifiedJobManagementProps) => {
           onConfirm={handlePrintAllDocumentation}
           maxStages={maxStages}
           jobTitle={job?.title || ''}
+          jobId={jobId}
+        />
+      )}
+
+      {/* Job Presets Manager */}
+      {jobId && (
+        <JobPresetManagerDialog
+          open={showJobPresets}
+          onOpenChange={setShowJobPresets}
           jobId={jobId}
         />
       )}

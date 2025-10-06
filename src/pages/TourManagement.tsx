@@ -21,7 +21,8 @@ import {
   Printer,
   Loader2,
   Euro,
-  MessageCircle
+  MessageCircle,
+  Box
 } from "lucide-react";
 import { TourRatesManagerDialog } from "@/components/tours/TourRatesManagerDialog";
 import { useTourRatesApproval } from "@/hooks/useTourRatesApproval";
@@ -34,6 +35,7 @@ import { TourDateManagementDialog } from "@/components/tours/TourDateManagementD
 import { TourDefaultsManager } from "@/components/tours/TourDefaultsManager";
 import { TourAssignmentDialog } from "@/components/tours/TourAssignmentDialog";
 import { TourDocumentsDialog } from "@/components/tours/TourDocumentsDialog";
+import { TourPresetManagerDialog } from "@/components/tours/TourPresetManagerDialog";
 import { format } from "date-fns";
 import { useTourAssignments } from "@/hooks/useTourAssignments";
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
@@ -62,6 +64,7 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
   const [isDefaultsManagerOpen, setIsDefaultsManagerOpen] = useState(false);
   const [isAssignmentsOpen, setIsAssignmentsOpen] = useState(false);
   const [isDocumentsOpen, setIsDocumentsOpen] = useState(false);
+  const [isTourPresetsOpen, setIsTourPresetsOpen] = useState(false);
   const [isRatesManagerOpen, setIsRatesManagerOpen] = useState(false);
   const [isLogisticsOpen, setIsLogisticsOpen] = useState(false);
   const [tourLogoUrl, setTourLogoUrl] = useState<string | undefined>();
@@ -245,6 +248,14 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
       icon: Euro,
       onClick: () => setIsRatesManagerOpen(true),
       badge: tourRatesApproved ? "Rates Approved" : "Needs Approval",
+      showForTechnician: false
+    },
+    {
+      title: "Tour Presets",
+      description: "Create and manage equipment presets for this tour",
+      icon: Box,
+      onClick: () => setIsTourPresetsOpen(true),
+      badge: "Equipment",
       showForTechnician: false
     },
     {
@@ -632,6 +643,15 @@ export const TourManagement = ({ tour }: TourManagementProps) => {
         tourId={tour.id}
         tourName={tour.name}
       />
+
+      {/* Tour Presets Manager */}
+      {!isTechnicianView && (
+        <TourPresetManagerDialog
+          open={isTourPresetsOpen}
+          onOpenChange={setIsTourPresetsOpen}
+          tourId={tour.id}
+        />
+      )}
 
       {/* Logistics – tour‑wide with per‑date overrides */}
       {!isTechnicianView && (

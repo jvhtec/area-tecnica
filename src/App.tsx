@@ -32,10 +32,9 @@ import LaborPOForm from '@/pages/LaborPOForm';
 import Logistics from '@/pages/Logistics';
 import FestivalManagement from '@/pages/FestivalManagement';
 import FestivalArtistManagement from '@/pages/FestivalArtistManagement';
-import LightsDisponibilidad from '@/pages/LightsDisponibilidad';
 import LightsMemoriaTecnica from '@/pages/LightsMemoriaTecnica';
 import VideoMemoriaTecnica from '@/pages/VideoMemoriaTecnica';
-import SoundDisponibilidad from '@/pages/SoundDisponibilidad';
+import Disponibilidad from '@/pages/Disponibilidad';
 import JobAssignmentMatrix from '@/pages/JobAssignmentMatrix';
 import ActivityCenter from '@/pages/ActivityCenter';
 import { EquipmentManagement } from '@/pages/EquipmentManagement';
@@ -142,9 +141,8 @@ export default function App() {
                     <Route path="/tour-dates/:tourDateId/video/pesos" element={<VideoPesosTool />} />
                     <Route path="/tour-dates/:tourDateId/video/consumos" element={<VideoConsumosTool />} />
                     
-                    {/* Disponibilidad Routes */}
-                    <Route path="/lights-disponibilidad" element={<LightsDisponibilidad />} />
-                    <Route path="/sound-disponibilidad" element={<SoundDisponibilidad />} />
+                    {/* Disponibilidad Route */}
+                    <Route path="/disponibilidad" element={<Disponibilidad />} />
                     
                     {/* Festival Management Routes */}
                     <Route path="/festival-management/:jobId" element={<FestivalManagement />} />

@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,9 @@ import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
 import type { PresetWithItems } from '@/types/equipment';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import type { DayProps } from 'react-day-picker';
+import { cn } from '@/lib/utils';
 
 interface DisponibilidadCalendarProps {
   selectedDate?: Date;
@@ -44,13 +47,13 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
 
   // Fetch all preset assignments for the department (removed user_id filter)
   const { data: presetAssignments, isLoading: isLoadingAssignments } = useQuery({
-    queryKey: ['preset-assignments'],
+    queryKey: ['preset-assignments', userDepartment],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('day_preset_assignments')
         .select(`
           *,
-          preset:presets (
+          preset:presets!inner (
             *,
             items:preset_items (
               *,
@@ -58,6 +61,7 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
             )
           )
         `)
+        .eq('preset.department', (userDepartment || '').toString())
         .order('date');
 
       if (error) {
@@ -143,6 +147,59 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
 
   const isLoading = isLoadingAssignments;
 
+  // Build quick info for tooltips (preset names + conflict status)
+  const infoByDate = useMemo(() => {
+    const map: Record<string, { names: string[]; count: number; conflict: boolean } > = {};
+    (presetAssignments || []).forEach((a: any) => {
+      const key = a.date;
+      if (!map[key]) map[key] = { names: [], count: 0, conflict: false };
+      map[key].count += 1;
+      if (a?.preset?.name) map[key].names.push(a.preset.name);
+    });
+    Object.keys(map).forEach(d => { map[d].conflict = hasConflict(new Date(d)); });
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetAssignments, stockData]);
+
+  // Custom Day with hover details
+  function DayWithHover(props: DayProps) {
+    const { date, displayMonth, buttonProps } = props as any;
+    if (!date || (displayMonth && date.getMonth() !== displayMonth.getMonth())) {
+      return <button {...buttonProps} />;
+    }
+    const key = format(date, 'yyyy-MM-dd');
+    const info = infoByDate[key];
+    const hasData = !!info;
+    const btnClass = cn(buttonProps?.className);
+    return (
+      <TooltipProvider>
+        <Tooltip delayDuration={150}>
+          <TooltipTrigger asChild>
+            <button {...buttonProps} className={btnClass} title={undefined}>
+              {date.getDate()}
+            </button>
+          </TooltipTrigger>
+          {hasData && (
+            <TooltipContent side="top" align="center" className="w-64">
+              <div className="space-y-2">
+                <div className="text-sm font-medium">{format(date, 'PPP')}</div>
+                <div className="text-sm">Presets: {info.count}</div>
+                {info.names.length > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    {info.names.map((n, i) => (<div key={i}>• {n}</div>))}
+                  </div>
+                )}
+                {info.conflict && (
+                  <div className="text-xs text-red-600 font-medium">Conflicts detected</div>
+                )}
+              </div>
+            </TooltipContent>
+          )}
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
   const navigateToToday = () => {
     const today = new Date();
     if (onDateSelect) {
@@ -151,7 +208,7 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
   };
 
   return (
-    <Card className="p-4">
+    <Card className="inline-block p-2 md:p-3">
       {/* Mobile controls */}
       {isMobile && (
         <div className="flex items-center justify-between mb-4">
@@ -183,7 +240,12 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect }: Disponibi
         mode="single"
         selected={selectedDate}
         onSelect={onDateSelect}
-        className="rounded-md border"
+        className="w-fit mx-auto rounded-md border"
+        classNames={{
+          caption: "flex justify-center pt-1 relative items-center",
+          table: "w-fit border-collapse space-y-1",
+        }}
+        components={{ Day: DayWithHover }}
         modifiers={modifiers}
         modifiersStyles={modifiersStyles}
         disabled={isLoading}

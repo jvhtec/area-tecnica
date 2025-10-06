@@ -13,17 +13,18 @@ import { WeeklySummary } from '@/components/disponibilidad/WeeklySummary';
 import { QuickPresetAssignment } from '@/components/disponibilidad/QuickPresetAssignment';
 import { SubRentalManager } from '@/components/equipment/SubRentalManager';
 import { DepartmentProvider } from '@/contexts/DepartmentContext';
-import { useOptimizedTableSubscriptions } from '@/hooks/useOptimizedSubscriptions';
 
-export default function SoundDisponibilidad() {
+export default function Disponibilidad() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPresetDialog, setShowPresetDialog] = useState(false);
   const navigate = useNavigate();
-  const { session } = useOptimizedAuth();
+  const { session, userDepartment } = useOptimizedAuth();
   const { toast } = useToast();
 
+  const department = (userDepartment || 'sound') as 'sound' | 'lights' | 'video';
+
   const { data: assignedPresets } = useQuery({
-    queryKey: ['preset-assignments', 'sound', selectedDate],
+    queryKey: ['preset-assignments', department, selectedDate],
     queryFn: async () => {
       if (!selectedDate) return null;
       
@@ -37,7 +38,7 @@ export default function SoundDisponibilidad() {
             department
           )
         `)
-        .eq('preset.department', 'sound')
+        .eq('preset.department', department)
         .eq('date', format(selectedDate, 'yyyy-MM-dd'))
         .order('order', { ascending: true });
 
@@ -55,21 +56,11 @@ export default function SoundDisponibilidad() {
     enabled: !!selectedDate
   });
 
-  // Realtime: subscribe to assignments and stock affecting this view
-  useOptimizedTableSubscriptions([
-    { table: 'day_preset_assignments', queryKey: ['preset-assignments'], priority: 'high' },
-    { table: 'preset_items', queryKey: ['preset-assignments'], priority: 'medium' },
-    { table: 'presets', queryKey: ['presets'], priority: 'low' },
-    { table: 'equipment', queryKey: ['equipment-with-stock', 'sound'], priority: 'low' },
-    { table: 'current_stock_levels', queryKey: ['equipment-with-stock', 'sound'], priority: 'medium' },
-    { table: 'sub_rentals', queryKey: ['equipment-with-stock', 'sound'], priority: 'medium' },
-  ]);
-
   return (
-    <DepartmentProvider department="sound">
+    <DepartmentProvider department={department}>
       <div className="container mx-auto py-6 space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Presets de Sonido</h1>
+          <h1 className="text-2xl font-bold">Disponibilidad · {department}</h1>
           <div className="flex gap-2">
             <Button 
               variant="outline"
@@ -133,3 +124,4 @@ export default function SoundDisponibilidad() {
     </DepartmentProvider>
   );
 }
+

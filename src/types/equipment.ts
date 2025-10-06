@@ -10,6 +10,9 @@ export type Preset = {
   id: string;
   name: string;
   user_id: string;
+  department?: string;
+  created_by?: string | null;
+  tour_id?: string | null;
   created_at?: string;
   updated_at?: string;
 };

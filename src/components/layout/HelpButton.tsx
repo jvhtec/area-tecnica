@@ -31,7 +31,7 @@ const routeToSection: Record<string, string> = {
   "/excel-tool": "#exceltool",
   "/hoja-de-ruta": "#hojaderuta",
   "/labor-po-form": "#laborpoform",
-  "/lights-disponibilidad": "#lightsdisponibilidad",
+  "/disponibilidad": "#lightsdisponibilidad",
   "/festival-management": "#festivalmanagement",
   "/auth": "#auth",
 };

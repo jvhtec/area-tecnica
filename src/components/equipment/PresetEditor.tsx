@@ -8,20 +8,29 @@ import { PresetWithItems, Equipment, PresetItem } from '@/types/equipment';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Save, X } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useDepartment } from '@/contexts/DepartmentContext';
 
 interface PresetEditorProps {
   preset?: PresetWithItems;
   isCopy?: boolean;
-  onSave: (name: string, items: Omit<PresetItem, 'id' | 'preset_id'>[]) => void;
+  onSave: (name: string, items: Omit<PresetItem, 'id' | 'preset_id'>[], tourId?: string | null) => void;
   onCancel: () => void;
+  fixedTourId?: string; // If provided, hide Tour selection and force this value
 }
 
-export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel }: PresetEditorProps) => {
+export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTourId }: PresetEditorProps) => {
   const { session } = useOptimizedAuth();
   const { department } = useDepartment();
   const [name, setName] = useState(preset?.name || '');
+  const [selectedTourId, setSelectedTourId] = useState<string | undefined | null>(fixedTourId ?? (preset as any)?.tour_id ?? undefined);
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
     if (!preset?.items) return {};
     return preset.items.reduce((acc, item) => {
@@ -42,6 +51,20 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel }: Prese
       if (error) throw error;
       return equipment as Equipment[];
     }
+  });
+
+  // Fetch tours when no fixed tour is enforced
+  const { data: tours } = useQuery({
+    queryKey: ['tours'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tours')
+        .select('id, name, status')
+        .order('name');
+      if (error) throw error;
+      return data as Array<{ id: string; name: string; status: string }>;
+    },
+    enabled: !fixedTourId
   });
 
   const handleQuantityChange = (equipmentId: string, value: string) => {
@@ -68,7 +91,7 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel }: Prese
         updated_at: now
       }));
 
-    onSave(name, items);
+    onSave(name, items, (fixedTourId ?? selectedTourId) || null);
   };
 
   return (
@@ -90,6 +113,27 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel }: Prese
               className="mt-1"
             />
           </div>
+          {!fixedTourId && (
+            <div>
+              <Label>Tour (optional)</Label>
+              <Select
+                value={selectedTourId ?? 'no-tour'}
+                onValueChange={(val) => setSelectedTourId(val === 'no-tour' ? null : val)}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="No tour (standalone preset)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no-tour">No tour</SelectItem>
+                  {tours?.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <ScrollArea className="h-[400px] pr-4">
             <div className="space-y-4">
               {equipmentList?.map((equipment) => (

@@ -87,7 +87,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
     }
   });
 
-  const handleSavePreset = async (name: string, items: Omit<PresetItem, 'id' | 'preset_id'>[]) => {
+  const handleSavePreset = async (name: string, items: Omit<PresetItem, 'id' | 'preset_id'>[], tourId?: string | null) => {
     try {
       if (!session?.user?.id) throw new Error('Must be logged in');
 
@@ -95,7 +95,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
         // Update existing preset
         const { error: presetError } = await supabase
           .from('presets')
-          .update({ name })
+          .update({ name, tour_id: tourId ?? null })
           .eq('id', editingPreset.id);
 
         if (presetError) throw presetError;
@@ -130,7 +130,8 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
             created_by: session.user.id,
             user_id: session.user.id, // Keep for backwards compatibility
             is_template: false,
-            department: department
+            department: department,
+            tour_id: tourId ?? null
           })
           .select()
           .single();

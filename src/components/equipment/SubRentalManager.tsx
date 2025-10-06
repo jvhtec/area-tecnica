@@ -14,6 +14,9 @@ import { useDepartment } from '@/contexts/DepartmentContext';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon } from 'lucide-react';
+import { ChevronsUpDown } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useOptimizedTableSubscriptions } from '@/hooks/useOptimizedSubscriptions';
 import {
   Select,
   SelectContent,
@@ -24,6 +27,7 @@ import {
 
 interface SubRental {
   id: string;
+  batch_id?: string;
   equipment_id: string;
   quantity: number;
   start_date: string;
@@ -42,11 +46,20 @@ export function SubRentalManager() {
   const queryClient = useQueryClient();
   const { department } = useDepartment();
   const [isAdding, setIsAdding] = useState(false);
-  const [selectedEquipment, setSelectedEquipment] = useState<string>('');
-  const [quantity, setQuantity] = useState<number>(1);
+  const [isOpen, setIsOpen] = useState(false); // collapsed by default
+  // Support multiple items in a single sub-rental action
+  const [items, setItems] = useState<Array<{ equipment_id: string; quantity: number }>>([
+    { equipment_id: '', quantity: 1 }
+  ]);
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
   const [notes, setNotes] = useState('');
+
+  // Realtime: refresh sub-rentals list and stock view when changes occur elsewhere
+  useOptimizedTableSubscriptions([
+    { table: 'sub_rentals', queryKey: ['sub-rentals', department], priority: 'high' },
+    { table: 'sub_rentals', queryKey: ['equipment-with-stock', department], priority: 'medium' },
+  ]);
 
   const { data: equipmentList } = useQuery({
     queryKey: ['equipment', department],
@@ -62,7 +75,7 @@ export function SubRentalManager() {
     }
   });
 
-  const { data: subRentals } = useQuery({
+  const { data: subRentals = [] } = useQuery({
     queryKey: ['sub-rentals', department],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -79,40 +92,67 @@ export function SubRentalManager() {
         .order('start_date', { ascending: false });
       
       if (error) throw error;
-      return data as SubRental[];
+      return (data || []) as SubRental[];
     }
   });
+
+  // Group sub-rentals by creation batch
+  const batches = Object.values(
+    (subRentals as SubRental[]).reduce((acc: Record<string, { batchId: string; start: string; end: string; notes: string | null; items: SubRental[]; total: number }>, r) => {
+      const key = r.batch_id || r.id;
+      if (!acc[key]) {
+        acc[key] = { batchId: key, start: r.start_date, end: r.end_date, notes: r.notes || null, items: [], total: 0 };
+      }
+      acc[key].items.push(r);
+      acc[key].total += r.quantity;
+      return acc;
+    }, {})
+  ).sort((a, b) => new Date(b.start).getTime() - new Date(a.start).getTime());
 
   // Add sub-rental mutation
   const addSubRentalMutation = useMutation({
     mutationFn: async () => {
-      if (!session?.user?.id || !selectedEquipment || !startDate || !endDate) {
+      if (!session?.user?.id || !startDate || !endDate) {
         throw new Error('Missing required fields');
       }
 
-      const { error } = await supabase
-        .from('sub_rentals')
-        .insert({
-          equipment_id: selectedEquipment,
-          quantity,
-          start_date: format(startDate, 'yyyy-MM-dd'),
-          end_date: format(endDate, 'yyyy-MM-dd'),
-          notes: notes || null,
-          created_by: session.user.id
-        });
+      // Validate at least one complete line item
+      const validItems = items.filter(
+        (it) => it.equipment_id && (it.quantity ?? 0) > 0
+      );
+      if (validItems.length === 0) {
+        throw new Error('Add at least one item');
+      }
+
+      // Bulk insert with shared batch id so items are grouped together
+      const batchId = (typeof crypto !== 'undefined' && (crypto as any).randomUUID)
+        ? (crypto as any).randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const payload = validItems.map((it) => ({
+        equipment_id: it.equipment_id,
+        quantity: it.quantity,
+        start_date: format(startDate, 'yyyy-MM-dd'),
+        end_date: format(endDate, 'yyyy-MM-dd'),
+        notes: notes || null,
+        created_by: session.user.id,
+        department: department,
+        batch_id: batchId
+      }));
+
+      const { error } = await supabase.from('sub_rentals').insert(payload);
 
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sub-rentals'] });
+      queryClient.invalidateQueries({ queryKey: ['sub-rentals-week'] });
       queryClient.invalidateQueries({ queryKey: ['equipment-with-stock'] });
       toast({
         title: "Success",
-        description: "Sub-rental added successfully"
+        description: "Sub-rental items added successfully"
       });
       // Reset form
-      setSelectedEquipment('');
-      setQuantity(1);
+      setItems([{ equipment_id: '', quantity: 1 }]);
       setStartDate(undefined);
       setEndDate(undefined);
       setNotes('');
@@ -139,6 +179,7 @@ export function SubRentalManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sub-rentals'] });
+      queryClient.invalidateQueries({ queryKey: ['sub-rentals-week'] });
       queryClient.invalidateQueries({ queryKey: ['equipment-with-stock'] });
       toast({
         title: "Success",
@@ -155,46 +196,89 @@ export function SubRentalManager() {
   });
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex justify-between items-center">
-          <CardTitle>Sub-Rentals (Temporary Stock Boosts)</CardTitle>
-          {!isAdding && (
-            <Button onClick={() => setIsAdding(true)} size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Sub-Rental
-            </Button>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle>Sub-Rentals (Temporary Stock Boosts)</CardTitle>
+            <div className="flex items-center gap-2">
+              {!isAdding && (
+                <Button onClick={() => { setIsAdding(true); setIsOpen(true); }} size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Sub-Rental
+                </Button>
+              )}
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" aria-label="Toggle">
+                  <ChevronsUpDown className="h-4 w-4" />
+                </Button>
+              </CollapsibleTrigger>
+            </div>
+          </div>
+        </CardHeader>
+        <CollapsibleContent>
+        <CardContent className="space-y-4">
         {isAdding && (
           <Card className="p-4 border-2 border-primary">
             <div className="space-y-4">
-              <div>
-                <Label>Equipment</Label>
-                <Select value={selectedEquipment} onValueChange={setSelectedEquipment}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select equipment" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {equipmentList?.map((eq) => (
-                      <SelectItem key={eq.id} value={eq.id}>
-                        {eq.name} ({eq.category})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label>Quantity</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  value={quantity}
-                  onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                />
+              <div className="space-y-2">
+                <Label>Items</Label>
+                {items.map((it, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-end">
+                    <div className="col-span-8">
+                      <Select
+                        value={it.equipment_id}
+                        onValueChange={(val) => {
+                          setItems((prev) => prev.map((p, i) => i === idx ? { ...p, equipment_id: val } : p));
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select equipment" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {equipmentList?.map((eq) => (
+                            <SelectItem key={eq.id} value={eq.id}>
+                              {eq.name} ({eq.category})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-3">
+                      <Input
+                        type="number"
+                        min="1"
+                        value={it.quantity}
+                        onChange={(e) => {
+                          const q = parseInt(e.target.value) || 1;
+                          setItems((prev) => prev.map((p, i) => i === idx ? { ...p, quantity: q } : p));
+                        }}
+                      />
+                    </div>
+                    <div className="col-span-1 flex justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
+                        disabled={items.length === 1}
+                        title={items.length === 1 ? 'At least one item required' : 'Remove item'}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                <div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setItems((prev) => [...prev, { equipment_id: '', quantity: 1 }])}
+                  >
+                    <Plus className="h-4 w-4 mr-2" /> Add another item
+                  </Button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -254,9 +338,13 @@ export function SubRentalManager() {
                 <Button variant="outline" onClick={() => setIsAdding(false)}>
                   Cancel
                 </Button>
-                <Button 
+                <Button
                   onClick={() => addSubRentalMutation.mutate()}
-                  disabled={!selectedEquipment || !startDate || !endDate}
+                  disabled={
+                    !startDate ||
+                    !endDate ||
+                    items.filter((it) => it.equipment_id && (it.quantity ?? 0) > 0).length === 0
+                  }
                 >
                   Add Sub-Rental
                 </Button>
@@ -266,40 +354,43 @@ export function SubRentalManager() {
         )}
 
         <div className="space-y-2">
-          {subRentals?.map((rental) => (
-            <Card key={rental.id} className="p-4">
-              <div className="flex justify-between items-start">
-                <div className="space-y-1">
-                  <div className="font-medium">{rental.equipment?.name}</div>
-                  <div className="text-sm text-muted-foreground">
-                    +{rental.quantity} units
-                  </div>
-                  <div className="text-sm">
-                    {format(new Date(rental.start_date), 'PPP')} → {format(new Date(rental.end_date), 'PPP')}
-                  </div>
-                  {rental.notes && (
-                    <div className="text-sm text-muted-foreground italic">
-                      {rental.notes}
+          {batches.map((batch) => (
+            <Card key={batch.batchId} className="p-4">
+              <div className="space-y-1">
+                <div className="font-medium">{format(new Date(batch.start), 'PPP')} → {format(new Date(batch.end), 'PPP')}</div>
+                <div className="text-sm text-muted-foreground">Total: +{batch.total} units</div>
+                {batch.notes && (
+                  <div className="text-sm text-muted-foreground italic">{batch.notes}</div>
+                )}
+              </div>
+              <div className="mt-3 space-y-2">
+                {batch.items.map((rental) => (
+                  <div key={rental.id} className="flex items-start justify-between border rounded-md p-2">
+                    <div className="text-sm">
+                      <div>+{rental.quantity} · {rental.equipment?.name} ({rental.equipment?.category})</div>
                     </div>
-                  )}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => deleteSubRentalMutation.mutate(rental.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => deleteSubRentalMutation.mutate(rental.id)}
+                      title="Remove sub-rental item"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
               </div>
             </Card>
           ))}
-          {(!subRentals || subRentals.length === 0) && !isAdding && (
+          {subRentals.length === 0 && !isAdding && (
             <p className="text-muted-foreground text-center py-4">
               No sub-rentals active
             </p>
           )}
         </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }

@@ -222,32 +222,17 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
               </Link>
             )}
             
-            {/* Lights Disponibilidad - for management and lights house techs */}
-            {(isManagementUser || isLightsHouseTech) && (
-              <Link to="/lights-disponibilidad">
+            {/* Disponibilidad - single entry, routes based on user's department */}
+            {(isManagementUser || userRole === 'house_tech') && (
+              <Link to="/disponibilidad">
                 <Button
                   variant="ghost"
                   className={`w-full justify-start gap-2 ${
-                    location.pathname === "/lights-disponibilidad" ? "bg-accent" : ""
+                    location.pathname === "/disponibilidad" ? "bg-accent" : ""
                   }`}
                 >
                   <CalendarCheck className="h-4 w-4" />
-                  <span>Lights Disponibilidad</span>
-                </Button>
-              </Link>
-            )}
-            
-            {/* Sound Disponibilidad - for management and sound house techs */}
-            {(isManagementUser || isSoundHouseTech) && (
-              <Link to="/sound-disponibilidad">
-                <Button
-                  variant="ghost"
-                  className={`w-full justify-start gap-2 ${
-                    location.pathname === "/sound-disponibilidad" ? "bg-accent" : ""
-                  }`}
-                >
-                  <CalendarCheck className="h-4 w-4" />
-                  <span>Sound Disponibilidad</span>
+                  <span>Disponibilidad</span>
                 </Button>
               </Link>
             )}

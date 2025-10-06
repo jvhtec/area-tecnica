@@ -509,6 +509,8 @@ export type Database = {
           id: string
           order: number | null
           preset_id: string
+          source: string | null
+          source_id: string | null
           updated_at: string | null
           user_id: string
         }
@@ -519,6 +521,8 @@ export type Database = {
           id?: string
           order?: number | null
           preset_id: string
+          source?: string | null
+          source_id?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -529,6 +533,8 @@ export type Database = {
           id?: string
           order?: number | null
           preset_id?: string
+          source?: string | null
+          source_id?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -3661,8 +3667,10 @@ export type Database = {
           created_by: string | null
           department: string
           id: string
+          job_id: string | null
           is_template: boolean | null
           name: string
+          tour_id: string | null
           updated_at: string | null
           user_id: string | null
         }
@@ -3671,8 +3679,10 @@ export type Database = {
           created_by?: string | null
           department?: string
           id?: string
+          job_id?: string | null
           is_template?: boolean | null
           name: string
+          tour_id?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -3681,12 +3691,29 @@ export type Database = {
           created_by?: string | null
           department?: string
           id?: string
+          job_id?: string | null
           is_template?: boolean | null
           name?: string
+          tour_id?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "presets_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presets_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profile_skills: {
         Row: {
@@ -4208,6 +4235,7 @@ export type Database = {
       }
       sub_rentals: {
         Row: {
+          batch_id: string
           created_at: string | null
           created_by: string | null
           department: string
@@ -4220,6 +4248,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          batch_id?: string
           created_at?: string | null
           created_by?: string | null
           department?: string
@@ -4232,6 +4261,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          batch_id?: string
           created_at?: string | null
           created_by?: string | null
           department?: string
