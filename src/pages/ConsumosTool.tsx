@@ -76,7 +76,7 @@ const ConsumosTool: React.FC = () => {
 
   // NEW: supply type, PF, and voltage (auto from supply type)
   const [phaseMode, setPhaseMode] = useState<'single' | 'three'>('three');
-  const [pf, setPf] = useState<number>(0.83);
+  const [pf, setPf] = useState<number>(0.95);
   const [voltage, setVoltage] = useState<number>(400); // 400 V LL for 3φ by default (Spain)
 
   useEffect(() => {
@@ -685,7 +685,7 @@ const ConsumosTool: React.FC = () => {
                 value={pf}
                 onChange={(e) => setPf(Math.max(0.1, Math.min(1, Number(e.target.value) || 0.83)))}
               />
-              <p className="text-xs text-muted-foreground">Usa 0.8–0.9 si no tienes medición real.</p>
+              <p className="text-xs text-muted-foreground">Usa 0.9 si la PDU mezcla amplificadores nuevos y viejos (p.ej LA8).</p>
             </div>
           </div>
 
