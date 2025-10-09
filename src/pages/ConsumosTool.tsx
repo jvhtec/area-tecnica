@@ -18,9 +18,9 @@ import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeade
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 
 const soundComponentDatabase = [
-  { id: 1, name: 'LA12X', watts: 2900 },
-  { id: 2, name: 'LA8', watts: 2500 },
-  { id: 3, name: 'LA4X', watts: 2000 },
+  { id: 1, name: 'LA12X', watts: 2000 },
+  { id: 2, name: 'LA8', watts: 1500 },
+  { id: 3, name: 'LA4X', watts: 750 },
   { id: 4, name: 'PLM20000D', watts: 2900 },
   { id: 5, name: 'Control FoH (L)', watts: 3500 },
   { id: 6, name: 'Control FoH (S)', watts: 1500 },
