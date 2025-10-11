@@ -25,11 +25,15 @@ export const ForgotPasswordForm = ({ onBack }: ForgotPasswordFormProps) => {
       return;
     }
 
+    console.log('[ForgotPassword] Requesting reset for:', email);
+
     try {
       await requestPasswordReset(email);
+      console.log('[ForgotPassword] Reset request successful');
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message || "Failed to send password reset email");
+      console.error('[ForgotPassword] Error:', err);
+      setError(err.message || "Failed to send password reset email. Please try again.");
     }
   };
 
