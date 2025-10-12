@@ -37,8 +37,8 @@ const handler = async (req: Request): Promise<Response> => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Check if user exists (silently)
-    const { data: users, error: userError } = await supabase.auth.admin.listUsers();
+    // Check if user exists by email (more reliable than paginated listUsers)
+    const { data: { user }, error: userError } = await supabase.auth.admin.getUserByEmail(email.toLowerCase());
 
     if (userError) {
       console.error("[Password Reset] Error checking user:", userError);
@@ -54,8 +54,6 @@ const handler = async (req: Request): Promise<Response> => {
         }
       );
     }
-
-    const user = users.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
 
     if (!user) {
       console.log(`[Password Reset] User not found for: ${email}`);
