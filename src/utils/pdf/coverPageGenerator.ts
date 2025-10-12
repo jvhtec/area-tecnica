@@ -185,7 +185,7 @@ export const generateCoverPage = async (
     }
     
     const pdfBytes = await pdfDoc.save();
-    return new Blob([pdfBytes], { type: 'application/pdf' });
+    return new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
   } catch (error) {
     console.error("Error generating cover page:", error);
     throw error;

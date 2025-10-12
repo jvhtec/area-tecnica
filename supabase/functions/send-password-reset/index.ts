@@ -73,7 +73,10 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Generate recovery link using admin API
-    const redirectUrl = `${Deno.env.get('PUBLIC_CONFIRM_BASE') || 'http://localhost:3000'}/auth?type=recovery`;
+    // Get origin from request headers for dynamic URL detection
+    const origin = req.headers.get('origin') || req.headers.get('referer')?.split('?')[0].replace(/\/$/, '');
+    const baseUrl = origin || Deno.env.get('PUBLIC_CONFIRM_BASE') || 'http://localhost:3000';
+    const redirectUrl = `${baseUrl}/auth?type=recovery`;
     
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
       type: 'recovery',

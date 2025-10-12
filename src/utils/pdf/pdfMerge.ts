@@ -73,7 +73,7 @@ export const mergePDFs = async (pdfBlobs: Blob[]): Promise<Blob> => {
     
     console.log(`Successfully merged ${pageCount} pages`);
     const mergedPdfBytes = await mergedPdf.save();
-    return new Blob([mergedPdfBytes], { type: 'application/pdf' });
+    return new Blob([new Uint8Array(mergedPdfBytes)], { type: 'application/pdf' });
   } catch (error) {
     console.error('Error merging PDFs:', error);
     throw new Error(`Failed to merge PDF documents: ${error.message}`);

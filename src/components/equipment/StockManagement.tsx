@@ -68,6 +68,7 @@ export function StockManagement() {
                         id: item.equipment_id,
                         name: item.equipment_name,
                         category: item.category,
+                        department: item.department,
                         created_at: new Date().toISOString(),
                         updated_at: new Date().toISOString()
                       })}
@@ -81,6 +82,7 @@ export function StockManagement() {
                         id: item.equipment_id,
                         name: item.equipment_name,
                         category: item.category,
+                        department: item.department,
                         created_at: new Date().toISOString(),
                         updated_at: new Date().toISOString()
                       })}

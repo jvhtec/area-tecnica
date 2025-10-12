@@ -70,9 +70,9 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     { table: 'current_stock_levels', queryKey: ['equipment-with-stock', department], priority: 'high' },
     { table: 'equipment', queryKey: ['equipment-with-stock', department], priority: 'medium' },
     { table: 'sub_rentals', queryKey: ['equipment-with-stock', department], priority: 'high' },
-    { table: 'day_preset_assignments', queryKey: ['week-preset-assignments', department, currentWeekStart], priority: 'high' },
-    { table: 'preset_items', queryKey: ['week-preset-assignments', department, currentWeekStart], priority: 'medium' },
-    { table: 'presets', queryKey: ['week-preset-assignments', department, currentWeekStart], priority: 'low' },
+    { table: 'day_preset_assignments', queryKey: ['week-preset-assignments', department, format(currentWeekStart, 'yyyy-MM-dd')], priority: 'high' },
+    { table: 'preset_items', queryKey: ['week-preset-assignments', department, format(currentWeekStart, 'yyyy-MM-dd')], priority: 'medium' },
+    { table: 'presets', queryKey: ['week-preset-assignments', department, format(currentWeekStart, 'yyyy-MM-dd')], priority: 'low' },
   ]);
 
   // Fetch base stock (without per-day rentals). We use the view but only read base_quantity.

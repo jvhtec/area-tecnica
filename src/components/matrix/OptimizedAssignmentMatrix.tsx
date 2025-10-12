@@ -255,6 +255,11 @@ export const OptimizedAssignmentMatrix = ({
     syncScrollPositions(mainScrollRef.current?.scrollLeft || 0, scrollTop, 'technician');
   }, [syncScrollPositions]);
 
+  const [availabilityPreferredChannel, setAvailabilityPreferredChannel] = useState<null | 'email' | 'whatsapp'>(null);
+  const [offerChannel, setOfferChannel] = useState<'email' | 'whatsapp'>('email');
+  const [offerPreferredChannel, setOfferPreferredChannel] = useState<null | 'email' | 'whatsapp'>(null);
+  const [availabilityDialog, setAvailabilityDialog] = useState<null | { open: boolean; jobId: string; profileId: string; dateIso: string; singleDay: boolean }>(null);
+
   const closeDialogs = useCallback(() => {
     setCellAction(null);
     setSelectedCells(new Set());
@@ -263,10 +268,6 @@ export const OptimizedAssignmentMatrix = ({
     // Invalidate queries when closing dialogs to refresh data
     invalidateAssignmentQueries();
   }, [invalidateAssignmentQueries]);
-
-  const [availabilityPreferredChannel, setAvailabilityPreferredChannel] = useState<null | 'email' | 'whatsapp'>(null);
-  const [offerChannel, setOfferChannel] = useState<'email' | 'whatsapp'>('email');
-  const [offerPreferredChannel, setOfferPreferredChannel] = useState<null | 'email' | 'whatsapp'>(null);
 
   const handleCellClick = useCallback((technicianId: string, date: Date, action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details' | 'offer-details-wa' | 'availability-wa', selectedJobId?: string) => {
     console.log('Matrix handling cell click:', { technicianId, date: format(date, 'yyyy-MM-dd'), action });
@@ -505,8 +506,7 @@ export const OptimizedAssignmentMatrix = ({
 
   const currentTechnician = getCurrentTechnician();
 
-  // Availability channel dialog state
-  const [availabilityDialog, setAvailabilityDialog] = useState<null | { open: boolean; jobId: string; profileId: string; dateIso: string; singleDay: boolean }>(null);
+  // Availability channel dialog state (moved up before usage)
   const [availabilityChannel, setAvailabilityChannel] = useState<'email' | 'whatsapp'>('email');
   const [availabilitySending, setAvailabilitySending] = useState(false);
 

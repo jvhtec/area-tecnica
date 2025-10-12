@@ -20,6 +20,7 @@ import { useOptimizedTableSubscriptions } from '@/hooks/useOptimizedSubscription
 export default function SoundDisponibilidad() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPresetDialog, setShowPresetDialog] = useState(false);
+  const [logoMap, setLogoMap] = useState<Record<string, string | undefined>>({});
   const navigate = useNavigate();
   const { session } = useOptimizedAuth();
   const { toast } = useToast();
@@ -77,6 +78,26 @@ export default function SoundDisponibilidad() {
     { table: 'current_stock_levels', queryKey: ['equipment-with-stock', 'sound'], priority: 'medium' },
     { table: 'sub_rentals', queryKey: ['equipment-with-stock', 'sound'], priority: 'medium' },
   ]);
+
+  // Fetch job logos for display
+  const jobIds = useMemo(() => (
+    (assignedPresets || [])
+      .map((a: any) => a?.preset?.job?.id)
+      .filter(Boolean)
+  ), [assignedPresets]);
+
+  useEffect(() => {
+    let ignore = false;
+    const unique = Array.from(new Set(jobIds as string[]));
+    (async () => {
+      for (const id of unique) {
+        if (logoMap[id]) continue;
+        const url = await fetchJobLogo(id);
+        if (!ignore) setLogoMap(prev => ({ ...prev, [id]: url }));
+      }
+    })();
+    return () => { ignore = true };
+  }, [jobIds, logoMap]);
 
   return (
     <DepartmentProvider department="sound">
@@ -191,21 +212,3 @@ export default function SoundDisponibilidad() {
     </DepartmentProvider>
   );
 }
-  const jobIds = useMemo(() => (
-    (assignedPresets || [])
-      .map((a: any) => a?.preset?.job?.id)
-      .filter(Boolean)
-  ), [assignedPresets]);
-  const [logoMap, setLogoMap] = useState<Record<string, string | undefined>>({});
-  useEffect(() => {
-    let ignore = false;
-    const unique = Array.from(new Set(jobIds as string[]));
-    (async () => {
-      for (const id of unique) {
-        if (logoMap[id]) continue;
-        const url = await fetchJobLogo(id);
-        if (!ignore) setLogoMap(prev => ({ ...prev, [id]: url }));
-      }
-    })();
-    return () => { ignore = true };
-  }, [jobIds]);
