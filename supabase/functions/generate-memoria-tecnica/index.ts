@@ -355,7 +355,9 @@ serve(async (req) => {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/pdf'
+            'Content-Type': 'application/pdf',
+            // Allow overwriting existing files to avoid 409 Duplicate errors
+            'x-upsert': 'true'
           },
           body: pdfBytes
         });
@@ -374,14 +376,25 @@ serve(async (req) => {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${supabaseKey}`,
-              'Content-Type': 'application/pdf'
+              'Content-Type': 'application/pdf',
+              'x-upsert': 'true'
             },
             body: pdfBytes
           });
           if (retryResp.ok) { selectedBucket = candidate; break; }
           lastUploadErr = new Error(`Upload retry failed: ${retryResp.status} ${retryResp.statusText} ${await retryResp.text()}`);
+        } else if (uploadResp.status === 409) {
+          // Duplicate resource: treat as success since file already exists
+          selectedBucket = candidate;
+          break;
         } else {
-          lastUploadErr = new Error(`Upload failed: ${uploadResp.status} ${uploadResp.statusText} ${await uploadResp.text()}`);
+          const bodyTxt = await uploadResp.text();
+          // Some gateways respond 400 with a JSON body carrying statusCode=409 for duplicates
+          if (bodyTxt.includes('"statusCode"') && bodyTxt.includes('409') && bodyTxt.toLowerCase().includes('duplicate')) {
+            selectedBucket = candidate;
+            break;
+          }
+          lastUploadErr = new Error(`Upload failed: ${uploadResp.status} ${uploadResp.statusText} ${bodyTxt}`);
         }
       } catch (e) {
         lastUploadErr = e;

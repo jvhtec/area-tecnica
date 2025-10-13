@@ -484,10 +484,22 @@ serve(async (req: Request) => {
     try {
       const msgBody = { chatId: wa_group_id, text: message, session } as const;
       const sendUrl = `${base}/api/sendText`;
-      const sendRes = await fetch(sendUrl, { method: 'POST', headers, body: JSON.stringify(msgBody) });
-      if (!sendRes.ok) {
-        const errTxt = await sendRes.text().catch(() => '');
-        console.warn('WAHA sendText failed', { status: sendRes.status, url: sendUrl, body: errTxt });
+      const timeoutMs = Number(Deno.env.get('WAHA_FETCH_TIMEOUT_MS') || 15000);
+      const controller = new AbortController();
+      const to = setTimeout(() => controller.abort(new DOMException('timeout','AbortError')), timeoutMs);
+      try {
+        const sendRes = await fetch(sendUrl, { method: 'POST', headers, body: JSON.stringify(msgBody), signal: controller.signal });
+        if (!sendRes.ok) {
+          const errTxt = await sendRes.text().catch(() => '');
+          if (sendRes.status === 524) {
+            const ray = (errTxt.match(/Cloudflare Ray ID:\s*<strong[^>]*>([^<]+)/i)?.[1]) || null;
+            console.warn('WAHA sendText timeout via Cloudflare (524)', { status: sendRes.status, url: sendUrl, rayId: ray });
+          } else {
+            console.warn('WAHA sendText failed', { status: sendRes.status, url: sendUrl, body: errTxt });
+          }
+        }
+      } finally {
+        clearTimeout(to);
       }
     } catch (_) { /* ignore */ }
 

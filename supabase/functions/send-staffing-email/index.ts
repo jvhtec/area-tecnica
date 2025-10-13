@@ -530,7 +530,12 @@ serve(async (req) => {
         const sendUrl = `${base}/api/sendText`;
         const msgBody = { chatId, text, session, linkPreview: false } as const;
         console.log('📤 SENDING WHATSAPP VIA WAHA...', { chatId: '***@c.us', sendUrl });
-        const waRes = await fetch(sendUrl, { method: 'POST', headers: headersWA, body: JSON.stringify(msgBody) });
+        // Add timeout + clearer logging for Cloudflare 524
+        const timeoutMs = Number(Deno.env.get('WAHA_FETCH_TIMEOUT_MS') || 15000);
+        const controller = new AbortController();
+        const to = setTimeout(() => controller.abort(new DOMException('timeout','AbortError')), timeoutMs);
+        const waRes = await fetch(sendUrl, { method: 'POST', headers: headersWA, body: JSON.stringify(msgBody), signal: controller.signal });
+        clearTimeout(to);
         console.log('📤 WAHA RESPONSE:', { status: waRes.status, ok: waRes.ok });
         await supabase.from('staffing_events').insert({ staffing_request_id: insertedId, event: 'whatsapp_sent', meta: { phase, status: waRes.status, role: role ?? null } });
         if (waRes.ok) {
@@ -556,6 +561,10 @@ serve(async (req) => {
           return new Response(JSON.stringify({ success: true, channel: 'whatsapp' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         } else {
           const errTxt = await waRes.text().catch(() => '');
+          if (waRes.status === 524) {
+            const ray = (errTxt.match(/Cloudflare Ray ID:\s*<strong[^>]*>([^<]+)/i)?.[1]) || null;
+            console.warn('[send-staffing-email] WAHA sendText timeout via Cloudflare (524)', { status: waRes.status, rayId: ray });
+          }
           return new Response(JSON.stringify({ error: 'WhatsApp delivery failed', details: { status: waRes.status, body: errTxt } }), { status: waRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
       } else {

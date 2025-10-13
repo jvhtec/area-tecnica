@@ -90,15 +90,40 @@ serve(async (req: Request) => {
 
     const sendUrl = `${base}/api/sendText`;
     const payload = { chatId: WAREHOUSE_SOUND_GROUP, text: msg, session, linkPreview: false } as const;
+
+    // Fetch with timeout + Cloudflare 524 awareness
+    const timeoutMs = Number(Deno.env.get('WAHA_FETCH_TIMEOUT_MS') || 15000);
+    const fetchWithTimeout = async (url: string, init: RequestInit, ms: number) => {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(new DOMException('timeout','AbortError')), ms);
+      try {
+        return await fetch(url, { ...init, signal: controller.signal });
+      } finally {
+        clearTimeout(id);
+      }
+    };
+    const parseCF524 = (body: string) => {
+      const is524 = /Error code\s*524/i.test(body) || /cloudflare/i.test(body);
+      if (!is524) return null;
+      const ray = (body.match(/Cloudflare Ray ID:\s*<strong[^>]*>([^<]+)/i)?.[1])
+        || (body.match(/Ray ID:\s*([a-z0-9]+)/i)?.[1]) || null;
+      return { rayId: ray };
+    };
+
     try {
-      const res = await fetch(sendUrl, { method: 'POST', headers, body: JSON.stringify(payload) });
+      const res = await fetchWithTimeout(sendUrl, { method: 'POST', headers, body: JSON.stringify(payload) }, timeoutMs);
       if (!res.ok) {
         const txt = await res.text().catch(() => '');
-        console.warn('WAHA sendText returned non-OK', { status: res.status, body: txt });
+        if (res.status === 524) {
+          const cf = parseCF524(txt);
+          console.warn('WAHA sendText timeout via Cloudflare (524)', { status: res.status, rayId: cf?.rayId || null });
+        } else {
+          console.warn('WAHA sendText returned non-OK', { status: res.status, body: txt });
+        }
       }
     } catch (e) {
-      console.warn('WAHA sendText fetch error:', e);
-      // Do not fail the whole function if WAHA responds but throws fetch errors (edge runtime quirks)
+      console.warn('WAHA sendText fetch error (timeout/abort or network):', String(e));
+      // Do not fail the whole function if WAHA fetch throws (edge runtime quirks)
     }
 
     // If message equals the default phrase for this job, create an announcement with a highlight directive
