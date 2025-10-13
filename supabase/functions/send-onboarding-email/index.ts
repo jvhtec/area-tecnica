@@ -255,7 +255,6 @@ serve(async (req) => {
       .accent { color: #00bcd4; font-weight: bold; }
       ul { padding-left: 20px; }
       li { margin-bottom: 6px; }
-      img { width: 100%; border-radius: 6px; margin: 10px 0; }
       .footer { font-size: 12px; color: #8fa3bf; margin-top: 20px; }
     </style>
   </head>
@@ -267,14 +266,20 @@ serve(async (req) => {
             <tr>
               <td style="padding:0 16px;">
                 <div class="container">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 12px 0;">
-        <a href="https://www.sector-pro.com" target="_blank" style="display:inline-block;text-decoration:none;">
-          <img src="${COMPANY_LOGO_URL}" alt="Sector Pro" style="display:block;height:28px;max-height:28px;width:auto;" />
-        </a>
-        <a href="https://sector-pro.work" target="_blank" style="display:inline-block;text-decoration:none;">
-          <img src="${AT_LOGO_URL}" alt="Área Técnica" style="display:block;height:28px;max-height:28px;width:auto;background:#ffffff;border-radius:4px;padding:2px;" />
-        </a>
-      </div>
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 12px 0;">
+        <tr>
+          <td align="left" style="padding:0;">
+            <a href="https://www.sector-pro.com" target="_blank" style="display:inline-block;text-decoration:none;">
+              <img src="${COMPANY_LOGO_URL}" alt="Sector Pro" width="160" style="display:block;border:0;max-width:160px;height:auto;" />
+            </a>
+          </td>
+          <td align="right" style="padding:0;">
+            <a href="https://sector-pro.work" target="_blank" style="display:inline-block;text-decoration:none;">
+              <img src="${AT_LOGO_URL}" alt="Área Técnica" width="120" style="display:block;border:0;max-width:120px;height:auto;background:#ffffff;border-radius:4px;padding:2px;" />
+            </a>
+          </td>
+        </tr>
+      </table>
       <h1>¡Bienvenido a Área&nbsp;Técnica!</h1>
       <p style="color:#dbeafe;">
         ¡Hola! Estamos encantados de tenerte a bordo como técnico en Sector&nbsp;Pro. Este correo incluye una guía rápida
@@ -304,7 +309,7 @@ serve(async (req) => {
           </li>
         </ul>
         <p style="color:#cfe1ff;">Así luce una tarjeta de asignación típica:</p>
-        <img src="${PUBLIC_LOGOS_BASE}/jobcard.png" alt="Tarjeta de asignación" />
+        <img src="${PUBLIC_LOGOS_BASE}/jobcard.png" alt="Tarjeta de asignación" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px 0;" />
       </div>
 
       <div class="card" style="background-color:#14263f;border-radius:8px;padding:15px;margin:20px 0;">
@@ -315,7 +320,7 @@ serve(async (req) => {
           restaurantes cercanos.
         </p>
         <p style="color:#cfe1ff;">Ejemplo de la ventana de detalles:</p>
-        <img src="${PUBLIC_LOGOS_BASE}/details.png" alt="Ventana de detalles" />
+        <img src="${PUBLIC_LOGOS_BASE}/details.png" alt="Ventana de detalles" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px 0;" />
       </div>
 
       <div class="card" style="background-color:#14263f;border-radius:8px;padding:15px;margin:20px 0;">
@@ -326,7 +331,7 @@ serve(async (req) => {
           lateral izquierda también encontrarás el enlace <strong>My Unavailability</strong> para gestionar tus ausencias.
         </p>
         <p style="color:#cfe1ff;">Vista simplificada de la gestión de disponibilidad:</p>
-        <img src="${PUBLIC_LOGOS_BASE}/availability.png" alt="Mi disponibilidad" />
+        <img src="${PUBLIC_LOGOS_BASE}/availability.png" alt="Mi disponibilidad" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px 0;" />
       </div>
 
       <div class="card" style="background-color:#14263f;border-radius:8px;padding:15px;margin:20px 0;">
@@ -337,7 +342,7 @@ serve(async (req) => {
           digitalmente para confirmar tu participación.
         </p>
         <p style="color:#cfe1ff;">Vista simplificada de la gestión de tiempos:</p>
-        <img src="${PUBLIC_LOGOS_BASE}/timesheet.png" alt="Gestión de tiempos" />
+        <img src="${PUBLIC_LOGOS_BASE}/timesheet.png" alt="Gestión de tiempos" width="560" style="display:block;width:100%;max-width:560px;height:auto;border-radius:6px;margin:10px 0;" />
       </div>
 
       <div class="card" style="background-color:#14263f;border-radius:8px;padding:15px;margin:20px 0;">
@@ -360,9 +365,9 @@ serve(async (req) => {
           <li style="margin-bottom:6px;">Confirma el nombre y pulsa <strong>Añadir</strong>.</li>
         </ol>
         <p style="color:#cfe1ff;">Referencias visuales:</p>
-        <img src="${PUBLIC_LOGOS_BASE}/menu.jpeg" alt="Abrir menú de Safari" />
-        <img src="${PUBLIC_LOGOS_BASE}/add.jpeg" alt="Opción Añadir a pantalla de inicio" />
-        <img src="${PUBLIC_LOGOS_BASE}/result.jpeg" alt="Icono instalado en iOS" />
+        <img src="${PUBLIC_LOGOS_BASE}/menu.jpeg" alt="Abrir menú de Safari" width="280" style="display:block;width:100%;max-width:280px;height:auto;border-radius:6px;margin:10px auto;" />
+        <img src="${PUBLIC_LOGOS_BASE}/add.jpeg" alt="Opción Añadir a pantalla de inicio" width="280" style="display:block;width:100%;max-width:280px;height:auto;border-radius:6px;margin:10px auto;" />
+        <img src="${PUBLIC_LOGOS_BASE}/result.jpeg" alt="Icono instalado en iOS" width="280" style="display:block;width:100%;max-width:280px;height:auto;border-radius:6px;margin:10px auto;" />
       </div>
 
       <p style="color:#dbeafe;">

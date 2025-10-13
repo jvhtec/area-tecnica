@@ -5,19 +5,53 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { useVacationRequests } from '@/hooks/useVacationRequests';
 import { format } from 'date-fns';
-import { History, CheckCircle, XCircle, Clock, Download } from 'lucide-react';
+import { History, CheckCircle, XCircle, Clock, Download, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { downloadVacationRequestPDF } from '@/utils/vacationRequestPdfExport';
 import type { VacationRequest } from '@/lib/vacation-requests';
+import { supabase } from '@/lib/supabase';
+import { useToast } from '@/hooks/use-toast';
 
 export const VacationRequestHistory = () => {
-  const { userRequests, isLoadingUserRequests } = useVacationRequests();
+  const { userRequests, departmentRequests, isLoadingUserRequests, isLoadingDepartmentRequests } = useVacationRequests();
+  const { toast } = useToast();
+  const [isManager, setIsManager] = React.useState(false);
+  const [sendingIds, setSendingIds] = React.useState<string[]>([]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      let role: string | null = (user?.app_metadata as any)?.role || (user?.user_metadata as any)?.role || null;
+      if (!role && user?.id) {
+        const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+        role = prof?.role ?? null;
+      }
+      if (!cancelled) setIsManager(role === 'admin' || role === 'management');
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleExportPDF = async (request: VacationRequest) => {
     try {
       await downloadVacationRequestPDF({ request });
     } catch (error) {
       console.error('Error exporting vacation request PDF:', error);
+    }
+  };
+
+  const handleResendEmail = async (request: VacationRequest) => {
+    try {
+      setSendingIds(prev => [...prev, request.id]);
+      const { error } = await supabase.functions.invoke('send-vacation-decision', {
+        body: { request_id: request.id }
+      });
+      if (error) throw error;
+      toast({ title: 'Email resent', description: 'Decision email has been resent with PDF attachment.' });
+    } catch (e: any) {
+      toast({ title: 'Failed to resend', description: e?.message || 'Error resending decision email.', variant: 'destructive' });
+    } finally {
+      setSendingIds(prev => prev.filter(id => id !== request.id));
     }
   };
 
@@ -34,11 +68,14 @@ export const VacationRequestHistory = () => {
     }
   };
 
-  if (isLoadingUserRequests) {
+  const rows = isManager ? departmentRequests : userRequests;
+  const isLoading = isManager ? isLoadingDepartmentRequests : isLoadingUserRequests;
+
+  if (isLoading) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-8">
-          <div className="text-muted-foreground">Loading your requests...</div>
+          <div className="text-muted-foreground">Loading requests...</div>
         </CardContent>
       </Card>
     );
@@ -53,27 +90,33 @@ export const VacationRequestHistory = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="px-3 sm:px-6">
-        {userRequests.length === 0 ? (
+        {rows.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            You haven't submitted any vacation requests yet.
+            {isManager ? 'No vacation requests found for your department.' : "You haven't submitted any vacation requests yet."}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Technician</TableHead>
                   <TableHead>Start Date</TableHead>
                   <TableHead>End Date</TableHead>
                   <TableHead>Reason</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Submitted</TableHead>
                   <TableHead>Response</TableHead>
-                  <TableHead className="w-[80px]">Actions</TableHead>
+                  <TableHead className="w-[120px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {userRequests.map(request => (
+                {rows.map(request => (
                   <TableRow key={request.id}>
+                    <TableCell>
+                      {request.technicians 
+                        ? ((`${request.technicians.first_name ?? ''} ${request.technicians.last_name ?? ''}`.trim()) || request.technicians.email || request.technician_id)
+                        : request.technician_id}
+                    </TableCell>
                     <TableCell>{format(new Date(request.start_date), 'MMM d, yyyy')}</TableCell>
                     <TableCell>{format(new Date(request.end_date), 'MMM d, yyyy')}</TableCell>
                     <TableCell className="max-w-[200px] truncate">{request.reason}</TableCell>
@@ -85,7 +128,7 @@ export const VacationRequestHistory = () => {
                         : '-'
                       }
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="space-x-1">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -95,6 +138,18 @@ export const VacationRequestHistory = () => {
                       >
                         <Download className="h-4 w-4" />
                       </Button>
+                      {isManager && request.status !== 'pending' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleResendEmail(request)}
+                          className="h-8 w-8 p-0"
+                          title="Resend decision email"
+                          disabled={sendingIds.includes(request.id)}
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

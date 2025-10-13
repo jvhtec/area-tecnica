@@ -13,7 +13,7 @@ export interface VacationRequest {
   approved_by?: string;
   approved_at?: string;
   rejection_reason?: string;
-  technicians?: { first_name: string; last_name: string; department: string };
+  technicians?: { first_name: string; last_name: string; department: string; email?: string };
 }
 
 export interface VacationRequestSubmission {
@@ -48,7 +48,10 @@ export const vacationRequestsApi = {
   async getUserRequests() {
     const { data, error } = await supabase
       .from('vacation_requests')
-      .select('*')
+      .select(`
+        *,
+        technicians:profiles!technician_id(first_name, last_name, department, email)
+      `)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -100,6 +103,17 @@ export const vacationRequestsApi = {
       .select();
 
     if (error) throw error;
+    // Fire-and-wait: send decision emails with PDF attachment
+    try {
+      const ids = (data ?? []).map((r: any) => r.id);
+      if (ids.length) {
+        await supabase.functions.invoke('send-vacation-decision', {
+          body: { request_ids: ids }
+        });
+      }
+    } catch (e) {
+      console.warn('Vacation decision email (approved) failed:', e);
+    }
     return data;
   },
 
@@ -120,6 +134,17 @@ export const vacationRequestsApi = {
       .select();
 
     if (error) throw error;
+    // Fire-and-wait: send decision emails with PDF attachment
+    try {
+      const ids = (data ?? []).map((r: any) => r.id);
+      if (ids.length) {
+        await supabase.functions.invoke('send-vacation-decision', {
+          body: { request_ids: ids }
+        });
+      }
+    } catch (e) {
+      console.warn('Vacation decision email (rejected) failed:', e);
+    }
     return data;
   }
 };

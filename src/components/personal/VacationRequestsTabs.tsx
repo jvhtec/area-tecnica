@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { supabase } from '@/lib/supabase';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useVacationRequests } from '@/hooks/useVacationRequests';
 import { format } from 'date-fns';
@@ -82,6 +84,113 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
+  };
+
+  // Inline component: Status badge with hover popover to show collisions
+  const StatusWithConflicts: React.FC<{ request: VacationRequest }> = ({ request }) => {
+    const [open, setOpen] = React.useState(false);
+    const [loading, setLoading] = React.useState(false);
+    const [collisions, setCollisions] = React.useState<any[] | null>(null);
+
+    const fetchCollisions = async () => {
+      if (!request?.technician_id || !request?.start_date || !request?.end_date) return;
+      setLoading(true);
+      try {
+        const startRange = new Date(`${request.start_date}T00:00:00`);
+        const endRange = new Date(`${request.end_date}T23:59:59.999`);
+        const { data, error } = await supabase
+          .from('job_assignments')
+          .select(`
+            jobs!inner (
+              id,
+              title,
+              start_time,
+              end_time,
+              locations(name)
+            )
+          `)
+          .eq('technician_id', request.technician_id)
+          .lte('jobs.start_time', endRange.toISOString())
+          .gte('jobs.end_time', startRange.toISOString());
+
+        if (error) throw error;
+        // Normalize joined shape
+        const rows = (data || []).map((row: any) => Array.isArray(row.jobs) ? row.jobs[0] : row.jobs).filter(Boolean);
+        setCollisions(rows);
+      } catch (e) {
+        console.error('Error checking collisions for request', request.id, e);
+        setCollisions([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const handleOpenChange = (next: boolean) => {
+      setOpen(next);
+      if (next && collisions === null) {
+        fetchCollisions();
+      }
+    };
+
+    // Prefetch collisions so badge can show a dot/count immediately
+    React.useEffect(() => {
+      // Only prefetch once
+      if (collisions === null) {
+        fetchCollisions();
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const conflictsCount = collisions?.length ?? 0;
+
+    return (
+      <HoverCard open={open} onOpenChange={handleOpenChange}>
+        <HoverCardTrigger asChild>
+          <div className="relative inline-flex cursor-default" title={conflictsCount > 0 ? `${conflictsCount} conflict(s)` : undefined}>
+            {getStatusBadge(request.status)}
+            {collisions && conflictsCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-[3px] rounded-full bg-red-600 text-white text-[10px] leading-[16px] text-center font-semibold shadow">
+                {conflictsCount}
+              </span>
+            )}
+          </div>
+        </HoverCardTrigger>
+        <HoverCardContent className="w-96" side="top" align="center">
+          <div className="space-y-2">
+            <div className="font-medium">Assignment collisions</div>
+            {loading && <div className="text-sm text-muted-foreground">Checking…</div>}
+            {!loading && collisions && collisions.length === 0 && (
+              <div className="text-sm text-green-700">No conflicts detected for this period.</div>
+            )}
+            {!loading && collisions && collisions.length > 0 && (
+              <div className="max-h-64 overflow-auto space-y-2">
+                {collisions.map((job: any) => {
+                  const start = new Date(job.start_time);
+                  const end = new Date(job.end_time);
+                  const locName = job.locations && Array.isArray(job.locations) && job.locations[0]?.name ? ` • ${job.locations[0].name}` : '';
+                  return (
+                    <div key={job.id} className="rounded-md border p-2">
+                      <div className="text-sm font-medium">
+                        <a className="text-blue-600 hover:underline" href={`/jobs/view/${job.id}`} target="_blank" rel="noopener noreferrer">
+                          {job.title || 'Job'}
+                        </a>
+                        {locName}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {format(start, 'PPpp')} – {format(end, 'PPpp')}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {!loading && collisions === null && (
+              <div className="text-sm text-muted-foreground">Hover to check conflicts.</div>
+            )}
+          </div>
+        </HoverCardContent>
+      </HoverCard>
+    );
   };
 
   const renderDepartmentRequests = () => {
@@ -171,7 +280,9 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
                         <TableCell>{format(new Date(request.end_date), 'MMM d, yyyy')}</TableCell>
                         <TableCell className="hidden lg:table-cell max-w-[200px] truncate">{request.reason}</TableCell>
                         <TableCell className="hidden md:table-cell">{format(new Date(request.created_at), 'MMM d, yyyy')}</TableCell>
-                        <TableCell>{getStatusBadge(request.status)}</TableCell>
+                        <TableCell>
+                          <StatusWithConflicts request={request as unknown as VacationRequest} />
+                        </TableCell>
                         <TableCell>
                           <Button
                             variant="ghost"

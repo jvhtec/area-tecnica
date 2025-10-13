@@ -11,7 +11,7 @@ import { format } from 'date-fns';
 interface VacationRequest {
   id: string;
   technician_id: string;
-  technicians: { name: string }; // Assuming a join to get technician name
+  technicians?: { first_name?: string; last_name?: string; email?: string; department?: string } | null;
   start_date: string;
   end_date: string;
   reason: string;
@@ -158,7 +158,7 @@ const VacationManagement = () => {
                           onCheckedChange={handleSelectAllRequests}
                         />
                       </TableHead>
-                      <TableHead>Technician</TableHead>
+                      <TableHead>Requester</TableHead>
                       <TableHead>Start Date</TableHead>
                       <TableHead>End Date</TableHead>
                       <TableHead>Reason</TableHead>
@@ -175,7 +175,16 @@ const VacationManagement = () => {
                             onCheckedChange={(isChecked: boolean) => handleSelectRequest(request.id, isChecked)}
                           />
                         </TableCell>
-                        <TableCell>{request.technicians?.name || 'N/A'}</TableCell>
+                        <TableCell>
+                          {(() => {
+                            const t = request.technicians || {};
+                            const fullName = [t.first_name, t.last_name].filter(Boolean).join(' ').trim();
+                            return fullName || t.email || request.technician_id;
+                          })()}
+                          {request.technicians?.department ? (
+                            <div className="text-xs text-muted-foreground">{request.technicians.department}</div>
+                          ) : null}
+                        </TableCell>
                         <TableCell>{format(new Date(request.start_date), 'MMM d, yyyy')}</TableCell>
                         <TableCell>{format(new Date(request.end_date), 'MMM d, yyyy')}</TableCell>
                         <TableCell className="max-w-[200px] truncate">{request.reason}</TableCell>

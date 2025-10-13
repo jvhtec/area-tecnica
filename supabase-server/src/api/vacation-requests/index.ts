@@ -27,7 +27,10 @@ export async function submitVacationRequest(supabase: SupabaseClient, request: {
 export async function getPendingVacationRequests(supabase: SupabaseClient) {
   const { data, error } = await supabase
     .from('vacation_requests')
-    .select('*, technicians(name)') // Select all fields from vacation_requests and the technician's name
+    .select(`
+      *,
+      technicians:profiles!technician_id(first_name,last_name,email,department)
+    `)
     .eq('status', 'pending')
     .order('created_at', { ascending: true });
 
@@ -42,14 +45,27 @@ export async function getPendingVacationRequests(supabase: SupabaseClient) {
 
 // Function to approve vacation requests in bulk
 export async function approveVacationRequests(supabase: SupabaseClient, requestIds: string[]) {
+  const { data: authData } = await supabase.auth.getUser();
+  const approverId = authData?.user?.id || null;
   const { data, error } = await supabase
     .from('vacation_requests')
-    .update({ status: 'approved' })
-    .in('id', requestIds);
+    .update({ status: 'approved', approved_by: approverId, approved_at: new Date().toISOString() })
+    .in('id', requestIds)
+    .select();
 
   if (error) {
     console.error('Error approving vacation requests:', error);
     return { data: null, error };
+  }
+
+  // Notify via Edge Function with PDF attachment
+  try {
+    const ids = Array.isArray(data) ? data.map((r: any) => r.id) : requestIds;
+    if (ids?.length) {
+      await supabase.functions.invoke('send-vacation-decision', { body: { request_ids: ids } });
+    }
+  } catch (e) {
+    console.warn('[approveVacationRequests] notify failed:', e);
   }
 
   console.log('Vacation requests approved successfully:', data);
@@ -58,14 +74,27 @@ export async function approveVacationRequests(supabase: SupabaseClient, requestI
 
 // Function to reject vacation requests in bulk (optional, but good to have)
 export async function rejectVacationRequests(supabase: SupabaseClient, requestIds: string[]) {
+  const { data: authData } = await supabase.auth.getUser();
+  const approverId = authData?.user?.id || null;
   const { data, error } = await supabase
     .from('vacation_requests')
-    .update({ status: 'rejected' })
-    .in('id', requestIds);
+    .update({ status: 'rejected', approved_by: approverId, approved_at: new Date().toISOString() })
+    .in('id', requestIds)
+    .select();
 
   if (error) {
     console.error('Error rejecting vacation requests:', error);
     return { data: null, error };
+  }
+
+  // Notify via Edge Function with PDF attachment
+  try {
+    const ids = Array.isArray(data) ? data.map((r: any) => r.id) : requestIds;
+    if (ids?.length) {
+      await supabase.functions.invoke('send-vacation-decision', { body: { request_ids: ids } });
+    }
+  } catch (e) {
+    console.warn('[rejectVacationRequests] notify failed:', e);
   }
 
   console.log('Vacation requests rejected successfully:', data);
