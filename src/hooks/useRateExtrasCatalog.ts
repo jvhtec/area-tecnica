@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { RATES_QUERY_KEYS } from '@/constants/ratesQueryKeys';
 
 export interface RateExtraRow {
   extra_type: 'travel_half' | 'travel_full' | 'day_off';
@@ -9,7 +10,7 @@ export interface RateExtraRow {
 
 export function useRateExtrasCatalog() {
   return useQuery({
-    queryKey: ['rate-extras-catalog'],
+    queryKey: RATES_QUERY_KEYS.extrasCatalog,
     queryFn: async (): Promise<RateExtraRow[]> => {
       const { data, error } = await supabase
         .from('rate_extras_2025')
@@ -35,7 +36,7 @@ export function useSaveRateExtra() {
       return data as RateExtraRow;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['rate-extras-catalog'] });
+      queryClient.invalidateQueries({ queryKey: RATES_QUERY_KEYS.extrasCatalog });
       toast.success('Extras catalog updated');
     },
     onError: (err: any) => {

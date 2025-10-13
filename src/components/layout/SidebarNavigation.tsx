@@ -17,7 +17,8 @@ import {
   FileText,
   Megaphone,
   Activity,
-  CalendarCheck
+  CalendarCheck,
+  Euro
 } from "lucide-react";
 import { TimesheetSidebarTrigger } from "@/components/timesheet/TimesheetSidebarTrigger";
 import { SidebarNavigationSkeleton } from './SidebarNavigationSkeleton';
@@ -141,6 +142,20 @@ export const SidebarNavigation = ({ userRole, userDepartment }: SidebarNavigatio
             >
               <Grid3X3 className="h-4 w-4" />
               <span>Assignment Matrix</span>
+            </Button>
+          </Link>
+        )}
+
+        {isManagementUser && (
+          <Link to="/management/rates">
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-2 ${
+                location.pathname === "/management/rates" ? "bg-accent" : ""
+              }`}
+            >
+              <Euro className="h-4 w-4" />
+              <span>Rates &amp; Extras</span>
             </Button>
           </Link>
         )}

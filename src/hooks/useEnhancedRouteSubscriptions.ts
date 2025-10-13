@@ -62,9 +62,17 @@ export const ROUTE_SUBSCRIPTIONS: Record<string, Array<{
     { table: 'tour_dates', priority: 'medium' }
   ],
   '/project-management': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_assignments', priority: 'medium' }, 
+    { table: 'jobs', priority: 'high' },
+    { table: 'job_assignments', priority: 'medium' },
     { table: 'job_departments', priority: 'medium' }
+  ],
+  '/management/rates': [
+    { table: 'rate_cards_tour_2025', priority: 'high' },
+    { table: 'rate_extras_2025', priority: 'high' },
+    { table: 'house_tech_rates', priority: 'high' },
+    { table: 'tours', priority: 'medium' },
+    { table: 'jobs', priority: 'medium' },
+    { table: 'job_assignments', priority: 'medium' }
   ],
   
   // Festival specific routes
