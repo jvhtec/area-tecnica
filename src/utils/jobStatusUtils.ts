@@ -1,4 +1,6 @@
 import { supabase } from "@/lib/supabase";
+import { addDays, startOfDay } from "date-fns";
+import { fromJobTimezone, toJobTimezone } from "@/utils/timezoneUtils";
 
 export type JobStatus = "Tentativa" | "Confirmado" | "Completado" | "Cancelado";
 
@@ -6,15 +8,23 @@ export type JobStatus = "Tentativa" | "Confirmado" | "Completado" | "Cancelado";
  * Checks if a job should be automatically completed based on its end date
  */
 export const shouldAutoComplete = (job: any): boolean => {
-  if (!job.end_time || job.status === "Cancelado" || job.status === "Completado") {
+  if (!job?.end_time || job.status === "Cancelado" || job.status === "Completado") {
     return false;
   }
-  
+
   const end = new Date(job.end_time);
+  if (Number.isNaN(end.getTime())) {
+    return false;
+  }
+
+  const timezone = job.timezone || "Europe/Madrid";
   const now = new Date();
-  // Only auto-complete starting the day AFTER the job ends (D+1 at 00:00 local time)
-  const nextDayStart = new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1, 0, 0, 0, 0);
-  return now >= nextDayStart;
+  // Only auto-complete starting the day AFTER the job ends (D+1 at 00:00 job local time)
+  const endLocal = toJobTimezone(end, timezone);
+  const nextDayStartLocal = startOfDay(addDays(endLocal, 1));
+  const nextDayStartUTC = fromJobTimezone(nextDayStartLocal, timezone);
+
+  return now >= nextDayStartUTC;
 };
 
 /**
