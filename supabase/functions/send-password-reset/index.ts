@@ -18,7 +18,10 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const { email }: PasswordResetRequest = await req.json();
 
-    if (!email) {
+    // Sanitize and validate basic shape
+    const normalizedEmail = (email || '').trim().toLowerCase();
+
+    if (!normalizedEmail) {
       return new Response(
         JSON.stringify({ error: "Email is required" }),
         { 
@@ -28,7 +31,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`[Password Reset] Processing request for: ${email}`);
+    console.log(`[Password Reset] Processing request for: ${normalizedEmail}`);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -36,44 +39,6 @@ const handler = async (req: Request): Promise<Response> => {
     const brevoFrom = Deno.env.get('BREVO_FROM')!;
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // List users and find by email (works for small-medium user bases)
-    const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
-
-    if (listError) {
-      console.error("[Password Reset] Error listing users:", listError);
-      // Don't reveal error - return success
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: "If an account with that email exists, a password reset link has been sent." 
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
-    }
-
-    // Find user by email
-    const user = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
-
-    if (!user) {
-      console.log(`[Password Reset] User not found for: ${email}`);
-      // Don't reveal user doesn't exist - return success
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: "If an account with that email exists, a password reset link has been sent." 
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
-    }
-
-    console.log(`[Password Reset] User found: ${email}`);
 
     // Generate recovery link using admin API
     // Get origin from request headers for dynamic URL detection
@@ -83,7 +48,7 @@ const handler = async (req: Request): Promise<Response> => {
     
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
       type: 'recovery',
-      email: email.toLowerCase(),
+      email: normalizedEmail,
       options: {
         redirectTo: redirectUrl
       }
@@ -100,10 +65,10 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Invalid recovery link generated");
     }
 
-    console.log(`[Password Reset] Generated recovery link for: ${email}`);
+    console.log(`[Password Reset] Generated recovery link for: ${normalizedEmail}`);
 
-    // Get user name for personalization
-    const userName = user.user_metadata?.first_name || user.email?.split('@')[0] || 'User';
+    // Basic personalization without metadata lookup
+    const userName = normalizedEmail.split('@')[0] || 'User';
 
     // Create email HTML template
     const htmlContent = `
@@ -193,7 +158,7 @@ const handler = async (req: Request): Promise<Response> => {
           email: brevoFrom,
           name: "Sistema de Gestión"
         },
-        to: [{ email: email.toLowerCase() }],
+        to: [{ email: normalizedEmail }],
         subject: 'Restablece tu contraseña',
         htmlContent: htmlContent
       })
@@ -205,7 +170,7 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error(`Brevo API failed: ${brevoResponse.status}`);
     }
 
-    console.log(`[Password Reset] Email sent successfully to: ${email}`);
+    console.log(`[Password Reset] Email sent successfully to: ${normalizedEmail}`);
 
     return new Response(
       JSON.stringify({ 

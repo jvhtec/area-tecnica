@@ -24,7 +24,7 @@ const videoComponentDatabase = [
 ];
 
 const SQRT3 = Math.sqrt(3);
-const PDU_TYPES_THREE = ['CEE16A 3P+N+G', 'CEE32A 3P+N+G', 'CEE63A 3P+N+G', 'CEE125A 3P+N+G'];
+const PDU_TYPES_THREE = ['CEE16A 3P+N+G', 'CEE32A 3P+N+G', 'CEE63A 3P+N+G', 'CEE125A 3P+N+G', 'Powerlock 400A 3P+N+G'];
 const PDU_TYPES_SINGLE = ['Schuko 16A', 'CEE32A 1P+N+G', 'CEE63A 1P+N+G'];
 
 interface TableRow {
@@ -238,7 +238,8 @@ const VideoConsumosTool: React.FC = () => {
     if (currentLine <= planningLimit(16)) return PDU_TYPES_THREE[0];
     if (currentLine <= planningLimit(32)) return PDU_TYPES_THREE[1];
     if (currentLine <= planningLimit(63)) return PDU_TYPES_THREE[2];
-    return PDU_TYPES_THREE[3];
+    if (currentLine <= planningLimit(125)) return PDU_TYPES_THREE[3];
+    return PDU_TYPES_THREE[4];
   };
 
   const savePowerRequirementTable = async (table: Table) => {

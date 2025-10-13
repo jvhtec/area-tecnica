@@ -274,13 +274,7 @@ export const exportToPDF = (
         }
       });
 
-      // Global FOH schuko note for power reports
-      if (type === 'power' && fohSchukoRequired) {
-        const need = 12; checkPageBreak(need);
-        doc.setFontSize(10); doc.setTextColor(80, 80, 80); doc.setFont(undefined, 'italic');
-        doc.text('Se requiere potencia de 16A en formato schuko hembra en posicion FoH', 14, yPosition);
-        yPosition += 10; doc.setFont(undefined, 'normal');
-      }
+      // (FOH schuko note intentionally only on summary page)
 
       // Summary data
       let generatedSummaryRows: SummaryRow[] = [];
@@ -354,6 +348,14 @@ export const exportToPDF = (
           doc.setTextColor(125, 1, 1);
           doc.text("Resumen", 14, yPosition);
           yPosition += 10;
+
+          // FOH Schuko global note also on summary page
+          if (fohSchukoRequired) {
+            checkPageBreak(12);
+            doc.setFontSize(10); doc.setTextColor(80, 80, 80); doc.setFont(undefined, 'italic');
+            doc.text('Se requiere potencia de 16A en formato schuko hembra en posicion FoH', 14, yPosition);
+            yPosition += 10; doc.setFont(undefined, 'normal');
+          }
 
           tables.forEach((table) => {
             checkPageBreak(30);
